@@ -1,0 +1,41 @@
+import type { Timestamps } from "./common";
+
+export type ChecklistPhase = "collected" | "uploaded" | "live";
+
+export type OnboardingChecklistItem = Timestamps & {
+  id: string;
+  projectId: string;
+  section: string;
+  label: string;
+  collected: boolean;
+  uploaded: boolean;
+  live: boolean;
+  remarks: string;
+};
+
+export type UploadType = "unit" | "customer" | "booking" | "payment";
+
+export type UnitUpload = Timestamps & {
+  id: string;
+  projectId: string;
+  type: UploadType;
+  fileName: string;
+  recordCount: number;
+  uploadedAt: string;
+};
+
+export type CustomerRecord = Timestamps & {
+  id: string;
+  projectId: string;
+  name: string;
+  unit: string;
+  phone: string;
+};
+
+export type PaymentRecord = Timestamps & {
+  id: string;
+  projectId: string;
+  customerName: string;
+  amount: number;
+  status: "pending" | "received" | "overdue";
+};

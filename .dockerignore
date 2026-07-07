@@ -1,0 +1,15 @@
+node_modules
+.output
+.nitro
+.tanstack
+.vinxi
+dist
+dist-ssr
+.git
+.gitignore
+*.log
+.env
+.env.*
+.DS_Store
+.vscode
+.idea
