@@ -48,7 +48,7 @@ function Training() {
                 <td className="px-4 py-3 text-muted-foreground">{s.date}</td>
                 <td className="px-4 py-3">{s.attendance}</td>
                 <td className="px-4 py-3">
-                  {s.recording !== "—" ? <a href={s.recording} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-accent-foreground hover:underline"><Video className="h-3.5 w-3.5" /> View</a> : "—"}
+                  {s.recording !== "—" ? <a href={s.recording} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline"><Video className="h-3.5 w-3.5" /> View</a> : "—"}
                 </td>
                 <td className="px-4 py-3"><Pill tone={s.status === "Completed" ? "success" : "warning"}>{s.status}</Pill></td>
                 <td className="px-4 py-3 text-right">

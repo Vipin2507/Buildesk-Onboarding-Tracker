@@ -146,7 +146,7 @@ function SortableStage({ id, index }: { id: string; index: number }) {
   return (
     <div ref={setNodeRef} style={style} className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-sm">
       <GripVertical className="h-4 w-4 cursor-grab text-muted-foreground" {...attributes} {...listeners} />
-      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[10px] font-semibold text-white">{index + 1}</span>
+      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-white">{index + 1}</span>
       {id}
     </div>
   );

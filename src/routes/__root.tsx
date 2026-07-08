@@ -16,6 +16,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { StoreHydrationGate } from "@/components/store-hydration-gate";
 import { AuthGate } from "@/components/auth-gate";
 import { useRouterState } from "@tanstack/react-router";
+import { RouterDebug } from "@/components/router-debug";
 
 function NotFoundComponent() {
   return (
@@ -64,7 +65,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           </button>
           <a
             href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-primary"
           >
             Go home
           </a>
@@ -136,6 +137,7 @@ function RootComponent() {
               </div>
             </div>
           )}
+          <RouterDebug />
           <Toaster position="top-right" richColors />
         </AuthGate>
       </StoreHydrationGate>

@@ -1,14 +1,17 @@
 import { useMemo } from "react";
-import { MODULES } from "@/data/constants";
+import { MODULE_CATALOG, normalizeCompanyModules } from "@/data/module-catalog";
+import type { ModuleKey } from "@/types";
+import { calcPostSalesProjectProgress } from "@/lib/post-sales-status";
 import { useActivityStore } from "./useActivityStore";
 import { useCompanyStore } from "./useCompanyStore";
 import { useOnboardingStore } from "./useOnboardingStore";
 import { useProjectStore } from "./useProjectStore";
+import { usePostSalesStore } from "./usePostSalesStore";
 import { useTicketStore } from "./useTicketStore";
 import { useEmployeeStore } from "./useEmployeeStore";
 import { getDaysUntilExpiry, getRenewalUrgency } from "./useRenewalStore";
 
-function calcProjectProgress(
+function calcOnboardingProjectProgress(
   projectId: string,
   checklistItems: ReturnType<typeof useOnboardingStore.getState>["checklistItems"],
 ) {
@@ -19,16 +22,84 @@ function calcProjectProgress(
   return Math.round((done / total) * 100);
 }
 
+export function getModuleProgressPercent(
+  companyId: string,
+  moduleKey: ModuleKey,
+  postSalesProjects: ReturnType<typeof usePostSalesStore.getState>["projects"],
+): number {
+  if (moduleKey === "post-sales") {
+    const projects = postSalesProjects.filter((p) => p.companyId === companyId);
+    if (projects.length === 0) return 0;
+    const total = projects.reduce((sum, p) => sum + calcPostSalesProjectProgress(p), 0);
+    return Math.round(total / projects.length);
+  }
+  // Stub modules: no project store yet — 0 until wired
+  return 0;
+}
+
+export function getCompanyOverallProgress(
+  companyId: string,
+  modules: { moduleKey: ModuleKey; optedIn: boolean }[],
+  postSalesProjects: ReturnType<typeof usePostSalesStore.getState>["projects"],
+): number {
+  const opted = modules.filter((m) => m.optedIn);
+  if (opted.length === 0) return 0;
+  const total = opted.reduce(
+    (sum, m) => sum + getModuleProgressPercent(companyId, m.moduleKey, postSalesProjects),
+    0,
+  );
+  return Math.round(total / opted.length);
+}
+
 export function useCompanyProgress(companyId: string) {
-  const projects = useProjectStore((s) => s.projects);
-  const checklistItems = useOnboardingStore((s) => s.checklistItems);
+  const company = useCompanyStore((s) => s.companies.find((c) => c.id === companyId));
+  const postSalesProjects = usePostSalesStore((s) => s.projects);
 
   return useMemo(() => {
-    const companyProjects = projects.filter((p) => p.companyId === companyId);
-    if (companyProjects.length === 0) return 0;
-    const total = companyProjects.reduce((sum, p) => sum + calcProjectProgress(p.id, checklistItems), 0);
-    return Math.round(total / companyProjects.length);
-  }, [projects, checklistItems, companyId]);
+    if (!company) return 0;
+    const modules = normalizeCompanyModules((company as any).modules);
+    return getCompanyOverallProgress(companyId, modules, postSalesProjects);
+  }, [company, companyId, postSalesProjects]);
+}
+
+export function useModuleProgress(companyId: string, moduleKey: ModuleKey) {
+  const postSalesProjects = usePostSalesStore((s) => s.projects);
+  return useMemo(
+    () => getModuleProgressPercent(companyId, moduleKey, postSalesProjects),
+    [companyId, moduleKey, postSalesProjects],
+  );
+}
+
+export function useCompanyModulesWithProgress(companyId: string) {
+  const company = useCompanyStore((s) => s.companies.find((c) => c.id === companyId));
+  const postSalesProjects = usePostSalesStore((s) => s.projects);
+
+  return useMemo(() => {
+    if (!company) return [];
+    const modules = normalizeCompanyModules((company as any).modules);
+    return modules.map((m) => ({
+      ...m,
+      progressPercent: m.optedIn
+        ? getModuleProgressPercent(companyId, m.moduleKey, postSalesProjects)
+        : 0,
+    }));
+  }, [company, companyId, postSalesProjects]);
+}
+
+export function usePostSalesProjectsForCompany(companyId: string) {
+  const projects = usePostSalesStore((s) => s.projects);
+  return useMemo(
+    () =>
+      projects
+        .filter((p) => p.companyId === companyId)
+        .map((p) => ({
+          ...p,
+          progress: calcPostSalesProjectProgress(p),
+          stepsDone: p.steps.filter((s) => s.approvalStatus === "approved").length,
+        }))
+        .sort((a, b) => a.projectNumber.localeCompare(b.projectNumber)),
+    [projects, companyId],
+  );
 }
 
 export function useCompanyWithComputed(companyId: string) {
@@ -49,19 +120,12 @@ export function useCompanyWithComputed(companyId: string) {
 export function useDashboardKpis() {
   const companies = useCompanyStore((s) => s.companies);
   const tickets = useTicketStore((s) => s.tickets);
-  const projects = useProjectStore((s) => s.projects);
-  const checklistItems = useOnboardingStore((s) => s.checklistItems);
+  const postSalesProjects = usePostSalesStore((s) => s.projects);
 
   return useMemo(() => {
     const companiesWithProgress = companies.map((c) => {
-      const companyProjects = projects.filter((p) => p.companyId === c.id);
-      const progress =
-        companyProjects.length > 0
-          ? Math.round(
-              companyProjects.reduce((sum, p) => sum + calcProjectProgress(p.id, checklistItems), 0) /
-                companyProjects.length,
-            )
-          : 0;
+      const modules = normalizeCompanyModules((c as any).modules);
+      const progress = getCompanyOverallProgress(c.id, modules, postSalesProjects);
       const computedStatus =
         progress >= 100 ? ("completed" as const) : progress > 0 ? ("in_progress" as const) : c.status;
       return { ...c, progress, computedStatus };
@@ -82,7 +146,7 @@ export function useDashboardKpis() {
       upcomingRenewals,
       companiesWithProgress,
     };
-  }, [companies, tickets, projects, checklistItems]);
+  }, [companies, tickets, postSalesProjects]);
 }
 
 export function useModuleAdoption() {
@@ -90,9 +154,9 @@ export function useModuleAdoption() {
 
   return useMemo(
     () =>
-      MODULES.map((mod) => ({
-        name: mod.replace(" Management", "").replace(" (General)", ""),
-        opted: companies.filter((c) => c.modules.includes(mod)).length,
+      MODULE_CATALOG.map((mod) => ({
+        name: mod.label,
+        opted: companies.filter((c) => c.modules.some((m) => m.moduleKey === mod.key && m.optedIn)).length,
       })),
     [companies],
   );
@@ -144,7 +208,7 @@ export function useProjectWithProgress(projectId: string) {
 
   return useMemo(() => {
     if (!project) return undefined;
-    const progress = calcProjectProgress(projectId, checklistItems);
+    const progress = calcOnboardingProjectProgress(projectId, checklistItems);
     const company = companies.find((c) => c.id === project.companyId);
     return { ...project, progress, companyName: company?.name ?? "" };
   }, [project, checklistItems, companies, projectId]);
@@ -171,4 +235,4 @@ export function useGlobalSearch(query: string) {
   }, [q, companies, projects, employees]);
 }
 
-export { calcProjectProgress };
+export { calcOnboardingProjectProgress as calcProjectProgress };

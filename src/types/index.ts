@@ -1,5 +1,6 @@
 export * from "./common";
 export * from "./company";
+export * from "./module";
 export * from "./project";
 export * from "./onboarding";
 export * from "./vendor";
@@ -10,3 +11,6 @@ export * from "./employee";
 export * from "./user";
 export * from "./document";
 export * from "./integration";
+export * from "./notes";
+export * from "./master";
+export * from "./settings";

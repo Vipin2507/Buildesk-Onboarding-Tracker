@@ -50,7 +50,7 @@ function CustomerApp() {
         ))}
       </div>
       <div className="card-soft mt-4 flex items-center gap-4 p-5">
-        <Smartphone className="h-10 w-10 text-accent" />
+        <Smartphone className="h-10 w-10 text-primary" />
         <div>
           <div className="font-medium">Publish status: <Pill tone={config.publishStatus === "published" ? "success" : "warning"}>{config.publishStatus}</Pill></div>
           <Button className="mt-2" size="sm" onClick={() => { updateConfig(projectId, { publishStatus: "published" }); toast.success("App published"); }}>Mark Published</Button>

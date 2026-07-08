@@ -49,7 +49,7 @@ function OnboardingList() {
                     <td className="px-4 py-3">{employees.find((e) => e.id === c.onboardingManagerId)?.name ?? "—"}</td>
                   <td className="px-4 py-3 text-right">
                     {p && (
-                      <Button size="sm" variant="ghost" className="gap-1 text-accent-foreground" asChild>
+                      <Button size="sm" variant="ghost" className="gap-1 text-primary" asChild>
                         <Link to="/projects/$projectId" params={{ projectId: p.id }} search={{ tab: "onboarding" }}>
                           Continue <ArrowRight className="h-3.5 w-3.5" />
                         </Link>

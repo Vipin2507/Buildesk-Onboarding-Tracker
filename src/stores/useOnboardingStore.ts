@@ -20,7 +20,10 @@ import {
 import { buildChecklistForProject } from "@/data/seed";
 import { CHECKLIST_TEMPLATE } from "@/data/constants";
 import { logActivity } from "./useActivityStore";
+import { recordAttachment } from "./useNotesAttachmentsStore";
 import { createPersistedStore, touch } from "./persist";
+import { useProjectStore } from "./useProjectStore";
+import { ATTACHMENT_CATEGORY_LABEL } from "@/types";
 
 type OnboardingState = {
   checklistItems: OnboardingChecklistItem[];
@@ -219,6 +222,23 @@ export const useOnboardingStore = createPersistedStore<OnboardingState>("onboard
       projectId,
       companyId,
     });
+
+    const resolvedCompanyId =
+      companyId ?? useProjectStore.getState().projects.find((p) => p.id === projectId)?.companyId;
+    if (resolvedCompanyId) {
+      const projectName = useProjectStore.getState().projects.find((p) => p.id === projectId)?.name;
+      recordAttachment({
+        companyId: resolvedCompanyId,
+        projectId,
+        fileName,
+        purpose: ATTACHMENT_CATEGORY_LABEL[type],
+        category: type,
+        context: projectName ? `Data migration · ${projectName}` : "Data migration",
+        recordCount,
+        uploadedBy: "You",
+        uploadedAt: now,
+      });
+    }
   },
 
   removeUpload: (id) => {

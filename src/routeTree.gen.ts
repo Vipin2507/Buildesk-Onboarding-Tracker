@@ -18,6 +18,7 @@ import { Route as RenewalsRouteImport } from './routes/renewals'
 import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as ModulesRouteImport } from './routes/modules'
+import { Route as MasterRouteImport } from './routes/master'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LaborRouteImport } from './routes/labor'
 import { Route as IntegrationsRouteImport } from './routes/integrations'
@@ -30,6 +31,8 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SupportTicketIdRouteImport } from './routes/support.$ticketId'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects.$projectId'
 import { Route as CompaniesCompanyIdRouteImport } from './routes/companies.$companyId'
+import { Route as CompaniesCompanyIdModulesModuleKeyRouteImport } from './routes/companies.$companyId.modules.$moduleKey'
+import { Route as CompaniesCompanyIdModulesPostSalesProjectsProjectIdRouteImport } from './routes/companies.$companyId.modules.post-sales.projects.$projectId'
 
 const VendorsRoute = VendorsRouteImport.update({
   id: '/vendors',
@@ -74,6 +77,11 @@ const OnboardingRoute = OnboardingRouteImport.update({
 const ModulesRoute = ModulesRouteImport.update({
   id: '/modules',
   path: '/modules',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MasterRoute = MasterRouteImport.update({
+  id: '/master',
+  path: '/master',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -136,6 +144,18 @@ const CompaniesCompanyIdRoute = CompaniesCompanyIdRouteImport.update({
   path: '/$companyId',
   getParentRoute: () => CompaniesRoute,
 } as any)
+const CompaniesCompanyIdModulesModuleKeyRoute =
+  CompaniesCompanyIdModulesModuleKeyRouteImport.update({
+    id: '/modules/$moduleKey',
+    path: '/modules/$moduleKey',
+    getParentRoute: () => CompaniesCompanyIdRoute,
+  } as any)
+const CompaniesCompanyIdModulesPostSalesProjectsProjectIdRoute =
+  CompaniesCompanyIdModulesPostSalesProjectsProjectIdRouteImport.update({
+    id: '/modules/post-sales/projects/$projectId',
+    path: '/modules/post-sales/projects/$projectId',
+    getParentRoute: () => CompaniesCompanyIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -147,6 +167,7 @@ export interface FileRoutesByFullPath {
   '/integrations': typeof IntegrationsRoute
   '/labor': typeof LaborRoute
   '/login': typeof LoginRoute
+  '/master': typeof MasterRoute
   '/modules': typeof ModulesRoute
   '/onboarding': typeof OnboardingRoute
   '/projects': typeof ProjectsRouteWithChildren
@@ -156,9 +177,11 @@ export interface FileRoutesByFullPath {
   '/support': typeof SupportRouteWithChildren
   '/training': typeof TrainingRoute
   '/vendors': typeof VendorsRoute
-  '/companies/$companyId': typeof CompaniesCompanyIdRoute
+  '/companies/$companyId': typeof CompaniesCompanyIdRouteWithChildren
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/support/$ticketId': typeof SupportTicketIdRoute
+  '/companies/$companyId/modules/$moduleKey': typeof CompaniesCompanyIdModulesModuleKeyRoute
+  '/companies/$companyId/modules/post-sales/projects/$projectId': typeof CompaniesCompanyIdModulesPostSalesProjectsProjectIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -170,6 +193,7 @@ export interface FileRoutesByTo {
   '/integrations': typeof IntegrationsRoute
   '/labor': typeof LaborRoute
   '/login': typeof LoginRoute
+  '/master': typeof MasterRoute
   '/modules': typeof ModulesRoute
   '/onboarding': typeof OnboardingRoute
   '/projects': typeof ProjectsRouteWithChildren
@@ -179,9 +203,11 @@ export interface FileRoutesByTo {
   '/support': typeof SupportRouteWithChildren
   '/training': typeof TrainingRoute
   '/vendors': typeof VendorsRoute
-  '/companies/$companyId': typeof CompaniesCompanyIdRoute
+  '/companies/$companyId': typeof CompaniesCompanyIdRouteWithChildren
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/support/$ticketId': typeof SupportTicketIdRoute
+  '/companies/$companyId/modules/$moduleKey': typeof CompaniesCompanyIdModulesModuleKeyRoute
+  '/companies/$companyId/modules/post-sales/projects/$projectId': typeof CompaniesCompanyIdModulesPostSalesProjectsProjectIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -194,6 +220,7 @@ export interface FileRoutesById {
   '/integrations': typeof IntegrationsRoute
   '/labor': typeof LaborRoute
   '/login': typeof LoginRoute
+  '/master': typeof MasterRoute
   '/modules': typeof ModulesRoute
   '/onboarding': typeof OnboardingRoute
   '/projects': typeof ProjectsRouteWithChildren
@@ -203,9 +230,11 @@ export interface FileRoutesById {
   '/support': typeof SupportRouteWithChildren
   '/training': typeof TrainingRoute
   '/vendors': typeof VendorsRoute
-  '/companies/$companyId': typeof CompaniesCompanyIdRoute
+  '/companies/$companyId': typeof CompaniesCompanyIdRouteWithChildren
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/support/$ticketId': typeof SupportTicketIdRoute
+  '/companies/$companyId/modules/$moduleKey': typeof CompaniesCompanyIdModulesModuleKeyRoute
+  '/companies/$companyId/modules/post-sales/projects/$projectId': typeof CompaniesCompanyIdModulesPostSalesProjectsProjectIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -219,6 +248,7 @@ export interface FileRouteTypes {
     | '/integrations'
     | '/labor'
     | '/login'
+    | '/master'
     | '/modules'
     | '/onboarding'
     | '/projects'
@@ -231,6 +261,8 @@ export interface FileRouteTypes {
     | '/companies/$companyId'
     | '/projects/$projectId'
     | '/support/$ticketId'
+    | '/companies/$companyId/modules/$moduleKey'
+    | '/companies/$companyId/modules/post-sales/projects/$projectId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -242,6 +274,7 @@ export interface FileRouteTypes {
     | '/integrations'
     | '/labor'
     | '/login'
+    | '/master'
     | '/modules'
     | '/onboarding'
     | '/projects'
@@ -254,6 +287,8 @@ export interface FileRouteTypes {
     | '/companies/$companyId'
     | '/projects/$projectId'
     | '/support/$ticketId'
+    | '/companies/$companyId/modules/$moduleKey'
+    | '/companies/$companyId/modules/post-sales/projects/$projectId'
   id:
     | '__root__'
     | '/'
@@ -265,6 +300,7 @@ export interface FileRouteTypes {
     | '/integrations'
     | '/labor'
     | '/login'
+    | '/master'
     | '/modules'
     | '/onboarding'
     | '/projects'
@@ -277,6 +313,8 @@ export interface FileRouteTypes {
     | '/companies/$companyId'
     | '/projects/$projectId'
     | '/support/$ticketId'
+    | '/companies/$companyId/modules/$moduleKey'
+    | '/companies/$companyId/modules/post-sales/projects/$projectId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -289,6 +327,7 @@ export interface RootRouteChildren {
   IntegrationsRoute: typeof IntegrationsRoute
   LaborRoute: typeof LaborRoute
   LoginRoute: typeof LoginRoute
+  MasterRoute: typeof MasterRoute
   ModulesRoute: typeof ModulesRoute
   OnboardingRoute: typeof OnboardingRoute
   ProjectsRoute: typeof ProjectsRouteWithChildren
@@ -363,6 +402,13 @@ declare module '@tanstack/react-router' {
       path: '/modules'
       fullPath: '/modules'
       preLoaderRoute: typeof ModulesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/master': {
+      id: '/master'
+      path: '/master'
+      fullPath: '/master'
+      preLoaderRoute: typeof MasterRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -449,15 +495,44 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CompaniesCompanyIdRouteImport
       parentRoute: typeof CompaniesRoute
     }
+    '/companies/$companyId/modules/$moduleKey': {
+      id: '/companies/$companyId/modules/$moduleKey'
+      path: '/modules/$moduleKey'
+      fullPath: '/companies/$companyId/modules/$moduleKey'
+      preLoaderRoute: typeof CompaniesCompanyIdModulesModuleKeyRouteImport
+      parentRoute: typeof CompaniesCompanyIdRoute
+    }
+    '/companies/$companyId/modules/post-sales/projects/$projectId': {
+      id: '/companies/$companyId/modules/post-sales/projects/$projectId'
+      path: '/modules/post-sales/projects/$projectId'
+      fullPath: '/companies/$companyId/modules/post-sales/projects/$projectId'
+      preLoaderRoute: typeof CompaniesCompanyIdModulesPostSalesProjectsProjectIdRouteImport
+      parentRoute: typeof CompaniesCompanyIdRoute
+    }
   }
 }
 
+interface CompaniesCompanyIdRouteChildren {
+  CompaniesCompanyIdModulesModuleKeyRoute: typeof CompaniesCompanyIdModulesModuleKeyRoute
+  CompaniesCompanyIdModulesPostSalesProjectsProjectIdRoute: typeof CompaniesCompanyIdModulesPostSalesProjectsProjectIdRoute
+}
+
+const CompaniesCompanyIdRouteChildren: CompaniesCompanyIdRouteChildren = {
+  CompaniesCompanyIdModulesModuleKeyRoute:
+    CompaniesCompanyIdModulesModuleKeyRoute,
+  CompaniesCompanyIdModulesPostSalesProjectsProjectIdRoute:
+    CompaniesCompanyIdModulesPostSalesProjectsProjectIdRoute,
+}
+
+const CompaniesCompanyIdRouteWithChildren =
+  CompaniesCompanyIdRoute._addFileChildren(CompaniesCompanyIdRouteChildren)
+
 interface CompaniesRouteChildren {
-  CompaniesCompanyIdRoute: typeof CompaniesCompanyIdRoute
+  CompaniesCompanyIdRoute: typeof CompaniesCompanyIdRouteWithChildren
 }
 
 const CompaniesRouteChildren: CompaniesRouteChildren = {
-  CompaniesCompanyIdRoute: CompaniesCompanyIdRoute,
+  CompaniesCompanyIdRoute: CompaniesCompanyIdRouteWithChildren,
 }
 
 const CompaniesRouteWithChildren = CompaniesRoute._addFileChildren(
@@ -497,6 +572,7 @@ const rootRouteChildren: RootRouteChildren = {
   IntegrationsRoute: IntegrationsRoute,
   LaborRoute: LaborRoute,
   LoginRoute: LoginRoute,
+  MasterRoute: MasterRoute,
   ModulesRoute: ModulesRoute,
   OnboardingRoute: OnboardingRoute,
   ProjectsRoute: ProjectsRouteWithChildren,

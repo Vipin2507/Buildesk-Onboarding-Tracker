@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useChildMatches } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   DndContext,
@@ -43,6 +43,13 @@ const ticketSchema = z.object({
 });
 
 function Support() {
+  const childMatches = useChildMatches();
+  if (childMatches.length > 0) return <Outlet />;
+
+  return <SupportListPage />;
+}
+
+function SupportListPage() {
   const tickets = useTicketStore((s) => s.tickets);
   const addTicket = useTicketStore((s) => s.addTicket);
   const updateTicket = useTicketStore((s) => s.updateTicket);
@@ -209,7 +216,7 @@ function Support() {
 function KanbanColumn({ title, tickets }: { title: string; tickets: Array<Ticket & { developer: string }> }) {
   const { setNodeRef, isOver } = useDroppable({ id: title });
   return (
-    <div ref={setNodeRef} className={cn("w-[260px] shrink-0 rounded-xl p-1", isOver && "bg-accent/10")}>
+    <div ref={setNodeRef} className={cn("w-[260px] shrink-0 rounded-xl p-1", isOver && "bg-primary/10")}>
       <div className="mb-2 flex items-center justify-between px-1">
         <div className="text-sm font-semibold">{title}</div>
         <span className="text-xs text-muted-foreground">{tickets.length}</span>

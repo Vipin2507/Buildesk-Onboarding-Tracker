@@ -176,8 +176,8 @@ function ProjectDetailPage() {
                     <button onClick={() => { setCurrentStep(i); updateProject(projectId, { currentStep: i }); }} className="group flex flex-col items-center gap-1.5">
                       <motion.div
                         initial={false}
-                        animate={{ scale: active ? 1.1 : 1, backgroundColor: done ? "var(--color-success)" : active ? "var(--color-accent)" : "var(--color-muted)" }}
-                        className={cn("flex h-9 w-9 items-center justify-center rounded-full text-xs font-semibold text-white", active && "ring-4 ring-accent/25")}
+                        animate={{ scale: active ? 1.1 : 1, backgroundColor: done ? "var(--color-success)" : active ? "var(--color-primary)" : "var(--color-muted)" }}
+                        className={cn("flex h-9 w-9 items-center justify-center rounded-full text-xs font-semibold text-white", active && "ring-4 ring-primary/25")}
                       >
                         {done ? <Check className="h-4 w-4" /> : i + 1}
                       </motion.div>
@@ -202,7 +202,7 @@ function ProjectDetailPage() {
                 const items = sectionItems[s.key] ?? [];
                 const done = items.filter((i) => i.collected && i.uploaded && i.live).length;
                 return (
-                  <button key={s.key} onClick={() => setSection(s.key)} className={cn("relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm", active ? "bg-accent/15 text-accent-foreground" : "hover:bg-muted")}>
+                  <button key={s.key} onClick={() => setSection(s.key)} className={cn("relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm", active ? "bg-primary/15 text-primary" : "hover:bg-muted")}>
                     <div className="flex-1">
                       <div className="font-medium">{s.label}</div>
                       <div className="mt-1 flex items-center gap-2">
@@ -265,7 +265,7 @@ function ProjectDetailPage() {
                               <td key={phase} className="px-3 py-3 text-center">
                                 <button
                                   onClick={() => toggleChecklist(item.id, phase)}
-                                  className={cn("inline-flex h-6 w-6 items-center justify-center rounded-md border", item[phase] ? "border-success bg-success text-white" : "border-input hover:border-accent")}
+                                  className={cn("inline-flex h-6 w-6 items-center justify-center rounded-md border", item[phase] ? "border-success bg-success text-white" : "border-input hover:border-primary")}
                                 >
                                   {item[phase] && <Check className="h-3.5 w-3.5" />}
                                 </button>
@@ -290,7 +290,7 @@ function ProjectDetailPage() {
                     <ol className="relative space-y-4 border-l-2 border-border pl-4">
                       {activities.slice(0, 5).map((a) => (
                         <li key={a.id} className="relative">
-                          <span className="absolute -left-[22px] top-1.5 h-3 w-3 rounded-full bg-accent ring-4 ring-accent/20" />
+                          <span className="absolute -left-[22px] top-1.5 h-3 w-3 rounded-full bg-primary ring-4 ring-primary/20" />
                           <div className="text-sm font-medium">{a.what}</div>
                           <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
                             <Clock className="h-3 w-3" /> {formatRelativeTime(a.createdAt)} · {a.who}
@@ -309,7 +309,7 @@ function ProjectDetailPage() {
       {tab !== "onboarding" && (
         <div className="card-soft p-5">
           <p className="text-sm text-muted-foreground">
-            Use the dedicated <Link to={`/${tab}` as "/data-migration"} className="text-accent underline">{tab}</Link> page for full CRUD — data is shared via global stores and scoped to this project where applicable.
+            Use the dedicated <Link to={`/${tab}` as "/data-migration"} className="text-primary underline">{tab}</Link> page for full CRUD — data is shared via global stores and scoped to this project where applicable.
           </p>
           <Button className="mt-4" variant="outline" asChild>
             <Link to={`/${tab === "go-live" ? "onboarding" : tab}` as "/data-migration"}>

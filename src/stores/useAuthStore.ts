@@ -14,6 +14,7 @@ type AuthState = {
   register: (data: { name: string; email: string; password: string; role?: UserRole }) => AuthResult;
   logout: () => void;
   setPassword: (userId: string, password: string) => void;
+  changePassword: (userId: string, currentPassword: string, nextPassword: string) => AuthResult;
 };
 
 export const useAuthStore = createPersistedStore<AuthState>("auth", (set, get) => ({
@@ -57,6 +58,9 @@ export const useAuthStore = createPersistedStore<AuthState>("auth", (set, get) =
       email: normalizedEmail,
       role,
       active: true,
+      notifyEmail: true,
+      notifyInApp: true,
+      timezone: "Asia/Kolkata",
     });
 
     set((s) => ({
@@ -75,6 +79,23 @@ export const useAuthStore = createPersistedStore<AuthState>("auth", (set, get) =
 
   setPassword: (userId, password) => {
     set((s) => ({ credentials: { ...s.credentials, [userId]: password } }));
+  },
+
+  changePassword: (userId, currentPassword, nextPassword) => {
+    const stored = get().credentials[userId];
+    if (!stored || stored !== currentPassword) {
+      return { success: false, error: "Current password is incorrect." };
+    }
+    if (nextPassword.length < 6) {
+      return { success: false, error: "New password must be at least 6 characters." };
+    }
+    if (nextPassword === currentPassword) {
+      return { success: false, error: "New password must be different from the current one." };
+    }
+    set((s) => ({ credentials: { ...s.credentials, [userId]: nextPassword } }));
+    const user = useUserStore.getState().users.find((u) => u.id === userId);
+    logActivity({ who: user?.name ?? "You", what: "Changed account password", kind: "info" });
+    return { success: true };
   },
 }));
 

@@ -2,7 +2,9 @@ import type { DocumentTemplate, DocumentStatus } from "@/types";
 import { newId, nowIso } from "@/types";
 import { seedDocuments } from "@/data/seed";
 import { logActivity } from "./useActivityStore";
+import { recordAttachment } from "./useNotesAttachmentsStore";
 import { createPersistedStore, touch } from "./persist";
+import { useProjectStore } from "./useProjectStore";
 
 const STATUS_ORDER: DocumentStatus[] = ["Draft", "Approved", "Uploaded", "Tested", "Live"];
 
@@ -46,11 +48,26 @@ export const useDocumentStore = createPersistedStore<DocumentState>("documents",
   },
 
   uploadTemplate: (id, fileName) => {
+    const t = get().templates.find((x) => x.id === id);
     set((s) => ({
-      templates: s.templates.map((t) =>
-        t.id === id ? touch({ ...t, fileName, status: "Uploaded" as const }) : t,
+      templates: s.templates.map((x) =>
+        x.id === id ? touch({ ...x, fileName, status: "Uploaded" as const }) : x,
       ),
     }));
-    logActivity({ who: "You", what: `Uploaded ${fileName}`, kind: "success" });
+    logActivity({ who: "You", what: `Uploaded ${fileName}`, kind: "success", projectId: t?.projectId });
+    if (t?.projectId) {
+      const project = useProjectStore.getState().projects.find((p) => p.id === t.projectId);
+      if (project) {
+        recordAttachment({
+          companyId: project.companyId,
+          projectId: t.projectId,
+          fileName,
+          purpose: t.name,
+          category: "document-template",
+          context: `Documents · ${project.name}`,
+          uploadedBy: "You",
+        });
+      }
+    }
   },
 }));

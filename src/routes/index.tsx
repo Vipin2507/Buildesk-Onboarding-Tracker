@@ -43,7 +43,7 @@ function Dashboard() {
     { label: "Completed", value: kpis.completed, icon: CheckCircle2, tone: "bg-success/15 text-success" },
     { label: "On Hold", value: kpis.onHold, icon: PauseCircle, tone: "bg-destructive/15 text-destructive" },
     { label: "Pending Tasks", value: kpis.pendingTasks, icon: ListChecks, tone: "bg-info/15 text-info" },
-    { label: "Upcoming Renewals", value: kpis.upcomingRenewals, icon: RefreshCw, tone: "bg-accent/15 text-accent-foreground" },
+    { label: "Upcoming Renewals", value: kpis.upcomingRenewals, icon: RefreshCw, tone: "bg-primary/15 text-primary" },
   ];
 
   const donutData = [
@@ -132,7 +132,7 @@ function Dashboard() {
                 <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
                 <YAxis tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
                 <Tooltip cursor={{ fill: "var(--color-muted)" }} />
-                <Bar dataKey="opted" fill="var(--color-accent)" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="opted" fill="var(--color-primary)" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -143,7 +143,7 @@ function Dashboard() {
         <div className="card-soft p-5 lg:col-span-2">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="font-semibold">Recent Onboarding</h3>
-            <Link to="/projects" className="text-xs font-medium text-accent-foreground hover:underline">View all</Link>
+            <Link to="/projects" className="text-xs font-medium text-primary hover:underline">View all</Link>
           </div>
           <div className="overflow-hidden rounded-lg border">
             <table className="w-full text-sm">
@@ -177,7 +177,7 @@ function Dashboard() {
                       <td className="px-3 py-2.5 text-muted-foreground">{manager?.name ?? "—"}</td>
                       <td className="px-3 py-2.5 text-right">
                         {project && (
-                          <Button size="sm" variant="ghost" className="gap-1 text-accent-foreground" asChild>
+                          <Button size="sm" variant="ghost" className="gap-1 text-primary" asChild>
                             <Link to="/projects/$projectId" params={{ projectId: project.id }} search={{ tab: "onboarding" }}>
                               Continue <ArrowRight className="h-3.5 w-3.5" />
                             </Link>
@@ -219,7 +219,7 @@ function Dashboard() {
                   <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
                     a.kind === "success" ? "bg-success" :
                     a.kind === "warning" ? "bg-warning" :
-                    a.kind === "danger" ? "bg-destructive" : "bg-accent"
+                    a.kind === "danger" ? "bg-destructive" : "bg-primary"
                   }`} />
                   <div className="min-w-0">
                     <div className="truncate">{a.what}</div>
@@ -235,7 +235,7 @@ function Dashboard() {
       <div className="mt-6 card-soft p-5">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="font-semibold">Upcoming Renewals</h3>
-          <Link to="/renewals" className="text-xs font-medium text-accent-foreground hover:underline">Manage</Link>
+          <Link to="/renewals" className="text-xs font-medium text-primary hover:underline">Manage</Link>
         </div>
         <div className="overflow-hidden rounded-lg border">
           <table className="w-full text-sm">

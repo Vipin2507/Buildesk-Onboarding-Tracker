@@ -28,7 +28,7 @@ function Reports() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {REPORTS.map((r) => (
           <button key={r.name} className="card-soft group flex items-start gap-4 p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-[var(--shadow-elevated)]">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent group-hover:bg-accent group-hover:text-white">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary group-hover:bg-primary group-hover:text-white">
               <r.icon className="h-5 w-5" />
             </div>
             <div>

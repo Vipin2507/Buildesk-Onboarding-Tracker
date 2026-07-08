@@ -23,8 +23,12 @@ import type {
   TrainingSession,
   Trigger,
   UnitUpload,
+  ModuleKey,
+  PostSalesProject,
   User,
   WorkOrder,
+  CompanyNote,
+  CompanyAttachment,
 } from "@/types";
 import type { StatusKey } from "@/types/common";
 import { newId, nowIso } from "@/types/common";
@@ -32,9 +36,9 @@ import {
   CHECKLIST_TEMPLATE,
   DOCUMENT_TEMPLATE_NAMES,
   INTEGRATION_NAMES,
-  MODULES,
   TRIGGER_EVENTS,
 } from "./constants";
+import { MODULE_CATALOG, buildDefaultPostSalesSteps, createCompanyModules } from "./module-catalog";
 
 const ts = nowIso();
 
@@ -72,10 +76,67 @@ export const seedEmployees: Employee[] = managers.map((name, i) => ({
 );
 
 export const seedUsers: User[] = [
-  { id: "user-1", name: "Aditya Kulkarni", email: "aditya@buildesk.com", role: "Admin", active: true, createdAt: ts, updatedAt: ts },
-  { id: "user-2", name: "Priya Sharma", email: "priya@buildesk.com", role: "Manager", active: true, createdAt: ts, updatedAt: ts },
-  { id: "user-3", name: "Rohan Iyer", email: "rohan@buildesk.com", role: "Manager", active: true, createdAt: ts, updatedAt: ts },
-  { id: "user-4", name: "Neha Kapoor", email: "neha@buildesk.com", role: "Viewer", active: true, createdAt: ts, updatedAt: ts },
+  {
+    id: "user-1",
+    name: "Aditya Kulkarni",
+    email: "aditya@buildesk.com",
+    role: "Admin",
+    active: true,
+    phone: "+91 98765 43210",
+    jobTitle: "Head of Implementation",
+    department: "Customer Success",
+    timezone: "Asia/Kolkata",
+    bio: "Owns onboarding quality and go-live readiness for enterprise accounts.",
+    notifyEmail: true,
+    notifyInApp: true,
+    createdAt: ts,
+    updatedAt: ts,
+  },
+  {
+    id: "user-2",
+    name: "Priya Sharma",
+    email: "priya@buildesk.com",
+    role: "Manager",
+    active: true,
+    phone: "+91 98111 22334",
+    jobTitle: "Onboarding Manager",
+    department: "Implementation",
+    timezone: "Asia/Kolkata",
+    notifyEmail: true,
+    notifyInApp: true,
+    createdAt: ts,
+    updatedAt: ts,
+  },
+  {
+    id: "user-3",
+    name: "Rohan Iyer",
+    email: "rohan@buildesk.com",
+    role: "Manager",
+    active: true,
+    phone: "+91 98222 33445",
+    jobTitle: "Implementation Lead",
+    department: "Implementation",
+    timezone: "Asia/Kolkata",
+    notifyEmail: true,
+    notifyInApp: false,
+    createdAt: ts,
+    updatedAt: ts,
+  },
+  {
+    id: "user-4",
+    name: "Neha Kapoor",
+    email: "neha@buildesk.com",
+    role: "Viewer",
+    active: true,
+    phone: "+91 98333 44556",
+    jobTitle: "CSM Associate",
+    department: "Customer Success",
+    timezone: "Asia/Kolkata",
+    notifyEmail: false,
+    notifyInApp: true,
+    createdAt: ts,
+    updatedAt: ts,
+  },
 ];
 
 /** Demo passwords for the local prototype — not for production use. */
@@ -86,10 +147,17 @@ export const seedCredentials: Record<string, string> = {
   "user-4": "buildesk123",
 };
 
+const PRESET_MODULE_KEYS: ModuleKey[][] = [
+  ["post-sales", "customer-app", "vendor-management"],
+  ["post-sales", "labor-management", "construction-management", "project-management"],
+  ["post-sales", "vendor-management", "customer-app", "labor-management"],
+  ["post-sales", "customer-app"],
+  ["post-sales", "vendor-management", "labor-management", "construction-management", "project-management", "customer-app"],
+];
+
 export const seedCompanies: Company[] = brands.map((name, i) => {
-  const modulesCount = 3 + (i % 5);
-  const modules = MODULES.slice(0, modulesCount);
   const progress = [15, 32, 48, 60, 75, 88, 100, 22, 55, 70, 45, 92, 12, 66, 80][i];
+  const optedKeys = PRESET_MODULE_KEYS[i % PRESET_MODULE_KEYS.length];
   return {
     id: `co-${i + 1}`,
     name,
@@ -98,10 +166,13 @@ export const seedCompanies: Company[] = brands.map((name, i) => {
     phone: `+91 9${String(800000000 + i * 12345).slice(0, 9)}`,
     email: `contact@${name.toLowerCase().replace(/\s+/g, "")}.com`,
     city: cities[i % cities.length],
+    officeAddress: `${100 + i}, Business Park, ${cities[i % cities.length]}`,
+    gstNumber: `27AABCU${String(9600 + i).padStart(4, "0")}1Z${i % 10}`,
+    billingInfo: `${plans[i % 3]} plan · Annual billing`,
     onboardingManagerId: seedEmployees[i % managers.length].id,
     csmId: seedEmployees[managers.length + (i % csms.length)].id,
     status: progress >= 100 ? "completed" : statuses[i % statuses.length],
-    modules: [...modules],
+    modules: createCompanyModules(optedKeys, `2024-${String(1 + (i % 12)).padStart(2, "0")}-01`),
     agreementDate: `2024-${String(1 + (i % 12)).padStart(2, "0")}-${String(5 + (i % 20)).padStart(2, "0")}`,
     goLiveTarget: `2025-${String(1 + ((i + 3) % 12)).padStart(2, "0")}-15`,
     planExpiry: `2026-${String(1 + (i % 12)).padStart(2, "0")}-20`,
@@ -110,6 +181,44 @@ export const seedCompanies: Company[] = brands.map((name, i) => {
     createdAt: ts,
     updatedAt: ts,
   };
+});
+
+function progressSteps(project: PostSalesProject, approvedCount: number): PostSalesProject {
+  const steps = project.steps.map((step, idx) => {
+    if (idx >= approvedCount) return step;
+    return {
+      ...step,
+      templateStatus: (step.requiresTemplate ? "received" : "not-required") as typeof step.templateStatus,
+      templateSentOn: step.requiresTemplate ? ts : undefined,
+      uploadStatus: "uploaded" as const,
+      uploadedFile: {
+        name: `${step.key}.xlsx`,
+        uploadedAt: ts,
+        recordCount: 80 + idx * 12,
+      },
+      approvalStatus: "approved" as const,
+      approvedBy: "Aditya Kulkarni",
+      approvedOn: ts,
+    };
+  });
+  return { ...project, steps };
+}
+
+export const seedPostSalesProjects: PostSalesProject[] = seedCompanies.flatMap((c, ci) => {
+  if (!c.modules.some((m) => m.moduleKey === "post-sales" && m.optedIn)) return [];
+  const count = 1 + (ci % 3);
+  return Array.from({ length: count }).map((_, pi) => {
+    const base: PostSalesProject = {
+      id: `ps-${ci}-${pi}`,
+      companyId: c.id,
+      projectNumber: `PRJ-${String(ci * 10 + pi + 1).padStart(3, "0")}`,
+      projectName: `${c.name.split(" ")[0]} ${["Heights", "Grove", "Residency", "Square", "Bay"][pi % 5]}`,
+      steps: buildDefaultPostSalesSteps(),
+      createdAt: ts,
+      updatedAt: ts,
+    };
+    return progressSteps(base, (ci + pi) % 6);
+  });
 });
 
 const projTypes = ["Residential", "Commercial", "Township", "Mixed-use", "Villas"];
@@ -211,14 +320,54 @@ export const seedTickets: Ticket[] = Array.from({ length: 22 }).map((_, i) => {
   };
 });
 
+function ago(ms: number) {
+  const t = new Date(Date.now() - ms).toISOString();
+  return { createdAt: t, updatedAt: t };
+}
+
 export const seedActivity: ActivityEntry[] = [
-  { id: newId(), who: "Priya Sharma", what: "Marked Sunrise Heights as Go Live", kind: "success", companyId: "co-1", projectId: "pr-0-0", createdAt: new Date(Date.now() - 600000).toISOString(), updatedAt: new Date(Date.now() - 600000).toISOString() },
-  { id: newId(), who: "Rohan Iyer", what: "Uploaded Customer Data for Skyline Residency", kind: "info", companyId: "co-2", createdAt: new Date(Date.now() - 3600000).toISOString(), updatedAt: new Date(Date.now() - 3600000).toISOString() },
-  { id: newId(), who: "System", what: "Renewal reminder sent to Green Meadows Group", kind: "warning", companyId: "co-3", createdAt: new Date(Date.now() - 7200000).toISOString(), updatedAt: new Date(Date.now() - 7200000).toISOString() },
-  { id: newId(), who: "Neha Kapoor", what: "Customization TKT-1008 moved to QA", kind: "info", createdAt: new Date(Date.now() - 18000000).toISOString(), updatedAt: new Date(Date.now() - 18000000).toISOString() },
-  { id: newId(), who: "Aarav Mehta", what: "Verified payment plan for Oceanic Bay", kind: "success", companyId: "co-4", createdAt: new Date(Date.now() - 86400000).toISOString(), updatedAt: new Date(Date.now() - 86400000).toISOString() },
-  { id: newId(), who: "Ishita Verma", what: "Bug TKT-1003 marked critical", kind: "danger", createdAt: new Date(Date.now() - 86400000).toISOString(), updatedAt: new Date(Date.now() - 86400000).toISOString() },
-  { id: newId(), who: "Vikram Rao", what: "Training completed for Prestige Horizon", kind: "success", companyId: "co-5", createdAt: new Date(Date.now() - 172800000).toISOString(), updatedAt: new Date(Date.now() - 172800000).toISOString() },
+  { id: newId(), who: "Priya Sharma", what: "Marked Sunrise Heights as Go Live", kind: "success", companyId: "co-1", projectId: "pr-0-0", ...ago(600_000) },
+  { id: newId(), who: "Aditya Kulkarni", what: "Approved Payment Plan step — PRJ-001", kind: "success", companyId: "co-1", projectId: "ps-0-0", ...ago(1_800_000) },
+  { id: newId(), who: "Priya Sharma", what: "Submitted Unit Types for approval — PRJ-001", kind: "info", companyId: "co-1", projectId: "ps-0-0", ...ago(3_600_000) },
+  { id: newId(), who: "Rohan Iyer", what: "Uploaded units.xlsx for Unit Types — PRJ-001", kind: "success", companyId: "co-1", projectId: "ps-0-0", ...ago(5_400_000) },
+  { id: newId(), who: "Priya Sharma", what: "Sent template for Unit Types to customer — PRJ-001", kind: "info", companyId: "co-1", projectId: "ps-0-0", ...ago(7_200_000) },
+  { id: newId(), who: "Aditya Kulkarni", what: "Updated company contact details", kind: "info", companyId: "co-1", ...ago(14_400_000) },
+  { id: newId(), who: "System", what: "Go-live reminder: target approaching in 14 days", kind: "warning", companyId: "co-1", ...ago(28_800_000) },
+  { id: newId(), who: "Priya Sharma", what: "Created Post Sales project PRJ-001", kind: "success", companyId: "co-1", projectId: "ps-0-0", ...ago(86_400_000) },
+  { id: newId(), who: "Rohan Iyer", what: "Uploaded Customer Data for Skyline Residency", kind: "info", companyId: "co-2", ...ago(3_600_000) },
+  { id: newId(), who: "System", what: "Renewal reminder sent to Green Meadows Group", kind: "warning", companyId: "co-3", ...ago(7_200_000) },
+  { id: newId(), who: "Neha Kapoor", what: "Customization TKT-1008 moved to QA", kind: "info", ...ago(18_000_000) },
+  { id: newId(), who: "Aarav Mehta", what: "Verified payment plan for Oceanic Bay", kind: "success", companyId: "co-4", ...ago(86_400_000) },
+  { id: newId(), who: "Ishita Verma", what: "Bug TKT-1003 marked critical", kind: "danger", ...ago(86_400_000) },
+  { id: newId(), who: "Vikram Rao", what: "Training completed for Prestige Horizon", kind: "success", companyId: "co-5", ...ago(172_800_000) },
+];
+
+export const seedNotes: CompanyNote[] = [
+  {
+    id: newId(),
+    companyId: "co-1",
+    author: "Priya Sharma",
+    body: "Customer prefers WhatsApp for template delivery. CC Aditya on all approval emails.",
+    pinned: true,
+    ...ago(172_800_000),
+  },
+  {
+    id: newId(),
+    companyId: "co-1",
+    author: "Aditya Kulkarni",
+    body: "Kickoff completed. Unit types and payment plan are first priorities for Post Sales.",
+    pinned: false,
+    projectId: "ps-0-0",
+    ...ago(259_200_000),
+  },
+  {
+    id: newId(),
+    companyId: "co-2",
+    author: "Rohan Iyer",
+    body: "Awaiting GST certificate before billing setup.",
+    pinned: false,
+    ...ago(86_400_000),
+  },
 ];
 
 export const seedTrainingSessions: TrainingSession[] = [
@@ -345,6 +494,72 @@ export const seedCustomerAppConfigs: CustomerAppConfig[] = seedProjects.slice(0,
   updatedAt: ts,
 }));
 
-export const seedUploads: UnitUpload[] = [];
+export const seedUploads: UnitUpload[] = [
+  {
+    id: newId(),
+    projectId: "pr-0-0",
+    type: "unit",
+    fileName: "sunrise_unit_config.xlsx",
+    recordCount: 214,
+    uploadedAt: new Date(Date.now() - 259_200_000).toISOString(),
+    createdAt: new Date(Date.now() - 259_200_000).toISOString(),
+    updatedAt: new Date(Date.now() - 259_200_000).toISOString(),
+  },
+  {
+    id: newId(),
+    projectId: "pr-0-0",
+    type: "customer",
+    fileName: "sunrise_customers.xlsx",
+    recordCount: 186,
+    uploadedAt: new Date(Date.now() - 172_800_000).toISOString(),
+    createdAt: new Date(Date.now() - 172_800_000).toISOString(),
+    updatedAt: new Date(Date.now() - 172_800_000).toISOString(),
+  },
+];
 export const seedCustomerRecords: CustomerRecord[] = [];
 export const seedPaymentRecords: PaymentRecord[] = [];
+
+/** Seed attachments from migrated uploads + post-sales files with purpose labels. */
+export const seedAttachments: CompanyAttachment[] = [
+  ...seedUploads.map((u) => {
+    const project = seedProjects.find((p) => p.id === u.projectId);
+    const purposeMap = {
+      unit: "Unit configuration",
+      customer: "Customer data",
+      booking: "Booking data",
+      payment: "Payment data",
+    } as const;
+    return {
+      id: newId(),
+      companyId: project?.companyId ?? "co-1",
+      projectId: u.projectId,
+      fileName: u.fileName,
+      purpose: purposeMap[u.type],
+      category: u.type,
+      context: project?.name ? `Onboarding · ${project.name}` : "Onboarding data migration",
+      recordCount: u.recordCount,
+      uploadedBy: "Rohan Iyer",
+      uploadedAt: u.uploadedAt,
+      createdAt: u.createdAt,
+      updatedAt: u.updatedAt,
+    } satisfies CompanyAttachment;
+  }),
+  ...seedPostSalesProjects.flatMap((project) =>
+    project.steps
+      .filter((s) => s.uploadedFile)
+      .map((s) => ({
+        id: newId(),
+        companyId: project.companyId,
+        projectId: project.id,
+        fileName: s.uploadedFile!.name,
+        purpose: s.label,
+        category: "post-sales-step" as const,
+        context: `Post Sales · ${project.projectNumber} · ${project.projectName}`,
+        recordCount: s.uploadedFile!.recordCount,
+        uploadedBy: "Priya Sharma",
+        uploadedAt: s.uploadedFile!.uploadedAt,
+        createdAt: s.uploadedFile!.uploadedAt,
+        updatedAt: s.uploadedFile!.uploadedAt,
+      } satisfies CompanyAttachment)),
+  ),
+];

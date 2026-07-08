@@ -11,7 +11,7 @@ export function ProgressBar({ value, className }: { value: number; className?: s
         transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
         className={cn(
           "h-full rounded-full",
-          v >= 100 ? "bg-success" : v >= 60 ? "bg-accent" : v >= 30 ? "bg-warning" : "bg-destructive",
+          v >= 100 ? "bg-success" : v >= 60 ? "bg-primary" : v >= 30 ? "bg-warning" : "bg-destructive",
         )}
       />
     </div>
@@ -32,7 +32,7 @@ export function ProgressRing({ value, size = 96, stroke = 10 }: { value: number;
           r={r}
           strokeWidth={stroke}
           strokeLinecap="round"
-          className="fill-none stroke-accent"
+          className="fill-none stroke-primary"
           initial={{ strokeDasharray: `0 ${c}` }}
           animate={{ strokeDasharray: `${(v / 100) * c} ${c}` }}
           transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}

@@ -11,6 +11,10 @@ import { useEmployeeStore } from "./useEmployeeStore";
 import { useUserStore } from "./useUserStore";
 import { useDocumentStore } from "./useDocumentStore";
 import { useIntegrationStore } from "./useIntegrationStore";
+import { usePostSalesStore } from "./usePostSalesStore";
+import { useNotesAttachmentsStore } from "./useNotesAttachmentsStore";
+import { useMasterStore } from "./useMasterStore";
+import { useSettingsStore } from "./useSettingsStore";
 
 const stores = [
   useAuthStore,
@@ -26,6 +30,10 @@ const stores = [
   useUserStore,
   useDocumentStore,
   useIntegrationStore,
+  usePostSalesStore,
+  useNotesAttachmentsStore,
+  useMasterStore,
+  useSettingsStore,
 ] as const;
 
 export async function rehydrateAllStores() {

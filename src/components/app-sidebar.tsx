@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import {
   LayoutDashboard, Building2, Boxes, Route as RouteIcon, Package,
   Upload, FileText, Smartphone, Truck, HardHat, Plug, GraduationCap,
-  LifeBuoy, RefreshCw, Users, BarChart3, Settings, Building,
+  LifeBuoy, RefreshCw, Users, BarChart3, Settings, Building, Database,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +24,7 @@ const nav = [
   { to: "/renewals", label: "Renewals", icon: RefreshCw },
   { to: "/employees", label: "Employees", icon: Users },
   { to: "/reports", label: "Reports", icon: BarChart3 },
+  { to: "/master", label: "Master Config", icon: Database },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -46,34 +47,41 @@ export function AppSidebar() {
         {nav.map((item) => {
           const active = item.exact ? pathname === item.to : pathname === item.to || pathname.startsWith(item.to + "/");
           const Icon = item.icon;
+          const showAdminDivider = item.to === "/master";
           return (
-            <Link
-              key={item.to}
-              to={item.to}
-              className={cn(
-                "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                active
-                  ? "text-white"
-                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-white",
+            <div key={item.to}>
+              {showAdminDivider && (
+                <div className="mx-3 mb-2 mt-4 border-t border-sidebar-border pt-3 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/45">
+                  Administration
+                </div>
               )}
-            >
-              {active && (
-                <motion.span
-                  layoutId="sidebar-active"
-                  className="absolute inset-0 rounded-lg bg-sidebar-accent"
-                  transition={{ type: "spring", stiffness: 400, damping: 36 }}
-                />
-              )}
-              {active && (
-                <motion.span
-                  layoutId="sidebar-indicator"
-                  className="absolute left-0 top-1/2 h-6 -translate-y-1/2 rounded-r-full bg-accent"
-                  style={{ width: 3 }}
-                />
-              )}
-              <Icon className="relative z-10 h-4 w-4 shrink-0" />
-              <span className="relative z-10 truncate">{item.label}</span>
-            </Link>
+              <Link
+                to={item.to}
+                className={cn(
+                  "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                  active
+                    ? "text-white"
+                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-white",
+                )}
+              >
+                {active && (
+                  <motion.span
+                    layoutId="sidebar-active"
+                    className="absolute inset-0 rounded-lg bg-sidebar-accent"
+                    transition={{ type: "spring", stiffness: 400, damping: 36 }}
+                  />
+                )}
+                {active && (
+                  <motion.span
+                    layoutId="sidebar-indicator"
+                    className="absolute left-0 top-1/2 h-6 -translate-y-1/2 rounded-r-full bg-sidebar-primary"
+                    style={{ width: 3 }}
+                  />
+                )}
+                <Icon className="relative z-10 h-4 w-4 shrink-0" />
+                <span className="relative z-10 truncate">{item.label}</span>
+              </Link>
+            </div>
           );
         })}
       </nav>

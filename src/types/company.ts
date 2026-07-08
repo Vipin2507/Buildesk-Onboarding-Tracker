@@ -1,4 +1,5 @@
 import type { StatusKey, Timestamps } from "./common";
+import type { CompanyModule } from "./module";
 
 export type CompanyPlan = "Starter" | "Growth" | "Enterprise";
 export type CompanyHealth = "Healthy" | "Moderate" | "Critical";
@@ -11,10 +12,13 @@ export type Company = Timestamps & {
   phone: string;
   email: string;
   city: string;
+  officeAddress?: string;
+  gstNumber?: string;
+  billingInfo?: string;
   onboardingManagerId: string;
   csmId: string;
   status: StatusKey;
-  modules: string[];
+  modules: CompanyModule[];
   agreementDate: string;
   goLiveTarget: string;
   planExpiry: string;

@@ -36,7 +36,15 @@ export function EmptyState({
   );
 }
 
-export function EntityNotFound({ entity, listPath, listLabel }: { entity: string; listPath: string; listLabel: string }) {
+export function EntityNotFound({
+  entity,
+  listPath,
+  listLabel,
+}: {
+  entity: string;
+  listPath: string;
+  listLabel: string;
+}) {
   return (
     <div className="flex min-h-[50vh] flex-col items-center justify-center px-4 text-center">
       <AlertTriangle className="mb-4 h-10 w-10 text-warning" />
@@ -45,7 +53,7 @@ export function EntityNotFound({ entity, listPath, listLabel }: { entity: string
         This {entity.toLowerCase()} may have been removed or the link is incorrect.
       </p>
       <Button asChild className="mt-6" variant="outline">
-        <Link to={listPath}>Back to {listLabel}</Link>
+        <Link to={listPath as "/"}>{listLabel.startsWith("Back") ? listLabel : `Back to ${listLabel}`}</Link>
       </Button>
     </div>
   );

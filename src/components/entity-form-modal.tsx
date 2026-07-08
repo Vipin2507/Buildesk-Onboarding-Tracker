@@ -17,6 +17,7 @@ export function ConfirmDeleteDialog({
   description,
   onConfirm,
   confirmLabel = "Delete",
+  confirmTone = "destructive",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -24,6 +25,7 @@ export function ConfirmDeleteDialog({
   description?: string;
   onConfirm: () => void;
   confirmLabel?: string;
+  confirmTone?: "destructive" | "default";
 }) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -35,7 +37,11 @@ export function ConfirmDeleteDialog({
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            className={
+              confirmTone === "destructive"
+                ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                : undefined
+            }
             onClick={onConfirm}
           >
             {confirmLabel}

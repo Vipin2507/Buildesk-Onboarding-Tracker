@@ -1,8 +1,9 @@
-import type { Company } from "@/types";
+import type { Company, ModuleKey } from "@/types";
 import { newId, nowIso } from "@/types";
 import { seedCompanies } from "@/data/seed";
 import { logActivity } from "./useActivityStore";
 import { createPersistedStore, touch } from "./persist";
+import { getModuleLabel, normalizeCompanyModules } from "@/data/module-catalog";
 
 type CompanyState = {
   companies: Company[];
@@ -12,9 +13,11 @@ type CompanyState = {
   getById: (id: string) => Company | undefined;
   transferManager: (companyId: string, managerId: string, who: string) => void;
   markRenewed: (id: string) => void;
+  enableModule: (companyId: string, moduleKey: ModuleKey) => void;
 };
 
-export const useCompanyStore = createPersistedStore<CompanyState>("companies", (set, get) => ({
+// Bump the store key to avoid stale persisted shapes after module refactors.
+export const useCompanyStore = createPersistedStore<CompanyState>("companies-v3", (set, get) => ({
   companies: seedCompanies,
 
   addCompany: (data) => {
@@ -78,5 +81,29 @@ export const useCompanyStore = createPersistedStore<CompanyState>("companies", (
     if (company) {
       logActivity({ who: "You", what: `Renewed plan for ${company.name}`, kind: "success", companyId: id });
     }
+  },
+
+  enableModule: (companyId, moduleKey) => {
+    const company = get().getById(companyId);
+    if (!company) return;
+    const today = new Date().toISOString().slice(0, 10);
+    set((s) => ({
+      companies: s.companies.map((c) => {
+        if (c.id !== companyId) return c;
+        const modules = normalizeCompanyModules((c as any).modules);
+        return touch({
+          ...c,
+          modules: modules.map((m) =>
+            m.moduleKey === moduleKey ? { ...m, optedIn: true, optedOnDate: today } : m,
+          ),
+        });
+      }),
+    }));
+    logActivity({
+      who: "You",
+      what: `Enabled module ${getModuleLabel(moduleKey)} for ${company.name}`,
+      kind: "success",
+      companyId,
+    });
   },
 }));
