@@ -1,3 +1,4 @@
+export { useAuthStore, useCurrentUser } from "./useAuthStore";
 export { useActivityStore, logActivity } from "./useActivityStore";
 export { useCompanyStore } from "./useCompanyStore";
 export { useProjectStore } from "./useProjectStore";

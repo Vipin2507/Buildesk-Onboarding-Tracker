@@ -1,17 +1,28 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Bell, Search, ChevronDown, Building2, Boxes } from "lucide-react";
-import { useGlobalSearch, useUserStore } from "@/stores";
+import { Bell, Search, ChevronDown, Building2, Boxes, LogOut, Settings, User } from "lucide-react";
+import { toast } from "sonner";
+import { useGlobalSearch, useAuthStore, useCurrentUser } from "@/stores";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function TopBar() {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const results = useGlobalSearch(query);
   const navigate = useNavigate();
-  const currentUser = useUserStore((s) => s.users.find((u) => u.id === s.currentUserId));
+  const logout = useAuthStore((s) => s.logout);
+  const currentUser = useCurrentUser();
   const ref = useRef<HTMLDivElement>(null);
 
   const hasResults = query.length > 0 && (results.companies.length > 0 || results.projects.length > 0);
+  const initials = currentUser?.name.split(" ").map((n) => n[0]).join("").slice(0, 2) ?? "??";
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -20,6 +31,12 @@ export function TopBar() {
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
+
+  function handleLogout() {
+    logout();
+    toast.success("Signed out");
+    navigate({ to: "/login", search: { mode: "login" } });
+  }
 
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b bg-background/80 px-6 backdrop-blur">
@@ -61,16 +78,40 @@ export function TopBar() {
         <button className="relative flex h-10 w-10 items-center justify-center rounded-lg border bg-card text-muted-foreground hover:text-foreground">
           <Bell className="h-4 w-4" />
         </button>
-        <button className="flex items-center gap-2 rounded-lg border bg-card p-1.5 pr-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-xs font-semibold text-primary-foreground">
-            {currentUser?.name.split(" ").map((n) => n[0]).join("").slice(0, 2) ?? "AK"}
-          </div>
-          <div className="text-left leading-tight">
-            <div className="text-xs font-semibold">{currentUser?.name ?? "Admin"}</div>
-            <div className="text-[10px] text-muted-foreground">{currentUser?.role ?? "Admin"}</div>
-          </div>
-          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="flex items-center gap-2 rounded-lg border bg-card p-1.5 pr-2.5 outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/40">
+              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-xs font-semibold text-primary-foreground">
+                {initials}
+              </div>
+              <div className="text-left leading-tight">
+                <div className="text-xs font-semibold">{currentUser?.name ?? "User"}</div>
+                <div className="text-[10px] text-muted-foreground">{currentUser?.role ?? "—"}</div>
+              </div>
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuLabel className="font-normal">
+              <div className="text-sm font-medium">{currentUser?.name}</div>
+              <div className="text-xs text-muted-foreground">{currentUser?.email}</div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => navigate({ to: "/settings" })}>
+              <Settings className="mr-2 h-4 w-4" />
+              Settings
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => { logout(); navigate({ to: "/login", search: { mode: "register" } }); }}>
+              <User className="mr-2 h-4 w-4" />
+              Add another account
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+              <LogOut className="mr-2 h-4 w-4" />
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );

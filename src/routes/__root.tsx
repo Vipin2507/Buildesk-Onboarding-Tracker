@@ -14,6 +14,8 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { TopBar } from "@/components/topbar";
 import { Toaster } from "@/components/ui/sonner";
 import { StoreHydrationGate } from "@/components/store-hydration-gate";
+import { AuthGate } from "@/components/auth-gate";
+import { useRouterState } from "@tanstack/react-router";
 
 function NotFoundComponent() {
   return (
@@ -114,20 +116,28 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isAuthPage = pathname === "/login";
 
   return (
     <QueryClientProvider client={queryClient}>
       <StoreHydrationGate>
-        <div className="flex min-h-screen w-full bg-background text-foreground">
-          <AppSidebar />
-          <div className="flex min-w-0 flex-1 flex-col">
-            <TopBar />
-            <main className="min-w-0 flex-1">
-              <Outlet />
-            </main>
-          </div>
-        </div>
-        <Toaster position="top-right" richColors />
+        <AuthGate>
+          {isAuthPage ? (
+            <Outlet />
+          ) : (
+            <div className="flex min-h-screen w-full bg-background text-foreground">
+              <AppSidebar />
+              <div className="flex min-w-0 flex-1 flex-col">
+                <TopBar />
+                <main className="min-w-0 flex-1">
+                  <Outlet />
+                </main>
+              </div>
+            </div>
+          )}
+          <Toaster position="top-right" richColors />
+        </AuthGate>
       </StoreHydrationGate>
     </QueryClientProvider>
   );

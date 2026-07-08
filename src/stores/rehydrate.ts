@@ -1,3 +1,4 @@
+import { useAuthStore } from "./useAuthStore";
 import { useActivityStore } from "./useActivityStore";
 import { useCompanyStore } from "./useCompanyStore";
 import { useProjectStore } from "./useProjectStore";
@@ -12,6 +13,7 @@ import { useDocumentStore } from "./useDocumentStore";
 import { useIntegrationStore } from "./useIntegrationStore";
 
 const stores = [
+  useAuthStore,
   useActivityStore,
   useCompanyStore,
   useProjectStore,

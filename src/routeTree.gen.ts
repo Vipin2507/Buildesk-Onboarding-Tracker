@@ -18,6 +18,7 @@ import { Route as RenewalsRouteImport } from './routes/renewals'
 import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as ModulesRouteImport } from './routes/modules'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as LaborRouteImport } from './routes/labor'
 import { Route as IntegrationsRouteImport } from './routes/integrations'
 import { Route as EmployeesRouteImport } from './routes/employees'
@@ -73,6 +74,11 @@ const OnboardingRoute = OnboardingRouteImport.update({
 const ModulesRoute = ModulesRouteImport.update({
   id: '/modules',
   path: '/modules',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LaborRoute = LaborRouteImport.update({
@@ -140,6 +146,7 @@ export interface FileRoutesByFullPath {
   '/employees': typeof EmployeesRoute
   '/integrations': typeof IntegrationsRoute
   '/labor': typeof LaborRoute
+  '/login': typeof LoginRoute
   '/modules': typeof ModulesRoute
   '/onboarding': typeof OnboardingRoute
   '/projects': typeof ProjectsRouteWithChildren
@@ -162,6 +169,7 @@ export interface FileRoutesByTo {
   '/employees': typeof EmployeesRoute
   '/integrations': typeof IntegrationsRoute
   '/labor': typeof LaborRoute
+  '/login': typeof LoginRoute
   '/modules': typeof ModulesRoute
   '/onboarding': typeof OnboardingRoute
   '/projects': typeof ProjectsRouteWithChildren
@@ -185,6 +193,7 @@ export interface FileRoutesById {
   '/employees': typeof EmployeesRoute
   '/integrations': typeof IntegrationsRoute
   '/labor': typeof LaborRoute
+  '/login': typeof LoginRoute
   '/modules': typeof ModulesRoute
   '/onboarding': typeof OnboardingRoute
   '/projects': typeof ProjectsRouteWithChildren
@@ -209,6 +218,7 @@ export interface FileRouteTypes {
     | '/employees'
     | '/integrations'
     | '/labor'
+    | '/login'
     | '/modules'
     | '/onboarding'
     | '/projects'
@@ -231,6 +241,7 @@ export interface FileRouteTypes {
     | '/employees'
     | '/integrations'
     | '/labor'
+    | '/login'
     | '/modules'
     | '/onboarding'
     | '/projects'
@@ -253,6 +264,7 @@ export interface FileRouteTypes {
     | '/employees'
     | '/integrations'
     | '/labor'
+    | '/login'
     | '/modules'
     | '/onboarding'
     | '/projects'
@@ -276,6 +288,7 @@ export interface RootRouteChildren {
   EmployeesRoute: typeof EmployeesRoute
   IntegrationsRoute: typeof IntegrationsRoute
   LaborRoute: typeof LaborRoute
+  LoginRoute: typeof LoginRoute
   ModulesRoute: typeof ModulesRoute
   OnboardingRoute: typeof OnboardingRoute
   ProjectsRoute: typeof ProjectsRouteWithChildren
@@ -350,6 +363,13 @@ declare module '@tanstack/react-router' {
       path: '/modules'
       fullPath: '/modules'
       preLoaderRoute: typeof ModulesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/labor': {
@@ -476,6 +496,7 @@ const rootRouteChildren: RootRouteChildren = {
   EmployeesRoute: EmployeesRoute,
   IntegrationsRoute: IntegrationsRoute,
   LaborRoute: LaborRoute,
+  LoginRoute: LoginRoute,
   ModulesRoute: ModulesRoute,
   OnboardingRoute: OnboardingRoute,
   ProjectsRoute: ProjectsRouteWithChildren,

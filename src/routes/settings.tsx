@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { PageHeader, PageWrap } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { EntityFormModal, ConfirmDeleteDialog } from "@/components/entity-form-modal";
-import { useUserStore } from "@/stores";
+import { useUserStore, useAuthStore } from "@/stores";
 import type { User } from "@/types";
 
 export const Route = createFileRoute("/settings")({
@@ -29,6 +29,7 @@ function Settings() {
   const addUser = useUserStore((s) => s.addUser);
   const updateUser = useUserStore((s) => s.updateUser);
   const deleteUser = useUserStore((s) => s.deleteUser);
+  const setPassword = useAuthStore((s) => s.setPassword);
   const [section, setSection] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -85,7 +86,10 @@ function Settings() {
 
       <EntityFormModal open={modalOpen} onOpenChange={setModalOpen} title={editing ? "Edit User" : "Invite User"} onSubmit={() => {
         if (editing) updateUser(editing.id, form);
-        else addUser(form);
+        else {
+          const user = addUser(form);
+          setPassword(user.id, "buildesk123");
+        }
         toast.success(editing ? "User updated" : "User invited");
         setModalOpen(false);
       }}>

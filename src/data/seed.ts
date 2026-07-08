@@ -78,6 +78,14 @@ export const seedUsers: User[] = [
   { id: "user-4", name: "Neha Kapoor", email: "neha@buildesk.com", role: "Viewer", active: true, createdAt: ts, updatedAt: ts },
 ];
 
+/** Demo passwords for the local prototype — not for production use. */
+export const seedCredentials: Record<string, string> = {
+  "user-1": "buildesk123",
+  "user-2": "buildesk123",
+  "user-3": "buildesk123",
+  "user-4": "buildesk123",
+};
+
 export const seedCompanies: Company[] = brands.map((name, i) => {
   const modulesCount = 3 + (i % 5);
   const modules = MODULES.slice(0, modulesCount);

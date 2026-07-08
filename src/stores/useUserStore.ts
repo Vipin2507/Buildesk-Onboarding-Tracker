@@ -6,16 +6,13 @@ import { createPersistedStore, touch } from "./persist";
 
 type UserState = {
   users: User[];
-  currentUserId: string;
   addUser: (data: Omit<User, "id" | "createdAt" | "updatedAt">) => User;
   updateUser: (id: string, data: Partial<User>) => void;
   deleteUser: (id: string) => User | undefined;
-  getCurrentUser: () => User | undefined;
 };
 
 export const useUserStore = createPersistedStore<UserState>("users", (set, get) => ({
   users: seedUsers,
-  currentUserId: "user-1",
 
   addUser: (data) => {
     const now = nowIso();
@@ -36,6 +33,4 @@ export const useUserStore = createPersistedStore<UserState>("users", (set, get) 
     if (user) logActivity({ who: "You", what: `Deactivated user ${user.name}`, kind: "warning" });
     return user;
   },
-
-  getCurrentUser: () => get().users.find((u) => u.id === get().currentUserId),
 }));
