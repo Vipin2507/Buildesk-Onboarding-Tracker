@@ -62,7 +62,7 @@ function calcProgress(items: OnboardingChecklistItem[]) {
   return Math.round((done / total) * 100);
 }
 
-export const useOnboardingStore = createPersistedStore<OnboardingState>("onboarding", (set, get) => ({
+export const useOnboardingStore = createPersistedStore<OnboardingState>("onboarding-v2", (set, get) => ({
   checklistItems: seedChecklistItems,
   otherCharges: seedOtherCharges,
   uploads: seedUploads,

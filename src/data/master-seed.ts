@@ -2,6 +2,8 @@ import type {
   MasterChecklistItemDef,
   MasterFieldDef,
   MasterIntegrationDef,
+  MasterInventoryItem,
+  MasterInventoryWorkflowStep,
   MasterModuleDef,
   MasterPicklist,
   MasterPlatformSettings,
@@ -22,6 +24,24 @@ import { DEFAULT_POST_SALES_STEPS, MODULE_CATALOG } from "@/data/module-catalog"
 function stamp(partial: Omit<MasterFieldDef, "id" | "createdAt" | "updatedAt"> & { id?: string }): MasterFieldDef {
   const now = nowIso();
   return { ...partial, id: partial.id ?? newId(), createdAt: now, updatedAt: now };
+}
+
+function workflowSteps(
+  steps: { key: string; label: string; requiresApproval?: boolean; requiresUpload?: boolean; description?: string }[],
+): MasterInventoryWorkflowStep[] {
+  const now = nowIso();
+  return steps.map((s, i) => ({
+    id: newId(),
+    key: s.key,
+    label: s.label,
+    description: s.description,
+    requiresApproval: s.requiresApproval ?? true,
+    requiresUpload: s.requiresUpload ?? false,
+    enabled: true,
+    order: i + 1,
+    createdAt: now,
+    updatedAt: now,
+  }));
 }
 
 export const SEED_PLATFORM: MasterPlatformSettings = {
@@ -148,3 +168,97 @@ export const SEED_TRIGGERS: MasterTriggerDef[] = TRIGGER_EVENTS.map((t, i) => ({
   createdAt: nowIso(),
   updatedAt: nowIso(),
 }));
+
+export const SEED_INVENTORY: MasterInventoryItem[] = [
+  {
+    id: newId(),
+    name: "Unit Configuration Pack",
+    sku: "INV-UNIT-001",
+    category: "Document Format",
+    description: "Tower / floor / unit master for data migration.",
+    unit: "pack",
+    enabled: true,
+    order: 1,
+    workflow: workflowSteps([
+      { key: "collect", label: "Collect sample data", requiresUpload: false },
+      { key: "template", label: "Share Excel template", requiresUpload: false, requiresApproval: false },
+      { key: "upload", label: "Upload filled sheet", requiresUpload: true },
+      { key: "validate", label: "Validate & approve", requiresUpload: false },
+    ]),
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  },
+  {
+    id: newId(),
+    name: "Demand Letter Format",
+    sku: "INV-DOC-DEMAND",
+    category: "Document Format",
+    description: "Customer demand letter template for go-live.",
+    unit: "template",
+    enabled: true,
+    order: 2,
+    workflow: workflowSteps([
+      { key: "draft", label: "Draft format", requiresApproval: false },
+      { key: "legal", label: "Legal review", requiresUpload: true },
+      { key: "client", label: "Client sign-off" },
+      { key: "publish", label: "Publish in app", requiresApproval: false },
+    ]),
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  },
+  {
+    id: newId(),
+    name: "Customer Mobile App",
+    sku: "INV-APP-CUST",
+    category: "Customer App",
+    description: "White-label or Buildesk-branded customer application.",
+    unit: "app",
+    enabled: true,
+    order: 3,
+    workflow: workflowSteps([
+      { key: "branding", label: "Branding assets collected", requiresUpload: true },
+      { key: "build", label: "App build configured", requiresApproval: false },
+      { key: "android", label: "Android published" },
+      { key: "ios", label: "iOS published" },
+      { key: "credentials", label: "Credentials shared", requiresApproval: false },
+    ]),
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  },
+  {
+    id: newId(),
+    name: "Cement (OPC 53)",
+    sku: "INV-MAT-CEM53",
+    category: "Material",
+    description: "Sample procurement material for vendor workflows.",
+    unit: "bag",
+    enabled: true,
+    order: 4,
+    workflow: workflowSteps([
+      { key: "spec", label: "Spec confirmed", requiresApproval: false },
+      { key: "supplier", label: "Supplier mapped" },
+      { key: "po", label: "PO format ready", requiresUpload: true },
+      { key: "receive", label: "Goods receipt process", requiresUpload: true },
+    ]),
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  },
+  {
+    id: newId(),
+    name: "Accounting Integration",
+    sku: "INV-INT-ACC",
+    category: "Integration",
+    description: "Connect ERP / accounting for payment sync.",
+    unit: "connector",
+    enabled: true,
+    order: 5,
+    workflow: workflowSteps([
+      { key: "scope", label: "Scope integration required", requiresApproval: false },
+      { key: "creds", label: "API credentials received", requiresUpload: true },
+      { key: "connect", label: "Connection established" },
+      { key: "test", label: "UAT signed off" },
+    ]),
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  },
+];

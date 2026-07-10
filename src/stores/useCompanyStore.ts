@@ -17,7 +17,7 @@ type CompanyState = {
 };
 
 // Bump the store key to avoid stale persisted shapes after module refactors.
-export const useCompanyStore = createPersistedStore<CompanyState>("companies-v3", (set, get) => ({
+export const useCompanyStore = createPersistedStore<CompanyState>("companies-v4", (set, get) => ({
   companies: seedCompanies,
 
   addCompany: (data) => {

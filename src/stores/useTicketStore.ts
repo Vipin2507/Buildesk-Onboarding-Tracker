@@ -13,7 +13,7 @@ type TicketState = {
   getById: (id: string) => Ticket | undefined;
 };
 
-export const useTicketStore = createPersistedStore<TicketState>("tickets", (set, get) => ({
+export const useTicketStore = createPersistedStore<TicketState>("tickets-v2", (set, get) => ({
   tickets: seedTickets,
 
   addTicket: (data) => {

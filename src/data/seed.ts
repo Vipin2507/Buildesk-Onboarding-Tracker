@@ -38,7 +38,7 @@ import {
   INTEGRATION_NAMES,
   TRIGGER_EVENTS,
 } from "./constants";
-import { MODULE_CATALOG, buildDefaultPostSalesSteps, createCompanyModules } from "./module-catalog";
+import { buildDefaultPostSalesSteps, createCompanyModules } from "./module-catalog";
 
 const ts = nowIso();
 
@@ -49,11 +49,91 @@ const statuses: StatusKey[] = ["in_progress", "review", "completed", "not_starte
 const healths = ["Healthy", "Moderate", "Critical"] as const;
 const plans = ["Starter", "Growth", "Enterprise"] as const;
 
-const brands = [
-  "Sunrise Developers", "Skyline Realty", "Green Meadows Group", "Oceanic Estates", "Prestige Horizon",
-  "Aurum Buildcon", "Kalpataru Signature", "Riverstone Habitat", "Marigold Infrastructure", "Elite Landmark",
-  "Silverline Housing", "Panorama Realtors", "Terra Nova Builders", "Highrise Ventures", "Emerald Enclave",
+/** Real client roster — name, optional contact/phone, project count. */
+const COMPANY_ROSTER: {
+  name: string;
+  contact?: string;
+  phone?: string;
+  projectCount: number;
+}[] = [
+  { name: "Globe Group", projectCount: 18 },
+  { name: "Gurukrupa Realcon Builders And Developers", projectCount: 24 },
+  { name: "Syscom Edutech Pvt. Ltd.", projectCount: 2 },
+  { name: "Dimples Group", projectCount: 4 },
+  { name: "Neelam Realtors", projectCount: 15 },
+  { name: "AUROBINDO TATTVA HOMES", projectCount: 2 },
+  { name: "Safron Flora", projectCount: 1 },
+  { name: "Aashrithaa Properties pvt ltd", projectCount: 14 },
+  { name: "A K Hitech Associates", projectCount: 1 },
+  { name: "E Square Homes", projectCount: 1 },
+  { name: "Laxmi Kamal Associates", projectCount: 1 },
+  { name: "ROYAL BUILDCON", projectCount: 2 },
+  { name: "LMP Group", projectCount: 2 },
+  { name: "EMPERIA DEVELOPERS", projectCount: 1 },
+  { name: "Balaji Estate", projectCount: 2 },
+  { name: "Mastro Realtech Pvt Ltd", projectCount: 2 },
+  { name: "JAY SHREE KRISHNA ENTERPRISES", projectCount: 3 },
+  { name: "JHA REALTY", projectCount: 3 },
+  { name: "Vatsala Land Developers PVT LTD", projectCount: 1 },
+  { name: "Sai Yogi Developers", projectCount: 1 },
+  { name: "Truearth Developers Pvt Ltd", projectCount: 2 },
+  { name: "Bhaveshwar Infra", projectCount: 3 },
+  { name: "Brillswroth", projectCount: 1 },
+  { name: "Millennium Group", projectCount: 3 },
+  { name: "BM ESTATE", projectCount: 1 },
+  { name: "BKM MINDSPACE", projectCount: 1 },
+  { name: "DAKSH REALTY", projectCount: 6 },
+  { name: "Optus Housing", projectCount: 1 },
+  { name: "YTT INDUSTRIES", projectCount: 2 },
+  { name: "SHIVANI BUILDERS & DEVELOPERS", projectCount: 1 },
+  { name: "MULTISTAR BUILDER LLP", projectCount: 1 },
+  { name: "Abhilash Synergetic Constructions Exports Pvt. Ltd.", projectCount: 2 },
+  { name: "LAXMI GROUP", projectCount: 7 },
+  { name: "Ikigai Estates", projectCount: 1 },
+  { name: "RIO DREAM CONSTRUCTION LLP", projectCount: 3 },
+  { name: "TUV INDIA PVT LTD", projectCount: 2 },
+  { name: "MAHADEV GREENS", contact: "Padmini Das", phone: "9938033250", projectCount: 3 },
+  { name: "K M DEVELOPERS", contact: "Kushal", phone: "7738615810", projectCount: 2 },
+  { name: "TRISHIKA DEVELOPERS LLP", contact: "Jash Bhanushali", phone: "9221615555", projectCount: 1 },
+  { name: "Dwelite", contact: "Bismay", phone: "9827959229", projectCount: 3 },
+  { name: "ISTA SPACES LLP", contact: "Parbin Singh", phone: "9902230794", projectCount: 10 },
+  { name: "JE & VEE INFRASTRUCTURE", contact: "Hitesh Trivedi", phone: "7700998792", projectCount: 9 },
+  { name: "LUXESTATES REALTY LLP", contact: "Kartik", phone: "6376972566", projectCount: 1 },
+  { name: "VILLA PROJECT - RANA REALTORS", contact: "Bhoomi", phone: "9970690803", projectCount: 2 },
+  { name: "MAVERICK REALTORS", contact: "Priya Chaturvedi", phone: "9004624232", projectCount: 2 },
+  { name: "NEEL REALTORS", contact: "Bagesh Yadav", phone: "9920164646", projectCount: 1 },
+  { name: "KYI SOFT SOLUTIONS PRIVATE LIMITED", contact: "Saurabh Agarwal", phone: "9650549090", projectCount: 1 },
+  { name: "APLITE DEVELOPERS LLP", contact: "Mansi Kadam", phone: "9372011205", projectCount: 1 },
+  { name: "KIARA GROUP (SANTUSHTI HOUSING LLP)", contact: "Shiv", phone: "9772545298", projectCount: 1 },
+  { name: "SANCHAYA LAND AND ESTATE PRIVATE LIMITED", contact: "Vasanth Raju", phone: "9036099342", projectCount: 2 },
+  { name: "TRIGUNA PROJECTS", contact: "Jagadeesh Reddy", phone: "9986263959", projectCount: 1 },
+  { name: "AKULA LANDMARKS", contact: "Namrata Ankur", phone: "9890309371", projectCount: 11 },
+  { name: "Skyboat Infrastructure", projectCount: 1 },
 ];
+
+function formatPhone(raw?: string) {
+  if (!raw) return "";
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 10) return `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`;
+  if (digits.length === 12 && digits.startsWith("91")) {
+    return `+91 ${digits.slice(2, 7)} ${digits.slice(7)}`;
+  }
+  return raw.trim();
+}
+
+function companyEmail(name: string) {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "")
+    .slice(0, 28);
+  return `contact@${slug || "buildesk"}.com`;
+}
+
+function projectLabel(companyName: string, index: number, total: number) {
+  const short = companyName.split(/[\s(-]/).filter(Boolean).slice(0, 2).join(" ");
+  if (total === 1) return `${short} — Main Project`;
+  return `${short} — Project ${index + 1}`;
+}
 
 export const seedEmployees: Employee[] = managers.map((name, i) => ({
   id: `emp-${i + 1}`,
@@ -155,23 +235,24 @@ const PRESET_MODULE_KEYS: ModuleKey[][] = [
   ["post-sales", "vendor-management", "labor-management", "construction-management", "project-management", "customer-app"],
 ];
 
-export const seedCompanies: Company[] = brands.map((name, i) => {
-  const progress = [15, 32, 48, 60, 75, 88, 100, 22, 55, 70, 45, 92, 12, 66, 80][i];
+export const seedCompanies: Company[] = COMPANY_ROSTER.map((row, i) => {
+  const progressHint = Math.min(100, 8 + ((i * 17) % 93));
   const optedKeys = PRESET_MODULE_KEYS[i % PRESET_MODULE_KEYS.length];
+  const phone = formatPhone(row.phone);
   return {
     id: `co-${i + 1}`,
-    name,
-    contact: ["Rajesh Kumar", "Sneha Rao", "Amit Bhatt", "Kavita Reddy", "Sanjay Menon"][i % 5],
-    designation: ["Director", "CEO", "COO", "VP - Sales", "GM"][i % 5],
-    phone: `+91 9${String(800000000 + i * 12345).slice(0, 9)}`,
-    email: `contact@${name.toLowerCase().replace(/\s+/g, "")}.com`,
+    name: row.name,
+    contact: row.contact?.trim() || "To be assigned",
+    designation: row.contact ? "Contact Person" : "Pending",
+    phone: phone || "—",
+    email: companyEmail(row.name),
     city: cities[i % cities.length],
     officeAddress: `${100 + i}, Business Park, ${cities[i % cities.length]}`,
     gstNumber: `27AABCU${String(9600 + i).padStart(4, "0")}1Z${i % 10}`,
-    billingInfo: `${plans[i % 3]} plan · Annual billing`,
+    billingInfo: `${plans[i % 3]} plan · Annual billing · ${row.projectCount} project${row.projectCount === 1 ? "" : "s"}`,
     onboardingManagerId: seedEmployees[i % managers.length].id,
     csmId: seedEmployees[managers.length + (i % csms.length)].id,
-    status: progress >= 100 ? "completed" : statuses[i % statuses.length],
+    status: progressHint >= 100 ? "completed" : statuses[i % statuses.length],
     modules: createCompanyModules(optedKeys, `2024-${String(1 + (i % 12)).padStart(2, "0")}-01`),
     agreementDate: `2024-${String(1 + (i % 12)).padStart(2, "0")}-${String(5 + (i % 20)).padStart(2, "0")}`,
     goLiveTarget: `2025-${String(1 + ((i + 3) % 12)).padStart(2, "0")}-15`,
@@ -206,38 +287,37 @@ function progressSteps(project: PostSalesProject, approvedCount: number): PostSa
 
 export const seedPostSalesProjects: PostSalesProject[] = seedCompanies.flatMap((c, ci) => {
   if (!c.modules.some((m) => m.moduleKey === "post-sales" && m.optedIn)) return [];
-  const count = 1 + (ci % 3);
-  return Array.from({ length: count }).map((_, pi) => {
-    const base: PostSalesProject = {
-      id: `ps-${ci}-${pi}`,
-      companyId: c.id,
-      projectNumber: `PRJ-${String(ci * 10 + pi + 1).padStart(3, "0")}`,
-      projectName: `${c.name.split(" ")[0]} ${["Heights", "Grove", "Residency", "Square", "Bay"][pi % 5]}`,
-      steps: buildDefaultPostSalesSteps(),
-      createdAt: ts,
-      updatedAt: ts,
-    };
-    return progressSteps(base, (ci + pi) % 6);
-  });
+  // One Post Sales tracker per company (keeps seed size manageable with large project counts).
+  const base: PostSalesProject = {
+    id: `ps-${ci}-0`,
+    companyId: c.id,
+    projectNumber: `PRJ-${String(ci + 1).padStart(3, "0")}`,
+    projectName: `${c.name.split(/[\s(-]/)[0]} Post Sales`,
+    steps: buildDefaultPostSalesSteps(),
+    createdAt: ts,
+    updatedAt: ts,
+  };
+  return [progressSteps(base, ci % 6)];
 });
 
 const projTypes = ["Residential", "Commercial", "Township", "Mixed-use", "Villas"];
 
-export const seedProjects: Project[] = seedCompanies.flatMap((c, ci) =>
-  Array.from({ length: 1 + (ci % 4) }).map((_, pi) => ({
+export const seedProjects: Project[] = COMPANY_ROSTER.flatMap((row, ci) => {
+  const company = seedCompanies[ci];
+  return Array.from({ length: row.projectCount }).map((_, pi) => ({
     id: `pr-${ci}-${pi}`,
-    name: `${c.name.split(" ")[0]} ${["Heights", "Grove", "Residency", "Square", "Bay"][pi % 5]}`,
-    companyId: c.id,
+    name: projectLabel(row.name, pi, row.projectCount),
+    companyId: company.id,
     type: projTypes[(ci + pi) % projTypes.length],
-    units: 60 + ((ci * 37 + pi * 19) % 400),
-    city: c.city,
+    units: 40 + ((ci * 37 + pi * 19) % 460),
+    city: company.city,
     rera: `P5${(1000 + ci * 10 + pi).toString()}0002024`,
-    status: c.status,
+    status: company.status,
     currentStep: (ci + pi) % 8,
     createdAt: ts,
     updatedAt: ts,
-  })),
-);
+  }));
+});
 
 export function buildChecklistForProject(projectId: string): OnboardingChecklistItem[] {
   const items: OnboardingChecklistItem[] = [];
@@ -266,9 +346,10 @@ export function buildChecklistForProject(projectId: string): OnboardingChecklist
   return items;
 }
 
-export const seedChecklistItems: OnboardingChecklistItem[] = seedProjects.flatMap((p) =>
-  buildChecklistForProject(p.id),
-);
+export const seedChecklistItems: OnboardingChecklistItem[] = seedProjects
+  // Seed checklist for the first project of each company; others init on first open.
+  .filter((p) => p.id.endsWith("-0"))
+  .flatMap((p) => buildChecklistForProject(p.id));
 
 export const seedOtherCharges: OtherCharge[] = seedProjects.slice(0, 5).flatMap((p, i) => [
   {
@@ -326,20 +407,20 @@ function ago(ms: number) {
 }
 
 export const seedActivity: ActivityEntry[] = [
-  { id: newId(), who: "Priya Sharma", what: "Marked Sunrise Heights as Go Live", kind: "success", companyId: "co-1", projectId: "pr-0-0", ...ago(600_000) },
+  { id: newId(), who: "Priya Sharma", what: "Marked Globe Group — Project 1 progress updated", kind: "success", companyId: "co-1", projectId: "pr-0-0", ...ago(600_000) },
   { id: newId(), who: "Aditya Kulkarni", what: "Approved Payment Plan step — PRJ-001", kind: "success", companyId: "co-1", projectId: "ps-0-0", ...ago(1_800_000) },
   { id: newId(), who: "Priya Sharma", what: "Submitted Unit Types for approval — PRJ-001", kind: "info", companyId: "co-1", projectId: "ps-0-0", ...ago(3_600_000) },
   { id: newId(), who: "Rohan Iyer", what: "Uploaded units.xlsx for Unit Types — PRJ-001", kind: "success", companyId: "co-1", projectId: "ps-0-0", ...ago(5_400_000) },
   { id: newId(), who: "Priya Sharma", what: "Sent template for Unit Types to customer — PRJ-001", kind: "info", companyId: "co-1", projectId: "ps-0-0", ...ago(7_200_000) },
-  { id: newId(), who: "Aditya Kulkarni", what: "Updated company contact details", kind: "info", companyId: "co-1", ...ago(14_400_000) },
+  { id: newId(), who: "Aditya Kulkarni", what: "Updated company contact details — Globe Group", kind: "info", companyId: "co-1", ...ago(14_400_000) },
   { id: newId(), who: "System", what: "Go-live reminder: target approaching in 14 days", kind: "warning", companyId: "co-1", ...ago(28_800_000) },
   { id: newId(), who: "Priya Sharma", what: "Created Post Sales project PRJ-001", kind: "success", companyId: "co-1", projectId: "ps-0-0", ...ago(86_400_000) },
-  { id: newId(), who: "Rohan Iyer", what: "Uploaded Customer Data for Skyline Residency", kind: "info", companyId: "co-2", ...ago(3_600_000) },
-  { id: newId(), who: "System", what: "Renewal reminder sent to Green Meadows Group", kind: "warning", companyId: "co-3", ...ago(7_200_000) },
+  { id: newId(), who: "Rohan Iyer", what: "Uploaded Customer Data for Gurukrupa Realcon", kind: "info", companyId: "co-2", ...ago(3_600_000) },
+  { id: newId(), who: "System", what: "Renewal reminder sent to Syscom Edutech Pvt. Ltd.", kind: "warning", companyId: "co-3", ...ago(7_200_000) },
   { id: newId(), who: "Neha Kapoor", what: "Customization TKT-1008 moved to QA", kind: "info", ...ago(18_000_000) },
-  { id: newId(), who: "Aarav Mehta", what: "Verified payment plan for Oceanic Bay", kind: "success", companyId: "co-4", ...ago(86_400_000) },
+  { id: newId(), who: "Aarav Mehta", what: "Verified payment plan for Dimples Group", kind: "success", companyId: "co-4", ...ago(86_400_000) },
   { id: newId(), who: "Ishita Verma", what: "Bug TKT-1003 marked critical", kind: "danger", ...ago(86_400_000) },
-  { id: newId(), who: "Vikram Rao", what: "Training completed for Prestige Horizon", kind: "success", companyId: "co-5", ...ago(172_800_000) },
+  { id: newId(), who: "Vikram Rao", what: "Training completed for Neelam Realtors", kind: "success", companyId: "co-5", ...ago(172_800_000) },
 ];
 
 export const seedNotes: CompanyNote[] = [
@@ -347,7 +428,7 @@ export const seedNotes: CompanyNote[] = [
     id: newId(),
     companyId: "co-1",
     author: "Priya Sharma",
-    body: "Customer prefers WhatsApp for template delivery. CC Aditya on all approval emails.",
+    body: "Globe Group — large portfolio (18 projects). Prefer WhatsApp for template delivery. CC Aditya on approvals.",
     pinned: true,
     ...ago(172_800_000),
   },
@@ -362,9 +443,9 @@ export const seedNotes: CompanyNote[] = [
   },
   {
     id: newId(),
-    companyId: "co-2",
+    companyId: "co-37",
     author: "Rohan Iyer",
-    body: "Awaiting GST certificate before billing setup.",
+    body: "MAHADEV GREENS — contact Padmini Das (9938033250). Confirm GST before billing setup.",
     pinned: false,
     ...ago(86_400_000),
   },

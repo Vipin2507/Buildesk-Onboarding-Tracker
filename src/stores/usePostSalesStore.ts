@@ -43,7 +43,7 @@ function mapStep(
 }
 
 // Bump the store key to avoid stale persisted shapes after step model refactors.
-export const usePostSalesStore = createPersistedStore<PostSalesState>("post-sales-v2", (set, get) => ({
+export const usePostSalesStore = createPersistedStore<PostSalesState>("post-sales-v3", (set, get) => ({
   projects: seedPostSalesProjects,
 
   addProject: ({ companyId, projectNumber, projectName }) => {

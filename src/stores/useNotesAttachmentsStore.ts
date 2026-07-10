@@ -36,7 +36,7 @@ type NotesAttachmentsState = {
 };
 
 export const useNotesAttachmentsStore = createPersistedStore<NotesAttachmentsState>(
-  "notes-attachments-v1",
+  "notes-attachments-v2",
   (set, get) => ({
     notes: seedNotes,
     attachments: seedAttachments,

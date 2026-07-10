@@ -18,9 +18,12 @@ export {
   useMasterStore,
   getEnabledWorkflowStepDefs,
   getPicklistValues,
+  getInventoryItem,
+  getEnabledInventoryItems,
 } from "./useMasterStore";
 export type { MasterResetSection } from "./useMasterStore";
 export { useSettingsStore } from "./useSettingsStore";
+export { useProjectProgressStore } from "./useProjectProgressStore";
 export {
   calcProjectProgress,
   useDashboardKpis,

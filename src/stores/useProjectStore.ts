@@ -3,6 +3,7 @@ import { newId, nowIso } from "@/types";
 import { seedProjects } from "@/data/seed";
 import { buildChecklistForProject } from "@/data/seed";
 import { useOnboardingStore } from "./useOnboardingStore";
+import { useProjectProgressStore } from "./useProjectProgressStore";
 import { logActivity } from "./useActivityStore";
 import { createPersistedStore, touch } from "./persist";
 
@@ -16,7 +17,7 @@ type ProjectState = {
   goLive: (id: string) => boolean;
 };
 
-export const useProjectStore = createPersistedStore<ProjectState>("projects", (set, get) => ({
+export const useProjectStore = createPersistedStore<ProjectState>("projects-v2", (set, get) => ({
   projects: seedProjects,
 
   addProject: (data) => {
@@ -55,6 +56,7 @@ export const useProjectStore = createPersistedStore<ProjectState>("projects", (s
     if (!project) return undefined;
     set((s) => ({ projects: s.projects.filter((p) => p.id !== id) }));
     useOnboardingStore.getState().removeProjectData(id);
+    useProjectProgressStore.getState().removeProject(id);
     logActivity({
       who: "You",
       what: `Deleted project ${project.name}`,

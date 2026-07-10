@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, ArrowRight, Clock, ChevronRight, ArrowLeft, Rocket } from "lucide-react";
 import { toast } from "sonner";
@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { PageHeader, PageWrap } from "@/components/page-header";
 import { ProgressBar } from "@/components/progress-bar";
+import { ProjectManualProgress } from "@/components/project-manual-progress";
 import { Button } from "@/components/ui/button";
 import { EntityNotFound } from "@/components/empty-state";
 import { DetailPageSkeleton } from "@/components/loading-skeleton";
@@ -16,17 +17,19 @@ import {
   useProjectStore,
   useOnboardingStore,
   useActivityStore,
+  useProjectProgressStore,
   calcProjectProgress,
 } from "@/stores";
 import { ONBOARDING_STEPS, ONBOARDING_SECTIONS } from "@/data/constants";
 import { formatRelativeTime } from "@/types/common";
+import { PROJECT_PROGRESS_MILESTONES } from "@/types/project";
 import { cn } from "@/lib/utils";
 
 const searchSchema = z.object({
   tab: z.enum([
-    "onboarding", "data-migration", "documents", "customer-app",
+    "progress", "onboarding", "data-migration", "documents", "customer-app",
     "vendors", "labor", "integrations", "training", "go-live",
-  ]).optional().default("onboarding"),
+  ]).optional().default("progress"),
 });
 
 export const Route = createFileRoute("/projects/$projectId")({
@@ -46,7 +49,15 @@ function ProjectDetailPage() {
   const allCharges = useOnboardingStore((s) => s.otherCharges);
   const allActivities = useActivityStore((s) => s.activities);
   const checklist = useMemo(() => allChecklist.filter((i) => i.projectId === projectId), [allChecklist, projectId]);
-  const progress = useMemo(() => calcProjectProgress(projectId, allChecklist), [projectId, allChecklist]);
+  const checklistProgress = useMemo(() => calcProjectProgress(projectId, allChecklist), [projectId, allChecklist]);
+  const manualChecks = useProjectProgressStore((s) => s.byProjectId[projectId]?.checks);
+  const manualPercent = useMemo(() => {
+    if (!manualChecks) return 0;
+    const total = PROJECT_PROGRESS_MILESTONES.length;
+    const done = PROJECT_PROGRESS_MILESTONES.filter((m) => manualChecks[m.key]).length;
+    return Math.round((done / total) * 100);
+  }, [manualChecks]);
+  const progress = tab === "progress" ? manualPercent : checklistProgress;
   const canGoLive = useMemo(
     () => {
       const goliveItems = checklist.filter((i) => i.section === "golive");
@@ -56,7 +67,12 @@ function ProjectDetailPage() {
   );
   const toggleChecklist = useOnboardingStore((s) => s.toggleChecklist);
   const updateRemarks = useOnboardingStore((s) => s.updateChecklistRemarks);
+  const initChecklistForProject = useOnboardingStore((s) => s.initChecklistForProject);
   const goLive = useProjectStore((s) => s.goLive);
+
+  useEffect(() => {
+    initChecklistForProject(projectId);
+  }, [projectId, initChecklistForProject]);
   const updateProject = useProjectStore((s) => s.updateProject);
   const activities = useMemo(
     () => allActivities.filter((a) => a.projectId === projectId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
@@ -84,6 +100,7 @@ function ProjectDetailPage() {
   const projectName = project.name;
 
   const TABS = [
+    { key: "progress", label: "Progress Tracker" },
     { key: "onboarding", label: "Onboarding" },
     { key: "data-migration", label: "Data Migration" },
     { key: "documents", label: "Documents" },
@@ -156,6 +173,8 @@ function ProjectDetailPage() {
           >{t.label}</button>
         ))}
       </div>
+
+      {tab === "progress" && <ProjectManualProgress projectId={projectId} />}
 
       {tab === "onboarding" && (
         <>
@@ -306,7 +325,7 @@ function ProjectDetailPage() {
         </>
       )}
 
-      {tab !== "onboarding" && (
+      {tab !== "onboarding" && tab !== "progress" && (
         <div className="card-soft p-5">
           <p className="text-sm text-muted-foreground">
             Use the dedicated <Link to={`/${tab}` as "/data-migration"} className="text-primary underline">{tab}</Link> page for full CRUD — data is shared via global stores and scoped to this project where applicable.

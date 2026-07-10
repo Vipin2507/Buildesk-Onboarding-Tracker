@@ -4,10 +4,12 @@ import {
   ArrowUp,
   Building2,
   Boxes,
+  Copy,
   Database,
   FileText,
   Layers,
   ListChecks,
+  Package,
   Pencil,
   Plug,
   Plus,
@@ -33,10 +35,15 @@ import {
 import type {
   FieldValueType,
   MasterFieldDef,
+  MasterInventoryCategory,
+  MasterInventoryItem,
+  MasterInventoryWorkflowStep,
+  MasterModuleDef,
   MasterPicklist,
   MasterTemplateDef,
   MasterWorkflowStepDef,
 } from "@/types";
+import { MASTER_INVENTORY_CATEGORIES } from "@/types/master";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/master")({
@@ -49,6 +56,7 @@ const SECTIONS = [
   { id: "company-fields", label: "Company Fields", icon: Building2 },
   { id: "project-fields", label: "Project Fields", icon: Boxes },
   { id: "picklists", label: "Picklists", icon: ListChecks },
+  { id: "inventory", label: "Inventory", icon: Package },
   { id: "workflow", label: "Workflow Steps", icon: Workflow },
   { id: "checklist", label: "Onboarding Checklist", icon: Layers },
   { id: "templates", label: "Templates", icon: FileText },
@@ -122,6 +130,7 @@ function MasterPage() {
           {section === "company-fields" && <FieldsPanel entity="company" />}
           {section === "project-fields" && <FieldsPanel entity="project" />}
           {section === "picklists" && <PicklistsPanel />}
+          {section === "inventory" && <InventoryPanel />}
           {section === "workflow" && <WorkflowPanel />}
           {section === "checklist" && <ChecklistPanel />}
           {section === "templates" && <TemplatesPanel />}
@@ -144,12 +153,14 @@ function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) 
   const modules = useMasterStore((s) => s.modules);
   const integrations = useMasterStore((s) => s.integrations);
   const triggers = useMasterStore((s) => s.triggers);
+  const inventoryItems = useMasterStore((s) => s.inventoryItems ?? []);
   const platform = useMasterStore((s) => s.platform);
 
   const cards = [
     { label: "Company Fields", value: companyFields.filter((f) => f.enabled).length, total: companyFields.length, to: "company-fields" as const },
     { label: "Project Fields", value: projectFields.filter((f) => f.enabled).length, total: projectFields.length, to: "project-fields" as const },
     { label: "Picklists", value: picklists.length, total: picklists.reduce((n, p) => n + p.values.length, 0), to: "picklists" as const, suffix: "values" },
+    { label: "Inventory Items", value: inventoryItems.filter((i) => i.enabled).length, total: inventoryItems.length, to: "inventory" as const },
     { label: "Workflow Steps", value: workflowSteps.filter((s) => s.enabled).length, total: workflowSteps.length, to: "workflow" as const },
     { label: "Checklist Items", value: checklistItems.filter((c) => c.enabled).length, total: checklistItems.length, to: "checklist" as const },
     { label: "Templates", value: templates.filter((t) => t.enabled).length, total: templates.length, to: "templates" as const },
@@ -556,6 +567,516 @@ function PicklistsPanel() {
   );
 }
 
+function InventoryPanel() {
+  const items = useMasterStore((s) => s.inventoryItems ?? []);
+  const addInventoryItem = useMasterStore((s) => s.addInventoryItem);
+  const updateInventoryItem = useMasterStore((s) => s.updateInventoryItem);
+  const deleteInventoryItem = useMasterStore((s) => s.deleteInventoryItem);
+  const addInventoryWorkflowStep = useMasterStore((s) => s.addInventoryWorkflowStep);
+  const updateInventoryWorkflowStep = useMasterStore((s) => s.updateInventoryWorkflowStep);
+  const deleteInventoryWorkflowStep = useMasterStore((s) => s.deleteInventoryWorkflowStep);
+  const moveInventoryWorkflowStep = useMasterStore((s) => s.moveInventoryWorkflowStep);
+  const applyDefaultWorkflowToItem = useMasterStore((s) => s.applyDefaultWorkflowToItem);
+  const clearInventoryWorkflow = useMasterStore((s) => s.clearInventoryWorkflow);
+
+  const sorted = useMemo(() => [...items].sort((a, b) => a.order - b.order), [items]);
+  const [selectedId, setSelectedId] = useState<string | null>(sorted[0]?.id ?? null);
+  const selected = sorted.find((i) => i.id === selectedId) ?? sorted[0] ?? null;
+
+  const [itemModal, setItemModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<MasterInventoryItem | null>(null);
+  const [deleteItemId, setDeleteItemId] = useState<string | null>(null);
+  const [itemForm, setItemForm] = useState({
+    name: "",
+    sku: "",
+    category: "Other" as MasterInventoryCategory,
+    description: "",
+    unit: "",
+    enabled: true,
+  });
+
+  const [stepModal, setStepModal] = useState(false);
+  const [editingStep, setEditingStep] = useState<MasterInventoryWorkflowStep | null>(null);
+  const [deleteStepId, setDeleteStepId] = useState<string | null>(null);
+  const [stepForm, setStepForm] = useState({
+    key: "",
+    label: "",
+    description: "",
+    requiresApproval: true,
+    requiresUpload: false,
+    enabled: true,
+  });
+
+  function openCreateItem() {
+    setEditingItem(null);
+    setItemForm({
+      name: "",
+      sku: "",
+      category: "Other",
+      description: "",
+      unit: "",
+      enabled: true,
+    });
+    setItemModal(true);
+  }
+
+  function openEditItem(item: MasterInventoryItem) {
+    setEditingItem(item);
+    setItemForm({
+      name: item.name,
+      sku: item.sku ?? "",
+      category: item.category,
+      description: item.description ?? "",
+      unit: item.unit ?? "",
+      enabled: item.enabled,
+    });
+    setItemModal(true);
+  }
+
+  function saveItem() {
+    if (!itemForm.name.trim()) {
+      toast.error("Item name is required");
+      return;
+    }
+    if (editingItem) {
+      updateInventoryItem(editingItem.id, {
+        name: itemForm.name.trim(),
+        sku: itemForm.sku.trim() || undefined,
+        category: itemForm.category,
+        description: itemForm.description.trim() || undefined,
+        unit: itemForm.unit.trim() || undefined,
+        enabled: itemForm.enabled,
+      });
+      toast.success("Inventory item updated");
+    } else {
+      const created = addInventoryItem({
+        name: itemForm.name.trim(),
+        sku: itemForm.sku.trim() || undefined,
+        category: itemForm.category,
+        description: itemForm.description.trim() || undefined,
+        unit: itemForm.unit.trim() || undefined,
+        enabled: itemForm.enabled,
+        order: items.length + 1,
+        workflow: [],
+      });
+      setSelectedId(created.id);
+      toast.success("Inventory item added — set up its workflow below");
+    }
+    setItemModal(false);
+  }
+
+  function openCreateStep() {
+    if (!selected) return;
+    setEditingStep(null);
+    setStepForm({
+      key: "",
+      label: "",
+      description: "",
+      requiresApproval: true,
+      requiresUpload: false,
+      enabled: true,
+    });
+    setStepModal(true);
+  }
+
+  function openEditStep(step: MasterInventoryWorkflowStep) {
+    setEditingStep(step);
+    setStepForm({
+      key: step.key,
+      label: step.label,
+      description: step.description ?? "",
+      requiresApproval: step.requiresApproval,
+      requiresUpload: step.requiresUpload,
+      enabled: step.enabled,
+    });
+    setStepModal(true);
+  }
+
+  function saveStep() {
+    if (!selected) return;
+    if (!stepForm.label.trim()) {
+      toast.error("Step label is required");
+      return;
+    }
+    const key =
+      stepForm.key.trim() ||
+      stepForm.label
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+    const payload = {
+      key,
+      label: stepForm.label.trim(),
+      description: stepForm.description.trim() || undefined,
+      requiresApproval: stepForm.requiresApproval,
+      requiresUpload: stepForm.requiresUpload,
+      enabled: stepForm.enabled,
+      order: editingStep?.order ?? selected.workflow.length + 1,
+    };
+    if (editingStep) {
+      updateInventoryWorkflowStep(selected.id, editingStep.id, payload);
+      toast.success("Workflow step updated");
+    } else {
+      addInventoryWorkflowStep(selected.id, payload);
+      toast.success("Workflow step added");
+    }
+    setStepModal(false);
+  }
+
+  const workflowSorted = useMemo(
+    () => [...(selected?.workflow ?? [])].sort((a, b) => a.order - b.order),
+    [selected],
+  );
+
+  return (
+    <div className="space-y-4">
+      <SectionHead
+        title="Inventory Catalog"
+        description="Add any item and manually design its end-to-end workflow. Full create, edit, reorder, and delete access."
+        action={
+          <Button size="sm" className="gap-1" onClick={openCreateItem}>
+            <Plus className="h-3.5 w-3.5" /> Add Item
+          </Button>
+        }
+      />
+
+      <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
+        <div className="card-soft space-y-2 p-3">
+          <div className="px-1 pb-1 text-xs font-medium text-muted-foreground">
+            {sorted.length} item{sorted.length === 1 ? "" : "s"}
+          </div>
+          {sorted.length === 0 && (
+            <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+              No inventory items yet. Click Add Item to create one.
+            </div>
+          )}
+          {sorted.map((item) => {
+            const active = (selected?.id ?? selectedId) === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setSelectedId(item.id)}
+                className={cn(
+                  "w-full rounded-lg border px-3 py-2.5 text-left transition-colors",
+                  active ? "border-primary bg-primary/10" : "hover:bg-muted/50",
+                )}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold">{item.name}</div>
+                    <div className="mt-0.5 flex flex-wrap gap-1">
+                      <Pill tone="accent">{item.category}</Pill>
+                      {item.sku && <span className="font-mono text-[10px] text-muted-foreground">{item.sku}</span>}
+                    </div>
+                  </div>
+                  <Pill tone={item.enabled ? "success" : "muted"}>{item.enabled ? "On" : "Off"}</Pill>
+                </div>
+                <div className="mt-1 text-[11px] text-muted-foreground">
+                  {item.workflow.filter((s) => s.enabled).length}/{item.workflow.length} workflow steps
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="min-w-0 space-y-4">
+          {!selected ? (
+            <div className="card-soft p-8 text-center text-sm text-muted-foreground">
+              Select or add an inventory item to configure its workflow.
+            </div>
+          ) : (
+            <>
+              <div className="card-soft p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h4 className="text-lg font-semibold">{selected.name}</h4>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {selected.description || "No description yet."}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                      <Pill tone="accent">{selected.category}</Pill>
+                      {selected.sku && <Pill>{selected.sku}</Pill>}
+                      {selected.unit && <Pill>Unit: {selected.unit}</Pill>}
+                      <Pill tone={selected.enabled ? "success" : "muted"}>
+                        {selected.enabled ? "Enabled" : "Disabled"}
+                      </Pill>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-0.5">
+                    <MasterToggle
+                      enabled={selected.enabled}
+                      onClick={() => updateInventoryItem(selected.id, { enabled: !selected.enabled })}
+                    />
+                    <MasterIconButton label="Edit item" onClick={() => openEditItem(selected)}>
+                      <Pencil />
+                    </MasterIconButton>
+                    <MasterIconButton label="Delete item" destructive onClick={() => setDeleteItemId(selected.id)}>
+                      <Trash2 />
+                    </MasterIconButton>
+                  </div>
+                </div>
+              </div>
+
+              <div className="card-soft p-5">
+                <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <h4 className="font-semibold">Item Workflow</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Manually define every step for this item — order, approvals, and uploads.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1"
+                      onClick={() => {
+                        applyDefaultWorkflowToItem(selected.id);
+                        toast.success("Default Post Sales workflow applied");
+                      }}
+                    >
+                      <Copy className="h-3.5 w-3.5" /> Use default workflow
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        clearInventoryWorkflow(selected.id);
+                        toast.message("Workflow cleared");
+                      }}
+                    >
+                      Clear
+                    </Button>
+                    <Button size="sm" className="gap-1" onClick={openCreateStep}>
+                      <Plus className="h-3.5 w-3.5" /> Add Step
+                    </Button>
+                  </div>
+                </div>
+
+                {workflowSorted.length === 0 ? (
+                  <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                    No steps yet. Add steps manually or apply the default Post Sales workflow.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {workflowSorted.map((step, idx) => (
+                      <div key={step.id} className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/20 p-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
+                          {idx + 1}
+                        </div>
+                        <div className="min-w-[160px] flex-1">
+                          <div className="font-medium">{step.label}</div>
+                          <div className="font-mono text-[11px] text-muted-foreground">{step.key}</div>
+                          {step.description && (
+                            <p className="mt-0.5 text-xs text-muted-foreground">{step.description}</p>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          <Pill tone={step.enabled ? "success" : "muted"}>{step.enabled ? "On" : "Off"}</Pill>
+                          {step.requiresApproval && <Pill tone="accent">Approval</Pill>}
+                          {step.requiresUpload && <Pill>Upload</Pill>}
+                        </div>
+                        <div className="flex items-center gap-0.5">
+                          <MasterIconButton
+                            label="Move up"
+                            onClick={() => moveInventoryWorkflowStep(selected.id, step.id, "up")}
+                          >
+                            <ArrowUp />
+                          </MasterIconButton>
+                          <MasterIconButton
+                            label="Move down"
+                            onClick={() => moveInventoryWorkflowStep(selected.id, step.id, "down")}
+                          >
+                            <ArrowDown />
+                          </MasterIconButton>
+                          <MasterToggle
+                            enabled={step.enabled}
+                            onClick={() =>
+                              updateInventoryWorkflowStep(selected.id, step.id, { enabled: !step.enabled })
+                            }
+                          />
+                          <MasterIconButton label="Edit step" onClick={() => openEditStep(step)}>
+                            <Pencil />
+                          </MasterIconButton>
+                          <MasterIconButton
+                            label="Delete step"
+                            destructive
+                            onClick={() => setDeleteStepId(step.id)}
+                          >
+                            <Trash2 />
+                          </MasterIconButton>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      <EntityFormModal
+        open={itemModal}
+        onOpenChange={setItemModal}
+        title={editingItem ? "Edit Inventory Item" : "Add Inventory Item"}
+        onSubmit={saveItem}
+      >
+        <div className="grid gap-3">
+          <label className="text-xs font-medium">
+            Name
+            <input
+              value={itemForm.name}
+              onChange={(e) => setItemForm((f) => ({ ...f, name: e.target.value }))}
+              className="mt-1 h-9 w-full rounded-md border px-3 text-sm"
+              placeholder="e.g. Receipt Format"
+            />
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="text-xs font-medium">
+              SKU
+              <input
+                value={itemForm.sku}
+                onChange={(e) => setItemForm((f) => ({ ...f, sku: e.target.value }))}
+                className="mt-1 h-9 w-full rounded-md border px-3 font-mono text-sm"
+                placeholder="INV-…"
+              />
+            </label>
+            <label className="text-xs font-medium">
+              Unit
+              <input
+                value={itemForm.unit}
+                onChange={(e) => setItemForm((f) => ({ ...f, unit: e.target.value }))}
+                className="mt-1 h-9 w-full rounded-md border px-3 text-sm"
+                placeholder="template / bag / app"
+              />
+            </label>
+          </div>
+          <label className="text-xs font-medium">
+            Category
+            <select
+              value={itemForm.category}
+              onChange={(e) =>
+                setItemForm((f) => ({ ...f, category: e.target.value as MasterInventoryCategory }))
+              }
+              className="mt-1 h-9 w-full rounded-md border px-3 text-sm"
+            >
+              {MASTER_INVENTORY_CATEGORIES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs font-medium">
+            Description
+            <textarea
+              value={itemForm.description}
+              onChange={(e) => setItemForm((f) => ({ ...f, description: e.target.value }))}
+              className="mt-1 min-h-[72px] w-full rounded-md border px-3 py-2 text-sm"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={itemForm.enabled}
+              onChange={(e) => setItemForm((f) => ({ ...f, enabled: e.target.checked }))}
+            />
+            Enabled
+          </label>
+        </div>
+      </EntityFormModal>
+
+      <EntityFormModal
+        open={stepModal}
+        onOpenChange={setStepModal}
+        title={editingStep ? "Edit Workflow Step" : "Add Workflow Step"}
+        onSubmit={saveStep}
+      >
+        <div className="grid gap-3">
+          <label className="text-xs font-medium">
+            Label
+            <input
+              value={stepForm.label}
+              onChange={(e) => setStepForm((f) => ({ ...f, label: e.target.value }))}
+              className="mt-1 h-9 w-full rounded-md border px-3 text-sm"
+            />
+          </label>
+          <label className="text-xs font-medium">
+            Key
+            <input
+              value={stepForm.key}
+              onChange={(e) => setStepForm((f) => ({ ...f, key: e.target.value }))}
+              className="mt-1 h-9 w-full rounded-md border px-3 font-mono text-sm"
+              placeholder="auto from label if empty"
+            />
+          </label>
+          <label className="text-xs font-medium">
+            Description
+            <textarea
+              value={stepForm.description}
+              onChange={(e) => setStepForm((f) => ({ ...f, description: e.target.value }))}
+              className="mt-1 min-h-[64px] w-full rounded-md border px-3 py-2 text-sm"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={stepForm.requiresApproval}
+              onChange={(e) => setStepForm((f) => ({ ...f, requiresApproval: e.target.checked }))}
+            />
+            Requires approval
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={stepForm.requiresUpload}
+              onChange={(e) => setStepForm((f) => ({ ...f, requiresUpload: e.target.checked }))}
+            />
+            Requires upload
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={stepForm.enabled}
+              onChange={(e) => setStepForm((f) => ({ ...f, enabled: e.target.checked }))}
+            />
+            Enabled
+          </label>
+        </div>
+      </EntityFormModal>
+
+      <ConfirmDeleteDialog
+        open={!!deleteItemId}
+        onOpenChange={(o) => !o && setDeleteItemId(null)}
+        title="Delete inventory item?"
+        description="This removes the item and its custom workflow from Master Config."
+        onConfirm={() => {
+          if (deleteItemId) {
+            deleteInventoryItem(deleteItemId);
+            if (selectedId === deleteItemId) setSelectedId(null);
+            toast.success("Inventory item deleted");
+          }
+          setDeleteItemId(null);
+        }}
+      />
+
+      <ConfirmDeleteDialog
+        open={!!deleteStepId}
+        onOpenChange={(o) => !o && setDeleteStepId(null)}
+        title="Delete workflow step?"
+        onConfirm={() => {
+          if (selected && deleteStepId) {
+            deleteInventoryWorkflowStep(selected.id, deleteStepId);
+            toast.success("Step deleted");
+          }
+          setDeleteStepId(null);
+        }}
+      />
+    </div>
+  );
+}
+
 function WorkflowPanel() {
   const steps = useMasterStore((s) => s.workflowSteps);
   const addWorkflowStep = useMasterStore((s) => s.addWorkflowStep);
@@ -852,14 +1373,72 @@ function TemplatesPanel() {
 
 function ModulesPanel() {
   const modules = useMasterStore((s) => s.modules);
+  const addModule = useMasterStore((s) => s.addModule);
   const updateModule = useMasterStore((s) => s.updateModule);
+  const deleteModule = useMasterStore((s) => s.deleteModule);
   const sorted = useMemo(() => [...modules].sort((a, b) => a.order - b.order), [modules]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<MasterModuleDef | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    key: "",
+    label: "",
+    description: "",
+    icon: "Boxes",
+    enabled: true,
+  });
+
+  function openCreate() {
+    setEditing(null);
+    setForm({ key: "", label: "", description: "", icon: "Boxes", enabled: true });
+    setModalOpen(true);
+  }
+
+  function openEdit(m: MasterModuleDef) {
+    setEditing(m);
+    setForm({
+      key: m.key,
+      label: m.label,
+      description: m.description,
+      icon: m.icon,
+      enabled: m.enabled,
+    });
+    setModalOpen(true);
+  }
+
+  function save() {
+    if (!form.label.trim() || !form.key.trim()) {
+      toast.error("Key and label required");
+      return;
+    }
+    const payload = {
+      key: form.key.trim(),
+      label: form.label.trim(),
+      description: form.description.trim() || "Custom module",
+      icon: form.icon.trim() || "Boxes",
+      enabled: form.enabled,
+      order: editing?.order ?? modules.length + 1,
+    };
+    if (editing) {
+      updateModule(editing.id, payload);
+      toast.success("Module updated");
+    } else {
+      addModule(payload);
+      toast.success("Module added");
+    }
+    setModalOpen(false);
+  }
 
   return (
     <div className="space-y-4">
       <SectionHead
         title="Module Catalog"
-        description="Control which product modules are offered when opting a company in."
+        description="Full control over product modules offered when opting a company in."
+        action={
+          <Button size="sm" className="gap-1" onClick={openCreate}>
+            <Plus className="h-3.5 w-3.5" /> Add Module
+          </Button>
+        }
       />
       <div className="grid gap-3 md:grid-cols-2">
         {sorted.map((m) => (
@@ -869,13 +1448,89 @@ function ModulesPanel() {
                 <div className="font-semibold">{m.label}</div>
                 <div className="font-mono text-[11px] text-muted-foreground">{m.key}</div>
               </div>
-              <MasterToggle enabled={m.enabled} onClick={() => updateModule(m.id, { enabled: !m.enabled })} />
+              <div className="flex items-center gap-0.5">
+                <MasterToggle enabled={m.enabled} onClick={() => updateModule(m.id, { enabled: !m.enabled })} />
+                <MasterIconButton label="Edit module" onClick={() => openEdit(m)}>
+                  <Pencil />
+                </MasterIconButton>
+                <MasterIconButton label="Delete module" destructive onClick={() => setDeleteId(m.id)}>
+                  <Trash2 />
+                </MasterIconButton>
+              </div>
             </div>
             <p className="text-sm text-muted-foreground">{m.description}</p>
-            <div className="mt-2"><Pill tone={m.enabled ? "success" : "muted"}>{m.enabled ? "Available" : "Hidden"}</Pill></div>
+            <div className="mt-2">
+              <Pill tone={m.enabled ? "success" : "muted"}>{m.enabled ? "Available" : "Hidden"}</Pill>
+            </div>
           </div>
         ))}
       </div>
+
+      <EntityFormModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        title={editing ? "Edit Module" : "Add Module"}
+        onSubmit={save}
+      >
+        <div className="grid gap-3">
+          <label className="text-xs font-medium">
+            Label
+            <input
+              value={form.label}
+              onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
+              className="mt-1 h-9 w-full rounded-md border px-3 text-sm"
+            />
+          </label>
+          <label className="text-xs font-medium">
+            Key
+            <input
+              value={form.key}
+              onChange={(e) => setForm((f) => ({ ...f, key: e.target.value }))}
+              className="mt-1 h-9 w-full rounded-md border px-3 font-mono text-sm"
+              placeholder="custom-module"
+            />
+          </label>
+          <label className="text-xs font-medium">
+            Description
+            <textarea
+              value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              className="mt-1 min-h-[64px] w-full rounded-md border px-3 py-2 text-sm"
+            />
+          </label>
+          <label className="text-xs font-medium">
+            Icon name
+            <input
+              value={form.icon}
+              onChange={(e) => setForm((f) => ({ ...f, icon: e.target.value }))}
+              className="mt-1 h-9 w-full rounded-md border px-3 text-sm"
+              placeholder="Boxes"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={form.enabled}
+              onChange={(e) => setForm((f) => ({ ...f, enabled: e.target.checked }))}
+            />
+            Enabled
+          </label>
+        </div>
+      </EntityFormModal>
+
+      <ConfirmDeleteDialog
+        open={!!deleteId}
+        onOpenChange={(o) => !o && setDeleteId(null)}
+        title="Delete module?"
+        description="Companies that already opted into this module keep their records; it will no longer appear for new opt-ins."
+        onConfirm={() => {
+          if (deleteId) {
+            deleteModule(deleteId);
+            toast.success("Module deleted");
+          }
+          setDeleteId(null);
+        }}
+      />
     </div>
   );
 }
@@ -883,17 +1538,33 @@ function ModulesPanel() {
 function IntegrationsPanel() {
   const integrations = useMasterStore((s) => s.integrations);
   const triggers = useMasterStore((s) => s.triggers);
+  const addIntegration = useMasterStore((s) => s.addIntegration);
   const updateIntegration = useMasterStore((s) => s.updateIntegration);
+  const deleteIntegration = useMasterStore((s) => s.deleteIntegration);
   const updateTrigger = useMasterStore((s) => s.updateTrigger);
   const addTrigger = useMasterStore((s) => s.addTrigger);
   const deleteTrigger = useMasterStore((s) => s.deleteTrigger);
   const [modalOpen, setModalOpen] = useState(false);
+  const [integrationModal, setIntegrationModal] = useState(false);
   const [form, setForm] = useState({ name: "", event: "", channel: "WhatsApp" });
+  const [integrationForm, setIntegrationForm] = useState({ name: "", description: "", enabled: true });
+  const [deleteIntegrationId, setDeleteIntegrationId] = useState<string | null>(null);
 
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <SectionHead title="Integrations" description="Enable/disable connectors shown in the integrations workspace." />
+        <SectionHead
+          title="Integrations"
+          description="Enable/disable connectors shown in the integrations workspace."
+          action={
+            <Button size="sm" className="gap-1" onClick={() => {
+              setIntegrationForm({ name: "", description: "", enabled: true });
+              setIntegrationModal(true);
+            }}>
+              <Plus className="h-3.5 w-3.5" /> Add Integration
+            </Button>
+          }
+        />
         <div className="grid gap-3 md:grid-cols-2">
           {integrations.map((i) => (
             <div key={i.id} className="card-soft flex items-start gap-3 p-4">
@@ -901,7 +1572,16 @@ function IntegrationsPanel() {
                 <div className="font-medium">{i.name}</div>
                 <p className="text-xs text-muted-foreground">{i.description}</p>
               </div>
-              <MasterToggle enabled={i.enabled} onClick={() => updateIntegration(i.id, { enabled: !i.enabled })} />
+              <div className="flex items-center gap-0.5">
+                <MasterToggle enabled={i.enabled} onClick={() => updateIntegration(i.id, { enabled: !i.enabled })} />
+                <MasterIconButton
+                  label="Delete integration"
+                  destructive
+                  onClick={() => setDeleteIntegrationId(i.id)}
+                >
+                  <Trash2 />
+                </MasterIconButton>
+              </div>
             </div>
           ))}
         </div>
@@ -965,6 +1645,63 @@ function IntegrationsPanel() {
           </label>
         </div>
       </EntityFormModal>
+
+      <EntityFormModal
+        open={integrationModal}
+        onOpenChange={setIntegrationModal}
+        title="Add Integration"
+        onSubmit={() => {
+          if (!integrationForm.name.trim()) return toast.error("Name required");
+          addIntegration({
+            name: integrationForm.name.trim(),
+            description: integrationForm.description.trim() || "Custom integration",
+            enabled: integrationForm.enabled,
+            order: integrations.length + 1,
+          });
+          setIntegrationModal(false);
+          toast.success("Integration added");
+        }}
+      >
+        <div className="grid gap-3">
+          <label className="text-xs font-medium">
+            Name
+            <input
+              value={integrationForm.name}
+              onChange={(e) => setIntegrationForm((f) => ({ ...f, name: e.target.value }))}
+              className="mt-1 h-9 w-full rounded-md border px-3 text-sm"
+            />
+          </label>
+          <label className="text-xs font-medium">
+            Description
+            <textarea
+              value={integrationForm.description}
+              onChange={(e) => setIntegrationForm((f) => ({ ...f, description: e.target.value }))}
+              className="mt-1 min-h-[64px] w-full rounded-md border px-3 py-2 text-sm"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={integrationForm.enabled}
+              onChange={(e) => setIntegrationForm((f) => ({ ...f, enabled: e.target.checked }))}
+            />
+            Enabled
+          </label>
+        </div>
+      </EntityFormModal>
+
+      <ConfirmDeleteDialog
+        open={!!deleteIntegrationId}
+        onOpenChange={(o) => !o && setDeleteIntegrationId(null)}
+        title="Delete integration?"
+        onConfirm={() => {
+          if (deleteIntegrationId) {
+            deleteIntegration(deleteIntegrationId);
+            toast.success("Integration deleted");
+          }
+          setDeleteIntegrationId(null);
+        }}
+      />
     </div>
   );
 }
@@ -984,6 +1721,7 @@ function DangerPanel() {
     { id: "modules", label: "Modules" },
     { id: "integrations", label: "Integrations" },
     { id: "triggers", label: "Triggers" },
+    { id: "inventoryItems", label: "Inventory items" },
   ];
 
   return (

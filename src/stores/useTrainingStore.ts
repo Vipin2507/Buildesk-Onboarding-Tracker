@@ -11,7 +11,7 @@ type TrainingState = {
   deleteSession: (id: string) => TrainingSession | undefined;
 };
 
-export const useTrainingStore = createPersistedStore<TrainingState>("training", (set, get) => ({
+export const useTrainingStore = createPersistedStore<TrainingState>("training-v2", (set, get) => ({
   sessions: seedTrainingSessions,
 
   addSession: (data) => {

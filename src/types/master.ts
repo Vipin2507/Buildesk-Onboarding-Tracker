@@ -100,3 +100,47 @@ export type MasterPlatformSettings = {
   requireRejectionRemarks: boolean;
   autoLogActivity: boolean;
 };
+
+export type MasterInventoryCategory =
+  | "Material"
+  | "Document Format"
+  | "Customer App"
+  | "Integration"
+  | "Procurement"
+  | "Service"
+  | "Other";
+
+export const MASTER_INVENTORY_CATEGORIES: MasterInventoryCategory[] = [
+  "Material",
+  "Document Format",
+  "Customer App",
+  "Integration",
+  "Procurement",
+  "Service",
+  "Other",
+];
+
+/** Step inside an inventory item's custom workflow. */
+export type MasterInventoryWorkflowStep = Timestamps & {
+  id: string;
+  key: string;
+  label: string;
+  description?: string;
+  requiresApproval: boolean;
+  requiresUpload: boolean;
+  enabled: boolean;
+  order: number;
+};
+
+/** Catalog item with a fully user-managed workflow. */
+export type MasterInventoryItem = Timestamps & {
+  id: string;
+  name: string;
+  sku?: string;
+  category: MasterInventoryCategory;
+  description?: string;
+  unit?: string;
+  enabled: boolean;
+  order: number;
+  workflow: MasterInventoryWorkflowStep[];
+};

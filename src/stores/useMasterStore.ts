@@ -2,6 +2,8 @@ import type {
   MasterChecklistItemDef,
   MasterFieldDef,
   MasterIntegrationDef,
+  MasterInventoryItem,
+  MasterInventoryWorkflowStep,
   MasterModuleDef,
   MasterPicklist,
   MasterPlatformSettings,
@@ -14,6 +16,7 @@ import {
   SEED_CHECKLIST,
   SEED_COMPANY_FIELDS,
   SEED_INTEGRATIONS,
+  SEED_INVENTORY,
   SEED_MODULES,
   SEED_PICKLISTS,
   SEED_PLATFORM,
@@ -36,6 +39,7 @@ type MasterState = {
   modules: MasterModuleDef[];
   integrations: MasterIntegrationDef[];
   triggers: MasterTriggerDef[];
+  inventoryItems: MasterInventoryItem[];
 
   updatePlatform: (data: Partial<MasterPlatformSettings>) => void;
 
@@ -65,7 +69,9 @@ type MasterState = {
   updateTemplate: (id: string, data: Partial<MasterTemplateDef>) => void;
   deleteTemplate: (id: string) => void;
 
+  addModule: (data: Omit<MasterModuleDef, "id" | "createdAt" | "updatedAt">) => void;
   updateModule: (id: string, data: Partial<MasterModuleDef>) => void;
+  deleteModule: (id: string) => void;
 
   addIntegration: (data: Omit<MasterIntegrationDef, "id" | "createdAt" | "updatedAt">) => void;
   updateIntegration: (id: string, data: Partial<MasterIntegrationDef>) => void;
@@ -74,6 +80,29 @@ type MasterState = {
   addTrigger: (data: Omit<MasterTriggerDef, "id" | "createdAt" | "updatedAt">) => void;
   updateTrigger: (id: string, data: Partial<MasterTriggerDef>) => void;
   deleteTrigger: (id: string) => void;
+
+  addInventoryItem: (
+    data: Omit<MasterInventoryItem, "id" | "createdAt" | "updatedAt" | "workflow"> & {
+      workflow?: MasterInventoryWorkflowStep[];
+    },
+  ) => MasterInventoryItem;
+  updateInventoryItem: (id: string, data: Partial<Omit<MasterInventoryItem, "workflow">>) => void;
+  deleteInventoryItem: (id: string) => void;
+
+  addInventoryWorkflowStep: (
+    itemId: string,
+    data: Omit<MasterInventoryWorkflowStep, "id" | "createdAt" | "updatedAt">,
+  ) => void;
+  updateInventoryWorkflowStep: (
+    itemId: string,
+    stepId: string,
+    data: Partial<MasterInventoryWorkflowStep>,
+  ) => void;
+  deleteInventoryWorkflowStep: (itemId: string, stepId: string) => void;
+  moveInventoryWorkflowStep: (itemId: string, stepId: string, direction: "up" | "down") => void;
+  setInventoryWorkflow: (itemId: string, workflow: MasterInventoryWorkflowStep[]) => void;
+  applyDefaultWorkflowToItem: (itemId: string) => void;
+  clearInventoryWorkflow: (itemId: string) => void;
 
   resetSection: (section: MasterResetSection) => void;
   resetAll: () => void;
@@ -89,7 +118,8 @@ export type MasterResetSection =
   | "templates"
   | "modules"
   | "integrations"
-  | "triggers";
+  | "triggers"
+  | "inventoryItems";
 
 function withId<T extends object>(data: T) {
   const now = nowIso();
@@ -128,6 +158,32 @@ function moveItem<T extends { id: string; order: number; updatedAt: string }>(
   return sorted;
 }
 
+function defaultWorkflowFromMaster(): MasterInventoryWorkflowStep[] {
+  const now = nowIso();
+  return [...SEED_WORKFLOW_STEPS]
+    .sort((a, b) => a.order - b.order)
+    .map((s, i) => ({
+      id: newId(),
+      key: s.key,
+      label: s.label,
+      description: s.description,
+      requiresApproval: true,
+      requiresUpload: s.requiresTemplate,
+      enabled: s.enabled,
+      order: i + 1,
+      createdAt: now,
+      updatedAt: now,
+    }));
+}
+
+function patchInventoryItem(
+  items: MasterInventoryItem[],
+  itemId: string,
+  patch: (item: MasterInventoryItem) => MasterInventoryItem,
+): MasterInventoryItem[] {
+  return items.map((item) => (item.id === itemId ? touch(patch(item)) : item));
+}
+
 const INITIAL: Pick<
   MasterState,
   | "platform"
@@ -140,6 +196,7 @@ const INITIAL: Pick<
   | "modules"
   | "integrations"
   | "triggers"
+  | "inventoryItems"
 > = {
   platform: SEED_PLATFORM,
   companyFields: SEED_COMPANY_FIELDS,
@@ -151,9 +208,10 @@ const INITIAL: Pick<
   modules: SEED_MODULES,
   integrations: SEED_INTEGRATIONS,
   triggers: SEED_TRIGGERS,
+  inventoryItems: SEED_INVENTORY,
 };
 
-export const useMasterStore = createPersistedStore<MasterState>("master-config-v1", (set, get) => ({
+export const useMasterStore = createPersistedStore<MasterState>("master-config-v2", (set, get) => ({
   ...INITIAL,
 
   updatePlatform: (data) => {
@@ -254,10 +312,19 @@ export const useMasterStore = createPersistedStore<MasterState>("master-config-v
     if (t) logActivity({ who: "You", what: `Deleted template ${t.name}`, kind: "warning" });
   },
 
+  addModule: (data) => {
+    set((s) => ({ modules: [...s.modules, withId(data)] }));
+    logActivity({ who: "You", what: `Added module ${data.label}`, kind: "success" });
+  },
   updateModule: (id, data) => {
     set((s) => ({
       modules: s.modules.map((m) => (m.id === id ? touch({ ...m, ...data }) : m)),
     }));
+  },
+  deleteModule: (id) => {
+    const m = get().modules.find((x) => x.id === id);
+    set((s) => ({ modules: s.modules.filter((x) => x.id !== id) }));
+    if (m) logActivity({ who: "You", what: `Deleted module ${m.label}`, kind: "warning" });
   },
 
   addIntegration: (data) => {
@@ -284,6 +351,91 @@ export const useMasterStore = createPersistedStore<MasterState>("master-config-v
     set((s) => ({ triggers: s.triggers.filter((t) => t.id !== id) }));
   },
 
+  addInventoryItem: (data) => {
+    const item = withId({
+      ...data,
+      workflow: data.workflow ?? [],
+    }) as MasterInventoryItem;
+    set((s) => ({ inventoryItems: [...(s.inventoryItems ?? []), item] }));
+    logActivity({ who: "You", what: `Added inventory item ${item.name}`, kind: "success" });
+    return item;
+  },
+  updateInventoryItem: (id, data) => {
+    set((s) => ({
+      inventoryItems: (s.inventoryItems ?? []).map((i) => (i.id === id ? touch({ ...i, ...data }) : i)),
+    }));
+  },
+  deleteInventoryItem: (id) => {
+    const item = (get().inventoryItems ?? []).find((x) => x.id === id);
+    set((s) => ({ inventoryItems: (s.inventoryItems ?? []).filter((x) => x.id !== id) }));
+    if (item) logActivity({ who: "You", what: `Deleted inventory item ${item.name}`, kind: "warning" });
+  },
+
+  addInventoryWorkflowStep: (itemId, data) => {
+    const step = withId(data) as MasterInventoryWorkflowStep;
+    set((s) => ({
+      inventoryItems: patchInventoryItem(s.inventoryItems ?? [], itemId, (item) => ({
+        ...item,
+        workflow: [...item.workflow, step],
+      })),
+    }));
+  },
+  updateInventoryWorkflowStep: (itemId, stepId, data) => {
+    set((s) => ({
+      inventoryItems: patchInventoryItem(s.inventoryItems ?? [], itemId, (item) => ({
+        ...item,
+        workflow: item.workflow.map((step) => (step.id === stepId ? touch({ ...step, ...data }) : step)),
+      })),
+    }));
+  },
+  deleteInventoryWorkflowStep: (itemId, stepId) => {
+    set((s) => ({
+      inventoryItems: patchInventoryItem(s.inventoryItems ?? [], itemId, (item) => ({
+        ...item,
+        workflow: item.workflow.filter((step) => step.id !== stepId),
+      })),
+    }));
+  },
+  moveInventoryWorkflowStep: (itemId, stepId, direction) => {
+    set((s) => ({
+      inventoryItems: patchInventoryItem(s.inventoryItems ?? [], itemId, (item) => ({
+        ...item,
+        workflow: moveItem(item.workflow, stepId, direction),
+      })),
+    }));
+  },
+  setInventoryWorkflow: (itemId, workflow) => {
+    set((s) => ({
+      inventoryItems: patchInventoryItem(s.inventoryItems ?? [], itemId, (item) => ({
+        ...item,
+        workflow,
+      })),
+    }));
+  },
+  applyDefaultWorkflowToItem: (itemId) => {
+    const workflow = defaultWorkflowFromMaster();
+    set((s) => ({
+      inventoryItems: patchInventoryItem(s.inventoryItems ?? [], itemId, (item) => ({
+        ...item,
+        workflow,
+      })),
+    }));
+    const item = (get().inventoryItems ?? []).find((x) => x.id === itemId);
+    logActivity({
+      who: "You",
+      what: `Applied default Post Sales workflow to ${item?.name ?? "inventory item"}`,
+      kind: "info",
+    });
+  },
+  clearInventoryWorkflow: (itemId) => {
+    set((s) => ({
+      inventoryItems: patchInventoryItem(s.inventoryItems ?? [], itemId, (item) => ({
+        ...item,
+        workflow: [],
+      })),
+    }));
+  },
+
   resetSection: (section) => {
     const map: Record<MasterResetSection, Partial<typeof INITIAL>> = {
       platform: { platform: SEED_PLATFORM },
@@ -296,6 +448,7 @@ export const useMasterStore = createPersistedStore<MasterState>("master-config-v
       modules: { modules: SEED_MODULES },
       integrations: { integrations: SEED_INTEGRATIONS },
       triggers: { triggers: SEED_TRIGGERS },
+      inventoryItems: { inventoryItems: SEED_INVENTORY },
     };
     set(map[section]);
     logActivity({ who: "You", what: `Reset master section: ${section}`, kind: "warning" });
@@ -316,4 +469,14 @@ export function getEnabledWorkflowStepDefs() {
 
 export function getPicklistValues(key: string): string[] {
   return useMasterStore.getState().picklists.find((p) => p.key === key)?.values ?? [];
+}
+
+export function getInventoryItem(id: string) {
+  return (useMasterStore.getState().inventoryItems ?? []).find((i) => i.id === id);
+}
+
+export function getEnabledInventoryItems() {
+  return [...(useMasterStore.getState().inventoryItems ?? [])]
+    .filter((i) => i.enabled)
+    .sort((a, b) => a.order - b.order);
 }

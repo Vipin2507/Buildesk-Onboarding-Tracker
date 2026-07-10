@@ -17,7 +17,7 @@ type ActivityState = {
   getRecent: (limit?: number) => ActivityEntry[];
 };
 
-export const useActivityStore = createPersistedStore<ActivityState>("activity", (set, get) => ({
+export const useActivityStore = createPersistedStore<ActivityState>("activity-v2", (set, get) => ({
   activities: seedActivity,
 
   addActivity: (entry) => {
