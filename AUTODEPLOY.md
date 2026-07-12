@@ -112,6 +112,8 @@ server {
   listen 80;
   server_name _;
 
+  client_max_body_size 12m;
+
   location / {
     proxy_pass http://127.0.0.1:3000;
     proxy_http_version 1.1;
@@ -253,7 +255,7 @@ crontab -e
 | --- | --- |
 | SSH permission denied | Public key not in `authorized_keys`; secret missing newlines |
 | `drizzle-kit: not found` on deploy | Deploy used `npm ci --omit=dev`. Fixed in `scripts/deploy.sh` — use full `npm ci` (vite/drizzle-kit are devDependencies). Pull latest and re-run the workflow. |
-| `no such column: "address"` on `db:push` | Known drizzle-kit + SQLite ADD COLUMN bug. Deploy now runs `npm run db:ensure` (raw `ALTER TABLE`) after push. On the VPS now: `cd /var/www/buildesk && npm run db:ensure && pm2 restart buildesk` |
+| `413 Request Entity Too Large` on image upload | Nginx default body limit is 1m. On VPS: add `client_max_body_size 12m;` inside the `server { }` block, then `nginx -t && systemctl reload nginx`. App also compresses avatars client-side after deploy. |
 | `git fetch` auth failed | VPS deploy key / HTTPS token for private repo |
 | `better-sqlite3` build fails | Install `build-essential` on VPS; Node 22 |
 | PM2 not found | `npm i -g pm2` as the same user Actions SSHs as |

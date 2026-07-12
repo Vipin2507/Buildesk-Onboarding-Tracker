@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { compressImageToDataUrl } from "@/lib/compress-image";
 import {
   PROJECT_OTHER_CHARGE_OPTIONS,
   PROJECT_TYPES,
@@ -164,21 +165,22 @@ export function ProjectFormModal({
     setCustomDraft("");
   }
 
-  function onLogoChange(file: File | undefined) {
+  async function onLogoChange(file: File | undefined) {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       toast.error("Please upload an image file");
       return;
     }
-    if (file.size > 800_000) {
-      toast.error("Logo must be under 800KB");
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("Logo must be under 8MB");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      form.setValue("logoUrl", String(reader.result), { shouldDirty: true });
-    };
-    reader.readAsDataURL(file);
+    try {
+      const dataUrl = await compressImageToDataUrl(file, { maxEdge: 400, quality: 0.8 });
+      form.setValue("logoUrl", dataUrl, { shouldDirty: true });
+    } catch {
+      toast.error("Could not process image");
+    }
   }
 
   function submit() {
@@ -416,7 +418,7 @@ export function ProjectFormModal({
               )}
               <div>
                 <div className="text-sm font-medium">{logoUrl ? "Change project logo" : "Upload project logo"}</div>
-                <div className="text-xs text-muted-foreground">PNG or JPG · max 800KB</div>
+                <div className="text-xs text-muted-foreground">PNG or JPG · auto-compressed</div>
               </div>
             </button>
             {logoUrl && (

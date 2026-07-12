@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useAuthStore, useCurrentUser, useUserStore } from "@/stores";
 import { authChangePassword, authUpdateProfile } from "@/lib/api";
+import { compressImageToDataUrl } from "@/lib/compress-image";
 import { cn } from "@/lib/utils";
 
 const TIMEZONES = [
@@ -81,21 +82,22 @@ export function EditProfileDialog({
     .join("")
     .slice(0, 2);
 
-  function onPickImage(file?: File | null) {
+  async function onPickImage(file?: File | null) {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       toast.error("Please choose an image file");
       return;
     }
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("Image must be under 2MB");
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("Image must be under 8MB");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      setForm((f) => ({ ...f, avatarUrl: String(reader.result ?? "") }));
-    };
-    reader.readAsDataURL(file);
+    try {
+      const avatarUrl = await compressImageToDataUrl(file, { maxEdge: 512, quality: 0.8 });
+      setForm((f) => ({ ...f, avatarUrl }));
+    } catch {
+      toast.error("Could not process image");
+    }
   }
 
   async function saveProfile() {
