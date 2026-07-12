@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { motion } from "framer-motion";
 import {
   LayoutDashboard,
   Building2,
@@ -76,37 +75,36 @@ export function AppSidebar() {
   return (
     <aside
       className={cn(
-        "hidden md:flex sticky top-0 h-screen shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200 ease-out",
+        "hidden md:flex sticky top-0 h-screen shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground",
+        "transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
         collapsed ? "w-[52px]" : "w-52",
       )}
     >
-      <div
-        className={cn(
-          "flex items-center gap-2 py-4",
-          collapsed ? "flex-col px-1.5" : "px-3",
-        )}
-      >
+      <div className="flex h-14 items-center gap-2 overflow-hidden px-2.5">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
           <Building className="h-4 w-4" />
         </div>
-        {!collapsed && (
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold tracking-tight text-white">Buildesk</div>
-            <div className="truncate text-[10px] text-sidebar-foreground/70">Onboarding & Post-Sales</div>
-          </div>
-        )}
+        <div
+          className={cn(
+            "min-w-0 flex-1 overflow-hidden transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+            collapsed ? "pointer-events-none translate-x-1 opacity-0" : "translate-x-0 opacity-100",
+          )}
+        >
+          <div className="truncate text-sm font-semibold tracking-tight text-white">Buildesk</div>
+          <div className="truncate text-[10px] text-sidebar-foreground/70">Onboarding & Post-Sales</div>
+        </div>
         <button
           type="button"
           onClick={toggle}
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-white"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors duration-200 hover:bg-sidebar-accent hover:text-white"
         >
           {collapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
         </button>
       </div>
 
-      <nav className={cn("flex-1 overflow-y-auto pb-3", collapsed ? "px-1" : "px-1.5")}>
+      <nav className="flex-1 overflow-x-hidden overflow-y-auto px-1.5 pb-3">
         {nav.map((item) => {
           const active = item.exact
             ? pathname === item.to
@@ -116,55 +114,64 @@ export function AppSidebar() {
           return (
             <div key={item.to}>
               {showAdminDivider && (
-                <div
-                  className={cn(
-                    "mb-1.5 mt-3 border-t border-sidebar-border pt-2.5",
-                    collapsed
-                      ? "mx-1"
-                      : "mx-2 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/45",
-                  )}
-                >
-                  {!collapsed && "Administration"}
+                <div className="mx-2 mb-1.5 mt-3 border-t border-sidebar-border pt-2.5">
+                  <div
+                    className={cn(
+                      "overflow-hidden text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/45 transition-[opacity,height] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                      collapsed ? "h-0 opacity-0" : "h-4 opacity-100",
+                    )}
+                  >
+                    Administration
+                  </div>
                 </div>
               )}
               <Link
                 to={item.to}
                 title={collapsed ? item.label : undefined}
                 className={cn(
-                  "relative flex items-center rounded-md text-[13px] font-medium transition-colors",
-                  collapsed ? "justify-center px-0 py-2" : "gap-2.5 px-2.5 py-1.5",
+                  "group relative flex items-center gap-2.5 overflow-hidden rounded-md px-2.5 py-1.5 text-[13px] font-medium",
+                  "transition-[background-color,color,padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                  collapsed && "justify-center px-0",
                   active
-                    ? "text-white"
-                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-white",
+                    ? "bg-sidebar-accent text-white"
+                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent/70 hover:text-white",
                 )}
               >
                 {active && (
-                  <motion.span
-                    layoutId="sidebar-active"
-                    className="absolute inset-0 rounded-md bg-sidebar-accent"
-                    transition={{ type: "spring", stiffness: 400, damping: 36 }}
-                  />
-                )}
-                {active && !collapsed && (
-                  <motion.span
-                    layoutId="sidebar-indicator"
-                    className="absolute left-0 top-1/2 h-5 -translate-y-1/2 rounded-r-full bg-sidebar-primary"
-                    style={{ width: 3 }}
+                  <span
+                    className={cn(
+                      "absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-sidebar-primary transition-opacity duration-300",
+                      collapsed ? "opacity-0" : "opacity-100",
+                    )}
                   />
                 )}
                 <Icon className="relative z-10 h-4 w-4 shrink-0" />
-                {!collapsed && <span className="relative z-10 truncate">{item.label}</span>}
+                <span
+                  className={cn(
+                    "relative z-10 truncate transition-[opacity,max-width,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                    collapsed
+                      ? "max-w-0 translate-x-1 opacity-0"
+                      : "max-w-[9rem] translate-x-0 opacity-100",
+                  )}
+                >
+                  {item.label}
+                </span>
               </Link>
             </div>
           );
         })}
       </nav>
 
-      {!collapsed && (
-        <div className="border-t border-sidebar-border px-3 py-3 text-[10px] text-sidebar-foreground/60">
+      <div
+        className={cn(
+          "overflow-hidden border-t border-sidebar-border transition-[opacity,max-height,padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+          collapsed ? "max-h-0 opacity-0" : "max-h-16 px-3 py-3 opacity-100",
+        )}
+      >
+        <div className="whitespace-nowrap text-[10px] text-sidebar-foreground/60">
           v1.0 · Buildesk Internal
         </div>
-      )}
+      </div>
     </aside>
   );
 }
