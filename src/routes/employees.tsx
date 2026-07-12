@@ -59,13 +59,33 @@ function Employees() {
       <PageHeader
         title="Employees & Onboarding Managers"
         actions={
-          <div className="flex gap-2">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
             <Button variant="outline" className="gap-1.5" onClick={() => setTransferOpen(true)}><ArrowLeftRight className="h-4 w-4" /> Transfer Manager</Button>
             <Button className="gap-1.5 bg-primary" onClick={() => { setEditing(null); form.reset(); setModalOpen(true); }}><Plus className="h-4 w-4" /> Add Employee</Button>
           </div>
         }
       />
-      <div className="card-soft overflow-hidden">
+      <div className="space-y-2.5 md:hidden">
+        {enriched.map((e) => (
+          <div key={e.id} className="rounded-xl border border-border bg-card p-3.5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                {e.name.split(" ").map((n) => n[0]).join("")}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-medium">{e.name}</div>
+                <div className="text-xs text-muted-foreground">{e.role} · {e.region}</div>
+              </div>
+              <span className="text-xs text-muted-foreground">{e.companies} cos</span>
+            </div>
+            <div className="mt-2 flex justify-end gap-1 border-t border-border/60 pt-2">
+              <Button size="icon" variant="ghost" onClick={() => { setEditing(e); form.reset({ name: e.name, role: e.role, region: e.region, email: e.email }); setModalOpen(true); }}><Pencil className="h-4 w-4" /></Button>
+              <Button size="icon" variant="ghost" onClick={() => { setEditing(e); setDeleteOpen(true); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="card-soft hidden overflow-hidden md:block">
         <table className="w-full text-sm">
           <thead className="bg-muted/60 text-xs text-muted-foreground">
             <tr>

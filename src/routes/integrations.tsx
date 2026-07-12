@@ -30,17 +30,17 @@ function Integrations() {
         actions={<Button className="bg-primary" onClick={() => setModalOpen(true)}>+ Add Trigger</Button>}
       />
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Integrations</h2>
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {integrations.map((i) => (
           <div key={i.id} className="card-soft p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <div>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="min-w-0">
                 <div className="font-medium">{i.name}</div>
                 <div className="text-xs text-muted-foreground">{i.description}</div>
               </div>
               <Switch checked={i.connected} onCheckedChange={() => { toggleIntegration(i.id, "connected"); toast.success(`${i.name} updated`); }} />
             </div>
-            <label className="flex items-center gap-2 text-xs">
+            <label className="flex min-h-10 items-center gap-2 text-xs">
               <input type="checkbox" checked={i.tested} onChange={() => toggleIntegration(i.id, "tested")} className="h-3.5 w-3.5" />
               <span className="text-muted-foreground">Tested</span>
             </label>
@@ -48,7 +48,29 @@ function Integrations() {
         ))}
       </div>
       <h2 className="mt-8 mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Trigger Management</h2>
-      <div className="card-soft overflow-hidden">
+      <div className="space-y-2.5 md:hidden">
+        {triggers.map((t) => (
+          <div key={t.id} className="rounded-xl border border-border bg-card p-3.5">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <div className="font-medium text-sm">{t.name}</div>
+                <div className="mt-0.5 text-xs text-muted-foreground">{t.event}</div>
+              </div>
+              <Pill tone="accent">{t.channel}</Pill>
+            </div>
+            <div className="mt-3 flex items-center justify-between border-t border-border/60 pt-2">
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-muted-foreground">Active</span>
+                <Switch checked={t.active} onCheckedChange={() => toggleTrigger(t.id)} />
+              </div>
+              <Button size="icon" variant="ghost" onClick={() => deleteTrigger(t.id)}>
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="card-soft hidden overflow-hidden md:block">
         <table className="w-full text-sm">
           <thead className="bg-muted/60 text-xs text-muted-foreground">
             <tr>

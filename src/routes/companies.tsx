@@ -184,13 +184,13 @@ function CompaniesListPage() {
         actions={<Button className="gap-1.5 bg-primary hover:bg-primary/90" onClick={openCreate}><Plus className="h-4 w-4" /> Add Company</Button>}
       />
 
-      <div className="card-soft mb-4 flex flex-wrap items-center gap-2 p-3">
+      <div className="card-soft mb-4 -mx-1 flex gap-2 overflow-x-auto px-1 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:flex-wrap md:overflow-visible md:p-3">
         {FILTERS.map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
             className={cn(
-              "rounded-md border px-3 py-1.5 text-xs font-medium transition-colors",
+              "min-h-10 shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors",
               filter === f ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted",
             )}
           >{f}</button>

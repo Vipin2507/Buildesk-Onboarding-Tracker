@@ -200,7 +200,64 @@ function PostSalesModulePage({
           onAction={openCreate}
         />
       ) : (
-        <div className="card-soft overflow-hidden">
+        <>
+          <div className="space-y-2.5 md:hidden">
+            {projects.map((p) => (
+              <div
+                key={p.id}
+                role="button"
+                tabIndex={0}
+                className="rounded-xl border border-border bg-card p-3.5 active:bg-muted/50"
+                onClick={() =>
+                  navigate({
+                    to: "/companies/$companyId/modules/post-sales/projects/$projectId",
+                    params: { companyId, projectId: p.id },
+                  })
+                }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    navigate({
+                      to: "/companies/$companyId/modules/post-sales/projects/$projectId",
+                      params: { companyId, projectId: p.id },
+                    });
+                  }
+                }}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="font-medium">{p.projectName}</div>
+                    <div className="text-xs text-muted-foreground">{p.projectNumber}</div>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {p.stepsDone}/{p.steps.length}
+                  </span>
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                  <ProgressBar value={p.progress} className="flex-1" />
+                  <span className="text-xs text-muted-foreground">{p.progress}%</span>
+                </div>
+                <div className="mt-2 flex items-center justify-between border-t border-border/60 pt-2 text-xs text-muted-foreground">
+                  <span>{formatRelativeTime(p.updatedAt)}</span>
+                  <div onClick={(e) => e.stopPropagation()} className="flex gap-1">
+                    <Button size="icon" variant="ghost" onClick={() => openEdit(p)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        setDeleting(p);
+                        setDeleteOpen(true);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="card-soft hidden overflow-hidden md:block">
           <table className="w-full text-sm">
             <thead className="bg-muted/60 text-xs text-muted-foreground">
               <tr>
@@ -255,7 +312,8 @@ function PostSalesModulePage({
               ))}
             </tbody>
           </table>
-        </div>
+          </div>
+        </>
       )}
 
       <EntityFormModal

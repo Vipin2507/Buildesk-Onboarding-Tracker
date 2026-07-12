@@ -72,8 +72,8 @@ function DataMigration() {
           <h3 className="font-semibold">Verification Dashboard</h3>
           <Pill tone="info">Excel ↔ CRM reconciliation</Pill>
         </div>
-        <div className="overflow-hidden rounded-lg border">
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto rounded-lg border">
+          <table className="w-full min-w-[480px] text-sm">
             <thead className="bg-muted/60 text-xs text-muted-foreground">
               <tr>
                 <th className="px-4 py-2 text-left">Metric</th>

@@ -1,52 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import {
-  LayoutDashboard,
-  Building2,
-  Boxes,
-  Route as RouteIcon,
-  Package,
-  Upload,
-  FileText,
-  Smartphone,
-  Truck,
-  HardHat,
-  Plug,
-  GraduationCap,
-  LifeBuoy,
-  RefreshCw,
-  Users,
-  BarChart3,
-  Settings,
-  Building,
-  Database,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+import { Building, ChevronLeft, ChevronRight } from "lucide-react";
+
+import { APP_NAV, isNavActive } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "buildesk-sidebar-collapsed";
-
-const nav = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { to: "/companies", label: "Companies", icon: Building2 },
-  { to: "/projects", label: "Projects", icon: Boxes },
-  { to: "/onboarding", label: "Onboarding Tracker", icon: RouteIcon },
-  { to: "/modules", label: "Modules & Add-ons", icon: Package },
-  { to: "/data-migration", label: "Data Migration", icon: Upload },
-  { to: "/documents", label: "Document Templates", icon: FileText },
-  { to: "/customer-app", label: "Customer App", icon: Smartphone },
-  { to: "/vendors", label: "Vendor Management", icon: Truck },
-  { to: "/labor", label: "Labor Management", icon: HardHat },
-  { to: "/integrations", label: "Integrations & Triggers", icon: Plug },
-  { to: "/training", label: "Training", icon: GraduationCap },
-  { to: "/support", label: "Support Desk", icon: LifeBuoy },
-  { to: "/renewals", label: "Renewals", icon: RefreshCw },
-  { to: "/employees", label: "Employees", icon: Users },
-  { to: "/reports", label: "Reports", icon: BarChart3 },
-  { to: "/master", label: "Master Config", icon: Database },
-  { to: "/settings", label: "Settings", icon: Settings },
-];
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -105,10 +64,8 @@ export function AppSidebar() {
         </div>
 
         <nav className="flex-1 overflow-x-hidden overflow-y-auto px-1.5 pb-3">
-          {nav.map((item) => {
-            const active = item.exact
-              ? pathname === item.to
-              : pathname === item.to || pathname.startsWith(item.to + "/");
+          {APP_NAV.map((item) => {
+            const active = isNavActive(pathname, item);
             const Icon = item.icon;
             const showAdminDivider = item.to === "/master";
             return (
@@ -174,7 +131,6 @@ export function AppSidebar() {
         </div>
       </aside>
 
-      {/* Edge handle — always visible outside the narrow rail */}
       <button
         type="button"
         onClick={toggle}
@@ -186,7 +142,7 @@ export function AppSidebar() {
           "transition-[right,background-color,box-shadow,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
           "hover:bg-primary hover:text-primary-foreground hover:border-primary hover:shadow-lg",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-          collapsed ? "-right-4" : "-right-4",
+          "-right-4",
         )}
       >
         {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}

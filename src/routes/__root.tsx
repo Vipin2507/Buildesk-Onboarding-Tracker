@@ -133,7 +133,7 @@ function RootComponent() {
                 <AppSidebar />
                 <div className="flex min-w-0 flex-1 flex-col">
                   <TopBar />
-                  <main className="min-w-0 flex-1">
+                  <main className="min-w-0 flex-1 pb-[env(safe-area-inset-bottom)]">
                     <Outlet />
                   </main>
                 </div>

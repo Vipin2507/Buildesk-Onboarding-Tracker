@@ -508,7 +508,8 @@ function ExcelSection() {
         </Button>
       </div>
       <div className="card-soft overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[560px] text-sm">
           <thead className="bg-muted/60 text-xs text-muted-foreground">
             <tr>
               <th className="px-4 py-2 text-left">Name</th>
@@ -556,6 +557,7 @@ function ExcelSection() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       <EntityFormModal
@@ -896,7 +898,8 @@ function UsersSection() {
         </Button>
       </div>
       <div className="card-soft overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[560px] text-sm">
           <thead className="bg-muted/60 text-xs text-muted-foreground">
             <tr>
               <th className="px-4 py-2 text-left">User</th>
@@ -977,6 +980,7 @@ function UsersSection() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       <EntityFormModal

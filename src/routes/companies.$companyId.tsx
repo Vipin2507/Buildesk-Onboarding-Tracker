@@ -171,14 +171,14 @@ function CompanyDetailContent() {
         />
       </div>
 
-      <div className="card-soft mb-5 flex gap-1 overflow-x-auto p-1.5">
+      <div className="card-soft mb-5 -mx-1 flex gap-1 overflow-x-auto px-1.5 py-1.5 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0">
         {TABS.map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
             className={cn(
-              "shrink-0 rounded-md px-3.5 py-2 text-sm font-medium transition-colors",
+              "min-h-10 shrink-0 snap-start rounded-md px-3.5 py-2 text-sm font-medium transition-colors",
               tab === t.id
                 ? "bg-primary text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:bg-muted hover:text-foreground",

@@ -110,9 +110,9 @@ function ProjectsListPage() {
           onAction={openCreate}
         />
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
           {enriched.map((p) => (
-            <div key={p.id} className="card-soft relative p-5 transition-shadow hover:shadow-[var(--shadow-elevated)]">
+            <div key={p.id} className="card-soft relative p-4 transition-shadow hover:shadow-[var(--shadow-elevated)] sm:p-5">
               <Link
                 to="/projects/$projectId"
                 params={{ projectId: p.id }}

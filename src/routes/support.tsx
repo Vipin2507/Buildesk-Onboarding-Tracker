@@ -122,19 +122,19 @@ function SupportListPage() {
         actions={<Button className="gap-1.5 bg-primary" onClick={() => { setEditing(null); form.reset(); setModalOpen(true); }}><Plus className="h-4 w-4" /> New Ticket</Button>}
       />
 
-      <div className="mb-4 grid gap-3 md:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         {(["Critical", "High", "Medium", "Low"] as const).map((p) => (
-          <div key={p} className="card-soft p-4">
+          <div key={p} className="card-soft p-3 sm:p-4">
             <Pill tone={p === "Critical" ? "danger" : p === "High" ? "warning" : p === "Medium" ? "info" : "muted"}>{p}</Pill>
-            <div className="mt-2 text-2xl font-semibold"><CountUp to={counts[p]} /></div>
+            <div className="mt-2 text-xl font-semibold sm:text-2xl"><CountUp to={counts[p]} /></div>
             <div className="text-xs text-muted-foreground">Open bugs</div>
           </div>
         ))}
       </div>
 
-      <div className="card-soft mb-4 flex flex-wrap gap-1 p-1">
+      <div className="card-soft mb-4 -mx-1 flex gap-1 overflow-x-auto px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:flex-wrap md:overflow-visible">
         {TABS.map((t) => (
-          <button key={t} onClick={() => setTab(t)} className={cn("rounded-md px-3 py-1.5 text-sm font-medium", tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}>{t}</button>
+          <button key={t} onClick={() => setTab(t)} className={cn("min-h-10 shrink-0 rounded-md px-3 py-2 text-sm font-medium", tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}>{t}</button>
         ))}
       </div>
 
@@ -142,43 +142,69 @@ function SupportListPage() {
         filtered.length === 0 ? (
           <EmptyState title="No tickets yet" description="Create a ticket to track bugs and customizations." actionLabel="+ Create Ticket" onAction={() => setModalOpen(true)} />
         ) : (
-          <div className="card-soft overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/60 text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-2 text-left">ID</th>
-                  <th className="px-4 py-2 text-left">Type</th>
-                  <th className="px-4 py-2 text-left">Title</th>
-                  <th className="px-4 py-2 text-left">Priority</th>
-                  <th className="px-4 py-2 text-left">Status</th>
-                  <th className="px-4 py-2 text-left">Developer</th>
-                  <th className="px-4 py-2"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((t) => (
-                  <tr key={t.id} className="border-t hover:bg-muted/40">
-                    <td className="px-4 py-2.5 font-mono text-xs">
-                      <Link to="/support/$ticketId" params={{ ticketId: t.id }} className="hover:underline">{t.id}</Link>
-                    </td>
-                    <td className="px-4 py-2.5"><Pill tone={t.type === "Bug" ? "danger" : "info"}>{t.type}</Pill></td>
-                    <td className="px-4 py-2.5 font-medium">{t.title}</td>
-                    <td className="px-4 py-2.5"><Pill tone={t.priority === "Critical" ? "danger" : "warning"}>{t.priority}</Pill></td>
-                    <td className="px-4 py-2.5">{t.status}</td>
-                    <td className="px-4 py-2.5">{t.developer}</td>
-                    <td className="px-4 py-2.5 text-right">
-                      <Button size="icon" variant="ghost" onClick={() => { setEditing(t); form.reset(t); setModalOpen(true); }}><Pencil className="h-4 w-4" /></Button>
-                      <Button size="icon" variant="ghost" onClick={() => { setEditing(t); setDeleteOpen(true); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <div className="space-y-2.5 md:hidden">
+              {filtered.map((t) => (
+                <div key={t.id} className="rounded-xl border border-border bg-card p-3.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <Link to="/support/$ticketId" params={{ ticketId: t.id }} className="font-mono text-xs text-primary hover:underline">
+                      {t.id}
+                    </Link>
+                    <Pill tone={t.priority === "Critical" ? "danger" : "warning"}>{t.priority}</Pill>
+                  </div>
+                  <div className="mt-1 font-medium text-sm">{t.title}</div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <Pill tone={t.type === "Bug" ? "danger" : "info"}>{t.type}</Pill>
+                    <span>{t.status}</span>
+                    <span>· {t.developer}</span>
+                  </div>
+                  <div className="mt-2 flex justify-end gap-1 border-t border-border/60 pt-2">
+                    <Button size="icon" variant="ghost" onClick={() => { setEditing(t); form.reset(t); setModalOpen(true); }}><Pencil className="h-4 w-4" /></Button>
+                    <Button size="icon" variant="ghost" onClick={() => { setEditing(t); setDeleteOpen(true); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="card-soft hidden overflow-hidden md:block">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/60 text-xs text-muted-foreground">
+                    <tr>
+                      <th className="px-4 py-2 text-left">ID</th>
+                      <th className="px-4 py-2 text-left">Type</th>
+                      <th className="px-4 py-2 text-left">Title</th>
+                      <th className="px-4 py-2 text-left">Priority</th>
+                      <th className="px-4 py-2 text-left">Status</th>
+                      <th className="px-4 py-2 text-left">Developer</th>
+                      <th className="px-4 py-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map((t) => (
+                      <tr key={t.id} className="border-t hover:bg-muted/40">
+                        <td className="px-4 py-2.5 font-mono text-xs">
+                          <Link to="/support/$ticketId" params={{ ticketId: t.id }} className="hover:underline">{t.id}</Link>
+                        </td>
+                        <td className="px-4 py-2.5"><Pill tone={t.type === "Bug" ? "danger" : "info"}>{t.type}</Pill></td>
+                        <td className="px-4 py-2.5 font-medium">{t.title}</td>
+                        <td className="px-4 py-2.5"><Pill tone={t.priority === "Critical" ? "danger" : "warning"}>{t.priority}</Pill></td>
+                        <td className="px-4 py-2.5">{t.status}</td>
+                        <td className="px-4 py-2.5">{t.developer}</td>
+                        <td className="px-4 py-2.5 text-right">
+                          <Button size="icon" variant="ghost" onClick={() => { setEditing(t); form.reset(t); setModalOpen(true); }}><Pencil className="h-4 w-4" /></Button>
+                          <Button size="icon" variant="ghost" onClick={() => { setEditing(t); setDeleteOpen(true); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
         )
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={(e) => setActiveId(String(e.active.id))} onDragEnd={onDragEnd}>
-          <div className="flex gap-3 overflow-x-auto pb-2">
+          <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch]">
             {TICKET_KANBAN_COLUMNS.map((col) => (
               <KanbanColumn key={col} title={col} tickets={enriched.filter((t) => t.status === col)} />
             ))}
@@ -216,7 +242,7 @@ function SupportListPage() {
 function KanbanColumn({ title, tickets }: { title: string; tickets: Array<Ticket & { developer: string }> }) {
   const { setNodeRef, isOver } = useDroppable({ id: title });
   return (
-    <div ref={setNodeRef} className={cn("w-[260px] shrink-0 rounded-xl p-1", isOver && "bg-primary/10")}>
+    <div ref={setNodeRef} className={cn("w-[min(260px,85vw)] shrink-0 snap-start rounded-xl p-1", isOver && "bg-primary/10")}>
       <div className="mb-2 flex items-center justify-between px-1">
         <div className="text-sm font-semibold">{title}</div>
         <span className="text-xs text-muted-foreground">{tickets.length}</span>

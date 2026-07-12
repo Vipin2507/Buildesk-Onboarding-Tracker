@@ -14,17 +14,17 @@ function Modules() {
   return (
     <PageWrap>
       <PageHeader title="Modules & Add-ons" subtitle="Adoption of each Buildesk module across your customer base." />
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {MODULE_CATALOG.map((m) => {
           const opted = companies.filter((c) => c.modules.some((x) => x.moduleKey === m.key && x.optedIn)).length;
           const pct = companies.length ? Math.round((opted / companies.length) * 100) : 0;
           return (
-            <div key={m.key} className="card-soft p-5">
+            <div key={m.key} className="card-soft p-4 sm:p-5">
               <div className="mb-2 flex items-center justify-between">
                 <div className="font-semibold">{m.label}</div>
                 <span className="text-xs text-muted-foreground">{pct}%</span>
               </div>
-              <div className="mb-3 text-3xl font-semibold">
+              <div className="mb-3 text-2xl font-semibold sm:text-3xl">
                 <CountUp to={opted} /> <span className="text-sm font-normal text-muted-foreground">/ {companies.length}</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-muted">

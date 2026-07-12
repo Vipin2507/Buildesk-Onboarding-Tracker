@@ -73,22 +73,22 @@ function Dashboard() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-6">
         {kpiCards.map((k, i) => (
           <motion.div
             key={k.label}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05 }}
-            className="card-soft p-4"
+            className="card-soft p-3 sm:p-4"
           >
-            <div className={`mb-3 inline-flex h-9 w-9 items-center justify-center rounded-lg ${k.tone}`}>
+            <div className={`mb-2 inline-flex h-8 w-8 items-center justify-center rounded-lg sm:mb-3 sm:h-9 sm:w-9 ${k.tone}`}>
               <k.icon className="h-4 w-4" />
             </div>
-            <div className="text-2xl font-semibold tracking-tight">
+            <div className="text-xl font-semibold tracking-tight sm:text-2xl">
               <CountUp to={k.value} />
             </div>
-            <div className="text-xs text-muted-foreground">{k.label}</div>
+            <div className="text-[11px] text-muted-foreground sm:text-xs">{k.label}</div>
           </motion.div>
         ))}
       </div>
@@ -145,7 +145,47 @@ function Dashboard() {
             <h3 className="font-semibold">Recent Onboarding</h3>
             <Link to="/projects" className="text-xs font-medium text-primary hover:underline">View all</Link>
           </div>
-          <div className="overflow-hidden rounded-lg border">
+          <div className="space-y-2.5 md:hidden">
+            {recent.map((c, i) => {
+              const project = projects.find((p) => p.companyId === c.id);
+              const manager = employees.find((e) => e.id === c.onboardingManagerId);
+              return (
+                <motion.div
+                  key={c.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: Math.min(i * 0.04, 0.24) }}
+                  className="rounded-xl border border-border p-3.5"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <Link
+                      to="/companies/$companyId"
+                      params={{ companyId: c.id }}
+                      className="min-w-0 font-medium hover:underline"
+                    >
+                      {c.name}
+                    </Link>
+                    <StatusPill status={c.computedStatus} />
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <ProgressBar value={c.progress} className="flex-1" />
+                    <span className="text-xs text-muted-foreground">{c.progress}%</span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                    <span>{manager?.name ?? "Unassigned"}</span>
+                    {project && (
+                      <Button size="sm" variant="ghost" className="h-8 gap-1 px-2 text-primary" asChild>
+                        <Link to="/projects/$projectId" params={{ projectId: project.id }} search={{ tab: "onboarding" }}>
+                          Continue <ArrowRight className="h-3.5 w-3.5" />
+                        </Link>
+                      </Button>
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+          <div className="hidden overflow-hidden rounded-lg border md:block">
             <table className="w-full text-sm">
               <thead className="bg-muted/60 text-xs text-muted-foreground">
                 <tr>
@@ -237,7 +277,32 @@ function Dashboard() {
           <h3 className="font-semibold">Upcoming Renewals</h3>
           <Link to="/renewals" className="text-xs font-medium text-primary hover:underline">Manage</Link>
         </div>
-        <div className="overflow-hidden rounded-lg border">
+        <div className="space-y-2.5 md:hidden">
+          {renewals.map((r, i) => (
+            <motion.div
+              key={r.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: Math.min(i * 0.04, 0.2) }}
+              className="rounded-xl border border-border p-3.5"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <Link to="/companies/$companyId" params={{ companyId: r.id }} className="font-medium hover:underline">
+                  {r.name}
+                </Link>
+                <Pill tone={r.urgency === "urgent" ? "warning" : r.urgency === "overdue" ? "danger" : "info"}>
+                  {r.urgency === "overdue" ? "Overdue" : "Upcoming"}
+                </Pill>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <Pill tone="accent">{r.plan}</Pill>
+                <span>{r.planExpiry}</span>
+                <Pill tone={r.daysLeft < 15 ? "danger" : r.daysLeft < 30 ? "warning" : "info"}>{r.daysLeft} days</Pill>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+        <div className="hidden overflow-hidden rounded-lg border md:block">
           <table className="w-full text-sm">
             <thead className="bg-muted/60 text-xs text-muted-foreground">
               <tr>

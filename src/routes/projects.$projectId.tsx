@@ -161,13 +161,13 @@ function ProjectDetailPage() {
         <ProgressBar value={progress} className="h-2" />
       </div>
 
-      <div className="card-soft mb-6 flex flex-wrap gap-1 p-1">
+      <div className="card-soft mb-6 -mx-1 flex gap-1 overflow-x-auto px-1 py-1 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:flex-wrap md:overflow-visible">
         {TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => navigate({ search: { tab: t.key } })}
             className={cn(
-              "rounded-md px-3 py-1.5 text-xs font-medium",
+              "min-h-10 shrink-0 rounded-md px-3 py-2 text-xs font-medium md:py-1.5",
               tab === t.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
             )}
           >{t.label}</button>
@@ -214,14 +214,14 @@ function ProjectDetailPage() {
           </div>
 
           <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-            <nav className="card-soft h-fit p-2">
+            <nav className="card-soft flex h-fit gap-1 overflow-x-auto p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:block lg:overflow-visible">
               {ONBOARDING_SECTIONS.map((s) => {
                 const active = s.key === section;
                 const pct = sectionProgress(s.key);
                 const items = sectionItems[s.key] ?? [];
                 const done = items.filter((i) => i.collected && i.uploaded && i.live).length;
                 return (
-                  <button key={s.key} onClick={() => setSection(s.key)} className={cn("relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm", active ? "bg-primary/15 text-primary" : "hover:bg-muted")}>
+                  <button key={s.key} onClick={() => setSection(s.key)} className={cn("relative flex min-w-[9.5rem] shrink-0 items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm lg:min-w-0 lg:w-full", active ? "bg-primary/15 text-primary" : "hover:bg-muted")}>
                     <div className="flex-1">
                       <div className="font-medium">{s.label}</div>
                       <div className="mt-1 flex items-center gap-2">
@@ -229,7 +229,7 @@ function ProjectDetailPage() {
                         <span className="text-[10px] text-muted-foreground">{done}/{items.length}</span>
                       </div>
                     </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    <ChevronRight className="hidden h-4 w-4 text-muted-foreground lg:block" />
                   </button>
                 );
               })}
@@ -238,9 +238,9 @@ function ProjectDetailPage() {
             <div className="min-w-0">
               <AnimatePresence mode="wait">
                 <motion.div key={section} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} className="card-soft p-5">
-                  <div className="mb-4 flex items-center justify-between">
+                  <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <h3 className="font-semibold">{ONBOARDING_SECTIONS.find((s) => s.key === section)?.label}</h3>
-                    <Button size="sm" onClick={() => { updateProject(projectId, { currentStep: Math.min(currentStep + 1, 7) }); setCurrentStep((s) => Math.min(s + 1, 7)); toast.success("Progress saved"); }}>
+                    <Button size="sm" className="w-full sm:w-auto" onClick={() => { updateProject(projectId, { currentStep: Math.min(currentStep + 1, 7) }); setCurrentStep((s) => Math.min(s + 1, 7)); toast.success("Progress saved"); }}>
                       Save & Continue <ArrowRight className="ml-1 h-3 w-3" />
                     </Button>
                   </div>
@@ -265,7 +265,39 @@ function ProjectDetailPage() {
                     </div>
                   )}
 
-                  <div className="overflow-hidden rounded-lg border">
+                  <div className="space-y-3 md:hidden">
+                    {(sectionItems[section] ?? []).map((item) => (
+                      <div key={item.id} className="rounded-xl border border-border p-3.5">
+                        <div className="font-medium text-sm">{item.label}</div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {(["collected", "uploaded", "live"] as const).map((phase) => (
+                            <button
+                              key={phase}
+                              type="button"
+                              onClick={() => toggleChecklist(item.id, phase)}
+                              className={cn(
+                                "inline-flex min-h-10 min-w-[5.5rem] items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-medium capitalize",
+                                item[phase]
+                                  ? "border-success bg-success text-white"
+                                  : "border-input bg-background hover:border-primary",
+                              )}
+                            >
+                              {item[phase] && <Check className="h-3.5 w-3.5" />}
+                              {phase}
+                            </button>
+                          ))}
+                        </div>
+                        <input
+                          value={item.remarks}
+                          onChange={(e) => updateRemarks(item.id, e.target.value)}
+                          placeholder="Add note…"
+                          className="mt-3 h-10 w-full rounded-lg border bg-background px-3 text-sm"
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="hidden overflow-hidden rounded-lg border md:block">
                     <table className="w-full text-sm">
                       <thead className="bg-muted/60 text-xs text-muted-foreground">
                         <tr>

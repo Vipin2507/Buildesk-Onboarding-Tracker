@@ -50,17 +50,17 @@ function Vendors() {
       <PageHeader title="Vendor Management" subtitle="Materials, suppliers, contractors and approval workflows."
         actions={<Button className="gap-1.5 bg-primary" onClick={() => { setFormData({}); setModalOpen(true); }}><Plus className="h-4 w-4" /> New</Button>}
       />
-      <div className="mb-4 grid gap-3 md:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         {kpis.map((k) => (
-          <div key={k.label} className="card-soft p-4">
+          <div key={k.label} className="card-soft p-3 sm:p-4">
             <div className="text-xs text-muted-foreground">{k.label}</div>
-            <div className="text-2xl font-semibold"><CountUp to={k.value} /></div>
+            <div className="text-xl font-semibold sm:text-2xl"><CountUp to={k.value} /></div>
           </div>
         ))}
       </div>
-      <div className="card-soft mb-4 flex flex-wrap gap-1 p-1">
+      <div className="card-soft mb-4 -mx-1 flex gap-1 overflow-x-auto px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:flex-wrap md:overflow-visible">
         {TABS.map((t) => (
-          <button key={t} onClick={() => setTab(t)} className={cn("rounded-md px-3 py-1.5 text-sm font-medium", tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}>{t}</button>
+          <button key={t} onClick={() => setTab(t)} className={cn("min-h-10 shrink-0 rounded-md px-3 py-2 text-sm font-medium", tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}>{t}</button>
         ))}
       </div>
 
@@ -95,18 +95,46 @@ function Vendors() {
 
 function Table({ rows, cols, onDelete }: { rows: (string | ReactNode)[][]; cols: string[]; onDelete?: (id: string) => void }) {
   return (
-    <div className="card-soft overflow-hidden">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/60 text-xs text-muted-foreground"><tr>{cols.map((c) => <th key={c} className="px-4 py-2.5 text-left font-medium">{c}</th>)}</tr></thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={i} className="border-t hover:bg-muted/40">
-              {r.slice(0, -1).map((cell, j) => <td key={j} className="px-4 py-3">{cell}</td>)}
-              {onDelete && <td className="px-4 py-3 text-right"><Button size="icon" variant="ghost" onClick={() => onDelete(String(r[r.length - 1]))}><Trash2 className="h-4 w-4 text-destructive" /></Button></td>}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="card-soft overflow-hidden p-0 md:p-0">
+      <div className="space-y-2.5 p-3 md:hidden">
+        {rows.map((r, i) => {
+          const id = String(r[r.length - 1]);
+          const cells = r.slice(0, -1);
+          return (
+            <div key={i} className="rounded-xl border border-border p-3.5">
+              <div className="font-medium text-sm">{cells[0]}</div>
+              <div className="mt-1.5 space-y-1 text-xs text-muted-foreground">
+                {cells.slice(1).map((cell, j) => (
+                  <div key={j} className="flex items-center justify-between gap-2">
+                    <span>{cols[j + 1]}</span>
+                    <span className="text-foreground">{cell}</span>
+                  </div>
+                ))}
+              </div>
+              {onDelete && (
+                <div className="mt-2 flex justify-end border-t border-border/60 pt-2">
+                  <Button size="icon" variant="ghost" onClick={() => onDelete(id)}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="hidden overflow-x-auto md:block">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/60 text-xs text-muted-foreground"><tr>{cols.map((c) => <th key={c} className="px-4 py-2.5 text-left font-medium">{c}</th>)}</tr></thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i} className="border-t hover:bg-muted/40">
+                {r.slice(0, -1).map((cell, j) => <td key={j} className="px-4 py-3">{cell}</td>)}
+                {onDelete && <td className="px-4 py-3 text-right"><Button size="icon" variant="ghost" onClick={() => onDelete(String(r[r.length - 1]))}><Trash2 className="h-4 w-4 text-destructive" /></Button></td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

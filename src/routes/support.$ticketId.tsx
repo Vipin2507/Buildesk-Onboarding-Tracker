@@ -24,7 +24,7 @@ function TicketDetail() {
   return (
     <PageWrap>
       <PageHeader title={ticket.title} subtitle={ticket.id} />
-      <div className="card-soft grid gap-4 p-5 md:grid-cols-2">
+      <div className="card-soft grid gap-4 p-4 sm:grid-cols-2 sm:p-5 md:grid-cols-2">
         <div><div className="text-xs text-muted-foreground">Type</div><Pill tone={ticket.type === "Bug" ? "danger" : "info"}>{ticket.type}</Pill></div>
         <div><div className="text-xs text-muted-foreground">Priority</div><Pill tone="warning">{ticket.priority}</Pill></div>
         <div><div className="text-xs text-muted-foreground">Status</div><div className="font-medium">{ticket.status}</div></div>

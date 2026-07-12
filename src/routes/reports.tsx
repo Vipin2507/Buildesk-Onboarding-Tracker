@@ -185,7 +185,7 @@ function Reports() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-            className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+            className="grid gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3"
           >
             {REPORT_META.map((r) => {
               const Icon = ICONS[r.id];
@@ -194,7 +194,7 @@ function Reports() {
                   key={r.id}
                   type="button"
                   onClick={() => openReport(r.id)}
-                  className="card-soft group flex items-start gap-4 p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-[var(--shadow-elevated)]"
+                  className="card-soft group flex min-h-[4.5rem] items-start gap-3 p-4 text-left transition-all active:scale-[0.99] hover:-translate-y-0.5 hover:shadow-[var(--shadow-elevated)] sm:gap-4 sm:p-5"
                 >
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary transition-colors group-hover:bg-primary group-hover:text-white">
                     <Icon className="h-5 w-5" />
@@ -225,15 +225,15 @@ function Reports() {
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-3 grid-cols-2 xl:grid-cols-4">
               {active.kpis.map((k) => (
-                <div key={k.label} className="card-soft p-4">
-                  <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                <div key={k.label} className="card-soft p-3 sm:p-4">
+                  <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground sm:text-[11px]">
                     {k.label}
                   </div>
                   <div
                     className={cn(
-                      "mt-1 text-2xl font-semibold tabular-nums",
+                      "mt-1 text-xl font-semibold tabular-nums sm:text-2xl",
                       k.tone === "success" && "text-success",
                       k.tone === "warning" && "text-warning-foreground",
                       k.tone === "danger" && "text-destructive",
@@ -246,9 +246,9 @@ function Reports() {
             </div>
 
             <div className="grid gap-4 lg:grid-cols-5">
-              <div className="card-soft p-4 lg:col-span-2">
+              <div className="card-soft order-1 p-4 lg:col-span-2">
                 <div className="mb-3 text-sm font-medium">{active.chartLabel ?? "Distribution"}</div>
-                <div className="h-64">
+                <div className="h-56 sm:h-64">
                   {active.chart.length === 0 ? (
                     <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
                       No chart data
@@ -289,7 +289,7 @@ function Reports() {
                 </div>
               </div>
 
-              <div className="lg:col-span-3">
+              <div className="order-2 lg:col-span-3">
                 <ReportTable columns={active.columns} rows={active.rows} />
               </div>
             </div>

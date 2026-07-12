@@ -102,7 +102,7 @@ function MasterPage() {
       />
 
       <div className="grid gap-5 lg:grid-cols-[240px_1fr]">
-        <aside className="card-soft h-fit space-y-1 p-2 lg:sticky lg:top-20">
+        <aside className="card-soft flex h-fit gap-1 overflow-x-auto p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:sticky lg:top-20 lg:block lg:space-y-1 lg:overflow-visible">
           {SECTIONS.map((s) => {
             const Icon = s.icon;
             return (
@@ -111,14 +111,14 @@ function MasterPage() {
                 type="button"
                 onClick={() => setSection(s.id)}
                 className={cn(
-                  "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium transition-colors",
+                  "flex min-h-10 shrink-0 items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium transition-colors lg:w-full",
                   section === s.id
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 )}
               >
                 <Icon className="h-4 w-4 shrink-0" />
-                {s.label}
+                <span className="whitespace-nowrap">{s.label}</span>
               </button>
             );
           })}
@@ -376,7 +376,8 @@ function FieldsPanel({ entity }: { entity: "company" | "project" }) {
         action={<Button size="sm" className="gap-1" onClick={openCreate}><Plus className="h-3.5 w-3.5" /> Add Field</Button>}
       />
       <div className="card-soft overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] text-sm">
           <thead className="bg-muted/50 text-xs text-muted-foreground">
             <tr>
               <th className="px-3 py-2 text-left">Order</th>
@@ -420,6 +421,7 @@ function FieldsPanel({ entity }: { entity: "company" | "project" }) {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       <EntityFormModal

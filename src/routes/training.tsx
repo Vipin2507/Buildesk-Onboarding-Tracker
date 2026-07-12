@@ -27,37 +27,67 @@ function Training() {
       <PageHeader title="Training" subtitle="Live and recorded sessions for every stakeholder team."
         actions={<Button className="gap-1.5 bg-primary" onClick={() => setModalOpen(true)}><Plus className="h-4 w-4" /> Add Session</Button>}
       />
-      <div className="card-soft overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/60 text-xs text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2 text-left">Session</th>
-              <th className="px-4 py-2 text-left">Trainer</th>
-              <th className="px-4 py-2 text-left">Date</th>
-              <th className="px-4 py-2 text-left">Attendance</th>
-              <th className="px-4 py-2 text-left">Recording</th>
-              <th className="px-4 py-2 text-left">Status</th>
-              <th className="px-4 py-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {sessions.map((s) => (
-              <tr key={s.id} className="border-t hover:bg-muted/40">
-                <td className="px-4 py-3 font-medium">{s.type}</td>
-                <td className="px-4 py-3">{employees.find((e) => e.id === s.trainerId)?.name}</td>
-                <td className="px-4 py-3 text-muted-foreground">{s.date}</td>
-                <td className="px-4 py-3">{s.attendance}</td>
-                <td className="px-4 py-3">
-                  {s.recording !== "—" ? <a href={s.recording} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline"><Video className="h-3.5 w-3.5" /> View</a> : "—"}
-                </td>
-                <td className="px-4 py-3"><Pill tone={s.status === "Completed" ? "success" : "warning"}>{s.status}</Pill></td>
-                <td className="px-4 py-3 text-right">
-                  <Button size="icon" variant="ghost" onClick={() => deleteSession(s.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                </td>
+      <div className="space-y-2.5 md:hidden">
+        {sessions.map((s) => (
+          <div key={s.id} className="rounded-xl border border-border bg-card p-3.5">
+            <div className="flex items-start justify-between gap-2">
+              <div className="font-medium">{s.type}</div>
+              <Pill tone={s.status === "Completed" ? "success" : "warning"}>{s.status}</Pill>
+            </div>
+            <div className="mt-1 text-sm text-muted-foreground">
+              {employees.find((e) => e.id === s.trainerId)?.name} · {s.date}
+            </div>
+            <div className="mt-2 flex items-center justify-between text-xs">
+              <span>Attendance: {s.attendance}</span>
+              {s.recording !== "—" ? (
+                <a href={s.recording} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary">
+                  <Video className="h-3.5 w-3.5" /> View
+                </a>
+              ) : (
+                <span className="text-muted-foreground">No recording</span>
+              )}
+            </div>
+            <div className="mt-2 flex justify-end border-t border-border/60 pt-2">
+              <Button size="icon" variant="ghost" onClick={() => deleteSession(s.id)}>
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="card-soft hidden overflow-hidden md:block">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/60 text-xs text-muted-foreground">
+              <tr>
+                <th className="px-4 py-2 text-left">Session</th>
+                <th className="px-4 py-2 text-left">Trainer</th>
+                <th className="px-4 py-2 text-left">Date</th>
+                <th className="px-4 py-2 text-left">Attendance</th>
+                <th className="px-4 py-2 text-left">Recording</th>
+                <th className="px-4 py-2 text-left">Status</th>
+                <th className="px-4 py-2"></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {sessions.map((s) => (
+                <tr key={s.id} className="border-t hover:bg-muted/40">
+                  <td className="px-4 py-3 font-medium">{s.type}</td>
+                  <td className="px-4 py-3">{employees.find((e) => e.id === s.trainerId)?.name}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{s.date}</td>
+                  <td className="px-4 py-3">{s.attendance}</td>
+                  <td className="px-4 py-3">
+                    {s.recording !== "—" ? <a href={s.recording} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline"><Video className="h-3.5 w-3.5" /> View</a> : "—"}
+                  </td>
+                  <td className="px-4 py-3"><Pill tone={s.status === "Completed" ? "success" : "warning"}>{s.status}</Pill></td>
+                  <td className="px-4 py-3 text-right">
+                    <Button size="icon" variant="ghost" onClick={() => deleteSession(s.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
       <EntityFormModal open={modalOpen} onOpenChange={setModalOpen} title="Add Training Session" onSubmit={() => { addSession(form); toast.success("Session scheduled"); setModalOpen(false); }}>
         <div className="grid gap-2">

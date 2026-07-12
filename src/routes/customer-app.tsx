@@ -25,13 +25,13 @@ function CustomerApp() {
   return (
     <PageWrap>
       <PageHeader title="Customer Application" subtitle={`Configure app for ${projects[0]?.name}`} />
-      <div className="card-soft mb-4 inline-flex rounded-full border bg-card p-1">
+      <div className="card-soft mb-4 flex w-full rounded-xl border bg-card p-1 sm:inline-flex sm:w-auto sm:rounded-full">
         {[{ k: "buildesk", label: "Buildesk App" }, { k: "whitelabel", label: "White Label App" }].map((t) => (
           <button key={t.k} onClick={() => { setMode(t.k as "buildesk" | "whitelabel"); updateConfig(projectId, { mode: t.k as "buildesk" | "whitelabel" }); toast.success("Mode updated"); }}
-            className={cn("rounded-full px-4 py-1.5 text-sm font-medium", mode === t.k ? "bg-primary text-primary-foreground" : "text-muted-foreground")}>{t.label}</button>
+            className={cn("min-h-10 flex-1 rounded-lg px-4 py-2 text-sm font-medium sm:flex-none sm:rounded-full sm:py-1.5", mode === t.k ? "bg-primary text-primary-foreground" : "text-muted-foreground")}>{t.label}</button>
         ))}
       </div>
-      <div className="card-soft grid gap-4 p-5 md:grid-cols-2">
+      <div className="card-soft grid gap-4 p-4 sm:p-5 md:grid-cols-2">
         {[
           { key: "appName", label: "App Name" },
           { key: "primaryColor", label: "Primary Color" },
@@ -49,11 +49,11 @@ function CustomerApp() {
           </div>
         ))}
       </div>
-      <div className="card-soft mt-4 flex items-center gap-4 p-5">
-        <Smartphone className="h-10 w-10 text-primary" />
+      <div className="card-soft mt-4 flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
+        <Smartphone className="h-10 w-10 shrink-0 text-primary" />
         <div>
           <div className="font-medium">Publish status: <Pill tone={config.publishStatus === "published" ? "success" : "warning"}>{config.publishStatus}</Pill></div>
-          <Button className="mt-2" size="sm" onClick={() => { updateConfig(projectId, { publishStatus: "published" }); toast.success("App published"); }}>Mark Published</Button>
+          <Button className="mt-2 w-full sm:w-auto" size="sm" onClick={() => { updateConfig(projectId, { publishStatus: "published" }); toast.success("App published"); }}>Mark Published</Button>
         </div>
       </div>
     </PageWrap>
