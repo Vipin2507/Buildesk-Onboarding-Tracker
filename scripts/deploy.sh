@@ -8,12 +8,16 @@ cd "$APP_DIR"
 
 echo "==> Node $(node -v) | npm $(npm -v)"
 
-# Full install: vite / nitro / drizzle-kit live in devDependencies and are required to build + push schema.
+# Full install: vite / nitro / drizzle-kit / tsx live in devDependencies.
 echo "==> Installing dependencies"
 npm ci
 
-echo "==> Applying DB schema (safe; does not reseed)"
-npx drizzle-kit push
+echo "==> Applying DB schema"
+# drizzle-kit push can fail on SQLite ADD COLUMN; ensure script patches missing cols safely.
+if ! npx drizzle-kit push; then
+  echo "==> drizzle-kit push failed — applying column patches via db:ensure"
+fi
+npm run db:ensure
 
 echo "==> Building"
 npm run build
