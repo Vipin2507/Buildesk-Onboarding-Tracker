@@ -64,7 +64,7 @@ Then clone/pull with SSH.
 cat > /var/www/buildesk/.env <<'EOF'
 NODE_ENV=production
 DATABASE_URL=file:/var/lib/buildesk/buildesk.db
-SESSION_SECRET=REPLACE_WITH_LONG_RANDOM_STRING
+SESSION_SECRET=f707ac77238e129c17ac243cdc8026d4abe020d745d043bba358c1a3bf4092a5
 EOF
 
 # Generate a secret:
@@ -77,13 +77,30 @@ Keep `.env` on the server only — never commit it.
 
 ```bash
 cd /var/www/buildesk
+
+# Must have .env with DATABASE_URL before db commands
+cat > .env <<'EOF'
+NODE_ENV=production
+DATABASE_URL=file:/var/lib/buildesk/buildesk.db
+SESSION_SECRET=REPLACE_WITH_LONG_RANDOM_STRING
+EOF
+
 npm ci
-npm run db:push
-npm run db:seed    # first time only
+npm run db:setup    # db:push (create tables) + db:seed — do NOT seed before push
 npm run build
 pm2 start .output/server/index.mjs --name buildesk
 pm2 save
 pm2 startup
+```
+
+If you already ran seed and saw `no such table: users`:
+
+```bash
+cd /var/www/buildesk
+# confirm DATABASE_URL points at the real file
+grep DATABASE_URL .env
+npm run db:push     # creates users and all other tables
+npm run db:seed
 ```
 
 ### 5. Nginx (+ HTTPS when you have a domain)

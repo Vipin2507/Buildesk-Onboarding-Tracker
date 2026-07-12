@@ -39,13 +39,30 @@ import { getDb, getSqlite } from "../src/server/db/client";
 import * as t from "../src/server/db/schema";
 
 async function main() {
-  // Ensure tables exist (push-style for seed bootstrap if migrate wasn't run)
+  const dbPath =
+    process.env.DATABASE_URL?.replace(/^file:/, "") ||
+    (process.env.DATA_DIR ? `${process.env.DATA_DIR}/buildesk.db` : "./data/buildesk.db");
+  console.log(`Seeding database: ${dbPath}`);
+
   getSqlite();
   const db = getDb();
 
-  const existing = db.select().from(t.users).all();
+  let existing;
+  try {
+    existing = db.select().from(t.users).all();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes("no such table")) {
+      console.error(
+        "Tables are missing. Create the schema first, then seed:\n\n  npm run db:push\n  npm run db:seed\n\nOr in one step:  npm run db:setup\n",
+      );
+      process.exit(1);
+    }
+    throw e;
+  }
+
   if (existing.length > 0) {
-    console.log(`Database already has ${existing.length} users — skipping seed (delete data/*.db to reseed).`);
+    console.log(`Database already has ${existing.length} users — skipping seed (delete the db file to reseed).`);
     return;
   }
 
