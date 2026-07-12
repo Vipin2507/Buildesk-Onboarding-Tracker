@@ -1,11 +1,32 @@
+import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import {
-  LayoutDashboard, Building2, Boxes, Route as RouteIcon, Package,
-  Upload, FileText, Smartphone, Truck, HardHat, Plug, GraduationCap,
-  LifeBuoy, RefreshCw, Users, BarChart3, Settings, Building, Database,
+  LayoutDashboard,
+  Building2,
+  Boxes,
+  Route as RouteIcon,
+  Package,
+  Upload,
+  FileText,
+  Smartphone,
+  Truck,
+  HardHat,
+  Plug,
+  GraduationCap,
+  LifeBuoy,
+  RefreshCw,
+  Users,
+  BarChart3,
+  Settings,
+  Building,
+  Database,
+  PanelLeftClose,
+  PanelLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const STORAGE_KEY = "buildesk-sidebar-collapsed";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
@@ -30,35 +51,88 @@ const nav = [
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    try {
+      setCollapsed(localStorage.getItem(STORAGE_KEY) === "1");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  function toggle() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(STORAGE_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }
 
   return (
-    <aside className="hidden md:flex sticky top-0 h-screen w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
-      <div className="flex items-center gap-2.5 px-5 py-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-          <Building className="h-5 w-5" />
+    <aside
+      className={cn(
+        "hidden md:flex sticky top-0 h-screen shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200 ease-out",
+        collapsed ? "w-[52px]" : "w-52",
+      )}
+    >
+      <div
+        className={cn(
+          "flex items-center gap-2 py-4",
+          collapsed ? "flex-col px-1.5" : "px-3",
+        )}
+      >
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
+          <Building className="h-4 w-4" />
         </div>
-        <div className="min-w-0">
-          <div className="truncate text-sm font-semibold tracking-tight text-white">Buildesk</div>
-          <div className="truncate text-[11px] text-sidebar-foreground/70">Onboarding & Post-Sales</div>
-        </div>
+        {!collapsed && (
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-semibold tracking-tight text-white">Buildesk</div>
+            <div className="truncate text-[10px] text-sidebar-foreground/70">Onboarding & Post-Sales</div>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={toggle}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-white"
+        >
+          {collapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+        </button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-2 pb-4">
+      <nav className={cn("flex-1 overflow-y-auto pb-3", collapsed ? "px-1" : "px-1.5")}>
         {nav.map((item) => {
-          const active = item.exact ? pathname === item.to : pathname === item.to || pathname.startsWith(item.to + "/");
+          const active = item.exact
+            ? pathname === item.to
+            : pathname === item.to || pathname.startsWith(item.to + "/");
           const Icon = item.icon;
           const showAdminDivider = item.to === "/master";
           return (
             <div key={item.to}>
               {showAdminDivider && (
-                <div className="mx-3 mb-2 mt-4 border-t border-sidebar-border pt-3 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/45">
-                  Administration
+                <div
+                  className={cn(
+                    "mb-1.5 mt-3 border-t border-sidebar-border pt-2.5",
+                    collapsed
+                      ? "mx-1"
+                      : "mx-2 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/45",
+                  )}
+                >
+                  {!collapsed && "Administration"}
                 </div>
               )}
               <Link
                 to={item.to}
+                title={collapsed ? item.label : undefined}
                 className={cn(
-                  "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                  "relative flex items-center rounded-md text-[13px] font-medium transition-colors",
+                  collapsed ? "justify-center px-0 py-2" : "gap-2.5 px-2.5 py-1.5",
                   active
                     ? "text-white"
                     : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-white",
@@ -67,28 +141,30 @@ export function AppSidebar() {
                 {active && (
                   <motion.span
                     layoutId="sidebar-active"
-                    className="absolute inset-0 rounded-lg bg-sidebar-accent"
+                    className="absolute inset-0 rounded-md bg-sidebar-accent"
                     transition={{ type: "spring", stiffness: 400, damping: 36 }}
                   />
                 )}
-                {active && (
+                {active && !collapsed && (
                   <motion.span
                     layoutId="sidebar-indicator"
-                    className="absolute left-0 top-1/2 h-6 -translate-y-1/2 rounded-r-full bg-sidebar-primary"
+                    className="absolute left-0 top-1/2 h-5 -translate-y-1/2 rounded-r-full bg-sidebar-primary"
                     style={{ width: 3 }}
                   />
                 )}
                 <Icon className="relative z-10 h-4 w-4 shrink-0" />
-                <span className="relative z-10 truncate">{item.label}</span>
+                {!collapsed && <span className="relative z-10 truncate">{item.label}</span>}
               </Link>
             </div>
           );
         })}
       </nav>
 
-      <div className="border-t border-sidebar-border p-4 text-[11px] text-sidebar-foreground/60">
-        v1.0 · Buildesk Internal
-      </div>
+      {!collapsed && (
+        <div className="border-t border-sidebar-border px-3 py-3 text-[10px] text-sidebar-foreground/60">
+          v1.0 · Buildesk Internal
+        </div>
+      )}
     </aside>
   );
 }
