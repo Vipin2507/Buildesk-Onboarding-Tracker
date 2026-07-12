@@ -39,13 +39,15 @@ function LoginPage() {
   const { mode } = Route.useSearch();
   const navigate = useNavigate({ from: "/login" });
   const setUser = useAuthStore((s) => s.setUser);
-  const [showPassword, setShowPassword] = useState(false);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showRegPassword, setShowRegPassword] = useState(false);
+  const [showRegConfirm, setShowRegConfirm] = useState(false);
   const [tab, setTab] = useState<"login" | "register">(mode);
   const [busy, setBusy] = useState(false);
 
   const loginForm = useForm({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "aditya@buildesk.com", password: "buildesk123" },
+    defaultValues: { email: "", password: "" },
   });
 
   const registerForm = useForm({
@@ -144,6 +146,9 @@ function LoginPage() {
               <label className="block text-xs font-medium">
                 Email
                 <input
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@company.com"
                   className="mt-1 h-10 w-full rounded-md border px-3 text-sm"
                   {...loginForm.register("email")}
                 />
@@ -152,25 +157,25 @@ function LoginPage() {
                 Password
                 <div className="relative mt-1">
                   <input
-                    type={showPassword ? "text" : "password"}
+                    type={showLoginPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    placeholder="••••••••"
                     className="h-10 w-full rounded-md border px-3 pr-10 text-sm"
                     {...loginForm.register("password")}
                   />
                   <button
                     type="button"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
-                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowLoginPassword((v) => !v)}
+                    aria-label={showLoginPassword ? "Hide password" : "Show password"}
                   >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
               </label>
               <Button className="w-full" disabled={busy}>
                 {busy ? "Signing in…" : "Sign in"}
               </Button>
-              <p className="text-center text-xs text-muted-foreground">
-                Demo: aditya@buildesk.com / buildesk123
-              </p>
             </form>
           ) : (
             <form
@@ -182,27 +187,58 @@ function LoginPage() {
             >
               <label className="block text-xs font-medium">
                 Name
-                <input className="mt-1 h-10 w-full rounded-md border px-3 text-sm" {...registerForm.register("name")} />
+                <input
+                  autoComplete="name"
+                  className="mt-1 h-10 w-full rounded-md border px-3 text-sm"
+                  {...registerForm.register("name")}
+                />
               </label>
               <label className="block text-xs font-medium">
                 Email
-                <input className="mt-1 h-10 w-full rounded-md border px-3 text-sm" {...registerForm.register("email")} />
+                <input
+                  type="email"
+                  autoComplete="email"
+                  className="mt-1 h-10 w-full rounded-md border px-3 text-sm"
+                  {...registerForm.register("email")}
+                />
               </label>
               <label className="block text-xs font-medium">
                 Password
-                <input
-                  type="password"
-                  className="mt-1 h-10 w-full rounded-md border px-3 text-sm"
-                  {...registerForm.register("password")}
-                />
+                <div className="relative mt-1">
+                  <input
+                    type={showRegPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    className="h-10 w-full rounded-md border px-3 pr-10 text-sm"
+                    {...registerForm.register("password")}
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowRegPassword((v) => !v)}
+                    aria-label={showRegPassword ? "Hide password" : "Show password"}
+                  >
+                    {showRegPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </label>
               <label className="block text-xs font-medium">
                 Confirm password
-                <input
-                  type="password"
-                  className="mt-1 h-10 w-full rounded-md border px-3 text-sm"
-                  {...registerForm.register("confirmPassword")}
-                />
+                <div className="relative mt-1">
+                  <input
+                    type={showRegConfirm ? "text" : "password"}
+                    autoComplete="new-password"
+                    className="h-10 w-full rounded-md border px-3 pr-10 text-sm"
+                    {...registerForm.register("confirmPassword")}
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowRegConfirm((v) => !v)}
+                    aria-label={showRegConfirm ? "Hide password" : "Show password"}
+                  >
+                    {showRegConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </label>
               <Button className="w-full" disabled={busy}>
                 {busy ? "Creating…" : "Create account"}
