@@ -64,6 +64,18 @@ export function loadCompanies(): Company[] {
 }
 
 export function mapProject(row: typeof t.projects.$inferSelect): Project {
+  let otherCharges: Project["otherCharges"] = [];
+  let customCharges: string[] = [];
+  try {
+    otherCharges = JSON.parse(row.otherChargesJson || "[]");
+  } catch {
+    otherCharges = [];
+  }
+  try {
+    customCharges = JSON.parse(row.customChargesJson || "[]");
+  } catch {
+    customCharges = [];
+  }
   return {
     id: row.id,
     name: row.name,
@@ -71,10 +83,19 @@ export function mapProject(row: typeof t.projects.$inferSelect): Project {
     type: row.type,
     units: row.units,
     city: row.city,
-    rera: row.rera,
+    rera: row.rera ?? "",
     status: row.status as Project["status"],
     currentStep: row.currentStep,
     goLiveAt: row.goLiveAt ?? undefined,
+    address: row.address ?? undefined,
+    state: row.state ?? undefined,
+    pinCode: row.pinCode ?? undefined,
+    totalTowers: row.totalTowers ?? undefined,
+    totalFloors: row.totalFloors ?? undefined,
+    agreementValue: row.agreementValue ?? undefined,
+    otherCharges,
+    customCharges,
+    logoUrl: row.logoUrl ?? undefined,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

@@ -141,7 +141,31 @@ async function main() {
   }
 
   for (const p of seedProjects) {
-    db.insert(t.projects).values(p).run();
+    db.insert(t.projects)
+      .values({
+        id: p.id,
+        name: p.name,
+        companyId: p.companyId,
+        type: p.type,
+        units: p.units,
+        city: p.city,
+        rera: p.rera ?? "",
+        status: p.status,
+        currentStep: p.currentStep,
+        goLiveAt: p.goLiveAt,
+        address: p.address,
+        state: p.state,
+        pinCode: p.pinCode,
+        totalTowers: p.totalTowers,
+        totalFloors: p.totalFloors,
+        agreementValue: p.agreementValue,
+        otherChargesJson: JSON.stringify(p.otherCharges ?? []),
+        customChargesJson: JSON.stringify(p.customCharges ?? []),
+        logoUrl: p.logoUrl,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+      })
+      .run();
   }
 
   for (const item of seedChecklistItems) {

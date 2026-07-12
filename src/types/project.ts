@@ -1,5 +1,27 @@
 import type { StatusKey, Timestamps } from "./common";
 
+export const PROJECT_OTHER_CHARGE_OPTIONS = [
+  { key: "parking", label: "Parking" },
+  { key: "floorRise", label: "Floor Rise" },
+  { key: "clubHouse", label: "Club House" },
+  { key: "legalCharges", label: "Legal Charges" },
+  { key: "maintenance", label: "Maintenance" },
+  { key: "plc", label: "PLC" },
+  { key: "infrastructure", label: "Infrastructure" },
+  { key: "corpusFund", label: "Corpus Fund" },
+] as const;
+
+export type ProjectOtherChargeKey = (typeof PROJECT_OTHER_CHARGE_OPTIONS)[number]["key"];
+
+export const PROJECT_TYPES = [
+  "Residential",
+  "Commercial",
+  "Mixed Use",
+  "Plots",
+  "Villa",
+  "Affordable Housing",
+] as const;
+
 export type Project = Timestamps & {
   id: string;
   name: string;
@@ -11,6 +33,16 @@ export type Project = Timestamps & {
   status: StatusKey;
   currentStep: number;
   goLiveAt?: string;
+  /** Extended project information */
+  address?: string;
+  state?: string;
+  pinCode?: string;
+  totalTowers?: number;
+  totalFloors?: number;
+  agreementValue?: number;
+  otherCharges?: ProjectOtherChargeKey[];
+  customCharges?: string[];
+  logoUrl?: string;
 };
 
 export type CustomerAppConfig = Timestamps & {

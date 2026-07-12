@@ -64,10 +64,47 @@ const projectInput = z.object({
   type: z.string(),
   units: z.number(),
   city: z.string(),
-  rera: z.string(),
+  rera: z.string().optional().default(""),
   status: z.enum(["not_started", "in_progress", "review", "completed", "on_hold"]),
   currentStep: z.number().optional(),
+  address: z.string().optional().nullable(),
+  state: z.string().optional().nullable(),
+  pinCode: z.string().optional().nullable(),
+  totalTowers: z.number().optional().nullable(),
+  totalFloors: z.number().optional().nullable(),
+  agreementValue: z.number().optional().nullable(),
+  otherCharges: z.array(z.string()).optional(),
+  customCharges: z.array(z.string()).optional(),
+  logoUrl: z.string().optional().nullable(),
 });
+
+function projectRowValues(
+  data: z.infer<typeof projectInput>,
+  extras: { id: string; now: string; createdAt: string },
+) {
+  return {
+    id: extras.id,
+    name: data.name,
+    companyId: data.companyId,
+    type: data.type,
+    units: data.units,
+    city: data.city,
+    rera: data.rera ?? "",
+    status: data.status,
+    currentStep: data.currentStep ?? 0,
+    address: data.address ?? null,
+    state: data.state ?? null,
+    pinCode: data.pinCode ?? null,
+    totalTowers: data.totalTowers ?? null,
+    totalFloors: data.totalFloors ?? null,
+    agreementValue: data.agreementValue ?? null,
+    otherChargesJson: JSON.stringify(data.otherCharges ?? []),
+    customChargesJson: JSON.stringify(data.customCharges ?? []),
+    logoUrl: data.logoUrl ?? null,
+    createdAt: extras.createdAt,
+    updatedAt: extras.now,
+  };
+}
 
 export const createProject = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => projectInput.parse(data))
@@ -77,19 +114,7 @@ export const createProject = createServerFn({ method: "POST" })
     const id = data.id ?? newId();
     const now = nowIso();
     db.insert(t.projects)
-      .values({
-        id,
-        name: data.name,
-        companyId: data.companyId,
-        type: data.type,
-        units: data.units,
-        city: data.city,
-        rera: data.rera,
-        status: data.status,
-        currentStep: data.currentStep ?? 0,
-        createdAt: now,
-        updatedAt: now,
-      })
+      .values(projectRowValues(data, { id, now, createdAt: now }))
       .run();
     ensureChecklist(id);
     logActivity({
@@ -104,17 +129,40 @@ export const createProject = createServerFn({ method: "POST" })
 
 export const updateProject = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({ id: z.string(), patch: projectInput.partial().extend({ goLiveAt: z.string().optional().nullable() }) }).parse(data),
+    z
+      .object({
+        id: z.string(),
+        patch: projectInput.partial().extend({ goLiveAt: z.string().optional().nullable() }),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     const user = requireUser(["Admin", "Manager"]);
     const existing = loadProject(data.id);
     if (!existing) throw new ApiError(404, "Project not found");
-    getDb()
-      .update(t.projects)
-      .set({ ...data.patch, updatedAt: nowIso() })
-      .where(eq(t.projects.id, data.id))
-      .run();
+    const now = nowIso();
+    const p = data.patch;
+    const set: Record<string, unknown> = { updatedAt: now };
+    if (p.name !== undefined) set.name = p.name;
+    if (p.companyId !== undefined) set.companyId = p.companyId;
+    if (p.type !== undefined) set.type = p.type;
+    if (p.units !== undefined) set.units = p.units;
+    if (p.city !== undefined) set.city = p.city;
+    if (p.rera !== undefined) set.rera = p.rera;
+    if (p.status !== undefined) set.status = p.status;
+    if (p.currentStep !== undefined) set.currentStep = p.currentStep;
+    if (p.goLiveAt !== undefined) set.goLiveAt = p.goLiveAt;
+    if (p.address !== undefined) set.address = p.address;
+    if (p.state !== undefined) set.state = p.state;
+    if (p.pinCode !== undefined) set.pinCode = p.pinCode;
+    if (p.totalTowers !== undefined) set.totalTowers = p.totalTowers;
+    if (p.totalFloors !== undefined) set.totalFloors = p.totalFloors;
+    if (p.agreementValue !== undefined) set.agreementValue = p.agreementValue;
+    if (p.otherCharges !== undefined) set.otherChargesJson = JSON.stringify(p.otherCharges);
+    if (p.customCharges !== undefined) set.customChargesJson = JSON.stringify(p.customCharges);
+    if (p.logoUrl !== undefined) set.logoUrl = p.logoUrl;
+
+    getDb().update(t.projects).set(set).where(eq(t.projects.id, data.id)).run();
     logActivity({
       who: user.name,
       what: `Updated project ${existing.name}`,
