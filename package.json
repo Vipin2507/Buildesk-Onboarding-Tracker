@@ -18,7 +18,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:ensure": "tsx --tsconfig tsconfig.json scripts/db-ensure-schema.ts",
+    "db:ensure": "node scripts/db-ensure-schema.mjs",
     "db:seed": "tsx --tsconfig tsconfig.json scripts/db-seed.ts",
     "db:setup": "npm run db:push && npm run db:ensure && npm run db:seed"
   },
