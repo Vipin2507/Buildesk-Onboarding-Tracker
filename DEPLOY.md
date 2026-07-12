@@ -29,6 +29,7 @@ Create `/var/www/buildesk/.env`:
 NODE_ENV=production
 DATABASE_URL=file:/var/lib/buildesk/buildesk.db
 SESSION_SECRET=<generate-a-long-random-string>
+# COOKIE_SECURE=true   # only after HTTPS is enabled
 ```
 
 ```bash

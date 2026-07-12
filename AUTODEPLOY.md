@@ -83,6 +83,7 @@ cat > .env <<'EOF'
 NODE_ENV=production
 DATABASE_URL=file:/var/lib/buildesk/buildesk.db
 SESSION_SECRET=REPLACE_WITH_LONG_RANDOM_STRING
+# Leave COOKIE_SECURE unset while using http://IP. After HTTPS: COOKIE_SECURE=true
 EOF
 
 npm ci
@@ -256,6 +257,9 @@ crontab -e
 | PM2 not found | `npm i -g pm2` as the same user Actions SSHs as |
 | Site 502 | `pm2 logs buildesk`; check Nginx → `127.0.0.1:3000` |
 | Schema drift | `cd /var/www/buildesk && npm run db:push` |
+| `Sign in required` after login on `http://IP` | Cookie was `Secure` (HTTPS-only). Ensure `.env` does **not** set `COOKIE_SECURE=true` until HTTPS is on; rebuild/restart PM2. Clear site cookies and sign in again. |
+| Login works but data sync fails | Same as above — session cookie not sent on HTTP |
+| PM2 not picking up `.env` | Ensure `/var/www/buildesk/.env` exists; app loads it when opening SQLite. After editing `.env`: `pm2 restart buildesk --update-env` |
 
 ---
 

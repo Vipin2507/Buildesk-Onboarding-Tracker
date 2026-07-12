@@ -65,11 +65,14 @@ export async function createSession(userId: string) {
   db.insert(sessions)
     .values({ id, userId, expiresAt, createdAt: nowIso() })
     .run();
+  // Secure cookies are ignored by browsers on plain HTTP (e.g. http://VPS_IP).
+  // Set COOKIE_SECURE=true only when serving over HTTPS.
+  const secure = ["1", "true", "yes"].includes((process.env.COOKIE_SECURE ?? "").toLowerCase());
   setCookie(SESSION_COOKIE, id, {
     httpOnly: true,
     path: "/",
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure,
     maxAge: SESSION_DAYS * 24 * 60 * 60,
   });
   return id;
