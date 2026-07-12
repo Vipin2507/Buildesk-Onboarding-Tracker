@@ -8,11 +8,12 @@ cd "$APP_DIR"
 
 echo "==> Node $(node -v) | npm $(npm -v)"
 
+# Full install: vite / nitro / drizzle-kit live in devDependencies and are required to build + push schema.
 echo "==> Installing dependencies"
-npm ci --omit=dev
+npm ci
 
 echo "==> Applying DB schema (safe; does not reseed)"
-npm run db:push
+npx drizzle-kit push
 
 echo "==> Building"
 npm run build

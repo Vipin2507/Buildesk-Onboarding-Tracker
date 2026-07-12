@@ -252,6 +252,7 @@ crontab -e
 | Symptom | Fix |
 | --- | --- |
 | SSH permission denied | Public key not in `authorized_keys`; secret missing newlines |
+| `drizzle-kit: not found` on deploy | Deploy used `npm ci --omit=dev`. Fixed in `scripts/deploy.sh` — use full `npm ci` (vite/drizzle-kit are devDependencies). Pull latest and re-run the workflow. |
 | `git fetch` auth failed | VPS deploy key / HTTPS token for private repo |
 | `better-sqlite3` build fails | Install `build-essential` on VPS; Node 22 |
 | PM2 not found | `npm i -g pm2` as the same user Actions SSHs as |
@@ -260,6 +261,27 @@ crontab -e
 | `Sign in required` after login on `http://IP` | Cookie was `Secure` (HTTPS-only). Ensure `.env` does **not** set `COOKIE_SECURE=true` until HTTPS is on; rebuild/restart PM2. Clear site cookies and sign in again. |
 | Login works but data sync fails | Same as above — session cookie not sent on HTTP |
 | PM2 not picking up `.env` | Ensure `/var/www/buildesk/.env` exists; app loads it when opening SQLite. After editing `.env`: `pm2 restart buildesk --update-env` |
+
+### Fix Actions SSH timeout (Hostinger firewall)
+
+GitHub-hosted runners use **changing public IPs**. If SSH is limited to your laptop IP, Actions will always time out.
+
+In hPanel → VPS → **Firewall**, set:
+
+| Action | Protocol | Port | Source |
+| --- | --- | --- | --- |
+| Accept | TCP | **22** | **Anywhere** / `0.0.0.0/0` |
+| Accept | TCP | **80** | Anywhere |
+| Accept | TCP | **443** | Anywhere |
+
+Save → wait 1–2 minutes → re-run the failed workflow (**Actions → Deploy → Re-run jobs**).
+
+Confirm secrets:
+
+- `VPS_HOST` = `200.97.166.244` (no `https://`, no trailing slash)
+- `VPS_USER` = `root`
+- `VPS_SSH_KEY` = full private key including `BEGIN` / `END` lines
+
 
 ---
 
