@@ -1,0 +1,300 @@
+import { createServerFn } from "@tanstack/react-start";
+import { and, eq } from "drizzle-orm";
+import { z } from "zod";
+
+import { CHECKLIST_TEMPLATE } from "@/data/constants";
+import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
+import { getDb } from "@/server/db/client";
+import * as t from "@/server/db/schema";
+import { loadProject, loadProjects, logActivity } from "@/server/api/mappers";
+import type { ProjectManualProgress } from "@/types";
+
+function ensureChecklist(projectId: string) {
+  const db = getDb();
+  const existing = db
+    .select()
+    .from(t.onboardingChecklistItems)
+    .where(eq(t.onboardingChecklistItems.projectId, projectId))
+    .get();
+  if (existing) return;
+  const now = nowIso();
+  for (const [section, labels] of Object.entries(CHECKLIST_TEMPLATE)) {
+    for (const label of labels) {
+      db.insert(t.onboardingChecklistItems)
+        .values({
+          id: newId(),
+          projectId,
+          section,
+          label,
+          collected: false,
+          uploaded: false,
+          live: false,
+          remarks: "",
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run();
+    }
+  }
+}
+
+export const listProjects = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) =>
+    z.object({ companyId: z.string().optional() }).optional().parse(data ?? {}),
+  )
+  .handler(async ({ data }) => {
+    requireUser();
+    return loadProjects(data?.companyId);
+  });
+
+export const getProject = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => z.object({ id: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    requireUser();
+    const project = loadProject(data.id);
+    if (!project) throw new ApiError(404, "Project not found");
+    ensureChecklist(data.id);
+    return project;
+  });
+
+const projectInput = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1),
+  companyId: z.string(),
+  type: z.string(),
+  units: z.number(),
+  city: z.string(),
+  rera: z.string(),
+  status: z.enum(["not_started", "in_progress", "review", "completed", "on_hold"]),
+  currentStep: z.number().optional(),
+});
+
+export const createProject = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => projectInput.parse(data))
+  .handler(async ({ data }) => {
+    const user = requireUser(["Admin", "Manager"]);
+    const db = getDb();
+    const id = data.id ?? newId();
+    const now = nowIso();
+    db.insert(t.projects)
+      .values({
+        id,
+        name: data.name,
+        companyId: data.companyId,
+        type: data.type,
+        units: data.units,
+        city: data.city,
+        rera: data.rera,
+        status: data.status,
+        currentStep: data.currentStep ?? 0,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+    ensureChecklist(id);
+    logActivity({
+      who: user.name,
+      what: `Created project ${data.name}`,
+      kind: "success",
+      companyId: data.companyId,
+      projectId: id,
+    });
+    return loadProject(id)!;
+  });
+
+export const updateProject = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ id: z.string(), patch: projectInput.partial().extend({ goLiveAt: z.string().optional().nullable() }) }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const user = requireUser(["Admin", "Manager"]);
+    const existing = loadProject(data.id);
+    if (!existing) throw new ApiError(404, "Project not found");
+    getDb()
+      .update(t.projects)
+      .set({ ...data.patch, updatedAt: nowIso() })
+      .where(eq(t.projects.id, data.id))
+      .run();
+    logActivity({
+      who: user.name,
+      what: `Updated project ${existing.name}`,
+      kind: "info",
+      companyId: existing.companyId,
+      projectId: data.id,
+    });
+    return loadProject(data.id)!;
+  });
+
+export const deleteProject = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const user = requireUser(["Admin", "Manager"]);
+    const existing = loadProject(data.id);
+    if (!existing) throw new ApiError(404, "Project not found");
+    getDb().delete(t.projects).where(eq(t.projects.id, data.id)).run();
+    logActivity({
+      who: user.name,
+      what: `Deleted project ${existing.name}`,
+      kind: "warning",
+      companyId: existing.companyId,
+      projectId: data.id,
+    });
+    return { ok: true };
+  });
+
+export const goLiveProject = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const user = requireUser(["Admin", "Manager"]);
+    const db = getDb();
+    const existing = loadProject(data.id);
+    if (!existing) throw new ApiError(404, "Project not found");
+    ensureChecklist(data.id);
+    const items = db
+      .select()
+      .from(t.onboardingChecklistItems)
+      .where(eq(t.onboardingChecklistItems.projectId, data.id))
+      .all();
+    const golive = items.filter((i) => i.section === "golive");
+    const ready = golive.length > 0 && golive.every((i) => i.collected && i.uploaded && i.live);
+    if (!ready) throw new ApiError(400, "Complete all Go-Live checklist items first");
+    const now = nowIso();
+    db.update(t.projects)
+      .set({ status: "completed", goLiveAt: now, currentStep: 7, updatedAt: now })
+      .where(eq(t.projects.id, data.id))
+      .run();
+    logActivity({
+      who: user.name,
+      what: `${existing.name} went LIVE!`,
+      kind: "success",
+      companyId: existing.companyId,
+      projectId: data.id,
+    });
+    return loadProject(data.id)!;
+  });
+
+export const getProjectProgress = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => z.object({ projectId: z.string() }).parse(data))
+  .handler(async ({ data }): Promise<ProjectManualProgress> => {
+    requireUser();
+    const db = getDb();
+    const row = db
+      .select()
+      .from(t.projectManualProgress)
+      .where(eq(t.projectManualProgress.projectId, data.projectId))
+      .get();
+    if (!row) {
+      const now = nowIso();
+      return {
+        projectId: data.projectId,
+        checks: {},
+        remarks: "",
+        createdAt: now,
+        updatedAt: now,
+      };
+    }
+    return {
+      projectId: row.projectId,
+      contactPerson: row.contactPerson ?? undefined,
+      contactNumber: row.contactNumber ?? undefined,
+      checks: JSON.parse(row.checksJson || "{}"),
+      remarks: row.remarks,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
+  });
+
+export const upsertProjectProgress = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        projectId: z.string(),
+        contactPerson: z.string().optional().nullable(),
+        contactNumber: z.string().optional().nullable(),
+        checks: z.record(z.boolean()).optional(),
+        remarks: z.string().optional(),
+        toggleKey: z.string().optional(),
+        markAll: z.boolean().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    requireUser();
+    const db = getDb();
+    const now = nowIso();
+    let row = db
+      .select()
+      .from(t.projectManualProgress)
+      .where(eq(t.projectManualProgress.projectId, data.projectId))
+      .get();
+    if (!row) {
+      db.insert(t.projectManualProgress)
+        .values({
+          projectId: data.projectId,
+          checksJson: "{}",
+          remarks: "",
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run();
+      row = db
+        .select()
+        .from(t.projectManualProgress)
+        .where(eq(t.projectManualProgress.projectId, data.projectId))
+        .get()!;
+    }
+    let checks = JSON.parse(row.checksJson || "{}") as Record<string, boolean>;
+    if (data.markAll !== undefined) {
+      const keys = [
+        "projectSetup", "existingDataUpload", "paymentUpload", "dueMatching", "demandFormat",
+        "receiptFormat", "agreementFormat", "allotmentLetterFormat", "welcomeLetterFormat",
+        "customerApplication", "whiteLabelOrBuildesk", "androidAppPublished", "iosAppPublished",
+        "credentialsShared", "appIntegrationRequired", "integrationConnected", "procurementManagement",
+        "materialDataUpdated", "supplierDataUpdated", "contractorDataUpdated", "poFormat", "woFormat",
+        "boqFormed", "clientSignOff",
+      ];
+      checks = Object.fromEntries(keys.map((k) => [k, data.markAll!]));
+    }
+    if (data.toggleKey) {
+      checks[data.toggleKey] = !checks[data.toggleKey];
+    }
+    if (data.checks) checks = { ...checks, ...data.checks };
+    db.update(t.projectManualProgress)
+      .set({
+        contactPerson: data.contactPerson !== undefined ? data.contactPerson : row.contactPerson,
+        contactNumber: data.contactNumber !== undefined ? data.contactNumber : row.contactNumber,
+        remarks: data.remarks !== undefined ? data.remarks : row.remarks,
+        checksJson: JSON.stringify(checks),
+        updatedAt: now,
+      })
+      .where(eq(t.projectManualProgress.projectId, data.projectId))
+      .run();
+    return {
+      projectId: data.projectId,
+      contactPerson: (data.contactPerson !== undefined ? data.contactPerson : row.contactPerson) ?? undefined,
+      contactNumber: (data.contactNumber !== undefined ? data.contactNumber : row.contactNumber) ?? undefined,
+      checks: checks as ProjectManualProgress["checks"],
+      remarks: data.remarks !== undefined ? data.remarks : row.remarks,
+      createdAt: row.createdAt,
+      updatedAt: now,
+    } satisfies ProjectManualProgress;
+  });
+
+export const listAllProgress = createServerFn({ method: "GET" }).handler(async () => {
+  requireUser();
+  return getDb()
+    .select()
+    .from(t.projectManualProgress)
+    .all()
+    .map(
+      (row): ProjectManualProgress => ({
+        projectId: row.projectId,
+        contactPerson: row.contactPerson ?? undefined,
+        contactNumber: row.contactNumber ?? undefined,
+        checks: JSON.parse(row.checksJson || "{}"),
+        remarks: row.remarks,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+      }),
+    );
+});

@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAuthStore, useCurrentUser, useUserStore } from "@/stores";
+import { authChangePassword, authUpdateProfile } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const TIMEZONES = [
@@ -31,8 +32,8 @@ export function EditProfileDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const user = useCurrentUser();
+  const setUser = useAuthStore((s) => s.setUser);
   const updateUser = useUserStore((s) => s.updateUser);
-  const changePassword = useAuthStore((s) => s.changePassword);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [tab, setTab] = useState<"profile" | "security" | "preferences">("profile");
@@ -97,7 +98,7 @@ export function EditProfileDialog({
     reader.readAsDataURL(file);
   }
 
-  function saveProfile() {
+  async function saveProfile() {
     if (form.name.trim().length < 2) {
       toast.error("Name must be at least 2 characters");
       return;
@@ -106,35 +107,49 @@ export function EditProfileDialog({
       toast.error("Enter a valid email");
       return;
     }
-    updateUser(user!.id, {
-      name: form.name.trim(),
-      email: form.email.trim().toLowerCase(),
-      phone: form.phone.trim() || undefined,
-      jobTitle: form.jobTitle.trim() || undefined,
-      department: form.department.trim() || undefined,
-      timezone: form.timezone,
-      bio: form.bio.trim() || undefined,
-      avatarUrl: form.avatarUrl || undefined,
-      notifyEmail: form.notifyEmail,
-      notifyInApp: form.notifyInApp,
-    });
-    toast.success("Profile updated");
-    onOpenChange(false);
+    try {
+      const result = await authUpdateProfile({
+        data: {
+          name: form.name.trim(),
+          email: form.email.trim().toLowerCase(),
+          phone: form.phone.trim() || null,
+          jobTitle: form.jobTitle.trim() || null,
+          department: form.department.trim() || null,
+          timezone: form.timezone,
+          bio: form.bio.trim() || null,
+          avatarUrl: form.avatarUrl || null,
+          notifyEmail: form.notifyEmail,
+          notifyInApp: form.notifyInApp,
+        },
+      });
+      setUser(result.data.user);
+      updateUser(user!.id, result.data.user);
+      toast.success("Profile updated");
+      onOpenChange(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to update profile");
+    }
   }
 
-  function savePassword() {
+  async function savePassword() {
     if (passwords.next !== passwords.confirm) {
       toast.error("New passwords do not match");
       return;
     }
-    const result = changePassword(user!.id, passwords.current, passwords.next);
-    if (!result.success) {
-      toast.error(result.error);
-      return;
+    try {
+      const result = await authChangePassword({
+        data: { currentPassword: passwords.current, nextPassword: passwords.next },
+      });
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success("Password changed");
+      setPasswords({ current: "", next: "", confirm: "" });
+      setTab("profile");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to change password");
     }
-    toast.success("Password changed");
-    setPasswords({ current: "", next: "", confirm: "" });
-    setTab("profile");
   }
 
   return (

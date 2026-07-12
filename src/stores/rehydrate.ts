@@ -1,4 +1,3 @@
-import { useAuthStore } from "./useAuthStore";
 import { useActivityStore } from "./useActivityStore";
 import { useCompanyStore } from "./useCompanyStore";
 import { useProjectStore } from "./useProjectStore";
@@ -18,7 +17,6 @@ import { useSettingsStore } from "./useSettingsStore";
 import { useProjectProgressStore } from "./useProjectProgressStore";
 
 const stores = [
-  useAuthStore,
   useActivityStore,
   useCompanyStore,
   useProjectStore,
@@ -39,5 +37,11 @@ const stores = [
 ] as const;
 
 export async function rehydrateAllStores() {
-  await Promise.all(stores.map((store) => store.persist.rehydrate()));
+  await Promise.all(
+    stores.map(async (store) => {
+      if ("persist" in store && store.persist?.rehydrate) {
+        await store.persist.rehydrate();
+      }
+    }),
+  );
 }

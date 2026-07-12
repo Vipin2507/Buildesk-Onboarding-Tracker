@@ -20,6 +20,7 @@ import { PageHeader, PageWrap } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useAuthStore, useSettingsStore, useUserStore } from "@/stores";
+import { createUser as apiCreateUser, updateUser as apiUpdateUser } from "@/lib/api";
 import {
   PERMISSION_LABELS,
   type DocumentSettings,
@@ -864,8 +865,8 @@ function UsersSection() {
   const addUser = useUserStore((s) => s.addUser);
   const updateUser = useUserStore((s) => s.updateUser);
   const deleteUser = useUserStore((s) => s.deleteUser);
-  const setPassword = useAuthStore((s) => s.setPassword);
-  const currentUserId = useAuthStore((s) => s.currentUserId);
+  const currentUser = useAuthStore((s) => s.user);
+  const currentUserId = currentUser?.id;
 
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -1001,14 +1002,26 @@ function UsersSection() {
             department: form.department?.trim() || undefined,
           };
           if (editing) {
-            updateUser(editing.id, payload);
-            toast.success("User updated");
+            void apiUpdateUser({ data: { id: editing.id, patch: payload } })
+              .then((u) => {
+                useUserStore.setState((s) => ({
+                  users: s.users.map((x) => (x.id === u.id ? u : x)),
+                }));
+                toast.success("User updated");
+                setModalOpen(false);
+              })
+              .catch((e) => toast.error(e instanceof Error ? e.message : "Update failed"));
+            return;
           } else {
-            const user = addUser({ ...payload, notifyEmail: true, notifyInApp: true, timezone: "Asia/Kolkata" });
-            setPassword(user.id, "buildesk123");
-            toast.success("User invited · temporary password: buildesk123");
+            void apiCreateUser({ data: { ...payload, password: "buildesk123" } })
+              .then((user) => {
+                useUserStore.setState((s) => ({ users: [...s.users, user] }));
+                toast.success("User invited · temporary password: buildesk123");
+                setModalOpen(false);
+              })
+              .catch((e) => toast.error(e instanceof Error ? e.message : "Invite failed"));
+            return;
           }
-          setModalOpen(false);
         }}
       >
         <div className="grid gap-2">

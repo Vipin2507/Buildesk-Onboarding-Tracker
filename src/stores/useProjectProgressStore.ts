@@ -3,6 +3,8 @@ import { nowIso } from "@/types";
 import { PROJECT_PROGRESS_MILESTONES } from "@/types/project";
 import { createPersistedStore, touch } from "./persist";
 import { logActivity } from "./useActivityStore";
+import { upsertProjectProgress } from "@/lib/api";
+import { serverSync } from "@/lib/sync";
 
 function emptyProgress(projectId: string): ProjectManualProgress {
   return {
@@ -29,8 +31,28 @@ type ProjectProgressState = {
   calcPercent: (projectId: string) => number;
 };
 
+function syncProgress(projectId: string, extra?: { markAll?: boolean }) {
+  // Read after local set via microtask so state is current
+  queueMicrotask(() => {
+    const progress = useProjectProgressStore.getState().byProjectId[projectId];
+    if (!progress) return;
+    serverSync("projectProgress", () =>
+      upsertProjectProgress({
+        data: {
+          projectId,
+          contactPerson: progress.contactPerson,
+          contactNumber: progress.contactNumber,
+          remarks: progress.remarks,
+          checks: progress.checks as Record<string, boolean>,
+          ...(extra?.markAll !== undefined ? { markAll: extra.markAll } : {}),
+        },
+      }),
+    );
+  });
+}
+
 export const useProjectProgressStore = createPersistedStore<ProjectProgressState>(
-  "project-manual-progress-v2",
+  "project-manual-progress-v3",
   (set, get) => ({
     byProjectId: {},
 
@@ -66,6 +88,7 @@ export const useProjectProgressStore = createPersistedStore<ProjectProgressState
         kind: "info",
         projectId,
       });
+      syncProgress(projectId);
     },
 
     setCheck: (projectId, key, value) => {
@@ -82,6 +105,7 @@ export const useProjectProgressStore = createPersistedStore<ProjectProgressState
           },
         };
       });
+      syncProgress(projectId);
     },
 
     updateMeta: (projectId, data) => {
@@ -95,6 +119,7 @@ export const useProjectProgressStore = createPersistedStore<ProjectProgressState
           },
         };
       });
+      syncProgress(projectId);
     },
 
     markAll: (projectId, value) => {
@@ -117,6 +142,7 @@ export const useProjectProgressStore = createPersistedStore<ProjectProgressState
         kind: value ? "success" : "warning",
         projectId,
       });
+      syncProgress(projectId, { markAll: value });
     },
 
     removeProject: (projectId) => {

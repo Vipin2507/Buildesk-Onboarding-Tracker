@@ -1,8 +1,13 @@
 import type { Ticket, TicketStatus } from "@/types";
-import { newId, nowIso } from "@/types";
-import { seedTickets } from "@/data/seed";
+import { nowIso } from "@/types";
 import { logActivity } from "./useActivityStore";
 import { createPersistedStore, touch } from "./persist";
+import {
+  createTicket as apiCreate,
+  updateTicket as apiUpdate,
+  deleteTicket as apiDelete,
+} from "@/lib/api";
+import { serverSync } from "@/lib/sync";
 
 type TicketState = {
   tickets: Ticket[];
@@ -13,14 +18,34 @@ type TicketState = {
   getById: (id: string) => Ticket | undefined;
 };
 
-export const useTicketStore = createPersistedStore<TicketState>("tickets-v2", (set, get) => ({
-  tickets: seedTickets,
+export const useTicketStore = createPersistedStore<TicketState>("tickets-v3", (set, get) => ({
+  tickets: [],
 
   addTicket: (data) => {
     const now = nowIso();
-    const ticket: Ticket = { ...data, id: `TKT-${1000 + get().tickets.length + 1}`, createdAt: now, updatedAt: now };
+    const ticket: Ticket = {
+      ...data,
+      id: `TKT-${1000 + get().tickets.length + 1}`,
+      createdAt: now,
+      updatedAt: now,
+    };
     set((s) => ({ tickets: [ticket, ...s.tickets] }));
     logActivity({ who: "You", what: `Created ticket ${ticket.id}: ${ticket.title}`, kind: "info" });
+    serverSync("createTicket", () =>
+      apiCreate({
+        data: {
+          id: ticket.id,
+          type: ticket.type,
+          title: ticket.title,
+          priority: ticket.priority,
+          status: ticket.status,
+          raisedOn: ticket.raisedOn,
+          eta: ticket.eta,
+          developerId: ticket.developerId,
+          companyId: ticket.companyId,
+        },
+      }),
+    );
     return ticket;
   },
 
@@ -28,18 +53,23 @@ export const useTicketStore = createPersistedStore<TicketState>("tickets-v2", (s
     set((s) => ({ tickets: s.tickets.map((t) => (t.id === id ? touch({ ...t, ...data }) : t)) }));
     const ticket = get().getById(id);
     if (ticket) logActivity({ who: "You", what: `Updated ticket ${id}`, kind: "info" });
+    serverSync("updateTicket", () => apiUpdate({ data: { id, patch: data } }));
   },
 
   deleteTicket: (id) => {
     const ticket = get().getById(id);
     set((s) => ({ tickets: s.tickets.filter((t) => t.id !== id) }));
-    if (ticket) logActivity({ who: "You", what: `Deleted ticket ${id}`, kind: "warning" });
+    if (ticket) {
+      logActivity({ who: "You", what: `Deleted ticket ${id}`, kind: "warning" });
+      serverSync("deleteTicket", () => apiDelete({ data: { id } }));
+    }
     return ticket;
   },
 
   moveTicket: (id, status) => {
     set((s) => ({ tickets: s.tickets.map((t) => (t.id === id ? touch({ ...t, status }) : t)) }));
     logActivity({ who: "You", what: `Ticket ${id} moved to ${status}`, kind: "info" });
+    serverSync("moveTicket", () => apiUpdate({ data: { id, patch: { status } } }));
   },
 
   getById: (id) => get().tickets.find((t) => t.id === id),

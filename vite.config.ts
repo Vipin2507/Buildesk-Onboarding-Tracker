@@ -23,6 +23,10 @@ export default defineConfig({
       "zustand",
       "zustand/middleware",
     ],
+    exclude: ["better-sqlite3"],
+  },
+  ssr: {
+    external: ["better-sqlite3"],
   },
   plugins: [
     tanstackStart({

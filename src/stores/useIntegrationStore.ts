@@ -1,8 +1,9 @@
 import type { Integration, Trigger } from "@/types";
 import { newId, nowIso } from "@/types";
-import { seedIntegrations, seedTriggers } from "@/data/seed";
 import { logActivity } from "./useActivityStore";
 import { createPersistedStore, touch } from "./persist";
+import { mutateIntegration } from "@/lib/api";
+import { serverSync } from "@/lib/sync";
 
 type IntegrationState = {
   integrations: Integration[];
@@ -15,43 +16,64 @@ type IntegrationState = {
   toggleTrigger: (id: string) => void;
 };
 
-export const useIntegrationStore = createPersistedStore<IntegrationState>("integrations", (set, get) => ({
-  integrations: seedIntegrations,
-  triggers: seedTriggers,
+export const useIntegrationStore = createPersistedStore<IntegrationState>("integrations-v2", (set, get) => ({
+  integrations: [],
+  triggers: [],
 
   toggleIntegration: (id, field) => {
     const integration = get().integrations.find((i) => i.id === id);
     if (!integration) return;
+    const next = !integration[field];
     set((s) => ({
       integrations: s.integrations.map((i) =>
-        i.id === id ? touch({ ...i, [field]: !i[field] }) : i,
+        i.id === id ? touch({ ...i, [field]: next }) : i,
       ),
     }));
     logActivity({
       who: "You",
-      what: `${integration.name} ${field} ${!integration[field] ? "enabled" : "disabled"}`,
+      what: `${integration.name} ${field} ${next ? "enabled" : "disabled"}`,
       kind: "info",
       projectId: integration.projectId,
     });
+    serverSync("toggleIntegration", () =>
+      mutateIntegration({
+        data: { kind: "integration", action: "update", id, values: { [field]: next } },
+      }),
+    );
   },
 
   addTrigger: (data) => {
     const t: Trigger = { ...data, id: newId(), createdAt: nowIso(), updatedAt: nowIso() };
     set((s) => ({ triggers: [...s.triggers, t] }));
     logActivity({ who: "You", what: `Added trigger ${t.name}`, kind: "success" });
+    serverSync("addTrigger", () =>
+      mutateIntegration({ data: { kind: "trigger", action: "create", id: t.id, values: { ...data } } }),
+    );
   },
 
   updateTrigger: (id, data) => {
     set((s) => ({ triggers: s.triggers.map((t) => (t.id === id ? touch({ ...t, ...data }) : t)) }));
+    serverSync("updateTrigger", () =>
+      mutateIntegration({ data: { kind: "trigger", action: "update", id, values: data } }),
+    );
   },
 
   deleteTrigger: (id) => {
     set((s) => ({ triggers: s.triggers.filter((t) => t.id !== id) }));
+    serverSync("deleteTrigger", () =>
+      mutateIntegration({ data: { kind: "trigger", action: "delete", id } }),
+    );
   },
 
   toggleTrigger: (id) => {
+    const current = get().triggers.find((t) => t.id === id);
+    if (!current) return;
+    const active = !current.active;
     set((s) => ({
-      triggers: s.triggers.map((t) => (t.id === id ? touch({ ...t, active: !t.active }) : t)),
+      triggers: s.triggers.map((t) => (t.id === id ? touch({ ...t, active }) : t)),
     }));
+    serverSync("toggleTrigger", () =>
+      mutateIntegration({ data: { kind: "trigger", action: "update", id, values: { active } } }),
+    );
   },
 }));

@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useGlobalSearch, useAuthStore, useCurrentUser } from "@/stores";
+import { authLogout } from "@/lib/api";
 
 export function TopBar() {
   const [query, setQuery] = useState("");
@@ -20,7 +21,7 @@ export function TopBar() {
   const [profileOpen, setProfileOpen] = useState(false);
   const results = useGlobalSearch(query);
   const navigate = useNavigate();
-  const logout = useAuthStore((s) => s.logout);
+  const setUser = useAuthStore((s) => s.setUser);
   const currentUser = useCurrentUser();
   const ref = useRef<HTMLDivElement>(null);
 
@@ -35,8 +36,9 @@ export function TopBar() {
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
-  function handleLogout() {
-    logout();
+  async function handleLogout() {
+    await authLogout();
+    setUser(null);
     toast.success("Signed out");
     void navigate({ to: "/login", search: { mode: "login" } });
   }
@@ -153,8 +155,9 @@ export function TopBar() {
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => {
-                  logout();
-                  void navigate({ to: "/login", search: { mode: "register" } });
+                  void handleLogout().then(() =>
+                    navigate({ to: "/login", search: { mode: "register" } }),
+                  );
                 }}
               >
                 <User className="mr-2 h-4 w-4" />

@@ -9,14 +9,6 @@ import type {
   UploadType,
 } from "@/types";
 import { newId, nowIso } from "@/types";
-import {
-  seedChecklistItems,
-  seedCustomerAppConfigs,
-  seedCustomerRecords,
-  seedOtherCharges,
-  seedPaymentRecords,
-  seedUploads,
-} from "@/data/seed";
 import { buildChecklistForProject } from "@/data/seed";
 import { CHECKLIST_TEMPLATE } from "@/data/constants";
 import { logActivity } from "./useActivityStore";
@@ -24,6 +16,15 @@ import { recordAttachment } from "./useNotesAttachmentsStore";
 import { createPersistedStore, touch } from "./persist";
 import { useProjectStore } from "./useProjectStore";
 import { ATTACHMENT_CATEGORY_LABEL } from "@/types";
+import {
+  toggleChecklist as apiToggleChecklist,
+  updateChecklistRemarks as apiUpdateRemarks,
+  addOtherCharge as apiAddCharge,
+  updateOtherCharge as apiUpdateCharge,
+  deleteOtherCharge as apiDeleteCharge,
+  simulateUpload as apiSimulateUpload,
+} from "@/lib/api";
+import { serverSync } from "@/lib/sync";
 
 type OnboardingState = {
   checklistItems: OnboardingChecklistItem[];
@@ -62,13 +63,13 @@ function calcProgress(items: OnboardingChecklistItem[]) {
   return Math.round((done / total) * 100);
 }
 
-export const useOnboardingStore = createPersistedStore<OnboardingState>("onboarding-v2", (set, get) => ({
-  checklistItems: seedChecklistItems,
-  otherCharges: seedOtherCharges,
-  uploads: seedUploads,
-  customerRecords: seedCustomerRecords,
-  paymentRecords: seedPaymentRecords,
-  customerAppConfigs: seedCustomerAppConfigs,
+export const useOnboardingStore = createPersistedStore<OnboardingState>("onboarding-v3", (set, get) => ({
+  checklistItems: [],
+  otherCharges: [],
+  uploads: [],
+  customerRecords: [],
+  paymentRecords: [],
+  customerAppConfigs: [],
 
   initChecklistForProject: (projectId) => {
     const existing = get().checklistItems.some((i) => i.projectId === projectId);
@@ -117,12 +118,14 @@ export const useOnboardingStore = createPersistedStore<OnboardingState>("onboard
       kind: "info",
       projectId: item.projectId,
     });
+    serverSync("toggleChecklist", () => apiToggleChecklist({ data: { id, phase } }));
   },
 
   updateChecklistRemarks: (id, remarks) => {
     set((s) => ({
       checklistItems: s.checklistItems.map((i) => (i.id === id ? touch({ ...i, remarks }) : i)),
     }));
+    serverSync("checklistRemarks", () => apiUpdateRemarks({ data: { id, remarks } }));
   },
 
   getChecklistByProject: (projectId) => get().checklistItems.filter((i) => i.projectId === projectId),
@@ -138,16 +141,29 @@ export const useOnboardingStore = createPersistedStore<OnboardingState>("onboard
     const charge: OtherCharge = { ...data, id: newId(), createdAt: nowIso(), updatedAt: nowIso() };
     set((s) => ({ otherCharges: [...s.otherCharges, charge] }));
     logActivity({ who: "You", what: `Added charge: ${charge.name}`, kind: "info", projectId: data.projectId });
+    serverSync("addOtherCharge", () =>
+      apiAddCharge({
+        data: {
+          id: charge.id,
+          projectId: charge.projectId,
+          name: charge.name,
+          amount: charge.amount,
+          type: charge.type,
+        },
+      }),
+    );
   },
 
   updateOtherCharge: (id, data) => {
     set((s) => ({
       otherCharges: s.otherCharges.map((c) => (c.id === id ? touch({ ...c, ...data }) : c)),
     }));
+    serverSync("updateOtherCharge", () => apiUpdateCharge({ data: { id, patch: data } }));
   },
 
   deleteOtherCharge: (id) => {
     set((s) => ({ otherCharges: s.otherCharges.filter((c) => c.id !== id) }));
+    serverSync("deleteOtherCharge", () => apiDeleteCharge({ data: { id } }));
   },
 
   getOtherChargesByProject: (projectId) => get().otherCharges.filter((c) => c.projectId === projectId),
@@ -225,6 +241,13 @@ export const useOnboardingStore = createPersistedStore<OnboardingState>("onboard
 
     const resolvedCompanyId =
       companyId ?? useProjectStore.getState().projects.find((p) => p.id === projectId)?.companyId;
+
+    serverSync("simulateUpload", () =>
+      apiSimulateUpload({
+        data: { projectId, type, fileName, companyId: resolvedCompanyId },
+      }),
+    );
+
     if (resolvedCompanyId) {
       const projectName = useProjectStore.getState().projects.find((p) => p.id === projectId)?.name;
       recordAttachment({

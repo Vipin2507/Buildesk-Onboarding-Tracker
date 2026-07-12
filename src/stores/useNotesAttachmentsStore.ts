@@ -1,8 +1,14 @@
 import type { AttachmentCategory, CompanyAttachment, CompanyNote } from "@/types";
 import { newId, nowIso } from "@/types";
-import { seedAttachments, seedNotes } from "@/data/seed";
 import { createPersistedStore, touch } from "./persist";
 import { logActivity } from "./useActivityStore";
+import {
+  addNote as apiAddNote,
+  updateNote as apiUpdateNote,
+  deleteNote as apiDeleteNote,
+  deleteAttachment as apiDeleteAttachment,
+} from "@/lib/api";
+import { serverSync } from "@/lib/sync";
 
 type NotesAttachmentsState = {
   notes: CompanyNote[];
@@ -36,10 +42,10 @@ type NotesAttachmentsState = {
 };
 
 export const useNotesAttachmentsStore = createPersistedStore<NotesAttachmentsState>(
-  "notes-attachments-v2",
+  "notes-attachments-v3",
   (set, get) => ({
-    notes: seedNotes,
-    attachments: seedAttachments,
+    notes: [],
+    attachments: [],
 
     addNote: ({ companyId, body, author, projectId, pinned }) => {
       const now = nowIso();
@@ -61,6 +67,18 @@ export const useNotesAttachmentsStore = createPersistedStore<NotesAttachmentsSta
         companyId,
         projectId,
       });
+      serverSync("addNote", () =>
+        apiAddNote({
+          data: {
+            id: note.id,
+            companyId,
+            body: note.body,
+            projectId,
+            pinned: note.pinned,
+            author,
+          },
+        }),
+      );
       return note;
     },
 
@@ -68,6 +86,7 @@ export const useNotesAttachmentsStore = createPersistedStore<NotesAttachmentsSta
       set((s) => ({
         notes: s.notes.map((n) => (n.id === id ? touch({ ...n, ...data }) : n)),
       }));
+      serverSync("updateNote", () => apiUpdateNote({ data: { id, patch: data } }));
     },
 
     deleteNote: (id) => {
@@ -81,6 +100,7 @@ export const useNotesAttachmentsStore = createPersistedStore<NotesAttachmentsSta
           companyId: note.companyId,
           projectId: note.projectId,
         });
+        serverSync("deleteNote", () => apiDeleteNote({ data: { id } }));
       }
     },
 
@@ -125,6 +145,7 @@ export const useNotesAttachmentsStore = createPersistedStore<NotesAttachmentsSta
           companyId: a.companyId,
           projectId: a.projectId,
         });
+        serverSync("deleteAttachment", () => apiDeleteAttachment({ data: { id } }));
       }
     },
 
@@ -143,7 +164,6 @@ export const useNotesAttachmentsStore = createPersistedStore<NotesAttachmentsSta
   }),
 );
 
-/** Fire-and-forget helper so upload flows can record docs without importing the hook. */
 export function recordAttachment(
   entry: Parameters<NotesAttachmentsState["addAttachment"]>[0],
 ) {

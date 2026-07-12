@@ -1,9 +1,15 @@
 import type { Company, ModuleKey } from "@/types";
 import { newId, nowIso } from "@/types";
-import { seedCompanies } from "@/data/seed";
 import { logActivity } from "./useActivityStore";
 import { createPersistedStore, touch } from "./persist";
 import { getModuleLabel, normalizeCompanyModules } from "@/data/module-catalog";
+import {
+  createCompany as apiCreateCompany,
+  updateCompany as apiUpdateCompany,
+  deleteCompany as apiDeleteCompany,
+  renewCompany as apiRenewCompany,
+} from "@/lib/api";
+import { serverSync } from "@/lib/sync";
 
 type CompanyState = {
   companies: Company[];
@@ -16,15 +22,39 @@ type CompanyState = {
   enableModule: (companyId: string, moduleKey: ModuleKey) => void;
 };
 
-// Bump the store key to avoid stale persisted shapes after module refactors.
-export const useCompanyStore = createPersistedStore<CompanyState>("companies-v4", (set, get) => ({
-  companies: seedCompanies,
+export const useCompanyStore = createPersistedStore<CompanyState>("companies-v5", (set, get) => ({
+  companies: [],
 
   addCompany: (data) => {
     const now = nowIso();
     const company: Company = { ...data, id: newId(), createdAt: now, updatedAt: now };
     set((s) => ({ companies: [company, ...s.companies] }));
     logActivity({ who: "You", what: `Added company ${company.name}`, kind: "success", companyId: company.id });
+    serverSync("createCompany", () =>
+      apiCreateCompany({
+        data: {
+          id: company.id,
+          name: company.name,
+          contact: company.contact,
+          designation: company.designation,
+          phone: company.phone,
+          email: company.email,
+          city: company.city,
+          officeAddress: company.officeAddress,
+          gstNumber: company.gstNumber,
+          billingInfo: company.billingInfo,
+          onboardingManagerId: company.onboardingManagerId,
+          csmId: company.csmId,
+          status: company.status,
+          agreementDate: company.agreementDate,
+          goLiveTarget: company.goLiveTarget,
+          planExpiry: company.planExpiry,
+          plan: company.plan,
+          health: company.health,
+          modules: company.modules,
+        },
+      }),
+    );
     return company;
   },
 
@@ -35,6 +65,17 @@ export const useCompanyStore = createPersistedStore<CompanyState>("companies-v4"
     const company = get().getById(id);
     if (company) {
       logActivity({ who: "You", what: `Updated company ${company.name}`, kind: "info", companyId: id });
+      serverSync("updateCompany", () =>
+        apiUpdateCompany({
+          data: {
+            id,
+            patch: {
+              ...data,
+              modules: data.modules ?? company.modules,
+            },
+          },
+        }),
+      );
     }
   },
 
@@ -43,6 +84,7 @@ export const useCompanyStore = createPersistedStore<CompanyState>("companies-v4"
     if (!company) return undefined;
     set((s) => ({ companies: s.companies.filter((c) => c.id !== id) }));
     logActivity({ who: "You", what: `Deleted company ${company.name}`, kind: "warning", companyId: id });
+    serverSync("deleteCompany", () => apiDeleteCompany({ data: { id } }));
     return company;
   },
 
@@ -62,17 +104,21 @@ export const useCompanyStore = createPersistedStore<CompanyState>("companies-v4"
       kind: "info",
       companyId,
     });
+    serverSync("transferManager", () =>
+      apiUpdateCompany({ data: { id: companyId, patch: { onboardingManagerId: managerId } } }),
+    );
   },
 
   markRenewed: (id) => {
     const now = nowIso();
+    const expiry = new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10);
     set((s) => ({
       companies: s.companies.map((c) =>
         c.id === id
           ? touch({
               ...c,
               renewedAt: now,
-              planExpiry: new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10),
+              planExpiry: expiry,
             })
           : c,
       ),
@@ -81,22 +127,21 @@ export const useCompanyStore = createPersistedStore<CompanyState>("companies-v4"
     if (company) {
       logActivity({ who: "You", what: `Renewed plan for ${company.name}`, kind: "success", companyId: id });
     }
+    serverSync("renewCompany", () => apiRenewCompany({ data: { id, planExpiry: expiry } }));
   },
 
   enableModule: (companyId, moduleKey) => {
     const company = get().getById(companyId);
     if (!company) return;
     const today = new Date().toISOString().slice(0, 10);
+    let nextModules = normalizeCompanyModules((company as { modules?: unknown }).modules);
+    nextModules = nextModules.map((m) =>
+      m.moduleKey === moduleKey ? { ...m, optedIn: true, optedOnDate: today } : m,
+    );
     set((s) => ({
       companies: s.companies.map((c) => {
         if (c.id !== companyId) return c;
-        const modules = normalizeCompanyModules((c as any).modules);
-        return touch({
-          ...c,
-          modules: modules.map((m) =>
-            m.moduleKey === moduleKey ? { ...m, optedIn: true, optedOnDate: today } : m,
-          ),
-        });
+        return touch({ ...c, modules: nextModules });
       }),
     }));
     logActivity({
@@ -105,5 +150,8 @@ export const useCompanyStore = createPersistedStore<CompanyState>("companies-v4"
       kind: "success",
       companyId,
     });
+    serverSync("enableModule", () =>
+      apiUpdateCompany({ data: { id: companyId, patch: { modules: nextModules } } }),
+    );
   },
 }));

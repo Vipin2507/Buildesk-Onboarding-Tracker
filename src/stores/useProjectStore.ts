@@ -1,11 +1,17 @@
 import type { Project } from "@/types";
 import { newId, nowIso } from "@/types";
-import { seedProjects } from "@/data/seed";
 import { buildChecklistForProject } from "@/data/seed";
 import { useOnboardingStore } from "./useOnboardingStore";
 import { useProjectProgressStore } from "./useProjectProgressStore";
 import { logActivity } from "./useActivityStore";
 import { createPersistedStore, touch } from "./persist";
+import {
+  createProject as apiCreateProject,
+  updateProject as apiUpdateProject,
+  deleteProject as apiDeleteProject,
+  goLiveProject as apiGoLiveProject,
+} from "@/lib/api";
+import { serverSync } from "@/lib/sync";
 
 type ProjectState = {
   projects: Project[];
@@ -17,8 +23,8 @@ type ProjectState = {
   goLive: (id: string) => boolean;
 };
 
-export const useProjectStore = createPersistedStore<ProjectState>("projects-v2", (set, get) => ({
-  projects: seedProjects,
+export const useProjectStore = createPersistedStore<ProjectState>("projects-v3", (set, get) => ({
+  projects: [],
 
   addProject: (data) => {
     const now = nowIso();
@@ -32,6 +38,21 @@ export const useProjectStore = createPersistedStore<ProjectState>("projects-v2",
       companyId: project.companyId,
       projectId: project.id,
     });
+    serverSync("createProject", () =>
+      apiCreateProject({
+        data: {
+          id: project.id,
+          name: project.name,
+          companyId: project.companyId,
+          type: project.type,
+          units: project.units,
+          city: project.city,
+          rera: project.rera,
+          status: project.status,
+          currentStep: project.currentStep,
+        },
+      }),
+    );
     return project;
   },
 
@@ -48,6 +69,7 @@ export const useProjectStore = createPersistedStore<ProjectState>("projects-v2",
         companyId: project.companyId,
         projectId: id,
       });
+      serverSync("updateProject", () => apiUpdateProject({ data: { id, patch: data } }));
     }
   },
 
@@ -64,6 +86,7 @@ export const useProjectStore = createPersistedStore<ProjectState>("projects-v2",
       companyId: project.companyId,
       projectId: id,
     });
+    serverSync("deleteProject", () => apiDeleteProject({ data: { id } }));
     return project;
   },
 
@@ -90,9 +113,9 @@ export const useProjectStore = createPersistedStore<ProjectState>("projects-v2",
         projectId: id,
       });
     }
+    serverSync("goLiveProject", () => apiGoLiveProject({ data: { id } }));
     return true;
   },
 }));
 
-// Re-export for checklist init
 export { buildChecklistForProject };

@@ -1,11 +1,16 @@
 import type { PostSalesProject, PostSalesStep } from "@/types";
 import { newId, nowIso } from "@/types";
 import { buildDefaultPostSalesSteps, buildPostSalesStepsFromDefs } from "@/data/module-catalog";
-import { seedPostSalesProjects } from "@/data/seed";
 import { logActivity } from "./useActivityStore";
 import { recordAttachment } from "./useNotesAttachmentsStore";
 import { getEnabledWorkflowStepDefs } from "./useMasterStore";
 import { createPersistedStore, touch } from "./persist";
+import {
+  createPostSalesProject as apiCreate,
+  deletePostSalesProject as apiDelete,
+  updatePostSalesStep as apiStep,
+} from "@/lib/api";
+import { serverSync } from "@/lib/sync";
 
 type PostSalesState = {
   projects: PostSalesProject[];
@@ -43,8 +48,8 @@ function mapStep(
 }
 
 // Bump the store key to avoid stale persisted shapes after step model refactors.
-export const usePostSalesStore = createPersistedStore<PostSalesState>("post-sales-v3", (set, get) => ({
-  projects: seedPostSalesProjects,
+export const usePostSalesStore = createPersistedStore<PostSalesState>("post-sales-v4", (set, get) => ({
+  projects: [],
 
   addProject: ({ companyId, projectNumber, projectName }) => {
     const now = nowIso();
@@ -70,6 +75,26 @@ export const usePostSalesStore = createPersistedStore<PostSalesState>("post-sale
       companyId,
       projectId: project.id,
     });
+    serverSync("createPostSales", () =>
+      apiCreate({
+        data: {
+          id: project.id,
+          companyId,
+          projectName,
+          projectNumber,
+          steps: project.steps.map((s) => ({
+            id: s.id,
+            key: s.key,
+            label: s.label,
+            requiresTemplate: s.requiresTemplate,
+            templateStatus: s.templateStatus,
+            uploadStatus: s.uploadStatus,
+            approvalStatus: s.approvalStatus,
+            order: s.order,
+          })),
+        },
+      }),
+    );
     return project;
   },
 
@@ -100,6 +125,7 @@ export const usePostSalesStore = createPersistedStore<PostSalesState>("post-sale
         companyId: project.companyId,
         projectId: id,
       });
+      serverSync("deletePostSales", () => apiDelete({ data: { id } }));
     }
     return project;
   },
@@ -152,6 +178,9 @@ export const usePostSalesStore = createPersistedStore<PostSalesState>("post-sale
         projectId,
       });
     }
+    serverSync("postSalesStep", () =>
+      apiStep({ data: { projectId, stepId, action: "send-template" } }),
+    );
   },
 
   markTemplateReceived: (projectId, stepId) => {
@@ -172,6 +201,9 @@ export const usePostSalesStore = createPersistedStore<PostSalesState>("post-sale
         projectId,
       });
     }
+    serverSync("postSalesStep", () =>
+      apiStep({ data: { projectId, stepId, action: "receive-template" } }),
+    );
   },
 
   uploadStepFile: (projectId, stepId, fileName, recordCount) => {
@@ -214,6 +246,9 @@ export const usePostSalesStore = createPersistedStore<PostSalesState>("post-sale
         uploadedAt,
       });
     }
+    serverSync("postSalesStep", () =>
+      apiStep({ data: { projectId, stepId, action: "upload", fileName } }),
+    );
   },
 
   submitForApproval: (projectId, stepId) => {
@@ -234,6 +269,7 @@ export const usePostSalesStore = createPersistedStore<PostSalesState>("post-sale
         projectId,
       });
     }
+    serverSync("postSalesStep", () => apiStep({ data: { projectId, stepId, action: "submit" } }));
   },
 
   approveStep: (projectId, stepId, approvedBy) => {
@@ -257,6 +293,7 @@ export const usePostSalesStore = createPersistedStore<PostSalesState>("post-sale
         projectId,
       });
     }
+    serverSync("postSalesStep", () => apiStep({ data: { projectId, stepId, action: "approve" } }));
   },
 
   rejectStep: (projectId, stepId, remarks, rejectedBy) => {
@@ -280,5 +317,8 @@ export const usePostSalesStore = createPersistedStore<PostSalesState>("post-sale
         projectId,
       });
     }
+    serverSync("postSalesStep", () =>
+      apiStep({ data: { projectId, stepId, action: "reject", remarks } }),
+    );
   },
 }));

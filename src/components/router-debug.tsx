@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 export function RouterDebug() {
   const location = useRouterState({ select: (s) => s.location });
-  const currentUserId = useAuthStore((s) => s.currentUserId);
+  const currentUserId = useAuthStore((s) => s.user?.id);
   const companiesCount = useCompanyStore((s) => s.companies.length);
   const [lastError, setLastError] = useState<string | null>(null);
 
