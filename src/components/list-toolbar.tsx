@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DatePickerField } from "@/components/date-picker-field";
 import { cn } from "@/lib/utils";
 
 const ease = [0.22, 1, 0.36, 1] as const;
@@ -326,26 +327,24 @@ export function ListToolbar({
                         <FieldLabel htmlFor={`${searchId}-from`}>
                           {dateRange!.label ? `${dateRange!.label} from` : "From"}
                         </FieldLabel>
-                        <Input
+                        <DatePickerField
                           id={`${searchId}-from`}
-                          type="date"
                           value={dateRange!.from}
                           max={dateRange!.to || undefined}
-                          onChange={(e) => dateRange!.onFromChange(e.target.value)}
-                          className={cn(fieldControl, "[color-scheme:inherit]")}
+                          onChange={dateRange!.onFromChange}
+                          placeholder="From date"
                         />
                       </div>
                       <div className="min-w-0">
                         <FieldLabel htmlFor={`${searchId}-to`}>
                           {dateRange!.label ? `${dateRange!.label} to` : "To"}
                         </FieldLabel>
-                        <Input
+                        <DatePickerField
                           id={`${searchId}-to`}
-                          type="date"
                           value={dateRange!.to}
                           min={dateRange!.from || undefined}
-                          onChange={(e) => dateRange!.onToChange(e.target.value)}
-                          className={cn(fieldControl, "[color-scheme:inherit]")}
+                          onChange={dateRange!.onToChange}
+                          placeholder="To date"
                         />
                       </div>
                     </>
