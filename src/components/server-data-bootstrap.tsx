@@ -132,6 +132,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
             status: t.status as never,
             developerId: t.developerId ?? "",
             companyId: t.companyId ?? "",
+            projectId: t.projectId ?? "",
             description: t.description ?? "",
           })),
         });

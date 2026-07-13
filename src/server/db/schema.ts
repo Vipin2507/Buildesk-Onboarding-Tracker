@@ -295,6 +295,7 @@ export const tickets = sqliteTable("tickets", {
   eta: text("eta").notNull(),
   developerId: text("developer_id"),
   companyId: text("company_id"),
+  projectId: text("project_id"),
   description: text("description").notNull().default(""),
   ...timestamps,
 });

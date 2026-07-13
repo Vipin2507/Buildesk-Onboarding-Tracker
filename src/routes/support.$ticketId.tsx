@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -15,7 +15,7 @@ import { DetailPageSkeleton } from "@/components/loading-skeleton";
 import { EntityNotFound } from "@/components/empty-state";
 import { useDetailLoading } from "@/hooks/use-detail-loading";
 import { TICKET_KANBAN_COLUMNS } from "@/data/constants";
-import { useTicketStore, useCompanyStore, useEmployeeStore } from "@/stores";
+import { useTicketStore, useCompanyStore, useEmployeeStore, useProjectStore } from "@/stores";
 import type { TicketStatus } from "@/types";
 import { formatDate } from "@/lib/utils";
 
@@ -37,7 +37,8 @@ const ticketSchema = z.object({
     "Released",
     "Closed",
   ]),
-  companyId: z.string(),
+  companyId: z.string().min(1),
+  projectId: z.string().min(1),
   developerId: z.string(),
   eta: z.string(),
 });
@@ -50,8 +51,10 @@ function TicketDetail() {
   const updateTicket = useTicketStore((s) => s.updateTicket);
   const deleteTicket = useTicketStore((s) => s.deleteTicket);
   const companies = useCompanyStore((s) => s.companies);
+  const projects = useProjectStore((s) => s.projects);
   const employees = useEmployeeStore((s) => s.employees);
   const company = companies.find((c) => c.id === ticket?.companyId);
+  const project = projects.find((p) => p.id === ticket?.projectId);
   const developer = employees.find((e) => e.id === ticket?.developerId);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -66,10 +69,17 @@ function TicketDetail() {
       priority: "Medium" as const,
       status: "New" as const,
       companyId: "",
+      projectId: "",
       developerId: "",
       eta: "",
     },
   });
+
+  const watchedCompanyId = form.watch("companyId");
+  const companyProjects = useMemo(
+    () => projects.filter((p) => p.companyId === watchedCompanyId),
+    [projects, watchedCompanyId],
+  );
 
   if (loading) return <DetailPageSkeleton />;
   if (!ticket) return <EntityNotFound entity="Ticket" listPath="/support" listLabel="Support" />;
@@ -82,6 +92,7 @@ function TicketDetail() {
       priority: ticket!.priority,
       status: ticket!.status,
       companyId: ticket!.companyId,
+      projectId: ticket!.projectId ?? "",
       developerId: ticket!.developerId,
       eta: ticket!.eta,
     });
@@ -206,6 +217,23 @@ function TicketDetail() {
               )
             }
           />
+          <Meta
+            label="Project"
+            value={
+              project ? (
+                <Link
+                  to="/projects/$projectId"
+                  params={{ projectId: project.id }}
+                  search={{ tab: "tickets" }}
+                  className="font-medium text-primary hover:underline"
+                >
+                  {project.name}
+                </Link>
+              ) : (
+                "—"
+              )
+            }
+          />
           <Meta label="Developer" value={developer?.name ?? "—"} />
           <Meta label="Raised on" value={formatDate(ticket.raisedOn)} />
           <Meta label="ETA" value={formatDate(ticket.eta)} />
@@ -264,12 +292,32 @@ function TicketDetail() {
           <select
             {...form.register("companyId")}
             className="h-9 rounded-md border border-input bg-card px-3 text-sm"
+            onChange={(e) => {
+              const companyId = e.target.value;
+              form.setValue("companyId", companyId);
+              const nextProject = projects.find((p) => p.companyId === companyId)?.id ?? "";
+              form.setValue("projectId", nextProject);
+            }}
           >
             {companies.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
             ))}
+          </select>
+          <select
+            {...form.register("projectId")}
+            className="h-9 rounded-md border border-input bg-card px-3 text-sm"
+          >
+            {companyProjects.length === 0 ? (
+              <option value="">No projects for this company</option>
+            ) : (
+              companyProjects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))
+            )}
           </select>
           <select
             {...form.register("developerId")}

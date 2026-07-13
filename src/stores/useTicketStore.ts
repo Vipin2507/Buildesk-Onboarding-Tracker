@@ -27,6 +27,7 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
     const ticket: Ticket = {
       ...data,
       description: data.description ?? "",
+      projectId: data.projectId ?? "",
       id: `TKT-${1000 + get().tickets.length + 1}`,
       createdAt: now,
       updatedAt: now,
@@ -53,6 +54,7 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
           eta: ticket.eta,
           developerId: ticket.developerId,
           companyId: ticket.companyId,
+          projectId: ticket.projectId || undefined,
           description: ticket.description,
         },
       }),

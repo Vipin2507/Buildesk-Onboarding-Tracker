@@ -386,6 +386,8 @@ export const seedTickets: Ticket[] = Array.from({ length: 22 }).map((_, i) => {
   const priorities = ["Critical", "High", "Medium", "Low"] as const;
   const ticketStatuses = ["New", "Assigned", "In Progress", "QA", "Ready for Release", "Released", "Closed"] as const;
   const company = seedCompanies[i % seedCompanies.length];
+  const companyProjects = seedProjects.filter((p) => p.companyId === company.id);
+  const project = companyProjects[i % Math.max(companyProjects.length, 1)] ?? seedProjects[i % seedProjects.length];
   return {
     id: `TKT-${1000 + i}`,
     type: types[i % 3],
@@ -405,6 +407,7 @@ export const seedTickets: Ticket[] = Array.from({ length: 22 }).map((_, i) => {
     eta: `2025-0${1 + ((i + 2) % 9)}-2${i % 9}`,
     developerId: seedEmployees[i % managers.length].id,
     companyId: company.id,
+    projectId: project?.id ?? "",
     description: `Details for ticket TKT-${1000 + i}: reported by onboarding team.`,
     createdAt: ts,
     updatedAt: ts,

@@ -9,6 +9,7 @@ import { PageHeader, PageWrap } from "@/components/page-header";
 import { ProgressBar } from "@/components/progress-bar";
 import { ProjectManualProgress } from "@/components/project-manual-progress";
 import { ProjectDocumentsPanel } from "@/components/project-documents-panel";
+import { ProjectTicketsPanel } from "@/components/project-tickets-panel";
 import { Button } from "@/components/ui/button";
 import { EntityNotFound } from "@/components/empty-state";
 import { DetailPageSkeleton } from "@/components/loading-skeleton";
@@ -30,7 +31,7 @@ import { cn, formatDate } from "@/lib/utils";
 const searchSchema = z.object({
   tab: z.enum([
     "progress", "onboarding", "data-migration", "documents", "customer-app",
-    "vendors", "labor", "integrations", "training", "go-live",
+    "vendors", "labor", "integrations", "training", "tickets", "go-live",
   ]).optional().default("progress"),
 });
 
@@ -118,6 +119,7 @@ function ProjectDetailPage() {
     { key: "labor", label: "Labor" },
     { key: "integrations", label: "Integrations" },
     { key: "training", label: "Training" },
+    { key: "tickets", label: "Tickets" },
     { key: "go-live", label: "Go Live" },
   ] as const;
 
@@ -442,7 +444,14 @@ function ProjectDetailPage() {
 
       {tab === "documents" && <ProjectDocumentsPanel projectId={projectId} />}
 
-      {tab !== "onboarding" && tab !== "progress" && tab !== "documents" && (
+      {tab === "tickets" && (
+        <ProjectTicketsPanel projectId={projectId} companyId={project.companyId} />
+      )}
+
+      {tab !== "onboarding" &&
+        tab !== "progress" &&
+        tab !== "documents" &&
+        tab !== "tickets" && (
         <div className="card-soft p-5">
           <p className="text-sm text-muted-foreground">
             Use the dedicated <Link to={`/${tab}` as "/data-migration"} className="text-primary underline">{tab}</Link> page for full CRUD — data is shared via global stores and scoped to this project where applicable.

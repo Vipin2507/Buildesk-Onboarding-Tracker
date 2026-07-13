@@ -34,6 +34,7 @@ export const createTicket = createServerFn({ method: "POST" })
         eta: z.string(),
         developerId: z.string().optional(),
         companyId: z.string().optional(),
+        projectId: z.string().optional(),
         description: z.string().optional(),
       })
       .parse(data),
@@ -41,13 +42,14 @@ export const createTicket = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     requireUser(["Admin", "Manager"]);
     const now = nowIso();
-    const { id: clientId, description, ...rest } = data;
+    const { id: clientId, description, projectId, ...rest } = data;
     const id = clientId ?? `TKT-${Date.now()}`;
     getDb()
       .insert(t.tickets)
       .values({
         id,
         ...rest,
+        projectId: projectId || null,
         description: description ?? "",
         createdAt: now,
         updatedAt: now,

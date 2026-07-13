@@ -28,7 +28,7 @@ import {
   inDateRange,
 } from "@/components/list-toolbar";
 import { TICKET_KANBAN_COLUMNS } from "@/data/constants";
-import { useTicketStore, useCompanyStore, useEmployeeStore } from "@/stores";
+import { useTicketStore, useCompanyStore, useEmployeeStore, useProjectStore } from "@/stores";
 import type { Ticket, TicketStatus } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -52,7 +52,8 @@ const ticketSchema = z.object({
     "Released",
     "Closed",
   ]),
-  companyId: z.string(),
+  companyId: z.string().min(1),
+  projectId: z.string().min(1, "Select a project"),
   developerId: z.string(),
   eta: z.string(),
 });
@@ -71,6 +72,7 @@ function SupportListPage() {
   const deleteTicket = useTicketStore((s) => s.deleteTicket);
   const moveTicket = useTicketStore((s) => s.moveTicket);
   const companies = useCompanyStore((s) => s.companies);
+  const projects = useProjectStore((s) => s.projects);
   const employees = useEmployeeStore((s) => s.employees);
 
   const [tab, setTab] = useState<(typeof TABS)[number]>("All");
@@ -84,10 +86,15 @@ function SupportListPage() {
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [companyFilter, setCompanyFilter] = useState("all");
+  const [projectFilter, setProjectFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [sortBy, setSortBy] = useState("raisedOn");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  const defaultCompanyId = companies[0]?.id ?? "";
+  const defaultProjectId =
+    projects.find((p) => p.companyId === defaultCompanyId)?.id ?? projects[0]?.id ?? "";
 
   const form = useForm({
     resolver: zodResolver(ticketSchema),
@@ -97,11 +104,26 @@ function SupportListPage() {
       type: "Bug" as const,
       priority: "Medium" as const,
       status: "New" as const,
-      companyId: companies[0]?.id ?? "",
+      companyId: defaultCompanyId,
+      projectId: defaultProjectId,
       developerId: employees[0]?.id ?? "",
       eta: "",
     },
   });
+
+  const watchedCompanyId = form.watch("companyId");
+  const companyProjects = useMemo(
+    () => projects.filter((p) => p.companyId === watchedCompanyId),
+    [projects, watchedCompanyId],
+  );
+
+  const filterProjects = useMemo(
+    () =>
+      companyFilter === "all"
+        ? projects
+        : projects.filter((p) => p.companyId === companyFilter),
+    [projects, companyFilter],
+  );
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
@@ -110,9 +132,10 @@ function SupportListPage() {
       tickets.map((t) => ({
         ...t,
         company: companies.find((c) => c.id === t.companyId)?.name ?? "",
+        project: projects.find((p) => p.id === t.projectId)?.name ?? "",
         developer: employees.find((e) => e.id === t.developerId)?.name ?? "",
       })),
-    [tickets, companies, employees],
+    [tickets, companies, projects, employees],
   );
 
   const tabFiltered = useMemo(() => {
@@ -129,6 +152,7 @@ function SupportListPage() {
       if (priorityFilter !== "all" && t.priority !== priorityFilter) return false;
       if (typeFilter !== "all" && t.type !== typeFilter) return false;
       if (companyFilter !== "all" && t.companyId !== companyFilter) return false;
+      if (projectFilter !== "all" && t.projectId !== projectFilter) return false;
       if (!inDateRange(t.raisedOn, dateFrom, dateTo)) return false;
       if (!q) return true;
       return (
@@ -136,6 +160,7 @@ function SupportListPage() {
         t.title.toLowerCase().includes(q) ||
         (t.description ?? "").toLowerCase().includes(q) ||
         t.company.toLowerCase().includes(q) ||
+        t.project.toLowerCase().includes(q) ||
         t.developer.toLowerCase().includes(q)
       );
     });
@@ -160,6 +185,7 @@ function SupportListPage() {
     priorityFilter,
     typeFilter,
     companyFilter,
+    projectFilter,
     dateFrom,
     dateTo,
     sortBy,
@@ -171,6 +197,7 @@ function SupportListPage() {
     priorityFilter !== "all",
     typeFilter !== "all",
     companyFilter !== "all",
+    projectFilter !== "all",
     Boolean(dateFrom),
     Boolean(dateTo),
   ].filter(Boolean).length;
@@ -196,13 +223,16 @@ function SupportListPage() {
 
   function openCreate() {
     setEditing(null);
+    const companyId = companies[0]?.id ?? "";
+    const projectId = projects.find((p) => p.companyId === companyId)?.id ?? "";
     form.reset({
       title: "",
       description: "",
       type: "Bug",
       priority: "Medium",
       status: "New",
-      companyId: companies[0]?.id ?? "",
+      companyId,
+      projectId,
       developerId: employees[0]?.id ?? "",
       eta: "",
     });
@@ -218,6 +248,7 @@ function SupportListPage() {
       priority: t.priority,
       status: t.status,
       companyId: t.companyId,
+      projectId: t.projectId ?? "",
       developerId: t.developerId,
       eta: t.eta,
     });
@@ -229,6 +260,7 @@ function SupportListPage() {
       const payload = {
         ...data,
         description: data.description ?? "",
+        projectId: data.projectId,
       };
       if (editing) {
         updateTicket(editing.id, payload);
@@ -343,10 +375,23 @@ function SupportListPage() {
                 id: "company",
                 label: "Company",
                 value: companyFilter,
-                onChange: setCompanyFilter,
+                onChange: (value) => {
+                  setCompanyFilter(value);
+                  setProjectFilter("all");
+                },
                 options: [
                   { value: "all", label: "All companies" },
                   ...companies.map((c) => ({ value: c.id, label: c.name })),
+                ],
+              },
+              {
+                id: "project",
+                label: "Project",
+                value: projectFilter,
+                onChange: setProjectFilter,
+                options: [
+                  { value: "all", label: "All projects" },
+                  ...filterProjects.map((p) => ({ value: p.id, label: p.name })),
                 ],
               },
             ]}
@@ -370,6 +415,7 @@ function SupportListPage() {
               setPriorityFilter("all");
               setTypeFilter("all");
               setCompanyFilter("all");
+              setProjectFilter("all");
               setDateFrom("");
               setDateTo("");
             }}
@@ -404,6 +450,7 @@ function SupportListPage() {
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                       <Pill tone={t.type === "Bug" ? "danger" : "info"}>{t.type}</Pill>
                       <span>{t.status}</span>
+                      {t.project ? <span>· {t.project}</span> : null}
                       <span>· {t.developer}</span>
                     </div>
                     <div className="mt-2 flex justify-end gap-1 border-t border-border/60 pt-2">
@@ -435,6 +482,7 @@ function SupportListPage() {
                         <th className="px-4 py-2 text-left">Priority</th>
                         <th className="px-4 py-2 text-left">Status</th>
                         <th className="px-4 py-2 text-left">Company</th>
+                        <th className="px-4 py-2 text-left">Project</th>
                         <th className="px-4 py-2 text-left">Developer</th>
                         <th className="px-4 py-2"></th>
                       </tr>
@@ -469,6 +517,7 @@ function SupportListPage() {
                           </td>
                           <td className="px-4 py-2.5">{t.status}</td>
                           <td className="px-4 py-2.5">{t.company}</td>
+                          <td className="px-4 py-2.5">{t.project || "—"}</td>
                           <td className="px-4 py-2.5">{t.developer}</td>
                           <td className="px-4 py-2.5 text-right">
                             <Button size="icon" variant="ghost" onClick={() => openEdit(t)}>
@@ -567,12 +616,33 @@ function SupportListPage() {
           <select
             {...form.register("companyId")}
             className="h-9 rounded-md border border-input bg-card px-3 text-sm"
+            onChange={(e) => {
+              const companyId = e.target.value;
+              form.setValue("companyId", companyId);
+              const nextProject =
+                projects.find((p) => p.companyId === companyId)?.id ?? "";
+              form.setValue("projectId", nextProject);
+            }}
           >
             {companies.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
             ))}
+          </select>
+          <select
+            {...form.register("projectId")}
+            className="h-9 rounded-md border border-input bg-card px-3 text-sm"
+          >
+            {companyProjects.length === 0 ? (
+              <option value="">No projects for this company</option>
+            ) : (
+              companyProjects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))
+            )}
           </select>
           <select
             {...form.register("developerId")}

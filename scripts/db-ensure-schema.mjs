@@ -143,6 +143,11 @@ const EXTRA_COLUMNS = [
     name: "description",
     ddl: "TEXT NOT NULL DEFAULT ''",
   },
+  {
+    table: "tickets",
+    name: "project_id",
+    ddl: "TEXT",
+  },
 ];
 
 for (const col of EXTRA_COLUMNS) {
@@ -181,6 +186,27 @@ if (!tableExists("notifications")) {
   console.log("+ CREATE TABLE notifications");
 } else {
   console.log("notifications: table already present");
+}
+
+// Backfill ticket.project_id from company projects when missing
+if (tableExists("tickets") && tableExists("projects")) {
+  const orphan = sqlite
+    .prepare(
+      `SELECT id, company_id FROM tickets WHERE (project_id IS NULL OR project_id = '') AND company_id IS NOT NULL AND company_id != ''`,
+    )
+    .all();
+  let filled = 0;
+  const pickProject = sqlite.prepare(
+    `SELECT id FROM projects WHERE company_id = ? ORDER BY id LIMIT 1`,
+  );
+  const setProject = sqlite.prepare(`UPDATE tickets SET project_id = ? WHERE id = ?`);
+  for (const row of orphan) {
+    const proj = pickProject.get(row.company_id);
+    if (!proj?.id) continue;
+    setProject.run(proj.id, row.id);
+    filled += 1;
+  }
+  if (filled > 0) console.log(`tickets: backfilled project_id on ${filled} row(s)`);
 }
 
 // Backfill start dates for existing rows
