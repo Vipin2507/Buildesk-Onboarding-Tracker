@@ -64,6 +64,8 @@ type DatePickerFieldProps = {
   className?: string;
   yearsBack?: number;
   yearsForward?: number;
+  /** Use when nesting inside Dialog/AlertDialog so the calendar stays interactive. */
+  modal?: boolean;
 };
 
 export function DatePickerField({
@@ -76,6 +78,7 @@ export function DatePickerField({
   className,
   yearsBack = 25,
   yearsForward = 5,
+  modal = false,
 }: DatePickerFieldProps) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(() => displayValue(value));
@@ -166,7 +169,7 @@ export function DatePickerField({
         ) : null}
       </div>
 
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover modal={modal} open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             type="button"
@@ -180,7 +183,13 @@ export function DatePickerField({
         </PopoverTrigger>
         <PopoverContent
           align="end"
-          className="w-auto border-border bg-popover p-0 text-popover-foreground"
+          className={cn(
+            "w-auto border-border bg-popover p-0 text-popover-foreground",
+            modal && "z-[100]",
+          )}
+          onOpenAutoFocus={(e) => {
+            if (modal) e.preventDefault();
+          }}
         >
           <Calendar
             mode="single"

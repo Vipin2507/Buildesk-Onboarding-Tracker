@@ -11,6 +11,7 @@ import { PageHeader, PageWrap } from "@/components/page-header";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { ConfirmDeleteDialog, EntityFormModal } from "@/components/entity-form-modal";
+import { DatePickerField } from "@/components/date-picker-field";
 import { DetailPageSkeleton } from "@/components/loading-skeleton";
 import { EntityNotFound } from "@/components/empty-state";
 import { useDetailLoading } from "@/hooks/use-detail-loading";
@@ -329,11 +330,17 @@ function TicketDetail() {
               </option>
             ))}
           </select>
-          <input
-            {...form.register("eta")}
-            type="date"
-            className="h-9 rounded-md border border-input bg-card px-3 text-sm"
-          />
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">ETA</label>
+            <DatePickerField
+              modal
+              value={form.watch("eta")}
+              onChange={(value) => form.setValue("eta", value, { shouldDirty: true, shouldValidate: true })}
+              placeholder="Pick ETA"
+              yearsBack={1}
+              yearsForward={3}
+            />
+          </div>
         </div>
       </EntityFormModal>
 
