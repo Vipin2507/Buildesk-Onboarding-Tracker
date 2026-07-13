@@ -1,6 +1,6 @@
-import { useId, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowDownAZ, ArrowUpAZ, RotateCcw, Search, X } from "lucide-react";
+import { ArrowDownAZ, ArrowUpAZ, ChevronDown, ListFilter, RotateCcw, Search, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,6 +63,8 @@ type ListToolbarProps = {
   resultLabel?: string;
   activeFilterCount?: number;
   onClear?: () => void;
+  /** Start with the filters panel open. Defaults to false. */
+  defaultFiltersOpen?: boolean;
   trailing?: ReactNode;
   className?: string;
 };
@@ -131,12 +133,16 @@ export function ListToolbar({
   resultLabel = "results",
   activeFilterCount = 0,
   onClear,
+  defaultFiltersOpen = false,
   trailing,
   className,
 }: ListToolbarProps) {
   const searchId = useId();
+  const [filtersOpen, setFiltersOpen] = useState(defaultFiltersOpen);
   const hasSelects = Boolean(selects?.length);
   const hasDateRange = Boolean(dateRange);
+  const hasChips = Boolean(chips?.length);
+  const hasFilterPanel = hasSelects || hasDateRange || hasChips;
   const hasSortSelect = Boolean(sortOptions?.length);
   const hasSort = hasSortSelect || Boolean(onSortDirChange);
 
@@ -175,6 +181,35 @@ export function ListToolbar({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {hasFilterPanel && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className={cn(
+                "h-10 gap-1.5 border-input bg-card dark:bg-muted/40 dark:hover:bg-muted/55",
+                filtersOpen && "border-primary/40 bg-primary/10 text-primary dark:bg-primary/15",
+              )}
+              aria-expanded={filtersOpen}
+              onClick={() => setFiltersOpen((o) => !o)}
+            >
+              <ListFilter className="h-4 w-4" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="rounded-md bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                  {activeFilterCount}
+                </span>
+              )}
+              <motion.span
+                animate={{ rotate: filtersOpen ? 180 : 0 }}
+                transition={{ duration: 0.25, ease }}
+                className="flex"
+              >
+                <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+              </motion.span>
+            </Button>
+          )}
+
           {hasSort && (
             <div className="flex items-center gap-1.5">
               {hasSortSelect && (
@@ -229,9 +264,6 @@ export function ListToolbar({
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                   Clear
-                  <span className="rounded-md bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                    {activeFilterCount}
-                  </span>
                 </Button>
               </motion.div>
             ) : null}
@@ -241,84 +273,99 @@ export function ListToolbar({
         </div>
       </div>
 
-      {chips && chips.length > 0 && (
-        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:flex-wrap md:overflow-visible">
-          {chips.map((chip) => {
-            const active = activeChip === chip.id;
-            return (
-              <button
-                key={chip.id}
-                type="button"
-                onClick={() => onChipChange?.(chip.id)}
-                className={cn(
-                  "min-h-9 shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-                  active
-                    ? "border-primary bg-primary text-primary-foreground shadow-[0_0_0_3px_rgb(0_155_255_/_0.14)] dark:shadow-[0_0_0_3px_rgb(46_176_255_/_0.18)]"
-                    : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground dark:bg-muted/30 dark:hover:bg-muted/50",
-                )}
-              >
-                {chip.label}
-                {typeof chip.count === "number" && (
-                  <span
-                    className={cn(
-                      "ml-1.5 tabular-nums",
-                      active ? "text-primary-foreground/80" : "text-muted-foreground",
-                    )}
-                  >
-                    {chip.count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      <AnimatePresence initial={false}>
+        {hasFilterPanel && filtersOpen && (
+          <motion.div
+            key="filters-panel"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease }}
+            className="overflow-hidden"
+          >
+            <div className="space-y-3.5 border-t border-border/70 pt-3.5">
+              {hasChips && (
+                <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:flex-wrap md:overflow-visible">
+                  {chips!.map((chip) => {
+                    const active = activeChip === chip.id;
+                    return (
+                      <button
+                        key={chip.id}
+                        type="button"
+                        onClick={() => onChipChange?.(chip.id)}
+                        className={cn(
+                          "min-h-9 shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                          active
+                            ? "border-primary bg-primary text-primary-foreground shadow-[0_0_0_3px_rgb(0_155_255_/_0.14)] dark:shadow-[0_0_0_3px_rgb(46_176_255_/_0.18)]"
+                            : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground dark:bg-muted/30 dark:hover:bg-muted/50",
+                        )}
+                      >
+                        {chip.label}
+                        {typeof chip.count === "number" && (
+                          <span
+                            className={cn(
+                              "ml-1.5 tabular-nums",
+                              active ? "text-primary-foreground/80" : "text-muted-foreground",
+                            )}
+                          >
+                            {chip.count}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
-      {(hasSelects || hasDateRange) && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {hasDateRange && (
-            <>
-              <div className="min-w-0">
-                <FieldLabel htmlFor={`${searchId}-from`}>
-                  {dateRange!.label ? `${dateRange!.label} from` : "From"}
-                </FieldLabel>
-                <Input
-                  id={`${searchId}-from`}
-                  type="date"
-                  value={dateRange!.from}
-                  max={dateRange!.to || undefined}
-                  onChange={(e) => dateRange!.onFromChange(e.target.value)}
-                  className={cn(fieldControl, "[color-scheme:inherit]")}
-                />
-              </div>
-              <div className="min-w-0">
-                <FieldLabel htmlFor={`${searchId}-to`}>
-                  {dateRange!.label ? `${dateRange!.label} to` : "To"}
-                </FieldLabel>
-                <Input
-                  id={`${searchId}-to`}
-                  type="date"
-                  value={dateRange!.to}
-                  min={dateRange!.from || undefined}
-                  onChange={(e) => dateRange!.onToChange(e.target.value)}
-                  className={cn(fieldControl, "[color-scheme:inherit]")}
-                />
-              </div>
-            </>
-          )}
-          {selects?.map((select) => (
-            <div key={select.id} className="min-w-0">
-              <FieldLabel htmlFor={`${searchId}-${select.id}`}>{select.label}</FieldLabel>
-              <ThemedSelect
-                id={`${searchId}-${select.id}`}
-                value={select.value}
-                onChange={select.onChange}
-                options={select.options}
-              />
+              {(hasSelects || hasDateRange) && (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {hasDateRange && (
+                    <>
+                      <div className="min-w-0">
+                        <FieldLabel htmlFor={`${searchId}-from`}>
+                          {dateRange!.label ? `${dateRange!.label} from` : "From"}
+                        </FieldLabel>
+                        <Input
+                          id={`${searchId}-from`}
+                          type="date"
+                          value={dateRange!.from}
+                          max={dateRange!.to || undefined}
+                          onChange={(e) => dateRange!.onFromChange(e.target.value)}
+                          className={cn(fieldControl, "[color-scheme:inherit]")}
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <FieldLabel htmlFor={`${searchId}-to`}>
+                          {dateRange!.label ? `${dateRange!.label} to` : "To"}
+                        </FieldLabel>
+                        <Input
+                          id={`${searchId}-to`}
+                          type="date"
+                          value={dateRange!.to}
+                          min={dateRange!.from || undefined}
+                          onChange={(e) => dateRange!.onToChange(e.target.value)}
+                          className={cn(fieldControl, "[color-scheme:inherit]")}
+                        />
+                      </div>
+                    </>
+                  )}
+                  {selects?.map((select) => (
+                    <div key={select.id} className="min-w-0">
+                      <FieldLabel htmlFor={`${searchId}-${select.id}`}>{select.label}</FieldLabel>
+                      <ThemedSelect
+                        id={`${searchId}-${select.id}`}
+                        value={select.value}
+                        onChange={select.onChange}
+                        options={select.options}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          ))}
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {typeof resultCount === "number" && (
         <div className="flex items-center justify-between border-t border-border/70 pt-2.5 text-xs text-muted-foreground">
