@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, useChildMatches, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDeleteDialog, EntityFormModal } from "@/components/entity-form-modal";
+import { ListToolbar, compareNumber, compareText, inDateRange } from "@/components/list-toolbar";
 import { MODULE_CATALOG, createCompanyModules } from "@/data/module-catalog";
 import {
   useCompanyStore,
@@ -21,7 +22,7 @@ import {
   useDashboardKpis,
 } from "@/stores";
 import type { Company, ModuleKey } from "@/types";
-import { cn, formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 
 export const Route = createFileRoute("/companies")({
   component: CompaniesPage,
@@ -58,7 +59,15 @@ const companySchema = z.object({
 
 type CompanyForm = z.infer<typeof companySchema>;
 
-const FILTERS = ["All", "In Progress", "Completed", "On Hold", "Not Started"] as const;
+const STATUS_CHIPS = [
+  { id: "all", label: "All", status: null as string | null },
+  { id: "in_progress", label: "In Progress", status: "in_progress" },
+  { id: "completed", label: "Completed", status: "completed" },
+  { id: "on_hold", label: "On Hold", status: "on_hold" },
+  { id: "not_started", label: "Not Started", status: "not_started" },
+] as const;
+
+type CompanySort = "name" | "progress" | "startDate" | "city" | "plan" | "health";
 
 function CompaniesPage() {
   const childMatches = useChildMatches();
@@ -76,7 +85,18 @@ function CompaniesListPage() {
   const kpis = useDashboardKpis();
   const navigate = useNavigate();
 
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]>("All");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [planFilter, setPlanFilter] = useState("all");
+  const [healthFilter, setHealthFilter] = useState("all");
+  const [progressFilter, setProgressFilter] = useState("all");
+  const [managerFilter, setManagerFilter] = useState("all");
+  const [cityFilter, setCityFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [sortBy, setSortBy] = useState<CompanySort>("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editing, setEditing] = useState<Company | null>(null);
@@ -108,16 +128,117 @@ function CompaniesListPage() {
 
   const enriched = kpis.companiesWithProgress;
 
-  const filtered = enriched.filter((c) => {
-    if (filter === "All") return true;
-    const map: Record<string, string> = {
-      "In Progress": "in_progress",
-      Completed: "completed",
-      "On Hold": "on_hold",
-      "Not Started": "not_started",
-    };
-    return c.computedStatus === map[filter] || c.status === map[filter];
-  });
+  const cities = useMemo(() => {
+    const set = new Set(enriched.map((c) => c.city).filter(Boolean));
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [enriched]);
+
+  const managers = useMemo(() => {
+    const ids = new Set(enriched.map((c) => c.onboardingManagerId).filter(Boolean));
+    return employees
+      .filter((e) => ids.has(e.id))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [enriched, employees]);
+
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: enriched.length };
+    for (const chip of STATUS_CHIPS) {
+      if (!chip.status) continue;
+      counts[chip.id] = enriched.filter(
+        (c) => c.computedStatus === chip.status || c.status === chip.status,
+      ).length;
+    }
+    return counts;
+  }, [enriched]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let rows = enriched.filter((c) => {
+      if (statusFilter !== "all") {
+        const chip = STATUS_CHIPS.find((s) => s.id === statusFilter);
+        if (chip?.status && c.computedStatus !== chip.status && c.status !== chip.status) {
+          return false;
+        }
+      }
+      if (planFilter !== "all" && c.plan !== planFilter) return false;
+      if (healthFilter !== "all" && c.health !== healthFilter) return false;
+      if (managerFilter !== "all" && c.onboardingManagerId !== managerFilter) return false;
+      if (cityFilter !== "all" && c.city !== cityFilter) return false;
+      if (progressFilter === "0" && c.progress !== 0) return false;
+      if (progressFilter === "1-49" && !(c.progress >= 1 && c.progress <= 49)) return false;
+      if (progressFilter === "50-99" && !(c.progress >= 50 && c.progress <= 99)) return false;
+      if (progressFilter === "100" && c.progress !== 100) return false;
+      if (!inDateRange(c.startDate || c.agreementDate, dateFrom, dateTo)) return false;
+      if (q) {
+        const hay = [c.name, c.city, c.contact, c.email, c.plan, c.health]
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+
+    rows = [...rows].sort((a, b) => {
+      switch (sortBy) {
+        case "progress":
+          return compareNumber(a.progress, b.progress, sortDir);
+        case "startDate":
+          return compareText(
+            a.startDate || a.agreementDate || "",
+            b.startDate || b.agreementDate || "",
+            sortDir,
+          );
+        case "city":
+          return compareText(a.city, b.city, sortDir);
+        case "plan":
+          return compareText(a.plan, b.plan, sortDir);
+        case "health":
+          return compareText(a.health, b.health, sortDir);
+        case "name":
+        default:
+          return compareText(a.name, b.name, sortDir);
+      }
+    });
+
+    return rows;
+  }, [
+    enriched,
+    search,
+    statusFilter,
+    planFilter,
+    healthFilter,
+    managerFilter,
+    cityFilter,
+    progressFilter,
+    dateFrom,
+    dateTo,
+    sortBy,
+    sortDir,
+  ]);
+
+  const activeFilterCount = [
+    statusFilter !== "all",
+    planFilter !== "all",
+    healthFilter !== "all",
+    progressFilter !== "all",
+    managerFilter !== "all",
+    cityFilter !== "all",
+    Boolean(dateFrom),
+    Boolean(dateTo),
+    search.trim() !== "",
+  ].filter(Boolean).length;
+
+  function clearFilters() {
+    setSearch("");
+    setStatusFilter("all");
+    setPlanFilter("all");
+    setHealthFilter("all");
+    setProgressFilter("all");
+    setManagerFilter("all");
+    setCityFilter("all");
+    setDateFrom("");
+    setDateTo("");
+  }
 
   function openCreate() {
     setEditing(null);
@@ -157,7 +278,12 @@ function CompaniesListPage() {
           status: "not_started",
           modules: createCompanyModules(data.modules),
         });
-        toast.success("Company added", { action: { label: "View", onClick: () => navigate({ to: "/companies/$companyId", params: { companyId: company.id } }) } });
+        toast.success("Company added", {
+          action: {
+            label: "View",
+            onClick: () => navigate({ to: "/companies/$companyId", params: { companyId: company.id } }),
+          },
+        });
       }
       setModalOpen(false);
     })();
@@ -181,87 +307,258 @@ function CompaniesListPage() {
     setDeleting(null);
   }
 
+  const citySelect =
+    cities.length > 1
+      ? [
+          {
+            id: "city",
+            label: "City",
+            value: cityFilter,
+            onChange: setCityFilter,
+            options: [
+              { value: "all", label: "All cities" },
+              ...cities.map((city) => ({ value: city, label: city })),
+            ],
+          },
+        ]
+      : [];
+
   return (
     <PageWrap>
       <PageHeader
         title="Companies"
         subtitle="All client companies onboarding to Buildesk."
-        actions={<Button className="gap-1.5 bg-primary hover:bg-primary/90" onClick={openCreate}><Plus className="h-4 w-4" /> Add Company</Button>}
+        actions={
+          <Button className="gap-1.5 bg-primary hover:bg-primary/90" onClick={openCreate}>
+            <Plus className="h-4 w-4" /> Add Company
+          </Button>
+        }
       />
 
-      <div className="card-soft mb-4 -mx-1 flex gap-2 overflow-x-auto px-1 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:flex-wrap md:overflow-visible md:p-3">
-        {FILTERS.map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={cn(
-              "min-h-10 shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors",
-              filter === f ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted",
-            )}
-          >{f}</button>
-        ))}
-      </div>
+      <ListToolbar
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search companies, cities, contacts…"
+        chips={STATUS_CHIPS.map((c) => ({
+          id: c.id,
+          label: c.label,
+          count: statusCounts[c.id] ?? 0,
+        }))}
+        activeChip={statusFilter}
+        onChipChange={setStatusFilter}
+        dateRange={{
+          label: "Start date",
+          from: dateFrom,
+          to: dateTo,
+          onFromChange: setDateFrom,
+          onToChange: setDateTo,
+        }}
+        selects={[
+          {
+            id: "plan",
+            label: "Plan",
+            value: planFilter,
+            onChange: setPlanFilter,
+            options: [
+              { value: "all", label: "All plans" },
+              { value: "Starter", label: "Starter" },
+              { value: "Growth", label: "Growth" },
+              { value: "Enterprise", label: "Enterprise" },
+            ],
+          },
+          {
+            id: "health",
+            label: "Health",
+            value: healthFilter,
+            onChange: setHealthFilter,
+            options: [
+              { value: "all", label: "All health" },
+              { value: "Healthy", label: "Healthy" },
+              { value: "Moderate", label: "Moderate" },
+              { value: "Critical", label: "Critical" },
+            ],
+          },
+          {
+            id: "progress",
+            label: "Progress",
+            value: progressFilter,
+            onChange: setProgressFilter,
+            options: [
+              { value: "all", label: "Any progress" },
+              { value: "0", label: "Not started (0%)" },
+              { value: "1-49", label: "Early (1–49%)" },
+              { value: "50-99", label: "Advanced (50–99%)" },
+              { value: "100", label: "Complete (100%)" },
+            ],
+          },
+          {
+            id: "manager",
+            label: "Manager",
+            value: managerFilter,
+            onChange: setManagerFilter,
+            options: [
+              { value: "all", label: "All managers" },
+              ...managers.map((m) => ({ value: m.id, label: m.name })),
+            ],
+          },
+          ...citySelect,
+        ]}
+        sortOptions={[
+          { value: "name", label: "Sort: Name" },
+          { value: "progress", label: "Sort: Progress" },
+          { value: "startDate", label: "Sort: Start date" },
+          { value: "city", label: "Sort: City" },
+          { value: "plan", label: "Sort: Plan" },
+          { value: "health", label: "Sort: Health" },
+        ]}
+        sortBy={sortBy}
+        sortDir={sortDir}
+        onSortByChange={(v) => setSortBy(v as CompanySort)}
+        onSortDirChange={setSortDir}
+        resultCount={filtered.length}
+        resultLabel={filtered.length === 1 ? "company" : "companies"}
+        activeFilterCount={activeFilterCount}
+        onClear={clearFilters}
+      />
 
       <div className="card-soft overflow-hidden p-4">
-        {filtered.length === 0 ? (
-          <EmptyState title="No companies yet" description="Add your first client company to start onboarding." actionLabel="+ Add Company" onAction={openCreate} />
+        {enriched.length === 0 ? (
+          <EmptyState
+            title="No companies yet"
+            description="Add your first client company to start onboarding."
+            actionLabel="+ Add Company"
+            onAction={openCreate}
+          />
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            title="No matches"
+            description="Try clearing filters or adjusting your search."
+            actionLabel="Clear filters"
+            onAction={clearFilters}
+          />
         ) : (
           <DataTable
             data={filtered}
-            searchKeys={["name", "city"]}
+            hideSearch
+            getRowId={(c) => c.id}
             onRowClick={(c) => navigate({ to: "/companies/$companyId", params: { companyId: c.id } })}
             columns={[
-              { key: "name", header: "Company", sortable: true, render: (c) => (
-                <div>
-                  <div className="font-medium">
-                    <a
-                      href={`/companies/${c.id}`}
-                      className="hover:underline"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {c.name}
-                    </a>
+              {
+                key: "name",
+                header: "Company",
+                sortable: true,
+                render: (c) => (
+                  <div>
+                    <div className="font-medium">
+                      <a
+                        href={`/companies/${c.id}`}
+                        className="hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {c.name}
+                      </a>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {c.city} · {c.plan}
+                    </div>
                   </div>
-                  <div className="text-xs text-muted-foreground">{c.city} · {c.plan}</div>
-                </div>
-              )},
-              { key: "contact", header: "Contact", render: (c) => (
-                <div><div>{c.contact}</div><div className="text-xs text-muted-foreground">{c.designation}</div></div>
-              )},
-              { key: "onboardingManagerId", header: "Manager", render: (c) => employees.find((e) => e.id === c.onboardingManagerId)?.name ?? "—" },
-              { key: "startDate", header: "Start Date", sortable: true, render: (c) => (
-                <span className="text-muted-foreground">{formatDate(c.startDate || c.agreementDate)}</span>
-              )},
-              { key: "modules", header: "Modules", render: (c) => (
-                <div className="flex flex-wrap gap-1">
-                  {c.modules.filter((m) => m.optedIn).slice(0, 2).map((m) => (
-                    <Pill key={m.moduleKey} tone="accent">{m.label}</Pill>
-                  ))}
-                  {c.modules.filter((m) => m.optedIn).length > 2 && (
-                    <Pill>+{c.modules.filter((m) => m.optedIn).length - 2}</Pill>
-                  )}
-                </div>
-              )},
-              { key: "progress", header: "Progress", sortable: true, render: (c) => (
-                <div className="flex items-center gap-2">
-                  <ProgressBar value={c.progress} className="w-28" />
-                  <span className="text-xs text-muted-foreground">{c.progress}%</span>
-                </div>
-              )},
-              { key: "computedStatus", header: "Status", render: (c) => <StatusPill status={c.computedStatus} /> },
-              { key: "projects", header: "Projects", render: (c) => allProjects.filter((p) => p.companyId === c.id).length },
+                ),
+              },
+              {
+                key: "contact",
+                header: "Contact",
+                render: (c) => (
+                  <div>
+                    <div>{c.contact}</div>
+                    <div className="text-xs text-muted-foreground">{c.designation}</div>
+                  </div>
+                ),
+              },
+              {
+                key: "onboardingManagerId",
+                header: "Manager",
+                render: (c) => employees.find((e) => e.id === c.onboardingManagerId)?.name ?? "—",
+              },
+              {
+                key: "startDate",
+                header: "Start Date",
+                sortable: true,
+                render: (c) => (
+                  <span className="text-muted-foreground">
+                    {formatDate(c.startDate || c.agreementDate)}
+                  </span>
+                ),
+              },
+              {
+                key: "modules",
+                header: "Modules",
+                render: (c) => (
+                  <div className="flex flex-wrap gap-1">
+                    {c.modules
+                      .filter((m) => m.optedIn)
+                      .slice(0, 2)
+                      .map((m) => (
+                        <Pill key={m.moduleKey} tone="accent">
+                          {m.label}
+                        </Pill>
+                      ))}
+                    {c.modules.filter((m) => m.optedIn).length > 2 && (
+                      <Pill>+{c.modules.filter((m) => m.optedIn).length - 2}</Pill>
+                    )}
+                  </div>
+                ),
+              },
+              {
+                key: "progress",
+                header: "Progress",
+                sortable: true,
+                render: (c) => (
+                  <div className="flex items-center gap-2">
+                    <ProgressBar value={c.progress} className="w-28" />
+                    <span className="text-xs text-muted-foreground">{c.progress}%</span>
+                  </div>
+                ),
+              },
+              {
+                key: "computedStatus",
+                header: "Status",
+                sortable: true,
+                render: (c) => <StatusPill status={c.computedStatus} />,
+              },
+              {
+                key: "projects",
+                header: "Projects",
+                render: (c) => allProjects.filter((p) => p.companyId === c.id).length,
+              },
             ]}
             actions={(c) => (
               <div className="flex justify-end gap-1">
-                <Button size="icon" variant="ghost" onClick={() => openEdit(c)}><Pencil className="h-4 w-4" /></Button>
-                <Button size="icon" variant="ghost" onClick={() => { setDeleting(c); setDeleteOpen(true); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                <Button size="icon" variant="ghost" onClick={() => openEdit(c)}>
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => {
+                    setDeleting(c);
+                    setDeleteOpen(true);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
               </div>
             )}
           />
         )}
       </div>
 
-      <EntityFormModal open={modalOpen} onOpenChange={setModalOpen} title={editing ? "Edit Company" : "Add Company"} onSubmit={onSubmit} submitLabel={editing ? "Update" : "Create"}>
+      <EntityFormModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        title={editing ? "Edit Company" : "Add Company"}
+        onSubmit={onSubmit}
+        submitLabel={editing ? "Update" : "Create"}
+      >
         <div className="grid gap-3">
           {(["name", "contact", "designation", "phone", "email", "city"] as const).map((field) => (
             <div key={field}>
@@ -272,15 +569,23 @@ function CompaniesListPage() {
           <div>
             <label className="text-xs font-medium">Onboarding Manager</label>
             <select {...form.register("onboardingManagerId")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm">
-              {employees.filter((e) => e.role.includes("Onboarding") || e.role.includes("Implementation")).map((e) => (
-                <option key={e.id} value={e.id}>{e.name}</option>
-              ))}
+              {employees
+                .filter((e) => e.role.includes("Onboarding") || e.role.includes("Implementation"))
+                .map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.name}
+                  </option>
+                ))}
             </select>
           </div>
           <div>
             <label className="text-xs font-medium">Plan</label>
             <select {...form.register("plan")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm">
-              {["Starter", "Growth", "Enterprise"].map((p) => <option key={p} value={p}>{p}</option>)}
+              {["Starter", "Growth", "Enterprise"].map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
             </select>
           </div>
           <div className="grid grid-cols-2 gap-3">

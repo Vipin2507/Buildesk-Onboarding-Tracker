@@ -195,6 +195,23 @@
     color-scheme: dark;
   }
 
+  /* Native date/time controls follow theme (used in list filters) */
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"] {
+    color-scheme: inherit;
+  }
+
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.65;
+  }
+
+  .dark input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1) brightness(1.15);
+    opacity: 0.85;
+  }
+
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
