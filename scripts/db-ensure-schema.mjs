@@ -124,6 +124,11 @@ const EXTRA_COLUMNS = [
     ddl: "INTEGER NOT NULL DEFAULT 0",
   },
   {
+    table: "onboarding_checklist_items",
+    name: "source",
+    ddl: "TEXT NOT NULL DEFAULT 'default'",
+  },
+  {
     table: "project_manual_progress",
     name: "not_applicable_json",
     ddl: "TEXT NOT NULL DEFAULT '{}'",
@@ -166,6 +171,34 @@ if (tableExists("projects")) {
     )
     .run();
   if (r.changes > 0) console.log(`projects: backfilled start_date on ${r.changes} row(s)`);
+}
+
+/** One-shot: clear auto-seeded checklist ticks that were never manually edited. */
+if (tableExists("onboarding_checklist_items")) {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS _schema_patches (
+      name TEXT PRIMARY KEY,
+      applied_at TEXT NOT NULL
+    )
+  `);
+  const patch = "reset_untouched_checklist_progress_v1";
+  const done = sqlite.prepare(`SELECT 1 AS ok FROM _schema_patches WHERE name = ?`).get(patch);
+  if (!done) {
+    const r = sqlite
+      .prepare(
+        `UPDATE onboarding_checklist_items
+         SET collected = 0, uploaded = 0, live = 0
+         WHERE created_at = updated_at
+           AND (collected = 1 OR uploaded = 1 OR live = 1)`,
+      )
+      .run();
+    sqlite
+      .prepare(`INSERT INTO _schema_patches (name, applied_at) VALUES (?, ?)`)
+      .run(patch, new Date().toISOString());
+    console.log(
+      `checklist: reset untouched fake progress on ${r.changes} item(s) (${patch})`,
+    );
+  }
 }
 
 sqlite.close();

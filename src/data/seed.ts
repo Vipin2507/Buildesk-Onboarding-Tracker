@@ -321,26 +321,32 @@ export const seedProjects: Project[] = COMPANY_ROSTER.flatMap((row, ci) => {
   }));
 });
 
-export function buildChecklistForProject(projectId: string): OnboardingChecklistItem[] {
+/** New / imported projects always start at 0% — never invent completed steps. */
+export function buildChecklistForProject(
+  projectId: string,
+  options?: { demoProgress?: boolean },
+): OnboardingChecklistItem[] {
   const items: OnboardingChecklistItem[] = [];
   let seed = projectId.split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
   const rand = () => {
     seed = (seed * 16807 + 0) % 2147483647;
     return seed / 2147483647;
   };
+  const demo = options?.demoProgress === true;
   for (const [section, labels] of Object.entries(CHECKLIST_TEMPLATE)) {
     for (const label of labels) {
-      const r = rand();
+      const r = demo ? rand() : 0;
       items.push({
         id: newId(),
         projectId,
         section,
         label,
-        collected: r > 0.3,
-        uploaded: r > 0.5,
-        live: r > 0.7,
+        collected: demo ? r > 0.3 : false,
+        uploaded: demo ? r > 0.5 : false,
+        live: demo ? r > 0.7 : false,
         notApplicable: false,
         remarks: "",
+        source: "default",
         createdAt: ts,
         updatedAt: ts,
       });
@@ -352,7 +358,7 @@ export function buildChecklistForProject(projectId: string): OnboardingChecklist
 export const seedChecklistItems: OnboardingChecklistItem[] = seedProjects
   // Seed checklist for the first project of each company; others init on first open.
   .filter((p) => p.id.endsWith("-0"))
-  .flatMap((p) => buildChecklistForProject(p.id));
+  .flatMap((p) => buildChecklistForProject(p.id, { demoProgress: true }));
 
 export const seedOtherCharges: OtherCharge[] = seedProjects.slice(0, 5).flatMap((p, i) => [
   {

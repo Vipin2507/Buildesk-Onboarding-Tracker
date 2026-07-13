@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { CHECKLIST_TEMPLATE } from "@/data/constants";
@@ -8,6 +8,37 @@ import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { logActivity } from "@/server/api/mappers";
 import type { ChecklistPhase, OnboardingChecklistItem, OtherCharge } from "@/types";
+
+function ensureDefaultChecklist(projectId: string) {
+  const db = getDb();
+  const existing = db
+    .select()
+    .from(t.onboardingChecklistItems)
+    .where(eq(t.onboardingChecklistItems.projectId, projectId))
+    .get();
+  if (existing) return;
+  const now = nowIso();
+  for (const [section, labels] of Object.entries(CHECKLIST_TEMPLATE)) {
+    for (const label of labels) {
+      db.insert(t.onboardingChecklistItems)
+        .values({
+          id: newId(),
+          projectId,
+          section,
+          label,
+          collected: false,
+          uploaded: false,
+          live: false,
+          notApplicable: false,
+          remarks: "",
+          source: "default",
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run();
+    }
+  }
+}
 
 function mapChecklist(row: typeof t.onboardingChecklistItems.$inferSelect): OnboardingChecklistItem {
   return {
@@ -20,6 +51,7 @@ function mapChecklist(row: typeof t.onboardingChecklistItems.$inferSelect): Onbo
     live: row.live,
     notApplicable: row.notApplicable ?? false,
     remarks: row.remarks,
+    source: (row.source as OnboardingChecklistItem["source"]) || "default",
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -50,6 +82,7 @@ export const listChecklist = createServerFn({ method: "GET" })
               live: false,
               notApplicable: false,
               remarks: "",
+              source: "default",
               createdAt: now,
               updatedAt: now,
             })
@@ -136,6 +169,77 @@ export const updateChecklistRemarks = createServerFn({ method: "POST" })
       .where(eq(t.onboardingChecklistItems.id, data.id))
       .run();
     return { ok: true };
+  });
+
+/** Mark a document template as required for a customer project — adds/removes an onboarding Documents step. */
+export const setDocumentRequired = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        projectId: z.string(),
+        documentName: z.string().min(1),
+        required: z.boolean(),
+        id: z.string().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    const db = getDb();
+    ensureDefaultChecklist(data.projectId);
+
+    const existing = db
+      .select()
+      .from(t.onboardingChecklistItems)
+      .where(
+        and(
+          eq(t.onboardingChecklistItems.projectId, data.projectId),
+          eq(t.onboardingChecklistItems.label, data.documentName),
+          eq(t.onboardingChecklistItems.source, "required-document"),
+        ),
+      )
+      .get();
+
+    if (data.required) {
+      if (existing) return { item: mapChecklist(existing), required: true as const };
+      const now = nowIso();
+      const id = data.id ?? newId();
+      const row = {
+        id,
+        projectId: data.projectId,
+        section: "documents",
+        label: data.documentName,
+        collected: false,
+        uploaded: false,
+        live: false,
+        notApplicable: false,
+        remarks: "",
+        source: "required-document" as const,
+        createdAt: now,
+        updatedAt: now,
+      };
+      db.insert(t.onboardingChecklistItems).values(row).run();
+      logActivity({
+        who: user.name,
+        what: `Marked "${data.documentName}" as required (added Documents process step)`,
+        kind: "info",
+        projectId: data.projectId,
+      });
+      return { item: mapChecklist(row), required: true as const };
+    }
+
+    if (existing) {
+      db.delete(t.onboardingChecklistItems)
+        .where(eq(t.onboardingChecklistItems.id, existing.id))
+        .run();
+      logActivity({
+        who: user.name,
+        what: `Cleared required flag on "${data.documentName}" (removed Documents process step)`,
+        kind: "info",
+        projectId: data.projectId,
+      });
+    }
+    return { item: null, required: false as const };
   });
 
 export const listOtherCharges = createServerFn({ method: "GET" })

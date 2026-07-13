@@ -13,6 +13,11 @@ export type OnboardingChecklistItem = Timestamps & {
   /** When true, item is skipped for this project and counts as complete. */
   notApplicable: boolean;
   remarks: string;
+  /**
+   * `default` = standard onboarding template item.
+   * `required-document` = customer-required doc added from Documents tab.
+   */
+  source?: "default" | "required-document";
 };
 
 export type UploadType = "unit" | "customer" | "booking" | "payment";

@@ -31,6 +31,7 @@ function ensureChecklist(projectId: string) {
           live: false,
           notApplicable: false,
           remarks: "",
+          source: "default",
           createdAt: now,
           updatedAt: now,
         })

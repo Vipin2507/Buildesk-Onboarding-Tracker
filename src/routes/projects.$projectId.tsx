@@ -8,6 +8,7 @@ import { z } from "zod";
 import { PageHeader, PageWrap } from "@/components/page-header";
 import { ProgressBar } from "@/components/progress-bar";
 import { ProjectManualProgress } from "@/components/project-manual-progress";
+import { ProjectDocumentsPanel } from "@/components/project-documents-panel";
 import { Button } from "@/components/ui/button";
 import { EntityNotFound } from "@/components/empty-state";
 import { DetailPageSkeleton } from "@/components/loading-skeleton";
@@ -279,7 +280,14 @@ function ProjectDetailPage() {
                       return (
                       <div key={item.id} className={cn("rounded-xl border border-border p-3.5", na && "bg-muted/30 opacity-90")}>
                         <div className="flex items-start justify-between gap-2">
-                          <div className={cn("font-medium text-sm", na && "text-muted-foreground line-through")}>{item.label}</div>
+                          <div className={cn("font-medium text-sm", na && "text-muted-foreground line-through")}>
+                            {item.label}
+                            {item.source === "required-document" && (
+                              <span className="ml-2 inline-flex align-middle rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                                Required
+                              </span>
+                            )}
+                          </div>
                           <button
                             type="button"
                             onClick={() => setNotApplicable(item.id, !na)}
@@ -354,7 +362,14 @@ function ProjectDetailPage() {
                           const na = !!item.notApplicable;
                           return (
                           <tr key={item.id} className={cn("border-t", na && "bg-muted/20")}>
-                            <td className={cn("px-4 py-3 font-medium", na && "text-muted-foreground line-through")}>{item.label}</td>
+                            <td className={cn("px-4 py-3 font-medium", na && "text-muted-foreground line-through")}>
+                              {item.label}
+                              {item.source === "required-document" && (
+                                <span className="ml-2 inline-flex align-middle rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                                  Required
+                                </span>
+                              )}
+                            </td>
                             {(["collected", "uploaded", "live"] as const).map((phase) => (
                               <td key={phase} className="px-3 py-3 text-center">
                                 <button
@@ -425,7 +440,9 @@ function ProjectDetailPage() {
         </>
       )}
 
-      {tab !== "onboarding" && tab !== "progress" && (
+      {tab === "documents" && <ProjectDocumentsPanel projectId={projectId} />}
+
+      {tab !== "onboarding" && tab !== "progress" && tab !== "documents" && (
         <div className="card-soft p-5">
           <p className="text-sm text-muted-foreground">
             Use the dedicated <Link to={`/${tab}` as "/data-migration"} className="text-primary underline">{tab}</Link> page for full CRUD — data is shared via global stores and scoped to this project where applicable.

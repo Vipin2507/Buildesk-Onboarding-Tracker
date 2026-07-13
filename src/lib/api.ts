@@ -33,6 +33,7 @@ export {
   toggleChecklist,
   setChecklistNotApplicable,
   updateChecklistRemarks,
+  setDocumentRequired,
   listOtherCharges,
   addOtherCharge,
   updateOtherCharge,

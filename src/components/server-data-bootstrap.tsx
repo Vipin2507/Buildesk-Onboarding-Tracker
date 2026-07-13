@@ -129,6 +129,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           checklistItems: checklist.map((c) => ({
             ...c,
             notApplicable: c.notApplicable ?? false,
+            source: c.source ?? "default",
           })),
           otherCharges: charges,
           uploads: uploads as never,

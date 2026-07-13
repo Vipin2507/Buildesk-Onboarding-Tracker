@@ -141,6 +141,8 @@ export const onboardingChecklistItems = sqliteTable(
     live: integer("live", { mode: "boolean" }).notNull().default(false),
     notApplicable: integer("not_applicable", { mode: "boolean" }).notNull().default(false),
     remarks: text("remarks").notNull().default(""),
+    /** default | required-document */
+    source: text("source").notNull().default("default"),
     ...timestamps,
   },
   (t) => [index("checklist_project_idx").on(t.projectId)],

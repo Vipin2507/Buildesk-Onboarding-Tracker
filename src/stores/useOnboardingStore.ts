@@ -20,6 +20,7 @@ import {
   toggleChecklist as apiToggleChecklist,
   setChecklistNotApplicable as apiSetNotApplicable,
   updateChecklistRemarks as apiUpdateRemarks,
+  setDocumentRequired as apiSetDocumentRequired,
   addOtherCharge as apiAddCharge,
   updateOtherCharge as apiUpdateCharge,
   deleteOtherCharge as apiDeleteCharge,
@@ -42,6 +43,9 @@ type OnboardingState = {
   toggleChecklist: (id: string, phase: ChecklistPhase, who?: string) => void;
   setChecklistNotApplicable: (id: string, notApplicable: boolean, who?: string) => void;
   updateChecklistRemarks: (id: string, remarks: string) => void;
+  /** When required, adds a Documents checklist step for this customer project. */
+  setDocumentRequired: (projectId: string, documentName: string, required: boolean, who?: string) => void;
+  isDocumentRequired: (projectId: string, documentName: string) => boolean;
   getChecklistByProject: (projectId: string) => OnboardingChecklistItem[];
   getProjectProgress: (projectId: string) => number;
   canGoLive: (projectId: string) => boolean;
@@ -150,6 +154,66 @@ export const useOnboardingStore = createStore<OnboardingState>((set, get) => ({
       checklistItems: s.checklistItems.map((i) => (i.id === id ? touch({ ...i, remarks }) : i)),
     }));
     serverSync("checklistRemarks", () => apiUpdateRemarks({ data: { id, remarks } }));
+  },
+
+  isDocumentRequired: (projectId, documentName) =>
+    get().checklistItems.some(
+      (i) =>
+        i.projectId === projectId &&
+        i.label === documentName &&
+        i.source === "required-document",
+    ),
+
+  setDocumentRequired: (projectId, documentName, required, who = "You") => {
+    const existing = get().checklistItems.find(
+      (i) =>
+        i.projectId === projectId &&
+        i.label === documentName &&
+        i.source === "required-document",
+    );
+
+    if (required) {
+      if (existing) return;
+      const item: OnboardingChecklistItem = {
+        id: newId(),
+        projectId,
+        section: "documents",
+        label: documentName,
+        collected: false,
+        uploaded: false,
+        live: false,
+        notApplicable: false,
+        remarks: "",
+        source: "required-document",
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+      };
+      set((s) => ({ checklistItems: [...s.checklistItems, item] }));
+      logActivity({
+        who,
+        what: `Marked "${documentName}" as required — added Documents process step`,
+        kind: "info",
+        projectId,
+      });
+      serverSync("setDocumentRequired", () =>
+        apiSetDocumentRequired({
+          data: { projectId, documentName, required: true, id: item.id },
+        }),
+      );
+      return;
+    }
+
+    if (!existing) return;
+    set((s) => ({ checklistItems: s.checklistItems.filter((i) => i.id !== existing.id) }));
+    logActivity({
+      who,
+      what: `Cleared required on "${documentName}" — removed Documents process step`,
+      kind: "info",
+      projectId,
+    });
+    serverSync("setDocumentRequired", () =>
+      apiSetDocumentRequired({ data: { projectId, documentName, required: false } }),
+    );
   },
 
   getChecklistByProject: (projectId) => get().checklistItems.filter((i) => i.projectId === projectId),
