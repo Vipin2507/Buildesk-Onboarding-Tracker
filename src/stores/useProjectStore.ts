@@ -11,13 +11,13 @@ import {
   deleteProject as apiDeleteProject,
   goLiveProject as apiGoLiveProject,
 } from "@/lib/api";
-import { serverSync } from "@/lib/sync";
+import { serverSync, waitForSync } from "@/lib/sync";
 
 type ProjectState = {
   projects: Project[];
   addProject: (data: Omit<Project, "id" | "createdAt" | "updatedAt">) => Project;
   updateProject: (id: string, data: Partial<Project>) => void;
-  deleteProject: (id: string) => Project | undefined;
+  deleteProject: (id: string, opts?: { sync?: boolean }) => Project | undefined;
   getById: (id: string) => Project | undefined;
   getByCompany: (companyId: string) => Project[];
   goLive: (id: string) => boolean;
@@ -38,31 +38,38 @@ export const useProjectStore = createStore<ProjectState>((set, get) => ({
       companyId: project.companyId,
       projectId: project.id,
     });
-    serverSync("createProject", () =>
-      apiCreateProject({
-        data: {
-          id: project.id,
-          name: project.name,
-          companyId: project.companyId,
-          type: project.type,
-          units: project.units,
-          city: project.city,
-          rera: project.rera,
-          status: project.status,
-          currentStep: project.currentStep,
-          startDate: project.startDate,
-          address: project.address,
-          state: project.state,
-          pinCode: project.pinCode,
-          totalTowers: project.totalTowers,
-          totalFloors: project.totalFloors,
-          agreementValue: project.agreementValue,
-          otherCharges: project.otherCharges,
-          customCharges: project.customCharges,
-          logoUrl: project.logoUrl,
-        },
-      }),
-    );
+    serverSync("createProject", async () => {
+      // Sheet import creates company + project back-to-back; wait for company row first.
+      await waitForSync(`company:${project.companyId}`);
+      const payload = {
+        id: project.id,
+        name: project.name,
+        companyId: project.companyId,
+        type: project.type,
+        units: project.units,
+        city: project.city,
+        rera: project.rera,
+        status: project.status,
+        currentStep: project.currentStep,
+        startDate: project.startDate,
+        address: project.address,
+        state: project.state,
+        pinCode: project.pinCode,
+        totalTowers: project.totalTowers,
+        totalFloors: project.totalFloors,
+        agreementValue: project.agreementValue,
+        otherCharges: project.otherCharges,
+        customCharges: project.customCharges,
+        logoUrl: project.logoUrl,
+      };
+      const result = await apiCreateProject({ data: payload });
+      if (result && typeof result === "object" && "skipped" in result && result.skipped) {
+        await new Promise((r) => setTimeout(r, 400));
+        await waitForSync(`company:${project.companyId}`);
+        return apiCreateProject({ data: payload });
+      }
+      return result;
+    });
     return project;
   },
 
@@ -83,7 +90,7 @@ export const useProjectStore = createStore<ProjectState>((set, get) => ({
     }
   },
 
-  deleteProject: (id) => {
+  deleteProject: (id, opts) => {
     const project = get().getById(id);
     if (!project) return undefined;
     set((s) => ({ projects: s.projects.filter((p) => p.id !== id) }));
@@ -96,7 +103,9 @@ export const useProjectStore = createStore<ProjectState>((set, get) => ({
       companyId: project.companyId,
       projectId: id,
     });
-    serverSync("deleteProject", () => apiDeleteProject({ data: { id } }));
+    if (opts?.sync !== false) {
+      serverSync("deleteProject", () => apiDeleteProject({ data: { id } }));
+    }
     return project;
   },
 

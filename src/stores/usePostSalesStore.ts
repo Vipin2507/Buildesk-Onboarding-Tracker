@@ -17,7 +17,7 @@ type PostSalesState = {
 
   addProject: (data: { companyId: string; projectNumber: string; projectName: string }) => PostSalesProject;
   updateProject: (id: string, data: Partial<Pick<PostSalesProject, "projectNumber" | "projectName">>) => void;
-  deleteProject: (id: string) => PostSalesProject | undefined;
+  deleteProject: (id: string, opts?: { sync?: boolean }) => PostSalesProject | undefined;
 
   addCustomStep: (
     projectId: string,
@@ -114,7 +114,7 @@ export const usePostSalesStore = createStore<PostSalesState>((set, get) => ({
     }
   },
 
-  deleteProject: (id) => {
+  deleteProject: (id, opts) => {
     const project = get().projects.find((p) => p.id === id);
     set((s) => ({ projects: s.projects.filter((p) => p.id !== id) }));
     if (project) {
@@ -125,7 +125,9 @@ export const usePostSalesStore = createStore<PostSalesState>((set, get) => ({
         companyId: project.companyId,
         projectId: id,
       });
-      serverSync("deletePostSales", () => apiDelete({ data: { id } }));
+      if (opts?.sync !== false) {
+        serverSync("deletePostSales", () => apiDelete({ data: { id } }));
+      }
     }
     return project;
   },

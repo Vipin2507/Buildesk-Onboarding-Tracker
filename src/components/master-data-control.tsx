@@ -140,9 +140,10 @@ export function DataControlPanel() {
 
   function cascadeDeleteCompany(companyId: string) {
     const linked = useProjectStore.getState().getByCompany(companyId);
-    for (const p of linked) useProjectStore.getState().deleteProject(p.id);
+    // Local cleanup only — server company delete cascades projects / post-sales via FK.
+    for (const p of linked) useProjectStore.getState().deleteProject(p.id, { sync: false });
     const postSales = usePostSalesStore.getState().projects.filter((p) => p.companyId === companyId);
-    for (const ps of postSales) usePostSalesStore.getState().deleteProject(ps.id);
+    for (const ps of postSales) usePostSalesStore.getState().deleteProject(ps.id, { sync: false });
     useCompanyStore.getState().deleteCompany(companyId);
     return linked.length;
   }

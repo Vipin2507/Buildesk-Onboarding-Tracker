@@ -9,7 +9,7 @@ import {
   deleteCompany as apiDeleteCompany,
   renewCompany as apiRenewCompany,
 } from "@/lib/api";
-import { serverSync } from "@/lib/sync";
+import { serverSync, serverSyncTracked } from "@/lib/sync";
 
 type CompanyState = {
   companies: Company[];
@@ -30,7 +30,7 @@ export const useCompanyStore = createStore<CompanyState>((set, get) => ({
     const company: Company = { ...data, id: newId(), createdAt: now, updatedAt: now };
     set((s) => ({ companies: [company, ...s.companies] }));
     logActivity({ who: "You", what: `Added company ${company.name}`, kind: "success", companyId: company.id });
-    serverSync("createCompany", () =>
+    serverSyncTracked(`company:${company.id}`, "createCompany", () =>
       apiCreateCompany({
         data: {
           id: company.id,

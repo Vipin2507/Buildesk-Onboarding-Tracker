@@ -116,10 +116,33 @@ export const createProject = createServerFn({ method: "POST" })
     const user = requireUser(["Admin", "Manager"]);
     const db = getDb();
     const id = data.id ?? newId();
+    const existing = loadProject(id);
+    if (existing) return existing;
+
+    // Import fires company + project almost together; wait briefly for company row.
+    let company = db.select().from(t.companies).where(eq(t.companies.id, data.companyId)).get();
+    if (!company) {
+      for (let i = 0; i < 5 && !company; i++) {
+        await new Promise((r) => setTimeout(r, 150));
+        company = db.select().from(t.companies).where(eq(t.companies.id, data.companyId)).get();
+      }
+    }
+    if (!company) {
+      return { ok: false as const, skipped: "company missing" as const };
+    }
+
     const now = nowIso();
-    db.insert(t.projects)
-      .values(projectRowValues(data, { id, now, createdAt: now }))
-      .run();
+    try {
+      db.insert(t.projects)
+        .values(projectRowValues(data, { id, now, createdAt: now }))
+        .run();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/FOREIGN KEY/i.test(msg)) {
+        return { ok: false as const, skipped: "company missing" as const };
+      }
+      throw e;
+    }
     ensureChecklist(id);
     logActivity({
       who: user.name,
@@ -183,7 +206,7 @@ export const deleteProject = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = requireUser(["Admin", "Manager"]);
     const existing = loadProject(data.id);
-    if (!existing) throw new ApiError(404, "Project not found");
+    if (!existing) return { ok: true as const, skipped: true as const };
     getDb().delete(t.projects).where(eq(t.projects.id, data.id)).run();
     logActivity({
       who: user.name,
@@ -192,7 +215,7 @@ export const deleteProject = createServerFn({ method: "POST" })
       companyId: existing.companyId,
       projectId: data.id,
     });
-    return { ok: true };
+    return { ok: true as const };
   });
 
 export const goLiveProject = createServerFn({ method: "POST" })

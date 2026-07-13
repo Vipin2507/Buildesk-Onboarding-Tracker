@@ -180,7 +180,7 @@ export const deletePostSalesProject = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = requireUser(["Admin", "Manager"]);
     const existing = loadPostSalesProject(data.id);
-    if (!existing) throw new ApiError(404, "Not found");
+    if (!existing) return { ok: true as const, skipped: true as const };
     getDb().delete(t.postSalesProjects).where(eq(t.postSalesProjects.id, data.id)).run();
     logActivity({
       who: user.name,
@@ -189,5 +189,5 @@ export const deletePostSalesProject = createServerFn({ method: "POST" })
       companyId: existing.companyId,
       projectId: data.id,
     });
-    return { ok: true };
+    return { ok: true as const };
   });

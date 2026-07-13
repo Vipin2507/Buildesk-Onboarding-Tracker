@@ -62,6 +62,8 @@ export const createCompany = createServerFn({ method: "POST" })
     const user = requireUser(["Admin", "Manager"]);
     const db = getDb();
     const id = data.id ?? newId();
+    const already = loadCompany(id);
+    if (already) return already;
     const now = nowIso();
     const moduleKeys = (data.moduleKeys ?? ["post-sales"]) as ModuleKey[];
     db.insert(t.companies)
@@ -168,10 +170,10 @@ export const deleteCompany = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = requireUser(["Admin"]);
     const existing = loadCompany(data.id);
-    if (!existing) throw new ApiError(404, "Company not found");
+    if (!existing) return { ok: true as const, skipped: true as const };
     getDb().delete(t.companies).where(eq(t.companies.id, data.id)).run();
     logActivity({ who: user.name, what: `Deleted company ${existing.name}`, kind: "warning", companyId: data.id });
-    return { ok: true };
+    return { ok: true as const };
   });
 
 export const renewCompany = createServerFn({ method: "POST" })
