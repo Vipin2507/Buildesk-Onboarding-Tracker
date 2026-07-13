@@ -22,7 +22,7 @@ import {
   type ProjectImportPlan,
 } from "@/lib/project-sheet-import";
 import { cn, formatDate } from "@/lib/utils";
-import { useCompanyStore, useEmployeeStore, useProjectStore } from "@/stores";
+import { useCompanyStore, useProjectStore } from "@/stores";
 import type { Company, Project } from "@/types";
 
 export function ProjectImportModal({
@@ -40,7 +40,6 @@ export function ProjectImportModal({
   const projects = useProjectStore((s) => s.projects);
   const addProject = useProjectStore((s) => s.addProject);
   const updateProject = useProjectStore((s) => s.updateProject);
-  const employees = useEmployeeStore((s) => s.employees);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -87,10 +86,7 @@ export function ProjectImportModal({
     if (!plan || plan.summary.ready === 0) return;
     setBusy(true);
 
-    const manager =
-      employees.find((e) => e.role.includes("Onboarding") || e.role.includes("Implementation")) ??
-      employees[0];
-    const csm = employees.find((e) => e.role === "CSM") ?? employees[0];
+    // Do not auto-assign people on import — leave manager/CSM empty for manual assignment.
     const today = new Date().toISOString().slice(0, 10);
     const goLive = new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10);
     const expiry = new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10);
@@ -120,8 +116,8 @@ export function ProjectImportModal({
               phone: "—",
               email: companyEmailFromName(action.companyName),
               city: "—",
-              onboardingManagerId: manager?.id ?? "",
-              csmId: csm?.id ?? "",
+              onboardingManagerId: "",
+              csmId: "",
               status: "not_started",
               modules: createCompanyModules(["post-sales", "customer-app"], action.startDate),
               agreementDate: action.startDate,

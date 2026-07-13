@@ -19,6 +19,7 @@ import {
   listTickets,
   listTraining,
   listUsers,
+  listNotifications,
   getAppConfig,
 } from "@/lib/api";
 import { wireConfigPersistence } from "@/lib/config-persistence";
@@ -31,6 +32,7 @@ import {
   useIntegrationStore,
   useLaborStore,
   useNotesAttachmentsStore,
+  useNotificationStore,
   useOnboardingStore,
   usePostSalesStore,
   useProjectProgressStore,
@@ -75,6 +77,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           tickets,
           training,
           activity,
+          notifications,
           vendors,
           labor,
           documents,
@@ -98,6 +101,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           listTickets(),
           listTraining(),
           listActivity({ data: { limit: 100 } }),
+          listNotifications({ data: { limit: 80 } }).catch(() => []),
           getVendorBundle(),
           getLaborBundle(),
           listDocuments(),
@@ -120,9 +124,20 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
         useEmployeeStore.setState({ employees });
         // Always apply server users (including empty) so deletes stay deleted — never fall back to seed.
         if (users.ok) useUserStore.setState({ users: users.users });
-        useTicketStore.setState({ tickets: tickets as never });
+        useTicketStore.setState({
+          tickets: tickets.map((t) => ({
+            ...t,
+            type: t.type as never,
+            priority: t.priority as never,
+            status: t.status as never,
+            developerId: t.developerId ?? "",
+            companyId: t.companyId ?? "",
+            description: t.description ?? "",
+          })),
+        });
         useTrainingStore.setState({ sessions: training as never });
         useActivityStore.setState({ activities: activity });
+        useNotificationStore.setState({ notifications });
         usePostSalesStore.setState({ projects: postSales });
         useNotesAttachmentsStore.setState({ notes, attachments });
         useOnboardingStore.setState({

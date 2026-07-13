@@ -1,6 +1,7 @@
 import type { Ticket, TicketStatus } from "@/types";
 import { nowIso } from "@/types";
 import { logActivity } from "./useActivityStore";
+import { notifyInApp } from "./useNotificationStore";
 import { createStore, touch } from "./persist";
 import {
   createTicket as apiCreate,
@@ -25,12 +26,21 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
     const now = nowIso();
     const ticket: Ticket = {
       ...data,
+      description: data.description ?? "",
       id: `TKT-${1000 + get().tickets.length + 1}`,
       createdAt: now,
       updatedAt: now,
     };
     set((s) => ({ tickets: [ticket, ...s.tickets] }));
     logActivity({ who: "You", what: `Created ticket ${ticket.id}: ${ticket.title}`, kind: "info" });
+    notifyInApp({
+      title: `New ticket ${ticket.id}`,
+      body: ticket.title,
+      kind: ticket.priority === "Critical" ? "danger" : "info",
+      href: `/support/${ticket.id}`,
+      companyId: ticket.companyId,
+      ticketId: ticket.id,
+    });
     serverSync("createTicket", () =>
       apiCreate({
         data: {
@@ -43,6 +53,7 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
           eta: ticket.eta,
           developerId: ticket.developerId,
           companyId: ticket.companyId,
+          description: ticket.description,
         },
       }),
     );
@@ -50,9 +61,30 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
   },
 
   updateTicket: (id, data) => {
+    const prev = get().getById(id);
     set((s) => ({ tickets: s.tickets.map((t) => (t.id === id ? touch({ ...t, ...data }) : t)) }));
     const ticket = get().getById(id);
     if (ticket) logActivity({ who: "You", what: `Updated ticket ${id}`, kind: "info" });
+    if (prev && data.status && data.status !== prev.status) {
+      notifyInApp({
+        title: `${id} → ${data.status}`,
+        body: ticket?.title ?? prev.title,
+        kind: "info",
+        href: `/support/${id}`,
+        companyId: ticket?.companyId ?? prev.companyId,
+        ticketId: id,
+      });
+    }
+    if (prev && data.developerId && data.developerId !== prev.developerId) {
+      notifyInApp({
+        title: `${id} reassigned`,
+        body: ticket?.title ?? prev.title,
+        kind: "info",
+        href: `/support/${id}`,
+        companyId: ticket?.companyId ?? prev.companyId,
+        ticketId: id,
+      });
+    }
     serverSync("updateTicket", () => apiUpdate({ data: { id, patch: data } }));
   },
 
@@ -67,8 +99,18 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
   },
 
   moveTicket: (id, status) => {
+    const prev = get().getById(id);
+    if (prev?.status === status) return;
     set((s) => ({ tickets: s.tickets.map((t) => (t.id === id ? touch({ ...t, status }) : t)) }));
     logActivity({ who: "You", what: `Ticket ${id} moved to ${status}`, kind: "info" });
+    notifyInApp({
+      title: `${id} → ${status}`,
+      body: prev?.title ?? "Ticket status updated",
+      kind: "info",
+      href: `/support/${id}`,
+      companyId: prev?.companyId,
+      ticketId: id,
+    });
     serverSync("moveTicket", () => apiUpdate({ data: { id, patch: { status } } }));
   },
 

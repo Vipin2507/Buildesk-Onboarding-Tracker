@@ -14,3 +14,4 @@ export * from "./integration";
 export * from "./notes";
 export * from "./master";
 export * from "./settings";
+export * from "./notification";

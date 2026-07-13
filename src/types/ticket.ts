@@ -21,5 +21,5 @@ export type Ticket = Timestamps & {
   eta: string;
   developerId: string;
   companyId: string;
-  description?: string;
+  description: string;
 };

@@ -138,6 +138,11 @@ const EXTRA_COLUMNS = [
     name: "start_date",
     ddl: "TEXT",
   },
+  {
+    table: "tickets",
+    name: "description",
+    ddl: "TEXT NOT NULL DEFAULT ''",
+  },
 ];
 
 for (const col of EXTRA_COLUMNS) {
@@ -153,6 +158,29 @@ for (const col of EXTRA_COLUMNS) {
   const sql = `ALTER TABLE ${col.table} ADD COLUMN ${col.name} ${col.ddl}`;
   console.log(`+ ${sql}`);
   sqlite.exec(sql);
+}
+
+if (!tableExists("notifications")) {
+  sqlite.exec(`
+    CREATE TABLE notifications (
+      id TEXT PRIMARY KEY NOT NULL,
+      user_id TEXT,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL DEFAULT '',
+      kind TEXT NOT NULL DEFAULT 'info',
+      href TEXT,
+      read_at TEXT,
+      company_id TEXT,
+      ticket_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications(user_id);
+    CREATE INDEX IF NOT EXISTS notifications_created_idx ON notifications(created_at);
+  `);
+  console.log("+ CREATE TABLE notifications");
+} else {
+  console.log("notifications: table already present");
 }
 
 // Backfill start dates for existing rows

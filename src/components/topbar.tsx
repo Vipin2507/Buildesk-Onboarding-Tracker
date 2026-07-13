@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Bell, Search, ChevronDown, Building2, Boxes, LogOut, Settings, User, UserRound, Menu } from "lucide-react";
+import { Search, ChevronDown, Building2, Boxes, LogOut, Settings, User, UserRound, Menu } from "lucide-react";
 import { toast } from "sonner";
 
 import { EditProfileDialog } from "@/components/edit-profile-dialog";
 import { MobileNavSheet } from "@/components/mobile-nav-sheet";
+import { NotificationsBell } from "@/components/notifications-panel";
 import { ThemeToggle, ThemeToggleCompact } from "@/components/theme-toggle";
 import {
   DropdownMenu,
@@ -121,13 +122,7 @@ export function TopBar() {
           <ThemeToggle className="hidden sm:inline-flex" />
           <ThemeToggleCompact className="sm:hidden" />
 
-          <button
-            type="button"
-            className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-border/80 bg-card text-muted-foreground transition-colors hover:text-foreground"
-            title="Notifications"
-          >
-            <Bell className="h-4 w-4" />
-          </button>
+          <NotificationsBell />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

@@ -405,6 +405,7 @@ export const seedTickets: Ticket[] = Array.from({ length: 22 }).map((_, i) => {
     eta: `2025-0${1 + ((i + 2) % 9)}-2${i % 9}`,
     developerId: seedEmployees[i % managers.length].id,
     companyId: company.id,
+    description: `Details for ticket TKT-${1000 + i}: reported by onboarding team.`,
     createdAt: ts,
     updatedAt: ts,
   };

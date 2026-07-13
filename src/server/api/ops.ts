@@ -34,17 +34,24 @@ export const createTicket = createServerFn({ method: "POST" })
         eta: z.string(),
         developerId: z.string().optional(),
         companyId: z.string().optional(),
+        description: z.string().optional(),
       })
       .parse(data),
   )
   .handler(async ({ data }) => {
     requireUser(["Admin", "Manager"]);
     const now = nowIso();
-    const { id: clientId, ...rest } = data;
+    const { id: clientId, description, ...rest } = data;
     const id = clientId ?? `TKT-${Date.now()}`;
     getDb()
       .insert(t.tickets)
-      .values({ id, ...rest, createdAt: now, updatedAt: now })
+      .values({
+        id,
+        ...rest,
+        description: description ?? "",
+        createdAt: now,
+        updatedAt: now,
+      })
       .run();
     return getDb().select().from(t.tickets).where(eq(t.tickets.id, id)).get()!;
   });

@@ -98,3 +98,10 @@ export {
   setAppConfig,
   getDashboardKpis,
 } from "@/server/api/ops";
+
+export {
+  listNotifications,
+  createNotification,
+  markNotificationRead,
+  markAllNotificationsRead,
+} from "@/server/api/notifications";

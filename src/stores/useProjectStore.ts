@@ -4,6 +4,7 @@ import { buildChecklistForProject } from "@/data/seed";
 import { useOnboardingStore } from "./useOnboardingStore";
 import { useProjectProgressStore } from "./useProjectProgressStore";
 import { logActivity } from "./useActivityStore";
+import { notifyInApp } from "./useNotificationStore";
 import { createStore, touch } from "./persist";
 import {
   createProject as apiCreateProject,
@@ -130,6 +131,14 @@ export const useProjectStore = createStore<ProjectState>((set, get) => ({
         kind: "success",
         companyId: project.companyId,
         projectId: id,
+      });
+      notifyInApp({
+        title: `${project.name} is live`,
+        body: "Project marked go-live.",
+        kind: "success",
+        href: `/projects/${project.id}`,
+        companyId: project.companyId,
+        gate: "golive",
       });
     }
     serverSync("goLiveProject", () => apiGoLiveProject({ data: { id } }));

@@ -295,9 +295,26 @@ export const tickets = sqliteTable("tickets", {
   eta: text("eta").notNull(),
   developerId: text("developer_id"),
   companyId: text("company_id"),
+  description: text("description").notNull().default(""),
   ...timestamps,
 });
 
+export const notifications = sqliteTable(
+  "notifications",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id"),
+    title: text("title").notNull(),
+    body: text("body").notNull().default(""),
+    kind: text("kind").notNull().default("info"),
+    href: text("href"),
+    readAt: text("read_at"),
+    companyId: text("company_id"),
+    ticketId: text("ticket_id"),
+    ...timestamps,
+  },
+  (t) => [index("notifications_user_idx").on(t.userId), index("notifications_created_idx").on(t.createdAt)],
+);
 export const trainingSessions = sqliteTable("training_sessions", {
   id: text("id").primaryKey(),
   type: text("type").notNull(),
