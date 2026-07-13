@@ -13,6 +13,7 @@ import type {
   WorkOrder,
 } from "@/types";
 import { STATUS_LABEL } from "@/types/common";
+import { calcChecklistProgress } from "@/lib/checklist";
 
 export const REPORT_IDS = [
   "onboarding",
@@ -63,11 +64,7 @@ export type ReportSnapshot = {
 };
 
 function projectProgress(projectId: string, checklist: OnboardingChecklistItem[]) {
-  const items = checklist.filter((i) => i.projectId === projectId);
-  if (items.length === 0) return 0;
-  const total = items.length * 3;
-  const done = items.reduce((sum, i) => sum + (i.collected ? 1 : 0) + (i.uploaded ? 1 : 0) + (i.live ? 1 : 0), 0);
-  return Math.round((done / total) * 100);
+  return calcChecklistProgress(checklist.filter((i) => i.projectId === projectId));
 }
 
 function daysBetween(iso: string) {

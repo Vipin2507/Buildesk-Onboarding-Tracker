@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, ArrowRight, Clock, ChevronRight, ArrowLeft, Rocket } from "lucide-react";
+import { Check, ArrowRight, Clock, ChevronRight, ArrowLeft, Rocket, Ban } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -23,6 +23,7 @@ import {
 import { ONBOARDING_STEPS, ONBOARDING_SECTIONS } from "@/data/constants";
 import { formatRelativeTime } from "@/types/common";
 import { PROJECT_PROGRESS_MILESTONES } from "@/types/project";
+import { isChecklistItemComplete } from "@/lib/checklist";
 import { cn } from "@/lib/utils";
 
 const searchSchema = z.object({
@@ -61,11 +62,15 @@ function ProjectDetailPage() {
   const canGoLive = useMemo(
     () => {
       const goliveItems = checklist.filter((i) => i.section === "golive");
-      return goliveItems.length > 0 && goliveItems.every((i) => i.collected && i.uploaded && i.live);
+      return (
+        goliveItems.length > 0 &&
+        goliveItems.every((i) => i.notApplicable || (i.collected && i.uploaded && i.live))
+      );
     },
     [checklist],
   );
   const toggleChecklist = useOnboardingStore((s) => s.toggleChecklist);
+  const setNotApplicable = useOnboardingStore((s) => s.setChecklistNotApplicable);
   const updateRemarks = useOnboardingStore((s) => s.updateChecklistRemarks);
   const initChecklistForProject = useOnboardingStore((s) => s.initChecklistForProject);
   const goLive = useProjectStore((s) => s.goLive);
@@ -128,7 +133,7 @@ function ProjectDetailPage() {
   function sectionProgress(sec: string) {
     const items = sectionItems[sec] ?? [];
     if (!items.length) return 0;
-    const done = items.filter((i) => i.collected && i.uploaded && i.live).length;
+    const done = items.filter(isChecklistItemComplete).length;
     return Math.round((done / items.length) * 100);
   }
 
@@ -219,7 +224,7 @@ function ProjectDetailPage() {
                 const active = s.key === section;
                 const pct = sectionProgress(s.key);
                 const items = sectionItems[s.key] ?? [];
-                const done = items.filter((i) => i.collected && i.uploaded && i.live).length;
+                const done = items.filter(isChecklistItemComplete).length;
                 return (
                   <button key={s.key} onClick={() => setSection(s.key)} className={cn("relative flex min-w-[9.5rem] shrink-0 items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm lg:min-w-0 lg:w-full", active ? "bg-primary/15 text-primary" : "hover:bg-muted")}>
                     <div className="flex-1">
@@ -266,9 +271,30 @@ function ProjectDetailPage() {
                   )}
 
                   <div className="space-y-3 md:hidden">
-                    {(sectionItems[section] ?? []).map((item) => (
-                      <div key={item.id} className="rounded-xl border border-border p-3.5">
-                        <div className="font-medium text-sm">{item.label}</div>
+                    {(sectionItems[section] ?? []).map((item) => {
+                      const na = !!item.notApplicable;
+                      return (
+                      <div key={item.id} className={cn("rounded-xl border border-border p-3.5", na && "bg-muted/30 opacity-90")}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className={cn("font-medium text-sm", na && "text-muted-foreground line-through")}>{item.label}</div>
+                          <button
+                            type="button"
+                            onClick={() => setNotApplicable(item.id, !na)}
+                            className={cn(
+                              "inline-flex min-h-9 shrink-0 items-center gap-1 rounded-lg border px-2.5 text-[11px] font-medium",
+                              na
+                                ? "border-muted-foreground/40 bg-muted text-muted-foreground"
+                                : "border-input bg-background text-muted-foreground hover:border-foreground/40",
+                            )}
+                          >
+                            <Ban className="h-3.5 w-3.5" />
+                            N/A
+                          </button>
+                        </div>
+                        {na ? (
+                          <p className="mt-2 text-xs text-muted-foreground">Not applicable for this project</p>
+                        ) : (
+                          <>
                         <div className="mt-3 flex flex-wrap gap-2">
                           {(["collected", "uploaded", "live"] as const).map((phase) => (
                             <button
@@ -293,8 +319,19 @@ function ProjectDetailPage() {
                           placeholder="Add note…"
                           className="mt-3 h-10 w-full rounded-lg border bg-background px-3 text-sm"
                         />
+                          </>
+                        )}
+                        {na && (
+                          <input
+                            value={item.remarks}
+                            onChange={(e) => updateRemarks(item.id, e.target.value)}
+                            placeholder="Why not applicable…"
+                            className="mt-3 h-10 w-full rounded-lg border bg-background px-3 text-sm"
+                          />
+                        )}
                       </div>
-                    ))}
+                    );
+                    })}
                   </div>
 
                   <div className="hidden overflow-hidden rounded-lg border md:block">
@@ -305,33 +342,61 @@ function ProjectDetailPage() {
                           <th className="px-3 py-2 text-center">Collected</th>
                           <th className="px-3 py-2 text-center">Uploaded</th>
                           <th className="px-3 py-2 text-center">Live</th>
+                          <th className="px-3 py-2 text-center">N/A</th>
                           <th className="px-3 py-2 text-left">Remarks</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {(sectionItems[section] ?? []).map((item) => (
-                          <tr key={item.id} className="border-t">
-                            <td className="px-4 py-3 font-medium">{item.label}</td>
+                        {(sectionItems[section] ?? []).map((item) => {
+                          const na = !!item.notApplicable;
+                          return (
+                          <tr key={item.id} className={cn("border-t", na && "bg-muted/20")}>
+                            <td className={cn("px-4 py-3 font-medium", na && "text-muted-foreground line-through")}>{item.label}</td>
                             {(["collected", "uploaded", "live"] as const).map((phase) => (
                               <td key={phase} className="px-3 py-3 text-center">
                                 <button
+                                  type="button"
+                                  disabled={na}
                                   onClick={() => toggleChecklist(item.id, phase)}
-                                  className={cn("inline-flex h-6 w-6 items-center justify-center rounded-md border", item[phase] ? "border-success bg-success text-white" : "border-input hover:border-primary")}
+                                  className={cn(
+                                    "inline-flex h-6 w-6 items-center justify-center rounded-md border",
+                                    na && "cursor-not-allowed opacity-40",
+                                    !na && item[phase] && "border-success bg-success text-white",
+                                    !na && !item[phase] && "border-input hover:border-primary",
+                                  )}
                                 >
-                                  {item[phase] && <Check className="h-3.5 w-3.5" />}
+                                  {!na && item[phase] && <Check className="h-3.5 w-3.5" />}
+                                  {na && <span className="text-[10px] text-muted-foreground">—</span>}
                                 </button>
                               </td>
                             ))}
+                            <td className="px-3 py-3 text-center">
+                              <button
+                                type="button"
+                                title={na ? "Mark as applicable" : "Not applicable for this project"}
+                                onClick={() => setNotApplicable(item.id, !na)}
+                                className={cn(
+                                  "inline-flex h-7 items-center gap-1 rounded-md border px-2 text-[11px] font-medium",
+                                  na
+                                    ? "border-muted-foreground/50 bg-muted text-muted-foreground"
+                                    : "border-input hover:border-foreground/40 hover:bg-muted/50",
+                                )}
+                              >
+                                <Ban className="h-3 w-3" />
+                                N/A
+                              </button>
+                            </td>
                             <td className="px-3 py-3">
                               <input
                                 value={item.remarks}
                                 onChange={(e) => updateRemarks(item.id, e.target.value)}
-                                placeholder="Add note…"
+                                placeholder={na ? "Why not applicable…" : "Add note…"}
                                 className="h-8 w-full rounded border bg-background px-2 text-xs"
                               />
                             </td>
                           </tr>
-                        ))}
+                        );
+                        })}
                       </tbody>
                     </table>
                   </div>

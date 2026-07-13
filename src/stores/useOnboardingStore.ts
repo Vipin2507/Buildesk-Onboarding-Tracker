@@ -18,6 +18,7 @@ import { useProjectStore } from "./useProjectStore";
 import { ATTACHMENT_CATEGORY_LABEL } from "@/types";
 import {
   toggleChecklist as apiToggleChecklist,
+  setChecklistNotApplicable as apiSetNotApplicable,
   updateChecklistRemarks as apiUpdateRemarks,
   addOtherCharge as apiAddCharge,
   updateOtherCharge as apiUpdateCharge,
@@ -25,6 +26,7 @@ import {
   simulateUpload as apiSimulateUpload,
 } from "@/lib/api";
 import { serverSync } from "@/lib/sync";
+import { calcChecklistProgress, isChecklistItemComplete } from "@/lib/checklist";
 
 type OnboardingState = {
   checklistItems: OnboardingChecklistItem[];
@@ -38,6 +40,7 @@ type OnboardingState = {
   removeProjectData: (projectId: string) => void;
 
   toggleChecklist: (id: string, phase: ChecklistPhase, who?: string) => void;
+  setChecklistNotApplicable: (id: string, notApplicable: boolean, who?: string) => void;
   updateChecklistRemarks: (id: string, remarks: string) => void;
   getChecklistByProject: (projectId: string) => OnboardingChecklistItem[];
   getProjectProgress: (projectId: string) => number;
@@ -57,10 +60,7 @@ type OnboardingState = {
 };
 
 function calcProgress(items: OnboardingChecklistItem[]) {
-  if (items.length === 0) return 0;
-  const total = items.length * 3;
-  const done = items.reduce((sum, i) => sum + (i.collected ? 1 : 0) + (i.uploaded ? 1 : 0) + (i.live ? 1 : 0), 0);
-  return Math.round((done / total) * 100);
+  return calcChecklistProgress(items);
 }
 
 export const useOnboardingStore = createPersistedStore<OnboardingState>("onboarding-v3", (set, get) => ({
@@ -106,7 +106,7 @@ export const useOnboardingStore = createPersistedStore<OnboardingState>("onboard
 
   toggleChecklist: (id, phase, who = "You") => {
     const item = get().checklistItems.find((i) => i.id === id);
-    if (!item) return;
+    if (!item || item.notApplicable) return;
     const key = phase as keyof Pick<OnboardingChecklistItem, "collected" | "uploaded" | "live">;
     const updated = touch({ ...item, [key]: !item[key] });
     set((s) => ({
@@ -119,6 +119,30 @@ export const useOnboardingStore = createPersistedStore<OnboardingState>("onboard
       projectId: item.projectId,
     });
     serverSync("toggleChecklist", () => apiToggleChecklist({ data: { id, phase } }));
+  },
+
+  setChecklistNotApplicable: (id, notApplicable, who = "You") => {
+    const item = get().checklistItems.find((i) => i.id === id);
+    if (!item) return;
+    const updated = touch({
+      ...item,
+      notApplicable,
+      ...(notApplicable ? { collected: false, uploaded: false, live: false } : {}),
+    });
+    set((s) => ({
+      checklistItems: s.checklistItems.map((i) => (i.id === id ? updated : i)),
+    }));
+    logActivity({
+      who,
+      what: notApplicable
+        ? `Marked "${item.label}" as not applicable`
+        : `Cleared N/A on "${item.label}"`,
+      kind: "info",
+      projectId: item.projectId,
+    });
+    serverSync("setChecklistNotApplicable", () =>
+      apiSetNotApplicable({ data: { id, notApplicable } }),
+    );
   },
 
   updateChecklistRemarks: (id, remarks) => {
@@ -134,7 +158,7 @@ export const useOnboardingStore = createPersistedStore<OnboardingState>("onboard
 
   canGoLive: (projectId) => {
     const goliveItems = get().checklistItems.filter((i) => i.projectId === projectId && i.section === "golive");
-    return goliveItems.length > 0 && goliveItems.every((i) => i.collected && i.uploaded && i.live);
+    return goliveItems.length > 0 && goliveItems.every(isChecklistItemComplete);
   },
 
   addOtherCharge: (data) => {

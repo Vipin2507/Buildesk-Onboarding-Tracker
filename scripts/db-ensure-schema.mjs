@@ -115,5 +115,29 @@ if (added === 0) {
   console.log(`projects: added ${added} column(s)`);
 }
 
+/** @type {{ table: string, name: string, ddl: string }[]} */
+const EXTRA_COLUMNS = [
+  {
+    table: "onboarding_checklist_items",
+    name: "not_applicable",
+    ddl: "INTEGER NOT NULL DEFAULT 0",
+  },
+];
+
+for (const col of EXTRA_COLUMNS) {
+  if (!tableExists(col.table)) {
+    console.log(`skip ${col.table}.${col.name} (table missing)`);
+    continue;
+  }
+  const cols = existingColumns(col.table);
+  if (cols.has(col.name)) {
+    console.log(`${col.table}: ${col.name} already present`);
+    continue;
+  }
+  const sql = `ALTER TABLE ${col.table} ADD COLUMN ${col.name} ${col.ddl}`;
+  console.log(`+ ${sql}`);
+  sqlite.exec(sql);
+}
+
 sqlite.close();
 console.log("db:ensure complete");

@@ -10,6 +10,8 @@ export type OnboardingChecklistItem = Timestamps & {
   collected: boolean;
   uploaded: boolean;
   live: boolean;
+  /** When true, item is skipped for this project and counts as complete. */
+  notApplicable: boolean;
   remarks: string;
 };
 

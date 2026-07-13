@@ -31,6 +31,7 @@ export {
 export {
   listChecklist,
   toggleChecklist,
+  setChecklistNotApplicable,
   updateChecklistRemarks,
   listOtherCharges,
   addOtherCharge,

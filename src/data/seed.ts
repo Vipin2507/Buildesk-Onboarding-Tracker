@@ -337,6 +337,7 @@ export function buildChecklistForProject(projectId: string): OnboardingChecklist
         collected: r > 0.3,
         uploaded: r > 0.5,
         live: r > 0.7,
+        notApplicable: false,
         remarks: "",
         createdAt: ts,
         updatedAt: ts,

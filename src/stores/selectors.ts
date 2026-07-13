@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { MODULE_CATALOG, normalizeCompanyModules } from "@/data/module-catalog";
 import type { ModuleKey } from "@/types";
 import { calcPostSalesProjectProgress } from "@/lib/post-sales-status";
+import { calcChecklistProgress } from "@/lib/checklist";
 import { useActivityStore } from "./useActivityStore";
 import { useCompanyStore } from "./useCompanyStore";
 import { useOnboardingStore } from "./useOnboardingStore";
@@ -15,11 +16,7 @@ function calcOnboardingProjectProgress(
   projectId: string,
   checklistItems: ReturnType<typeof useOnboardingStore.getState>["checklistItems"],
 ) {
-  const items = checklistItems.filter((i) => i.projectId === projectId);
-  if (items.length === 0) return 0;
-  const total = items.length * 3;
-  const done = items.reduce((sum, i) => sum + (i.collected ? 1 : 0) + (i.uploaded ? 1 : 0) + (i.live ? 1 : 0), 0);
-  return Math.round((done / total) * 100);
+  return calcChecklistProgress(checklistItems.filter((i) => i.projectId === projectId));
 }
 
 export function getModuleProgressPercent(

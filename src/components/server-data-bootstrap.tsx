@@ -123,7 +123,10 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
         usePostSalesStore.setState({ projects: postSales });
         useNotesAttachmentsStore.setState({ notes, attachments });
         useOnboardingStore.setState({
-          checklistItems: checklist,
+          checklistItems: checklist.map((c) => ({
+            ...c,
+            notApplicable: c.notApplicable ?? false,
+          })),
           otherCharges: charges,
           uploads: uploads as never,
         });

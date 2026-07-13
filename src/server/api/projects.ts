@@ -29,6 +29,7 @@ function ensureChecklist(projectId: string) {
           collected: false,
           uploaded: false,
           live: false,
+          notApplicable: false,
           remarks: "",
           createdAt: now,
           updatedAt: now,
@@ -204,7 +205,9 @@ export const goLiveProject = createServerFn({ method: "POST" })
       .where(eq(t.onboardingChecklistItems.projectId, data.id))
       .all();
     const golive = items.filter((i) => i.section === "golive");
-    const ready = golive.length > 0 && golive.every((i) => i.collected && i.uploaded && i.live);
+    const ready =
+      golive.length > 0 &&
+      golive.every((i) => i.notApplicable || (i.collected && i.uploaded && i.live));
     if (!ready) throw new ApiError(400, "Complete all Go-Live checklist items first");
     const now = nowIso();
     db.update(t.projects)

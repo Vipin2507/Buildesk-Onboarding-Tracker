@@ -18,6 +18,7 @@ function mapChecklist(row: typeof t.onboardingChecklistItems.$inferSelect): Onbo
     collected: row.collected,
     uploaded: row.uploaded,
     live: row.live,
+    notApplicable: row.notApplicable ?? false,
     remarks: row.remarks,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -47,6 +48,7 @@ export const listChecklist = createServerFn({ method: "GET" })
               collected: false,
               uploaded: false,
               live: false,
+              notApplicable: false,
               remarks: "",
               createdAt: now,
               updatedAt: now,
@@ -76,6 +78,7 @@ export const toggleChecklist = createServerFn({ method: "POST" })
       .where(eq(t.onboardingChecklistItems.id, data.id))
       .get();
     if (!row) throw new ApiError(404, "Checklist item not found");
+    if (row.notApplicable) throw new ApiError(400, "Item is marked not applicable");
     const phase = data.phase as ChecklistPhase;
     const next = !row[phase];
     db.update(t.onboardingChecklistItems)
@@ -89,6 +92,38 @@ export const toggleChecklist = createServerFn({ method: "POST" })
       projectId: row.projectId,
     });
     return mapChecklist({ ...row, [phase]: next, updatedAt: nowIso() });
+  });
+
+export const setChecklistNotApplicable = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ id: z.string(), notApplicable: z.boolean() }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    const db = getDb();
+    const row = db
+      .select()
+      .from(t.onboardingChecklistItems)
+      .where(eq(t.onboardingChecklistItems.id, data.id))
+      .get();
+    if (!row) throw new ApiError(404, "Checklist item not found");
+    const now = nowIso();
+    const patch = data.notApplicable
+      ? { notApplicable: true, collected: false, uploaded: false, live: false, updatedAt: now }
+      : { notApplicable: false, updatedAt: now };
+    db.update(t.onboardingChecklistItems)
+      .set(patch)
+      .where(eq(t.onboardingChecklistItems.id, data.id))
+      .run();
+    logActivity({
+      who: user.name,
+      what: data.notApplicable
+        ? `Marked "${row.label}" as not applicable`
+        : `Cleared N/A on "${row.label}"`,
+      kind: "info",
+      projectId: row.projectId,
+    });
+    return mapChecklist({ ...row, ...patch });
   });
 
 export const updateChecklistRemarks = createServerFn({ method: "POST" })
