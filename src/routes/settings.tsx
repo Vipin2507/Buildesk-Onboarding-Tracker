@@ -6,6 +6,8 @@ import {
   Download,
   FileSpreadsheet,
   FileText,
+  Monitor,
+  Palette,
   Pencil,
   Plus,
   Shield,
@@ -17,10 +19,14 @@ import { toast } from "sonner";
 
 import { ConfirmDeleteDialog, EntityFormModal } from "@/components/entity-form-modal";
 import { PageHeader, PageWrap } from "@/components/page-header";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { useTheme } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useAuthStore, useSettingsStore, useUserStore } from "@/stores";
 import { createUser as apiCreateUser, updateUser as apiUpdateUser } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import type { ThemeMode } from "@/lib/theme";
 import {
   PERMISSION_LABELS,
   type DocumentSettings,
@@ -32,13 +38,13 @@ import {
   type User,
   type UserRole,
 } from "@/types";
-import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/settings")({
   component: Settings,
 });
 
 type SectionId =
+  | "appearance"
   | "company"
   | "notifications"
   | "documents"
@@ -53,6 +59,7 @@ const SECTIONS: {
   desc: string;
   icon: typeof Building2;
 }[] = [
+  { id: "appearance", title: "Appearance", desc: "Light and dark theme for the whole app.", icon: Palette },
   { id: "company", title: "Company Settings", desc: "Legal name, GST, branding, timezone.", icon: Building2 },
   { id: "notifications", title: "Email & Notifications", desc: "SMTP, digest cadence, event alerts.", icon: Bell },
   { id: "documents", title: "Document Settings", desc: "Default formats & signatories.", icon: FileText },
@@ -95,6 +102,7 @@ function Settings() {
           <Button variant="ghost" size="sm" className="mb-4" onClick={() => setSection(null)}>
             ← Back to Settings
           </Button>
+          {section === "appearance" && <AppearanceSection />}
           {section === "company" && <CompanySection />}
           {section === "notifications" && <NotificationsSection />}
           {section === "documents" && <DocumentsSection />}
@@ -105,6 +113,68 @@ function Settings() {
         </div>
       )}
     </PageWrap>
+  );
+}
+
+function AppearanceSection() {
+  const { mode, resolved, setMode } = useTheme();
+
+  const options: { id: ThemeMode; label: string; desc: string; icon: typeof Monitor }[] = [
+    { id: "light", label: "Light", desc: "Bright surfaces, high clarity for daytime work.", icon: Palette },
+    { id: "dark", label: "Dark", desc: "Low-glare navy surfaces for long sessions.", icon: Palette },
+    { id: "system", label: "System", desc: "Follow your OS preference automatically.", icon: Monitor },
+  ];
+
+  return (
+    <div className="space-y-5">
+      <SectionTitle
+        title="Appearance"
+        subtitle="Theme applies across every screen, control, and chart — contrast is tuned for both modes."
+      />
+
+      <div className="card-soft flex flex-wrap items-center justify-between gap-4 p-5">
+        <div>
+          <div className="text-sm font-semibold">Quick switch</div>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Currently {resolved} · preference: {mode}
+          </p>
+        </div>
+        <ThemeToggle />
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        {options.map((opt) => {
+          const active = mode === opt.id;
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                setMode(opt.id, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+              }}
+              className={cn(
+                "card-soft p-4 text-left transition-all",
+                active
+                  ? "ring-2 ring-primary/50 shadow-[var(--shadow-elevated)]"
+                  : "hover:border-primary/30",
+              )}
+            >
+              <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <opt.icon className="h-4 w-4" />
+              </div>
+              <div className="font-semibold">{opt.label}</div>
+              <p className="mt-1 text-xs text-muted-foreground">{opt.desc}</p>
+              {active && (
+                <span className="mt-3 inline-flex text-[10px] font-semibold uppercase tracking-wide text-primary">
+                  Active
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -938,7 +1008,9 @@ function UsersSection() {
                   <span
                     className={cn(
                       "inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
-                      u.active ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600",
+                      u.active
+                        ? "bg-success/15 text-success border border-success/30"
+                        : "bg-muted text-muted-foreground border border-border",
                     )}
                   >
                     {u.active ? "Active" : "Inactive"}

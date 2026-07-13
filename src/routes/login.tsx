@@ -7,6 +7,7 @@ import { Building2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { ThemeToggleCompact } from "@/components/theme-toggle";
 import { authLogin, authRegister } from "@/lib/api";
 import { useAuthStore } from "@/stores";
 import { cn } from "@/lib/utils";
@@ -108,10 +109,13 @@ function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-muted/40 px-4 py-6 sm:py-10">
+    <div className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-muted/40 px-4 py-6 sm:py-10">
+      <div className="absolute right-4 top-4 sm:right-6 sm:top-6">
+        <ThemeToggleCompact />
+      </div>
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-[0_8px_24px_rgb(0_155_255_/_0.25)]">
             <Building2 className="h-6 w-6" />
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">Buildesk</h1>

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { EditProfileDialog } from "@/components/edit-profile-dialog";
 import { MobileNavSheet } from "@/components/mobile-nav-sheet";
+import { ThemeToggle, ThemeToggleCompact } from "@/components/theme-toggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -117,9 +118,12 @@ export function TopBar() {
         </div>
 
         <div className="flex shrink-0 items-center gap-2 md:gap-3">
+          <ThemeToggle className="hidden sm:inline-flex" />
+          <ThemeToggleCompact className="sm:hidden" />
+
           <button
             type="button"
-            className="relative flex h-10 w-10 items-center justify-center rounded-lg border bg-card text-muted-foreground hover:text-foreground"
+            className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-border/80 bg-card text-muted-foreground transition-colors hover:text-foreground"
             title="Notifications"
           >
             <Bell className="h-4 w-4" />

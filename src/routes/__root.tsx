@@ -6,6 +6,7 @@ import {
   useRouter,
   HeadContent,
   Scripts,
+  useRouterState,
 } from "@tanstack/react-router";
 import { type ReactNode } from "react";
 
@@ -16,8 +17,9 @@ import { Toaster } from "@/components/ui/sonner";
 import { StoreHydrationGate } from "@/components/store-hydration-gate";
 import { AuthGate } from "@/components/auth-gate";
 import { ServerDataBootstrap } from "@/components/server-data-bootstrap";
-import { useRouterState } from "@tanstack/react-router";
+import { ThemeProvider, useTheme } from "@/components/theme-provider";
 import { RouterDebug } from "@/components/router-debug";
+import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 
 function NotFoundComponent() {
   return (
@@ -66,7 +68,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           </button>
           <a
             href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-primary"
+            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
           >
             Go home
           </a>
@@ -82,18 +84,30 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Buildesk Onboarding Tracker" },
-      { name: "description", content: "Internal onboarding & post-sales tracker for the Buildesk Real Estate CRM & ERP platform." },
+      {
+        name: "description",
+        content:
+          "Internal onboarding & post-sales tracker for the Buildesk Real Estate CRM & ERP platform.",
+      },
       { property: "og:title", content: "Buildesk Onboarding Tracker" },
-      { property: "og:description", content: "Track every client company from sign-up through Go-Live and beyond." },
+      {
+        property: "og:description",
+        content: "Track every client company from sign-up through Go-Live and beyond.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "color-scheme", content: "light dark" },
+      { name: "theme-color", content: "#009bff" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
+      },
     ],
   }),
   shellComponent: RootShell,
@@ -104,11 +118,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         <HeadContent />
       </head>
-      <body>
+      <body className="bg-background text-foreground antialiased">
         {children}
         <Scripts />
       </body>
@@ -123,27 +138,34 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <StoreHydrationGate>
-        <AuthGate>
-          {isAuthPage ? (
-            <Outlet />
-          ) : (
-            <ServerDataBootstrap>
-              <div className="flex min-h-screen w-full bg-background text-foreground">
-                <AppSidebar />
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <TopBar />
-                  <main className="min-w-0 flex-1 pb-[env(safe-area-inset-bottom)]">
-                    <Outlet />
-                  </main>
+      <ThemeProvider>
+        <StoreHydrationGate>
+          <AuthGate>
+            {isAuthPage ? (
+              <Outlet />
+            ) : (
+              <ServerDataBootstrap>
+                <div className="flex min-h-screen w-full bg-background text-foreground">
+                  <AppSidebar />
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <TopBar />
+                    <main className="min-w-0 flex-1 pb-[env(safe-area-inset-bottom)]">
+                      <Outlet />
+                    </main>
+                  </div>
                 </div>
-              </div>
-            </ServerDataBootstrap>
-          )}
-          <RouterDebug />
-          <Toaster position="top-right" richColors />
-        </AuthGate>
-      </StoreHydrationGate>
+              </ServerDataBootstrap>
+            )}
+            <RouterDebug />
+            <ThemedToaster />
+          </AuthGate>
+        </StoreHydrationGate>
+      </ThemeProvider>
     </QueryClientProvider>
   );
+}
+
+function ThemedToaster() {
+  const { resolved } = useTheme();
+  return <Toaster position="top-right" richColors theme={resolved} />;
 }

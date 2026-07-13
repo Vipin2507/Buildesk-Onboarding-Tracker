@@ -3,7 +3,7 @@ import { STATUS_LABEL, type StatusKey } from "@/types/common";
 
 const styles: Record<StatusKey, string> = {
   not_started: "bg-muted text-muted-foreground border-border",
-  in_progress: "bg-warning/15 text-warning-foreground border-warning/30",
+  in_progress: "bg-warning/15 text-warning border-warning/30 dark:text-warning-foreground",
   review: "bg-primary/15 text-primary border-primary/30",
   completed: "bg-success/15 text-success border-success/30",
   on_hold: "bg-destructive/15 text-destructive border-destructive/30",
@@ -45,7 +45,7 @@ export function Pill({
     muted: "bg-muted text-muted-foreground border-border",
     accent: "bg-primary/15 text-primary border-primary/30",
     success: "bg-success/15 text-success border-success/30",
-    warning: "bg-warning/15 text-warning-foreground border-warning/30",
+    warning: "bg-warning/15 text-warning border-warning/30 dark:text-warning-foreground",
     danger: "bg-destructive/15 text-destructive border-destructive/30",
     info: "bg-primary/15 text-primary border-primary/30",
   };
