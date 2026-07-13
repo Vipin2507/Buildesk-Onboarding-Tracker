@@ -1,7 +1,7 @@
 import type { AttendanceRecord, Labor } from "@/types";
 import { newId, nowIso } from "@/types";
 import { logActivity } from "./useActivityStore";
-import { createPersistedStore, touch } from "./persist";
+import { createStore, touch } from "./persist";
 import { mutateLabor } from "@/lib/api";
 import { serverSync } from "@/lib/sync";
 
@@ -17,7 +17,7 @@ type LaborState = {
   deleteAttendance: (id: string) => void;
 };
 
-export const useLaborStore = createPersistedStore<LaborState>("labor-v2", (set, get) => ({
+export const useLaborStore = createStore<LaborState>((set, get) => ({
   labor: [],
   attendance: [],
 

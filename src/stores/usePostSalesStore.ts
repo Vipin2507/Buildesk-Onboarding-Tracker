@@ -4,7 +4,7 @@ import { buildDefaultPostSalesSteps, buildPostSalesStepsFromDefs } from "@/data/
 import { logActivity } from "./useActivityStore";
 import { recordAttachment } from "./useNotesAttachmentsStore";
 import { getEnabledWorkflowStepDefs } from "./useMasterStore";
-import { createPersistedStore, touch } from "./persist";
+import { createStore, touch } from "./persist";
 import {
   createPostSalesProject as apiCreate,
   deletePostSalesProject as apiDelete,
@@ -48,7 +48,7 @@ function mapStep(
 }
 
 // Bump the store key to avoid stale persisted shapes after step model refactors.
-export const usePostSalesStore = createPersistedStore<PostSalesState>("post-sales-v4", (set, get) => ({
+export const usePostSalesStore = createStore<PostSalesState>((set, get) => ({
   projects: [],
 
   addProject: ({ companyId, projectNumber, projectName }) => {

@@ -2,7 +2,7 @@ import type { Employee } from "@/types";
 import { newId, nowIso } from "@/types";
 import { useCompanyStore } from "./useCompanyStore";
 import { logActivity } from "./useActivityStore";
-import { createPersistedStore, touch } from "./persist";
+import { createStore, touch } from "./persist";
 import {
   createEmployee as apiCreateEmployee,
   updateEmployee as apiUpdateEmployee,
@@ -21,7 +21,7 @@ type EmployeeState = {
 };
 
 /** Server SQLite is authoritative — never re-seed from code after deletes. */
-export const useEmployeeStore = createPersistedStore<EmployeeState>("employees-v2", (set, get) => ({
+export const useEmployeeStore = createStore<EmployeeState>((set, get) => ({
   employees: [],
 
   addEmployee: (data) => {

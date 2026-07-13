@@ -1,7 +1,7 @@
 import type { User } from "@/types";
 import { newId, nowIso } from "@/types";
 import { logActivity } from "./useActivityStore";
-import { createPersistedStore, touch } from "./persist";
+import { createStore, touch } from "./persist";
 import {
   createUser as apiCreateUser,
   updateUser as apiUpdateUser,
@@ -17,7 +17,7 @@ type UserState = {
 };
 
 /** Server SQLite is authoritative — never re-seed from code after deletes. */
-export const useUserStore = createPersistedStore<UserState>("users-v2", (set, get) => ({
+export const useUserStore = createStore<UserState>((set, get) => ({
   users: [],
 
   addUser: (data) => {

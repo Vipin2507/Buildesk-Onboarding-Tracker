@@ -1,6 +1,6 @@
 import type { ActivityEntry, ActivityKind } from "@/types";
 import { newId, nowIso } from "@/types";
-import { createPersistedStore } from "./persist";
+import { createStore } from "./persist";
 
 type ActivityState = {
   activities: ActivityEntry[];
@@ -17,7 +17,7 @@ type ActivityState = {
 };
 
 /** Server SQLite is authoritative — never re-seed from code after deletes. */
-export const useActivityStore = createPersistedStore<ActivityState>("activity-v3", (set, get) => ({
+export const useActivityStore = createStore<ActivityState>((set, get) => ({
   activities: [],
 
   addActivity: (entry) => {

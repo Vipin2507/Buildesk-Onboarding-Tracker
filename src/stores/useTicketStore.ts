@@ -1,7 +1,7 @@
 import type { Ticket, TicketStatus } from "@/types";
 import { nowIso } from "@/types";
 import { logActivity } from "./useActivityStore";
-import { createPersistedStore, touch } from "./persist";
+import { createStore, touch } from "./persist";
 import {
   createTicket as apiCreate,
   updateTicket as apiUpdate,
@@ -18,7 +18,7 @@ type TicketState = {
   getById: (id: string) => Ticket | undefined;
 };
 
-export const useTicketStore = createPersistedStore<TicketState>("tickets-v3", (set, get) => ({
+export const useTicketStore = createStore<TicketState>((set, get) => ({
   tickets: [],
 
   addTicket: (data) => {

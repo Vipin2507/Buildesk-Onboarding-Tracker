@@ -1,7 +1,7 @@
 import type { TrainingSession } from "@/types";
 import { newId, nowIso } from "@/types";
 import { logActivity } from "./useActivityStore";
-import { createPersistedStore, touch } from "./persist";
+import { createStore, touch } from "./persist";
 import {
   createTraining as apiCreate,
   updateTraining as apiUpdate,
@@ -16,7 +16,7 @@ type TrainingState = {
   deleteSession: (id: string) => TrainingSession | undefined;
 };
 
-export const useTrainingStore = createPersistedStore<TrainingState>("training-v3", (set, get) => ({
+export const useTrainingStore = createStore<TrainingState>((set, get) => ({
   sessions: [],
 
   addSession: (data) => {

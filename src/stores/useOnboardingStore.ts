@@ -13,7 +13,7 @@ import { buildChecklistForProject } from "@/data/seed";
 import { CHECKLIST_TEMPLATE } from "@/data/constants";
 import { logActivity } from "./useActivityStore";
 import { recordAttachment } from "./useNotesAttachmentsStore";
-import { createPersistedStore, touch } from "./persist";
+import { createStore, touch } from "./persist";
 import { useProjectStore } from "./useProjectStore";
 import { ATTACHMENT_CATEGORY_LABEL } from "@/types";
 import {
@@ -63,7 +63,7 @@ function calcProgress(items: OnboardingChecklistItem[]) {
   return calcChecklistProgress(items);
 }
 
-export const useOnboardingStore = createPersistedStore<OnboardingState>("onboarding-v3", (set, get) => ({
+export const useOnboardingStore = createStore<OnboardingState>((set, get) => ({
   checklistItems: [],
   otherCharges: [],
   uploads: [],

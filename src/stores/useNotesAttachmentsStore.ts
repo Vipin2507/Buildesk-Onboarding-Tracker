@@ -1,6 +1,6 @@
 import type { AttachmentCategory, CompanyAttachment, CompanyNote } from "@/types";
 import { newId, nowIso } from "@/types";
-import { createPersistedStore, touch } from "./persist";
+import { createStore, touch } from "./persist";
 import { logActivity } from "./useActivityStore";
 import {
   addNote as apiAddNote,
@@ -41,9 +41,7 @@ type NotesAttachmentsState = {
   getAttachmentsByCompany: (companyId: string) => CompanyAttachment[];
 };
 
-export const useNotesAttachmentsStore = createPersistedStore<NotesAttachmentsState>(
-  "notes-attachments-v3",
-  (set, get) => ({
+export const useNotesAttachmentsStore = createStore<NotesAttachmentsState>((set, get) => ({
     notes: [],
     attachments: [],
 

@@ -4,7 +4,7 @@ import { buildChecklistForProject } from "@/data/seed";
 import { useOnboardingStore } from "./useOnboardingStore";
 import { useProjectProgressStore } from "./useProjectProgressStore";
 import { logActivity } from "./useActivityStore";
-import { createPersistedStore, touch } from "./persist";
+import { createStore, touch } from "./persist";
 import {
   createProject as apiCreateProject,
   updateProject as apiUpdateProject,
@@ -23,7 +23,7 @@ type ProjectState = {
   goLive: (id: string) => boolean;
 };
 
-export const useProjectStore = createPersistedStore<ProjectState>("projects-v3", (set, get) => ({
+export const useProjectStore = createStore<ProjectState>((set, get) => ({
   projects: [],
 
   addProject: (data) => {

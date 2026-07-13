@@ -9,7 +9,7 @@ import type {
 } from "@/types";
 import { newId, nowIso } from "@/types";
 import { logActivity } from "./useActivityStore";
-import { createPersistedStore, touch } from "./persist";
+import { createStore, touch } from "./persist";
 import { mutateVendorEntity } from "@/lib/api";
 import { serverSync } from "@/lib/sync";
 
@@ -86,7 +86,7 @@ function syncFlow(flowId: string) {
   });
 }
 
-export const useVendorStore = createPersistedStore<VendorState>("vendors-v2", (set, get) => ({
+export const useVendorStore = createStore<VendorState>((set, get) => ({
   materials: [],
   suppliers: [],
   contractors: [],

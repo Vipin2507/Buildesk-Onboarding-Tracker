@@ -1,7 +1,7 @@
 import type { Integration, Trigger } from "@/types";
 import { newId, nowIso } from "@/types";
 import { logActivity } from "./useActivityStore";
-import { createPersistedStore, touch } from "./persist";
+import { createStore, touch } from "./persist";
 import { mutateIntegration } from "@/lib/api";
 import { serverSync } from "@/lib/sync";
 
@@ -16,7 +16,7 @@ type IntegrationState = {
   toggleTrigger: (id: string) => void;
 };
 
-export const useIntegrationStore = createPersistedStore<IntegrationState>("integrations-v2", (set, get) => ({
+export const useIntegrationStore = createStore<IntegrationState>((set, get) => ({
   integrations: [],
   triggers: [],
 

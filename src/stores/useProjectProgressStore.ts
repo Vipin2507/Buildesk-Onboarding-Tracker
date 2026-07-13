@@ -1,7 +1,7 @@
 import type { ProjectManualProgress, ProjectProgressMilestoneKey } from "@/types";
 import { nowIso } from "@/types";
 import { PROJECT_PROGRESS_MILESTONES } from "@/types/project";
-import { createPersistedStore, touch } from "./persist";
+import { createStore, touch } from "./persist";
 import { logActivity } from "./useActivityStore";
 import { upsertProjectProgress } from "@/lib/api";
 import { serverSync } from "@/lib/sync";
@@ -57,9 +57,7 @@ function syncProgress(projectId: string, extra?: { markAll?: boolean }) {
   });
 }
 
-export const useProjectProgressStore = createPersistedStore<ProjectProgressState>(
-  "project-manual-progress-v3",
-  (set, get) => ({
+export const useProjectProgressStore = createStore<ProjectProgressState>((set, get) => ({
     byProjectId: {},
 
     ensure: (projectId) => {

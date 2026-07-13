@@ -1,7 +1,7 @@
 import type { Company, ModuleKey } from "@/types";
 import { newId, nowIso } from "@/types";
 import { logActivity } from "./useActivityStore";
-import { createPersistedStore, touch } from "./persist";
+import { createStore, touch } from "./persist";
 import { getModuleLabel, normalizeCompanyModules } from "@/data/module-catalog";
 import {
   createCompany as apiCreateCompany,
@@ -22,7 +22,7 @@ type CompanyState = {
   enableModule: (companyId: string, moduleKey: ModuleKey) => void;
 };
 
-export const useCompanyStore = createPersistedStore<CompanyState>("companies-v5", (set, get) => ({
+export const useCompanyStore = createStore<CompanyState>((set, get) => ({
   companies: [],
 
   addCompany: (data) => {

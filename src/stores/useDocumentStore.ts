@@ -2,7 +2,7 @@ import type { DocumentTemplate, DocumentStatus } from "@/types";
 import { newId, nowIso } from "@/types";
 import { logActivity } from "./useActivityStore";
 import { recordAttachment } from "./useNotesAttachmentsStore";
-import { createPersistedStore, touch } from "./persist";
+import { createStore, touch } from "./persist";
 import { useProjectStore } from "./useProjectStore";
 import { mutateDocument } from "@/lib/api";
 import { serverSync } from "@/lib/sync";
@@ -18,7 +18,7 @@ type DocumentState = {
   uploadTemplate: (id: string, fileName: string) => void;
 };
 
-export const useDocumentStore = createPersistedStore<DocumentState>("documents-v2", (set, get) => ({
+export const useDocumentStore = createStore<DocumentState>((set, get) => ({
   templates: [],
 
   addTemplate: (data) => {
