@@ -8,7 +8,7 @@ export function StoreHydrationGate({ children }: { children: ReactNode }) {
     let mounted = true;
     rehydrateAllStores()
       .catch((error) => {
-        console.warn("[buildesk] Store rehydration failed, using seed data", error);
+        console.warn("[buildesk] Store rehydration failed", error);
       })
       .finally(() => {
         if (mounted) setReady(true);

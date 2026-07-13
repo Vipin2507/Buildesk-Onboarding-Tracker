@@ -255,6 +255,7 @@ export const seedCompanies: Company[] = COMPANY_ROSTER.map((row, i) => {
     status: progressHint >= 100 ? "completed" : statuses[i % statuses.length],
     modules: createCompanyModules(optedKeys, `2024-${String(1 + (i % 12)).padStart(2, "0")}-01`),
     agreementDate: `2024-${String(1 + (i % 12)).padStart(2, "0")}-${String(5 + (i % 20)).padStart(2, "0")}`,
+    startDate: `2024-${String(1 + (i % 12)).padStart(2, "0")}-${String(5 + (i % 20)).padStart(2, "0")}`,
     goLiveTarget: `2025-${String(1 + ((i + 3) % 12)).padStart(2, "0")}-15`,
     planExpiry: `2026-${String(1 + (i % 12)).padStart(2, "0")}-20`,
     plan: plans[i % 3],
@@ -314,6 +315,7 @@ export const seedProjects: Project[] = COMPANY_ROSTER.flatMap((row, ci) => {
     rera: `P5${(1000 + ci * 10 + pi).toString()}0002024`,
     status: company.status,
     currentStep: (ci + pi) % 8,
+    startDate: `2024-${String(1 + ((ci + pi) % 12)).padStart(2, "0")}-${String(8 + ((ci + pi) % 18)).padStart(2, "0")}`,
     createdAt: ts,
     updatedAt: ts,
   }));

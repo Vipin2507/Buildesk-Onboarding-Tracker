@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, CheckCheck, Eraser } from "lucide-react";
+import { Ban, Check, CheckCheck, Eraser } from "lucide-react";
 import { toast } from "sonner";
 
 import { ProgressBar } from "@/components/progress-bar";
@@ -28,6 +28,7 @@ export function ProjectManualProgress({ projectId }: { projectId: string }) {
   const ensure = useProjectProgressStore((s) => s.ensure);
   const progress = useProjectProgressStore((s) => s.byProjectId[projectId]);
   const toggleCheck = useProjectProgressStore((s) => s.toggleCheck);
+  const toggleNotApplicable = useProjectProgressStore((s) => s.toggleNotApplicable);
   const updateMeta = useProjectProgressStore((s) => s.updateMeta);
   const markAll = useProjectProgressStore((s) => s.markAll);
   const calcPercent = useProjectProgressStore((s) => s.calcPercent);
@@ -49,16 +50,31 @@ export function ProjectManualProgress({ projectId }: { projectId: string }) {
   }, [progress, company?.contact, company?.phone]);
 
   const percent = calcPercent(projectId);
+  const naMap = progress?.notApplicable ?? {};
   const doneCount = useMemo(
-    () => PROJECT_PROGRESS_MILESTONES.filter((m) => progress?.checks[m.key]).length,
+    () =>
+      PROJECT_PROGRESS_MILESTONES.filter(
+        (m) => progress?.checks[m.key] || progress?.notApplicable?.[m.key],
+      ).length,
     [progress],
   );
+  const applicableTotal = useMemo(
+    () => PROJECT_PROGRESS_MILESTONES.filter((m) => !naMap[m.key]).length,
+    [naMap],
+  );
   const total = PROJECT_PROGRESS_MILESTONES.length;
+  const naCount = total - applicableTotal;
 
   function onToggle(key: ProjectProgressMilestoneKey) {
+    if (progress?.notApplicable?.[key]) return;
     toggleCheck(projectId, key);
     setPulseKey(key);
     window.setTimeout(() => setPulseKey((k) => (k === key ? null : k)), 450);
+  }
+
+  function onToggleNa(e: React.MouseEvent, key: ProjectProgressMilestoneKey) {
+    e.stopPropagation();
+    toggleNotApplicable(projectId, key);
   }
 
   function saveMeta() {
@@ -79,7 +95,7 @@ export function ProjectManualProgress({ projectId }: { projectId: string }) {
           <div>
             <h3 className="text-lg font-semibold">Manual Progress Tracker</h3>
             <p className="text-sm text-muted-foreground">
-              Check off milestones as work completes. Progress updates instantly.
+              Check off milestones as work completes, or mark N/A when not relevant.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -109,6 +125,7 @@ export function ProjectManualProgress({ projectId }: { projectId: string }) {
         <div className="mb-2 flex items-center justify-between text-sm">
           <span className="text-muted-foreground">
             {doneCount} of {total} milestones
+            {naCount > 0 ? ` · ${naCount} N/A` : ""}
           </span>
           <motion.span
             key={percent}
@@ -152,7 +169,9 @@ export function ProjectManualProgress({ projectId }: { projectId: string }) {
       <div className="space-y-4">
         {GROUPS.map((group) => {
           const items = PROJECT_PROGRESS_MILESTONES.filter((m) => m.group === group);
-          const groupDone = items.filter((m) => progress?.checks[m.key]).length;
+          const groupDone = items.filter(
+            (m) => progress?.checks[m.key] || progress?.notApplicable?.[m.key],
+          ).length;
           const groupPct = items.length ? Math.round((groupDone / items.length) * 100) : 0;
 
           return (
@@ -171,54 +190,106 @@ export function ProjectManualProgress({ projectId }: { projectId: string }) {
 
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 {items.map((item) => {
-                  const checked = Boolean(progress?.checks[item.key]);
+                  const na = Boolean(progress?.notApplicable?.[item.key]);
+                  const checked = Boolean(progress?.checks[item.key]) && !na;
                   const pulsing = pulseKey === item.key;
                   return (
-                    <motion.button
+                    <div
                       key={item.key}
-                      type="button"
-                      layout
-                      onClick={() => onToggle(item.key)}
-                      whileTap={{ scale: 0.98 }}
-                      animate={
-                        pulsing
-                          ? { scale: [1, 1.03, 1], boxShadow: ["0 0 0 0 rgba(0,155,255,0)", "0 0 0 6px rgba(0,155,255,0.18)", "0 0 0 0 rgba(0,155,255,0)"] }
-                          : { scale: 1 }
-                      }
-                      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
                       className={cn(
-                        "flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors",
-                        checked
-                          ? "border-success/40 bg-success/10"
-                          : "border-border bg-card hover:border-primary/40 hover:bg-muted/40",
+                        "flex items-center gap-2 rounded-lg border px-2 py-2 transition-colors",
+                        na
+                          ? "border-border bg-muted/30"
+                          : checked
+                            ? "border-success/40 bg-success/10"
+                            : "border-border bg-card",
                       )}
                     >
-                      <span
+                      <motion.button
+                        type="button"
+                        layout
+                        disabled={na}
+                        onClick={() => onToggle(item.key)}
+                        whileTap={na ? undefined : { scale: 0.98 }}
+                        animate={
+                          pulsing
+                            ? {
+                                scale: [1, 1.03, 1],
+                                boxShadow: [
+                                  "0 0 0 0 rgba(0,155,255,0)",
+                                  "0 0 0 6px rgba(0,155,255,0.18)",
+                                  "0 0 0 0 rgba(0,155,255,0)",
+                                ],
+                              }
+                            : { scale: 1 }
+                        }
+                        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
                         className={cn(
-                          "flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors",
-                          checked
-                            ? "border-success bg-success text-white"
-                            : "border-input bg-background text-transparent",
+                          "flex min-w-0 flex-1 items-center gap-3 rounded-md px-1.5 py-1 text-left",
+                          na && "cursor-default opacity-70",
+                          !na && "hover:bg-muted/40",
                         )}
                       >
-                        <AnimatePresence mode="wait" initial={false}>
-                          {checked && (
-                            <motion.span
-                              key="check"
-                              initial={{ scale: 0.4, opacity: 0 }}
-                              animate={{ scale: 1, opacity: 1 }}
-                              exit={{ scale: 0.4, opacity: 0 }}
-                              transition={{ type: "spring", stiffness: 420, damping: 22 }}
-                            >
-                              <Check className="h-4 w-4" />
-                            </motion.span>
+                        <span
+                          className={cn(
+                            "flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors",
+                            na
+                              ? "border-muted-foreground/30 bg-muted text-muted-foreground"
+                              : checked
+                                ? "border-success bg-success text-white"
+                                : "border-input bg-background text-transparent",
                           )}
-                        </AnimatePresence>
-                      </span>
-                      <span className={cn("text-sm font-medium", checked && "text-foreground")}>
-                        {item.label}
-                      </span>
-                    </motion.button>
+                        >
+                          <AnimatePresence mode="wait" initial={false}>
+                            {na ? (
+                              <motion.span
+                                key="na"
+                                initial={{ scale: 0.4, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0.4, opacity: 0 }}
+                              >
+                                <Ban className="h-3.5 w-3.5" />
+                              </motion.span>
+                            ) : (
+                              checked && (
+                                <motion.span
+                                  key="check"
+                                  initial={{ scale: 0.4, opacity: 0 }}
+                                  animate={{ scale: 1, opacity: 1 }}
+                                  exit={{ scale: 0.4, opacity: 0 }}
+                                  transition={{ type: "spring", stiffness: 420, damping: 22 }}
+                                >
+                                  <Check className="h-4 w-4" />
+                                </motion.span>
+                              )
+                            )}
+                          </AnimatePresence>
+                        </span>
+                        <span
+                          className={cn(
+                            "text-sm font-medium",
+                            na && "text-muted-foreground line-through",
+                            checked && "text-foreground",
+                          )}
+                        >
+                          {item.label}
+                        </span>
+                      </motion.button>
+                      <button
+                        type="button"
+                        title={na ? "Mark as applicable" : "Not applicable for this project"}
+                        onClick={(e) => onToggleNa(e, item.key)}
+                        className={cn(
+                          "inline-flex h-8 shrink-0 items-center gap-1 rounded-md border px-2 text-[10px] font-semibold uppercase tracking-wide",
+                          na
+                            ? "border-muted-foreground/40 bg-muted text-muted-foreground"
+                            : "border-input text-muted-foreground hover:border-foreground/40 hover:bg-muted/50",
+                        )}
+                      >
+                        <Ban className="h-3 w-3" />
+                        N/A
+                      </button>
+                    </div>
                   );
                 })}
               </div>

@@ -40,6 +40,7 @@ const detailSchema = z.object({
   plan: z.enum(["Starter", "Growth", "Enterprise"]),
   health: z.enum(["Healthy", "Moderate", "Critical"]),
   status: z.enum(["not_started", "in_progress", "review", "completed", "on_hold"]),
+  startDate: z.string().min(1),
   agreementDate: z.string().min(1),
   goLiveTarget: z.string().min(1),
   planExpiry: z.string().min(1),
@@ -240,6 +241,10 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
               <input {...form.register("billingInfo")} className={inputClass()} />
             </label>
             <label className="block text-xs font-medium">
+              Start Date
+              <input type="date" {...form.register("startDate")} className={inputClass()} />
+            </label>
+            <label className="block text-xs font-medium">
               Agreement Date
               <input type="date" {...form.register("agreementDate")} className={inputClass()} />
             </label>
@@ -297,6 +302,7 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
               <Pill tone="accent">{company.plan}</Pill>
             </Field>
             <Field label="Billing Info">{company.billingInfo || `${company.plan} plan`}</Field>
+            <Field label="Start Date" icon={Calendar}>{company.startDate || company.agreementDate}</Field>
             <Field label="Agreement Date" icon={Calendar}>{company.agreementDate}</Field>
             <Field label="Go-Live Target" icon={Calendar}>{company.goLiveTarget}</Field>
             <Field label="Plan Expiry" icon={Calendar}>{company.planExpiry}</Field>
@@ -335,6 +341,7 @@ function toFormValues(company: Company): DetailForm {
     plan: company.plan,
     health: company.health,
     status: company.status,
+    startDate: company.startDate || company.agreementDate,
     agreementDate: company.agreementDate,
     goLiveTarget: company.goLiveTarget,
     planExpiry: company.planExpiry,

@@ -92,7 +92,9 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           listCompanies(),
           listProjects({ data: {} }),
           listEmployees(),
-          listUsers().catch(() => []),
+          listUsers()
+            .then((u) => ({ ok: true as const, users: u }))
+            .catch(() => ({ ok: false as const, users: [] as Awaited<ReturnType<typeof listUsers>> })),
           listTickets(),
           listTraining(),
           listActivity({ data: { limit: 100 } }),
@@ -116,7 +118,8 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
         useCompanyStore.setState({ companies });
         useProjectStore.setState({ projects });
         useEmployeeStore.setState({ employees });
-        if (users.length) useUserStore.setState({ users });
+        // Always apply server users (including empty) so deletes stay deleted — never fall back to seed.
+        if (users.ok) useUserStore.setState({ users: users.users });
         useTicketStore.setState({ tickets: tickets as never });
         useTrainingStore.setState({ sessions: training as never });
         useActivityStore.setState({ activities: activity });
@@ -131,7 +134,15 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           uploads: uploads as never,
         });
         useProjectProgressStore.setState({
-          byProjectId: Object.fromEntries(progressRows.map((p) => [p.projectId, p])),
+          byProjectId: Object.fromEntries(
+            progressRows.map((p) => [
+              p.projectId,
+              {
+                ...p,
+                notApplicable: p.notApplicable ?? {},
+              },
+            ]),
+          ),
         });
         useVendorStore.setState({
           materials: vendors.materials,

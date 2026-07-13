@@ -24,7 +24,7 @@ import { ONBOARDING_STEPS, ONBOARDING_SECTIONS } from "@/data/constants";
 import { formatRelativeTime } from "@/types/common";
 import { PROJECT_PROGRESS_MILESTONES } from "@/types/project";
 import { isChecklistItemComplete } from "@/lib/checklist";
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 
 const searchSchema = z.object({
   tab: z.enum([
@@ -52,12 +52,15 @@ function ProjectDetailPage() {
   const checklist = useMemo(() => allChecklist.filter((i) => i.projectId === projectId), [allChecklist, projectId]);
   const checklistProgress = useMemo(() => calcProjectProgress(projectId, allChecklist), [projectId, allChecklist]);
   const manualChecks = useProjectProgressStore((s) => s.byProjectId[projectId]?.checks);
+  const manualNa = useProjectProgressStore((s) => s.byProjectId[projectId]?.notApplicable);
   const manualPercent = useMemo(() => {
-    if (!manualChecks) return 0;
-    const total = PROJECT_PROGRESS_MILESTONES.length;
-    const done = PROJECT_PROGRESS_MILESTONES.filter((m) => manualChecks[m.key]).length;
-    return Math.round((done / total) * 100);
-  }, [manualChecks]);
+    if (!manualChecks && !manualNa) return 0;
+    const na = manualNa ?? {};
+    const applicable = PROJECT_PROGRESS_MILESTONES.filter((m) => !na[m.key]);
+    if (applicable.length === 0) return 100;
+    const done = applicable.filter((m) => manualChecks?.[m.key]).length;
+    return Math.round((done / applicable.length) * 100);
+  }, [manualChecks, manualNa]);
   const progress = tab === "progress" ? manualPercent : checklistProgress;
   const canGoLive = useMemo(
     () => {
@@ -147,7 +150,7 @@ function ProjectDetailPage() {
 
       <PageHeader
         title={project.name}
-        subtitle={`${company?.name ?? ""} · ${project.city}`}
+        subtitle={`${company?.name ?? ""} · ${project.city}${project.startDate ? ` · Started ${formatDate(project.startDate)}` : ""}`}
         actions={
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">{progress}% complete</span>

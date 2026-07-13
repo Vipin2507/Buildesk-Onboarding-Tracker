@@ -32,6 +32,8 @@ export type Project = Timestamps & {
   rera: string;
   status: StatusKey;
   currentStep: number;
+  /** When project onboarding / delivery started */
+  startDate?: string;
   goLiveAt?: string;
   /** Extended project information */
   address?: string;
@@ -92,5 +94,7 @@ export type ProjectManualProgress = Timestamps & {
   contactPerson?: string;
   contactNumber?: string;
   checks: Partial<Record<ProjectProgressMilestoneKey, boolean>>;
+  /** Milestones skipped for this project (count as complete). */
+  notApplicable: Partial<Record<ProjectProgressMilestoneKey, boolean>>;
   remarks: string;
 };

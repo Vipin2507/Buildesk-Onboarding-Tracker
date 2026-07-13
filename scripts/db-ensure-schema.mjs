@@ -60,6 +60,7 @@ const PROJECT_COLUMNS = [
   { name: "other_charges_json", ddl: "TEXT NOT NULL DEFAULT '[]'" },
   { name: "custom_charges_json", ddl: "TEXT NOT NULL DEFAULT '[]'" },
   { name: "logo_url", ddl: "TEXT" },
+  { name: "start_date", ddl: "TEXT" },
 ];
 
 const dbPath = resolveDbPath();
@@ -122,6 +123,16 @@ const EXTRA_COLUMNS = [
     name: "not_applicable",
     ddl: "INTEGER NOT NULL DEFAULT 0",
   },
+  {
+    table: "project_manual_progress",
+    name: "not_applicable_json",
+    ddl: "TEXT NOT NULL DEFAULT '{}'",
+  },
+  {
+    table: "companies",
+    name: "start_date",
+    ddl: "TEXT",
+  },
 ];
 
 for (const col of EXTRA_COLUMNS) {
@@ -137,6 +148,24 @@ for (const col of EXTRA_COLUMNS) {
   const sql = `ALTER TABLE ${col.table} ADD COLUMN ${col.name} ${col.ddl}`;
   console.log(`+ ${sql}`);
   sqlite.exec(sql);
+}
+
+// Backfill start dates for existing rows
+if (tableExists("companies")) {
+  const r = sqlite
+    .prepare(
+      `UPDATE companies SET start_date = agreement_date WHERE start_date IS NULL OR start_date = ''`,
+    )
+    .run();
+  if (r.changes > 0) console.log(`companies: backfilled start_date on ${r.changes} row(s)`);
+}
+if (tableExists("projects")) {
+  const r = sqlite
+    .prepare(
+      `UPDATE projects SET start_date = substr(created_at, 1, 10) WHERE (start_date IS NULL OR start_date = '') AND created_at IS NOT NULL`,
+    )
+    .run();
+  if (r.changes > 0) console.log(`projects: backfilled start_date on ${r.changes} row(s)`);
 }
 
 sqlite.close();

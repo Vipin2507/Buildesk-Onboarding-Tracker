@@ -21,7 +21,7 @@ import {
   useDashboardKpis,
 } from "@/stores";
 import type { Company, ModuleKey } from "@/types";
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 
 export const Route = createFileRoute("/companies")({
   component: CompaniesPage,
@@ -51,6 +51,7 @@ const companySchema = z.object({
     )
     .min(1),
   agreementDate: z.string(),
+  startDate: z.string().min(1, "Start date is required"),
   goLiveTarget: z.string(),
   planExpiry: z.string(),
 });
@@ -90,6 +91,7 @@ function CompaniesListPage() {
       plan: "Growth", health: "Healthy",
       modules: ["post-sales", "customer-app", "vendor-management"],
       agreementDate: new Date().toISOString().slice(0, 10),
+      startDate: new Date().toISOString().slice(0, 10),
       goLiveTarget: new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10),
       planExpiry: new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10),
     },
@@ -132,7 +134,10 @@ function CompaniesListPage() {
       plan: c.plan,
       health: c.health,
       modules: c.modules.filter((m) => m.optedIn).map((m) => m.moduleKey),
-      agreementDate: c.agreementDate, goLiveTarget: c.goLiveTarget, planExpiry: c.planExpiry,
+      agreementDate: c.agreementDate,
+      startDate: c.startDate || c.agreementDate,
+      goLiveTarget: c.goLiveTarget,
+      planExpiry: c.planExpiry,
     });
     setModalOpen(true);
   }
@@ -224,6 +229,9 @@ function CompaniesListPage() {
                 <div><div>{c.contact}</div><div className="text-xs text-muted-foreground">{c.designation}</div></div>
               )},
               { key: "onboardingManagerId", header: "Manager", render: (c) => employees.find((e) => e.id === c.onboardingManagerId)?.name ?? "—" },
+              { key: "startDate", header: "Start Date", sortable: true, render: (c) => (
+                <span className="text-muted-foreground">{formatDate(c.startDate || c.agreementDate)}</span>
+              )},
               { key: "modules", header: "Modules", render: (c) => (
                 <div className="flex flex-wrap gap-1">
                   {c.modules.filter((m) => m.optedIn).slice(0, 2).map((m) => (
@@ -274,6 +282,24 @@ function CompaniesListPage() {
             <select {...form.register("plan")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm">
               {["Starter", "Growth", "Enterprise"].map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium">Start Date</label>
+              <input type="date" {...form.register("startDate")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-medium">Agreement Date</label>
+              <input type="date" {...form.register("agreementDate")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-medium">Go-Live Target</label>
+              <input type="date" {...form.register("goLiveTarget")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-medium">Plan Expiry</label>
+              <input type="date" {...form.register("planExpiry")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" />
+            </div>
           </div>
           <div>
             <div className="text-xs font-medium">Modules Purchased</div>

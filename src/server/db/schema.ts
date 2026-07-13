@@ -61,6 +61,7 @@ export const companies = sqliteTable("companies", {
   csmId: text("csm_id").notNull(),
   status: text("status").notNull(),
   agreementDate: text("agreement_date").notNull(),
+  startDate: text("start_date"),
   goLiveTarget: text("go_live_target").notNull(),
   planExpiry: text("plan_expiry").notNull(),
   plan: text("plan").notNull(),
@@ -98,6 +99,7 @@ export const projects = sqliteTable(
     rera: text("rera").notNull().default(""),
     status: text("status").notNull(),
     currentStep: integer("current_step").notNull().default(0),
+    startDate: text("start_date"),
     goLiveAt: text("go_live_at"),
     address: text("address"),
     state: text("state"),
@@ -120,6 +122,7 @@ export const projectManualProgress = sqliteTable("project_manual_progress", {
   contactPerson: text("contact_person"),
   contactNumber: text("contact_number"),
   checksJson: text("checks_json").notNull().default("{}"),
+  notApplicableJson: text("not_applicable_json").notNull().default("{}"),
   remarks: text("remarks").notNull().default(""),
   ...timestamps,
 });

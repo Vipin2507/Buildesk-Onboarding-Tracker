@@ -36,7 +36,7 @@ import {
   useOnboardingStore,
 } from "@/stores";
 import { calcPostSalesProjectProgress } from "@/lib/post-sales-status";
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 
 export const Route = createFileRoute("/companies/$companyId")({
   component: CompanyDetailPage,
@@ -113,7 +113,7 @@ function CompanyDetailContent() {
 
       <PageHeader
         title={company.name}
-        subtitle={`${company.city} · ${company.plan} plan · ${company.contact}`}
+        subtitle={`${company.city} · ${company.plan} plan · Started ${formatDate(company.startDate || company.agreementDate)}`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill status={progress >= 100 ? "completed" : company.status} />
@@ -400,12 +400,16 @@ function CompanyDetailContent() {
               </p>
             </div>
             <div className="card-soft p-5">
+              <div className="text-xs text-muted-foreground">Start Date</div>
+              <div className="mt-2 text-lg font-semibold">{formatDate(company.startDate || company.agreementDate)}</div>
+            </div>
+            <div className="card-soft p-5">
               <div className="text-xs text-muted-foreground">Agreement Date</div>
-              <div className="mt-2 text-lg font-semibold">{company.agreementDate}</div>
+              <div className="mt-2 text-lg font-semibold">{formatDate(company.agreementDate)}</div>
             </div>
             <div className="card-soft p-5">
               <div className="text-xs text-muted-foreground">Plan Expiry</div>
-              <div className="mt-2 text-lg font-semibold">{company.planExpiry}</div>
+              <div className="mt-2 text-lg font-semibold">{formatDate(company.planExpiry)}</div>
               {company.renewedAt && (
                 <p className="mt-2 text-xs text-muted-foreground">
                   Last renewed {new Date(company.renewedAt).toLocaleDateString()}

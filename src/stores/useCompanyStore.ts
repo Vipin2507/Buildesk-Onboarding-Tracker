@@ -47,6 +47,7 @@ export const useCompanyStore = createPersistedStore<CompanyState>("companies-v5"
           csmId: company.csmId,
           status: company.status,
           agreementDate: company.agreementDate,
+          startDate: company.startDate,
           goLiveTarget: company.goLiveTarget,
           planExpiry: company.planExpiry,
           plan: company.plan,

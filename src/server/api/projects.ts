@@ -68,6 +68,7 @@ const projectInput = z.object({
   rera: z.string().optional().default(""),
   status: z.enum(["not_started", "in_progress", "review", "completed", "on_hold"]),
   currentStep: z.number().optional(),
+  startDate: z.string().optional().nullable(),
   address: z.string().optional().nullable(),
   state: z.string().optional().nullable(),
   pinCode: z.string().optional().nullable(),
@@ -93,6 +94,7 @@ function projectRowValues(
     rera: data.rera ?? "",
     status: data.status,
     currentStep: data.currentStep ?? 0,
+    startDate: data.startDate ?? null,
     address: data.address ?? null,
     state: data.state ?? null,
     pinCode: data.pinCode ?? null,
@@ -152,6 +154,7 @@ export const updateProject = createServerFn({ method: "POST" })
     if (p.rera !== undefined) set.rera = p.rera;
     if (p.status !== undefined) set.status = p.status;
     if (p.currentStep !== undefined) set.currentStep = p.currentStep;
+    if (p.startDate !== undefined) set.startDate = p.startDate;
     if (p.goLiveAt !== undefined) set.goLiveAt = p.goLiveAt;
     if (p.address !== undefined) set.address = p.address;
     if (p.state !== undefined) set.state = p.state;
@@ -239,6 +242,7 @@ export const getProjectProgress = createServerFn({ method: "GET" })
       return {
         projectId: data.projectId,
         checks: {},
+        notApplicable: {},
         remarks: "",
         createdAt: now,
         updatedAt: now,
@@ -249,6 +253,7 @@ export const getProjectProgress = createServerFn({ method: "GET" })
       contactPerson: row.contactPerson ?? undefined,
       contactNumber: row.contactNumber ?? undefined,
       checks: JSON.parse(row.checksJson || "{}"),
+      notApplicable: JSON.parse(row.notApplicableJson || "{}"),
       remarks: row.remarks,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
@@ -263,6 +268,7 @@ export const upsertProjectProgress = createServerFn({ method: "POST" })
         contactPerson: z.string().optional().nullable(),
         contactNumber: z.string().optional().nullable(),
         checks: z.record(z.boolean()).optional(),
+        notApplicable: z.record(z.boolean()).optional(),
         remarks: z.string().optional(),
         toggleKey: z.string().optional(),
         markAll: z.boolean().optional(),
@@ -283,6 +289,7 @@ export const upsertProjectProgress = createServerFn({ method: "POST" })
         .values({
           projectId: data.projectId,
           checksJson: "{}",
+          notApplicableJson: "{}",
           remarks: "",
           createdAt: now,
           updatedAt: now,
@@ -294,28 +301,34 @@ export const upsertProjectProgress = createServerFn({ method: "POST" })
         .where(eq(t.projectManualProgress.projectId, data.projectId))
         .get()!;
     }
+    const keys = [
+      "projectSetup", "existingDataUpload", "paymentUpload", "dueMatching", "demandFormat",
+      "receiptFormat", "agreementFormat", "allotmentLetterFormat", "welcomeLetterFormat",
+      "customerApplication", "whiteLabelOrBuildesk", "androidAppPublished", "iosAppPublished",
+      "credentialsShared", "appIntegrationRequired", "integrationConnected", "procurementManagement",
+      "materialDataUpdated", "supplierDataUpdated", "contractorDataUpdated", "poFormat", "woFormat",
+      "boqFormed", "clientSignOff",
+    ];
     let checks = JSON.parse(row.checksJson || "{}") as Record<string, boolean>;
+    let notApplicable = JSON.parse(row.notApplicableJson || "{}") as Record<string, boolean>;
     if (data.markAll !== undefined) {
-      const keys = [
-        "projectSetup", "existingDataUpload", "paymentUpload", "dueMatching", "demandFormat",
-        "receiptFormat", "agreementFormat", "allotmentLetterFormat", "welcomeLetterFormat",
-        "customerApplication", "whiteLabelOrBuildesk", "androidAppPublished", "iosAppPublished",
-        "credentialsShared", "appIntegrationRequired", "integrationConnected", "procurementManagement",
-        "materialDataUpdated", "supplierDataUpdated", "contractorDataUpdated", "poFormat", "woFormat",
-        "boqFormed", "clientSignOff",
-      ];
       checks = Object.fromEntries(keys.map((k) => [k, data.markAll!]));
+      notApplicable = Object.fromEntries(keys.map((k) => [k, false]));
     }
     if (data.toggleKey) {
-      checks[data.toggleKey] = !checks[data.toggleKey];
+      if (!notApplicable[data.toggleKey]) {
+        checks[data.toggleKey] = !checks[data.toggleKey];
+      }
     }
     if (data.checks) checks = { ...checks, ...data.checks };
+    if (data.notApplicable) notApplicable = { ...notApplicable, ...data.notApplicable };
     db.update(t.projectManualProgress)
       .set({
         contactPerson: data.contactPerson !== undefined ? data.contactPerson : row.contactPerson,
         contactNumber: data.contactNumber !== undefined ? data.contactNumber : row.contactNumber,
         remarks: data.remarks !== undefined ? data.remarks : row.remarks,
         checksJson: JSON.stringify(checks),
+        notApplicableJson: JSON.stringify(notApplicable),
         updatedAt: now,
       })
       .where(eq(t.projectManualProgress.projectId, data.projectId))
@@ -325,6 +338,7 @@ export const upsertProjectProgress = createServerFn({ method: "POST" })
       contactPerson: (data.contactPerson !== undefined ? data.contactPerson : row.contactPerson) ?? undefined,
       contactNumber: (data.contactNumber !== undefined ? data.contactNumber : row.contactNumber) ?? undefined,
       checks: checks as ProjectManualProgress["checks"],
+      notApplicable: notApplicable as ProjectManualProgress["notApplicable"],
       remarks: data.remarks !== undefined ? data.remarks : row.remarks,
       createdAt: row.createdAt,
       updatedAt: now,
@@ -343,6 +357,7 @@ export const listAllProgress = createServerFn({ method: "GET" }).handler(async (
         contactPerson: row.contactPerson ?? undefined,
         contactNumber: row.contactNumber ?? undefined,
         checks: JSON.parse(row.checksJson || "{}"),
+        notApplicable: JSON.parse(row.notApplicableJson || "{}"),
         remarks: row.remarks,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,

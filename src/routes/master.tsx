@@ -16,6 +16,7 @@ import {
   RotateCcw,
   Settings2,
   ShieldAlert,
+  Table2,
   Trash2,
   Workflow,
 } from "lucide-react";
@@ -27,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Pill } from "@/components/status-pill";
 import { ConfirmDeleteDialog, EntityFormModal } from "@/components/entity-form-modal";
+import { DataControlPanel } from "@/components/master-data-control";
 import {
   useCurrentUser,
   useMasterStore,
@@ -62,6 +64,7 @@ const SECTIONS = [
   { id: "templates", label: "Templates", icon: FileText },
   { id: "modules", label: "Modules", icon: Layers },
   { id: "integrations", label: "Integrations", icon: Plug },
+  { id: "data-control", label: "Data Control", icon: Table2 },
   { id: "danger", label: "Reset & Safety", icon: ShieldAlert },
 ] as const;
 
@@ -136,6 +139,7 @@ function MasterPage() {
           {section === "templates" && <TemplatesPanel />}
           {section === "modules" && <ModulesPanel />}
           {section === "integrations" && <IntegrationsPanel />}
+          {section === "data-control" && <DataControlPanel />}
           {section === "danger" && <DangerPanel />}
         </div>
       </div>
@@ -166,6 +170,7 @@ function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) 
     { label: "Templates", value: templates.filter((t) => t.enabled).length, total: templates.length, to: "templates" as const },
     { label: "Modules", value: modules.filter((m) => m.enabled).length, total: modules.length, to: "modules" as const },
     { label: "Integrations", value: integrations.filter((i) => i.enabled).length, total: integrations.length + triggers.length, to: "integrations" as const },
+    { label: "Data Control", value: "Edit", total: "companies & projects", to: "data-control" as const, suffix: "" },
   ];
 
   return (
@@ -190,14 +195,17 @@ function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) 
             <div className="text-xs text-muted-foreground">{c.label}</div>
             <div className="mt-1 text-2xl font-semibold">{c.value}</div>
             <div className="text-[11px] text-muted-foreground">
-              of {c.total} {c.suffix ?? "defined"} · click to manage
+              {typeof c.total === "number"
+                ? `of ${c.total} ${c.suffix || "defined"} · click to manage`
+                : `${c.total} · click to manage`}
             </div>
           </button>
         ))}
       </div>
       <div className="card-soft border-dashed p-4 text-sm text-muted-foreground">
         Changes here drive new Post Sales projects, form catalogs, and template pickers.
-        Existing operational records are not rewritten until you recreate them.
+        Existing operational records are not rewritten until you recreate them. Use Data Control
+        to edit or delete live company and project records.
       </div>
     </div>
   );

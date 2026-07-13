@@ -1085,12 +1085,14 @@ function UsersSection() {
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title="Remove user?"
+        description="This permanently deletes the account from the server. It will not come back on refresh."
         onConfirm={() => {
           if (editing) {
             deleteUser(editing.id);
             toast.success("User removed");
           }
           setDeleteOpen(false);
+          setEditing(null);
         }}
       />
     </div>

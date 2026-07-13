@@ -12,6 +12,7 @@ import {
   FolderKanban,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
+import type { Resolver } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -30,8 +31,10 @@ import { compressImageToDataUrl } from "@/lib/compress-image";
 import {
   PROJECT_OTHER_CHARGE_OPTIONS,
   PROJECT_TYPES,
+  STATUS_LABEL,
   type Project,
   type ProjectOtherChargeKey,
+  type StatusKey,
 } from "@/types";
 
 const INDIAN_STATES = [
@@ -41,6 +44,8 @@ const INDIAN_STATES = [
   "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand",
   "West Bengal", "Delhi", "Jammu and Kashmir", "Ladakh", "Puducherry", "Chandigarh",
 ];
+
+const STATUS_KEYS = Object.keys(STATUS_LABEL) as StatusKey[];
 
 export const projectFormSchema = z.object({
   name: z.string().min(2, "Project name is required"),
@@ -55,12 +60,30 @@ export const projectFormSchema = z.object({
   units: z.coerce.number().min(1, "Total units required"),
   agreementValue: z.coerce.number().min(0),
   rera: z.string().optional(),
+  startDate: z.string().min(1, "Start date is required"),
   otherCharges: z.array(z.string()),
   customCharges: z.array(z.string()),
   logoUrl: z.string().optional(),
 });
 
+export const projectAdminFormSchema = projectFormSchema
+  .extend({
+    address: z.string().optional(),
+    state: z.string().optional(),
+    pinCode: z.string().optional(),
+    units: z.coerce.number().min(0),
+    status: z.enum(["not_started", "in_progress", "review", "completed", "on_hold"]),
+    currentStep: z.coerce.number().min(0).max(20),
+    goLiveAt: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.pinCode && data.pinCode.length > 0 && !/^\d{6}$/.test(data.pinCode)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Enter a valid 6-digit PIN", path: ["pinCode"] });
+    }
+  });
+
 export type ProjectFormValues = z.infer<typeof projectFormSchema>;
+export type ProjectAdminFormValues = z.infer<typeof projectAdminFormSchema>;
 
 const field =
   "mt-1.5 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition-shadow focus:ring-2 focus:ring-primary/25";
@@ -101,20 +124,25 @@ export function ProjectFormModal({
   editing,
   defaultCompanyId,
   onSave,
+  adminMode = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   companies: { id: string; name: string; city?: string }[];
   editing: Project | null;
   defaultCompanyId?: string;
-  onSave: (data: ProjectFormValues) => void;
+  onSave: (data: ProjectAdminFormValues) => void;
+  /** Master Data Control — edit status, step, go-live and relax required address fields. */
+  adminMode?: boolean;
 }) {
   const [customDraft, setCustomDraft] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const form = useForm<ProjectFormValues>({
-    resolver: zodResolver(projectFormSchema),
-    defaultValues: emptyDefaults(companies, defaultCompanyId),
+  const form = useForm<ProjectAdminFormValues>({
+    resolver: (adminMode
+      ? zodResolver(projectAdminFormSchema)
+      : zodResolver(projectFormSchema)) as Resolver<ProjectAdminFormValues>,
+    defaultValues: emptyDefaults(companies, defaultCompanyId, adminMode),
   });
 
   useEffect(() => {
@@ -123,9 +151,9 @@ export function ProjectFormModal({
       form.reset({
         name: editing.name,
         companyId: editing.companyId,
-        address: editing.address ?? "",
+        address: editing.address ?? (adminMode ? "" : ""),
         state: editing.state ?? "",
-        city: editing.city,
+        city: editing.city || (adminMode ? "—" : ""),
         pinCode: editing.pinCode ?? "",
         type: editing.type,
         totalTowers: editing.totalTowers ?? 0,
@@ -133,15 +161,19 @@ export function ProjectFormModal({
         units: editing.units,
         agreementValue: editing.agreementValue ?? 0,
         rera: editing.rera ?? "",
+        startDate: editing.startDate ?? new Date().toISOString().slice(0, 10),
         otherCharges: editing.otherCharges ?? [],
         customCharges: editing.customCharges ?? [],
         logoUrl: editing.logoUrl ?? "",
+        status: editing.status,
+        currentStep: editing.currentStep,
+        goLiveAt: editing.goLiveAt ? editing.goLiveAt.slice(0, 16) : "",
       });
     } else {
-      form.reset(emptyDefaults(companies, defaultCompanyId));
+      form.reset(emptyDefaults(companies, defaultCompanyId, adminMode));
     }
     setCustomDraft("");
-  }, [open, editing, companies, defaultCompanyId, form]);
+  }, [open, editing, companies, defaultCompanyId, form, adminMode]);
 
   const otherCharges = form.watch("otherCharges") ?? [];
   const customCharges = form.watch("customCharges") ?? [];
@@ -246,8 +278,47 @@ export function ProjectFormModal({
                 <label className="text-xs font-medium text-muted-foreground">RERA (optional)</label>
                 <input {...form.register("rera")} className={field} placeholder="RERA number" />
               </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Start Date</label>
+                <input type="date" {...form.register("startDate")} className={field} />
+                {form.formState.errors.startDate && (
+                  <p className="mt-1 text-[11px] text-destructive">{form.formState.errors.startDate.message}</p>
+                )}
+              </div>
             </div>
           </Section>
+
+          {adminMode && (
+            <Section icon={Layers} title="Admin status" delay={0.04}>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Status</label>
+                  <select {...form.register("status")} className={field}>
+                    {STATUS_KEYS.map((s) => (
+                      <option key={s} value={s}>
+                        {STATUS_LABEL[s]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Current step</label>
+                  <input type="number" min={0} max={20} {...form.register("currentStep")} className={field} />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-medium text-muted-foreground">Go-live at (optional)</label>
+                  <input type="datetime-local" {...form.register("goLiveAt")} className={field} />
+                  <button
+                    type="button"
+                    className="mt-1 text-[11px] text-muted-foreground underline-offset-2 hover:underline"
+                    onClick={() => form.setValue("goLiveAt", "", { shouldDirty: true })}
+                  >
+                    Clear go-live
+                  </button>
+                </div>
+              </div>
+            </Section>
+          )}
 
           <Section icon={MapPin} title="Location" delay={0.06}>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -447,12 +518,13 @@ export function ProjectFormModal({
 function emptyDefaults(
   companies: { id: string; name: string; city?: string }[],
   defaultCompanyId?: string,
-): ProjectFormValues {
+  adminMode = false,
+): ProjectAdminFormValues {
   const company = companies.find((c) => c.id === defaultCompanyId) ?? companies[0];
   return {
     name: "",
     companyId: company?.id ?? "",
-    address: "",
+    address: adminMode ? "" : "",
     state: "",
     city: company?.city ?? "",
     pinCode: "",
@@ -462,13 +534,17 @@ function emptyDefaults(
     units: 1,
     agreementValue: 0,
     rera: "",
+    startDate: new Date().toISOString().slice(0, 10),
     otherCharges: [],
     customCharges: [],
     logoUrl: "",
+    status: "not_started",
+    currentStep: 0,
+    goLiveAt: "",
   };
 }
 
-export function formValuesToProjectPatch(data: ProjectFormValues): Omit<
+export function formValuesToProjectPatch(data: ProjectFormValues | ProjectAdminFormValues): Omit<
   Project,
   "id" | "createdAt" | "updatedAt" | "status" | "currentStep" | "goLiveAt"
 > {
@@ -479,14 +555,27 @@ export function formValuesToProjectPatch(data: ProjectFormValues): Omit<
     units: data.units,
     city: data.city.trim(),
     rera: data.rera?.trim() ?? "",
-    address: data.address.trim(),
-    state: data.state,
-    pinCode: data.pinCode,
+    address: (data.address ?? "").trim() || undefined,
+    state: data.state || undefined,
+    pinCode: data.pinCode || undefined,
     totalTowers: data.totalTowers,
     totalFloors: data.totalFloors,
     agreementValue: data.agreementValue,
     otherCharges: data.otherCharges as ProjectOtherChargeKey[],
     customCharges: data.customCharges,
     logoUrl: data.logoUrl || undefined,
+    startDate: data.startDate,
+  };
+}
+
+export function formValuesToProjectAdminPatch(
+  data: ProjectAdminFormValues,
+): Omit<Project, "id" | "createdAt" | "updatedAt"> {
+  const goLiveRaw = data.goLiveAt?.trim();
+  return {
+    ...formValuesToProjectPatch(data),
+    status: data.status,
+    currentStep: data.currentStep,
+    goLiveAt: goLiveRaw ? new Date(goLiveRaw).toISOString() : undefined,
   };
 }

@@ -20,6 +20,7 @@ export type Company = Timestamps & {
   status: StatusKey;
   modules: CompanyModule[];
   agreementDate: string;
+  startDate: string;
   goLiveTarget: string;
   planExpiry: string;
   plan: CompanyPlan;
