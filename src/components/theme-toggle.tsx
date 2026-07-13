@@ -5,11 +5,10 @@ import { Moon, Sun } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
 
-const ease = [0.22, 1, 0.36, 1] as const;
+const ease = [0.33, 0, 0.2, 1] as const;
 
 /**
- * Premium light/dark control — segmented track with sliding glass indicator.
- * Not a cartoon sun/moon bounce; restrained motion, clear focus, WCAG contrast.
+ * Light/dark control — segmented track with a quiet sliding indicator.
  */
 export function ThemeToggle({ className }: { className?: string }) {
   const { resolved, setMode } = useTheme();
@@ -44,7 +43,7 @@ export function ThemeToggle({ className }: { className?: string }) {
         )}
         initial={false}
         animate={{ left: isDark ? "calc(50% + 1px)" : "4px" }}
-        transition={{ duration: 0.38, ease }}
+        transition={{ duration: 0.55, ease }}
       />
 
       <ToggleOption
@@ -73,8 +72,8 @@ export function ThemeToggleCompact({ className }: { className?: string }) {
       type="button"
       className={cn(
         "relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-border/80 bg-card",
-        "text-muted-foreground transition-[color,background-color,box-shadow,border-color] duration-300",
-        "hover:border-primary/30 hover:text-foreground hover:shadow-[0_0_0_3px_rgb(0_155_255_/_0.1)]",
+        "text-muted-foreground transition-[color,background-color,box-shadow,border-color] duration-500",
+        "hover:border-primary/30 hover:text-foreground",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
         className,
       )}
@@ -88,10 +87,10 @@ export function ThemeToggleCompact({ className }: { className?: string }) {
       <AnimatePresence mode="wait" initial={false}>
         <motion.span
           key={isDark ? "moon" : "sun"}
-          initial={{ opacity: 0, rotate: isDark ? -30 : 30, scale: 0.7 }}
-          animate={{ opacity: 1, rotate: 0, scale: 1 }}
-          exit={{ opacity: 0, rotate: isDark ? 30 : -30, scale: 0.7 }}
-          transition={{ duration: 0.28, ease }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.35, ease }}
           className="absolute inset-0 flex items-center justify-center"
         >
           {isDark ? (

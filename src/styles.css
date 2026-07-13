@@ -213,43 +213,53 @@
   html.theme-animating,
   html.theme-animating *:not([data-theme-ignore]) {
     transition:
-      background-color 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-      border-color 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-      color 0.35s cubic-bezier(0.22, 1, 0.36, 1),
-      fill 0.35s cubic-bezier(0.22, 1, 0.36, 1),
-      stroke 0.35s cubic-bezier(0.22, 1, 0.36, 1),
-      box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-      outline-color 0.35s cubic-bezier(0.22, 1, 0.36, 1) !important;
+      background-color 0.7s cubic-bezier(0.33, 0, 0.2, 1),
+      border-color 0.7s cubic-bezier(0.33, 0, 0.2, 1),
+      color 0.65s cubic-bezier(0.33, 0, 0.2, 1),
+      fill 0.65s cubic-bezier(0.33, 0, 0.2, 1),
+      stroke 0.65s cubic-bezier(0.33, 0, 0.2, 1),
+      box-shadow 0.7s cubic-bezier(0.33, 0, 0.2, 1),
+      outline-color 0.65s cubic-bezier(0.33, 0, 0.2, 1) !important;
   }
 }
 
-/* Circular reveal — premium theme switch (Chromium / Safari) */
+/* Soft crossfade theme switch — restrained, no circular wipe */
 @supports (view-transition-name: root) {
   ::view-transition-old(root),
   ::view-transition-new(root) {
-    animation: none;
+    animation-duration: 0.7s;
+    animation-timing-function: cubic-bezier(0.33, 0, 0.2, 1);
     mix-blend-mode: normal;
   }
 
   ::view-transition-old(root) {
-    z-index: 1;
+    animation-name: theme-fade-out;
   }
 
   ::view-transition-new(root) {
-    z-index: 9999;
-    animation: theme-circle-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-name: theme-fade-in;
   }
 
-  @keyframes theme-circle-in {
+  @keyframes theme-fade-out {
     from {
-      clip-path: circle(0px at var(--theme-x, 50%) var(--theme-y, 50%));
+      opacity: 1;
     }
     to {
-      clip-path: circle(150vmax at var(--theme-x, 50%) var(--theme-y, 50%));
+      opacity: 0;
+    }
+  }
+
+  @keyframes theme-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
+    ::view-transition-old(root),
     ::view-transition-new(root) {
       animation: none;
     }

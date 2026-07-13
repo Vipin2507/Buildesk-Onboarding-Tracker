@@ -30,37 +30,36 @@ export function applyThemeClass(resolved: ResolvedTheme) {
   root.dataset.theme = resolved;
 }
 
-/** Apply theme with optional circular reveal from a click point. */
-export function setTheme(mode: ThemeMode, origin?: { x: number; y: number }) {
+const THEME_TRANSITION_MS = 700;
+
+/** Apply theme with a calm crossfade (no circular wipe). */
+export function setTheme(mode: ThemeMode, _origin?: { x: number; y: number }) {
   localStorage.setItem(THEME_STORAGE_KEY, mode);
   const resolved = resolveTheme(mode);
   const root = document.documentElement;
-  const isDark = resolved === "dark";
-
   const run = () => applyThemeClass(resolved);
 
-  if (
-    origin &&
-    typeof document.startViewTransition === "function" &&
-    !window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  ) {
-    root.style.setProperty("--theme-x", `${origin.x}px`);
-    root.style.setProperty("--theme-y", `${origin.y}px`);
-    // Direction hint for clip reveal
-    root.dataset.themeTo = resolved;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    run();
+    return;
+  }
+
+  // Soft crossfade via View Transitions when available
+  if (typeof document.startViewTransition === "function") {
+    root.dataset.themeTransition = "fade";
     const transition = document.startViewTransition(() => {
       run();
     });
     void transition.finished.finally(() => {
-      delete root.dataset.themeTo;
+      delete root.dataset.themeTransition;
     });
     return;
   }
 
-  // Fallback: brief CSS transition class
+  // Fallback: ease color tokens over ~700ms
   root.classList.add("theme-animating");
   run();
-  window.setTimeout(() => root.classList.remove("theme-animating"), 450);
+  window.setTimeout(() => root.classList.remove("theme-animating"), THEME_TRANSITION_MS);
 }
 
 /** Inline script for shell <head> — prevents light flash before React hydrates. */
