@@ -147,11 +147,7 @@ export function ListToolbar({
   const hasSort = hasSortSelect || Boolean(onSortDirChange);
 
   return (
-    <motion.div
-      layout
-      className={cn("card-soft mb-4 space-y-3.5 p-3 sm:p-4", className)}
-      transition={{ duration: 0.28, ease }}
-    >
+    <div className={cn("card-soft mb-4 p-3 sm:p-4", className)}>
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -200,13 +196,12 @@ export function ListToolbar({
                   {activeFilterCount}
                 </span>
               )}
-              <motion.span
-                animate={{ rotate: filtersOpen ? 180 : 0 }}
-                transition={{ duration: 0.25, ease }}
-                className="flex"
-              >
-                <ChevronDown className="h-3.5 w-3.5 opacity-70" />
-              </motion.span>
+              <ChevronDown
+                className={cn(
+                  "h-3.5 w-3.5 opacity-70 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                  filtersOpen && "rotate-180",
+                )}
+              />
             </Button>
           )}
 
@@ -273,17 +268,23 @@ export function ListToolbar({
         </div>
       </div>
 
-      <AnimatePresence initial={false}>
-        {hasFilterPanel && filtersOpen && (
-          <motion.div
-            key="filters-panel"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3, ease }}
-            className="overflow-hidden"
-          >
-            <div className="space-y-3.5 border-t border-border/70 pt-3.5">
+      {hasFilterPanel && (
+        <div
+          className={cn(
+            "grid transition-[grid-template-rows,opacity,margin] duration-[380ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+            filtersOpen
+              ? "mt-3.5 grid-rows-[1fr] opacity-100"
+              : "pointer-events-none mt-0 grid-rows-[0fr] opacity-0",
+          )}
+          aria-hidden={!filtersOpen}
+        >
+          <div className="min-h-0 overflow-hidden">
+            <div
+              className={cn(
+                "space-y-3.5 border-t border-border/70 pt-3.5 transition-[transform,opacity] duration-[380ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+                filtersOpen ? "translate-y-0 opacity-100" : "-translate-y-1.5 opacity-0",
+              )}
+            >
               {hasChips && (
                 <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:flex-wrap md:overflow-visible">
                   {chips!.map((chip) => {
@@ -363,12 +364,12 @@ export function ListToolbar({
                 </div>
               )}
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+        </div>
+      )}
 
       {typeof resultCount === "number" && (
-        <div className="flex items-center justify-between border-t border-border/70 pt-2.5 text-xs text-muted-foreground">
+        <div className="mt-3.5 flex items-center justify-between border-t border-border/70 pt-2.5 text-xs text-muted-foreground">
           <motion.span
             key={resultCount}
             initial={{ opacity: 0.4, y: 2 }}
@@ -380,7 +381,7 @@ export function ListToolbar({
           </motion.span>
         </div>
       )}
-    </motion.div>
+    </div>
   );
 }
 
