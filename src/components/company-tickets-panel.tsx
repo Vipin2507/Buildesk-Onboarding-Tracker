@@ -44,7 +44,11 @@ export function CompanyTicketsPanel({ companyId }: Props) {
   const updateTicket = useTicketStore((s) => s.updateTicket);
   const deleteTicket = useTicketStore((s) => s.deleteTicket);
   const employees = useEmployeeStore((s) => s.employees);
-  const projects = useProjectStore((s) => s.projects.filter((p) => p.companyId === companyId));
+  const allProjects = useProjectStore((s) => s.projects);
+  const projects = useMemo(
+    () => allProjects.filter((p) => p.companyId === companyId),
+    [allProjects, companyId],
+  );
 
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);

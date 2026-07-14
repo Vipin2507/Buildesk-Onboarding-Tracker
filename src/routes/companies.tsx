@@ -102,8 +102,8 @@ function CompaniesListPage() {
   const [cityFilter, setCityFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [sortBy, setSortBy] = useState<CompanySort>("name");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [sortBy, setSortBy] = useState<CompanySort>("startDate");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);

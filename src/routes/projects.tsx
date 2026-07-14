@@ -83,9 +83,9 @@ function ProjectsListPage() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [groupSort, setGroupSort] = useState<GroupSort>("company");
-  const [projectSort, setProjectSort] = useState<ProjectSort>("name");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [groupSort, setGroupSort] = useState<GroupSort>("startDate");
+  const [projectSort, setProjectSort] = useState<ProjectSort>("startDate");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const projectTypes = useMemo(() => {
     const set = new Set(projects.map((p) => p.type).filter(Boolean));
@@ -208,22 +208,23 @@ function ProjectsListPage() {
     setExpandedInit(true);
   }, [groups, expandedInit]);
 
+  const groupIdsKey = useMemo(() => groups.map((g) => g.companyId).join("|"), [groups]);
+
   // Keep matching groups visible when filters change — avoid new Set when membership unchanged
   useEffect(() => {
     if (!expandedInit) return;
-    if (groups.length === 0) return;
+    if (!groupIdsKey) return;
+    const ids = groupIdsKey.split("|");
     setExpanded((prev) => {
-      const stillVisible = [...prev].filter((id) => groups.some((g) => g.companyId === id));
+      const stillVisible = [...prev].filter((id) => ids.includes(id));
       const nextIds =
-        stillVisible.length > 0
-          ? stillVisible
-          : groups.slice(0, Math.min(3, groups.length)).map((g) => g.companyId);
+        stillVisible.length > 0 ? stillVisible : ids.slice(0, Math.min(3, ids.length));
       if (nextIds.length === prev.size && nextIds.every((id) => prev.has(id))) {
         return prev;
       }
       return new Set(nextIds);
     });
-  }, [groups, expandedInit]);
+  }, [groupIdsKey, expandedInit]);
 
   function toggleCompany(companyId: string) {
     setExpanded((prev) => {

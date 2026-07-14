@@ -319,7 +319,7 @@ export function ListToolbar({
                 </div>
               )}
 
-              {(hasSelects || hasDateRange) && (
+              {(hasSelects || hasDateRange) && filtersOpen ? (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   {hasDateRange && (
                     <>
@@ -361,7 +361,7 @@ export function ListToolbar({
                     </div>
                   ))}
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
         </div>

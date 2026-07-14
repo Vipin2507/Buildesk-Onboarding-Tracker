@@ -127,7 +127,11 @@ function GenericModuleHub({
 }) {
   const setModuleLive = useCompanyStore((s) => s.setModuleLive);
   const updateModuleMeta = useCompanyStore((s) => s.updateModuleMeta);
-  const projects = useProjectStore((s) => s.projects.filter((p) => p.companyId === companyId));
+  const allProjects = useProjectStore((s) => s.projects);
+  const projects = useMemo(
+    () => allProjects.filter((p) => p.companyId === companyId),
+    [allProjects, companyId],
+  );
   const byProjectId = useProjectProgressStore((s) => s.byProjectId);
   const crud = CRUD_LINKS[moduleKey];
   const milestones = milestonesForModule(moduleKey);
