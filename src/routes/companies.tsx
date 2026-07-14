@@ -47,18 +47,16 @@ const companySchema = z.object({
   csmId: z.string(),
   plan: z.enum(["Annual", "Half-Yearly", "AMC"]),
   health: z.enum(["Healthy", "Moderate", "Critical"]),
-  modules: z
-    .array(
-      z.enum([
-        "post-sales",
-        "vendor-management",
-        "labor-management",
-        "customer-app",
-        "construction-management",
-        "project-management",
-      ]),
-    )
-    .default([]),
+  modules: z.array(
+    z.enum([
+      "post-sales",
+      "vendor-management",
+      "labor-management",
+      "customer-app",
+      "construction-management",
+      "project-management",
+    ]),
+  ),
   agreementDate: z.string(),
   startDate: z.string().min(1, "Start date is required"),
   goLiveTarget: z.string(),
