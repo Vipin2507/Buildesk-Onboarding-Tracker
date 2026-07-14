@@ -1,6 +1,8 @@
 import { asc, desc, eq } from "drizzle-orm";
 
 import type { Company, CompanyModule, ModuleKey, PostSalesProject, PostSalesStep, Project } from "@/types";
+import { migrateLegacyPlan } from "@/types/company";
+import { normalizeCompanyModules } from "@/data/module-catalog";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 
@@ -13,6 +15,11 @@ export function mapCompany(row: typeof t.companies.$inferSelect, modules: Compan
     phone: row.phone,
     email: row.email,
     city: row.city,
+    region: (row.region as Company["region"]) || "Rest of India",
+    ownerName: row.ownerName ?? "",
+    ownerMobile: row.ownerMobile ?? "",
+    pocName: row.pocName || row.contact || "",
+    pocMobile: row.pocMobile || row.phone || "",
     officeAddress: row.officeAddress ?? undefined,
     gstNumber: row.gstNumber ?? undefined,
     billingInfo: row.billingInfo ?? undefined,
@@ -24,7 +31,7 @@ export function mapCompany(row: typeof t.companies.$inferSelect, modules: Compan
     startDate: row.startDate || row.agreementDate,
     goLiveTarget: row.goLiveTarget,
     planExpiry: row.planExpiry,
-    plan: row.plan as Company["plan"],
+    plan: migrateLegacyPlan(row.plan),
     health: row.health as Company["health"],
     renewedAt: row.renewedAt ?? undefined,
     createdAt: row.createdAt,
@@ -44,6 +51,9 @@ export function loadCompanyModules(companyId: string): CompanyModule[] {
       label: m.label,
       optedIn: m.optedIn,
       optedOnDate: m.optedOnDate ?? undefined,
+      liveAt: m.liveAt ?? undefined,
+      pocName: m.pocName ?? undefined,
+      pocMobile: m.pocMobile ?? undefined,
     }));
 }
 
@@ -51,7 +61,7 @@ export function loadCompany(id: string): Company | null {
   const db = getDb();
   const row = db.select().from(t.companies).where(eq(t.companies.id, id)).get();
   if (!row) return null;
-  return mapCompany(row, loadCompanyModules(id));
+  return mapCompany(row, normalizeCompanyModules(loadCompanyModules(id)));
 }
 
 export function loadCompanies(): Company[] {
@@ -61,7 +71,7 @@ export function loadCompanies(): Company[] {
     .from(t.companies)
     .orderBy(asc(t.companies.name))
     .all()
-    .map((row) => mapCompany(row, loadCompanyModules(row.id)));
+    .map((row) => mapCompany(row, normalizeCompanyModules(loadCompanyModules(row.id))));
 }
 
 export function mapProject(row: typeof t.projects.$inferSelect): Project {
@@ -98,6 +108,8 @@ export function mapProject(row: typeof t.projects.$inferSelect): Project {
     otherCharges,
     customCharges,
     logoUrl: row.logoUrl ?? undefined,
+    pocName: row.pocName ?? undefined,
+    pocMobile: row.pocMobile ?? undefined,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

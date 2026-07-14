@@ -13,6 +13,11 @@ export type CompanyModule = {
   label: string;
   optedIn: boolean;
   optedOnDate?: string;
+  /** Module-level Live timestamp when marked live. */
+  liveAt?: string;
+  /** Optional POC override for this module. */
+  pocName?: string;
+  pocMobile?: string;
 };
 
 export type TemplateStatus = "not-required" | "not-sent" | "sent" | "received";

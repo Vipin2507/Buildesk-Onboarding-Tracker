@@ -30,8 +30,8 @@ import { cn, formatDate } from "@/lib/utils";
 
 const searchSchema = z.object({
   tab: z.enum([
-    "progress", "onboarding", "data-migration", "documents", "customer-app",
-    "vendors", "labor", "integrations", "training", "tickets", "go-live",
+    "progress", "onboarding", "data-migration", "documents",
+    "integrations", "training", "tickets", "go-live",
   ]).optional().default("progress"),
 });
 
@@ -114,9 +114,6 @@ function ProjectDetailPage() {
     { key: "onboarding", label: "Onboarding" },
     { key: "data-migration", label: "Data Migration" },
     { key: "documents", label: "Documents" },
-    { key: "customer-app", label: "Customer App" },
-    { key: "vendors", label: "Vendors" },
-    { key: "labor", label: "Labor" },
     { key: "integrations", label: "Integrations" },
     { key: "training", label: "Training" },
     { key: "tickets", label: "Tickets" },
@@ -151,7 +148,7 @@ function ProjectDetailPage() {
 
       <PageHeader
         title={project.name}
-        subtitle={`${company?.name ?? ""} · ${project.city}${project.startDate ? ` · Started ${formatDate(project.startDate)}` : ""}`}
+        subtitle={`${company?.name ?? ""} · ${project.city}${project.pocName ? ` · POC ${project.pocName}` : ""}${project.startDate ? ` · Started ${formatDate(project.startDate)}` : ""}`}
         actions={
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">{progress}% complete</span>

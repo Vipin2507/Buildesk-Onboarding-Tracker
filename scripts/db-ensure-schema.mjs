@@ -148,6 +148,56 @@ const EXTRA_COLUMNS = [
     name: "project_id",
     ddl: "TEXT",
   },
+  {
+    table: "companies",
+    name: "region",
+    ddl: "TEXT NOT NULL DEFAULT 'Rest of India'",
+  },
+  {
+    table: "companies",
+    name: "owner_name",
+    ddl: "TEXT NOT NULL DEFAULT ''",
+  },
+  {
+    table: "companies",
+    name: "owner_mobile",
+    ddl: "TEXT NOT NULL DEFAULT ''",
+  },
+  {
+    table: "companies",
+    name: "poc_name",
+    ddl: "TEXT NOT NULL DEFAULT ''",
+  },
+  {
+    table: "companies",
+    name: "poc_mobile",
+    ddl: "TEXT NOT NULL DEFAULT ''",
+  },
+  {
+    table: "company_modules",
+    name: "live_at",
+    ddl: "TEXT",
+  },
+  {
+    table: "company_modules",
+    name: "poc_name",
+    ddl: "TEXT",
+  },
+  {
+    table: "company_modules",
+    name: "poc_mobile",
+    ddl: "TEXT",
+  },
+  {
+    table: "projects",
+    name: "poc_name",
+    ddl: "TEXT",
+  },
+  {
+    table: "projects",
+    name: "poc_mobile",
+    ddl: "TEXT",
+  },
 ];
 
 for (const col of EXTRA_COLUMNS) {
@@ -207,6 +257,61 @@ if (tableExists("tickets") && tableExists("projects")) {
     filled += 1;
   }
   if (filled > 0) console.log(`tickets: backfilled project_id on ${filled} row(s)`);
+}
+
+// Migrate legacy company plans → Annual / Half-Yearly / AMC
+if (tableExists("companies")) {
+  const planMap = [
+    ["Starter", "Annual"],
+    ["Growth", "Half-Yearly"],
+    ["Enterprise", "AMC"],
+  ];
+  let planChanges = 0;
+  for (const [from, to] of planMap) {
+    const r = sqlite.prepare(`UPDATE companies SET plan = ? WHERE plan = ?`).run(to, from);
+    planChanges += r.changes;
+  }
+  if (planChanges > 0) console.log(`companies: migrated plan on ${planChanges} row(s)`);
+
+  // Default POC from legacy contact/phone when empty
+  const poc = sqlite
+    .prepare(
+      `UPDATE companies SET poc_name = contact WHERE (poc_name IS NULL OR poc_name = '') AND contact IS NOT NULL AND contact != ''`,
+    )
+    .run();
+  if (poc.changes > 0) console.log(`companies: backfilled poc_name on ${poc.changes} row(s)`);
+  const pocPhone = sqlite
+    .prepare(
+      `UPDATE companies SET poc_mobile = phone WHERE (poc_mobile IS NULL OR poc_mobile = '') AND phone IS NOT NULL AND phone != ''`,
+    )
+    .run();
+  if (pocPhone.changes > 0) console.log(`companies: backfilled poc_mobile on ${pocPhone.changes} row(s)`);
+
+  // Heuristic region from city when still at default
+  const cities = sqlite.prepare(`SELECT id, city, region FROM companies`).all();
+  const setRegion = sqlite.prepare(`UPDATE companies SET region = ? WHERE id = ?`);
+  let regionChanges = 0;
+  for (const row of cities) {
+    if (row.region && row.region !== "Rest of India") continue;
+    const c = String(row.city || "").toLowerCase();
+    let region = "Rest of India";
+    if (["delhi", "gurugram", "gurgaon", "noida", "faridabad", "ghaziabad"].some((x) => c.includes(x))) {
+      region = "NCR";
+    } else if (
+      ["bengaluru", "bangalore", "chennai", "hyderabad", "kochi", "coimbatore"].some((x) =>
+        c.includes(x),
+      )
+    ) {
+      region = "South";
+    } else if (["mumbai", "pune", "ahmedabad", "surat", "nagpur", "goa"].some((x) => c.includes(x))) {
+      region = "West";
+    }
+    if (region !== "Rest of India" || !row.region) {
+      setRegion.run(region, row.id);
+      regionChanges += 1;
+    }
+  }
+  if (regionChanges > 0) console.log(`companies: backfilled region on ${regionChanges} row(s)`);
 }
 
 // Backfill start dates for existing rows

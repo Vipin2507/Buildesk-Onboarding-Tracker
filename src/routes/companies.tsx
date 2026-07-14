@@ -14,14 +14,17 @@ import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDeleteDialog, EntityFormModal } from "@/components/entity-form-modal";
 import { ListToolbar, compareNumber, compareText, inDateRange } from "@/components/list-toolbar";
-import { MODULE_CATALOG, createCompanyModules } from "@/data/module-catalog";
+import { MODULE_CATALOG, createCompanyModules, normalizeCompanyModules } from "@/data/module-catalog";
+import { ProgressSummaryCards } from "@/components/progress-summary-cards";
 import {
   useCompanyStore,
   useEmployeeStore,
   useProjectStore,
   useDashboardKpis,
 } from "@/stores";
+import { isCompanyModulesAllLive } from "@/lib/module-progress";
 import type { Company, ModuleKey } from "@/types";
+import { COMPANY_REGIONS } from "@/types";
 import { formatDate } from "@/lib/utils";
 
 export const Route = createFileRoute("/companies")({
@@ -35,9 +38,14 @@ const companySchema = z.object({
   phone: z.string().min(10),
   email: z.string().email(),
   city: z.string().min(2),
+  region: z.enum(["NCR", "South", "West", "Rest of India"]),
+  ownerName: z.string().min(1),
+  ownerMobile: z.string().min(1),
+  pocName: z.string().min(1),
+  pocMobile: z.string().min(1),
   onboardingManagerId: z.string(),
   csmId: z.string(),
-  plan: z.enum(["Starter", "Growth", "Enterprise"]),
+  plan: z.enum(["Annual", "Half-Yearly", "AMC"]),
   health: z.enum(["Healthy", "Moderate", "Critical"]),
   modules: z
     .array(
@@ -106,9 +114,11 @@ function CompaniesListPage() {
     resolver: zodResolver(companySchema),
     defaultValues: {
       name: "", contact: "", designation: "", phone: "", email: "", city: "",
+      region: "Rest of India",
+      ownerName: "", ownerMobile: "", pocName: "", pocMobile: "",
       onboardingManagerId: employees[0]?.id ?? "",
       csmId: employees.find((e) => e.role === "CSM")?.id ?? "",
-      plan: "Growth", health: "Healthy",
+      plan: "Half-Yearly", health: "Healthy",
       modules: ["post-sales", "customer-app", "vendor-management"],
       agreementDate: new Date().toISOString().slice(0, 10),
       startDate: new Date().toISOString().slice(0, 10),
@@ -120,9 +130,18 @@ function CompaniesListPage() {
   function mergeModules(existing: Company["modules"], selected: ModuleKey[]) {
     const baseline = createCompanyModules(selected);
     return baseline.map((m) => {
-      if (!m.optedIn) return m;
       const prev = existing.find((x) => x.moduleKey === m.moduleKey);
-      return prev?.optedIn ? { ...m, optedOnDate: prev.optedOnDate } : m;
+      if (!m.optedIn) return { ...m, liveAt: undefined, pocName: prev?.pocName, pocMobile: prev?.pocMobile };
+      if (prev?.optedIn) {
+        return {
+          ...m,
+          optedOnDate: prev.optedOnDate,
+          liveAt: prev.liveAt,
+          pocName: prev.pocName,
+          pocMobile: prev.pocMobile,
+        };
+      }
+      return m;
     });
   }
 
@@ -228,6 +247,33 @@ function CompaniesListPage() {
     search.trim() !== "",
   ].filter(Boolean).length;
 
+  const portfolioCards = useMemo(() => {
+    const total = filtered.length;
+    const pending = filtered.filter(
+      (c) => c.progress === 0 || c.computedStatus === "not_started" || c.status === "not_started",
+    ).length;
+    const inProgress = filtered.filter(
+      (c) => !c.isLive && c.progress > 0 && c.progress < 100 && c.computedStatus !== "completed",
+    ).length;
+    const live = filtered.filter(
+      (c) =>
+        c.isLive ||
+        c.progress >= 100 ||
+        c.computedStatus === "completed" ||
+        isCompanyModulesAllLive(normalizeCompanyModules(c.modules)),
+    ).length;
+    const avg =
+      total === 0 ? 0 : Math.round(filtered.reduce((sum, c) => sum + c.progress, 0) / total);
+    return [
+      { id: "total", label: "Total", value: total },
+      { id: "pending", label: "Pending", value: pending, hint: "Not started / 0%" },
+      { id: "in_progress", label: "In Progress", value: inProgress },
+      { id: "live", label: "Live", value: live },
+      { id: "avg", label: "Average %", value: avg, suffix: "%" },
+      { id: "overall", label: "Overall %", value: avg, suffix: "%", hint: "Mean of company %" },
+    ];
+  }, [filtered]);
+
   function clearFilters() {
     setSearch("");
     setStatusFilter("all");
@@ -251,10 +297,15 @@ function CompaniesListPage() {
     form.reset({
       name: c.name, contact: c.contact, designation: c.designation,
       phone: c.phone, email: c.email, city: c.city,
+      region: c.region ?? "Rest of India",
+      ownerName: c.ownerName || "",
+      ownerMobile: c.ownerMobile || "",
+      pocName: c.pocName || c.contact,
+      pocMobile: c.pocMobile || c.phone,
       onboardingManagerId: c.onboardingManagerId, csmId: c.csmId,
       plan: c.plan,
       health: c.health,
-      modules: c.modules.filter((m) => m.optedIn).map((m) => m.moduleKey),
+      modules: normalizeCompanyModules(c.modules).filter((m) => m.optedIn).map((m) => m.moduleKey),
       agreementDate: c.agreementDate,
       startDate: c.startDate || c.agreementDate,
       goLiveTarget: c.goLiveTarget,
@@ -335,6 +386,8 @@ function CompaniesListPage() {
         }
       />
 
+      <ProgressSummaryCards cards={portfolioCards} />
+
       <ListToolbar
         search={search}
         onSearchChange={setSearch}
@@ -361,9 +414,9 @@ function CompaniesListPage() {
             onChange: setPlanFilter,
             options: [
               { value: "all", label: "All plans" },
-              { value: "Starter", label: "Starter" },
-              { value: "Growth", label: "Growth" },
-              { value: "Enterprise", label: "Enterprise" },
+              { value: "Annual", label: "Annual" },
+              { value: "Half-Yearly", label: "Half-Yearly" },
+              { value: "AMC", label: "AMC" },
             ],
           },
           {
@@ -567,6 +620,34 @@ function CompaniesListPage() {
             </div>
           ))}
           <div>
+            <label className="text-xs font-medium">Region</label>
+            <select {...form.register("region")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm">
+              {COMPANY_REGIONS.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium">Owner Name</label>
+              <input {...form.register("ownerName")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-medium">Owner Mobile</label>
+              <input {...form.register("ownerMobile")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-medium">POC Name</label>
+              <input {...form.register("pocName")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-medium">POC Mobile</label>
+              <input {...form.register("pocMobile")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" />
+            </div>
+          </div>
+          <div>
             <label className="text-xs font-medium">Onboarding Manager</label>
             <select {...form.register("onboardingManagerId")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm">
               {employees
@@ -581,7 +662,7 @@ function CompaniesListPage() {
           <div>
             <label className="text-xs font-medium">Plan</label>
             <select {...form.register("plan")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm">
-              {["Starter", "Growth", "Enterprise"].map((p) => (
+              {["Annual", "Half-Yearly", "AMC"].map((p) => (
                 <option key={p} value={p}>
                   {p}
                 </option>

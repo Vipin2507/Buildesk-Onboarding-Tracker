@@ -20,6 +20,12 @@ type CompanyState = {
   transferManager: (companyId: string, managerId: string, who: string) => void;
   markRenewed: (id: string) => void;
   enableModule: (companyId: string, moduleKey: ModuleKey) => void;
+  setModuleLive: (companyId: string, moduleKey: ModuleKey, live: boolean) => void;
+  updateModuleMeta: (
+    companyId: string,
+    moduleKey: ModuleKey,
+    data: { pocName?: string; pocMobile?: string },
+  ) => void;
 };
 
 export const useCompanyStore = createStore<CompanyState>((set, get) => ({
@@ -40,6 +46,11 @@ export const useCompanyStore = createStore<CompanyState>((set, get) => ({
           phone: company.phone,
           email: company.email,
           city: company.city,
+          region: company.region,
+          ownerName: company.ownerName,
+          ownerMobile: company.ownerMobile,
+          pocName: company.pocName,
+          pocMobile: company.pocMobile,
           officeAddress: company.officeAddress,
           gstNumber: company.gstNumber,
           billingInfo: company.billingInfo,
@@ -152,6 +163,61 @@ export const useCompanyStore = createStore<CompanyState>((set, get) => ({
       companyId,
     });
     serverSync("enableModule", () =>
+      apiUpdateCompany({ data: { id: companyId, patch: { modules: nextModules } } }),
+    );
+  },
+
+  setModuleLive: (companyId, moduleKey, live) => {
+    const company = get().getById(companyId);
+    if (!company) return;
+    const now = nowIso();
+    const nextModules = normalizeCompanyModules(company.modules).map((m) =>
+      m.moduleKey === moduleKey
+        ? { ...m, optedIn: live ? true : m.optedIn, liveAt: live ? now : undefined }
+        : m,
+    );
+    const allLive =
+      nextModules.filter((m) => m.optedIn).length > 0 &&
+      nextModules.filter((m) => m.optedIn).every((m) => Boolean(m.liveAt));
+    set((s) => ({
+      companies: s.companies.map((c) => {
+        if (c.id !== companyId) return c;
+        return touch({
+          ...c,
+          modules: nextModules,
+          status: allLive ? "completed" : c.status === "completed" ? "in_progress" : c.status,
+        });
+      }),
+    }));
+    logActivity({
+      who: "You",
+      what: `${live ? "Marked" : "Cleared"} Live on ${getModuleLabel(moduleKey)} for ${company.name}`,
+      kind: live ? "success" : "info",
+      companyId,
+    });
+    const updated = get().getById(companyId)!;
+    serverSync("setModuleLive", () =>
+      apiUpdateCompany({
+        data: {
+          id: companyId,
+          patch: { modules: nextModules, status: updated.status },
+        },
+      }),
+    );
+  },
+
+  updateModuleMeta: (companyId, moduleKey, data) => {
+    const company = get().getById(companyId);
+    if (!company) return;
+    const nextModules = normalizeCompanyModules(company.modules).map((m) =>
+      m.moduleKey === moduleKey ? { ...m, ...data } : m,
+    );
+    set((s) => ({
+      companies: s.companies.map((c) =>
+        c.id === companyId ? touch({ ...c, modules: nextModules }) : c,
+      ),
+    }));
+    serverSync("updateModuleMeta", () =>
       apiUpdateCompany({ data: { id: companyId, patch: { modules: nextModules } } }),
     );
   },

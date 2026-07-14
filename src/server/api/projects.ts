@@ -79,6 +79,8 @@ const projectInput = z.object({
   otherCharges: z.array(z.string()).optional(),
   customCharges: z.array(z.string()).optional(),
   logoUrl: z.string().optional().nullable(),
+  pocName: z.string().optional().nullable(),
+  pocMobile: z.string().optional().nullable(),
 });
 
 function projectRowValues(
@@ -105,6 +107,8 @@ function projectRowValues(
     otherChargesJson: JSON.stringify(data.otherCharges ?? []),
     customChargesJson: JSON.stringify(data.customCharges ?? []),
     logoUrl: data.logoUrl ?? null,
+    pocName: data.pocName ?? null,
+    pocMobile: data.pocMobile ?? null,
     createdAt: extras.createdAt,
     updatedAt: extras.now,
   };
@@ -189,6 +193,8 @@ export const updateProject = createServerFn({ method: "POST" })
     if (p.otherCharges !== undefined) set.otherChargesJson = JSON.stringify(p.otherCharges);
     if (p.customCharges !== undefined) set.customChargesJson = JSON.stringify(p.customCharges);
     if (p.logoUrl !== undefined) set.logoUrl = p.logoUrl;
+    if (p.pocName !== undefined) set.pocName = p.pocName;
+    if (p.pocMobile !== undefined) set.pocMobile = p.pocMobile;
 
     getDb().update(t.projects).set(set).where(eq(t.projects.id, data.id)).run();
     logActivity({

@@ -37,15 +37,18 @@ export function ModuleCard({
   label,
   optedIn,
   progressPercent,
+  isLive = false,
 }: {
   companyId: string;
   moduleKey: ModuleKey;
   label: string;
   optedIn: boolean;
   progressPercent: number;
+  isLive?: boolean;
 }) {
   const navigate = useNavigate();
   const enableModule = useCompanyStore((s) => s.enableModule);
+  const setModuleLive = useCompanyStore((s) => s.setModuleLive);
   const catalog = MODULE_CATALOG.find((m) => m.key === moduleKey);
   const Icon = ICONS[catalog?.icon ?? "layers"];
 
@@ -61,6 +64,12 @@ export function ModuleCard({
     e.stopPropagation();
     enableModule(companyId, moduleKey);
     toast.success(`${label} enabled`);
+  }
+
+  function handleLive(e: React.MouseEvent) {
+    e.stopPropagation();
+    setModuleLive(companyId, moduleKey, !isLive);
+    toast.success(isLive ? `${label} marked Not Live` : `${label} is Live`);
   }
 
   const card = (
@@ -82,7 +91,12 @@ export function ModuleCard({
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Icon className="h-5 w-5" />
         </div>
-        <Pill tone={optedIn ? "success" : "muted"}>{optedIn ? "Opted In" : "Not Opted"}</Pill>
+        <div className="flex flex-col items-end gap-1">
+          <Pill tone={optedIn ? "success" : "muted"}>{optedIn ? "Opted In" : "Not Opted"}</Pill>
+          {optedIn ? (
+            <Pill tone={isLive ? "success" : "muted"}>{isLive ? "Live" : "Not Live"}</Pill>
+          ) : null}
+        </div>
       </div>
       <div>
         <div className="font-semibold">{label}</div>
@@ -91,9 +105,14 @@ export function ModuleCard({
         </p>
       </div>
       {optedIn ? (
-        <div className="mt-auto flex items-center gap-3 pt-1">
-          <ProgressRing value={progressPercent} size={56} stroke={6} />
-          <div className="text-xs text-muted-foreground">Module progress</div>
+        <div className="mt-auto space-y-2 pt-1">
+          <div className="flex items-center gap-3">
+            <ProgressRing value={progressPercent} size={56} stroke={6} />
+            <div className="text-xs text-muted-foreground">Module progress</div>
+          </div>
+          <Button size="sm" variant="outline" onClick={handleLive}>
+            {isLive ? "Clear Live" : "Mark Live"}
+          </Button>
         </div>
       ) : (
         <div className="mt-auto pt-1">

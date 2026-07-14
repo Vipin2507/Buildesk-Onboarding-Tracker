@@ -208,14 +208,20 @@ function ProjectsListPage() {
     setExpandedInit(true);
   }, [groups, expandedInit]);
 
-  // Keep matching groups visible when filters change
+  // Keep matching groups visible when filters change — avoid new Set when membership unchanged
   useEffect(() => {
     if (!expandedInit) return;
     if (groups.length === 0) return;
     setExpanded((prev) => {
       const stillVisible = [...prev].filter((id) => groups.some((g) => g.companyId === id));
-      if (stillVisible.length > 0) return new Set(stillVisible);
-      return new Set(groups.slice(0, Math.min(3, groups.length)).map((g) => g.companyId));
+      const nextIds =
+        stillVisible.length > 0
+          ? stillVisible
+          : groups.slice(0, Math.min(3, groups.length)).map((g) => g.companyId);
+      if (nextIds.length === prev.size && nextIds.every((id) => prev.has(id))) {
+        return prev;
+      }
+      return new Set(nextIds);
     });
   }, [groups, expandedInit]);
 

@@ -3,6 +3,11 @@ import { MODULE_CATALOG, normalizeCompanyModules } from "@/data/module-catalog";
 import type { ModuleKey } from "@/types";
 import { calcPostSalesProjectProgress } from "@/lib/post-sales-status";
 import { calcChecklistProgress } from "@/lib/checklist";
+import {
+  calcManualGroupProgress,
+  isCompanyModulesAllLive,
+  MODULE_MILESTONE_GROUPS,
+} from "@/lib/module-progress";
 import { useActivityStore } from "./useActivityStore";
 import { useCompanyStore } from "./useCompanyStore";
 import { useOnboardingStore } from "./useOnboardingStore";
@@ -44,8 +49,18 @@ export function getModuleProgressPercent(
     const total = projects.reduce((sum, p) => sum + calcPostSalesProjectProgress(p), 0);
     return Math.round(total / projects.length);
   }
-  // Stub modules: no project store yet — 0 until wired
-  return 0;
+
+  const groups = MODULE_MILESTONE_GROUPS[moduleKey];
+  if (!groups) return 0;
+
+  const projectIds = useProjectStore
+    .getState()
+    .projects.filter((p) => p.companyId === companyId)
+    .map((p) => p.id);
+  const progressRows = projectIds
+    .map((id) => useProjectProgressStore.getState().byProjectId[id])
+    .filter(Boolean);
+  return calcManualGroupProgress(progressRows, groups);
 }
 
 export function getCompanyOverallProgress(
@@ -65,36 +80,59 @@ export function getCompanyOverallProgress(
 export function useCompanyProgress(companyId: string) {
   const company = useCompanyStore((s) => s.companies.find((c) => c.id === companyId));
   const postSalesProjects = usePostSalesStore((s) => s.projects);
+  const projects = useProjectStore((s) => s.projects);
+  const progressByProject = useProjectProgressStore((s) => s.byProjectId);
 
   return useMemo(() => {
     if (!company) return 0;
-    const modules = normalizeCompanyModules((company as any).modules);
+    const modules = normalizeCompanyModules(company.modules);
     return getCompanyOverallProgress(companyId, modules, postSalesProjects);
-  }, [company, companyId, postSalesProjects]);
+  }, [company, companyId, postSalesProjects, projects, progressByProject]);
 }
 
 export function useModuleProgress(companyId: string, moduleKey: ModuleKey) {
   const postSalesProjects = usePostSalesStore((s) => s.projects);
+  const projects = useProjectStore((s) => s.projects);
+  const progressByProject = useProjectProgressStore((s) => s.byProjectId);
   return useMemo(
     () => getModuleProgressPercent(companyId, moduleKey, postSalesProjects),
-    [companyId, moduleKey, postSalesProjects],
+    [companyId, moduleKey, postSalesProjects, projects, progressByProject],
   );
 }
 
 export function useCompanyModulesWithProgress(companyId: string) {
   const company = useCompanyStore((s) => s.companies.find((c) => c.id === companyId));
   const postSalesProjects = usePostSalesStore((s) => s.projects);
+  const projects = useProjectStore((s) => s.projects);
+  const progressByProject = useProjectProgressStore((s) => s.byProjectId);
 
   return useMemo(() => {
     if (!company) return [];
-    const modules = normalizeCompanyModules((company as any).modules);
-    return modules.map((m) => ({
-      ...m,
-      progressPercent: m.optedIn
+    const modules = normalizeCompanyModules(company.modules);
+    return modules.map((m) => {
+      const progressPercent = m.optedIn
         ? getModuleProgressPercent(companyId, m.moduleKey, postSalesProjects)
-        : 0,
-    }));
-  }, [company, companyId, postSalesProjects]);
+        : 0;
+      return {
+        ...m,
+        progressPercent,
+        isLive: Boolean(m.liveAt) || progressPercent >= 100,
+      };
+    });
+  }, [company, companyId, postSalesProjects, projects, progressByProject]);
+}
+
+export function companyIsLive(companyId: string): boolean {
+  const company = useCompanyStore.getState().companies.find((c) => c.id === companyId);
+  if (!company) return false;
+  const modules = normalizeCompanyModules(company.modules);
+  const opted = modules.filter((m) => m.optedIn);
+  if (opted.length === 0) return false;
+  const postSalesProjects = usePostSalesStore.getState().projects;
+  return opted.every((m) => {
+    if (m.liveAt) return true;
+    return getModuleProgressPercent(companyId, m.moduleKey, postSalesProjects) >= 100;
+  });
 }
 
 export function usePostSalesProjectsForCompany(companyId: string) {
@@ -132,14 +170,28 @@ export function useDashboardKpis() {
   const companies = useCompanyStore((s) => s.companies);
   const tickets = useTicketStore((s) => s.tickets);
   const postSalesProjects = usePostSalesStore((s) => s.projects);
+  const progressByProject = useProjectProgressStore((s) => s.byProjectId);
 
   return useMemo(() => {
     const companiesWithProgress = companies.map((c) => {
-      const modules = normalizeCompanyModules((c as any).modules);
+      const modules = normalizeCompanyModules(c.modules);
       const progress = getCompanyOverallProgress(c.id, modules, postSalesProjects);
-      const computedStatus =
-        progress >= 100 ? ("completed" as const) : progress > 0 ? ("in_progress" as const) : c.status;
-      return { ...c, progress, computedStatus };
+      const live =
+        isCompanyModulesAllLive(modules) ||
+        (modules.filter((m) => m.optedIn).length > 0 &&
+          modules
+            .filter((m) => m.optedIn)
+            .every(
+              (m) =>
+                Boolean(m.liveAt) ||
+                getModuleProgressPercent(c.id, m.moduleKey, postSalesProjects) >= 100,
+            ));
+      const computedStatus = live
+        ? ("completed" as const)
+        : progress > 0
+          ? ("in_progress" as const)
+          : c.status;
+      return { ...c, progress, computedStatus, isLive: live };
     });
 
     const openTickets = tickets.filter((t) => t.status !== "Closed").length;
@@ -151,13 +203,13 @@ export function useDashboardKpis() {
     return {
       totalCompanies: companies.length,
       activeOnboarding: companiesWithProgress.filter((c) => c.computedStatus === "in_progress").length,
-      completed: companiesWithProgress.filter((c) => c.computedStatus === "completed").length,
+      completed: companiesWithProgress.filter((c) => c.isLive || c.computedStatus === "completed").length,
       onHold: companiesWithProgress.filter((c) => c.status === "on_hold").length,
       pendingTasks: openTickets,
       upcomingRenewals,
       companiesWithProgress,
     };
-  }, [companies, tickets, postSalesProjects]);
+  }, [companies, tickets, postSalesProjects, progressByProject]);
 }
 
 export function useModuleAdoption() {

@@ -109,6 +109,11 @@ async function main() {
         phone: c.phone,
         email: c.email,
         city: c.city,
+        region: c.region,
+        ownerName: c.ownerName,
+        ownerMobile: c.ownerMobile,
+        pocName: c.pocName,
+        pocMobile: c.pocMobile,
         officeAddress: c.officeAddress,
         gstNumber: c.gstNumber,
         billingInfo: c.billingInfo,
@@ -136,6 +141,9 @@ async function main() {
           label: m.label,
           optedIn: m.optedIn,
           optedOnDate: m.optedOnDate,
+          liveAt: m.liveAt ?? null,
+          pocName: m.pocName ?? null,
+          pocMobile: m.pocMobile ?? null,
         })
         .run();
     }
@@ -164,6 +172,8 @@ async function main() {
         otherChargesJson: JSON.stringify(p.otherCharges ?? []),
         customChargesJson: JSON.stringify(p.customCharges ?? []),
         logoUrl: p.logoUrl,
+        pocName: p.pocName ?? null,
+        pocMobile: p.pocMobile ?? null,
         createdAt: p.createdAt,
         updatedAt: p.updatedAt,
       })

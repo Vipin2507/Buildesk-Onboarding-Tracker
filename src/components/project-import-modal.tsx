@@ -116,6 +116,11 @@ export function ProjectImportModal({
               phone: "—",
               email: companyEmailFromName(action.companyName),
               city: "—",
+              region: "Rest of India",
+              ownerName: "",
+              ownerMobile: "",
+              pocName: "To be assigned",
+              pocMobile: "—",
               onboardingManagerId: "",
               csmId: "",
               status: "not_started",
@@ -124,7 +129,7 @@ export function ProjectImportModal({
               startDate: action.startDate,
               goLiveTarget: goLive,
               planExpiry: expiry,
-              plan: "Growth",
+              plan: "Half-Yearly",
               health: "Healthy",
             } satisfies Omit<Company, "id" | "createdAt" | "updatedAt">);
             companyIdByName.set(key, company.id);

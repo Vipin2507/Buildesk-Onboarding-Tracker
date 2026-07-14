@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarIcon, X } from "lucide-react";
 import { format, parse, isValid, startOfMonth, endOfMonth } from "date-fns";
 
@@ -44,7 +44,6 @@ function parseTypedDate(raw: string): Date | undefined {
     if (isValid(d)) return d;
   }
 
-  // Last resort: Date constructor for ISO-like values
   const fallback = new Date(text);
   return isValid(fallback) ? fallback : undefined;
 }
@@ -82,23 +81,28 @@ export function DatePickerField({
 }: DatePickerFieldProps) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(() => displayValue(value));
-  const selected = parseYmd(value);
-  const minDate = parseYmd(min ?? "");
-  const maxDate = parseYmd(max ?? "");
+  const selected = useMemo(() => parseYmd(value), [value]);
+  const minDate = useMemo(() => parseYmd(min ?? ""), [min]);
+  const maxDate = useMemo(() => parseYmd(max ?? ""), [max]);
 
   useEffect(() => {
     setDraft(displayValue(value));
   }, [value]);
 
-  const now = new Date();
-  const startMonth = (() => {
-    const start = startOfMonth(new Date(now.getFullYear() - yearsBack, 0, 1));
+  // Stable month bounds — new Date() every render previously caused DayPicker update loops (#185).
+  const startMonth = useMemo(() => {
+    const year = new Date().getFullYear();
+    const start = startOfMonth(new Date(year - yearsBack, 0, 1));
     return minDate && minDate < start ? startOfMonth(minDate) : start;
-  })();
-  const endMonth = (() => {
-    const end = endOfMonth(new Date(now.getFullYear() + yearsForward, 11, 31));
+  }, [yearsBack, minDate]);
+
+  const endMonth = useMemo(() => {
+    const year = new Date().getFullYear();
+    const end = endOfMonth(new Date(year + yearsForward, 11, 31));
     return maxDate && maxDate > end ? endOfMonth(maxDate) : end;
-  })();
+  }, [yearsForward, maxDate]);
+
+  const defaultMonth = selected ?? minDate ?? maxDate ?? startMonth;
 
   function commitTyped(raw: string) {
     const trimmed = raw.trim();
@@ -187,34 +191,38 @@ export function DatePickerField({
             "w-auto border-border bg-popover p-0 text-popover-foreground",
             modal && "z-[100]",
           )}
-          onOpenAutoFocus={(e) => {
-            if (modal) e.preventDefault();
-          }}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          onCloseAutoFocus={(e) => e.preventDefault()}
         >
-          <Calendar
-            mode="single"
-            captionLayout="dropdown"
-            selected={selected}
-            defaultMonth={selected ?? minDate ?? maxDate}
-            startMonth={startMonth}
-            endMonth={endMonth}
-            onSelect={(date) => {
-              if (!date) {
-                onChange("");
-                setDraft("");
-              } else {
-                onChange(toYmd(date));
-                setDraft(format(date, "dd MMM yyyy"));
+          {open ? (
+            <Calendar
+              mode="single"
+              captionLayout="dropdown"
+              selected={selected}
+              defaultMonth={defaultMonth}
+              startMonth={startMonth}
+              endMonth={endMonth}
+              onSelect={(date) => {
+                if (!date) {
+                  onChange("");
+                  setDraft("");
+                } else {
+                  onChange(toYmd(date));
+                  setDraft(format(date, "dd MMM yyyy"));
+                }
+                setOpen(false);
+              }}
+              disabled={
+                minDate || maxDate
+                  ? (date) => {
+                      if (minDate && date < minDate) return true;
+                      if (maxDate && date > maxDate) return true;
+                      return false;
+                    }
+                  : undefined
               }
-              setOpen(false);
-            }}
-            disabled={(date) => {
-              if (minDate && date < minDate) return true;
-              if (maxDate && date > maxDate) return true;
-              return false;
-            }}
-            initialFocus
-          />
+            />
+          ) : null}
           {value ? (
             <div className="border-t border-border p-2">
               <Button

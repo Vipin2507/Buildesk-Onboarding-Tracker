@@ -30,7 +30,7 @@ import {
   useProjectStore,
 } from "@/stores";
 import type { Company, CompanyHealth, CompanyPlan, ModuleKey, Project, StatusKey } from "@/types";
-import { STATUS_LABEL } from "@/types";
+import { COMPANY_REGIONS, STATUS_LABEL } from "@/types";
 
 type EntityTab = "companies" | "projects";
 
@@ -41,13 +41,18 @@ const companyAdminSchema = z.object({
   phone: z.string().min(1),
   email: z.string().email(),
   city: z.string().min(1),
+  region: z.enum(["NCR", "South", "West", "Rest of India"]),
+  ownerName: z.string().optional(),
+  ownerMobile: z.string().optional(),
+  pocName: z.string().optional(),
+  pocMobile: z.string().optional(),
   officeAddress: z.string().optional(),
   gstNumber: z.string().optional(),
   billingInfo: z.string().optional(),
   onboardingManagerId: z.string().min(1),
   csmId: z.string().min(1),
   status: z.enum(["not_started", "in_progress", "review", "completed", "on_hold"]),
-  plan: z.enum(["Starter", "Growth", "Enterprise"]),
+  plan: z.enum(["Annual", "Half-Yearly", "AMC"]),
   health: z.enum(["Healthy", "Moderate", "Critical"]),
   agreementDate: z.string().min(1),
   startDate: z.string().min(1),
@@ -501,6 +506,11 @@ function CompanyAdminEditModal({
         phone: data.phone.trim(),
         email: data.email.trim(),
         city: data.city.trim(),
+        region: data.region,
+        ownerName: data.ownerName?.trim() || "",
+        ownerMobile: data.ownerMobile?.trim() || "",
+        pocName: data.pocName?.trim() || data.contact.trim(),
+        pocMobile: data.pocMobile?.trim() || data.phone.trim(),
         officeAddress: data.officeAddress?.trim() || undefined,
         gstNumber: data.gstNumber?.trim() || undefined,
         billingInfo: data.billingInfo?.trim() || undefined,
@@ -535,6 +545,15 @@ function CompanyAdminEditModal({
             <Field label="City">
               <input {...form.register("city")} className={inputClass} />
             </Field>
+            <Field label="Region">
+              <select {...form.register("region")} className={inputClass}>
+                {COMPANY_REGIONS.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </Field>
             <Field label="Office address" className="sm:col-span-2">
               <input {...form.register("officeAddress")} className={inputClass} />
             </Field>
@@ -558,6 +577,21 @@ function CompanyAdminEditModal({
             </Field>
             <Field label="Email">
               <input {...form.register("email")} className={inputClass} />
+            </Field>
+          </Section>
+
+          <Section title="Owner & POC">
+            <Field label="Owner name">
+              <input {...form.register("ownerName")} className={inputClass} />
+            </Field>
+            <Field label="Owner mobile">
+              <input {...form.register("ownerMobile")} className={inputClass} />
+            </Field>
+            <Field label="POC name">
+              <input {...form.register("pocName")} className={inputClass} />
+            </Field>
+            <Field label="POC mobile">
+              <input {...form.register("pocMobile")} className={inputClass} />
             </Field>
           </Section>
 
@@ -591,7 +625,7 @@ function CompanyAdminEditModal({
             </Field>
             <Field label="Plan">
               <select {...form.register("plan")} className={inputClass}>
-                {(["Starter", "Growth", "Enterprise"] as const).map((p) => (
+                {(["Annual", "Half-Yearly", "AMC"] as const).map((p) => (
                   <option key={p} value={p}>
                     {p}
                   </option>
@@ -681,13 +715,18 @@ function companyToForm(company: Company | null): CompanyAdminForm {
       phone: "",
       email: "",
       city: "",
+      region: "Rest of India",
+      ownerName: "",
+      ownerMobile: "",
+      pocName: "",
+      pocMobile: "",
       officeAddress: "",
       gstNumber: "",
       billingInfo: "",
       onboardingManagerId: "",
       csmId: "",
       status: "not_started",
-      plan: "Growth",
+      plan: "Half-Yearly",
       health: "Healthy",
       agreementDate: "",
       startDate: "",
@@ -704,6 +743,11 @@ function companyToForm(company: Company | null): CompanyAdminForm {
     phone: company.phone,
     email: company.email,
     city: company.city,
+    region: company.region ?? "Rest of India",
+    ownerName: company.ownerName ?? "",
+    ownerMobile: company.ownerMobile ?? "",
+    pocName: company.pocName ?? company.contact,
+    pocMobile: company.pocMobile ?? company.phone,
     officeAddress: company.officeAddress ?? "",
     gstNumber: company.gstNumber ?? "",
     billingInfo: company.billingInfo ?? "",

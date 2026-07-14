@@ -15,6 +15,7 @@ const GROUPS = [
   "Customer App",
   "Integrations",
   "Procurement",
+  "Labor",
   "Close-out",
 ] as const;
 
@@ -45,10 +46,22 @@ export function ProjectManualProgress({ projectId }: { projectId: string }) {
 
   useEffect(() => {
     if (!progress) return;
-    setRemarks(progress.remarks);
-    setContactPerson(progress.contactPerson ?? company?.contact ?? "");
-    setContactNumber(progress.contactNumber ?? company?.phone ?? "");
-  }, [progress, company?.contact, company?.phone]);
+    setRemarks((prev) => (prev === (progress.remarks ?? "") ? prev : progress.remarks ?? ""));
+    const nextPerson =
+      progress.contactPerson ?? project?.pocName ?? company?.pocName ?? company?.contact ?? "";
+    const nextNumber =
+      progress.contactNumber ?? project?.pocMobile ?? company?.pocMobile ?? company?.phone ?? "";
+    setContactPerson((prev) => (prev === nextPerson ? prev : nextPerson));
+    setContactNumber((prev) => (prev === nextNumber ? prev : nextNumber));
+  }, [
+    progress,
+    project?.pocName,
+    project?.pocMobile,
+    company?.pocName,
+    company?.pocMobile,
+    company?.contact,
+    company?.phone,
+  ]);
 
   const percent = calcPercent(projectId);
   const naMap = progress?.notApplicable ?? {};
@@ -201,16 +214,26 @@ export function ProjectManualProgress({ projectId }: { projectId: string }) {
                 </div>
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              <div className={cn(
+                "grid gap-2",
+                group === "Integrations" || group === "Labor"
+                  ? "sm:grid-cols-1 xl:grid-cols-2"
+                  : "sm:grid-cols-2 xl:grid-cols-3",
+              )}>
                 {items.map((item) => {
                   const na = Boolean(progress?.notApplicable?.[item.key]);
                   const checked = Boolean(progress?.checks[item.key]) && !na;
                   const pulsing = pulseKey === item.key;
+                  const description =
+                    "description" in item && typeof item.description === "string"
+                      ? item.description
+                      : undefined;
+                  const showLiveBadge = group === "Integrations" || group === "Labor" || group === "Customer App";
                   return (
                     <div
                       key={item.key}
                       className={cn(
-                        "flex items-center gap-2 rounded-lg border px-2 py-2 transition-colors",
+                        "flex items-start gap-2 rounded-lg border px-2 py-2 transition-colors",
                         na
                           ? "border-border bg-muted/30"
                           : checked
@@ -238,14 +261,14 @@ export function ProjectManualProgress({ projectId }: { projectId: string }) {
                         }
                         transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
                         className={cn(
-                          "flex min-w-0 flex-1 items-center gap-3 rounded-md px-1.5 py-1 text-left",
+                          "flex min-w-0 flex-1 items-start gap-3 rounded-md px-1.5 py-1 text-left",
                           na && "cursor-default opacity-70",
                           !na && "hover:bg-muted/40",
                         )}
                       >
                         <span
                           className={cn(
-                            "flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors",
+                            "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors",
                             na
                               ? "border-muted-foreground/30 bg-muted text-muted-foreground"
                               : checked
@@ -278,14 +301,31 @@ export function ProjectManualProgress({ projectId }: { projectId: string }) {
                             )}
                           </AnimatePresence>
                         </span>
-                        <span
-                          className={cn(
-                            "text-sm font-medium",
-                            na && "text-muted-foreground line-through",
-                            checked && "text-foreground",
-                          )}
-                        >
-                          {item.label}
+                        <span className="min-w-0 flex-1">
+                          <span
+                            className={cn(
+                              "block text-sm font-medium",
+                              na && "text-muted-foreground line-through",
+                              checked && "text-foreground",
+                            )}
+                          >
+                            {item.label}
+                          </span>
+                          {description ? (
+                            <span className="mt-0.5 block text-xs text-muted-foreground">{description}</span>
+                          ) : null}
+                          {showLiveBadge && !na ? (
+                            <span
+                              className={cn(
+                                "mt-1.5 inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                                checked
+                                  ? "bg-success/15 text-success"
+                                  : "bg-muted text-muted-foreground",
+                              )}
+                            >
+                              {checked ? "Live" : "Not Live"}
+                            </span>
+                          ) : null}
                         </span>
                       </motion.button>
                       <button
@@ -293,7 +333,7 @@ export function ProjectManualProgress({ projectId }: { projectId: string }) {
                         title={na ? "Mark as applicable" : "Not applicable for this project"}
                         onClick={(e) => onToggleNa(e, item.key)}
                         className={cn(
-                          "inline-flex h-8 shrink-0 items-center gap-1 rounded-md border px-2 text-[10px] font-semibold uppercase tracking-wide",
+                          "mt-0.5 inline-flex h-8 shrink-0 items-center gap-1 rounded-md border px-2 text-[10px] font-semibold uppercase tracking-wide",
                           na
                             ? "border-muted-foreground/40 bg-muted text-muted-foreground"
                             : "border-input text-muted-foreground hover:border-foreground/40 hover:bg-muted/50",

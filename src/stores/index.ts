@@ -38,4 +38,7 @@ export {
   useModuleProgress,
   useCompanyModulesWithProgress,
   usePostSalesProjectsForCompany,
+  companyIsLive,
+  getCompanyOverallProgress,
+  getModuleProgressPercent,
 } from "./selectors";

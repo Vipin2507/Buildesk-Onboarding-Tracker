@@ -99,6 +99,9 @@ export function createCompanyModules(optedKeys: ModuleKey[], optedOnDate?: strin
     label: m.label,
     optedIn: optedKeys.includes(m.key),
     optedOnDate: optedKeys.includes(m.key) ? (optedOnDate ?? new Date().toISOString().slice(0, 10)) : undefined,
+    liveAt: undefined as string | undefined,
+    pocName: undefined as string | undefined,
+    pocMobile: undefined as string | undefined,
   }));
 }
 
@@ -113,35 +116,40 @@ function legacyModuleStringToKey(value: string): ModuleKey | null {
   return null;
 }
 
-/** Backward-compatible normalization for persisted data. */
+/** Merge stored modules onto full catalog so empty DB never blanks the Modules tab. */
 export function normalizeCompanyModules(input: unknown): CompanyModule[] {
-  if (Array.isArray(input)) {
-    // New shape: CompanyModule[]
-    if (input.every((x) => x && typeof x === "object" && "moduleKey" in (x as any))) {
-      const keys = new Set(MODULE_CATALOG.map((m) => m.key));
-      return (input as any[]).flatMap((m) => {
-        if (!m || typeof m !== "object") return [];
-        const moduleKey = (m as any).moduleKey as ModuleKey;
-        if (!keys.has(moduleKey)) return [];
-        const label = (m as any).label ?? getModuleLabel(moduleKey);
-        return [
-          {
-            moduleKey,
-            label,
-            optedIn: Boolean((m as any).optedIn),
-            optedOnDate: (m as any).optedOnDate,
-          } satisfies CompanyModule,
-        ];
-      });
-    }
+  const catalog = createCompanyModules([]);
 
-    // Legacy shape: string[]
-    if (input.every((x) => typeof x === "string")) {
-      const keys = (input as string[]).map((s) => legacyModuleStringToKey(s)).filter(Boolean) as ModuleKey[];
-      return createCompanyModules(keys);
-    }
+  if (!Array.isArray(input) || input.length === 0) {
+    return catalog;
   }
 
-  // Unknown / missing -> nothing opted in
-  return createCompanyModules([]);
+  // New shape: CompanyModule[]
+  if (input.every((x) => x && typeof x === "object" && "moduleKey" in (x as object))) {
+    const byKey = new Map(
+      (input as CompanyModule[])
+        .filter((m) => m && typeof m === "object" && MODULE_CATALOG.some((c) => c.key === m.moduleKey))
+        .map((m) => [
+          m.moduleKey,
+          {
+            moduleKey: m.moduleKey,
+            label: m.label ?? getModuleLabel(m.moduleKey),
+            optedIn: Boolean(m.optedIn),
+            optedOnDate: m.optedOnDate,
+            liveAt: m.liveAt,
+            pocName: m.pocName,
+            pocMobile: m.pocMobile,
+          } satisfies CompanyModule,
+        ]),
+    );
+    return catalog.map((base) => byKey.get(base.moduleKey) ?? base);
+  }
+
+  // Legacy shape: string[]
+  if (input.every((x) => typeof x === "string")) {
+    const keys = (input as string[]).map((s) => legacyModuleStringToKey(s)).filter(Boolean) as ModuleKey[];
+    return createCompanyModules(keys);
+  }
+
+  return catalog;
 }

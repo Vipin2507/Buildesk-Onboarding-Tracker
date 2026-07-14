@@ -21,8 +21,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { StatusPill, Pill } from "@/components/status-pill";
 import { useCompanyStore, useEmployeeStore } from "@/stores";
-import type { Company, CompanyHealth, CompanyPlan, StatusKey } from "@/types";
-import { STATUS_LABEL } from "@/types";
+import type { Company, CompanyHealth, CompanyPlan, CompanyRegion, StatusKey } from "@/types";
+import { COMPANY_REGIONS, STATUS_LABEL } from "@/types";
 import { cn } from "@/lib/utils";
 
 const detailSchema = z.object({
@@ -32,12 +32,17 @@ const detailSchema = z.object({
   phone: z.string().min(10, "Valid phone required"),
   email: z.string().email("Valid email required"),
   city: z.string().min(2, "City is required"),
+  region: z.enum(["NCR", "South", "West", "Rest of India"]),
+  ownerName: z.string().min(1),
+  ownerMobile: z.string().min(1),
+  pocName: z.string().min(1),
+  pocMobile: z.string().min(1),
   officeAddress: z.string().optional(),
   gstNumber: z.string().optional(),
   billingInfo: z.string().optional(),
   onboardingManagerId: z.string().min(1),
   csmId: z.string().min(1),
-  plan: z.enum(["Starter", "Growth", "Enterprise"]),
+  plan: z.enum(["Annual", "Half-Yearly", "AMC"]),
   health: z.enum(["Healthy", "Moderate", "Critical"]),
   status: z.enum(["not_started", "in_progress", "review", "completed", "on_hold"]),
   startDate: z.string().min(1),
@@ -163,6 +168,14 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
               City
               <input {...form.register("city")} className={inputClass(!!form.formState.errors.city)} />
             </label>
+            <label className="block text-xs font-medium">
+              Region
+              <select {...form.register("region")} className={inputClass()}>
+                {COMPANY_REGIONS.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            </label>
             <label className="block text-xs font-medium md:col-span-2">
               Office Address
               <input {...form.register("officeAddress")} className={inputClass()} />
@@ -208,6 +221,25 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
             </label>
           </Section>
 
+          <Section title="Owner & POC">
+            <label className="block text-xs font-medium">
+              Owner Name
+              <input {...form.register("ownerName")} className={inputClass()} />
+            </label>
+            <label className="block text-xs font-medium">
+              Owner Mobile
+              <input {...form.register("ownerMobile")} className={inputClass()} />
+            </label>
+            <label className="block text-xs font-medium">
+              POC Name
+              <input {...form.register("pocName")} className={inputClass()} />
+            </label>
+            <label className="block text-xs font-medium">
+              POC Mobile
+              <input {...form.register("pocMobile")} className={inputClass()} />
+            </label>
+          </Section>
+
           <Section title="Ownership">
             <label className="block text-xs font-medium">
               Onboarding Manager
@@ -231,7 +263,7 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
             <label className="block text-xs font-medium">
               Plan
               <select {...form.register("plan")} className={inputClass()}>
-                {(["Starter", "Growth", "Enterprise"] as const).map((p) => (
+                {(["Annual", "Half-Yearly", "AMC"] as const).map((p) => (
                   <option key={p} value={p}>{p}</option>
                 ))}
               </select>
@@ -265,6 +297,7 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
               <span className="font-medium">{company.name}</span>
             </Field>
             <Field label="City" icon={MapPin}>{company.city}</Field>
+            <Field label="Region" icon={MapPin}>{company.region || "Rest of India"}</Field>
             <Field label="Office Address" icon={MapPin} className="md:col-span-2">
               {company.officeAddress || company.city}
             </Field>
@@ -287,8 +320,17 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
             <Field label="Email" icon={Mail}>
               <a className="text-primary hover:underline" href={`mailto:${company.email}`}>{company.email}</a>
             </Field>
-            <Field label="Phone" icon={Phone}>
-              <a className="text-primary hover:underline" href={`tel:${company.phone}`}>{company.phone}</a>
+            <Field label="Phone" icon={Phone}>{company.phone}</Field>
+          </Section>
+
+          <Section title="Owner & POC">
+            <Field label="Owner" icon={User}>
+              <div className="font-medium">{company.ownerName || "—"}</div>
+              <div className="text-xs text-muted-foreground">{company.ownerMobile || ""}</div>
+            </Field>
+            <Field label="POC" icon={UserCog}>
+              <div className="font-medium">{company.pocName || company.contact}</div>
+              <div className="text-xs text-muted-foreground">{company.pocMobile || company.phone}</div>
             </Field>
           </Section>
 
@@ -333,6 +375,11 @@ function toFormValues(company: Company): DetailForm {
     phone: company.phone,
     email: company.email,
     city: company.city,
+    region: (company.region as CompanyRegion) || "Rest of India",
+    ownerName: company.ownerName || "",
+    ownerMobile: company.ownerMobile || "",
+    pocName: company.pocName || company.contact,
+    pocMobile: company.pocMobile || company.phone,
     officeAddress: company.officeAddress ?? "",
     gstNumber: company.gstNumber ?? "",
     billingInfo: company.billingInfo ?? "",

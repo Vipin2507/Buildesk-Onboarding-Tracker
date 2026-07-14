@@ -47,7 +47,22 @@ const csms = ["Karan Shah", "Ananya Nair", "Devansh Patel", "Meera Joshi"];
 const cities = ["Mumbai", "Pune", "Bengaluru", "Hyderabad", "Ahmedabad", "Gurugram", "Chennai", "Kolkata", "Noida", "Jaipur"];
 const statuses: StatusKey[] = ["in_progress", "review", "completed", "not_started", "on_hold", "in_progress", "completed", "in_progress"];
 const healths = ["Healthy", "Moderate", "Critical"] as const;
-const plans = ["Starter", "Growth", "Enterprise"] as const;
+const plans = ["Annual", "Half-Yearly", "AMC"] as const;
+const regions = ["NCR", "South", "West", "Rest of India"] as const;
+
+function regionForCity(city: string): (typeof regions)[number] {
+  const c = city.toLowerCase();
+  if (["delhi", "gurugram", "gurgaon", "noida", "faridabad", "ghaziabad"].some((x) => c.includes(x))) {
+    return "NCR";
+  }
+  if (["bengaluru", "bangalore", "chennai", "hyderabad", "kochi", "coimbatore"].some((x) => c.includes(x))) {
+    return "South";
+  }
+  if (["mumbai", "pune", "ahmedabad", "surat", "nagpur", "goa"].some((x) => c.includes(x))) {
+    return "West";
+  }
+  return "Rest of India";
+}
 
 /** Real client roster — name, optional contact/phone, project count. */
 const COMPANY_ROSTER: {
@@ -247,6 +262,11 @@ export const seedCompanies: Company[] = COMPANY_ROSTER.map((row, i) => {
     phone: phone || "—",
     email: companyEmail(row.name),
     city: cities[i % cities.length],
+    region: regionForCity(cities[i % cities.length]),
+    ownerName: row.contact?.trim() || "Owner TBD",
+    ownerMobile: phone || "—",
+    pocName: row.contact?.trim() || "To be assigned",
+    pocMobile: phone || "—",
     officeAddress: `${100 + i}, Business Park, ${cities[i % cities.length]}`,
     gstNumber: `27AABCU${String(9600 + i).padStart(4, "0")}1Z${i % 10}`,
     billingInfo: `${plans[i % 3]} plan · Annual billing · ${row.projectCount} project${row.projectCount === 1 ? "" : "s"}`,

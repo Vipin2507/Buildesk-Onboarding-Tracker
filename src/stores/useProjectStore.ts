@@ -64,6 +64,8 @@ export const useProjectStore = createStore<ProjectState>((set, get) => ({
         otherCharges: project.otherCharges,
         customCharges: project.customCharges,
         logoUrl: project.logoUrl,
+        pocName: project.pocName,
+        pocMobile: project.pocMobile,
       };
       const result = await apiCreateProject({ data: payload });
       if (result && typeof result === "object" && "skipped" in result && result.skipped) {

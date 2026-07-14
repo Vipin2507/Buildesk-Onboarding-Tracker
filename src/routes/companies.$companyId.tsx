@@ -25,6 +25,7 @@ import { CompanyTicketsPanel } from "@/components/company-tickets-panel";
 import { EntityNotFound, EmptyState } from "@/components/empty-state";
 import { DetailPageSkeleton } from "@/components/loading-skeleton";
 import { ConfirmDeleteDialog } from "@/components/entity-form-modal";
+import { ProgressSummaryCards } from "@/components/progress-summary-cards";
 import { useDetailLoading } from "@/hooks/use-detail-loading";
 import {
   useCompanyStore,
@@ -88,10 +89,26 @@ function CompanyDetailContent() {
 
   const manager = employees.find((e) => e.id === company.onboardingManagerId);
   const optedModules = modulesWithProgress.filter((m) => m.optedIn);
+  const liveModules = optedModules.filter((m) => m.isLive);
+  const companyLive =
+    optedModules.length > 0 && optedModules.every((m) => m.isLive);
   const avgModuleProgress =
     optedModules.length === 0
       ? 0
       : Math.round(optedModules.reduce((sum, m) => sum + m.progressPercent, 0) / optedModules.length);
+  const projectsLive = projects.filter((p) => p.status === "completed" || Boolean(p.goLiveAt)).length;
+  const progressCards = [
+    { id: "opted", label: "Modules Opted", value: optedModules.length },
+    { id: "live", label: "Modules Live", value: liveModules.length },
+    { id: "avg", label: "Avg Module %", value: avgModuleProgress, suffix: "%" },
+    { id: "overall", label: "Overall %", value: progress, suffix: "%" },
+    { id: "projects", label: "Projects", value: projects.length + postSalesProjects.length },
+    {
+      id: "projects_live",
+      label: "Projects Live",
+      value: projectsLive + postSalesProjects.filter((p) => p.progress >= 100).length,
+    },
+  ];
 
   function handleDelete() {
     if (projects.length > 0 || postSalesProjects.length > 0) {
@@ -117,10 +134,14 @@ function CompanyDetailContent() {
 
       <PageHeader
         title={company.name}
-        subtitle={`${company.city} · ${company.plan} plan · Started ${formatDate(company.startDate || company.agreementDate)}`}
+        subtitle={`${company.city}${company.region ? ` · ${company.region}` : ""} · ${company.plan} plan · Started ${formatDate(company.startDate || company.agreementDate)}`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <StatusPill status={progress >= 100 ? "completed" : company.status} />
+            {companyLive ? (
+              <Pill tone="success">Live</Pill>
+            ) : (
+              <StatusPill status={progress >= 100 ? "completed" : company.status} />
+            )}
             <Pill
               tone={
                 company.health === "Healthy"
@@ -199,7 +220,7 @@ function CompanyDetailContent() {
         <div className="space-y-4">
           <TabIntro
             title="Module Catalog"
-            description="Enable purchased modules and open project trackers for opted-in products."
+            description="Enable purchased modules, track progress, and mark Live. Customer App, Vendors, and Labor deep CRUD stay on their global pages — open each module hub for links."
           />
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {modulesWithProgress.map((m) => (
@@ -210,6 +231,7 @@ function CompanyDetailContent() {
                 label={m.label}
                 optedIn={m.optedIn}
                 progressPercent={m.progressPercent}
+                isLive={m.isLive}
               />
             ))}
           </div>
@@ -222,6 +244,7 @@ function CompanyDetailContent() {
             title="Module Progress"
             description="Completion across each opted-in module. Drill into projects to update steps."
           />
+          <ProgressSummaryCards cards={progressCards} />
           {optedModules.length === 0 ? (
             <EmptyState
               title="No modules opted in"
@@ -239,13 +262,20 @@ function CompanyDetailContent() {
                   <div className="min-w-[160px]">
                     <div className="font-medium">{m.label}</div>
                     <div className="text-xs text-muted-foreground">
-                      {m.progressPercent >= 100 ? "Complete" : m.progressPercent === 0 ? "Not started" : "In progress"}
+                      {m.isLive
+                        ? "Live"
+                        : m.progressPercent >= 100
+                          ? "Ready for Live"
+                          : m.progressPercent === 0
+                            ? "Not started"
+                            : "In progress"}
                     </div>
                   </div>
                   <div className="min-w-[140px] flex-1">
                     <ProgressBar value={m.progressPercent} />
                   </div>
                   <span className="w-12 text-right text-sm font-semibold">{m.progressPercent}%</span>
+                  <Pill tone={m.isLive ? "success" : "muted"}>{m.isLive ? "Live" : "Not Live"}</Pill>
                   <Button
                     size="sm"
                     variant="outline"

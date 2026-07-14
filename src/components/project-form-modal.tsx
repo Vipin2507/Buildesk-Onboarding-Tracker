@@ -61,6 +61,8 @@ export const projectFormSchema = z.object({
   agreementValue: z.coerce.number().min(0),
   rera: z.string().optional(),
   startDate: z.string().min(1, "Start date is required"),
+  pocName: z.string().optional(),
+  pocMobile: z.string().optional(),
   otherCharges: z.array(z.string()),
   customCharges: z.array(z.string()),
   logoUrl: z.string().optional(),
@@ -162,6 +164,8 @@ export function ProjectFormModal({
         agreementValue: editing.agreementValue ?? 0,
         rera: editing.rera ?? "",
         startDate: editing.startDate ?? new Date().toISOString().slice(0, 10),
+        pocName: editing.pocName ?? "",
+        pocMobile: editing.pocMobile ?? "",
         otherCharges: editing.otherCharges ?? [],
         customCharges: editing.customCharges ?? [],
         logoUrl: editing.logoUrl ?? "",
@@ -284,6 +288,14 @@ export function ProjectFormModal({
                 {form.formState.errors.startDate && (
                   <p className="mt-1 text-[11px] text-destructive">{form.formState.errors.startDate.message}</p>
                 )}
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Project POC Name</label>
+                <input {...form.register("pocName")} className={field} placeholder="On-site contact" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Project POC Mobile</label>
+                <input {...form.register("pocMobile")} className={field} placeholder="Mobile number" />
               </div>
             </div>
           </Section>
@@ -535,6 +547,8 @@ function emptyDefaults(
     agreementValue: 0,
     rera: "",
     startDate: new Date().toISOString().slice(0, 10),
+    pocName: "",
+    pocMobile: "",
     otherCharges: [],
     customCharges: [],
     logoUrl: "",
@@ -565,6 +579,8 @@ export function formValuesToProjectPatch(data: ProjectFormValues | ProjectAdminF
     customCharges: data.customCharges,
     logoUrl: data.logoUrl || undefined,
     startDate: data.startDate,
+    pocName: data.pocName?.trim() || undefined,
+    pocMobile: data.pocMobile?.trim() || undefined,
   };
 }
 

@@ -31,6 +31,11 @@ const companyInput = z.object({
   phone: z.string().min(1),
   email: z.string().email(),
   city: z.string().min(1),
+  region: z.enum(["NCR", "South", "West", "Rest of India"]).optional(),
+  ownerName: z.string().optional(),
+  ownerMobile: z.string().optional(),
+  pocName: z.string().optional(),
+  pocMobile: z.string().optional(),
   officeAddress: z.string().optional(),
   gstNumber: z.string().optional(),
   billingInfo: z.string().optional(),
@@ -41,7 +46,7 @@ const companyInput = z.object({
   startDate: z.string().optional(),
   goLiveTarget: z.string(),
   planExpiry: z.string(),
-  plan: z.enum(["Starter", "Growth", "Enterprise"]),
+  plan: z.enum(["Annual", "Half-Yearly", "AMC"]),
   health: z.enum(["Healthy", "Moderate", "Critical"]),
   moduleKeys: z.array(z.string()).optional(),
   modules: z
@@ -51,6 +56,9 @@ const companyInput = z.object({
         label: z.string(),
         optedIn: z.boolean(),
         optedOnDate: z.string().optional(),
+        liveAt: z.string().optional().nullable(),
+        pocName: z.string().optional().nullable(),
+        pocMobile: z.string().optional().nullable(),
       }),
     )
     .optional(),
@@ -75,6 +83,11 @@ export const createCompany = createServerFn({ method: "POST" })
         phone: data.phone,
         email: data.email,
         city: data.city,
+        region: data.region ?? "Rest of India",
+        ownerName: data.ownerName ?? "",
+        ownerMobile: data.ownerMobile ?? "",
+        pocName: data.pocName || data.contact,
+        pocMobile: data.pocMobile || data.phone,
         officeAddress: data.officeAddress,
         gstNumber: data.gstNumber,
         billingInfo: data.billingInfo,
@@ -98,6 +111,9 @@ export const createCompany = createServerFn({ method: "POST" })
         label: m.label,
         optedIn: m.optedIn,
         optedOnDate: m.optedOnDate,
+        liveAt: m.liveAt,
+        pocName: m.pocName,
+        pocMobile: m.pocMobile,
       }));
     for (const m of modules) {
       db.insert(t.companyModules)
@@ -108,6 +124,9 @@ export const createCompany = createServerFn({ method: "POST" })
           label: m.label,
           optedIn: m.optedIn,
           optedOnDate: m.optedOnDate,
+          liveAt: m.liveAt ?? null,
+          pocName: m.pocName ?? null,
+          pocMobile: m.pocMobile ?? null,
         })
         .run();
     }
@@ -129,6 +148,9 @@ export const updateCompany = createServerFn({ method: "POST" })
                 label: z.string(),
                 optedIn: z.boolean(),
                 optedOnDate: z.string().optional(),
+                liveAt: z.string().optional().nullable(),
+                pocName: z.string().optional().nullable(),
+                pocMobile: z.string().optional().nullable(),
               }),
             )
             .optional(),
@@ -157,6 +179,9 @@ export const updateCompany = createServerFn({ method: "POST" })
             label: m.label,
             optedIn: m.optedIn,
             optedOnDate: m.optedOnDate,
+            liveAt: m.liveAt ?? null,
+            pocName: m.pocName ?? null,
+            pocMobile: m.pocMobile ?? null,
           })
           .run();
       }
