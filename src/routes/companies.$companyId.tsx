@@ -21,6 +21,7 @@ import { ModuleCard } from "@/components/module-card";
 import { CompanyOverviewTab } from "@/components/company-overview-tab";
 import { CompanyNotesAttachmentsTab } from "@/components/company-notes-attachments";
 import { CompanyHistoryTab } from "@/components/company-history";
+import { CompanyTicketsPanel } from "@/components/company-tickets-panel";
 import { EntityNotFound, EmptyState } from "@/components/empty-state";
 import { DetailPageSkeleton } from "@/components/loading-skeleton";
 import { ConfirmDeleteDialog } from "@/components/entity-form-modal";
@@ -34,6 +35,7 @@ import {
   usePostSalesProjectsForCompany,
   calcProjectProgress,
   useOnboardingStore,
+  useProjectProgressStore,
 } from "@/stores";
 import { calcPostSalesProjectProgress } from "@/lib/post-sales-status";
 import { cn, formatDate } from "@/lib/utils";
@@ -47,6 +49,7 @@ const TABS = [
   { id: "Modules", label: "Modules" },
   { id: "Progress", label: "Progress" },
   { id: "Projects", label: "Projects" },
+  { id: "Tickets", label: "Tickets" },
   { id: "Notes & Attachments", label: "Notes & Files" },
   { id: "History", label: "History" },
   { id: "Billing", label: "Billing" },
@@ -75,6 +78,7 @@ function CompanyDetailContent() {
   const projects = useMemo(() => allProjects.filter((p) => p.companyId === companyId), [allProjects, companyId]);
   const postSalesProjects = usePostSalesProjectsForCompany(companyId);
   const checklistItems = useOnboardingStore((s) => s.checklistItems);
+  const progressByProject = useProjectProgressStore((s) => s.byProjectId);
   const employees = useEmployeeStore((s) => s.employees);
   const progress = useCompanyProgress(companyId);
   const modulesWithProgress = useCompanyModulesWithProgress(companyId);
@@ -282,6 +286,8 @@ function CompanyDetailContent() {
             ) : (
               <div className="grid gap-3 md:grid-cols-2">
                 {projects.map((p) => {
+                  // progressByProject keeps cards in sync when Progress Tracker updates
+                  void progressByProject;
                   const pct = calcProjectProgress(p.id, checklistItems);
                   return (
                     <Link
@@ -366,6 +372,8 @@ function CompanyDetailContent() {
           </section>
         </div>
       )}
+
+      {tab === "Tickets" && <CompanyTicketsPanel companyId={companyId} />}
 
       {tab === "Notes & Attachments" && <CompanyNotesAttachmentsTab companyId={companyId} />}
 

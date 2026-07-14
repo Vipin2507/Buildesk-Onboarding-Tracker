@@ -8,6 +8,7 @@ import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { logActivity } from "@/server/api/mappers";
 import type { ChecklistPhase, OnboardingChecklistItem, OtherCharge } from "@/types";
+import { applyChecklistPhaseToggle } from "@/lib/checklist";
 
 function ensureDefaultChecklist(projectId: string) {
   const db = getDb();
@@ -113,18 +114,58 @@ export const toggleChecklist = createServerFn({ method: "POST" })
     if (!row) throw new ApiError(404, "Checklist item not found");
     if (row.notApplicable) throw new ApiError(400, "Item is marked not applicable");
     const phase = data.phase as ChecklistPhase;
-    const next = !row[phase];
+    const next = applyChecklistPhaseToggle(mapChecklist(row), phase);
+    if (!next) throw new ApiError(400, "Complete prior phases first (Collected → Uploaded → Live)");
+    const now = nowIso();
     db.update(t.onboardingChecklistItems)
-      .set({ [phase]: next, updatedAt: nowIso() })
+      .set({
+        collected: next.collected,
+        uploaded: next.uploaded,
+        live: next.live,
+        updatedAt: now,
+      })
       .where(eq(t.onboardingChecklistItems.id, data.id))
       .run();
     logActivity({
       who: user.name,
-      what: `${next ? "Checked" : "Unchecked"} ${row.label} (${phase})`,
+      what: `${next[phase] ? "Checked" : "Unchecked"} ${row.label} (${phase})`,
       kind: "info",
       projectId: row.projectId,
     });
-    return mapChecklist({ ...row, [phase]: next, updatedAt: nowIso() });
+    return mapChecklist({
+      ...row,
+      collected: next.collected,
+      uploaded: next.uploaded,
+      live: next.live,
+      updatedAt: now,
+    });
+  });
+
+export const completeProjectChecklist = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ projectId: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const user = requireUser(["Admin", "Manager"]);
+    const db = getDb();
+    const now = nowIso();
+    const rows = db
+      .select()
+      .from(t.onboardingChecklistItems)
+      .where(eq(t.onboardingChecklistItems.projectId, data.projectId))
+      .all();
+    for (const row of rows) {
+      if (row.notApplicable) continue;
+      db.update(t.onboardingChecklistItems)
+        .set({ collected: true, uploaded: true, live: true, updatedAt: now })
+        .where(eq(t.onboardingChecklistItems.id, row.id))
+        .run();
+    }
+    logActivity({
+      who: user.name,
+      what: "Completed all onboarding checklist items",
+      kind: "success",
+      projectId: data.projectId,
+    });
+    return { ok: true as const, count: rows.filter((r) => !r.notApplicable).length };
   });
 
 export const setChecklistNotApplicable = createServerFn({ method: "POST" })

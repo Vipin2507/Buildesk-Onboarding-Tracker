@@ -31,6 +31,7 @@ export {
 export {
   listChecklist,
   toggleChecklist,
+  completeProjectChecklist,
   setChecklistNotApplicable,
   updateChecklistRemarks,
   setDocumentRequired,

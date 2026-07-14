@@ -17,7 +17,7 @@ import {
   type ProjectAdminFormValues,
 } from "@/components/project-form-modal";
 import { ProjectImportModal } from "@/components/project-import-modal";
-import { useCompanyStore, useProjectStore, useOnboardingStore, calcProjectProgress } from "@/stores";
+import { useCompanyStore, useProjectStore, useOnboardingStore, useProjectProgressStore, calcProjectProgress } from "@/stores";
 import type { Project } from "@/types";
 import { cn, formatDate } from "@/lib/utils";
 
@@ -65,6 +65,7 @@ function ProjectsListPage() {
   const deleteProject = useProjectStore((s) => s.deleteProject);
   const companies = useCompanyStore((s) => s.companies);
   const checklistItems = useOnboardingStore((s) => s.checklistItems);
+  const progressByProject = useProjectProgressStore((s) => s.byProjectId);
   const navigate = useNavigate();
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -97,7 +98,7 @@ function ProjectsListPage() {
       companyName: companies.find((c) => c.id === p.companyId)?.name ?? "Unknown company",
       progress: calcProjectProgress(p.id, checklistItems),
     }));
-  }, [projects, companies, checklistItems]);
+  }, [projects, companies, checklistItems, progressByProject]);
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = { all: enrichedAll.length };

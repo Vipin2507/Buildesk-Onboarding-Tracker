@@ -22,6 +22,8 @@ type ProjectState = {
   getById: (id: string) => Project | undefined;
   getByCompany: (companyId: string) => Project[];
   goLive: (id: string) => boolean;
+  /** One-click: mark Progress Tracker + checklist complete and set status completed. */
+  completeProject: (id: string) => void;
 };
 
 export const useProjectStore = createStore<ProjectState>((set, get) => ({
@@ -143,6 +145,45 @@ export const useProjectStore = createStore<ProjectState>((set, get) => ({
     }
     serverSync("goLiveProject", () => apiGoLiveProject({ data: { id } }));
     return true;
+  },
+
+  completeProject: (id) => {
+    const project = get().getById(id);
+    if (!project) return;
+    const now = nowIso();
+    useProjectProgressStore.getState().markAll(id, true);
+    useOnboardingStore.getState().completeAllChecklistForProject(id);
+    set((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === id
+          ? touch({
+              ...p,
+              status: "completed",
+              currentStep: 7,
+              goLiveAt: p.goLiveAt ?? now,
+            })
+          : p,
+      ),
+    }));
+    logActivity({
+      who: "You",
+      what: `Completed project ${project.name} in one click`,
+      kind: "success",
+      companyId: project.companyId,
+      projectId: id,
+    });
+    serverSync("completeProject", () =>
+      apiUpdateProject({
+        data: {
+          id,
+          patch: {
+            status: "completed",
+            currentStep: 7,
+            goLiveAt: project.goLiveAt ?? now,
+          },
+        },
+      }),
+    );
   },
 }));
 

@@ -18,6 +18,7 @@ import { useProjectStore } from "./useProjectStore";
 import { ATTACHMENT_CATEGORY_LABEL } from "@/types";
 import {
   toggleChecklist as apiToggleChecklist,
+  completeProjectChecklist as apiCompleteProjectChecklist,
   setChecklistNotApplicable as apiSetNotApplicable,
   updateChecklistRemarks as apiUpdateRemarks,
   setDocumentRequired as apiSetDocumentRequired,
@@ -27,7 +28,7 @@ import {
   simulateUpload as apiSimulateUpload,
 } from "@/lib/api";
 import { serverSync } from "@/lib/sync";
-import { calcChecklistProgress, isChecklistItemComplete } from "@/lib/checklist";
+import { calcChecklistProgress, isChecklistItemComplete, applyChecklistPhaseToggle } from "@/lib/checklist";
 
 type OnboardingState = {
   checklistItems: OnboardingChecklistItem[];
@@ -43,6 +44,8 @@ type OnboardingState = {
   toggleChecklist: (id: string, phase: ChecklistPhase, who?: string) => void;
   setChecklistNotApplicable: (id: string, notApplicable: boolean, who?: string) => void;
   updateChecklistRemarks: (id: string, remarks: string) => void;
+  /** Mark every applicable checklist item fully complete for a project. */
+  completeAllChecklistForProject: (projectId: string, who?: string) => void;
   /** When required, adds a Documents checklist step for this customer project. */
   setDocumentRequired: (projectId: string, documentName: string, required: boolean, who?: string) => void;
   isDocumentRequired: (projectId: string, documentName: string) => boolean;
@@ -111,8 +114,9 @@ export const useOnboardingStore = createStore<OnboardingState>((set, get) => ({
   toggleChecklist: (id, phase, who = "You") => {
     const item = get().checklistItems.find((i) => i.id === id);
     if (!item || item.notApplicable) return;
-    const key = phase as keyof Pick<OnboardingChecklistItem, "collected" | "uploaded" | "live">;
-    const updated = touch({ ...item, [key]: !item[key] });
+    const next = applyChecklistPhaseToggle(item, phase);
+    if (!next) return;
+    const updated = touch(next);
     set((s) => ({
       checklistItems: s.checklistItems.map((i) => (i.id === id ? updated : i)),
     }));
@@ -123,6 +127,32 @@ export const useOnboardingStore = createStore<OnboardingState>((set, get) => ({
       projectId: item.projectId,
     });
     serverSync("toggleChecklist", () => apiToggleChecklist({ data: { id, phase } }));
+  },
+
+  completeAllChecklistForProject: (projectId, who = "You") => {
+    const now = nowIso();
+    set((s) => ({
+      checklistItems: s.checklistItems.map((i) => {
+        if (i.projectId !== projectId || i.notApplicable) return i;
+        if (i.collected && i.uploaded && i.live) return i;
+        return {
+          ...i,
+          collected: true,
+          uploaded: true,
+          live: true,
+          updatedAt: now,
+        };
+      }),
+    }));
+    logActivity({
+      who,
+      what: "Completed all onboarding checklist items",
+      kind: "success",
+      projectId,
+    });
+    serverSync("completeProjectChecklist", () =>
+      apiCompleteProjectChecklist({ data: { projectId } }),
+    );
   },
 
   setChecklistNotApplicable: (id, notApplicable, who = "You") => {

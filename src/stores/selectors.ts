@@ -6,6 +6,7 @@ import { calcChecklistProgress } from "@/lib/checklist";
 import { useActivityStore } from "./useActivityStore";
 import { useCompanyStore } from "./useCompanyStore";
 import { useOnboardingStore } from "./useOnboardingStore";
+import { useProjectProgressStore } from "./useProjectProgressStore";
 import { useProjectStore } from "./useProjectStore";
 import { usePostSalesStore } from "./usePostSalesStore";
 import { useTicketStore } from "./useTicketStore";
@@ -17,6 +18,19 @@ function calcOnboardingProjectProgress(
   checklistItems: ReturnType<typeof useOnboardingStore.getState>["checklistItems"],
 ) {
   return calcChecklistProgress(checklistItems.filter((i) => i.projectId === projectId));
+}
+
+/**
+ * Project card / list progress: higher of onboarding checklist and Progress Tracker,
+ * so Mark all on the tracker is reflected on project cards.
+ */
+function calcCombinedProjectProgress(
+  projectId: string,
+  checklistItems: ReturnType<typeof useOnboardingStore.getState>["checklistItems"],
+) {
+  const checklist = calcOnboardingProjectProgress(projectId, checklistItems);
+  const manual = useProjectProgressStore.getState().calcPercent(projectId);
+  return Math.max(checklist, manual);
 }
 
 export function getModuleProgressPercent(
@@ -232,4 +246,4 @@ export function useGlobalSearch(query: string) {
   }, [q, companies, projects, employees]);
 }
 
-export { calcOnboardingProjectProgress as calcProjectProgress };
+export { calcCombinedProjectProgress as calcProjectProgress };

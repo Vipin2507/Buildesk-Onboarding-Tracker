@@ -25,7 +25,7 @@ import {
 import { ONBOARDING_STEPS, ONBOARDING_SECTIONS } from "@/data/constants";
 import { formatRelativeTime } from "@/types/common";
 import { PROJECT_PROGRESS_MILESTONES } from "@/types/project";
-import { isChecklistItemComplete } from "@/lib/checklist";
+import { calcChecklistProgress, canToggleChecklistPhase, countApplicableChecklist } from "@/lib/checklist";
 import { cn, formatDate } from "@/lib/utils";
 
 const searchSchema = z.object({
@@ -138,9 +138,7 @@ function ProjectDetailPage() {
 
   function sectionProgress(sec: string) {
     const items = sectionItems[sec] ?? [];
-    if (!items.length) return 0;
-    const done = items.filter(isChecklistItemComplete).length;
-    return Math.round((done / items.length) * 100);
+    return calcChecklistProgress(items);
   }
 
   return (
@@ -230,14 +228,17 @@ function ProjectDetailPage() {
                 const active = s.key === section;
                 const pct = sectionProgress(s.key);
                 const items = sectionItems[s.key] ?? [];
-                const done = items.filter(isChecklistItemComplete).length;
+                const { done, total, na } = countApplicableChecklist(items);
                 return (
                   <button key={s.key} onClick={() => setSection(s.key)} className={cn("relative flex min-w-[9.5rem] shrink-0 items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm lg:min-w-0 lg:w-full", active ? "bg-primary/15 text-primary" : "hover:bg-muted")}>
                     <div className="flex-1">
                       <div className="font-medium">{s.label}</div>
                       <div className="mt-1 flex items-center gap-2">
                         <ProgressBar value={pct} className="h-1 w-24" />
-                        <span className="text-[10px] text-muted-foreground">{done}/{items.length}</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {done}/{total}
+                          {na > 0 ? ` · ${na} N/A` : ""}
+                        </span>
                       </div>
                     </div>
                     <ChevronRight className="hidden h-4 w-4 text-muted-foreground lg:block" />
@@ -309,22 +310,41 @@ function ProjectDetailPage() {
                         ) : (
                           <>
                         <div className="mt-3 flex flex-wrap gap-2">
-                          {(["collected", "uploaded", "live"] as const).map((phase) => (
+                          {(["collected", "uploaded", "live"] as const).map((phase) => {
+                            const allowed = canToggleChecklistPhase(item, phase);
+                            return (
                             <button
                               key={phase}
                               type="button"
-                              onClick={() => toggleChecklist(item.id, phase)}
+                              disabled={!allowed && !item[phase]}
+                              title={
+                                !allowed && !item[phase]
+                                  ? "Complete prior steps first (Collected → Uploaded → Live)"
+                                  : undefined
+                              }
+                              onClick={() => {
+                                if (!canToggleChecklistPhase(item, phase) && !item[phase]) {
+                                  toast.error("Complete prior steps first", {
+                                    description: "Collected → Uploaded → Live",
+                                  });
+                                  return;
+                                }
+                                toggleChecklist(item.id, phase);
+                              }}
                               className={cn(
                                 "inline-flex min-h-10 min-w-[5.5rem] items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-medium capitalize",
                                 item[phase]
                                   ? "border-success bg-success text-white"
-                                  : "border-input bg-background hover:border-primary",
+                                  : allowed
+                                    ? "border-input bg-background hover:border-primary"
+                                    : "cursor-not-allowed border-input bg-muted/40 text-muted-foreground opacity-50",
                               )}
                             >
                               {item[phase] && <Check className="h-3.5 w-3.5" />}
                               {phase}
                             </button>
-                          ))}
+                            );
+                          })}
                         </div>
                         <input
                           value={item.remarks}
@@ -372,24 +392,42 @@ function ProjectDetailPage() {
                                 </span>
                               )}
                             </td>
-                            {(["collected", "uploaded", "live"] as const).map((phase) => (
+                            {(["collected", "uploaded", "live"] as const).map((phase) => {
+                              const allowed = !na && canToggleChecklistPhase(item, phase);
+                              return (
                               <td key={phase} className="px-3 py-3 text-center">
                                 <button
                                   type="button"
-                                  disabled={na}
-                                  onClick={() => toggleChecklist(item.id, phase)}
+                                  disabled={na || (!allowed && !item[phase])}
+                                  title={
+                                    na
+                                      ? "Not applicable"
+                                      : !allowed && !item[phase]
+                                        ? "Complete prior steps first"
+                                        : undefined
+                                  }
+                                  onClick={() => {
+                                    if (!canToggleChecklistPhase(item, phase) && !item[phase]) {
+                                      toast.error("Complete prior steps first", {
+                                        description: "Collected → Uploaded → Live",
+                                      });
+                                      return;
+                                    }
+                                    toggleChecklist(item.id, phase);
+                                  }}
                                   className={cn(
                                     "inline-flex h-6 w-6 items-center justify-center rounded-md border",
-                                    na && "cursor-not-allowed opacity-40",
+                                    (na || (!allowed && !item[phase])) && "cursor-not-allowed opacity-40",
                                     !na && item[phase] && "border-success bg-success text-white",
-                                    !na && !item[phase] && "border-input hover:border-primary",
+                                    !na && !item[phase] && allowed && "border-input hover:border-primary",
                                   )}
                                 >
                                   {!na && item[phase] && <Check className="h-3.5 w-3.5" />}
                                   {na && <span className="text-[10px] text-muted-foreground">—</span>}
                                 </button>
                               </td>
-                            ))}
+                              );
+                            })}
                             <td className="px-3 py-3 text-center">
                               <button
                                 type="button"

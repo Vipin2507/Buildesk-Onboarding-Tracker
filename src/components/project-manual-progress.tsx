@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Ban, Check, CheckCheck, Eraser } from "lucide-react";
+import { Ban, Check, CheckCheck, Eraser, Rocket } from "lucide-react";
 import { toast } from "sonner";
 
 import { ProgressBar } from "@/components/progress-bar";
@@ -32,6 +32,7 @@ export function ProjectManualProgress({ projectId }: { projectId: string }) {
   const updateMeta = useProjectProgressStore((s) => s.updateMeta);
   const markAll = useProjectProgressStore((s) => s.markAll);
   const calcPercent = useProjectProgressStore((s) => s.calcPercent);
+  const completeProject = useProjectStore((s) => s.completeProject);
 
   const [remarks, setRemarks] = useState("");
   const [contactPerson, setContactPerson] = useState("");
@@ -51,19 +52,18 @@ export function ProjectManualProgress({ projectId }: { projectId: string }) {
 
   const percent = calcPercent(projectId);
   const naMap = progress?.notApplicable ?? {};
-  const doneCount = useMemo(
-    () =>
-      PROJECT_PROGRESS_MILESTONES.filter(
-        (m) => progress?.checks[m.key] || progress?.notApplicable?.[m.key],
-      ).length,
-    [progress],
-  );
   const applicableTotal = useMemo(
     () => PROJECT_PROGRESS_MILESTONES.filter((m) => !naMap[m.key]).length,
     [naMap],
   );
+  const doneCount = useMemo(
+    () =>
+      PROJECT_PROGRESS_MILESTONES.filter((m) => !naMap[m.key] && progress?.checks[m.key]).length,
+    [progress, naMap],
+  );
   const total = PROJECT_PROGRESS_MILESTONES.length;
   const naCount = total - applicableTotal;
+  const alreadyComplete = project?.status === "completed";
 
   function onToggle(key: ProjectProgressMilestoneKey) {
     if (progress?.notApplicable?.[key]) return;
@@ -98,7 +98,20 @@ export function ProjectManualProgress({ projectId }: { projectId: string }) {
               Check off milestones as work completes, or mark N/A when not relevant.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              className="bg-primary"
+              disabled={alreadyComplete && percent === 100}
+              onClick={() => {
+                completeProject(projectId);
+                toast.success("Project completed", {
+                  description: "Progress Tracker and onboarding checklist marked complete.",
+                });
+              }}
+            >
+              <Rocket className="mr-1 h-3.5 w-3.5" /> Complete project
+            </Button>
             <Button
               size="sm"
               variant="outline"
@@ -124,8 +137,8 @@ export function ProjectManualProgress({ projectId }: { projectId: string }) {
 
         <div className="mb-2 flex items-center justify-between text-sm">
           <span className="text-muted-foreground">
-            {doneCount} of {total} milestones
-            {naCount > 0 ? ` · ${naCount} N/A` : ""}
+            {doneCount} of {applicableTotal} milestones
+            {naCount > 0 ? ` · ${naCount} N/A excluded` : ""}
           </span>
           <motion.span
             key={percent}
