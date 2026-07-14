@@ -220,7 +220,7 @@ function CompanyDetailContent() {
         <div className="space-y-4">
           <TabIntro
             title="Module Catalog"
-            description="Enable purchased modules, track progress, and mark Live. Customer App, Vendors, and Labor deep CRUD stay on their global pages — open each module hub for links."
+            description="Enable or disable purchased modules, track progress, and mark Live. Customer App, Vendors, and Labor deep CRUD stay on their global pages — open each module hub for links."
           />
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {modulesWithProgress.map((m) => (

@@ -20,6 +20,7 @@ type CompanyState = {
   transferManager: (companyId: string, managerId: string, who: string) => void;
   markRenewed: (id: string) => void;
   enableModule: (companyId: string, moduleKey: ModuleKey) => void;
+  disableModule: (companyId: string, moduleKey: ModuleKey) => void;
   setModuleLive: (companyId: string, moduleKey: ModuleKey, live: boolean) => void;
   updateModuleMeta: (
     companyId: string,
@@ -164,6 +165,44 @@ export const useCompanyStore = createStore<CompanyState>((set, get) => ({
     });
     serverSync("enableModule", () =>
       apiUpdateCompany({ data: { id: companyId, patch: { modules: nextModules } } }),
+    );
+  },
+
+  disableModule: (companyId, moduleKey) => {
+    const company = get().getById(companyId);
+    if (!company) return;
+    const nextModules = normalizeCompanyModules(company.modules).map((m) =>
+      m.moduleKey === moduleKey
+        ? { ...m, optedIn: false, optedOnDate: undefined, liveAt: undefined }
+        : m,
+    );
+    const stillLive =
+      nextModules.filter((m) => m.optedIn).length > 0 &&
+      nextModules.filter((m) => m.optedIn).every((m) => Boolean(m.liveAt));
+    set((s) => ({
+      companies: s.companies.map((c) => {
+        if (c.id !== companyId) return c;
+        return touch({
+          ...c,
+          modules: nextModules,
+          status: stillLive ? "completed" : c.status === "completed" ? "in_progress" : c.status,
+        });
+      }),
+    }));
+    logActivity({
+      who: "You",
+      what: `Disabled module ${getModuleLabel(moduleKey)} for ${company.name}`,
+      kind: "warning",
+      companyId,
+    });
+    const updated = get().getById(companyId)!;
+    serverSync("disableModule", () =>
+      apiUpdateCompany({
+        data: {
+          id: companyId,
+          patch: { modules: nextModules, status: updated.status },
+        },
+      }),
     );
   },
 

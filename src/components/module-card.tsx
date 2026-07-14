@@ -48,6 +48,7 @@ export function ModuleCard({
 }) {
   const navigate = useNavigate();
   const enableModule = useCompanyStore((s) => s.enableModule);
+  const disableModule = useCompanyStore((s) => s.disableModule);
   const setModuleLive = useCompanyStore((s) => s.setModuleLive);
   const catalog = MODULE_CATALOG.find((m) => m.key === moduleKey);
   const Icon = ICONS[catalog?.icon ?? "layers"];
@@ -64,6 +65,12 @@ export function ModuleCard({
     e.stopPropagation();
     enableModule(companyId, moduleKey);
     toast.success(`${label} enabled`);
+  }
+
+  function handleDisable(e: React.MouseEvent) {
+    e.stopPropagation();
+    disableModule(companyId, moduleKey);
+    toast.success(`${label} removed from company`);
   }
 
   function handleLive(e: React.MouseEvent) {
@@ -110,9 +117,14 @@ export function ModuleCard({
             <ProgressRing value={progressPercent} size={56} stroke={6} />
             <div className="text-xs text-muted-foreground">Module progress</div>
           </div>
-          <Button size="sm" variant="outline" onClick={handleLive}>
-            {isLive ? "Clear Live" : "Mark Live"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={handleLive}>
+              {isLive ? "Clear Live" : "Mark Live"}
+            </Button>
+            <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10" onClick={handleDisable}>
+              Disable
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="mt-auto pt-1">

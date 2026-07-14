@@ -124,7 +124,7 @@ export function ProjectImportModal({
               onboardingManagerId: "",
               csmId: "",
               status: "not_started",
-              modules: createCompanyModules(["post-sales", "customer-app"], action.startDate),
+              modules: createCompanyModules([], action.startDate),
               agreementDate: action.startDate,
               startDate: action.startDate,
               goLiveTarget: goLive,

@@ -58,7 +58,7 @@ const companySchema = z.object({
         "project-management",
       ]),
     )
-    .min(1),
+    .default([]),
   agreementDate: z.string(),
   startDate: z.string().min(1, "Start date is required"),
   goLiveTarget: z.string(),
@@ -119,7 +119,7 @@ function CompaniesListPage() {
       onboardingManagerId: employees[0]?.id ?? "",
       csmId: employees.find((e) => e.role === "CSM")?.id ?? "",
       plan: "Half-Yearly", health: "Healthy",
-      modules: ["post-sales", "customer-app", "vendor-management"],
+      modules: [],
       agreementDate: new Date().toISOString().slice(0, 10),
       startDate: new Date().toISOString().slice(0, 10),
       goLiveTarget: new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10),
