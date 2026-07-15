@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
+import { motion } from "framer-motion";
 import { Building, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { APP_NAV, isNavActive } from "@/lib/nav";
@@ -86,20 +87,26 @@ export function AppSidebar() {
                   to={item.to}
                   title={collapsed ? item.label : undefined}
                   className={cn(
-                    "group relative flex items-center gap-2.5 overflow-hidden rounded-md px-2.5 py-1.5 text-[13px] font-medium",
-                    "transition-[background-color,color,padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                    "group relative flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium",
+                    "transition-[color,padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
                     collapsed && "justify-center px-0",
                     active
-                      ? "bg-sidebar-accent text-white"
+                      ? "text-white"
                       : "text-sidebar-foreground/80 hover:bg-sidebar-accent/70 hover:text-white",
                   )}
                 >
                   {active && (
-                    <span
-                      className={cn(
-                        "absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-sidebar-primary transition-opacity duration-300",
-                        collapsed ? "opacity-0" : "opacity-100",
-                      )}
+                    <motion.span
+                      layoutId="sidebar-active"
+                      className="absolute inset-0 rounded-md bg-sidebar-accent"
+                      transition={{ type: "spring", stiffness: 400, damping: 36 }}
+                    />
+                  )}
+                  {active && !collapsed && (
+                    <motion.span
+                      layoutId="sidebar-indicator"
+                      className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-sidebar-primary"
+                      transition={{ type: "spring", stiffness: 400, damping: 36 }}
                     />
                   )}
                   <Icon className="relative z-10 h-4 w-4 shrink-0" />
