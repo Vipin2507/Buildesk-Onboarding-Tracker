@@ -8,6 +8,7 @@ import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { loadProject, loadProjects, logActivity } from "@/server/api/mappers";
 import type { ProjectManualProgress } from "@/types";
+import { PROJECT_PROGRESS_MILESTONES } from "@/types/project";
 
 function ensureChecklist(projectId: string) {
   const db = getDb();
@@ -15,29 +16,56 @@ function ensureChecklist(projectId: string) {
     .select()
     .from(t.onboardingChecklistItems)
     .where(eq(t.onboardingChecklistItems.projectId, projectId))
-    .get();
-  if (existing) return;
+    .all();
+  if (existing.length > 0) return existing;
   const now = nowIso();
+  const created: (typeof t.onboardingChecklistItems.$inferSelect)[] = [];
   for (const [section, labels] of Object.entries(CHECKLIST_TEMPLATE)) {
     for (const label of labels) {
-      db.insert(t.onboardingChecklistItems)
-        .values({
-          id: newId(),
-          projectId,
-          section,
-          label,
-          collected: false,
-          uploaded: false,
-          live: false,
-          notApplicable: false,
-          remarks: "",
-          source: "default",
-          createdAt: now,
-          updatedAt: now,
-        })
-        .run();
+      const row = {
+        id: newId(),
+        projectId,
+        section,
+        label,
+        collected: false,
+        uploaded: false,
+        live: false,
+        notApplicable: false,
+        remarks: "",
+        source: "default",
+        createdAt: now,
+        updatedAt: now,
+      };
+      db.insert(t.onboardingChecklistItems).values(row).run();
+      created.push(row);
     }
   }
+  return created;
+}
+
+function ensureCustomerAppConfig(projectId: string) {
+  const db = getDb();
+  const existing = db
+    .select()
+    .from(t.customerAppConfigs)
+    .where(eq(t.customerAppConfigs.projectId, projectId))
+    .get();
+  if (existing) return existing;
+  const now = nowIso();
+  const row = {
+    projectId,
+    mode: "buildesk",
+    appName: "Customer App",
+    primaryColor: "#2563eb",
+    logoUrl: "",
+    supportEmail: "",
+    supportPhone: "",
+    publishStatus: "draft",
+    createdAt: now,
+    updatedAt: now,
+  };
+  db.insert(t.customerAppConfigs).values(row).run();
+  return row;
 }
 
 export const listProjects = createServerFn({ method: "GET" })
@@ -56,6 +84,7 @@ export const getProject = createServerFn({ method: "GET" })
     const project = loadProject(data.id);
     if (!project) throw new ApiError(404, "Project not found");
     ensureChecklist(data.id);
+    ensureCustomerAppConfig(data.id);
     return project;
   });
 
@@ -121,7 +150,24 @@ export const createProject = createServerFn({ method: "POST" })
     const db = getDb();
     const id = data.id ?? newId();
     const existing = loadProject(id);
-    if (existing) return existing;
+    if (existing) {
+      ensureCustomerAppConfig(id);
+      const checklist = ensureChecklist(id).map((row) => ({
+        id: row.id,
+        projectId: row.projectId,
+        section: row.section,
+        label: row.label,
+        collected: row.collected,
+        uploaded: row.uploaded,
+        live: row.live,
+        notApplicable: row.notApplicable ?? false,
+        remarks: row.remarks,
+        source: (row.source as "default" | "required-document") || "default",
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+      }));
+      return { project: existing, checklist };
+    }
 
     // Import fires company + project almost together; wait briefly for company row.
     let company = db.select().from(t.companies).where(eq(t.companies.id, data.companyId)).get();
@@ -148,6 +194,7 @@ export const createProject = createServerFn({ method: "POST" })
       throw e;
     }
     ensureChecklist(id);
+    ensureCustomerAppConfig(id);
     logActivity({
       who: user.name,
       what: `Created project ${data.name}`,
@@ -155,7 +202,22 @@ export const createProject = createServerFn({ method: "POST" })
       companyId: data.companyId,
       projectId: id,
     });
-    return loadProject(id)!;
+    const project = loadProject(id)!;
+    const checklist = ensureChecklist(id).map((row) => ({
+      id: row.id,
+      projectId: row.projectId,
+      section: row.section,
+      label: row.label,
+      collected: row.collected,
+      uploaded: row.uploaded,
+      live: row.live,
+      notApplicable: row.notApplicable ?? false,
+      remarks: row.remarks,
+      source: (row.source as "default" | "required-document") || "default",
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    }));
+    return { project, checklist };
   });
 
 export const updateProject = createServerFn({ method: "POST" })
@@ -331,14 +393,7 @@ export const upsertProjectProgress = createServerFn({ method: "POST" })
         .where(eq(t.projectManualProgress.projectId, data.projectId))
         .get()!;
     }
-    const keys = [
-      "projectSetup", "existingDataUpload", "paymentUpload", "dueMatching", "demandFormat",
-      "receiptFormat", "agreementFormat", "allotmentLetterFormat", "welcomeLetterFormat",
-      "customerApplication", "whiteLabelOrBuildesk", "androidAppPublished", "iosAppPublished",
-      "credentialsShared", "appIntegrationRequired", "integrationConnected", "procurementManagement",
-      "materialDataUpdated", "supplierDataUpdated", "contractorDataUpdated", "poFormat", "woFormat",
-      "boqFormed", "clientSignOff",
-    ];
+    const keys = PROJECT_PROGRESS_MILESTONES.map((m) => m.key);
     let checks = JSON.parse(row.checksJson || "{}") as Record<string, boolean>;
     let notApplicable = JSON.parse(row.notApplicableJson || "{}") as Record<string, boolean>;
     if (data.markAll !== undefined) {

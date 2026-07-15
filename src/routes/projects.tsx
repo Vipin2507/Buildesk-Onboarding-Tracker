@@ -267,7 +267,7 @@ function ProjectsListPage() {
             navigate({
               to: "/projects/$projectId",
               params: { projectId: project.id },
-              search: { tab: "onboarding" },
+              search: { tab: "progress" },
             }),
         },
       });
@@ -542,7 +542,7 @@ function ProjectsListPage() {
                                 <Link
                                   to="/projects/$projectId"
                                   params={{ projectId: p.id }}
-                                  search={{ tab: "onboarding" }}
+                                  search={{ tab: "progress" }}
                                   className="block"
                                 >
                                   <div className="mb-2 flex items-start gap-3">

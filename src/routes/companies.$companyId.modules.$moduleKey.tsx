@@ -194,7 +194,7 @@ function GenericModuleHub({
             </Button>
             {crud ? (
               <Button size="sm" variant="outline" asChild>
-                <Link to={crud.to as "/vendors"}>
+                <Link to={crud.to as "/vendors"} search={{ companyId }}>
                   <ExternalLink className="mr-1 h-3.5 w-3.5" /> {crud.label}
                 </Link>
               </Button>

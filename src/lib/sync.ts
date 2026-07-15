@@ -52,6 +52,31 @@ export function serverSync(label: string, fn: () => Promise<unknown>) {
   });
 }
 
+/**
+ * Optimistic write with rollback: on non-ignorable failure, restore prior state
+ * (or refetch) so the UI does not lie about persistence.
+ */
+export function serverSyncWithRollback(
+  label: string,
+  fn: () => Promise<unknown>,
+  rollback: () => void | Promise<void>,
+) {
+  void fn().catch(async (e) => {
+    const message = e instanceof Error ? e.message : `Failed to sync ${label}`;
+    if (isIgnorableSyncError(message)) {
+      console.warn(`[sync:${label}]`, message);
+      return;
+    }
+    console.error(`[sync:${label}]`, e);
+    try {
+      await rollback();
+    } catch (rollbackErr) {
+      console.error(`[sync:${label}:rollback]`, rollbackErr);
+    }
+    toast.error(message, { description: "Local change was reverted." });
+  });
+}
+
 /** Debounced sync for bulk config blobs (master / settings). */
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
 

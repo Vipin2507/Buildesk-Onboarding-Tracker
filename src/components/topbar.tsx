@@ -101,7 +101,7 @@ export function TopBar() {
                     void navigate({
                       to: "/projects/$projectId",
                       params: { projectId: p.id },
-                      search: { tab: "onboarding" },
+                      search: { tab: "progress" },
                     });
                     setQuery("");
                     setOpen(false);

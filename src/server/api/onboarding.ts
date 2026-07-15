@@ -99,6 +99,60 @@ export const listChecklist = createServerFn({ method: "GET" })
     return rows.map(mapChecklist);
   });
 
+export const setChecklistState = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string(),
+        collected: z.boolean(),
+        uploaded: z.boolean(),
+        live: z.boolean(),
+        notApplicable: z.boolean().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    const db = getDb();
+    const row = db
+      .select()
+      .from(t.onboardingChecklistItems)
+      .where(eq(t.onboardingChecklistItems.id, data.id))
+      .get();
+    if (!row) throw new ApiError(404, "Checklist item not found");
+    const now = nowIso();
+    const notApplicable = data.notApplicable ?? false;
+    const collected = notApplicable ? false : data.collected;
+    const uploaded = notApplicable ? false : data.uploaded && collected;
+    const live = notApplicable ? false : data.live && uploaded && collected;
+    db.update(t.onboardingChecklistItems)
+      .set({
+        notApplicable,
+        collected,
+        uploaded,
+        live,
+        updatedAt: now,
+      })
+      .where(eq(t.onboardingChecklistItems.id, data.id))
+      .run();
+    logActivity({
+      who: user.name,
+      what: notApplicable
+        ? `Marked "${row.label}" as not applicable`
+        : `Set checklist state on "${row.label}"`,
+      kind: "info",
+      projectId: row.projectId,
+    });
+    return mapChecklist({
+      ...row,
+      notApplicable,
+      collected,
+      uploaded,
+      live,
+      updatedAt: now,
+    });
+  });
+
 export const toggleChecklist = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z.object({ id: z.string(), phase: z.enum(["collected", "uploaded", "live"]) }).parse(data),
@@ -424,3 +478,85 @@ export const listAllUploads = createServerFn({ method: "GET" }).handler(async ()
   requireUser();
   return getDb().select().from(t.unitUploads).all();
 });
+
+function mapCustomerAppConfig(row: typeof t.customerAppConfigs.$inferSelect) {
+  return {
+    projectId: row.projectId,
+    mode: row.mode as "buildesk" | "whitelabel",
+    appName: row.appName,
+    primaryColor: row.primaryColor,
+    logoUrl: row.logoUrl,
+    supportEmail: row.supportEmail,
+    supportPhone: row.supportPhone,
+    publishStatus: row.publishStatus as "draft" | "review" | "published",
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+export const listAllCustomerAppConfigs = createServerFn({ method: "GET" }).handler(async () => {
+  requireUser();
+  return getDb().select().from(t.customerAppConfigs).all().map(mapCustomerAppConfig);
+});
+
+export const upsertCustomerAppConfig = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        projectId: z.string(),
+        patch: z
+          .object({
+            mode: z.enum(["buildesk", "whitelabel"]).optional(),
+            appName: z.string().optional(),
+            primaryColor: z.string().optional(),
+            logoUrl: z.string().optional(),
+            supportEmail: z.string().optional(),
+            supportPhone: z.string().optional(),
+            publishStatus: z.enum(["draft", "review", "published"]).optional(),
+          })
+          .optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    requireUser(["Admin", "Manager"]);
+    const db = getDb();
+    const now = nowIso();
+    const existing = db
+      .select()
+      .from(t.customerAppConfigs)
+      .where(eq(t.customerAppConfigs.projectId, data.projectId))
+      .get();
+    const patch = data.patch ?? {};
+    if (!existing) {
+      const row = {
+        projectId: data.projectId,
+        mode: patch.mode ?? "buildesk",
+        appName: patch.appName ?? "Customer App",
+        primaryColor: patch.primaryColor ?? "#2563eb",
+        logoUrl: patch.logoUrl ?? "",
+        supportEmail: patch.supportEmail ?? "",
+        supportPhone: patch.supportPhone ?? "",
+        publishStatus: patch.publishStatus ?? "draft",
+        createdAt: now,
+        updatedAt: now,
+      };
+      db.insert(t.customerAppConfigs).values(row).run();
+      return mapCustomerAppConfig(row);
+    }
+    const next = {
+      mode: patch.mode ?? existing.mode,
+      appName: patch.appName ?? existing.appName,
+      primaryColor: patch.primaryColor ?? existing.primaryColor,
+      logoUrl: patch.logoUrl ?? existing.logoUrl,
+      supportEmail: patch.supportEmail ?? existing.supportEmail,
+      supportPhone: patch.supportPhone ?? existing.supportPhone,
+      publishStatus: patch.publishStatus ?? existing.publishStatus,
+      updatedAt: now,
+    };
+    db.update(t.customerAppConfigs)
+      .set(next)
+      .where(eq(t.customerAppConfigs.projectId, data.projectId))
+      .run();
+    return mapCustomerAppConfig({ ...existing, ...next });
+  });

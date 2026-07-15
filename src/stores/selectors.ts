@@ -267,14 +267,16 @@ export function useUpcomingRenewals(limit = 5) {
 export function useProjectWithProgress(projectId: string) {
   const project = useProjectStore((s) => s.projects.find((p) => p.id === projectId));
   const checklistItems = useOnboardingStore((s) => s.checklistItems);
+  const progressByProject = useProjectProgressStore((s) => s.byProjectId);
   const companies = useCompanyStore((s) => s.companies);
 
   return useMemo(() => {
     if (!project) return undefined;
-    const progress = calcOnboardingProjectProgress(projectId, checklistItems);
+    void progressByProject;
+    const progress = calcCombinedProjectProgress(projectId, checklistItems);
     const company = companies.find((c) => c.id === project.companyId);
     return { ...project, progress, companyName: company?.name ?? "" };
-  }, [project, checklistItems, companies, projectId]);
+  }, [project, checklistItems, companies, projectId, progressByProject]);
 }
 
 export function useGlobalSearch(query: string) {

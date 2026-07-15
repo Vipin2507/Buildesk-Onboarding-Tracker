@@ -29,10 +29,10 @@ import { calcChecklistProgress, canToggleChecklistPhase, countApplicableChecklis
 import { cn, formatDate } from "@/lib/utils";
 
 const searchSchema = z.object({
-  tab: z.enum([
-    "progress", "onboarding", "data-migration", "documents",
-    "integrations", "training", "tickets", "go-live",
-  ]).optional().default("progress"),
+  tab: z
+    .enum(["progress", "onboarding", "documents", "tickets"])
+    .optional()
+    .default("progress"),
 });
 
 export const Route = createFileRoute("/projects/$projectId")({
@@ -52,9 +52,13 @@ function ProjectDetailPage() {
   const allCharges = useOnboardingStore((s) => s.otherCharges);
   const allActivities = useActivityStore((s) => s.activities);
   const checklist = useMemo(() => allChecklist.filter((i) => i.projectId === projectId), [allChecklist, projectId]);
-  const checklistProgress = useMemo(() => calcProjectProgress(projectId, allChecklist), [projectId, allChecklist]);
-  const manualChecks = useProjectProgressStore((s) => s.byProjectId[projectId]?.checks);
-  const manualNa = useProjectProgressStore((s) => s.byProjectId[projectId]?.notApplicable);
+  const progressByProject = useProjectProgressStore((s) => s.byProjectId[projectId]);
+  const checklistProgress = useMemo(
+    () => calcProjectProgress(projectId, allChecklist),
+    [projectId, allChecklist, progressByProject],
+  );
+  const manualChecks = progressByProject?.checks;
+  const manualNa = progressByProject?.notApplicable;
   const manualPercent = useMemo(() => {
     if (!manualChecks && !manualNa) return 0;
     const na = manualNa ?? {};
@@ -63,7 +67,7 @@ function ProjectDetailPage() {
     const done = applicable.filter((m) => manualChecks?.[m.key]).length;
     return Math.round((done / applicable.length) * 100);
   }, [manualChecks, manualNa]);
-  const progress = tab === "progress" ? manualPercent : checklistProgress;
+  const progress = Math.max(checklistProgress, manualPercent);
   const canGoLive = useMemo(
     () => {
       const goliveItems = checklist.filter((i) => i.section === "golive");
@@ -111,13 +115,9 @@ function ProjectDetailPage() {
 
   const TABS = [
     { key: "progress", label: "Progress Tracker" },
-    { key: "onboarding", label: "Onboarding" },
-    { key: "data-migration", label: "Data Migration" },
+    { key: "onboarding", label: "Checklist Detail" },
     { key: "documents", label: "Documents" },
-    { key: "integrations", label: "Integrations" },
-    { key: "training", label: "Training" },
     { key: "tickets", label: "Tickets" },
-    { key: "go-live", label: "Go Live" },
   ] as const;
 
   function handleGoLive() {
@@ -148,7 +148,7 @@ function ProjectDetailPage() {
 
       <PageHeader
         title={project.name}
-        subtitle={`${company?.name ?? ""} · ${project.city}${project.pocName ? ` · POC ${project.pocName}` : ""}${project.startDate ? ` · Started ${formatDate(project.startDate)}` : ""}`}
+        subtitle={`${company?.name ?? ""} · ${project.city}${project.pocName ? ` · POC ${project.pocName}` : ""}${project.startDate ? ` · Started ${formatDate(project.startDate)}` : ""} · Track milestones in Progress; use Checklist for phase-level detail`}
         actions={
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">{progress}% complete</span>
@@ -481,22 +481,6 @@ function ProjectDetailPage() {
 
       {tab === "tickets" && (
         <ProjectTicketsPanel projectId={projectId} companyId={project.companyId} />
-      )}
-
-      {tab !== "onboarding" &&
-        tab !== "progress" &&
-        tab !== "documents" &&
-        tab !== "tickets" && (
-        <div className="card-soft p-5">
-          <p className="text-sm text-muted-foreground">
-            Use the dedicated <Link to={`/${tab}` as "/data-migration"} className="text-primary underline">{tab}</Link> page for full CRUD — data is shared via global stores and scoped to this project where applicable.
-          </p>
-          <Button className="mt-4" variant="outline" asChild>
-            <Link to={`/${tab === "go-live" ? "onboarding" : tab}` as "/data-migration"}>
-              Open {TABS.find((t) => t.key === tab)?.label}
-            </Link>
-          </Button>
-        </div>
       )}
     </PageWrap>
   );

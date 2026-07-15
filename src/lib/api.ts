@@ -30,6 +30,7 @@ export {
 
 export {
   listChecklist,
+  setChecklistState,
   toggleChecklist,
   completeProjectChecklist,
   setChecklistNotApplicable,
@@ -44,6 +45,8 @@ export {
   listAllChecklist,
   listAllOtherCharges,
   listAllUploads,
+  listAllCustomerAppConfigs,
+  upsertCustomerAppConfig,
 } from "@/server/api/onboarding";
 
 export {

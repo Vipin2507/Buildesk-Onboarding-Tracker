@@ -108,7 +108,9 @@ export function ProjectManualProgress({ projectId }: { projectId: string }) {
           <div>
             <h3 className="text-lg font-semibold">Manual Progress Tracker</h3>
             <p className="text-sm text-muted-foreground">
-              Check off milestones as work completes, or mark N/A when not relevant.
+              Shared with Onboarding: checking milestones here updates matching checklist
+              rows (and the reverse when a checklist item is fully completed). Mark all also
+              completes the onboarding checklist.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -130,7 +132,9 @@ export function ProjectManualProgress({ projectId }: { projectId: string }) {
               variant="outline"
               onClick={() => {
                 markAll(projectId, true);
-                toast.success("All milestones marked complete");
+                toast.success("All milestones marked complete", {
+                  description: "Matching onboarding checklist items were updated too.",
+                });
               }}
             >
               <CheckCheck className="mr-1 h-3.5 w-3.5" /> Mark all
@@ -140,7 +144,9 @@ export function ProjectManualProgress({ projectId }: { projectId: string }) {
               variant="ghost"
               onClick={() => {
                 markAll(projectId, false);
-                toast.message("All milestones cleared");
+                toast.message("All milestones cleared", {
+                  description: "Mapped onboarding checklist rows were reset.",
+                });
               }}
             >
               <Eraser className="mr-1 h-3.5 w-3.5" /> Clear

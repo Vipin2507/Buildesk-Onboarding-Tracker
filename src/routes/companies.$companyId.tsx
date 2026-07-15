@@ -1,5 +1,6 @@
 import { createFileRoute, Link, Outlet, useChildMatches, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { z } from "zod";
 import {
   ArrowLeft,
   ArrowRight,
@@ -41,7 +42,23 @@ import {
 import { calcPostSalesProjectProgress } from "@/lib/post-sales-status";
 import { cn, formatDate } from "@/lib/utils";
 
+const tabSchema = z.enum([
+  "Overview",
+  "Modules",
+  "Progress",
+  "Projects",
+  "Tickets",
+  "Notes & Attachments",
+  "History",
+  "Billing",
+]);
+
+const searchSchema = z.object({
+  tab: tabSchema.optional(),
+});
+
 export const Route = createFileRoute("/companies/$companyId")({
+  validateSearch: (search) => searchSchema.parse(search),
   component: CompanyDetailPage,
 });
 
@@ -67,10 +84,15 @@ function CompanyDetailPage() {
 
 function CompanyDetailContent() {
   const { companyId } = Route.useParams();
+  const search = Route.useSearch();
+  const tab: TabId = search.tab ?? "Overview";
   const loading = useDetailLoading();
-  const navigate = useNavigate();
-  const [tab, setTab] = useState<TabId>("Overview");
+  const navigate = useNavigate({ from: "/companies/$companyId" });
   const [deleteOpen, setDeleteOpen] = useState(false);
+
+  const setTab = (next: TabId) => {
+    void navigate({ search: { tab: next }, replace: true });
+  };
 
   const company = useCompanyStore((s) => s.companies.find((c) => c.id === companyId));
   const deleteCompany = useCompanyStore((s) => s.deleteCompany);
@@ -220,7 +242,7 @@ function CompanyDetailContent() {
         <div className="space-y-4">
           <TabIntro
             title="Module Catalog"
-            description="Enable or disable purchased modules, track progress, and mark Live. Customer App, Vendors, and Labor deep CRUD stay on their global pages — open each module hub for links."
+            description="Enable or disable purchased modules and mark Live. Open a module hub for company-scoped Customer App, Vendors, or Labor tools."
           />
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {modulesWithProgress.map((m) => (
@@ -324,7 +346,7 @@ function CompanyDetailContent() {
                       key={p.id}
                       to="/projects/$projectId"
                       params={{ projectId: p.id }}
-                      search={{ tab: "onboarding" }}
+                      search={{ tab: "progress" }}
                       className="card-soft group block p-4 transition-all hover:-translate-y-0.5 hover:shadow-md"
                     >
                       <div className="flex items-start justify-between gap-2">

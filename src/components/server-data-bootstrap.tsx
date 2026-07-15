@@ -11,6 +11,7 @@ import {
   listAllOtherCharges,
   listAllProgress,
   listAllUploads,
+  listAllCustomerAppConfigs,
   listCompanies,
   listDocuments,
   listEmployees,
@@ -91,6 +92,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           charges,
           uploads,
           progressRows,
+          customerApps,
         ] = await Promise.all([
           listCompanies(),
           listProjects({ data: {} }),
@@ -115,6 +117,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           listAllOtherCharges().catch(() => []),
           listAllUploads().catch(() => []),
           listAllProgress().catch(() => []),
+          listAllCustomerAppConfigs().catch(() => []),
         ]);
 
         if (cancelled) return;
@@ -149,6 +152,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           })),
           otherCharges: charges,
           uploads: uploads as never,
+          customerAppConfigs: customerApps as never,
         });
         useProjectProgressStore.setState({
           byProjectId: Object.fromEntries(
@@ -197,7 +201,8 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
         if (!cancelled) {
           console.error(e);
           setError(e instanceof Error ? e.message : "Failed to load server data");
-          setReady(true);
+          // Fail closed — do not mount the app on a hollow/empty Zustand cache.
+          setReady(false);
         }
       }
     })();
@@ -207,20 +212,32 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
     };
   }, [user?.id]);
 
-  if (!ready) {
+  if (error) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
-        Syncing data from server…
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 p-6 text-center">
+        <p className="text-sm font-medium text-destructive">Could not load workspace data</p>
+        <p className="max-w-sm text-xs text-muted-foreground">{error}</p>
+        <button
+          type="button"
+          className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+          onClick={() => {
+            setError(null);
+            setReady(false);
+            // Trigger effect by forcing remount via state flip of user dependency —
+            // re-run by briefly clearing ready and reloading.
+            window.location.reload();
+          }}
+        >
+          Retry
+        </button>
       </div>
     );
   }
 
-  if (error) {
+  if (!ready) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-2 p-6 text-center">
-        <p className="text-sm text-destructive">{error}</p>
-        <p className="text-xs text-muted-foreground">Showing cached data where available.</p>
-        {children}
+      <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
+        Syncing data from server…
       </div>
     );
   }

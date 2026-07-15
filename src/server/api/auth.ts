@@ -31,7 +31,6 @@ const registerInput = z.object({
   name: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(6),
-  role: z.enum(["Admin", "Manager", "Viewer"]).optional(),
 });
 
 const changePasswordInput = z.object({
@@ -74,7 +73,7 @@ export const authRegister = createServerFn({ method: "POST" })
         name: data.name.trim(),
         email,
         passwordHash,
-        role: data.role ?? "Viewer",
+        role: "Viewer",
         active: true,
         notifyEmail: true,
         notifyInApp: true,

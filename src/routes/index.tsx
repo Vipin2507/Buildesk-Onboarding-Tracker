@@ -175,7 +175,7 @@ function Dashboard() {
                     <span>{manager?.name ?? "Unassigned"}</span>
                     {project && (
                       <Button size="sm" variant="ghost" className="h-8 gap-1 px-2 text-primary" asChild>
-                        <Link to="/projects/$projectId" params={{ projectId: project.id }} search={{ tab: "onboarding" }}>
+                        <Link to="/projects/$projectId" params={{ projectId: project.id }} search={{ tab: "progress" }}>
                           Continue <ArrowRight className="h-3.5 w-3.5" />
                         </Link>
                       </Button>
@@ -218,7 +218,7 @@ function Dashboard() {
                       <td className="px-3 py-2.5 text-right">
                         {project && (
                           <Button size="sm" variant="ghost" className="gap-1 text-primary" asChild>
-                            <Link to="/projects/$projectId" params={{ projectId: project.id }} search={{ tab: "onboarding" }}>
+                            <Link to="/projects/$projectId" params={{ projectId: project.id }} search={{ tab: "progress" }}>
                               Continue <ArrowRight className="h-3.5 w-3.5" />
                             </Link>
                           </Button>

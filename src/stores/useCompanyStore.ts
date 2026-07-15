@@ -9,7 +9,7 @@ import {
   deleteCompany as apiDeleteCompany,
   renewCompany as apiRenewCompany,
 } from "@/lib/api";
-import { serverSync, serverSyncTracked } from "@/lib/sync";
+import { serverSync, serverSyncTracked, serverSyncWithRollback } from "@/lib/sync";
 
 type CompanyState = {
   companies: Company[];
@@ -72,22 +72,31 @@ export const useCompanyStore = createStore<CompanyState>((set, get) => ({
   },
 
   updateCompany: (id, data) => {
+    const previous = get().getById(id);
+    if (!previous) return;
     set((s) => ({
       companies: s.companies.map((c) => (c.id === id ? touch({ ...c, ...data }) : c)),
     }));
     const company = get().getById(id);
     if (company) {
       logActivity({ who: "You", what: `Updated company ${company.name}`, kind: "info", companyId: id });
-      serverSync("updateCompany", () =>
-        apiUpdateCompany({
-          data: {
-            id,
-            patch: {
-              ...data,
-              modules: data.modules ?? company.modules,
+      serverSyncWithRollback(
+        "updateCompany",
+        () =>
+          apiUpdateCompany({
+            data: {
+              id,
+              patch: {
+                ...data,
+                modules: data.modules ?? company.modules,
+              },
             },
-          },
-        }),
+          }),
+        () => {
+          set((s) => ({
+            companies: s.companies.map((c) => (c.id === id ? previous : c)),
+          }));
+        },
       );
     }
   },
@@ -97,7 +106,13 @@ export const useCompanyStore = createStore<CompanyState>((set, get) => ({
     if (!company) return undefined;
     set((s) => ({ companies: s.companies.filter((c) => c.id !== id) }));
     logActivity({ who: "You", what: `Deleted company ${company.name}`, kind: "warning", companyId: id });
-    serverSync("deleteCompany", () => apiDeleteCompany({ data: { id } }));
+    serverSyncWithRollback(
+      "deleteCompany",
+      () => apiDeleteCompany({ data: { id } }),
+      () => {
+        set((s) => ({ companies: [company, ...s.companies] }));
+      },
+    );
     return company;
   },
 

@@ -9,7 +9,6 @@ import type {
   UploadType,
 } from "@/types";
 import { newId, nowIso } from "@/types";
-import { buildChecklistForProject } from "@/data/seed";
 import { CHECKLIST_TEMPLATE } from "@/data/constants";
 import { logActivity } from "./useActivityStore";
 import { recordAttachment } from "./useNotesAttachmentsStore";
@@ -26,8 +25,10 @@ import {
   updateOtherCharge as apiUpdateCharge,
   deleteOtherCharge as apiDeleteCharge,
   simulateUpload as apiSimulateUpload,
+  listChecklist as apiListChecklist,
+  upsertCustomerAppConfig as apiUpsertCustomerApp,
 } from "@/lib/api";
-import { serverSync } from "@/lib/sync";
+import { serverSync, serverSyncWithRollback } from "@/lib/sync";
 import { calcChecklistProgress, isChecklistItemComplete, applyChecklistPhaseToggle } from "@/lib/checklist";
 
 type OnboardingState = {
@@ -39,6 +40,8 @@ type OnboardingState = {
   customerAppConfigs: CustomerAppConfig[];
 
   initChecklistForProject: (projectId: string) => void;
+  /** Replace client checklist rows for a project with authoritative server rows. */
+  replaceChecklistForProject: (projectId: string, items: OnboardingChecklistItem[]) => void;
   removeProjectData: (projectId: string) => void;
 
   toggleChecklist: (id: string, phase: ChecklistPhase, who?: string) => void;
@@ -80,23 +83,42 @@ export const useOnboardingStore = createStore<OnboardingState>((set, get) => ({
 
   initChecklistForProject: (projectId) => {
     const existing = get().checklistItems.some((i) => i.projectId === projectId);
-    if (existing) return;
-    const items = buildChecklistForProject(projectId);
-    const config: CustomerAppConfig = {
-      projectId,
-      mode: "buildesk",
-      appName: "Customer App",
-      primaryColor: "#2563eb",
-      logoUrl: "",
-      supportEmail: "",
-      supportPhone: "",
-      publishStatus: "draft",
-      createdAt: nowIso(),
-      updatedAt: nowIso(),
-    };
+    if (!existing) {
+      // Prefer server IDs — local seed UUIDs would never match SQLite toggles.
+      void apiListChecklist({ data: { projectId } })
+        .then((items) => {
+          if (!items?.length) return;
+          get().replaceChecklistForProject(projectId, items);
+        })
+        .catch(() => {
+          // Offline / bootstrap race: leave empty until next fetch.
+        });
+    }
+    const hadConfig = get().customerAppConfigs.some((c) => c.projectId === projectId);
+    if (!hadConfig) {
+      const config: CustomerAppConfig = {
+        projectId,
+        mode: "buildesk",
+        appName: "Customer App",
+        primaryColor: "#2563eb",
+        logoUrl: "",
+        supportEmail: "",
+        supportPhone: "",
+        publishStatus: "draft",
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+      };
+      set((s) => ({ customerAppConfigs: [...s.customerAppConfigs, config] }));
+      serverSync("customerApp", () => apiUpsertCustomerApp({ data: { projectId, patch: config } }));
+    }
+  },
+
+  replaceChecklistForProject: (projectId, items) => {
     set((s) => ({
-      checklistItems: [...s.checklistItems, ...items],
-      customerAppConfigs: [...s.customerAppConfigs, config],
+      checklistItems: [
+        ...s.checklistItems.filter((i) => i.projectId !== projectId),
+        ...items,
+      ],
     }));
   },
 
@@ -127,6 +149,13 @@ export const useOnboardingStore = createStore<OnboardingState>((set, get) => ({
       projectId: item.projectId,
     });
     serverSync("toggleChecklist", () => apiToggleChecklist({ data: { id, phase } }));
+    if (updated.collected && updated.uploaded && updated.live) {
+      queueMicrotask(() => {
+        void import("@/lib/progress-onboarding-bridge").then((m) =>
+          m.syncProgressFromChecklistItem(item.projectId, item.section, item.label, true),
+        );
+      });
+    }
   },
 
   completeAllChecklistForProject: (projectId, who = "You") => {
@@ -392,12 +421,25 @@ export const useOnboardingStore = createStore<OnboardingState>((set, get) => ({
   getUploadsByProject: (projectId) => get().uploads.filter((u) => u.projectId === projectId),
 
   updateCustomerAppConfig: (projectId, data) => {
+    const previous = get().customerAppConfigs.find((c) => c.projectId === projectId);
     set((s) => ({
       customerAppConfigs: s.customerAppConfigs.map((c) =>
         c.projectId === projectId ? touch({ ...c, ...data }) : c,
       ),
     }));
     logActivity({ who: "You", what: "Updated customer app configuration", kind: "info", projectId });
+    serverSyncWithRollback(
+      "customerApp",
+      () => apiUpsertCustomerApp({ data: { projectId, patch: data } }),
+      () => {
+        if (!previous) return;
+        set((s) => ({
+          customerAppConfigs: s.customerAppConfigs.map((c) =>
+            c.projectId === projectId ? previous : c,
+          ),
+        }));
+      },
+    );
   },
 
   getCustomerAppConfig: (projectId) => get().customerAppConfigs.find((c) => c.projectId === projectId),

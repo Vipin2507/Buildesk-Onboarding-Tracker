@@ -1,6 +1,5 @@
 import type { Project } from "@/types";
 import { newId, nowIso } from "@/types";
-import { buildChecklistForProject } from "@/data/seed";
 import { useOnboardingStore } from "./useOnboardingStore";
 import { useProjectProgressStore } from "./useProjectProgressStore";
 import { logActivity } from "./useActivityStore";
@@ -12,7 +11,8 @@ import {
   deleteProject as apiDeleteProject,
   goLiveProject as apiGoLiveProject,
 } from "@/lib/api";
-import { serverSync, waitForSync } from "@/lib/sync";
+import { serverSync, waitForSync, serverSyncWithRollback } from "@/lib/sync";
+import { toast } from "sonner";
 
 type ProjectState = {
   projects: Project[];
@@ -33,7 +33,7 @@ export const useProjectStore = createStore<ProjectState>((set, get) => ({
     const now = nowIso();
     const project: Project = { ...data, id: newId(), createdAt: now, updatedAt: now };
     set((s) => ({ projects: [project, ...s.projects] }));
-    useOnboardingStore.getState().initChecklistForProject(project.id);
+    // Checklist is created on the server and hydrated from the create response.
     logActivity({
       who: "You",
       what: `Created project ${project.name}`,
@@ -42,7 +42,6 @@ export const useProjectStore = createStore<ProjectState>((set, get) => ({
       projectId: project.id,
     });
     serverSync("createProject", async () => {
-      // Sheet import creates company + project back-to-back; wait for company row first.
       await waitForSync(`company:${project.companyId}`);
       const payload = {
         id: project.id,
@@ -67,11 +66,21 @@ export const useProjectStore = createStore<ProjectState>((set, get) => ({
         pocName: project.pocName,
         pocMobile: project.pocMobile,
       };
-      const result = await apiCreateProject({ data: payload });
+      let result = await apiCreateProject({ data: payload });
       if (result && typeof result === "object" && "skipped" in result && result.skipped) {
         await new Promise((r) => setTimeout(r, 400));
         await waitForSync(`company:${project.companyId}`);
-        return apiCreateProject({ data: payload });
+        result = await apiCreateProject({ data: payload });
+      }
+      if (result && typeof result === "object" && "skipped" in result && result.skipped) {
+        set((s) => ({ projects: s.projects.filter((p) => p.id !== project.id) }));
+        toast.error("Could not save project — company was not ready. Try again.");
+        return result;
+      }
+      if (result && typeof result === "object" && "checklist" in result && Array.isArray(result.checklist)) {
+        useOnboardingStore.getState().replaceChecklistForProject(project.id, result.checklist);
+      } else {
+        useOnboardingStore.getState().initChecklistForProject(project.id);
       }
       return result;
     });
@@ -79,6 +88,8 @@ export const useProjectStore = createStore<ProjectState>((set, get) => ({
   },
 
   updateProject: (id, data) => {
+    const previous = get().getById(id);
+    if (!previous) return;
     set((s) => ({
       projects: s.projects.map((p) => (p.id === id ? touch({ ...p, ...data }) : p)),
     }));
@@ -91,7 +102,15 @@ export const useProjectStore = createStore<ProjectState>((set, get) => ({
         companyId: project.companyId,
         projectId: id,
       });
-      serverSync("updateProject", () => apiUpdateProject({ data: { id, patch: data } }));
+      serverSyncWithRollback(
+        "updateProject",
+        () => apiUpdateProject({ data: { id, patch: data } }),
+        () => {
+          set((s) => ({
+            projects: s.projects.map((p) => (p.id === id ? previous : p)),
+          }));
+        },
+      );
     }
   },
 
@@ -146,6 +165,11 @@ export const useProjectStore = createStore<ProjectState>((set, get) => ({
       });
     }
     serverSync("goLiveProject", () => apiGoLiveProject({ data: { id } }));
+    queueMicrotask(() => {
+      void import("@/lib/progress-onboarding-bridge").then((m) =>
+        m.markClientSignOffOnProgress(id),
+      );
+    });
     return true;
   },
 
@@ -188,5 +212,3 @@ export const useProjectStore = createStore<ProjectState>((set, get) => ({
     );
   },
 }));
-
-export { buildChecklistForProject };
