@@ -28,6 +28,37 @@ import { PROJECT_PROGRESS_MILESTONES } from "@/types/project";
 import { calcChecklistProgress, canToggleChecklistPhase, countApplicableChecklist } from "@/lib/checklist";
 import { cn, formatDate } from "@/lib/utils";
 
+type OnboardingSectionKey = (typeof ONBOARDING_SECTIONS)[number]["key"];
+
+const STEP_TO_SECTION: OnboardingSectionKey[] = [
+  "project", // 0 Project Details
+  "project", // 1 Other Charges
+  "unit", // 2 Unit Configuration
+  "customer", // 3 Customer Data Upload
+  "payment", // 4 Payment Data Upload
+  "documents", // 5 Documents Upload
+  "integrations", // 6 Payment Plan / Integrations
+  "golive", // 7 Review & Complete
+];
+
+const SECTION_TO_STEP: Record<OnboardingSectionKey, number> = {
+  project: 0,
+  unit: 2,
+  customer: 3,
+  payment: 4,
+  documents: 5,
+  integrations: 6,
+  golive: 7,
+};
+
+function sectionForStep(step: number): OnboardingSectionKey {
+  return STEP_TO_SECTION[Math.max(0, Math.min(step, STEP_TO_SECTION.length - 1))] ?? "project";
+}
+
+function stepForSection(sectionKey: string): number {
+  return SECTION_TO_STEP[sectionKey as OnboardingSectionKey] ?? 0;
+}
+
 const searchSchema = z.object({
   tab: z
     .enum(["progress", "onboarding", "documents", "tickets"])
@@ -97,8 +128,24 @@ function ProjectDetailPage() {
   const deleteOtherCharge = useOnboardingStore((s) => s.deleteOtherCharge);
 
   const [currentStep, setCurrentStep] = useState(project?.currentStep ?? 0);
-  const [section, setSection] = useState("project");
+  const [section, setSection] = useState<OnboardingSectionKey>(() =>
+    sectionForStep(project?.currentStep ?? 0),
+  );
   const [goLiveAnim, setGoLiveAnim] = useState(false);
+
+  function goToStep(step: number) {
+    const next = Math.max(0, Math.min(step, ONBOARDING_STEPS.length - 1));
+    setCurrentStep(next);
+    setSection(sectionForStep(next));
+    updateProject(projectId, { currentStep: next });
+  }
+
+  function goToSection(sectionKey: OnboardingSectionKey) {
+    setSection(sectionKey);
+    const next = stepForSection(sectionKey);
+    setCurrentStep(next);
+    updateProject(projectId, { currentStep: next });
+  }
 
   const sectionItems = useMemo(() => {
     const map: Record<string, typeof checklist> = {};
@@ -198,7 +245,7 @@ function ProjectDetailPage() {
                 const active = i === currentStep;
                 return (
                   <div key={s} className="flex flex-1 items-center gap-1 min-w-[110px]">
-                    <button onClick={() => { setCurrentStep(i); updateProject(projectId, { currentStep: i }); }} className="group flex flex-col items-center gap-1.5">
+                    <button onClick={() => goToStep(i)} className="group flex flex-col items-center gap-1.5">
                       <motion.div
                         initial={false}
                         animate={{ scale: active ? 1.1 : 1, backgroundColor: done ? "var(--color-success)" : active ? "var(--color-primary)" : "var(--color-muted)" }}
@@ -227,7 +274,7 @@ function ProjectDetailPage() {
                 const items = sectionItems[s.key] ?? [];
                 const { done, total, na } = countApplicableChecklist(items);
                 return (
-                  <button key={s.key} onClick={() => setSection(s.key)} className={cn("relative flex min-w-[9.5rem] shrink-0 items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm lg:min-w-0 lg:w-full", active ? "bg-primary/15 text-primary" : "hover:bg-muted")}>
+                  <button key={s.key} onClick={() => goToSection(s.key)} className={cn("relative flex min-w-[9.5rem] shrink-0 items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm lg:min-w-0 lg:w-full", active ? "bg-primary/15 text-primary" : "hover:bg-muted")}>
                     <div className="flex-1">
                       <div className="font-medium">{s.label}</div>
                       <div className="mt-1 flex items-center gap-2">
@@ -249,7 +296,22 @@ function ProjectDetailPage() {
                 <motion.div key={section} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} className="card-soft p-5">
                   <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <h3 className="font-semibold">{ONBOARDING_SECTIONS.find((s) => s.key === section)?.label}</h3>
-                    <Button size="sm" className="w-full sm:w-auto" onClick={() => { updateProject(projectId, { currentStep: Math.min(currentStep + 1, 7) }); setCurrentStep((s) => Math.min(s + 1, 7)); toast.success("Progress saved"); }}>
+                    <Button
+                      size="sm"
+                      className="w-full sm:w-auto"
+                      onClick={() => {
+                        const idx = ONBOARDING_SECTIONS.findIndex((s) => s.key === section);
+                        if (idx < 0) return;
+                        if (idx >= ONBOARDING_SECTIONS.length - 1) {
+                          goToStep(ONBOARDING_STEPS.length - 1);
+                          toast.success("Last section saved — checklist is ready for Go Live");
+                          return;
+                        }
+                        const next = ONBOARDING_SECTIONS[idx + 1]!;
+                        goToSection(next.key);
+                        toast.success(`Saved — moved to ${next.label}`);
+                      }}
+                    >
                       Save & Continue <ArrowRight className="ml-1 h-3 w-3" />
                     </Button>
                   </div>

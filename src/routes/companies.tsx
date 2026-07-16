@@ -25,7 +25,70 @@ import {
 import { isCompanyModulesAllLive } from "@/lib/module-progress";
 import type { Company, ModuleKey } from "@/types";
 import { COMPANY_REGIONS } from "@/types";
-import { formatDate } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
+
+const FIELD_LABELS: Record<string, string> = {
+  name: "Company Name",
+  contact: "Contact Person",
+  designation: "Designation",
+  phone: "Mobile Number",
+  email: "Email",
+  city: "City",
+};
+
+function managerOptions(employees: { id: string; name: string; role: string }[]) {
+  const preferred = employees.filter(
+    (e) => e.role.includes("Onboarding") || e.role.includes("Implementation"),
+  );
+  return preferred.length > 0 ? preferred : employees;
+}
+
+function defaultCompanyFormValues(
+  employees: { id: string; name: string; role: string }[],
+): CompanyForm {
+  const managers = managerOptions(employees);
+  const today = new Date().toISOString().slice(0, 10);
+  return {
+    name: "",
+    contact: "",
+    designation: "",
+    phone: "",
+    email: "",
+    city: "",
+    region: "Rest of India",
+    ownerName: "",
+    ownerMobile: "",
+    pocName: "",
+    pocMobile: "",
+    onboardingManagerId: managers[0]?.id ?? "",
+    csmId: employees.find((e) => e.role === "CSM")?.id ?? "",
+    plan: "Half-Yearly",
+    health: "Healthy",
+    modules: [],
+    agreementDate: today,
+    startDate: today,
+    goLiveTarget: new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10),
+    planExpiry: new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10),
+  };
+}
+
+function normalizeCompanyPayload(data: CompanyForm) {
+  return {
+    ...data,
+    ownerName: (data.ownerName ?? "").trim() || data.contact.trim(),
+    ownerMobile: (data.ownerMobile ?? "").trim() || data.phone.trim(),
+    pocName: (data.pocName ?? "").trim() || data.contact.trim(),
+    pocMobile: (data.pocMobile ?? "").trim() || data.phone.trim(),
+    csmId: data.csmId ?? "",
+  };
+}
+
+function inputClass(hasError?: boolean) {
+  return cn(
+    "mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40",
+    hasError && "border-destructive focus:ring-destructive/30",
+  );
+}
 
 export const Route = createFileRoute("/companies")({
   component: CompaniesPage,
@@ -39,12 +102,12 @@ const companySchema = z.object({
   email: z.string().email(),
   city: z.string().min(2),
   region: z.enum(["NCR", "South", "West", "Rest of India"]),
-  ownerName: z.string().min(1),
-  ownerMobile: z.string().min(1),
-  pocName: z.string().min(1),
-  pocMobile: z.string().min(1),
-  onboardingManagerId: z.string(),
-  csmId: z.string(),
+  ownerName: z.string().optional(),
+  ownerMobile: z.string().optional(),
+  pocName: z.string().optional(),
+  pocMobile: z.string().optional(),
+  onboardingManagerId: z.string().min(1, "Select an onboarding manager"),
+  csmId: z.string().optional(),
   plan: z.enum(["Annual", "Half-Yearly", "AMC"]),
   health: z.enum(["Healthy", "Moderate", "Critical"]),
   modules: z.array(
@@ -110,20 +173,10 @@ function CompaniesListPage() {
 
   const form = useForm<CompanyForm>({
     resolver: zodResolver(companySchema),
-    defaultValues: {
-      name: "", contact: "", designation: "", phone: "", email: "", city: "",
-      region: "Rest of India",
-      ownerName: "", ownerMobile: "", pocName: "", pocMobile: "",
-      onboardingManagerId: employees[0]?.id ?? "",
-      csmId: employees.find((e) => e.role === "CSM")?.id ?? "",
-      plan: "Half-Yearly", health: "Healthy",
-      modules: [],
-      agreementDate: new Date().toISOString().slice(0, 10),
-      startDate: new Date().toISOString().slice(0, 10),
-      goLiveTarget: new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10),
-      planExpiry: new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10),
-    },
+    defaultValues: defaultCompanyFormValues(employees),
   });
+
+  const onboardingManagers = useMemo(() => managerOptions(employees), [employees]);
 
   function mergeModules(existing: Company["modules"], selected: ModuleKey[]) {
     const baseline = createCompanyModules(selected);
@@ -286,7 +339,7 @@ function CompaniesListPage() {
 
   function openCreate() {
     setEditing(null);
-    form.reset();
+    form.reset(defaultCompanyFormValues(employees));
     setModalOpen(true);
   }
 
@@ -313,29 +366,36 @@ function CompaniesListPage() {
   }
 
   function onSubmit() {
-    form.handleSubmit((data) => {
-      if (editing) {
-        updateCompany(editing.id, {
-          ...data,
-          status: editing.status,
-          modules: mergeModules(editing.modules, data.modules),
-        });
-        toast.success("Company updated");
-      } else {
-        const company = addCompany({
-          ...data,
-          status: "not_started",
-          modules: createCompanyModules(data.modules),
-        });
-        toast.success("Company added", {
-          action: {
-            label: "View",
-            onClick: () => navigate({ to: "/companies/$companyId", params: { companyId: company.id } }),
-          },
-        });
-      }
-      setModalOpen(false);
-    })();
+    form.handleSubmit(
+      (data) => {
+        const payload = normalizeCompanyPayload(data);
+        if (editing) {
+          updateCompany(editing.id, {
+            ...payload,
+            status: editing.status,
+            modules: mergeModules(editing.modules, data.modules),
+          });
+          toast.success("Company updated");
+        } else {
+          const company = addCompany({
+            ...payload,
+            status: "not_started",
+            modules: createCompanyModules(data.modules),
+          });
+          toast.success("Company added", {
+            action: {
+              label: "View",
+              onClick: () => navigate({ to: "/companies/$companyId", params: { companyId: company.id } }),
+            },
+          });
+        }
+        setModalOpen(false);
+      },
+      (errors) => {
+        const first = Object.values(errors)[0];
+        toast.error(first?.message?.toString() ?? "Please complete the required fields");
+      },
+    )();
   }
 
   function confirmDelete() {
@@ -610,56 +670,104 @@ function CompaniesListPage() {
         onSubmit={onSubmit}
         submitLabel={editing ? "Update" : "Create"}
       >
-        <div className="grid gap-3">
-          {(["name", "contact", "designation", "phone", "email", "city"] as const).map((field) => (
-            <div key={field}>
-              <label className="text-xs font-medium capitalize">{field}</label>
-              <input {...form.register(field)} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" />
+        <div className="grid gap-4">
+          <div className="space-y-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Company</div>
+            <div>
+              <label className="text-xs font-medium">{FIELD_LABELS.name}</label>
+              <input {...form.register("name")} className={inputClass(!!form.formState.errors.name)} />
+              {form.formState.errors.name ? (
+                <p className="mt-1 text-xs text-destructive">{form.formState.errors.name.message}</p>
+              ) : null}
             </div>
-          ))}
-          <div>
-            <label className="text-xs font-medium">Region</label>
-            <select {...form.register("region")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm">
-              {COMPANY_REGIONS.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium">{FIELD_LABELS.city}</label>
+                <input {...form.register("city")} className={inputClass(!!form.formState.errors.city)} />
+              </div>
+              <div>
+                <label className="text-xs font-medium">Region</label>
+                <select {...form.register("region")} className={inputClass()}>
+                  {COMPANY_REGIONS.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Primary Contact</div>
+            <p className="text-xs text-muted-foreground">
+              Main signatory / day-to-day contact. Owner and POC default to these if left blank.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              {(["contact", "designation", "phone", "email"] as const).map((field) => (
+                <div key={field} className={field === "email" ? "col-span-2" : undefined}>
+                  <label className="text-xs font-medium">{FIELD_LABELS[field]}</label>
+                  <input
+                    {...form.register(field)}
+                    type={field === "email" ? "email" : field === "phone" ? "tel" : "text"}
+                    placeholder={field === "phone" ? "10-digit mobile" : undefined}
+                    className={inputClass(!!form.formState.errors[field])}
+                  />
+                  {form.formState.errors[field] ? (
+                    <p className="mt-1 text-xs text-destructive">{form.formState.errors[field]?.message}</p>
+                  ) : null}
+                </div>
               ))}
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium">Owner Name</label>
-              <input {...form.register("ownerName")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" />
-            </div>
-            <div>
-              <label className="text-xs font-medium">Owner Mobile</label>
-              <input {...form.register("ownerMobile")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" />
-            </div>
-            <div>
-              <label className="text-xs font-medium">POC Name</label>
-              <input {...form.register("pocName")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" />
-            </div>
-            <div>
-              <label className="text-xs font-medium">POC Mobile</label>
-              <input {...form.register("pocMobile")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" />
             </div>
           </div>
+
+          <div className="space-y-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Owner & POC <span className="font-normal normal-case text-muted-foreground">(optional)</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium">Owner Name</label>
+                <input {...form.register("ownerName")} placeholder="Defaults to contact person" className={inputClass()} />
+              </div>
+              <div>
+                <label className="text-xs font-medium">Owner Mobile</label>
+                <input {...form.register("ownerMobile")} placeholder="Defaults to mobile above" className={inputClass()} />
+              </div>
+              <div>
+                <label className="text-xs font-medium">POC Name</label>
+                <input {...form.register("pocName")} placeholder="Defaults to contact person" className={inputClass()} />
+              </div>
+              <div>
+                <label className="text-xs font-medium">POC Mobile</label>
+                <input {...form.register("pocMobile")} placeholder="Defaults to mobile above" className={inputClass()} />
+              </div>
+            </div>
+          </div>
+
           <div>
             <label className="text-xs font-medium">Onboarding Manager</label>
-            <select {...form.register("onboardingManagerId")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm">
-              {employees
-                .filter((e) => e.role.includes("Onboarding") || e.role.includes("Implementation"))
-                .map((e) => (
+            <select
+              {...form.register("onboardingManagerId")}
+              className={inputClass(!!form.formState.errors.onboardingManagerId)}
+            >
+              {onboardingManagers.length === 0 ? (
+                <option value="">No managers available — add employees first</option>
+              ) : (
+                onboardingManagers.map((e) => (
                   <option key={e.id} value={e.id}>
                     {e.name}
                   </option>
-                ))}
+                ))
+              )}
             </select>
+            {form.formState.errors.onboardingManagerId ? (
+              <p className="mt-1 text-xs text-destructive">{form.formState.errors.onboardingManagerId.message}</p>
+            ) : null}
           </div>
           <div>
             <label className="text-xs font-medium">Plan</label>
-            <select {...form.register("plan")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm">
+            <select {...form.register("plan")} className={inputClass()}>
               {["Annual", "Half-Yearly", "AMC"].map((p) => (
                 <option key={p} value={p}>
                   {p}
@@ -670,7 +778,7 @@ function CompaniesListPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium">Start Date</label>
-              <input type="date" {...form.register("startDate")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" />
+              <input type="date" {...form.register("startDate")} className={inputClass(!!form.formState.errors.startDate)} />
             </div>
             <div>
               <label className="text-xs font-medium">Agreement Date</label>

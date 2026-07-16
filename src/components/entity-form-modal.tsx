@@ -9,6 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 
 export function ConfirmDeleteDialog({
   open,
@@ -75,8 +76,10 @@ export function EntityFormModal({
         </AlertDialogHeader>
         <div className="py-2">{children}</div>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={onSubmit}>{submitLabel}</AlertDialogAction>
+          <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+          <Button type="button" onClick={onSubmit}>
+            {submitLabel}
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

@@ -8,6 +8,7 @@ import {
   CalendarClock,
   FolderKanban,
   Layers,
+  Plus,
   RefreshCw,
   Trash2,
   TrendingUp,
@@ -27,6 +28,11 @@ import { EntityNotFound, EmptyState } from "@/components/empty-state";
 import { DetailPageSkeleton } from "@/components/loading-skeleton";
 import { ConfirmDeleteDialog } from "@/components/entity-form-modal";
 import { ProgressSummaryCards } from "@/components/progress-summary-cards";
+import {
+  ProjectFormModal,
+  formValuesToProjectPatch,
+  type ProjectAdminFormValues,
+} from "@/components/project-form-modal";
 import { useDetailLoading } from "@/hooks/use-detail-loading";
 import {
   useCompanyStore,
@@ -89,6 +95,7 @@ function CompanyDetailContent() {
   const loading = useDetailLoading();
   const navigate = useNavigate({ from: "/companies/$companyId" });
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [projectModalOpen, setProjectModalOpen] = useState(false);
 
   const setTab = (next: TabId) => {
     void navigate({ search: { tab: next }, replace: true });
@@ -97,6 +104,7 @@ function CompanyDetailContent() {
   const company = useCompanyStore((s) => s.companies.find((c) => c.id === companyId));
   const deleteCompany = useCompanyStore((s) => s.deleteCompany);
   const markRenewed = useCompanyStore((s) => s.markRenewed);
+  const addProject = useProjectStore((s) => s.addProject);
   const allProjects = useProjectStore((s) => s.projects);
   const projects = useMemo(() => allProjects.filter((p) => p.companyId === companyId), [allProjects, companyId]);
   const postSalesProjects = usePostSalesProjectsForCompany(companyId);
@@ -144,6 +152,27 @@ function CompanyDetailContent() {
     navigate({ to: "/companies" });
   }
 
+  function openAddProject() {
+    setTab("Projects");
+    setProjectModalOpen(true);
+  }
+
+  function onSaveProject(data: ProjectAdminFormValues) {
+    const patch = formValuesToProjectPatch({ ...data, companyId });
+    const project = addProject({ ...patch, status: "not_started", currentStep: 0 });
+    toast.success("Project created", {
+      action: {
+        label: "Open",
+        onClick: () =>
+          navigate({
+            to: "/projects/$projectId",
+            params: { projectId: project.id },
+            search: { tab: "progress" },
+          }),
+      },
+    });
+  }
+
   return (
     <PageWrap>
       <div className="mb-4">
@@ -175,6 +204,9 @@ function CompanyDetailContent() {
             >
               {company.health}
             </Pill>
+            <Button size="sm" className="gap-1.5 bg-primary hover:bg-primary/90" onClick={openAddProject}>
+              <Plus className="h-4 w-4" /> Add Project
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -326,15 +358,23 @@ function CompanyDetailContent() {
           />
 
           <section className="space-y-3">
-            <div className="flex items-center gap-2">
-              <FolderKanban className="h-4 w-4 text-muted-foreground" />
-              <h4 className="text-sm font-semibold">Onboarding Projects</h4>
-              <Pill>{projects.length}</Pill>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <FolderKanban className="h-4 w-4 text-muted-foreground" />
+                <h4 className="text-sm font-semibold">Onboarding Projects</h4>
+                <Pill>{projects.length}</Pill>
+              </div>
+              <Button size="sm" className="gap-1.5 bg-primary hover:bg-primary/90" onClick={() => setProjectModalOpen(true)}>
+                <Plus className="h-3.5 w-3.5" /> Add Project
+              </Button>
             </div>
             {projects.length === 0 ? (
-              <div className="rounded-lg border border-dashed bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
-                No onboarding projects yet.
-              </div>
+              <EmptyState
+                title="No onboarding projects yet"
+                description="Create a project for this company to start the Progress Tracker."
+                actionLabel="+ Add Project"
+                onAction={() => setProjectModalOpen(true)}
+              />
             ) : (
               <div className="grid gap-3 md:grid-cols-2">
                 {projects.map((p) => {
@@ -488,6 +528,15 @@ function CompanyDetailContent() {
           </p>
         </div>
       )}
+
+      <ProjectFormModal
+        open={projectModalOpen}
+        onOpenChange={setProjectModalOpen}
+        companies={[{ id: company.id, name: company.name, city: company.city }]}
+        editing={null}
+        defaultCompanyId={companyId}
+        onSave={onSaveProject}
+      />
 
       <ConfirmDeleteDialog
         open={deleteOpen}
