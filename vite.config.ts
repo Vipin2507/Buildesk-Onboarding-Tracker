@@ -10,6 +10,12 @@ export default defineConfig({
     host: true,
     strictPort: true,
   },
+  // Downlevel modern syntax (?. , ?? , #private) so production
+  // bundles don't throw "Unexpected token '.'" in older browsers / WebViews.
+  build: {
+    target: "es2019",
+    cssTarget: "chrome80",
+  },
   resolve: {
     tsconfigPaths: true,
     dedupe: ["react", "react-dom", "@tanstack/react-router", "@tanstack/react-query"],
