@@ -17,11 +17,33 @@ function ensureChecklist(projectId: string) {
     .from(t.onboardingChecklistItems)
     .where(eq(t.onboardingChecklistItems.projectId, projectId))
     .all();
-  if (existing.length > 0) return existing;
   const now = nowIso();
-  const created: (typeof t.onboardingChecklistItems.$inferSelect)[] = [];
+
+  // Keep required-document extras; prune/rename default items to match current template.
+  const allowed = new Set(
+    Object.entries(CHECKLIST_TEMPLATE).flatMap(([section, labels]) =>
+      labels.map((label) => `${section}::${label}`),
+    ),
+  );
+  for (const row of existing) {
+    if (row.source === "required-document") continue;
+    if (!allowed.has(`${row.section}::${row.label}`)) {
+      db.delete(t.onboardingChecklistItems).where(eq(t.onboardingChecklistItems.id, row.id)).run();
+    }
+  }
+
+  const remaining = db
+    .select()
+    .from(t.onboardingChecklistItems)
+    .where(eq(t.onboardingChecklistItems.projectId, projectId))
+    .all();
+  const have = new Set(remaining.map((r) => `${r.section}::${r.label}`));
+  const created: (typeof t.onboardingChecklistItems.$inferSelect)[] = [...remaining];
+
   for (const [section, labels] of Object.entries(CHECKLIST_TEMPLATE)) {
     for (const label of labels) {
+      const key = `${section}::${label}`;
+      if (have.has(key)) continue;
       const row = {
         id: newId(),
         projectId,
@@ -30,6 +52,9 @@ function ensureChecklist(projectId: string) {
         collected: false,
         uploaded: false,
         live: false,
+        collectedAt: null as string | null,
+        uploadedAt: null as string | null,
+        liveAt: null as string | null,
         notApplicable: false,
         remarks: "",
         source: "default",
@@ -160,6 +185,9 @@ export const createProject = createServerFn({ method: "POST" })
         collected: row.collected,
         uploaded: row.uploaded,
         live: row.live,
+        collectedAt: row.collectedAt ?? undefined,
+        uploadedAt: row.uploadedAt ?? undefined,
+        liveAt: row.liveAt ?? undefined,
         notApplicable: row.notApplicable ?? false,
         remarks: row.remarks,
         source: (row.source as "default" | "required-document") || "default",
@@ -211,6 +239,9 @@ export const createProject = createServerFn({ method: "POST" })
       collected: row.collected,
       uploaded: row.uploaded,
       live: row.live,
+      collectedAt: row.collectedAt ?? undefined,
+      uploadedAt: row.uploadedAt ?? undefined,
+      liveAt: row.liveAt ?? undefined,
       notApplicable: row.notApplicable ?? false,
       remarks: row.remarks,
       source: (row.source as "default" | "required-document") || "default",

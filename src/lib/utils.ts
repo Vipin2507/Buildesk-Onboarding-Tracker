@@ -12,3 +12,17 @@ export function formatDate(value?: string | null) {
   if (Number.isNaN(d.getTime())) return value;
   return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
+
+/** Display ISO as short date + time for checklist phase stamps. */
+export function formatDateTime(value?: string | null) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}

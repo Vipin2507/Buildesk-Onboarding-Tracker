@@ -13,28 +13,19 @@ export const CHECKLIST_ITEM_MILESTONES: Array<{
   { section: "project", label: "Other charges defined", milestones: ["projectSetup"] },
   {
     section: "unit",
-    label: "Unit configuration Excel uploaded",
+    label: "Unit Detail Uploaded",
     milestones: ["existingDataUpload"],
   },
-  { section: "unit", label: "Tower/floor plan mapped", milestones: ["existingDataUpload"] },
-  { section: "unit", label: "Unit types validated", milestones: ["existingDataUpload"] },
-  { section: "unit", label: "Pricing sheet locked", milestones: ["existingDataUpload"] },
   {
     section: "customer",
-    label: "Customer data Excel uploaded",
+    label: "Excel Uploaded",
     milestones: ["existingDataUpload"],
   },
-  { section: "customer", label: "Duplicate check completed", milestones: ["existingDataUpload"] },
-  { section: "customer", label: "KYC linked", milestones: ["existingDataUpload"] },
-  { section: "customer", label: "Contact numbers verified", milestones: ["existingDataUpload"] },
   {
     section: "payment",
-    label: "Payment plans defined",
-    milestones: ["paymentUpload", "dueMatching"],
+    label: "Uploaded",
+    milestones: ["paymentUpload"],
   },
-  { section: "payment", label: "Booking data uploaded", milestones: ["paymentUpload"] },
-  { section: "payment", label: "Payment data uploaded", milestones: ["paymentUpload"] },
-  { section: "payment", label: "Ledger reconciled", milestones: ["dueMatching"] },
   { section: "documents", label: "Agreement template uploaded", milestones: ["agreementFormat"] },
   { section: "documents", label: "Demand letter tested", milestones: ["demandFormat"] },
   { section: "documents", label: "Receipt template live", milestones: ["receiptFormat"] },
@@ -45,7 +36,6 @@ export const CHECKLIST_ITEM_MILESTONES: Array<{
   },
   { section: "integrations", label: "WATI API connected", milestones: ["whatsappIntegration"] },
   { section: "integrations", label: "SMS gateway configured", milestones: ["smsIntegration"] },
-  { section: "integrations", label: "Website form integrated", milestones: ["crmIntegration"] },
   { section: "integrations", label: "Email SMTP verified", milestones: ["integrationConnected"] },
   { section: "golive", label: "Client sign-off received", milestones: ["clientSignOff"] },
 ];
@@ -78,7 +68,10 @@ function sameChecklistState(a: OnboardingChecklistItem, b: OnboardingChecklistIt
     a.notApplicable === b.notApplicable &&
     a.collected === b.collected &&
     a.uploaded === b.uploaded &&
-    a.live === b.live
+    a.live === b.live &&
+    a.collectedAt === b.collectedAt &&
+    a.uploadedAt === b.uploadedAt &&
+    a.liveAt === b.liveAt
   );
 }
 
@@ -123,6 +116,9 @@ export function computeChecklistPatchFromProgress(
         collected: false,
         uploaded: false,
         live: false,
+        collectedAt: undefined,
+        uploadedAt: undefined,
+        liveAt: undefined,
         updatedAt: now,
       };
     } else if (states.every((s) => s === "done" || s === "na")) {
@@ -132,6 +128,9 @@ export function computeChecklistPatchFromProgress(
         collected: true,
         uploaded: true,
         live: true,
+        collectedAt: item.collectedAt ?? now,
+        uploadedAt: item.uploadedAt ?? now,
+        liveAt: item.liveAt ?? now,
         updatedAt: now,
       };
     } else {
@@ -141,6 +140,9 @@ export function computeChecklistPatchFromProgress(
         collected: false,
         uploaded: false,
         live: false,
+        collectedAt: undefined,
+        uploadedAt: undefined,
+        liveAt: undefined,
         updatedAt: now,
       };
     }

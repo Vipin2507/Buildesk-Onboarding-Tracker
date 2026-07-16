@@ -8,7 +8,7 @@ import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { logActivity } from "@/server/api/mappers";
 import type { ChecklistPhase, OnboardingChecklistItem, OtherCharge } from "@/types";
-import { applyChecklistPhaseToggle } from "@/lib/checklist";
+import { applyChecklistPhaseToggle, stampChecklistPhaseDates } from "@/lib/checklist";
 
 function ensureDefaultChecklist(projectId: string) {
   const db = getDb();
@@ -50,6 +50,9 @@ function mapChecklist(row: typeof t.onboardingChecklistItems.$inferSelect): Onbo
     collected: row.collected,
     uploaded: row.uploaded,
     live: row.live,
+    collectedAt: row.collectedAt ?? (row.collected ? row.updatedAt : undefined),
+    uploadedAt: row.uploadedAt ?? (row.uploaded ? row.updatedAt : undefined),
+    liveAt: row.liveAt ?? (row.live ? row.updatedAt : undefined),
     notApplicable: row.notApplicable ?? false,
     remarks: row.remarks,
     source: (row.source as OnboardingChecklistItem["source"]) || "default",
@@ -63,39 +66,56 @@ export const listChecklist = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     requireUser();
     const db = getDb();
+    const now = nowIso();
     let rows = db
       .select()
       .from(t.onboardingChecklistItems)
       .where(eq(t.onboardingChecklistItems.projectId, data.projectId))
       .all();
-    if (rows.length === 0) {
-      const now = nowIso();
-      for (const [section, labels] of Object.entries(CHECKLIST_TEMPLATE)) {
-        for (const label of labels) {
-          db.insert(t.onboardingChecklistItems)
-            .values({
-              id: newId(),
-              projectId: data.projectId,
-              section,
-              label,
-              collected: false,
-              uploaded: false,
-              live: false,
-              notApplicable: false,
-              remarks: "",
-              source: "default",
-              createdAt: now,
-              updatedAt: now,
-            })
-            .run();
-        }
+
+    const allowed = new Set(
+      Object.entries(CHECKLIST_TEMPLATE).flatMap(([section, labels]) =>
+        labels.map((label) => `${section}::${label}`),
+      ),
+    );
+    for (const row of rows) {
+      if (row.source === "required-document") continue;
+      if (!allowed.has(`${row.section}::${row.label}`)) {
+        db.delete(t.onboardingChecklistItems).where(eq(t.onboardingChecklistItems.id, row.id)).run();
       }
-      rows = db
-        .select()
-        .from(t.onboardingChecklistItems)
-        .where(eq(t.onboardingChecklistItems.projectId, data.projectId))
-        .all();
     }
+    rows = db
+      .select()
+      .from(t.onboardingChecklistItems)
+      .where(eq(t.onboardingChecklistItems.projectId, data.projectId))
+      .all();
+    const have = new Set(rows.map((r) => `${r.section}::${r.label}`));
+    for (const [section, labels] of Object.entries(CHECKLIST_TEMPLATE)) {
+      for (const label of labels) {
+        if (have.has(`${section}::${label}`)) continue;
+        db.insert(t.onboardingChecklistItems)
+          .values({
+            id: newId(),
+            projectId: data.projectId,
+            section,
+            label,
+            collected: false,
+            uploaded: false,
+            live: false,
+            notApplicable: false,
+            remarks: "",
+            source: "default",
+            createdAt: now,
+            updatedAt: now,
+          })
+          .run();
+      }
+    }
+    rows = db
+      .select()
+      .from(t.onboardingChecklistItems)
+      .where(eq(t.onboardingChecklistItems.projectId, data.projectId))
+      .all();
     return rows.map(mapChecklist);
   });
 
@@ -125,12 +145,21 @@ export const setChecklistState = createServerFn({ method: "POST" })
     const collected = notApplicable ? false : data.collected;
     const uploaded = notApplicable ? false : data.uploaded && collected;
     const live = notApplicable ? false : data.live && uploaded && collected;
+    const dates = stampChecklistPhaseDates(mapChecklist(row), {
+      collected,
+      uploaded,
+      live,
+      notApplicable,
+    }, now);
     db.update(t.onboardingChecklistItems)
       .set({
         notApplicable,
         collected,
         uploaded,
         live,
+        collectedAt: dates.collectedAt ?? null,
+        uploadedAt: dates.uploadedAt ?? null,
+        liveAt: dates.liveAt ?? null,
         updatedAt: now,
       })
       .where(eq(t.onboardingChecklistItems.id, data.id))
@@ -149,6 +178,9 @@ export const setChecklistState = createServerFn({ method: "POST" })
       collected,
       uploaded,
       live,
+      collectedAt: dates.collectedAt ?? null,
+      uploadedAt: dates.uploadedAt ?? null,
+      liveAt: dates.liveAt ?? null,
       updatedAt: now,
     });
   });
@@ -176,6 +208,9 @@ export const toggleChecklist = createServerFn({ method: "POST" })
         collected: next.collected,
         uploaded: next.uploaded,
         live: next.live,
+        collectedAt: next.collectedAt ?? null,
+        uploadedAt: next.uploadedAt ?? null,
+        liveAt: next.liveAt ?? null,
         updatedAt: now,
       })
       .where(eq(t.onboardingChecklistItems.id, data.id))
@@ -191,6 +226,9 @@ export const toggleChecklist = createServerFn({ method: "POST" })
       collected: next.collected,
       uploaded: next.uploaded,
       live: next.live,
+      collectedAt: next.collectedAt ?? null,
+      uploadedAt: next.uploadedAt ?? null,
+      liveAt: next.liveAt ?? null,
       updatedAt: now,
     });
   });
@@ -209,7 +247,15 @@ export const completeProjectChecklist = createServerFn({ method: "POST" })
     for (const row of rows) {
       if (row.notApplicable) continue;
       db.update(t.onboardingChecklistItems)
-        .set({ collected: true, uploaded: true, live: true, updatedAt: now })
+        .set({
+          collected: true,
+          uploaded: true,
+          live: true,
+          collectedAt: row.collectedAt ?? now,
+          uploadedAt: row.uploadedAt ?? now,
+          liveAt: row.liveAt ?? now,
+          updatedAt: now,
+        })
         .where(eq(t.onboardingChecklistItems.id, row.id))
         .run();
     }
@@ -237,7 +283,16 @@ export const setChecklistNotApplicable = createServerFn({ method: "POST" })
     if (!row) throw new ApiError(404, "Checklist item not found");
     const now = nowIso();
     const patch = data.notApplicable
-      ? { notApplicable: true, collected: false, uploaded: false, live: false, updatedAt: now }
+      ? {
+          notApplicable: true,
+          collected: false,
+          uploaded: false,
+          live: false,
+          collectedAt: null,
+          uploadedAt: null,
+          liveAt: null,
+          updatedAt: now,
+        }
       : { notApplicable: false, updatedAt: now };
     db.update(t.onboardingChecklistItems)
       .set(patch)
@@ -307,6 +362,9 @@ export const setDocumentRequired = createServerFn({ method: "POST" })
         collected: false,
         uploaded: false,
         live: false,
+        collectedAt: null as string | null,
+        uploadedAt: null as string | null,
+        liveAt: null as string | null,
         notApplicable: false,
         remarks: "",
         source: "required-document" as const,

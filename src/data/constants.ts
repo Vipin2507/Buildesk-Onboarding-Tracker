@@ -32,12 +32,12 @@ export const ONBOARDING_SECTIONS = [
 
 export const CHECKLIST_TEMPLATE: Record<string, string[]> = {
   project: ["Project master created", "Address & RERA captured", "POCs assigned", "Other charges defined"],
-  unit: ["Unit configuration Excel uploaded", "Tower/floor plan mapped", "Unit types validated", "Pricing sheet locked"],
-  customer: ["Customer data Excel uploaded", "Duplicate check completed", "KYC linked", "Contact numbers verified"],
-  payment: ["Payment plans defined", "Booking data uploaded", "Payment data uploaded", "Ledger reconciled"],
+  unit: ["Unit Detail Uploaded"],
+  customer: ["Excel Uploaded"],
+  payment: ["Uploaded"],
   documents: ["Agreement template uploaded", "Demand letter tested", "Receipt template live", "Reminder templates approved"],
-  integrations: ["WATI API connected", "SMS gateway configured", "Website form integrated", "Email SMTP verified"],
-  golive: ["Team training completed", "Client sign-off received", "Go-live date confirmed", "Handover to CSM"],
+  integrations: ["WATI API connected", "SMS gateway configured", "Email SMTP verified"],
+  golive: ["Team training completed", "Client sign-off received", "Go-live date confirmed"],
 };
 
 export const DOCUMENT_TEMPLATE_NAMES = [

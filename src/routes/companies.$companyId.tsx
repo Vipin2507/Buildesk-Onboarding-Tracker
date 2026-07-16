@@ -52,7 +52,7 @@ const tabSchema = z.enum([
   "Overview",
   "Modules",
   "Progress",
-  "Projects",
+  "Project",
   "Tickets",
   "Notes & Attachments",
   "History",
@@ -60,7 +60,13 @@ const tabSchema = z.enum([
 ]);
 
 const searchSchema = z.object({
-  tab: tabSchema.optional(),
+  tab: z
+    .union([
+      tabSchema,
+      // Legacy company tab id from before Projects → Project rename
+      z.literal("Projects").transform(() => "Project" as const),
+    ])
+    .optional(),
 });
 
 export const Route = createFileRoute("/companies/$companyId")({
@@ -72,7 +78,7 @@ const TABS = [
   { id: "Overview", label: "Details" },
   { id: "Modules", label: "Modules" },
   { id: "Progress", label: "Progress" },
-  { id: "Projects", label: "Projects" },
+  { id: "Project", label: "Project" },
   { id: "Tickets", label: "Tickets" },
   { id: "Notes & Attachments", label: "Notes & Files" },
   { id: "History", label: "History" },
@@ -153,7 +159,7 @@ function CompanyDetailContent() {
   }
 
   function openAddProject() {
-    setTab("Projects");
+    setTab("Project");
     setProjectModalOpen(true);
   }
 
@@ -350,11 +356,11 @@ function CompanyDetailContent() {
         </div>
       )}
 
-      {tab === "Projects" && (
+      {tab === "Project" && (
         <div className="space-y-6">
           <TabIntro
-            title="Projects"
-            description="Onboarding projects and Post Sales trackers linked to this company."
+            title="Project"
+            description="Onboarding projects and Post Sales trackers for this company."
           />
 
           <section className="space-y-3">

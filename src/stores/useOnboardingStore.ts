@@ -82,18 +82,15 @@ export const useOnboardingStore = createStore<OnboardingState>((set, get) => ({
   customerAppConfigs: [],
 
   initChecklistForProject: (projectId) => {
-    const existing = get().checklistItems.some((i) => i.projectId === projectId);
-    if (!existing) {
-      // Prefer server IDs — local seed UUIDs would never match SQLite toggles.
-      void apiListChecklist({ data: { projectId } })
-        .then((items) => {
-          if (!items?.length) return;
-          get().replaceChecklistForProject(projectId, items);
-        })
-        .catch(() => {
-          // Offline / bootstrap race: leave empty until next fetch.
-        });
-    }
+    // Always refresh from server so template restructures (prune/add) apply.
+    void apiListChecklist({ data: { projectId } })
+      .then((items) => {
+        if (!items) return;
+        get().replaceChecklistForProject(projectId, items);
+      })
+      .catch(() => {
+        // Offline / bootstrap race: leave existing cache until next fetch.
+      });
     const hadConfig = get().customerAppConfigs.some((c) => c.projectId === projectId);
     if (!hadConfig) {
       const config: CustomerAppConfig = {
@@ -169,6 +166,9 @@ export const useOnboardingStore = createStore<OnboardingState>((set, get) => ({
           collected: true,
           uploaded: true,
           live: true,
+          collectedAt: i.collectedAt ?? now,
+          uploadedAt: i.uploadedAt ?? now,
+          liveAt: i.liveAt ?? now,
           updatedAt: now,
         };
       }),
@@ -190,7 +190,16 @@ export const useOnboardingStore = createStore<OnboardingState>((set, get) => ({
     const updated = touch({
       ...item,
       notApplicable,
-      ...(notApplicable ? { collected: false, uploaded: false, live: false } : {}),
+      ...(notApplicable
+        ? {
+            collected: false,
+            uploaded: false,
+            live: false,
+            collectedAt: undefined,
+            uploadedAt: undefined,
+            liveAt: undefined,
+          }
+        : {}),
     });
     set((s) => ({
       checklistItems: s.checklistItems.map((i) => (i.id === id ? updated : i)),

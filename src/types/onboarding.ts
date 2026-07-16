@@ -10,6 +10,12 @@ export type OnboardingChecklistItem = Timestamps & {
   collected: boolean;
   uploaded: boolean;
   live: boolean;
+  /** ISO timestamp when Collected was marked (cleared when unchecked). */
+  collectedAt?: string;
+  /** ISO timestamp when Uploaded was marked. */
+  uploadedAt?: string;
+  /** ISO timestamp when Live was marked. */
+  liveAt?: string;
   /** When true, item is skipped for this project and counts as complete. */
   notApplicable: boolean;
   remarks: string;

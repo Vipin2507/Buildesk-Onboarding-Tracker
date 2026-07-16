@@ -143,7 +143,7 @@ function Dashboard() {
         <div className="card-soft p-5 lg:col-span-2">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="font-semibold">Recent Onboarding</h3>
-            <Link to="/projects" className="text-xs font-medium text-primary hover:underline">View all</Link>
+            <Link to="/companies" className="text-xs font-medium text-primary hover:underline">View all</Link>
           </div>
           <div className="space-y-2.5 md:hidden">
             {recent.map((c, i) => {

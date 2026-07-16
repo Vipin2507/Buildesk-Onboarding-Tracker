@@ -129,6 +129,21 @@ const EXTRA_COLUMNS = [
     ddl: "TEXT NOT NULL DEFAULT 'default'",
   },
   {
+    table: "onboarding_checklist_items",
+    name: "collected_at",
+    ddl: "TEXT",
+  },
+  {
+    table: "onboarding_checklist_items",
+    name: "uploaded_at",
+    ddl: "TEXT",
+  },
+  {
+    table: "onboarding_checklist_items",
+    name: "live_at",
+    ddl: "TEXT",
+  },
+  {
     table: "project_manual_progress",
     name: "not_applicable_json",
     ddl: "TEXT NOT NULL DEFAULT '{}'",
@@ -357,6 +372,68 @@ if (tableExists("onboarding_checklist_items")) {
     console.log(
       `checklist: reset untouched fake progress on ${r.changes} item(s) (${patch})`,
     );
+  }
+
+  const restructure = "checklist_restructure_v2";
+  const restructureDone = sqlite
+    .prepare(`SELECT 1 AS ok FROM _schema_patches WHERE name = ?`)
+    .get(restructure);
+  if (!restructureDone) {
+    const renames = [
+      ["unit", "Unit configuration Excel uploaded", "Unit Detail Uploaded"],
+      ["customer", "Customer data Excel uploaded", "Excel Uploaded"],
+      ["payment", "Payment data uploaded", "Uploaded"],
+    ];
+    for (const [section, from, to] of renames) {
+      sqlite
+        .prepare(
+          `UPDATE onboarding_checklist_items SET label = ? WHERE section = ? AND label = ? AND IFNULL(source, 'default') = 'default'`,
+        )
+        .run(to, section, from);
+    }
+    const obsolete = [
+      "Tower/floor plan mapped",
+      "Unit types validated",
+      "Pricing sheet locked",
+      "Duplicate check completed",
+      "KYC linked",
+      "Contact numbers verified",
+      "Payment plans defined",
+      "Booking data uploaded",
+      "Ledger reconciled",
+      "Website form integrated",
+      "Handover to CSM",
+      "Unit configuration Excel uploaded",
+      "Customer data Excel uploaded",
+      "Payment data uploaded",
+    ];
+    const del = sqlite
+      .prepare(
+        `DELETE FROM onboarding_checklist_items
+         WHERE IFNULL(source, 'default') = 'default'
+           AND label IN (${obsolete.map(() => "?").join(",")})`,
+      )
+      .run(...obsolete);
+    // Backfill phase dates from updated_at where phase is on but date missing
+    sqlite
+      .prepare(
+        `UPDATE onboarding_checklist_items SET collected_at = updated_at WHERE collected = 1 AND collected_at IS NULL`,
+      )
+      .run();
+    sqlite
+      .prepare(
+        `UPDATE onboarding_checklist_items SET uploaded_at = updated_at WHERE uploaded = 1 AND uploaded_at IS NULL`,
+      )
+      .run();
+    sqlite
+      .prepare(
+        `UPDATE onboarding_checklist_items SET live_at = updated_at WHERE live = 1 AND live_at IS NULL`,
+      )
+      .run();
+    sqlite
+      .prepare(`INSERT INTO _schema_patches (name, applied_at) VALUES (?, ?)`)
+      .run(restructure, new Date().toISOString());
+    console.log(`checklist: restructure removed ${del.changes} obsolete item(s) (${restructure})`);
   }
 }
 

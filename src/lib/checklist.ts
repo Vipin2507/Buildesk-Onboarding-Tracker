@@ -1,8 +1,15 @@
 import type { OnboardingChecklistItem } from "@/types";
+import { nowIso } from "@/types";
 
 export type ChecklistPhase = "collected" | "uploaded" | "live";
 
 const PHASE_ORDER: ChecklistPhase[] = ["collected", "uploaded", "live"];
+
+const PHASE_AT: Record<ChecklistPhase, "collectedAt" | "uploadedAt" | "liveAt"> = {
+  collected: "collectedAt",
+  uploaded: "uploadedAt",
+  live: "liveAt",
+};
 
 /** Item is done for go-live gates (fully checked through or marked N/A). */
 export function isChecklistItemComplete(item: OnboardingChecklistItem) {
@@ -52,6 +59,7 @@ export function canToggleChecklistPhase(item: OnboardingChecklistItem, phase: Ch
 /**
  * Apply a sequential phase toggle.
  * Turning on requires prior phases; turning off clears this and later phases.
+ * Sets / clears phase timestamps accordingly.
  */
 export function applyChecklistPhaseToggle(
   item: OnboardingChecklistItem,
@@ -61,14 +69,37 @@ export function applyChecklistPhaseToggle(
   if (!canToggleChecklistPhase(item, phase)) return null;
 
   const turningOn = !item[phase];
+  const now = nowIso();
   if (turningOn) {
-    return { ...item, [phase]: true };
+    return {
+      ...item,
+      [phase]: true,
+      [PHASE_AT[phase]]: now,
+    };
   }
 
   const idx = PHASE_ORDER.indexOf(phase);
   const next = { ...item };
   for (let i = idx; i < PHASE_ORDER.length; i++) {
-    next[PHASE_ORDER[i]] = false;
+    const p = PHASE_ORDER[i]!;
+    next[p] = false;
+    next[PHASE_AT[p]] = undefined;
   }
   return next;
+}
+
+/** Stamp phase dates when setting absolute checklist state (e.g. progress sync). */
+export function stampChecklistPhaseDates(
+  prev: OnboardingChecklistItem,
+  next: Pick<OnboardingChecklistItem, "collected" | "uploaded" | "live" | "notApplicable">,
+  now = nowIso(),
+): Pick<OnboardingChecklistItem, "collectedAt" | "uploadedAt" | "liveAt"> {
+  if (next.notApplicable) {
+    return { collectedAt: undefined, uploadedAt: undefined, liveAt: undefined };
+  }
+  return {
+    collectedAt: next.collected ? prev.collectedAt ?? now : undefined,
+    uploadedAt: next.uploaded ? prev.uploadedAt ?? now : undefined,
+    liveAt: next.live ? prev.liveAt ?? now : undefined,
+  };
 }

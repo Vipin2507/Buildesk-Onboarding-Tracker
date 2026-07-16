@@ -9,7 +9,6 @@ import { PageHeader, PageWrap } from "@/components/page-header";
 import { ProgressBar } from "@/components/progress-bar";
 import { ProjectManualProgress } from "@/components/project-manual-progress";
 import { ProjectDocumentsPanel } from "@/components/project-documents-panel";
-import { ProjectTicketsPanel } from "@/components/project-tickets-panel";
 import { Button } from "@/components/ui/button";
 import { EntityNotFound } from "@/components/empty-state";
 import { DetailPageSkeleton } from "@/components/loading-skeleton";
@@ -26,7 +25,7 @@ import { ONBOARDING_STEPS, ONBOARDING_SECTIONS } from "@/data/constants";
 import { formatRelativeTime } from "@/types/common";
 import { PROJECT_PROGRESS_MILESTONES } from "@/types/project";
 import { calcChecklistProgress, canToggleChecklistPhase, countApplicableChecklist } from "@/lib/checklist";
-import { cn, formatDate } from "@/lib/utils";
+import { cn, formatDate, formatDateTime } from "@/lib/utils";
 
 type OnboardingSectionKey = (typeof ONBOARDING_SECTIONS)[number]["key"];
 
@@ -61,7 +60,7 @@ function stepForSection(sectionKey: string): number {
 
 const searchSchema = z.object({
   tab: z
-    .enum(["progress", "onboarding", "documents", "tickets"])
+    .enum(["progress", "onboarding", "documents"])
     .optional()
     .default("progress"),
 });
@@ -156,7 +155,9 @@ function ProjectDetailPage() {
   }, [checklist]);
 
   if (loading) return <DetailPageSkeleton />;
-  if (!project) return <EntityNotFound entity="Project" listPath="/projects" listLabel="Projects" />;
+  if (!project) {
+    return <EntityNotFound entity="Project" listPath="/companies" listLabel="Companies" />;
+  }
 
   const projectName = project.name;
 
@@ -164,7 +165,6 @@ function ProjectDetailPage() {
     { key: "progress", label: "Progress Tracker" },
     { key: "onboarding", label: "Checklist Detail" },
     { key: "documents", label: "Documents" },
-    { key: "tickets", label: "Tickets" },
   ] as const;
 
   function handleGoLive() {
@@ -189,7 +189,13 @@ function ProjectDetailPage() {
     <PageWrap>
       <div className="mb-4">
         <Button variant="ghost" size="sm" asChild>
-          <Link to="/projects"><ArrowLeft className="mr-1 h-4 w-4" /> Projects</Link>
+          <Link
+            to="/companies/$companyId"
+            params={{ companyId: project.companyId }}
+            search={{ tab: "Project" }}
+          >
+            <ArrowLeft className="mr-1 h-4 w-4" /> Company
+          </Link>
         </Button>
       </div>
 
@@ -371,6 +377,12 @@ function ProjectDetailPage() {
                         <div className="mt-3 flex flex-wrap gap-2">
                           {(["collected", "uploaded", "live"] as const).map((phase) => {
                             const allowed = canToggleChecklistPhase(item, phase);
+                            const at =
+                              phase === "collected"
+                                ? item.collectedAt
+                                : phase === "uploaded"
+                                  ? item.uploadedAt
+                                  : item.liveAt;
                             return (
                             <button
                               key={phase}
@@ -379,7 +391,9 @@ function ProjectDetailPage() {
                               title={
                                 !allowed && !item[phase]
                                   ? "Complete prior steps first (Collected → Uploaded → Live)"
-                                  : undefined
+                                  : at
+                                    ? formatDateTime(at)
+                                    : undefined
                               }
                               onClick={() => {
                                 if (!canToggleChecklistPhase(item, phase) && !item[phase]) {
@@ -391,7 +405,7 @@ function ProjectDetailPage() {
                                 toggleChecklist(item.id, phase);
                               }}
                               className={cn(
-                                "inline-flex min-h-10 min-w-[5.5rem] items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-medium capitalize",
+                                "inline-flex min-h-10 min-w-[5.5rem] flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-1.5 text-xs font-medium capitalize",
                                 item[phase]
                                   ? "border-success bg-success text-white"
                                   : allowed
@@ -399,8 +413,15 @@ function ProjectDetailPage() {
                                     : "cursor-not-allowed border-input bg-muted/40 text-muted-foreground opacity-50",
                               )}
                             >
-                              {item[phase] && <Check className="h-3.5 w-3.5" />}
-                              {phase}
+                              <span className="inline-flex items-center gap-1">
+                                {item[phase] && <Check className="h-3.5 w-3.5" />}
+                                {phase}
+                              </span>
+                              {item[phase] && at ? (
+                                <span className="text-[9px] font-normal opacity-90 normal-case">
+                                  {formatDate(at)}
+                                </span>
+                              ) : null}
                             </button>
                             );
                           })}
@@ -453,6 +474,12 @@ function ProjectDetailPage() {
                             </td>
                             {(["collected", "uploaded", "live"] as const).map((phase) => {
                               const allowed = !na && canToggleChecklistPhase(item, phase);
+                              const at =
+                                phase === "collected"
+                                  ? item.collectedAt
+                                  : phase === "uploaded"
+                                    ? item.uploadedAt
+                                    : item.liveAt;
                               return (
                               <td key={phase} className="px-3 py-3 text-center">
                                 <button
@@ -463,7 +490,9 @@ function ProjectDetailPage() {
                                       ? "Not applicable"
                                       : !allowed && !item[phase]
                                         ? "Complete prior steps first"
-                                        : undefined
+                                        : at
+                                          ? formatDateTime(at)
+                                          : undefined
                                   }
                                   onClick={() => {
                                     if (!canToggleChecklistPhase(item, phase) && !item[phase]) {
@@ -475,7 +504,7 @@ function ProjectDetailPage() {
                                     toggleChecklist(item.id, phase);
                                   }}
                                   className={cn(
-                                    "inline-flex h-6 w-6 items-center justify-center rounded-md border",
+                                    "inline-flex min-h-9 min-w-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-md border px-1.5 py-1",
                                     (na || (!allowed && !item[phase])) && "cursor-not-allowed opacity-40",
                                     !na && item[phase] && "border-success bg-success text-white",
                                     !na && !item[phase] && allowed && "border-input hover:border-primary",
@@ -483,6 +512,11 @@ function ProjectDetailPage() {
                                 >
                                   {!na && item[phase] && <Check className="h-3.5 w-3.5" />}
                                   {na && <span className="text-[10px] text-muted-foreground">—</span>}
+                                  {!na && item[phase] && at ? (
+                                    <span className="text-[9px] font-normal leading-tight opacity-90">
+                                      {formatDate(at)}
+                                    </span>
+                                  ) : null}
                                 </button>
                               </td>
                               );
@@ -540,10 +574,6 @@ function ProjectDetailPage() {
       )}
 
       {tab === "documents" && <ProjectDocumentsPanel projectId={projectId} />}
-
-      {tab === "tickets" && (
-        <ProjectTicketsPanel projectId={projectId} companyId={project.companyId} />
-      )}
     </PageWrap>
   );
 }

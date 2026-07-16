@@ -200,7 +200,7 @@ export function CompanyTicketsPanel({ companyId }: Props) {
                         <Link
                           to="/projects/$projectId"
                           params={{ projectId: t.projectId }}
-                          search={{ tab: "tickets" }}
+                          search={{ tab: "progress" }}
                           className="text-primary hover:underline"
                         >
                           {t.project}

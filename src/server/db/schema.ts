@@ -149,6 +149,9 @@ export const onboardingChecklistItems = sqliteTable(
     collected: integer("collected", { mode: "boolean" }).notNull().default(false),
     uploaded: integer("uploaded", { mode: "boolean" }).notNull().default(false),
     live: integer("live", { mode: "boolean" }).notNull().default(false),
+    collectedAt: text("collected_at"),
+    uploadedAt: text("uploaded_at"),
+    liveAt: text("live_at"),
     notApplicable: integer("not_applicable", { mode: "boolean" }).notNull().default(false),
     remarks: text("remarks").notNull().default(""),
     /** default | required-document */
