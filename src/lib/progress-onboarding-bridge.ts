@@ -4,8 +4,8 @@ import {
 } from "@/lib/api";
 import {
   computeChecklistPatchFromProgress,
+  computeProgressPatchFromChecklist,
   isProgressChecklistSyncing,
-  milestonesForChecklistItem,
   withProgressChecklistSyncLock,
 } from "@/lib/progress-checklist-sync";
 import { serverSync } from "@/lib/sync";
@@ -14,6 +14,48 @@ import { useOnboardingStore } from "@/stores/useOnboardingStore";
 import { useProjectProgressStore } from "@/stores/useProjectProgressStore";
 import type { ProjectProgressMilestoneKey } from "@/types";
 import { nowIso } from "@/types";
+
+function persistProgress(
+  projectId: string,
+  progress: {
+    contactPerson?: string;
+    contactNumber?: string;
+    remarks: string;
+    checks: Partial<Record<ProjectProgressMilestoneKey, boolean>>;
+    notApplicable: Partial<Record<ProjectProgressMilestoneKey, boolean>>;
+  },
+) {
+  serverSync("projectProgress", () =>
+    upsertProjectProgress({
+      data: {
+        projectId,
+        contactPerson: progress.contactPerson,
+        contactNumber: progress.contactNumber,
+        remarks: progress.remarks,
+        checks: progress.checks as Record<string, boolean>,
+        notApplicable: (progress.notApplicable ?? {}) as Record<string, boolean>,
+      },
+    }),
+  );
+}
+
+function persistChecklistPatches(
+  patched: ReturnType<typeof computeChecklistPatchFromProgress>,
+) {
+  for (const item of patched) {
+    serverSync("setChecklistState", () =>
+      apiSetChecklistState({
+        data: {
+          id: item.id,
+          collected: item.collected,
+          uploaded: item.uploaded,
+          live: item.live,
+          notApplicable: item.notApplicable,
+        },
+      }),
+    );
+  }
+}
 
 /** Progress Tracker → Onboarding checklist (overlapping rows only). */
 export function syncChecklistFromProgress(projectId: string) {
@@ -34,20 +76,7 @@ export function syncChecklistFromProgress(projectId: string) {
     useOnboardingStore.setState((s) => ({
       checklistItems: s.checklistItems.map((i) => byId.get(i.id) ?? i),
     }));
-
-    for (const item of patched) {
-      serverSync("setChecklistState", () =>
-        apiSetChecklistState({
-          data: {
-            id: item.id,
-            collected: item.collected,
-            uploaded: item.uploaded,
-            live: item.live,
-            notApplicable: item.notApplicable,
-          },
-        }),
-      );
-    }
+    persistChecklistPatches(patched);
   });
 }
 
@@ -77,72 +106,64 @@ export function syncMarkAllToChecklist(projectId: string, complete: boolean) {
     useOnboardingStore.setState((s) => ({
       checklistItems: s.checklistItems.map((i) => byId.get(i.id) ?? i),
     }));
-    for (const item of patched) {
-      serverSync("setChecklistState", () =>
-        apiSetChecklistState({
-          data: {
-            id: item.id,
-            collected: item.collected,
-            uploaded: item.uploaded,
-            live: item.live,
-            notApplicable: item.notApplicable,
-          },
-        }),
-      );
-    }
+    persistChecklistPatches(patched);
   });
 }
 
-/** Soft reverse: completing a checklist row checks its mapped Progress milestones. */
-export function syncProgressFromChecklistItem(
-  projectId: string,
-  section: string,
-  label: string,
-  fullyDone: boolean,
-) {
-  if (!fullyDone || isProgressChecklistSyncing()) return;
-  const keys = milestonesForChecklistItem(section, label);
-  if (keys.length === 0) return;
-
+/**
+ * Soft reverse: checklist changes update mapped Progress milestones.
+ * Shared milestones (e.g. existingDataUpload) require all mapped rows complete.
+ */
+export function syncProgressFromChecklist(projectId: string) {
+  if (isProgressChecklistSyncing()) return;
   withProgressChecklistSyncLock(() => {
     useProjectProgressStore.getState().ensure(projectId);
     const current = useProjectProgressStore.getState().byProjectId[projectId];
     if (!current) return;
-    let changed = false;
-    const checks = { ...current.checks };
-    for (const key of keys) {
-      if (current.notApplicable?.[key]) continue;
-      if (!checks[key]) {
-        checks[key] = true;
-        changed = true;
-      }
-    }
-    if (!changed) return;
+    const items = useOnboardingStore
+      .getState()
+      .checklistItems.filter((i) => i.projectId === projectId);
+    const patch = computeProgressPatchFromChecklist(
+      items,
+      current.checks,
+      current.notApplicable ?? {},
+    );
+    if (!patch.changed) return;
     useProjectProgressStore.setState((s) => ({
       byProjectId: {
         ...s.byProjectId,
         [projectId]: touch({
           ...current,
-          checks,
-          notApplicable: current.notApplicable ?? {},
+          checks: patch.checks,
+          notApplicable: patch.notApplicable,
         }),
       },
     }));
     const progress = useProjectProgressStore.getState().byProjectId[projectId];
     if (!progress) return;
-    serverSync("projectProgress", () =>
-      upsertProjectProgress({
-        data: {
-          projectId,
-          contactPerson: progress.contactPerson,
-          contactNumber: progress.contactNumber,
-          remarks: progress.remarks,
-          checks: progress.checks as Record<string, boolean>,
-          notApplicable: (progress.notApplicable ?? {}) as Record<string, boolean>,
-        },
-      }),
-    );
+    persistProgress(projectId, progress);
   });
+}
+
+/** @deprecated Prefer syncProgressFromChecklist — kept for call-site compatibility. */
+export function syncProgressFromChecklistItem(
+  projectId: string,
+  _section: string,
+  _label: string,
+  _fullyDone: boolean,
+) {
+  syncProgressFromChecklist(projectId);
+}
+
+/**
+ * Align both sides when opening a project:
+ * 1) Checklist completions bump Progress
+ * 2) Progress state wins and rewrites mapped Checklist rows
+ */
+export function reconcileProgressAndChecklist(projectId: string) {
+  if (isProgressChecklistSyncing()) return;
+  syncProgressFromChecklist(projectId);
+  queueMicrotask(() => syncChecklistFromProgress(projectId));
 }
 
 /** After Go Live, ensure Close-out client sign-off is checked on Progress Tracker. */
@@ -166,18 +187,7 @@ export function markClientSignOffOnProgress(projectId: string) {
     }));
     const progress = useProjectProgressStore.getState().byProjectId[projectId];
     if (!progress) return;
-    serverSync("projectProgress", () =>
-      upsertProjectProgress({
-        data: {
-          projectId,
-          contactPerson: progress.contactPerson,
-          contactNumber: progress.contactNumber,
-          remarks: progress.remarks,
-          checks: progress.checks as Record<string, boolean>,
-          notApplicable: (progress.notApplicable ?? {}) as Record<string, boolean>,
-        },
-      }),
-    );
+    persistProgress(projectId, progress);
   });
   queueMicrotask(() => syncChecklistFromProgress(projectId));
 }

@@ -116,6 +116,7 @@ function ProjectDetailPage() {
 
   useEffect(() => {
     initChecklistForProject(projectId);
+    useProjectProgressStore.getState().ensure(projectId);
   }, [projectId, initChecklistForProject]);
   const updateProject = useProjectStore((s) => s.updateProject);
   const activities = useMemo(

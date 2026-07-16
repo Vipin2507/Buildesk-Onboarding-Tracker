@@ -87,9 +87,19 @@ export const useOnboardingStore = createStore<OnboardingState>((set, get) => ({
       .then((items) => {
         if (!items) return;
         get().replaceChecklistForProject(projectId, items);
+        queueMicrotask(() => {
+          void import("@/lib/progress-onboarding-bridge").then((m) =>
+            m.reconcileProgressAndChecklist(projectId),
+          );
+        });
       })
       .catch(() => {
-        // Offline / bootstrap race: leave existing cache until next fetch.
+        // Offline / bootstrap race: still try local reconcile.
+        queueMicrotask(() => {
+          void import("@/lib/progress-onboarding-bridge").then((m) =>
+            m.reconcileProgressAndChecklist(projectId),
+          );
+        });
       });
     const hadConfig = get().customerAppConfigs.some((c) => c.projectId === projectId);
     if (!hadConfig) {
@@ -146,13 +156,11 @@ export const useOnboardingStore = createStore<OnboardingState>((set, get) => ({
       projectId: item.projectId,
     });
     serverSync("toggleChecklist", () => apiToggleChecklist({ data: { id, phase } }));
-    if (updated.collected && updated.uploaded && updated.live) {
-      queueMicrotask(() => {
-        void import("@/lib/progress-onboarding-bridge").then((m) =>
-          m.syncProgressFromChecklistItem(item.projectId, item.section, item.label, true),
-        );
-      });
-    }
+    queueMicrotask(() => {
+      void import("@/lib/progress-onboarding-bridge").then((m) =>
+        m.syncProgressFromChecklist(item.projectId),
+      );
+    });
   },
 
   completeAllChecklistForProject: (projectId, who = "You") => {
@@ -215,6 +223,11 @@ export const useOnboardingStore = createStore<OnboardingState>((set, get) => ({
     serverSync("setChecklistNotApplicable", () =>
       apiSetNotApplicable({ data: { id, notApplicable } }),
     );
+    queueMicrotask(() => {
+      void import("@/lib/progress-onboarding-bridge").then((m) =>
+        m.syncProgressFromChecklist(item.projectId),
+      );
+    });
   },
 
   updateChecklistRemarks: (id, remarks) => {

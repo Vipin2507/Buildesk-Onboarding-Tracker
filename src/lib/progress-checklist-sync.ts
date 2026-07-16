@@ -40,7 +40,7 @@ export const CHECKLIST_ITEM_MILESTONES: Array<{
   { section: "golive", label: "Client sign-off received", milestones: ["clientSignOff"] },
 ];
 
-/** Milestones that should flip on when a checklist row is completed (soft reverse sync). */
+/** Milestones that should flip when a checklist row changes. */
 export function milestonesForChecklistItem(
   section: string,
   label: string,
@@ -49,6 +49,15 @@ export function milestonesForChecklistItem(
     CHECKLIST_ITEM_MILESTONES.find((m) => m.section === section && m.label === label)
       ?.milestones ?? []
   );
+}
+
+export function checklistMappingsForMilestone(key: ProjectProgressMilestoneKey) {
+  return CHECKLIST_ITEM_MILESTONES.filter((m) => m.milestones.includes(key));
+}
+
+export function isChecklistRowFullyDone(item: OnboardingChecklistItem | undefined) {
+  if (!item || item.notApplicable) return false;
+  return item.collected && item.uploaded && item.live;
 }
 
 type MilestoneState = "done" | "na" | "open";
@@ -134,6 +143,7 @@ export function computeChecklistPatchFromProgress(
         updatedAt: now,
       };
     } else {
+      // Partial or open milestones → checklist not complete
       next = {
         ...item,
         notApplicable: false,
@@ -151,4 +161,68 @@ export function computeChecklistPatchFromProgress(
     }
   }
   return patched;
+}
+
+/**
+ * Soft reverse: derive Progress milestone patches from checklist rows.
+ * - All mapped rows fully done → check milestone
+ * - All mapped rows N/A → milestone N/A
+ * - Otherwise → clear check (and clear N/A if any row is actively incomplete)
+ */
+export function computeProgressPatchFromChecklist(
+  items: OnboardingChecklistItem[],
+  checks: Partial<Record<ProjectProgressMilestoneKey, boolean>>,
+  notApplicable: Partial<Record<ProjectProgressMilestoneKey, boolean>>,
+): {
+  checks: Partial<Record<ProjectProgressMilestoneKey, boolean>>;
+  notApplicable: Partial<Record<ProjectProgressMilestoneKey, boolean>>;
+  changed: boolean;
+} {
+  const byKey = new Map(items.map((i) => [`${i.section}::${i.label}`, i]));
+  const nextChecks = { ...checks };
+  const nextNa = { ...notApplicable };
+  let changed = false;
+
+  const milestoneKeys = new Set<ProjectProgressMilestoneKey>();
+  for (const m of CHECKLIST_ITEM_MILESTONES) {
+    for (const key of m.milestones) milestoneKeys.add(key);
+  }
+
+  for (const key of milestoneKeys) {
+    const mappings = checklistMappingsForMilestone(key);
+    const rows = mappings
+      .map((m) => byKey.get(`${m.section}::${m.label}`))
+      .filter((r): r is OnboardingChecklistItem => Boolean(r));
+    if (rows.length === 0) continue;
+
+    const allNa = rows.every((r) => r.notApplicable);
+    // Require every mapped row to be done (or N/A), with at least one actually done
+    const everyCompleteOrNa = rows.every((r) => r.notApplicable || isChecklistRowFullyDone(r));
+    const anyDone = rows.some((r) => isChecklistRowFullyDone(r));
+
+    let wantNa = allNa;
+    let wantCheck = !wantNa && everyCompleteOrNa && anyDone;
+
+    // Shared milestone (e.g. existingDataUpload): check only when ALL mapped rows are done
+    if (mappings.length > 1) {
+      wantCheck = !wantNa && rows.every((r) => isChecklistRowFullyDone(r));
+      wantNa = allNa;
+    }
+
+    if (Boolean(nextNa[key]) !== wantNa) {
+      nextNa[key] = wantNa;
+      changed = true;
+    }
+    if (wantNa) {
+      if (nextChecks[key]) {
+        nextChecks[key] = false;
+        changed = true;
+      }
+    } else if (Boolean(nextChecks[key]) !== wantCheck) {
+      nextChecks[key] = wantCheck;
+      changed = true;
+    }
+  }
+
+  return { checks: nextChecks, notApplicable: nextNa, changed };
 }
