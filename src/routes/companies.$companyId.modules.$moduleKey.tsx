@@ -246,8 +246,8 @@ function GenericModuleHub({
       <div className="card-soft p-4">
         <h3 className="mb-1 font-semibold">Task checklist</h3>
         <p className="mb-4 text-xs text-muted-foreground">
-          Derived from Progress Tracker milestones across {projects.length} project
-          {projects.length === 1 ? "" : "s"}. Update checkboxes on each project&apos;s Progress Tracker.
+          Derived from project onboarding milestones across {projects.length} project
+          {projects.length === 1 ? "" : "s"}. Update checklist phases on each project.
         </p>
         {checklist.length === 0 ? (
           <EmptyState
@@ -288,7 +288,7 @@ function GenericModuleHub({
           <div className="flex flex-wrap gap-2">
             {projects.map((p) => (
               <Button key={p.id} size="sm" variant="outline" asChild>
-                <Link to="/projects/$projectId" params={{ projectId: p.id }} search={{ tab: "progress" }}>
+                <Link to="/projects/$projectId" params={{ projectId: p.id }} search={{ tab: "onboarding" }}>
                   {p.name}
                 </Link>
               </Button>

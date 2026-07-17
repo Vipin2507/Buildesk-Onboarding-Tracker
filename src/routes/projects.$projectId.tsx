@@ -7,7 +7,6 @@ import { z } from "zod";
 
 import { PageHeader, PageWrap } from "@/components/page-header";
 import { ProgressBar } from "@/components/progress-bar";
-import { ProjectManualProgress } from "@/components/project-manual-progress";
 import { ProjectDocumentsPanel } from "@/components/project-documents-panel";
 import { Button } from "@/components/ui/button";
 import { EntityNotFound } from "@/components/empty-state";
@@ -18,12 +17,10 @@ import {
   useProjectStore,
   useOnboardingStore,
   useActivityStore,
-  useProjectProgressStore,
   calcProjectProgress,
 } from "@/stores";
 import { ONBOARDING_STEPS, ONBOARDING_SECTIONS } from "@/data/constants";
 import { formatRelativeTime } from "@/types/common";
-import { PROJECT_PROGRESS_MILESTONES } from "@/types/project";
 import { calcChecklistProgress, canToggleChecklistPhase, countApplicableChecklist } from "@/lib/checklist";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 
@@ -60,9 +57,10 @@ function stepForSection(sectionKey: string): number {
 
 const searchSchema = z.object({
   tab: z
-    .enum(["progress", "onboarding", "documents"])
+    .enum(["onboarding", "documents"])
+    .or(z.literal("progress").transform(() => "onboarding" as const))
     .optional()
-    .default("progress"),
+    .default("onboarding"),
 });
 
 export const Route = createFileRoute("/projects/$projectId")({
@@ -82,22 +80,10 @@ function ProjectDetailPage() {
   const allCharges = useOnboardingStore((s) => s.otherCharges);
   const allActivities = useActivityStore((s) => s.activities);
   const checklist = useMemo(() => allChecklist.filter((i) => i.projectId === projectId), [allChecklist, projectId]);
-  const progressByProject = useProjectProgressStore((s) => s.byProjectId[projectId]);
-  const checklistProgress = useMemo(
+  const progress = useMemo(
     () => calcProjectProgress(projectId, allChecklist),
-    [projectId, allChecklist, progressByProject],
+    [projectId, allChecklist],
   );
-  const manualChecks = progressByProject?.checks;
-  const manualNa = progressByProject?.notApplicable;
-  const manualPercent = useMemo(() => {
-    if (!manualChecks && !manualNa) return 0;
-    const na = manualNa ?? {};
-    const applicable = PROJECT_PROGRESS_MILESTONES.filter((m) => !na[m.key]);
-    if (applicable.length === 0) return 100;
-    const done = applicable.filter((m) => manualChecks?.[m.key]).length;
-    return Math.round((done / applicable.length) * 100);
-  }, [manualChecks, manualNa]);
-  const progress = Math.max(checklistProgress, manualPercent);
   const canGoLive = useMemo(
     () => {
       const goliveItems = checklist.filter((i) => i.section === "golive");
@@ -116,7 +102,6 @@ function ProjectDetailPage() {
 
   useEffect(() => {
     initChecklistForProject(projectId);
-    useProjectProgressStore.getState().ensure(projectId);
   }, [projectId, initChecklistForProject]);
   const updateProject = useProjectStore((s) => s.updateProject);
   const activities = useMemo(
@@ -163,7 +148,6 @@ function ProjectDetailPage() {
   const projectName = project.name;
 
   const TABS = [
-    { key: "progress", label: "Progress Tracker" },
     { key: "onboarding", label: "Checklist Detail" },
     { key: "documents", label: "Documents" },
   ] as const;
@@ -202,7 +186,7 @@ function ProjectDetailPage() {
 
       <PageHeader
         title={project.name}
-        subtitle={`${company?.name ?? ""} · ${project.city}${project.pocName ? ` · POC ${project.pocName}` : ""}${project.startDate ? ` · Started ${formatDate(project.startDate)}` : ""} · Track milestones in Progress; use Checklist for phase-level detail`}
+        subtitle={`${company?.name ?? ""} · ${project.city}${project.pocName ? ` · POC ${project.pocName}` : ""}${project.startDate ? ` · Started ${formatDate(project.startDate)}` : ""} · Complete checklist phases to track onboarding`}
         actions={
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">{progress}% complete</span>
@@ -233,8 +217,6 @@ function ProjectDetailPage() {
           >{t.label}</button>
         ))}
       </div>
-
-      {tab === "progress" && <ProjectManualProgress projectId={projectId} />}
 
       {tab === "onboarding" && (
         <>

@@ -225,7 +225,7 @@ function TicketDetail() {
                 <Link
                   to="/projects/$projectId"
                   params={{ projectId: project.id }}
-                  search={{ tab: "progress" }}
+                  search={{ tab: "onboarding" }}
                   className="font-medium text-primary hover:underline"
                 >
                   {project.name}

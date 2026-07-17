@@ -57,7 +57,7 @@ function OnboardingList() {
     <PageWrap>
       <PageHeader
         title="Onboarding Tracker"
-        subtitle="Active project onboardings — Continue opens the Progress Tracker (primary). Checklist Detail is available as a secondary tab."
+        subtitle="Active project onboardings — Continue opens Checklist Detail."
       />
 
       <div className="space-y-2.5 md:hidden">
@@ -85,7 +85,7 @@ function OnboardingList() {
             <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
               <span>{r.manager}</span>
               <Button size="sm" variant="ghost" className="h-8 gap-1 px-2 text-primary" asChild>
-                <Link to="/projects/$projectId" params={{ projectId: r.project.id }} search={{ tab: "progress" }}>
+                <Link to="/projects/$projectId" params={{ projectId: r.project.id }} search={{ tab: "onboarding" }}>
                   Continue <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </Button>
@@ -131,7 +131,7 @@ function OnboardingList() {
                 <td className="px-4 py-3">{r.manager}</td>
                 <td className="px-4 py-3 text-right">
                   <Button size="sm" variant="ghost" className="gap-1 text-primary" asChild>
-                    <Link to="/projects/$projectId" params={{ projectId: r.project.id }} search={{ tab: "progress" }}>
+                    <Link to="/projects/$projectId" params={{ projectId: r.project.id }} search={{ tab: "onboarding" }}>
                       Continue <ArrowRight className="h-3.5 w-3.5" />
                     </Link>
                   </Button>

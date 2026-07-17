@@ -43,7 +43,6 @@ import {
   usePostSalesProjectsForCompany,
   calcProjectProgress,
   useOnboardingStore,
-  useProjectProgressStore,
 } from "@/stores";
 import { calcPostSalesProjectProgress } from "@/lib/post-sales-status";
 import { cn, formatDate } from "@/lib/utils";
@@ -115,7 +114,6 @@ function CompanyDetailContent() {
   const projects = useMemo(() => allProjects.filter((p) => p.companyId === companyId), [allProjects, companyId]);
   const postSalesProjects = usePostSalesProjectsForCompany(companyId);
   const checklistItems = useOnboardingStore((s) => s.checklistItems);
-  const progressByProject = useProjectProgressStore((s) => s.byProjectId);
   const employees = useEmployeeStore((s) => s.employees);
   const progress = useCompanyProgress(companyId);
   const modulesWithProgress = useCompanyModulesWithProgress(companyId);
@@ -173,7 +171,7 @@ function CompanyDetailContent() {
           navigate({
             to: "/projects/$projectId",
             params: { projectId: project.id },
-            search: { tab: "progress" },
+            search: { tab: "onboarding" },
           }),
       },
     });
@@ -377,22 +375,20 @@ function CompanyDetailContent() {
             {projects.length === 0 ? (
               <EmptyState
                 title="No onboarding projects yet"
-                description="Create a project for this company to start the Progress Tracker."
+                description="Create a project for this company to start the onboarding checklist."
                 actionLabel="+ Add Project"
                 onAction={() => setProjectModalOpen(true)}
               />
             ) : (
               <div className="grid gap-3 md:grid-cols-2">
                 {projects.map((p) => {
-                  // progressByProject keeps cards in sync when Progress Tracker updates
-                  void progressByProject;
                   const pct = calcProjectProgress(p.id, checklistItems);
                   return (
                     <Link
                       key={p.id}
                       to="/projects/$projectId"
                       params={{ projectId: p.id }}
-                      search={{ tab: "progress" }}
+                      search={{ tab: "onboarding" }}
                       className="card-soft group block p-4 transition-all hover:-translate-y-0.5 hover:shadow-md"
                     >
                       <div className="flex items-start justify-between gap-2">

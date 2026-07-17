@@ -139,11 +139,34 @@ function Employees() {
         <div className="grid gap-3">
           <select value={fromId} onChange={(e) => setFromId(e.target.value)} className="h-9 rounded-md border px-3 text-sm">
             <option value="">From manager…</option>
-            {employees.filter((e) => e.role === "Onboarding Manager").map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+            {employees
+              .filter(
+                (e) =>
+                  e.role === "Admin" ||
+                  e.role === "Onboarding Manager" ||
+                  e.role.includes("Implementation"),
+              )
+              .map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.name}
+                </option>
+              ))}
           </select>
           <select value={toId} onChange={(e) => setToId(e.target.value)} className="h-9 rounded-md border px-3 text-sm">
             <option value="">To manager…</option>
-            {employees.filter((e) => e.role === "Onboarding Manager" && e.id !== fromId).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+            {employees
+              .filter(
+                (e) =>
+                  e.id !== fromId &&
+                  (e.role === "Admin" ||
+                    e.role === "Onboarding Manager" ||
+                    e.role.includes("Implementation")),
+              )
+              .map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.name}
+                </option>
+              ))}
           </select>
         </div>
       </EntityFormModal>

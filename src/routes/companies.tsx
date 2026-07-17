@@ -40,7 +40,10 @@ const FIELD_LABELS: Record<string, string> = {
 
 function managerOptions(employees: { id: string; name: string; role: string }[]) {
   const preferred = employees.filter(
-    (e) => e.role.includes("Onboarding") || e.role.includes("Implementation"),
+    (e) =>
+      e.role === "Admin" ||
+      e.role.includes("Onboarding") ||
+      e.role.includes("Implementation"),
   );
   return preferred.length > 0 ? preferred : employees;
 }
