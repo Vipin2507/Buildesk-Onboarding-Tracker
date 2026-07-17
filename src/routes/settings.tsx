@@ -19,24 +19,23 @@ import { toast } from "sonner";
 
 import { ConfirmDeleteDialog, EntityFormModal } from "@/components/entity-form-modal";
 import { PageHeader, PageWrap } from "@/components/page-header";
+import { RolesPermissionsPanel } from "@/components/roles-permissions-panel";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useTheme } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { usePermissions } from "@/hooks/use-permissions";
 import { useAuthStore, useSettingsStore, useUserStore } from "@/stores";
 import { createUser as apiCreateUser, updateUser as apiUpdateUser } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { ThemeMode } from "@/lib/theme";
 import {
-  PERMISSION_LABELS,
   type DocumentSettings,
   type ExcelTemplateSetting,
   type NotificationSettings,
   type OrgSettings,
   type PaymentPlanPreset,
-  type RolePermissionKey,
   type User,
-  type UserRole,
 } from "@/types";
 
 type SectionId =
@@ -75,16 +74,27 @@ const SECTIONS: {
   title: string;
   desc: string;
   icon: typeof Building2;
+  adminOnly?: boolean;
+  requiresManageSettings?: boolean;
 }[] = [
   { id: "appearance", title: "Appearance", desc: "Light and dark theme for the whole app.", icon: Palette },
-  { id: "company", title: "Company Settings", desc: "Legal name, GST, branding, timezone.", icon: Building2 },
-  { id: "notifications", title: "Email & Notifications", desc: "SMTP, digest cadence, event alerts.", icon: Bell },
-  { id: "documents", title: "Document Settings", desc: "Default formats & signatories.", icon: FileText },
-  { id: "excel", title: "Excel Templates", desc: "Manage import templates & samples.", icon: FileSpreadsheet },
-  { id: "payments", title: "Payment Plan Settings", desc: "Base plans and installment presets.", icon: Wallet },
-  { id: "roles", title: "Roles & Permissions", desc: "Access matrix by role.", icon: Shield },
-  { id: "users", title: "User Management", desc: "Invite, deactivate and audit users.", icon: Users },
+  { id: "company", title: "Company Settings", desc: "Legal name, GST, branding, timezone.", icon: Building2, requiresManageSettings: true },
+  { id: "notifications", title: "Email & Notifications", desc: "SMTP, digest cadence, event alerts.", icon: Bell, requiresManageSettings: true },
+  { id: "documents", title: "Document Settings", desc: "Default formats & signatories.", icon: FileText, requiresManageSettings: true },
+  { id: "excel", title: "Excel Templates", desc: "Manage import templates & samples.", icon: FileSpreadsheet, requiresManageSettings: true },
+  { id: "payments", title: "Payment Plan Settings", desc: "Base plans and installment presets.", icon: Wallet, requiresManageSettings: true },
+  { id: "roles", title: "Roles & Permissions", desc: "Create roles and configure access.", icon: Shield, adminOnly: true },
+  { id: "users", title: "User Management", desc: "Invite, deactivate and audit users.", icon: Users, adminOnly: true },
 ];
+
+function canAccessSettingsSection(
+  section: (typeof SECTIONS)[number],
+  ctx: { isAdmin: boolean; can: (key: "manageSettings") => boolean },
+) {
+  if (section.adminOnly) return ctx.isAdmin;
+  if (section.requiresManageSettings) return ctx.isAdmin || ctx.can("manageSettings");
+  return true;
+}
 
 const FIELD =
   "mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/25";
@@ -92,11 +102,24 @@ const FIELD =
 function Settings() {
   const navigate = useNavigate({ from: "/settings" });
   const search = Route.useSearch();
+  const { isAdmin, can } = usePermissions();
   const [section, setSection] = useState<SectionId | null>(search.section ?? null);
 
+  const visibleSections = SECTIONS.filter((s) =>
+    canAccessSettingsSection(s, { isAdmin, can }),
+  );
+
   useEffect(() => {
-    if (search.section) setSection(search.section);
-  }, [search.section]);
+    if (search.section) {
+      const target = SECTIONS.find((s) => s.id === search.section);
+      if (target && canAccessSettingsSection(target, { isAdmin, can })) {
+        setSection(search.section);
+      } else if (search.section) {
+        setSection(null);
+        void navigate({ search: { section: undefined, invite: false }, replace: true });
+      }
+    }
+  }, [search.section, isAdmin, can, navigate]);
 
   function openSection(next: SectionId | null) {
     setSection(next);
@@ -111,7 +134,7 @@ function Settings() {
       <PageHeader title="Settings" subtitle="Configure the tracker to match your workflow." />
       {!section ? (
         <div className="grid gap-3 md:grid-cols-2">
-          {SECTIONS.map((s) => (
+          {visibleSections.map((s) => (
             <button
               key={s.id}
               type="button"
@@ -134,13 +157,15 @@ function Settings() {
             ← Back to Settings
           </Button>
           {section === "appearance" && <AppearanceSection />}
-          {section === "company" && <CompanySection />}
-          {section === "notifications" && <NotificationsSection />}
-          {section === "documents" && <DocumentsSection />}
-          {section === "excel" && <ExcelSection />}
-          {section === "payments" && <PaymentsSection />}
-          {section === "roles" && <RolesSection />}
-          {section === "users" && <UsersSection initialInviteOpen={Boolean(search.invite)} />}
+          {section === "company" && (isAdmin || can("manageSettings")) && <CompanySection />}
+          {section === "notifications" && (isAdmin || can("manageSettings")) && <NotificationsSection />}
+          {section === "documents" && (isAdmin || can("manageSettings")) && <DocumentsSection />}
+          {section === "excel" && (isAdmin || can("manageSettings")) && <ExcelSection />}
+          {section === "payments" && (isAdmin || can("manageSettings")) && <PaymentsSection />}
+          {section === "roles" && isAdmin && <RolesPermissionsPanel />}
+          {section === "users" && isAdmin && (
+            <UsersSection initialInviteOpen={Boolean(search.invite)} />
+          )}
         </div>
       )}
     </PageWrap>
@@ -898,77 +923,15 @@ function PaymentsSection() {
   );
 }
 
-function RolesSection() {
-  const permissions = useSettingsStore((s) => s.permissions);
-  const setPermission = useSettingsStore((s) => s.setPermission);
-  const resetPermissions = useSettingsStore((s) => s.resetPermissions);
-  const roles: UserRole[] = ["Admin", "Manager", "Viewer"];
-  const keys = Object.keys(PERMISSION_LABELS) as RolePermissionKey[];
-
-  return (
-    <div className="card-soft overflow-hidden">
-      <div className="flex items-start justify-between gap-3 border-b p-5">
-        <SectionTitle title="Roles & Permissions" subtitle="Control what each role can do across the tracker." />
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            resetPermissions();
-            toast.success("Permissions reset to defaults");
-          }}
-        >
-          Reset defaults
-        </Button>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/60 text-xs text-muted-foreground">
-            <tr>
-              <th className="px-4 py-3 text-left">Permission</th>
-              {roles.map((r) => (
-                <th key={r} className="px-4 py-3 text-center">{r}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {keys.map((key) => (
-              <tr key={key} className="border-t">
-                <td className="px-4 py-3">{PERMISSION_LABELS[key]}</td>
-                {roles.map((role) => (
-                  <td key={role} className="px-4 py-3 text-center">
-                    <div className="flex justify-center">
-                      <Switch
-                        size="sm"
-                        checked={permissions[role][key]}
-                        disabled={role === "Admin" && (key === "manageUsers" || key === "manageSettings" || key === "manageMaster")}
-                        onCheckedChange={(v) => {
-                          setPermission(role, key, v);
-                          toast.success(`${role}: ${PERMISSION_LABELS[key]} ${v ? "enabled" : "disabled"}`);
-                        }}
-                      />
-                    </div>
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <p className="border-t px-5 py-3 text-xs text-muted-foreground">
-        Admin core permissions stay enabled so the platform remains manageable. Changes persist locally in this prototype.
-      </p>
-    </div>
-  );
-}
-
 type UserForm = Pick<User, "name" | "email" | "role" | "active" | "phone" | "jobTitle" | "department">;
 
 function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boolean }) {
   const users = useUserStore((s) => s.users);
   const deleteUser = useUserStore((s) => s.deleteUser);
+  const roles = useSettingsStore((s) => s.roles);
   const currentUser = useAuthStore((s) => s.user);
   const currentUserId = currentUser?.id;
-  const isAdmin = currentUser?.role === "Admin";
+  const { isAdmin } = usePermissions();
   const navigate = useNavigate({ from: "/settings" });
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -977,7 +940,7 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
   const [form, setForm] = useState<UserForm>({
     name: "",
     email: "",
-    role: "Viewer",
+    role: roles.find((r) => r.key === "Viewer")?.key ?? roles[0]?.key ?? "Viewer",
     active: true,
     phone: "",
     jobTitle: "",
@@ -987,7 +950,15 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
   useEffect(() => {
     if (!initialInviteOpen || !isAdmin) return;
     setEditing(null);
-    setForm({ name: "", email: "", role: "Viewer", active: true, phone: "", jobTitle: "", department: "" });
+    setForm({
+      name: "",
+      email: "",
+      role: roles.find((r) => r.key === "Viewer")?.key ?? roles[0]?.key ?? "Viewer",
+      active: true,
+      phone: "",
+      jobTitle: "",
+      department: "",
+    });
     setModalOpen(true);
     void navigate({ search: { section: "users", invite: false }, replace: true });
   }, [initialInviteOpen, isAdmin, navigate]);
@@ -998,7 +969,15 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
       return;
     }
     setEditing(null);
-    setForm({ name: "", email: "", role: "Viewer", active: true, phone: "", jobTitle: "", department: "" });
+    setForm({
+      name: "",
+      email: "",
+      role: roles.find((r) => r.key === "Viewer")?.key ?? roles[0]?.key ?? "Viewer",
+      active: true,
+      phone: "",
+      jobTitle: "",
+      department: "",
+    });
     setModalOpen(true);
   }
 
@@ -1055,7 +1034,9 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-3">{u.role}</td>
+                <td className="px-4 py-3">
+                  {roles.find((r) => r.key === u.role)?.name ?? u.role}
+                </td>
                 <td className="px-4 py-3 text-muted-foreground">{u.department ?? "—"}</td>
                 <td className="px-4 py-3">
                   <span
@@ -1196,10 +1177,12 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
           <select
             className={FIELD}
             value={form.role}
-            onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}
+            onChange={(e) => setForm({ ...form, role: e.target.value })}
           >
-            {(["Admin", "Manager", "Viewer"] as const).map((r) => (
-              <option key={r} value={r}>{r}</option>
+            {roles.map((r) => (
+              <option key={r.id} value={r.key}>
+                {r.name}
+              </option>
             ))}
           </select>
           <label className="flex items-center gap-2 text-sm">

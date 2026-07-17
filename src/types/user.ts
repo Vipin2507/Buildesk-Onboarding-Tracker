@@ -1,6 +1,9 @@
 import type { Timestamps } from "./common";
 
-export type UserRole = "Admin" | "Manager" | "Viewer";
+export type UserRole = string;
+
+/** Built-in role keys shipped with the platform */
+export type SystemUserRole = "Admin" | "Manager" | "Viewer";
 
 export type User = Timestamps & {
   id: string;

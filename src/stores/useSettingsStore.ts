@@ -4,10 +4,18 @@ import type {
   NotificationSettings,
   OrgSettings,
   PaymentPlanPreset,
+  RoleDefinition,
   RolePermissionKey,
   RolePermissions,
 } from "@/types";
 import { newId, nowIso } from "@/types";
+import {
+  DEFAULT_ROLES,
+  defaultPermissionMap,
+  normalizeAdminPermissions,
+  rolesFromLegacyPermissions,
+  slugifyRoleKey,
+} from "@/lib/permissions";
 import { createPersistedStore, touch } from "./persist";
 import { logActivity } from "./useActivityStore";
 
@@ -130,46 +138,15 @@ const SEED_PLANS: PaymentPlanPreset[] = [
   },
 ];
 
-const SEED_PERMISSIONS: RolePermissions = {
-  Admin: {
-    manageCompanies: true,
-    manageProjects: true,
-    approvePostSales: true,
-    manageTickets: true,
-    viewReports: true,
-    manageMaster: true,
-    manageUsers: true,
-    manageSettings: true,
-  },
-  Manager: {
-    manageCompanies: true,
-    manageProjects: true,
-    approvePostSales: false,
-    manageTickets: true,
-    viewReports: true,
-    manageMaster: false,
-    manageUsers: false,
-    manageSettings: false,
-  },
-  Viewer: {
-    manageCompanies: false,
-    manageProjects: false,
-    approvePostSales: false,
-    manageTickets: false,
-    viewReports: true,
-    manageMaster: false,
-    manageUsers: false,
-    manageSettings: false,
-  },
-};
-
 type SettingsState = {
   org: OrgSettings;
   notifications: NotificationSettings;
   documents: DocumentSettings;
   excelTemplates: ExcelTemplateSetting[];
   paymentPlans: PaymentPlanPreset[];
-  permissions: RolePermissions;
+  roles: RoleDefinition[];
+  /** @deprecated migrated into roles */
+  permissions?: RolePermissions;
 
   updateOrg: (data: Partial<OrgSettings>) => void;
   updateNotifications: (data: Partial<NotificationSettings>) => void;
@@ -183,17 +160,34 @@ type SettingsState = {
   updatePaymentPlan: (id: string, data: Partial<PaymentPlanPreset>) => void;
   deletePaymentPlan: (id: string) => void;
 
-  setPermission: (role: keyof RolePermissions, key: RolePermissionKey, value: boolean) => void;
+  addRole: (data: { name: string; description?: string; cloneFromId?: string }) => RoleDefinition;
+  updateRole: (id: string, data: Partial<Pick<RoleDefinition, "name" | "description">>) => void;
+  deleteRole: (id: string) => boolean;
+  setRolePermission: (roleId: string, key: RolePermissionKey, value: boolean) => void;
+  setRolePermissions: (roleId: string, permissions: Partial<Record<RolePermissionKey, boolean>>) => void;
+  resetRoles: () => void;
+  getRoleByKey: (key: string) => RoleDefinition | undefined;
+
+  /** @deprecated use setRolePermission */
+  setPermission: (role: string, key: RolePermissionKey, value: boolean) => void;
+  /** @deprecated use resetRoles */
   resetPermissions: () => void;
 };
 
-export const useSettingsStore = createPersistedStore<SettingsState>("app-settings-v1", (set) => ({
+function cloneRoles(roles: RoleDefinition[]) {
+  return roles.map((r) => ({
+    ...r,
+    permissions: { ...r.permissions },
+  }));
+}
+
+export const useSettingsStore = createPersistedStore<SettingsState>("app-settings-v2", (set, get) => ({
   org: SEED_ORG,
   notifications: SEED_NOTIFICATIONS,
   documents: SEED_DOCUMENTS,
   excelTemplates: SEED_EXCEL,
   paymentPlans: SEED_PLANS,
-  permissions: SEED_PERMISSIONS,
+  roles: cloneRoles(DEFAULT_ROLES),
 
   updateOrg: (data) => {
     set((s) => ({ org: { ...s.org, ...data } }));
@@ -246,17 +240,114 @@ export const useSettingsStore = createPersistedStore<SettingsState>("app-setting
     set((s) => ({ paymentPlans: s.paymentPlans.filter((p) => p.id !== id) }));
   },
 
-  setPermission: (role, key, value) => {
+  addRole: (data) => {
+    const now = nowIso();
+    const existingKeys = get().roles.map((r) => r.key);
+    const key = slugifyRoleKey(data.name, existingKeys);
+    const cloneSource = data.cloneFromId
+      ? get().roles.find((r) => r.id === data.cloneFromId)
+      : get().roles.find((r) => r.key === "Manager");
+    const permissions = defaultPermissionMap(cloneSource?.permissions ?? {});
+    const role: RoleDefinition = {
+      id: newId(),
+      key,
+      name: data.name.trim(),
+      description: data.description?.trim() || undefined,
+      isSystem: false,
+      permissions,
+      createdAt: now,
+      updatedAt: now,
+    };
+    set((s) => ({ roles: [...s.roles, role] }));
+    logActivity({ who: "You", what: `Created role ${role.name}`, kind: "success" });
+    return role;
+  },
+
+  updateRole: (id, data) => {
     set((s) => ({
-      permissions: {
-        ...s.permissions,
-        [role]: { ...s.permissions[role], [key]: value },
-      },
+      roles: s.roles.map((r) => {
+        if (r.id !== id) return r;
+        return touch({
+          ...r,
+          ...(data.name !== undefined ? { name: data.name.trim() } : {}),
+          ...(data.description !== undefined
+            ? { description: data.description.trim() || undefined }
+            : {}),
+        });
+      }),
+    }));
+    logActivity({ who: "You", what: "Updated role", kind: "info" });
+  },
+
+  deleteRole: (id) => {
+    const role = get().roles.find((r) => r.id === id);
+    if (!role || role.isSystem) return false;
+    set((s) => ({ roles: s.roles.filter((r) => r.id !== id) }));
+    logActivity({ who: "You", what: `Deleted role ${role.name}`, kind: "warning" });
+    return true;
+  },
+
+  setRolePermission: (roleId, key, value) => {
+    set((s) => ({
+      roles: s.roles.map((r) => {
+        if (r.id !== roleId) return r;
+        const permissions = normalizeAdminPermissions(r.key, {
+          ...r.permissions,
+          [key]: value,
+        });
+        return touch({ ...r, permissions });
+      }),
     }));
   },
 
+  setRolePermissions: (roleId, patch) => {
+    set((s) => ({
+      roles: s.roles.map((r) => {
+        if (r.id !== roleId) return r;
+        const permissions = normalizeAdminPermissions(r.key, { ...r.permissions, ...patch });
+        return touch({ ...r, permissions });
+      }),
+    }));
+  },
+
+  resetRoles: () => {
+    set({ roles: cloneRoles(DEFAULT_ROLES) });
+    logActivity({ who: "You", what: "Reset roles & permissions to defaults", kind: "warning" });
+  },
+
+  getRoleByKey: (key) => get().roles.find((r) => r.key === key),
+
+  setPermission: (roleKey, key, value) => {
+    const role = get().roles.find((r) => r.key === roleKey);
+    if (role) get().setRolePermission(role.id, key, value);
+  },
+
   resetPermissions: () => {
-    set({ permissions: SEED_PERMISSIONS });
-    logActivity({ who: "You", what: "Reset role permissions to defaults", kind: "warning" });
+    get().resetRoles();
   },
 }));
+
+/** Hydrate roles from server snapshot or legacy local permissions. */
+export function hydrateSettingsFromServer(snapshot: Record<string, unknown> | null | undefined) {
+  if (!snapshot || typeof snapshot !== "object") return;
+  const patch: Partial<SettingsState> = {};
+  if (snapshot.org) patch.org = snapshot.org as OrgSettings;
+  if (snapshot.notifications) patch.notifications = snapshot.notifications as NotificationSettings;
+  if (snapshot.documents) patch.documents = snapshot.documents as DocumentSettings;
+  if (snapshot.excelTemplates) patch.excelTemplates = snapshot.excelTemplates as ExcelTemplateSetting[];
+  if (snapshot.paymentPlans) patch.paymentPlans = snapshot.paymentPlans as PaymentPlanPreset[];
+  if (Array.isArray(snapshot.roles) && snapshot.roles.length > 0) {
+    patch.roles = (snapshot.roles as RoleDefinition[]).map((r) => ({
+      ...r,
+      permissions: normalizeAdminPermissions(
+        r.key,
+        defaultPermissionMap(r.permissions ?? {}),
+      ),
+    }));
+  } else if (snapshot.permissions) {
+    patch.roles = rolesFromLegacyPermissions(snapshot.permissions as RolePermissions);
+  }
+  if (Object.keys(patch).length > 0) {
+    useSettingsStore.setState((s) => ({ ...s, ...patch }));
+  }
+}

@@ -193,7 +193,8 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           useMasterStore.setState((s) => ({ ...s, ...master }));
         }
         if (settings && typeof settings === "object" && Object.keys(settings).length > 1) {
-          useSettingsStore.setState((s) => ({ ...s, ...settings }));
+          const { hydrateSettingsFromServer } = await import("@/stores/useSettingsStore");
+          hydrateSettingsFromServer(settings as Record<string, unknown>);
         }
 
         setReady(true);

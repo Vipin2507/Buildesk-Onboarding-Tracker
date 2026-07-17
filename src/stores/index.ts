@@ -22,7 +22,7 @@ export {
   getEnabledInventoryItems,
 } from "./useMasterStore";
 export type { MasterResetSection } from "./useMasterStore";
-export { useSettingsStore } from "./useSettingsStore";
+export { useSettingsStore, hydrateSettingsFromServer } from "./useSettingsStore";
 export { useNotificationStore, notifyInApp } from "./useNotificationStore";
 export { useProjectProgressStore } from "./useProjectProgressStore";
 export {

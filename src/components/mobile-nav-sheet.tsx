@@ -8,7 +8,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { APP_NAV, isNavActive } from "@/lib/nav";
+import { APP_NAV, filterNavItems, isNavActive } from "@/lib/nav";
+import { usePermissions } from "@/hooks/use-permissions";
 import { cn } from "@/lib/utils";
 
 const ease = [0.22, 1, 0.36, 1] as const;
@@ -21,6 +22,8 @@ export function MobileNavSheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { isAdmin, can } = usePermissions();
+  const navItems = filterNavItems(APP_NAV, { isAdmin, can });
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -43,7 +46,7 @@ export function MobileNavSheet({
         </SheetHeader>
 
         <nav className="flex-1 overflow-y-auto px-2 py-3">
-          {APP_NAV.map((item, i) => {
+          {navItems.map((item, i) => {
             const active = isNavActive(pathname, item);
             const Icon = item.icon;
             const showAdminDivider = item.to === "/master";

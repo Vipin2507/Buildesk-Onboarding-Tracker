@@ -3,13 +3,16 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { Building, ChevronLeft, ChevronRight } from "lucide-react";
 
-import { APP_NAV, isNavActive } from "@/lib/nav";
+import { APP_NAV, filterNavItems, isNavActive } from "@/lib/nav";
+import { usePermissions } from "@/hooks/use-permissions";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "buildesk-sidebar-collapsed";
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { isAdmin, can } = usePermissions();
+  const navItems = filterNavItems(APP_NAV, { isAdmin, can });
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -65,7 +68,7 @@ export function AppSidebar() {
         </div>
 
         <nav className="flex-1 overflow-x-hidden overflow-y-auto px-1.5 pb-3">
-          {APP_NAV.map((item) => {
+          {navItems.map((item) => {
             const active = isNavActive(pathname, item);
             const Icon = item.icon;
             const showAdminDivider = item.to === "/master";

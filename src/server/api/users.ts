@@ -29,7 +29,7 @@ export const createUser = createServerFn({ method: "POST" })
       .object({
         name: z.string().min(2),
         email: z.string().email(),
-        role: z.enum(["Admin", "Manager", "Viewer"]),
+        role: z.string().min(1),
         active: z.boolean().optional(),
         phone: z.string().optional(),
         jobTitle: z.string().optional(),
@@ -77,7 +77,7 @@ export const updateUser = createServerFn({ method: "POST" })
         patch: z.object({
           name: z.string().optional(),
           email: z.string().email().optional(),
-          role: z.enum(["Admin", "Manager", "Viewer"]).optional(),
+          role: z.string().min(1).optional(),
           active: z.boolean().optional(),
           phone: z.string().optional().nullable(),
           jobTitle: z.string().optional().nullable(),

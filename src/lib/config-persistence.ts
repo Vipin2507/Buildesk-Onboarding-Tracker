@@ -29,7 +29,7 @@ function settingsSnapshot() {
     documents: s.documents,
     excelTemplates: s.excelTemplates,
     paymentPlans: s.paymentPlans,
-    permissions: s.permissions,
+    roles: s.roles,
   };
 }
 

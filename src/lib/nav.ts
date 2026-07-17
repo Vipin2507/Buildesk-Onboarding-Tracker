@@ -18,12 +18,17 @@ import {
   Settings,
   Database,
 } from "lucide-react";
+import type { RolePermissionKey } from "@/types";
 
 export type NavItem = {
   to: string;
   label: string;
   icon: LucideIcon;
   exact?: boolean;
+  /** Hide unless user is Admin or has this permission */
+  permission?: RolePermissionKey;
+  /** Administration block — Admin only */
+  adminOnly?: boolean;
 };
 
 export const APP_NAV: NavItem[] = [
@@ -40,9 +45,9 @@ export const APP_NAV: NavItem[] = [
   { to: "/training", label: "Training", icon: GraduationCap },
   { to: "/support", label: "Support Desk", icon: LifeBuoy },
   { to: "/renewals", label: "Renewals", icon: RefreshCw },
-  { to: "/employees", label: "Employees", icon: Users },
-  { to: "/reports", label: "Reports", icon: BarChart3 },
-  { to: "/master", label: "Master Config", icon: Database },
+  { to: "/employees", label: "Employees", icon: Users, permission: "manageEmployees" },
+  { to: "/reports", label: "Reports", icon: BarChart3, permission: "viewReports" },
+  { to: "/master", label: "Master Config", icon: Database, adminOnly: true },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -50,3 +55,15 @@ export function isNavActive(pathname: string, item: NavItem) {
   if (item.exact) return pathname === item.to;
   return pathname === item.to || pathname.startsWith(item.to + "/");
 }
+
+export function filterNavItems(
+  items: NavItem[],
+  ctx: { isAdmin: boolean; can: (key: RolePermissionKey) => boolean },
+) {
+  return items.filter((item) => {
+    if (item.adminOnly && !ctx.isAdmin) return false;
+    if (item.permission && !ctx.isAdmin && !ctx.can(item.permission)) return false;
+    return true;
+  });
+}
+
