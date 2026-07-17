@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, useChildMatches, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState, useCallback } from "react";
-import { Plus, Pencil, Trash2, UserRound } from "lucide-react";
+import { Plus, Pencil, Trash2, UserRound, FileSpreadsheet } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,7 +13,9 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDeleteDialog, EntityFormModal } from "@/components/entity-form-modal";
+import { ProjectImportModal } from "@/components/project-import-modal";
 import { ListToolbar, compareNumber, compareText, inDateRange } from "@/components/list-toolbar";
+import { usePermissions } from "@/hooks/use-permissions";
 import { MODULE_CATALOG, createCompanyModules, normalizeCompanyModules } from "@/data/module-catalog";
 import { ProgressSummaryCards } from "@/components/progress-summary-cards";
 import {
@@ -154,6 +156,8 @@ function CompaniesListPage() {
   const employees = useEmployeeStore((s) => s.employees);
   const kpis = useDashboardKpis();
   const navigate = useNavigate();
+  const { can } = usePermissions();
+  const canManageCompanies = can("manageCompanies");
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -170,6 +174,7 @@ function CompaniesListPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [assignManagerId, setAssignManagerId] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [editing, setEditing] = useState<Company | null>(null);
@@ -493,9 +498,18 @@ function CompaniesListPage() {
         title="Companies"
         subtitle="All client companies onboarding to Buildesk."
         actions={
-          <Button className="gap-1.5 bg-primary hover:bg-primary/90" onClick={openCreate}>
-            <Plus className="h-4 w-4" /> Add Company
-          </Button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            {canManageCompanies && (
+              <Button variant="outline" className="gap-1.5" onClick={() => setImportOpen(true)}>
+                <FileSpreadsheet className="h-4 w-4" /> Import sheet
+              </Button>
+            )}
+            {canManageCompanies && (
+              <Button className="gap-1.5 bg-primary hover:bg-primary/90" onClick={openCreate}>
+                <Plus className="h-4 w-4" /> Add Company
+              </Button>
+            )}
+          </div>
         }
       />
 
@@ -938,6 +952,17 @@ function CompaniesListPage() {
         title="Delete company?"
         description={deleting ? `Remove ${deleting.name}? This cannot be undone if projects exist.` : undefined}
         onConfirm={confirmDelete}
+      />
+
+      <ProjectImportModal
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={() => {
+          setManagerFilter("unassigned");
+          toast.message("Imported companies have no manager yet", {
+            description: "Filter is set to Unassigned — select rows and assign a manager.",
+          });
+        }}
       />
     </PageWrap>
   );
