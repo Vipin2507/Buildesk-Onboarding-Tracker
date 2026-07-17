@@ -39,9 +39,13 @@ function Employees() {
 
   function onSubmit() {
     form.handleSubmit((data) => {
-      if (editing) updateEmployee(editing.id, data);
-      else addEmployee(data);
-      toast.success(editing ? "Employee updated" : "Employee added");
+      if (editing) {
+        updateEmployee(editing.id, data);
+        toast.success("Employee updated");
+      } else {
+        addEmployee(data);
+        toast.success("Employee added. Login user is synced (default password for new account: buildesk123).");
+      }
       setModalOpen(false);
     })();
   }

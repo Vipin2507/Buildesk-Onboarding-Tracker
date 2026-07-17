@@ -7,6 +7,12 @@ import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import type { Employee } from "@/types";
 
+function mapEmployeeRoleToUserRole(role: string): "Admin" | "Manager" | "Viewer" {
+  if (role === "Admin") return "Admin";
+  if (role === "Onboarding Manager" || role === "Implementation Lead") return "Manager";
+  return "Viewer";
+}
+
 export const listUsers = createServerFn({ method: "GET" }).handler(async () => {
   requireUser(["Admin", "Manager"]);
   return getDb()
@@ -112,12 +118,47 @@ export const createEmployee = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     requireUser(["Admin", "Manager"]);
+    const db = getDb();
     const now = nowIso();
     const id = newId();
-    getDb()
+    const email = data.email.trim().toLowerCase();
+    db
       .insert(t.employees)
-      .values({ id, ...data, createdAt: now, updatedAt: now })
+      .values({ id, ...data, email, createdAt: now, updatedAt: now })
       .run();
+    const existingUser = db.select().from(t.users).where(eq(t.users.email, email)).get();
+    if (!existingUser) {
+      const userId = newId();
+      const passwordHash = await hashPassword("buildesk123");
+      db.insert(t.users)
+        .values({
+          id: userId,
+          name: data.name.trim(),
+          email,
+          passwordHash,
+          role: mapEmployeeRoleToUserRole(data.role),
+          active: true,
+          jobTitle: data.role,
+          department: "Operations",
+          notifyEmail: true,
+          notifyInApp: true,
+          timezone: "Asia/Kolkata",
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run();
+    } else {
+      db.update(t.users)
+        .set({
+          name: data.name.trim(),
+          role: mapEmployeeRoleToUserRole(data.role),
+          jobTitle: data.role,
+          active: true,
+          updatedAt: now,
+        })
+        .where(eq(t.users.id, existingUser.id))
+        .run();
+    }
     return { id, ...data, role: data.role as Employee["role"], createdAt: now, updatedAt: now } satisfies Employee;
   });
 
@@ -137,11 +178,33 @@ export const updateEmployee = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     requireUser(["Admin", "Manager"]);
-    getDb()
+    const db = getDb();
+    const existing = db.select().from(t.employees).where(eq(t.employees.id, data.id)).get();
+    if (!existing) throw new ApiError(404, "Employee not found");
+    const prevEmail = existing.email.trim().toLowerCase();
+    const nextEmail = (data.patch.email ?? existing.email).trim().toLowerCase();
+    db
       .update(t.employees)
-      .set({ ...data.patch, updatedAt: nowIso() })
+      .set({ ...data.patch, ...(data.patch.email ? { email: nextEmail } : {}), updatedAt: nowIso() })
       .where(eq(t.employees.id, data.id))
       .run();
+    const userByPrevEmail = db.select().from(t.users).where(eq(t.users.email, prevEmail)).get();
+    if (userByPrevEmail) {
+      db.update(t.users)
+        .set({
+          ...(data.patch.name !== undefined ? { name: data.patch.name } : {}),
+          ...(data.patch.email !== undefined ? { email: nextEmail } : {}),
+          ...(data.patch.role !== undefined
+            ? {
+                role: mapEmployeeRoleToUserRole(data.patch.role),
+                jobTitle: data.patch.role,
+              }
+            : {}),
+          updatedAt: nowIso(),
+        })
+        .where(eq(t.users.id, userByPrevEmail.id))
+        .run();
+    }
     return { ok: true };
   });
 
@@ -149,6 +212,14 @@ export const deleteEmployee = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ id: z.string() }).parse(data))
   .handler(async ({ data }) => {
     requireUser(["Admin"]);
-    getDb().delete(t.employees).where(eq(t.employees.id, data.id)).run();
+    const db = getDb();
+    const employee = db.select().from(t.employees).where(eq(t.employees.id, data.id)).get();
+    if (!employee) return { ok: true };
+    const email = employee.email.trim().toLowerCase();
+    db.delete(t.employees).where(eq(t.employees.id, data.id)).run();
+    const user = db.select().from(t.users).where(eq(t.users.email, email)).get();
+    if (user) {
+      db.delete(t.users).where(eq(t.users.id, user.id)).run();
+    }
     return { ok: true };
   });
