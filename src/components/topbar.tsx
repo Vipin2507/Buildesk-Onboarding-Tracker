@@ -160,20 +160,25 @@ export function TopBar() {
                 <UserRound className="mr-2 h-4 w-4" />
                 Edit Profile
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => void navigate({ to: "/settings" })}>
+              <DropdownMenuItem
+                onClick={() => void navigate({ to: "/settings", search: { section: undefined, invite: false } })}
+              >
                 <Settings className="mr-2 h-4 w-4" />
                 Settings
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  void handleLogout().then(() =>
-                    navigate({ to: "/login", search: { mode: "register" } }),
-                  );
-                }}
-              >
-                <User className="mr-2 h-4 w-4" />
-                Add another account
-              </DropdownMenuItem>
+              {currentUser?.role === "Admin" && (
+                <DropdownMenuItem
+                  onClick={() =>
+                    void navigate({
+                      to: "/settings",
+                      search: { section: "users", invite: true },
+                    })
+                  }
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  Invite user
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
                 <LogOut className="mr-2 h-4 w-4" />

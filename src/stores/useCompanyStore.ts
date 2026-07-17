@@ -18,6 +18,7 @@ type CompanyState = {
   deleteCompany: (id: string) => Company | undefined;
   getById: (id: string) => Company | undefined;
   transferManager: (companyId: string, managerId: string, who: string) => void;
+  assignOnboardingManagerBulk: (companyIds: string[], managerId: string, who?: string) => void;
   markRenewed: (id: string) => void;
   enableModule: (companyId: string, moduleKey: ModuleKey) => void;
   disableModule: (companyId: string, moduleKey: ModuleKey) => void;
@@ -134,6 +135,31 @@ export const useCompanyStore = createStore<CompanyState>((set, get) => ({
     });
     serverSync("transferManager", () =>
       apiUpdateCompany({ data: { id: companyId, patch: { onboardingManagerId: managerId } } }),
+    );
+  },
+
+  assignOnboardingManagerBulk: (companyIds, managerId, who = "You") => {
+    if (!managerId || companyIds.length === 0) return;
+    const idSet = new Set(companyIds);
+    const touched = get().companies.filter((c) => idSet.has(c.id));
+    if (touched.length === 0) return;
+
+    set((s) => ({
+      companies: s.companies.map((c) =>
+        idSet.has(c.id) ? touch({ ...c, onboardingManagerId: managerId }) : c,
+      ),
+    }));
+    logActivity({
+      who,
+      what: `Assigned onboarding manager to ${touched.length} ${touched.length === 1 ? "company" : "companies"}`,
+      kind: "success",
+    });
+    serverSync("assignOnboardingManagerBulk", () =>
+      Promise.all(
+        touched.map((c) =>
+          apiUpdateCompany({ data: { id: c.id, patch: { onboardingManagerId: managerId } } }),
+        ),
+      ),
     );
   },
 

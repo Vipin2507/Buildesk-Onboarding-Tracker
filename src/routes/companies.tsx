@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, useChildMatches, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { useMemo, useState, useCallback } from "react";
+import { Plus, Pencil, Trash2, UserRound } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -149,6 +149,7 @@ function CompaniesListPage() {
   const addCompany = useCompanyStore((s) => s.addCompany);
   const updateCompany = useCompanyStore((s) => s.updateCompany);
   const deleteCompany = useCompanyStore((s) => s.deleteCompany);
+  const assignOnboardingManagerBulk = useCompanyStore((s) => s.assignOnboardingManagerBulk);
   const allProjects = useProjectStore((s) => s.projects);
   const employees = useEmployeeStore((s) => s.employees);
   const kpis = useDashboardKpis();
@@ -168,6 +169,9 @@ function CompaniesListPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assignManagerId, setAssignManagerId] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [editing, setEditing] = useState<Company | null>(null);
   const [deleting, setDeleting] = useState<Company | null>(null);
 
@@ -210,6 +214,54 @@ function CompaniesListPage() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [enriched, employees]);
 
+  const unassignedCount = useMemo(
+    () => enriched.filter((c) => !c.onboardingManagerId).length,
+    [enriched],
+  );
+
+  const toggleSelection = useCallback((id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectionAll = useCallback((ids: string[], checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (checked) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  }, []);
+
+  function openBulkAssign() {
+    if (selectedIds.size === 0) return;
+    if (onboardingManagers.length === 0) {
+      toast.error("Add an onboarding manager in Employees first");
+      return;
+    }
+    setAssignManagerId(onboardingManagers[0]?.id ?? "");
+    setAssignOpen(true);
+  }
+
+  function confirmBulkAssign() {
+    if (!assignManagerId) {
+      toast.error("Select an onboarding manager");
+      return;
+    }
+    const ids = [...selectedIds];
+    assignOnboardingManagerBulk(ids, assignManagerId);
+    const managerName = employees.find((e) => e.id === assignManagerId)?.name ?? "manager";
+    toast.success(`Assigned ${managerName} to ${ids.length} ${ids.length === 1 ? "company" : "companies"}`);
+    setSelectedIds(new Set());
+    setAssignOpen(false);
+  }
+
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = { all: enriched.length };
     for (const chip of STATUS_CHIPS) {
@@ -232,7 +284,10 @@ function CompaniesListPage() {
       }
       if (planFilter !== "all" && c.plan !== planFilter) return false;
       if (healthFilter !== "all" && c.health !== healthFilter) return false;
-      if (managerFilter !== "all" && c.onboardingManagerId !== managerFilter) return false;
+      if (managerFilter === "unassigned" && c.onboardingManagerId) return false;
+      if (managerFilter !== "all" && managerFilter !== "unassigned" && c.onboardingManagerId !== managerFilter) {
+        return false;
+      }
       if (cityFilter !== "all" && c.city !== cityFilter) return false;
       if (progressFilter === "0" && c.progress !== 0) return false;
       if (progressFilter === "1-49" && !(c.progress >= 1 && c.progress <= 49)) return false;
@@ -509,6 +564,9 @@ function CompaniesListPage() {
             onChange: setManagerFilter,
             options: [
               { value: "all", label: "All managers" },
+              ...(unassignedCount > 0
+                ? [{ value: "unassigned", label: `Unassigned (${unassignedCount})` }]
+                : []),
               ...managers.map((m) => ({ value: m.id, label: m.name })),
             ],
           },
@@ -532,6 +590,23 @@ function CompaniesListPage() {
         onClear={clearFilters}
       />
 
+      {selectedIds.size > 0 && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5">
+          <span className="text-sm font-medium">
+            {selectedIds.size} {selectedIds.size === 1 ? "company" : "companies"} selected
+          </span>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => setSelectedIds(new Set())}>
+              Clear
+            </Button>
+            <Button size="sm" className="gap-1.5" onClick={openBulkAssign}>
+              <UserRound className="h-3.5 w-3.5" />
+              Assign Onboarding Manager
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="card-soft overflow-hidden p-4">
         {enriched.length === 0 ? (
           <EmptyState
@@ -552,6 +627,11 @@ function CompaniesListPage() {
             data={filtered}
             hideSearch
             getRowId={(c) => c.id}
+            selection={{
+              selectedIds,
+              onToggle: toggleSelection,
+              onToggleAll: toggleSelectionAll,
+            }}
             onRowClick={(c) => navigate({ to: "/companies/$companyId", params: { companyId: c.id } })}
             columns={[
               {
@@ -820,6 +900,35 @@ function CompaniesListPage() {
               })}
             </div>
           </div>
+        </div>
+      </EntityFormModal>
+
+      <EntityFormModal
+        open={assignOpen}
+        onOpenChange={setAssignOpen}
+        title="Assign Onboarding Manager"
+        submitLabel="Assign"
+        onSubmit={confirmBulkAssign}
+      >
+        <div className="grid gap-3">
+          <p className="text-sm text-muted-foreground">
+            Assign a manager to {selectedIds.size} selected{" "}
+            {selectedIds.size === 1 ? "company" : "companies"}.
+          </p>
+          <label className="text-xs font-medium">
+            Onboarding Manager
+            <select
+              value={assignManagerId}
+              onChange={(e) => setAssignManagerId(e.target.value)}
+              className={inputClass()}
+            >
+              {onboardingManagers.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.name} · {e.role}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       </EntityFormModal>
 

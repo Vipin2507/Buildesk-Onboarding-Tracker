@@ -11,7 +11,6 @@ import {
   destroySession,
   getSessionUser,
   hashPassword,
-  newId,
   nowIso,
   requireUser,
   resultErr,
@@ -59,32 +58,9 @@ export const authLogin = createServerFn({ method: "POST" })
 
 export const authRegister = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => registerInput.parse(data))
-  .handler(async ({ data }) => {
-    const db = getDb();
-    const email = data.email.trim().toLowerCase();
-    const existing = db.select().from(users).where(eq(users.email, email)).get();
-    if (existing) return resultErr("An account with this email already exists. Sign in instead.");
-    const now = nowIso();
-    const id = newId();
-    const passwordHash = await hashPassword(data.password);
-    db.insert(users)
-      .values({
-        id,
-        name: data.name.trim(),
-        email,
-        passwordHash,
-        role: "Viewer",
-        active: true,
-        notifyEmail: true,
-        notifyInApp: true,
-        timezone: "Asia/Kolkata",
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
-    const row = db.select().from(users).where(eq(users.id, id)).get()!;
-    await createSession(id);
-    return resultOk({ user: toPublicUser(row) });
+  .handler(async () => {
+    // Public self-registration is disabled. Admins create accounts via Settings → Invite User.
+    return resultErr("Self-registration is disabled. Ask an Admin to invite you.");
   });
 
 export const authLogout = createServerFn({ method: "POST" }).handler(async () => {

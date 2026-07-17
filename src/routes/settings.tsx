@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   Bell,
@@ -39,10 +39,6 @@ import {
   type UserRole,
 } from "@/types";
 
-export const Route = createFileRoute("/settings")({
-  component: Settings,
-});
-
 type SectionId =
   | "appearance"
   | "company"
@@ -52,6 +48,27 @@ type SectionId =
   | "payments"
   | "roles"
   | "users";
+
+const SECTION_IDS: SectionId[] = [
+  "appearance",
+  "company",
+  "notifications",
+  "documents",
+  "excel",
+  "payments",
+  "roles",
+  "users",
+];
+
+export const Route = createFileRoute("/settings")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    section: SECTION_IDS.includes(search.section as SectionId)
+      ? (search.section as SectionId)
+      : (undefined as SectionId | undefined),
+    invite: Boolean(search.invite === true || search.invite === "true" || search.invite === "1"),
+  }),
+  component: Settings,
+});
 
 const SECTIONS: {
   id: SectionId;
@@ -73,7 +90,21 @@ const FIELD =
   "mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/25";
 
 function Settings() {
-  const [section, setSection] = useState<SectionId | null>(null);
+  const navigate = useNavigate({ from: "/settings" });
+  const search = Route.useSearch();
+  const [section, setSection] = useState<SectionId | null>(search.section ?? null);
+
+  useEffect(() => {
+    if (search.section) setSection(search.section);
+  }, [search.section]);
+
+  function openSection(next: SectionId | null) {
+    setSection(next);
+    void navigate({
+      search: { section: next ?? undefined, invite: false },
+      replace: true,
+    });
+  }
 
   return (
     <PageWrap>
@@ -84,7 +115,7 @@ function Settings() {
             <button
               key={s.id}
               type="button"
-              onClick={() => setSection(s.id)}
+              onClick={() => openSection(s.id)}
               className="card-soft flex gap-4 p-5 text-left transition-shadow hover:shadow-[var(--shadow-elevated)]"
             >
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -99,7 +130,7 @@ function Settings() {
         </div>
       ) : (
         <div>
-          <Button variant="ghost" size="sm" className="mb-4" onClick={() => setSection(null)}>
+          <Button variant="ghost" size="sm" className="mb-4" onClick={() => openSection(null)}>
             ← Back to Settings
           </Button>
           {section === "appearance" && <AppearanceSection />}
@@ -109,7 +140,7 @@ function Settings() {
           {section === "excel" && <ExcelSection />}
           {section === "payments" && <PaymentsSection />}
           {section === "roles" && <RolesSection />}
-          {section === "users" && <UsersSection />}
+          {section === "users" && <UsersSection initialInviteOpen={Boolean(search.invite)} />}
         </div>
       )}
     </PageWrap>
@@ -932,13 +963,13 @@ function RolesSection() {
 
 type UserForm = Pick<User, "name" | "email" | "role" | "active" | "phone" | "jobTitle" | "department">;
 
-function UsersSection() {
+function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boolean }) {
   const users = useUserStore((s) => s.users);
-  const addUser = useUserStore((s) => s.addUser);
-  const updateUser = useUserStore((s) => s.updateUser);
   const deleteUser = useUserStore((s) => s.deleteUser);
   const currentUser = useAuthStore((s) => s.user);
   const currentUserId = currentUser?.id;
+  const isAdmin = currentUser?.role === "Admin";
+  const navigate = useNavigate({ from: "/settings" });
 
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -953,20 +984,42 @@ function UsersSection() {
     department: "",
   });
 
+  useEffect(() => {
+    if (!initialInviteOpen || !isAdmin) return;
+    setEditing(null);
+    setForm({ name: "", email: "", role: "Viewer", active: true, phone: "", jobTitle: "", department: "" });
+    setModalOpen(true);
+    void navigate({ search: { section: "users", invite: false }, replace: true });
+  }, [initialInviteOpen, isAdmin, navigate]);
+
+  function openInvite() {
+    if (!isAdmin) {
+      toast.error("Only admins can invite users");
+      return;
+    }
+    setEditing(null);
+    setForm({ name: "", email: "", role: "Viewer", active: true, phone: "", jobTitle: "", department: "" });
+    setModalOpen(true);
+  }
+
   return (
     <div>
       <div className="mb-4 flex items-start justify-between gap-3">
-        <SectionTitle title="User Management" subtitle="Invite teammates and manage access." />
-        <Button
-          onClick={() => {
-            setEditing(null);
-            setForm({ name: "", email: "", role: "Viewer", active: true, phone: "", jobTitle: "", department: "" });
-            setModalOpen(true);
-          }}
-        >
-          <Plus className="mr-1 h-4 w-4" /> Invite User
-        </Button>
+        <SectionTitle
+          title="User Management"
+          subtitle="Create login accounts with role, contact details, and access. Same form used from Invite user in the profile menu."
+        />
+        {isAdmin && (
+          <Button onClick={openInvite}>
+            <Plus className="mr-1 h-4 w-4" /> Invite User
+          </Button>
+        )}
       </div>
+      {!isAdmin && (
+        <p className="mb-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          Viewing accounts only. Ask an Admin to invite or edit users.
+        </p>
+      )}
       <div className="card-soft overflow-hidden">
         <div className="overflow-x-auto">
         <table className="w-full min-w-[560px] text-sm">
@@ -1017,36 +1070,40 @@ function UsersSection() {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => {
-                      setEditing(u);
-                      setForm({
-                        name: u.name,
-                        email: u.email,
-                        role: u.role,
-                        active: u.active,
-                        phone: u.phone ?? "",
-                        jobTitle: u.jobTitle ?? "",
-                        department: u.department ?? "",
-                      });
-                      setModalOpen(true);
-                    }}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    disabled={u.id === currentUserId}
-                    onClick={() => {
-                      setEditing(u);
-                      setDeleteOpen(true);
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  {isAdmin && (
+                    <>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => {
+                          setEditing(u);
+                          setForm({
+                            name: u.name,
+                            email: u.email,
+                            role: u.role,
+                            active: u.active,
+                            phone: u.phone ?? "",
+                            jobTitle: u.jobTitle ?? "",
+                            department: u.department ?? "",
+                          });
+                          setModalOpen(true);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        disabled={u.id === currentUserId}
+                        onClick={() => {
+                          setEditing(u);
+                          setDeleteOpen(true);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}
@@ -1060,6 +1117,10 @@ function UsersSection() {
         onOpenChange={setModalOpen}
         title={editing ? "Edit User" : "Invite User"}
         onSubmit={() => {
+          if (!isAdmin) {
+            toast.error("Only admins can manage users");
+            return;
+          }
           if (form.name.trim().length < 2) {
             toast.error("Name must be at least 2 characters");
             return;
@@ -1088,16 +1149,14 @@ function UsersSection() {
               })
               .catch((e) => toast.error(e instanceof Error ? e.message : "Update failed"));
             return;
-          } else {
-            void apiCreateUser({ data: { ...payload, password: "buildesk123" } })
-              .then((user) => {
-                useUserStore.setState((s) => ({ users: [...s.users, user] }));
-                toast.success("User invited · temporary password: buildesk123");
-                setModalOpen(false);
-              })
-              .catch((e) => toast.error(e instanceof Error ? e.message : "Invite failed"));
-            return;
           }
+          void apiCreateUser({ data: { ...payload, password: "buildesk123" } })
+            .then((user) => {
+              useUserStore.setState((s) => ({ users: [...s.users, user] }));
+              toast.success("User invited · temporary password: buildesk123");
+              setModalOpen(false);
+            })
+            .catch((e) => toast.error(e instanceof Error ? e.message : "Invite failed"));
         }}
       >
         <div className="grid gap-2">
@@ -1148,7 +1207,9 @@ function UsersSection() {
             Active account
           </label>
           {!editing && (
-            <p className="text-xs text-muted-foreground">New users get temporary password <code>buildesk123</code>.</p>
+            <p className="text-xs text-muted-foreground">
+              New users get temporary password <code>buildesk123</code>. They can change it after sign-in.
+            </p>
           )}
         </div>
       </EntityFormModal>

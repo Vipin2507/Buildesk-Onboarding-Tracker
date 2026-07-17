@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, ChevronRight, Search } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 
 const ease = [0.22, 1, 0.36, 1] as const;
@@ -22,6 +23,12 @@ function sortValue(row: unknown, key: string): string | number {
   return String(value);
 }
 
+export type DataTableSelection = {
+  selectedIds: Set<string>;
+  onToggle: (id: string, checked: boolean) => void;
+  onToggleAll: (ids: string[], checked: boolean) => void;
+};
+
 export function DataTable<T>({
   data,
   columns,
@@ -32,6 +39,7 @@ export function DataTable<T>({
   emptyState,
   actions,
   getRowId,
+  selection,
 }: {
   data: T[];
   columns: {
@@ -48,6 +56,7 @@ export function DataTable<T>({
   emptyState?: ReactNode;
   actions?: (row: T) => ReactNode;
   getRowId?: (row: T) => string;
+  selection?: DataTableSelection;
 }) {
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<string | null>(null);
@@ -86,6 +95,18 @@ export function DataTable<T>({
   const safePage = Math.min(page, totalPages - 1);
   const paged = filtered.slice(safePage * pageSize, (safePage + 1) * pageSize);
 
+  const filteredIds = useMemo(
+    () => filtered.map((row, i) => getRowId?.(row) ?? String(i)),
+    [filtered, getRowId],
+  );
+  const selectedFilteredCount = selection
+    ? filteredIds.filter((id) => selection.selectedIds.has(id)).length
+    : 0;
+  const allFilteredSelected =
+    selection != null && filteredIds.length > 0 && selectedFilteredCount === filteredIds.length;
+  const someFilteredSelected =
+    selection != null && selectedFilteredCount > 0 && !allFilteredSelected;
+
   if (data.length === 0 && emptyState) return <>{emptyState}</>;
 
   const primary = columns[0];
@@ -112,9 +133,22 @@ export function DataTable<T>({
       )}
 
       <div className="space-y-2.5 md:hidden">
+        {selection && filtered.length > 0 && (
+          <label className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-xs">
+            <Checkbox
+              checked={allFilteredSelected ? true : someFilteredSelected ? "indeterminate" : false}
+              onCheckedChange={(checked) =>
+                selection.onToggleAll(filteredIds, checked === true)
+              }
+              aria-label="Select all filtered rows"
+            />
+            Select all ({filtered.length})
+          </label>
+        )}
         <AnimatePresence mode="popLayout">
           {paged.map((row, i) => {
             const id = getRowId?.(row) ?? String(i);
+            const selected = selection?.selectedIds.has(id) ?? false;
             return (
               <motion.div
                 key={id}
@@ -126,11 +160,21 @@ export function DataTable<T>({
                 className={cn(
                   "rounded-xl border border-border bg-card p-3.5",
                   onRowClick && "active:bg-muted/50",
+                  selected && "border-primary/40 bg-primary/5",
                 )}
                 onClick={() => onRowClick?.(row)}
                 role={onRowClick ? "button" : undefined}
               >
                 <div className="flex items-start gap-2">
+                  {selection && (
+                    <div onClick={(e) => e.stopPropagation()} className="pt-0.5">
+                      <Checkbox
+                        checked={selected}
+                        onCheckedChange={(checked) => selection.onToggle(id, checked === true)}
+                        aria-label="Select row"
+                      />
+                    </div>
+                  )}
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium text-foreground">{primary?.render(row)}</div>
                     {secondary && (
@@ -168,6 +212,17 @@ export function DataTable<T>({
           <table className="w-full text-sm">
             <thead className="bg-muted/60 text-xs text-muted-foreground">
               <tr>
+                {selection && (
+                  <th className="w-10 px-3 py-2.5">
+                    <Checkbox
+                      checked={allFilteredSelected ? true : someFilteredSelected ? "indeterminate" : false}
+                      onCheckedChange={(checked) =>
+                        selection.onToggleAll(filteredIds, checked === true)
+                      }
+                      aria-label="Select all filtered rows"
+                    />
+                  </th>
+                )}
                 {columns.map((col) => (
                   <th
                     key={col.key}
@@ -203,15 +258,26 @@ export function DataTable<T>({
             <tbody>
               {paged.map((row, i) => {
                 const id = getRowId?.(row) ?? String(i);
+                const selected = selection?.selectedIds.has(id) ?? false;
                 return (
                   <tr
                     key={id}
                     className={cn(
                       "border-t transition-colors",
                       onRowClick && "cursor-pointer hover:bg-muted/40",
+                      selected && "bg-primary/5",
                     )}
                     onClick={() => onRowClick?.(row)}
                   >
+                    {selection && (
+                      <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selected}
+                          onCheckedChange={(checked) => selection.onToggle(id, checked === true)}
+                          aria-label="Select row"
+                        />
+                      </td>
+                    )}
                     {columns.map((col) => (
                       <td key={col.key} className="px-4 py-3">
                         {col.render(row)}
