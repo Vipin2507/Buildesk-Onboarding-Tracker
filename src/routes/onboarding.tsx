@@ -12,7 +12,9 @@ import {
   useOnboardingStore,
   useProjectProgressStore,
   useProjectStore,
+  useUserStore,
 } from "@/stores";
+import { resolveAssigneeLabel } from "@/lib/managers";
 import { PROJECT_PROGRESS_MILESTONES } from "@/types/project";
 
 export const Route = createFileRoute("/onboarding")({
@@ -21,6 +23,7 @@ export const Route = createFileRoute("/onboarding")({
 
 function OnboardingList() {
   const employees = useEmployeeStore((s) => s.employees);
+  const users = useUserStore((s) => s.users);
   const companies = useCompanyStore((s) => s.companies);
   const projects = useProjectStore((s) => s.projects);
   const checklistItems = useOnboardingStore((s) => s.checklistItems);
@@ -46,12 +49,12 @@ function OnboardingList() {
           project: p,
           company,
           progress,
-          manager: employees.find((e) => e.id === company?.onboardingManagerId)?.name ?? "—",
+          manager: resolveAssigneeLabel(company?.onboardingManagerId, users, employees),
         };
       })
       .filter((r) => r.project.status !== "completed" && r.progress < 100)
       .sort((a, b) => b.progress - a.progress);
-  }, [projects, companies, checklistItems, progressByProject, employees]);
+  }, [projects, companies, checklistItems, progressByProject, employees, users]);
 
   return (
     <PageWrap>

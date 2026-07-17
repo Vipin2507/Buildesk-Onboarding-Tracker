@@ -23,13 +23,15 @@ import { Button } from "@/components/ui/button";
 import { StatusPill } from "@/components/status-pill";
 import { MODULE_CATALOG, createCompanyModules } from "@/data/module-catalog";
 import { cn, formatDate } from "@/lib/utils";
+import { assignableManagerUsers } from "@/lib/managers";
 import {
   useCompanyStore,
   useEmployeeStore,
   usePostSalesStore,
   useProjectStore,
+  useUserStore,
 } from "@/stores";
-import type { Company, CompanyHealth, CompanyPlan, ModuleKey, Project, StatusKey } from "@/types";
+import type { Company, CompanyHealth, CompanyPlan, ModuleKey, Project, StatusKey, User } from "@/types";
 import { COMPANY_REGIONS, STATUS_LABEL } from "@/types";
 
 type EntityTab = "companies" | "projects";
@@ -75,6 +77,7 @@ export function DataControlPanel() {
   const deleteProject = useProjectStore((s) => s.deleteProject);
   const getByCompany = useProjectStore((s) => s.getByCompany);
   const employees = useEmployeeStore((s) => s.employees);
+  const users = useUserStore((s) => s.users);
 
   const [tab, setTab] = useState<EntityTab>("companies");
   const [query, setQuery] = useState("");
@@ -427,7 +430,7 @@ export function DataControlPanel() {
 
       <CompanyAdminEditModal
         company={editingCompany}
-        employees={employees}
+        users={users}
         onClose={() => setEditingCompany(null)}
         onSave={(id, patch) => {
           updateCompany(id, patch);
@@ -466,12 +469,12 @@ export function DataControlPanel() {
 
 function CompanyAdminEditModal({
   company,
-  employees,
+  users,
   onClose,
   onSave,
 }: {
   company: Company | null;
-  employees: { id: string; name: string; role: string }[];
+  users: User[];
   onClose: () => void;
   onSave: (id: string, patch: Partial<Company>) => void;
 }) {
@@ -486,10 +489,8 @@ function CompanyAdminEditModal({
     if (company) form.reset(companyToForm(company));
   }, [company, form]);
 
-  const managers = employees.filter(
-    (e) => e.role.includes("Onboarding") || e.role.includes("Implementation") || e.role === "Admin",
-  );
-  const csms = employees.filter((e) => e.role === "CSM" || e.role === "Admin");
+  const managers = assignableManagerUsers(users);
+  const csms = managers;
 
   function submit() {
     if (!company) return;
@@ -598,18 +599,18 @@ function CompanyAdminEditModal({
           <Section title="Ownership & status">
             <Field label="Onboarding manager">
               <select {...form.register("onboardingManagerId")} className={inputClass}>
-                {managers.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.name}
+                {managers.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} · {u.role}
                   </option>
                 ))}
               </select>
             </Field>
             <Field label="CSM">
               <select {...form.register("csmId")} className={inputClass}>
-                {csms.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.name}
+                {csms.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} · {u.role}
                   </option>
                 ))}
               </select>

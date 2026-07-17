@@ -22,10 +22,12 @@ import {
   useCompanyStore,
   useEmployeeStore,
   useProjectStore,
+  useUserStore,
   useDashboardKpis,
 } from "@/stores";
 import { isCompanyModulesAllLive } from "@/lib/module-progress";
-import type { Company, ModuleKey } from "@/types";
+import { assignableManagerUsers, resolveAssigneeLabel } from "@/lib/managers";
+import type { Company, ModuleKey, User } from "@/types";
 import { COMPANY_REGIONS } from "@/types";
 import { cn, formatDate } from "@/lib/utils";
 
@@ -38,20 +40,8 @@ const FIELD_LABELS: Record<string, string> = {
   city: "City",
 };
 
-function managerOptions(employees: { id: string; name: string; role: string }[]) {
-  const preferred = employees.filter(
-    (e) =>
-      e.role === "Admin" ||
-      e.role.includes("Onboarding") ||
-      e.role.includes("Implementation"),
-  );
-  return preferred.length > 0 ? preferred : employees;
-}
-
-function defaultCompanyFormValues(
-  employees: { id: string; name: string; role: string }[],
-): CompanyForm {
-  const managers = managerOptions(employees);
+function defaultCompanyFormValues(users: User[]): CompanyForm {
+  const managers = assignableManagerUsers(users);
   const today = new Date().toISOString().slice(0, 10);
   return {
     name: "",
@@ -66,7 +56,7 @@ function defaultCompanyFormValues(
     pocName: "",
     pocMobile: "",
     onboardingManagerId: managers[0]?.id ?? "",
-    csmId: employees.find((e) => e.role === "CSM")?.id ?? "",
+    csmId: "",
     plan: "Half-Yearly",
     health: "Healthy",
     modules: [],
@@ -157,9 +147,10 @@ function CompaniesListPage() {
   const assignOnboardingManagerBulk = useCompanyStore((s) => s.assignOnboardingManagerBulk);
   const allProjects = useProjectStore((s) => s.projects);
   const employees = useEmployeeStore((s) => s.employees);
+  const users = useUserStore((s) => s.users);
   const kpis = useDashboardKpis();
   const navigate = useNavigate();
-  const { can } = usePermissions();
+  const { can, isAdmin } = usePermissions();
   const canManageCompanies = can("manageCompanies");
 
   const [search, setSearch] = useState("");
@@ -185,10 +176,10 @@ function CompaniesListPage() {
 
   const form = useForm<CompanyForm>({
     resolver: zodResolver(companySchema),
-    defaultValues: defaultCompanyFormValues(employees),
+    defaultValues: defaultCompanyFormValues(users),
   });
 
-  const onboardingManagers = useMemo(() => managerOptions(employees), [employees]);
+  const assignableUsers = useMemo(() => assignableManagerUsers(users), [users]);
 
   function mergeModules(existing: Company["modules"], selected: ModuleKey[]) {
     const baseline = createCompanyModules(selected);
@@ -216,11 +207,14 @@ function CompaniesListPage() {
   }, [enriched]);
 
   const managers = useMemo(() => {
-    const ids = new Set(enriched.map((c) => c.onboardingManagerId).filter(Boolean));
-    return employees
-      .filter((e) => ids.has(e.id))
+    const ids = [...new Set(enriched.map((c) => c.onboardingManagerId).filter(Boolean))];
+    return ids
+      .map((id) => ({
+        id,
+        name: resolveAssigneeLabel(id, users, employees),
+      }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [enriched, employees]);
+  }, [enriched, users, employees]);
 
   const unassignedCount = useMemo(
     () => enriched.filter((c) => !c.onboardingManagerId).length,
@@ -248,23 +242,31 @@ function CompaniesListPage() {
   }, []);
 
   function openBulkAssign() {
-    if (selectedIds.size === 0) return;
-    if (onboardingManagers.length === 0) {
-      toast.error("Add an onboarding manager in Employees first");
+    if (!isAdmin) {
+      toast.error("Only admins can assign onboarding managers");
       return;
     }
-    setAssignManagerId(onboardingManagers[0]?.id ?? "");
+    if (selectedIds.size === 0) return;
+    if (assignableUsers.length === 0) {
+      toast.error("Invite users in Settings → User Management first");
+      return;
+    }
+    setAssignManagerId(assignableUsers[0]?.id ?? "");
     setAssignOpen(true);
   }
 
   function confirmBulkAssign() {
+    if (!isAdmin) {
+      toast.error("Only admins can assign onboarding managers");
+      return;
+    }
     if (!assignManagerId) {
       toast.error("Select an onboarding manager");
       return;
     }
     const ids = [...selectedIds];
     assignOnboardingManagerBulk(ids, assignManagerId);
-    const managerName = employees.find((e) => e.id === assignManagerId)?.name ?? "manager";
+    const managerName = resolveAssigneeLabel(assignManagerId, users, employees);
     toast.success(`Assigned ${managerName} to ${ids.length} ${ids.length === 1 ? "company" : "companies"}`);
     setSelectedIds(new Set());
     setAssignOpen(false);
@@ -402,7 +404,7 @@ function CompaniesListPage() {
 
   function openCreate() {
     setEditing(null);
-    form.reset(defaultCompanyFormValues(employees));
+    form.reset(defaultCompanyFormValues(users));
     setModalOpen(true);
   }
 
@@ -607,7 +609,7 @@ function CompaniesListPage() {
         onClear={clearFilters}
       />
 
-      {selectedIds.size > 0 && (
+      {isAdmin && selectedIds.size > 0 && (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5">
           <span className="text-sm font-medium">
             {selectedIds.size} {selectedIds.size === 1 ? "company" : "companies"} selected
@@ -644,11 +646,15 @@ function CompaniesListPage() {
             data={filtered}
             hideSearch
             getRowId={(c) => c.id}
-            selection={{
-              selectedIds,
-              onToggle: toggleSelection,
-              onToggleAll: toggleSelectionAll,
-            }}
+            selection={
+              isAdmin
+                ? {
+                    selectedIds,
+                    onToggle: toggleSelection,
+                    onToggleAll: toggleSelectionAll,
+                  }
+                : undefined
+            }
             onRowClick={(c) => navigate({ to: "/companies/$companyId", params: { companyId: c.id } })}
             columns={[
               {
@@ -685,7 +691,7 @@ function CompaniesListPage() {
               {
                 key: "onboardingManagerId",
                 header: "Manager",
-                render: (c) => employees.find((e) => e.id === c.onboardingManagerId)?.name ?? "—",
+                render: (c) => resolveAssigneeLabel(c.onboardingManagerId, users, employees),
               },
               {
                 key: "startDate",
@@ -847,19 +853,24 @@ function CompaniesListPage() {
             <select
               {...form.register("onboardingManagerId")}
               className={inputClass(!!form.formState.errors.onboardingManagerId)}
+              disabled={!isAdmin}
             >
-              {onboardingManagers.length === 0 ? (
-                <option value="">No managers available — add employees first</option>
+              {assignableUsers.length === 0 ? (
+                <option value="">No users available — invite users first</option>
               ) : (
-                onboardingManagers.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.name}
+                assignableUsers.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} · {u.role}
+                    {u.jobTitle ? ` · ${u.jobTitle}` : ""}
                   </option>
                 ))
               )}
             </select>
             {form.formState.errors.onboardingManagerId ? (
               <p className="mt-1 text-xs text-destructive">{form.formState.errors.onboardingManagerId.message}</p>
+            ) : null}
+            {!isAdmin ? (
+              <p className="mt-1 text-xs text-muted-foreground">Only admins can assign onboarding managers.</p>
             ) : null}
           </div>
           <div>
@@ -939,9 +950,10 @@ function CompaniesListPage() {
               onChange={(e) => setAssignManagerId(e.target.value)}
               className={inputClass()}
             >
-              {onboardingManagers.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.name} · {e.role}
+              {assignableUsers.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name} · {u.role}
+                  {u.email ? ` · ${u.email}` : ""}
                 </option>
               ))}
             </select>

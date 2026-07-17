@@ -20,7 +20,9 @@ import {
   useUpcomingRenewals,
   useProjectStore,
   useEmployeeStore,
+  useUserStore,
 } from "@/stores";
+import { resolveAssigneeLabel } from "@/lib/managers";
 import { formatRelativeTime } from "@/types/common";
 
 export const Route = createFileRoute("/")({
@@ -34,6 +36,7 @@ function Dashboard() {
   const activities = useRecentActivity(6);
   const renewals = useUpcomingRenewals(5);
   const employees = useEmployeeStore((s) => s.employees);
+  const users = useUserStore((s) => s.users);
   const projects = useProjectStore((s) => s.projects);
   const navigate = useNavigate();
 
@@ -148,7 +151,7 @@ function Dashboard() {
           <div className="space-y-2.5 md:hidden">
             {recent.map((c, i) => {
               const project = projects.find((p) => p.companyId === c.id);
-              const manager = employees.find((e) => e.id === c.onboardingManagerId);
+              const managerName = resolveAssigneeLabel(c.onboardingManagerId, users, employees);
               return (
                 <motion.div
                   key={c.id}
@@ -172,7 +175,7 @@ function Dashboard() {
                     <span className="text-xs text-muted-foreground">{c.progress}%</span>
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                    <span>{manager?.name ?? "Unassigned"}</span>
+                    <span>{managerName === "—" ? "Unassigned" : managerName}</span>
                     {project && (
                       <Button size="sm" variant="ghost" className="h-8 gap-1 px-2 text-primary" asChild>
                         <Link to="/projects/$projectId" params={{ projectId: project.id }} search={{ tab: "onboarding" }}>
@@ -199,7 +202,7 @@ function Dashboard() {
               <tbody>
                 {recent.map((c) => {
                   const project = projects.find((p) => p.companyId === c.id);
-                  const manager = employees.find((e) => e.id === c.onboardingManagerId);
+                  const managerName = resolveAssigneeLabel(c.onboardingManagerId, users, employees);
                   return (
                     <tr key={c.id} className="border-t transition-colors hover:bg-muted/40">
                       <td className="px-3 py-2.5 font-medium">
@@ -214,7 +217,7 @@ function Dashboard() {
                           <span className="text-xs text-muted-foreground">{c.progress}%</span>
                         </div>
                       </td>
-                      <td className="px-3 py-2.5 text-muted-foreground">{manager?.name ?? "—"}</td>
+                      <td className="px-3 py-2.5 text-muted-foreground">{managerName}</td>
                       <td className="px-3 py-2.5 text-right">
                         {project && (
                           <Button size="sm" variant="ghost" className="gap-1 text-primary" asChild>

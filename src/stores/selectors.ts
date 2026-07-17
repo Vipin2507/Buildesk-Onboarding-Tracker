@@ -16,6 +16,8 @@ import { useProjectStore } from "./useProjectStore";
 import { usePostSalesStore } from "./usePostSalesStore";
 import { useTicketStore } from "./useTicketStore";
 import { useEmployeeStore } from "./useEmployeeStore";
+import { useUserStore } from "./useUserStore";
+import { resolveAssigneeName } from "@/lib/managers";
 import { getDaysUntilExpiry, getRenewalUrgency } from "./useRenewalStore";
 
 function calcOnboardingProjectProgress(
@@ -155,15 +157,20 @@ export function useCompanyWithComputed(companyId: string) {
   const company = useCompanyStore((s) => s.companies.find((c) => c.id === companyId));
   const projects = useProjectStore((s) => s.projects);
   const employees = useEmployeeStore((s) => s.employees);
+  const users = useUserStore((s) => s.users);
   const progress = useCompanyProgress(companyId);
 
   return useMemo(() => {
     if (!company) return undefined;
-    const manager = employees.find((e) => e.id === company.onboardingManagerId);
-    const csm = employees.find((e) => e.id === company.csmId);
+    const managerName = resolveAssigneeName(company.onboardingManagerId, users, employees);
+    const csmName = resolveAssigneeName(company.csmId, users, employees);
+    const manager = managerName
+      ? { id: company.onboardingManagerId, name: managerName }
+      : undefined;
+    const csm = csmName ? { id: company.csmId, name: csmName } : undefined;
     const projectCount = projects.filter((p) => p.companyId === companyId).length;
     return { ...company, progress, projectCount, manager, csm };
-  }, [company, employees, projects, companyId, progress]);
+  }, [company, employees, users, projects, companyId, progress]);
 }
 
 export function useDashboardKpis() {

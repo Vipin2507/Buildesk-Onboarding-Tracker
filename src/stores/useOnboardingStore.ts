@@ -29,7 +29,7 @@ import {
   upsertCustomerAppConfig as apiUpsertCustomerApp,
 } from "@/lib/api";
 import { serverSync, serverSyncWithRollback } from "@/lib/sync";
-import { calcChecklistProgress, isChecklistItemComplete, applyChecklistPhaseToggle } from "@/lib/checklist";
+import { calcChecklistProgress, isChecklistItemComplete, applyChecklistPhaseToggle, applyChecklistPhaseDate } from "@/lib/checklist";
 
 type OnboardingState = {
   checklistItems: OnboardingChecklistItem[];
@@ -44,7 +44,8 @@ type OnboardingState = {
   replaceChecklistForProject: (projectId: string, items: OnboardingChecklistItem[]) => void;
   removeProjectData: (projectId: string) => void;
 
-  toggleChecklist: (id: string, phase: ChecklistPhase, who?: string) => void;
+  toggleChecklist: (id: string, phase: ChecklistPhase, who?: string, at?: string) => void;
+  setChecklistPhaseDate: (id: string, phase: ChecklistPhase, at: string, who?: string) => void;
   setChecklistNotApplicable: (id: string, notApplicable: boolean, who?: string) => void;
   updateChecklistRemarks: (id: string, remarks: string) => void;
   /** Mark every applicable checklist item fully complete for a project. */
@@ -140,10 +141,10 @@ export const useOnboardingStore = createStore<OnboardingState>((set, get) => ({
     }));
   },
 
-  toggleChecklist: (id, phase, who = "You") => {
+  toggleChecklist: (id, phase, who = "You", at) => {
     const item = get().checklistItems.find((i) => i.id === id);
     if (!item || item.notApplicable) return;
-    const next = applyChecklistPhaseToggle(item, phase);
+    const next = applyChecklistPhaseToggle(item, phase, at);
     if (!next) return;
     const updated = touch(next);
     set((s) => ({
@@ -155,12 +156,30 @@ export const useOnboardingStore = createStore<OnboardingState>((set, get) => ({
       kind: "info",
       projectId: item.projectId,
     });
-    serverSync("toggleChecklist", () => apiToggleChecklist({ data: { id, phase } }));
+    serverSync("toggleChecklist", () => apiToggleChecklist({ data: { id, phase, at } }));
     queueMicrotask(() => {
       void import("@/lib/progress-onboarding-bridge").then((m) =>
         m.syncProgressFromChecklist(item.projectId),
       );
     });
+  },
+
+  setChecklistPhaseDate: (id, phase, at, who = "You") => {
+    const item = get().checklistItems.find((i) => i.id === id);
+    if (!item || item.notApplicable || !item[phase]) return;
+    const next = applyChecklistPhaseDate(item, phase, at);
+    if (!next) return;
+    const updated = touch(next);
+    set((s) => ({
+      checklistItems: s.checklistItems.map((i) => (i.id === id ? updated : i)),
+    }));
+    logActivity({
+      who,
+      what: `Updated "${item.label}" ${phase} date`,
+      kind: "info",
+      projectId: item.projectId,
+    });
+    serverSync("toggleChecklist", () => apiToggleChecklist({ data: { id, phase, at } }));
   },
 
   completeAllChecklistForProject: (projectId, who = "You") => {

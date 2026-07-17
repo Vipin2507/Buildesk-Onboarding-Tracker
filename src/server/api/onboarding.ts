@@ -8,7 +8,7 @@ import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { logActivity } from "@/server/api/mappers";
 import type { ChecklistPhase, OnboardingChecklistItem, OtherCharge } from "@/types";
-import { applyChecklistPhaseToggle, stampChecklistPhaseDates } from "@/lib/checklist";
+import { applyChecklistPhaseToggle, stampChecklistPhaseDates, applyChecklistPhaseDate } from "@/lib/checklist";
 
 function ensureDefaultChecklist(projectId: string) {
   const db = getDb();
@@ -187,7 +187,13 @@ export const setChecklistState = createServerFn({ method: "POST" })
 
 export const toggleChecklist = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({ id: z.string(), phase: z.enum(["collected", "uploaded", "live"]) }).parse(data),
+    z
+      .object({
+        id: z.string(),
+        phase: z.enum(["collected", "uploaded", "live"]),
+        at: z.string().optional(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     const user = requireUser();
@@ -200,7 +206,12 @@ export const toggleChecklist = createServerFn({ method: "POST" })
     if (!row) throw new ApiError(404, "Checklist item not found");
     if (row.notApplicable) throw new ApiError(400, "Item is marked not applicable");
     const phase = data.phase as ChecklistPhase;
-    const next = applyChecklistPhaseToggle(mapChecklist(row), phase);
+    const mapped = mapChecklist(row);
+    const next = mapped[phase]
+      ? data.at
+        ? applyChecklistPhaseDate(mapped, phase, data.at)
+        : applyChecklistPhaseToggle(mapped, phase)
+      : applyChecklistPhaseToggle(mapped, phase, data.at);
     if (!next) throw new ApiError(400, "Complete prior phases first (Collected → Uploaded → Live)");
     const now = nowIso();
     db.update(t.onboardingChecklistItems)

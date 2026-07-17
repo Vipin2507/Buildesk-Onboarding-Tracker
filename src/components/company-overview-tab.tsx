@@ -20,7 +20,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 
 import { Button } from "@/components/ui/button";
 import { StatusPill, Pill } from "@/components/status-pill";
-import { useCompanyStore, useEmployeeStore } from "@/stores";
+import { usePermissions } from "@/hooks/use-permissions";
+import { assignableManagerUsers, resolveAssigneeName } from "@/lib/managers";
+import { useCompanyStore, useEmployeeStore, useUserStore } from "@/stores";
 import type { Company, CompanyHealth, CompanyPlan, CompanyRegion, StatusKey } from "@/types";
 import { COMPANY_REGIONS, STATUS_LABEL } from "@/types";
 import { cn } from "@/lib/utils";
@@ -85,6 +87,8 @@ function inputClass(error?: boolean) {
 export function CompanyOverviewTab({ company }: { company: Company }) {
   const updateCompany = useCompanyStore((s) => s.updateCompany);
   const employees = useEmployeeStore((s) => s.employees);
+  const users = useUserStore((s) => s.users);
+  const { isAdmin } = usePermissions();
   const [editing, setEditing] = useState(false);
 
   const form = useForm<DetailForm>({
@@ -96,12 +100,10 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
     if (!editing) form.reset(toFormValues(company));
   }, [company, editing, form]);
 
-  const manager = employees.find((e) => e.id === company.onboardingManagerId);
-  const csm = employees.find((e) => e.id === company.csmId);
-  const managers = employees.filter(
-    (e) => e.role.includes("Onboarding") || e.role.includes("Implementation") || e.role === "Admin",
-  );
-  const csms = employees.filter((e) => e.role === "CSM" || e.role === "Admin");
+  const managerName = resolveAssigneeName(company.onboardingManagerId, users, employees);
+  const csmName = resolveAssigneeName(company.csmId, users, employees);
+  const managers = assignableManagerUsers(users);
+  const csms = assignableManagerUsers(users);
 
   function onSave() {
     form.handleSubmit((data) => {
@@ -243,17 +245,30 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
           <Section title="Ownership">
             <label className="block text-xs font-medium">
               Onboarding Manager
-              <select {...form.register("onboardingManagerId")} className={inputClass()}>
-                {managers.map((e) => (
-                  <option key={e.id} value={e.id}>{e.name}</option>
+              <select
+                {...form.register("onboardingManagerId")}
+                className={inputClass()}
+                disabled={!isAdmin}
+              >
+                {managers.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} · {u.role}
+                  </option>
                 ))}
               </select>
+              {!isAdmin ? (
+                <span className="mt-1 block text-[11px] text-muted-foreground">
+                  Only admins can change the onboarding manager.
+                </span>
+              ) : null}
             </label>
             <label className="block text-xs font-medium">
               CSM
               <select {...form.register("csmId")} className={inputClass()}>
-                {csms.map((e) => (
-                  <option key={e.id} value={e.id}>{e.name}</option>
+                {csms.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} · {u.role}
+                  </option>
                 ))}
               </select>
             </label>
@@ -335,8 +350,8 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
           </Section>
 
           <Section title="Ownership">
-            <Field label="Onboarding Manager" icon={UserCog}>{manager?.name ?? "—"}</Field>
-            <Field label="CSM" icon={UserCog}>{csm?.name ?? "—"}</Field>
+            <Field label="Onboarding Manager" icon={UserCog}>{managerName ?? "—"}</Field>
+            <Field label="CSM" icon={UserCog}>{csmName ?? "—"}</Field>
           </Section>
 
           <Section title="Commercial">

@@ -59,22 +59,22 @@ export function canToggleChecklistPhase(item: OnboardingChecklistItem, phase: Ch
 /**
  * Apply a sequential phase toggle.
  * Turning on requires prior phases; turning off clears this and later phases.
- * Sets / clears phase timestamps accordingly.
+ * Optional `at` (YYYY-MM-DD or ISO) stamps the phase date when turning on.
  */
 export function applyChecklistPhaseToggle(
   item: OnboardingChecklistItem,
   phase: ChecklistPhase,
+  at?: string,
 ): OnboardingChecklistItem | null {
   if (item.notApplicable) return null;
   if (!canToggleChecklistPhase(item, phase)) return null;
 
   const turningOn = !item[phase];
-  const now = nowIso();
   if (turningOn) {
     return {
       ...item,
       [phase]: true,
-      [PHASE_AT[phase]]: now,
+      [PHASE_AT[phase]]: normalizePhaseAt(at),
     };
   }
 
@@ -86,6 +86,34 @@ export function applyChecklistPhaseToggle(
     next[PHASE_AT[p]] = undefined;
   }
   return next;
+}
+
+/** Normalize a picked calendar date (or ISO) for checklist phase timestamps. */
+export function normalizePhaseAt(at?: string, fallback = nowIso()) {
+  const raw = at?.trim();
+  if (!raw) return fallback;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return `${raw}T12:00:00.000Z`;
+  if (/^\d{4}-\d{2}-\d{2}T/.test(raw)) return raw;
+  return fallback;
+}
+
+/** Update only the timestamp for an already-completed phase. */
+export function applyChecklistPhaseDate(
+  item: OnboardingChecklistItem,
+  phase: ChecklistPhase,
+  at: string,
+): OnboardingChecklistItem | null {
+  if (item.notApplicable || !item[phase]) return null;
+  return {
+    ...item,
+    [PHASE_AT[phase]]: normalizePhaseAt(at),
+  };
+}
+
+/** YYYY-MM-DD for date picker value from a stored phase timestamp. */
+export function phaseAtToYmd(at?: string) {
+  if (!at) return "";
+  return at.slice(0, 10);
 }
 
 /** Stamp phase dates when setting absolute checklist state (e.g. progress sync). */

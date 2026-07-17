@@ -8,9 +8,11 @@ import { z } from "zod";
 import { PageHeader, PageWrap } from "@/components/page-header";
 import { ProgressBar } from "@/components/progress-bar";
 import { ProjectDocumentsPanel } from "@/components/project-documents-panel";
+import { DatePickerField } from "@/components/date-picker-field";
 import { Button } from "@/components/ui/button";
 import { EntityNotFound } from "@/components/empty-state";
 import { DetailPageSkeleton } from "@/components/loading-skeleton";
+import { EntityFormModal } from "@/components/entity-form-modal";
 import { useDetailLoading } from "@/hooks/use-detail-loading";
 import {
   useCompanyStore,
@@ -21,7 +23,13 @@ import {
 } from "@/stores";
 import { ONBOARDING_STEPS, ONBOARDING_SECTIONS } from "@/data/constants";
 import { formatRelativeTime } from "@/types/common";
-import { calcChecklistProgress, canToggleChecklistPhase, countApplicableChecklist } from "@/lib/checklist";
+import type { ChecklistPhase } from "@/types";
+import {
+  calcChecklistProgress,
+  canToggleChecklistPhase,
+  countApplicableChecklist,
+  phaseAtToYmd,
+} from "@/lib/checklist";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 
 type OnboardingSectionKey = (typeof ONBOARDING_SECTIONS)[number]["key"];
@@ -95,6 +103,7 @@ function ProjectDetailPage() {
     [checklist],
   );
   const toggleChecklist = useOnboardingStore((s) => s.toggleChecklist);
+  const setChecklistPhaseDate = useOnboardingStore((s) => s.setChecklistPhaseDate);
   const setNotApplicable = useOnboardingStore((s) => s.setChecklistNotApplicable);
   const updateRemarks = useOnboardingStore((s) => s.updateChecklistRemarks);
   const initChecklistForProject = useOnboardingStore((s) => s.initChecklistForProject);
@@ -117,6 +126,13 @@ function ProjectDetailPage() {
     sectionForStep(project?.currentStep ?? 0),
   );
   const [goLiveAnim, setGoLiveAnim] = useState(false);
+  const [phaseDialog, setPhaseDialog] = useState<{
+    itemId: string;
+    label: string;
+    phase: ChecklistPhase;
+    mode: "complete" | "edit";
+  } | null>(null);
+  const [phaseDate, setPhaseDate] = useState("");
 
   function goToStep(step: number) {
     const next = Math.max(0, Math.min(step, ONBOARDING_STEPS.length - 1));
@@ -168,6 +184,46 @@ function ProjectDetailPage() {
   function sectionProgress(sec: string) {
     const items = sectionItems[sec] ?? [];
     return calcChecklistProgress(items);
+  }
+
+  function openPhaseDialog(item: (typeof checklist)[number], phase: ChecklistPhase) {
+    if (!canToggleChecklistPhase(item, phase) && !item[phase]) {
+      toast.error("Complete prior steps first", {
+        description: "Collected → Uploaded → Live",
+      });
+      return;
+    }
+    const at =
+      phase === "collected" ? item.collectedAt : phase === "uploaded" ? item.uploadedAt : item.liveAt;
+    setPhaseDialog({
+      itemId: item.id,
+      label: item.label,
+      phase,
+      mode: item[phase] ? "edit" : "complete",
+    });
+    setPhaseDate(phaseAtToYmd(at) || new Date().toISOString().slice(0, 10));
+  }
+
+  function confirmPhaseDialog() {
+    if (!phaseDialog || !phaseDate) {
+      toast.error("Pick a date for this step");
+      return;
+    }
+    if (phaseDialog.mode === "edit") {
+      setChecklistPhaseDate(phaseDialog.itemId, phaseDialog.phase, phaseDate);
+      toast.success(`${phaseDialog.phase} date updated`);
+    } else {
+      toggleChecklist(phaseDialog.itemId, phaseDialog.phase, "You", phaseDate);
+      toast.success(`Marked ${phaseDialog.phase}`);
+    }
+    setPhaseDialog(null);
+  }
+
+  function clearPhaseDialog() {
+    if (!phaseDialog) return;
+    toggleChecklist(phaseDialog.itemId, phaseDialog.phase);
+    toast.success(`Cleared ${phaseDialog.phase}`);
+    setPhaseDialog(null);
   }
 
   return (
@@ -378,15 +434,7 @@ function ProjectDetailPage() {
                                     ? formatDateTime(at)
                                     : undefined
                               }
-                              onClick={() => {
-                                if (!canToggleChecklistPhase(item, phase) && !item[phase]) {
-                                  toast.error("Complete prior steps first", {
-                                    description: "Collected → Uploaded → Live",
-                                  });
-                                  return;
-                                }
-                                toggleChecklist(item.id, phase);
-                              }}
+                              onClick={() => openPhaseDialog(item, phase)}
                               className={cn(
                                 "inline-flex min-h-10 min-w-[5.5rem] flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-1.5 text-xs font-medium capitalize",
                                 item[phase]
@@ -404,7 +452,11 @@ function ProjectDetailPage() {
                                 <span className="text-[9px] font-normal opacity-90 normal-case">
                                   {formatDate(at)}
                                 </span>
-                              ) : null}
+                              ) : (
+                                <span className="text-[9px] font-normal opacity-70 normal-case">
+                                  Pick date
+                                </span>
+                              )}
                             </button>
                             );
                           })}
@@ -477,15 +529,7 @@ function ProjectDetailPage() {
                                           ? formatDateTime(at)
                                           : undefined
                                   }
-                                  onClick={() => {
-                                    if (!canToggleChecklistPhase(item, phase) && !item[phase]) {
-                                      toast.error("Complete prior steps first", {
-                                        description: "Collected → Uploaded → Live",
-                                      });
-                                      return;
-                                    }
-                                    toggleChecklist(item.id, phase);
-                                  }}
+                                  onClick={() => openPhaseDialog(item, phase)}
                                   className={cn(
                                     "inline-flex min-h-9 min-w-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-md border px-1.5 py-1",
                                     (na || (!allowed && !item[phase])) && "cursor-not-allowed opacity-40",
@@ -498,6 +542,10 @@ function ProjectDetailPage() {
                                   {!na && item[phase] && at ? (
                                     <span className="text-[9px] font-normal leading-tight opacity-90">
                                       {formatDate(at)}
+                                    </span>
+                                  ) : !na && allowed ? (
+                                    <span className="text-[9px] font-normal leading-tight text-muted-foreground">
+                                      Date
                                     </span>
                                   ) : null}
                                 </button>
@@ -557,6 +605,50 @@ function ProjectDetailPage() {
       )}
 
       {tab === "documents" && <ProjectDocumentsPanel projectId={projectId} />}
+
+      <EntityFormModal
+        open={!!phaseDialog}
+        onOpenChange={(open) => {
+          if (!open) setPhaseDialog(null);
+        }}
+        title={
+          phaseDialog
+            ? phaseDialog.mode === "edit"
+              ? `Edit ${phaseDialog.phase} date`
+              : `Mark ${phaseDialog.phase}`
+            : "Checklist step"
+        }
+        submitLabel={phaseDialog?.mode === "edit" ? "Save date" : "Confirm"}
+        onSubmit={confirmPhaseDialog}
+      >
+        {phaseDialog && (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">{phaseDialog.label}</span>
+              {" · "}
+              Pick the actual date this step happened (historical onboarding data is supported).
+            </p>
+            <label className="block text-xs font-medium">
+              {phaseDialog.phase.charAt(0).toUpperCase() + phaseDialog.phase.slice(1)} date
+              <div className="mt-1">
+                <DatePickerField
+                  value={phaseDate}
+                  onChange={setPhaseDate}
+                  placeholder="Type or pick a date"
+                  yearsBack={40}
+                  yearsForward={1}
+                  modal
+                />
+              </div>
+            </label>
+            {phaseDialog.mode === "edit" && (
+              <Button type="button" variant="outline" className="w-full" onClick={clearPhaseDialog}>
+                Clear this step
+              </Button>
+            )}
+          </div>
+        )}
+      </EntityFormModal>
     </PageWrap>
   );
 }

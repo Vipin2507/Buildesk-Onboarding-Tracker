@@ -43,8 +43,10 @@ import {
   usePostSalesProjectsForCompany,
   calcProjectProgress,
   useOnboardingStore,
+  useUserStore,
 } from "@/stores";
 import { calcPostSalesProjectProgress } from "@/lib/post-sales-status";
+import { resolveAssigneeName } from "@/lib/managers";
 import { cn, formatDate } from "@/lib/utils";
 
 const tabSchema = z.enum([
@@ -115,13 +117,14 @@ function CompanyDetailContent() {
   const postSalesProjects = usePostSalesProjectsForCompany(companyId);
   const checklistItems = useOnboardingStore((s) => s.checklistItems);
   const employees = useEmployeeStore((s) => s.employees);
+  const users = useUserStore((s) => s.users);
   const progress = useCompanyProgress(companyId);
   const modulesWithProgress = useCompanyModulesWithProgress(companyId);
 
   if (loading) return <DetailPageSkeleton />;
   if (!company) return <EntityNotFound entity="Company" listPath="/companies" listLabel="Companies" />;
 
-  const manager = employees.find((e) => e.id === company.onboardingManagerId);
+  const managerName = resolveAssigneeName(company.onboardingManagerId, users, employees);
   const optedModules = modulesWithProgress.filter((m) => m.optedIn);
   const liveModules = optedModules.filter((m) => m.isLive);
   const companyLive =
@@ -239,7 +242,7 @@ function CompanyDetailContent() {
         <StatCard
           label="Onboarding Manager"
           icon={Building2}
-          value={manager?.name ?? "—"}
+          value={managerName ?? "—"}
           foot={<span className="text-xs text-muted-foreground">Avg module {avgModuleProgress}%</span>}
         />
         <StatCard
