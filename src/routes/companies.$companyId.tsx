@@ -8,6 +8,7 @@ import {
   CalendarClock,
   FolderKanban,
   Layers,
+  Pencil,
   Plus,
   RefreshCw,
   Trash2,
@@ -48,6 +49,7 @@ import {
 import { calcPostSalesProjectProgress } from "@/lib/post-sales-status";
 import { resolveAssigneeName } from "@/lib/managers";
 import { cn, formatDate } from "@/lib/utils";
+import type { Project } from "@/types";
 
 const tabSchema = z.enum([
   "Overview",
@@ -103,6 +105,7 @@ function CompanyDetailContent() {
   const navigate = useNavigate({ from: "/companies/$companyId" });
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [projectModalOpen, setProjectModalOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
 
   const setTab = (next: TabId) => {
     void navigate({ search: { tab: next }, replace: true });
@@ -112,6 +115,7 @@ function CompanyDetailContent() {
   const deleteCompany = useCompanyStore((s) => s.deleteCompany);
   const markRenewed = useCompanyStore((s) => s.markRenewed);
   const addProject = useProjectStore((s) => s.addProject);
+  const updateProject = useProjectStore((s) => s.updateProject);
   const allProjects = useProjectStore((s) => s.projects);
   const projects = useMemo(() => allProjects.filter((p) => p.companyId === companyId), [allProjects, companyId]);
   const postSalesProjects = usePostSalesProjectsForCompany(companyId);
@@ -160,14 +164,27 @@ function CompanyDetailContent() {
   }
 
   function openAddProject() {
+    setEditingProject(null);
     setTab("Project");
+    setProjectModalOpen(true);
+  }
+
+  function openEditProject(project: Project) {
+    setEditingProject(project);
     setProjectModalOpen(true);
   }
 
   function onSaveProject(data: ProjectAdminFormValues) {
     const patch = formValuesToProjectPatch({ ...data, companyId });
+    if (editingProject) {
+      updateProject(editingProject.id, patch);
+      toast.success("Project details updated");
+      setEditingProject(null);
+      return;
+    }
     const project = addProject({ ...patch, status: "not_started", currentStep: 0 });
     toast.success("Project created", {
+      description: "Use Edit on the project card to add location, scale, and commercial details.",
       action: {
         label: "Open",
         onClick: () =>
@@ -361,7 +378,7 @@ function CompanyDetailContent() {
         <div className="space-y-6">
           <TabIntro
             title="Project"
-            description="Onboarding projects and Post Sales trackers for this company."
+            description="Onboarding projects and Post Sales trackers. Use Edit to fill address, towers, floors, units, and commercial details after import or create."
           />
 
           <section className="space-y-3">
@@ -371,7 +388,14 @@ function CompanyDetailContent() {
                 <h4 className="text-sm font-semibold">Onboarding Projects</h4>
                 <Pill>{projects.length}</Pill>
               </div>
-              <Button size="sm" className="gap-1.5 bg-primary hover:bg-primary/90" onClick={() => setProjectModalOpen(true)}>
+              <Button
+                size="sm"
+                className="gap-1.5 bg-primary hover:bg-primary/90"
+                onClick={() => {
+                  setEditingProject(null);
+                  setProjectModalOpen(true);
+                }}
+              >
                 <Plus className="h-3.5 w-3.5" /> Add Project
               </Button>
             </div>
@@ -380,34 +404,56 @@ function CompanyDetailContent() {
                 title="No onboarding projects yet"
                 description="Create a project for this company to start the onboarding checklist."
                 actionLabel="+ Add Project"
-                onAction={() => setProjectModalOpen(true)}
+                onAction={() => {
+                  setEditingProject(null);
+                  setProjectModalOpen(true);
+                }}
               />
             ) : (
               <div className="grid gap-3 md:grid-cols-2">
                 {projects.map((p) => {
                   const pct = calcProjectProgress(p.id, checklistItems);
                   return (
-                    <Link
+                    <div
                       key={p.id}
-                      to="/projects/$projectId"
-                      params={{ projectId: p.id }}
-                      search={{ tab: "onboarding" }}
-                      className="card-soft group block p-4 transition-all hover:-translate-y-0.5 hover:shadow-md"
+                      className="card-soft group p-4 transition-all hover:-translate-y-0.5 hover:shadow-md"
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <div>
+                        <Link
+                          to="/projects/$projectId"
+                          params={{ projectId: p.id }}
+                          search={{ tab: "onboarding" }}
+                          className="min-w-0 flex-1"
+                        >
                           <div className="font-semibold group-hover:text-primary">{p.name}</div>
                           <div className="mt-0.5 text-xs text-muted-foreground">
-                            {p.type} · {p.units} units · {p.city}
+                            {p.type} · {p.units} units · {p.city || "No city"}
+                            {p.address ? ` · ${p.address}` : ""}
                           </div>
+                        </Link>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <StatusPill status={p.status} />
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8 gap-1 px-2"
+                            onClick={() => openEditProject(p)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" /> Edit
+                          </Button>
                         </div>
-                        <StatusPill status={p.status} />
                       </div>
-                      <div className="mt-3">
+                      <Link
+                        to="/projects/$projectId"
+                        params={{ projectId: p.id }}
+                        search={{ tab: "onboarding" }}
+                        className="mt-3 block"
+                      >
                         <ProgressBar value={pct} />
                         <div className="mt-1 text-xs text-muted-foreground">{pct}% complete</div>
-                      </div>
-                    </Link>
+                      </Link>
+                    </div>
                   );
                 })}
               </div>
@@ -536,9 +582,12 @@ function CompanyDetailContent() {
 
       <ProjectFormModal
         open={projectModalOpen}
-        onOpenChange={setProjectModalOpen}
+        onOpenChange={(open) => {
+          setProjectModalOpen(open);
+          if (!open) setEditingProject(null);
+        }}
         companies={[{ id: company.id, name: company.name, city: company.city }]}
-        editing={null}
+        editing={editingProject}
         defaultCompanyId={companyId}
         onSave={onSaveProject}
       />

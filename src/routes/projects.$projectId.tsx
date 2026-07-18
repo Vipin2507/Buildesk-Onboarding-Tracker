@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, ArrowRight, Clock, ChevronRight, ArrowLeft, Rocket, Ban } from "lucide-react";
+import { Check, ArrowRight, Clock, ChevronRight, ArrowLeft, Rocket, Ban, Pencil, CheckCheck } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -13,6 +13,11 @@ import { Button } from "@/components/ui/button";
 import { EntityNotFound } from "@/components/empty-state";
 import { DetailPageSkeleton } from "@/components/loading-skeleton";
 import { EntityFormModal } from "@/components/entity-form-modal";
+import {
+  ProjectFormModal,
+  formValuesToProjectPatch,
+  type ProjectAdminFormValues,
+} from "@/components/project-form-modal";
 import { useDetailLoading } from "@/hooks/use-detail-loading";
 import {
   useCompanyStore,
@@ -108,6 +113,7 @@ function ProjectDetailPage() {
   const updateRemarks = useOnboardingStore((s) => s.updateChecklistRemarks);
   const initChecklistForProject = useOnboardingStore((s) => s.initChecklistForProject);
   const goLive = useProjectStore((s) => s.goLive);
+  const completeProject = useProjectStore((s) => s.completeProject);
 
   useEffect(() => {
     initChecklistForProject(projectId);
@@ -133,6 +139,11 @@ function ProjectDetailPage() {
     mode: "complete" | "edit";
   } | null>(null);
   const [phaseDate, setPhaseDate] = useState("");
+  const [editOpen, setEditOpen] = useState(false);
+
+  const companiesForForm = useCompanyStore((s) =>
+    s.companies.map((c) => ({ id: c.id, name: c.name, city: c.city })),
+  );
 
   function goToStep(step: number) {
     const next = Math.max(0, Math.min(step, ONBOARDING_STEPS.length - 1));
@@ -181,6 +192,13 @@ function ProjectDetailPage() {
     }
   }
 
+  function handleCompleteProject() {
+    completeProject(projectId);
+    toast.success("Project completed", {
+      description: "Checklist marked complete and project set to completed.",
+    });
+  }
+
   function sectionProgress(sec: string) {
     const items = sectionItems[sec] ?? [];
     return calcChecklistProgress(items);
@@ -226,6 +244,12 @@ function ProjectDetailPage() {
     setPhaseDialog(null);
   }
 
+  function onSaveProjectDetails(data: ProjectAdminFormValues) {
+    if (!project) return;
+    updateProject(project.id, formValuesToProjectPatch(data));
+    toast.success("Project details updated");
+  }
+
   return (
     <PageWrap>
       <div className="mb-4">
@@ -244,8 +268,20 @@ function ProjectDetailPage() {
         title={project.name}
         subtitle={`${company?.name ?? ""} · ${project.city}${project.pocName ? ` · POC ${project.pocName}` : ""}${project.startDate ? ` · Started ${formatDate(project.startDate)}` : ""} · Complete checklist phases to track onboarding`}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-muted-foreground">{progress}% complete</span>
+            <Button type="button" size="sm" variant="outline" className="gap-1.5" onClick={() => setEditOpen(true)}>
+              <Pencil className="h-4 w-4" /> Edit details
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="gap-1.5 bg-primary hover:bg-primary/90"
+              disabled={project.status === "completed" && progress === 100}
+              onClick={handleCompleteProject}
+            >
+              <CheckCheck className="h-4 w-4" /> Complete project
+            </Button>
             <Button
               className={cn("gap-1.5 bg-primary", goLiveAnim && "animate-pulse ring-4 ring-success/40")}
               disabled={!canGoLive || !!project.goLiveAt}
@@ -649,6 +685,15 @@ function ProjectDetailPage() {
           </div>
         )}
       </EntityFormModal>
+
+      <ProjectFormModal
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        companies={companiesForForm}
+        editing={project}
+        defaultCompanyId={project.companyId}
+        onSave={onSaveProjectDetails}
+      />
     </PageWrap>
   );
 }

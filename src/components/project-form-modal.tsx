@@ -1,12 +1,13 @@
 import { useEffect, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { Building2, FolderKanban, Layers } from "lucide-react";
+import { Building2, FolderKanban, Layers, MapPin, Ruler } from "lucide-react";
 import { useForm } from "react-hook-form";
 import type { Resolver } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 
+import { DatePickerField } from "@/components/date-picker-field";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -17,6 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
+  PROJECT_OTHER_CHARGE_OPTIONS,
   PROJECT_TYPES,
   STATUS_LABEL,
   type Project,
@@ -35,7 +37,6 @@ export const projectFormSchema = z.object({
   rera: z.string().optional(),
   pocName: z.string().optional(),
   pocMobile: z.string().optional(),
-  // Kept for patch compatibility / admin edit — not shown in create UI
   address: z.string().optional(),
   state: z.string().optional(),
   pinCode: z.string().optional(),
@@ -69,10 +70,12 @@ const field =
 function Section({
   icon: Icon,
   title,
+  description,
   children,
 }: {
   icon: typeof Building2;
   title: string;
+  description?: string;
   children: ReactNode;
 }) {
   return (
@@ -82,11 +85,14 @@ function Section({
       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
       className="rounded-xl border border-border/80 bg-muted/20 p-4"
     >
-      <div className="mb-3 flex items-center gap-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+      <div className="mb-3 flex items-start gap-2">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Icon className="h-4 w-4" />
         </div>
-        <h3 className="text-sm font-semibold tracking-tight">{title}</h3>
+        <div>
+          <h3 className="text-sm font-semibold tracking-tight">{title}</h3>
+          {description ? <p className="text-[11px] text-muted-foreground">{description}</p> : null}
+        </div>
       </div>
       {children}
     </motion.section>
@@ -117,6 +123,9 @@ export function ProjectFormModal({
       : zodResolver(projectFormSchema)) as Resolver<ProjectAdminFormValues>,
     defaultValues: emptyDefaults(companies, defaultCompanyId),
   });
+
+  const showFullDetails = Boolean(editing) || adminMode;
+  const otherCharges = form.watch("otherCharges") ?? [];
 
   useEffect(() => {
     if (!open) return;
@@ -172,9 +181,13 @@ export function ProjectFormModal({
             </div>
             <div>
               <AlertDialogTitle className="text-lg">
-                {editing ? "Edit Project" : "Create Project"}
+                {editing ? "Edit Project Details" : "Create Project"}
               </AlertDialogTitle>
-              <p className="text-xs text-muted-foreground">Enter project details to add it to inventory</p>
+              <p className="text-xs text-muted-foreground">
+                {editing
+                  ? "Update location, scale, POC, and commercial details"
+                  : "Add basics now — edit later for full location & scale"}
+              </p>
             </div>
           </div>
         </AlertDialogHeader>
@@ -221,19 +234,28 @@ export function ProjectFormModal({
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-muted-foreground">City (optional)</label>
-                <input {...form.register("city")} className={field} placeholder="City" />
+                <label className="text-xs font-medium text-muted-foreground">Start Date</label>
+                <div className="mt-1.5">
+                  <DatePickerField
+                    value={form.watch("startDate") ?? ""}
+                    onChange={(v) => form.setValue("startDate", v, { shouldDirty: true, shouldValidate: true })}
+                    placeholder="Pick start date"
+                    yearsBack={40}
+                    yearsForward={5}
+                    modal
+                  />
+                </div>
+                {form.formState.errors.startDate && (
+                  <p className="mt-1 text-[11px] text-destructive">{form.formState.errors.startDate.message}</p>
+                )}
               </div>
               <div>
                 <label className="text-xs font-medium text-muted-foreground">RERA (optional)</label>
                 <input {...form.register("rera")} className={field} placeholder="RERA number" />
               </div>
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Start Date</label>
-                <input type="date" {...form.register("startDate")} className={field} />
-                {form.formState.errors.startDate && (
-                  <p className="mt-1 text-[11px] text-destructive">{form.formState.errors.startDate.message}</p>
-                )}
+                <label className="text-xs font-medium text-muted-foreground">City (optional)</label>
+                <input {...form.register("city")} className={field} placeholder="City" />
               </div>
               <div>
                 <label className="text-xs font-medium text-muted-foreground">Project POC Name</label>
@@ -245,6 +267,89 @@ export function ProjectFormModal({
               </div>
             </div>
           </Section>
+
+          {showFullDetails && (
+            <>
+              <Section
+                icon={MapPin}
+                title="Location"
+                description="Site address used on documents and onboarding."
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <label className="text-xs font-medium text-muted-foreground">Address</label>
+                    <input {...form.register("address")} className={field} placeholder="Project site address" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">State</label>
+                    <input {...form.register("state")} className={field} placeholder="State" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">PIN code</label>
+                    <input {...form.register("pinCode")} className={field} placeholder="6-digit PIN" />
+                    {form.formState.errors.pinCode && (
+                      <p className="mt-1 text-[11px] text-destructive">{form.formState.errors.pinCode.message}</p>
+                    )}
+                  </div>
+                </div>
+              </Section>
+
+              <Section
+                icon={Ruler}
+                title="Scale & commercial"
+                description="Inventory size and agreement value."
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Total towers</label>
+                    <input type="number" min={0} {...form.register("totalTowers")} className={field} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Total floors</label>
+                    <input type="number" min={0} {...form.register("totalFloors")} className={field} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Units</label>
+                    <input type="number" min={0} {...form.register("units")} className={field} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Agreement value</label>
+                    <input type="number" min={0} {...form.register("agreementValue")} className={field} />
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <div className="mb-2 text-xs font-medium text-muted-foreground">Other charges applicable</div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {PROJECT_OTHER_CHARGE_OPTIONS.map((opt) => {
+                      const checked = otherCharges.includes(opt.key);
+                      return (
+                        <label key={opt.key} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              const next = e.target.checked
+                                ? [...otherCharges, opt.key]
+                                : otherCharges.filter((k) => k !== opt.key);
+                              form.setValue("otherCharges", next, { shouldDirty: true });
+                            }}
+                          />
+                          {opt.label}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </Section>
+            </>
+          )}
+
+          {!showFullDetails && (
+            <p className="rounded-lg border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              After save, open <span className="font-medium text-foreground">Edit Project Details</span> from the
+              Project tab to add address, towers, floors, units, and charges.
+            </p>
+          )}
 
           {adminMode && (
             <Section icon={Layers} title="Admin status">
