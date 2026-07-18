@@ -141,8 +141,10 @@ function ProjectDetailPage() {
   const [phaseDate, setPhaseDate] = useState("");
   const [editOpen, setEditOpen] = useState(false);
 
-  const companiesForForm = useCompanyStore((s) =>
-    s.companies.map((c) => ({ id: c.id, name: c.name, city: c.city })),
+  const allCompanies = useCompanyStore((s) => s.companies);
+  const companiesForForm = useMemo(
+    () => allCompanies.map((c) => ({ id: c.id, name: c.name, city: c.city })),
+    [allCompanies],
   );
 
   function goToStep(step: number) {

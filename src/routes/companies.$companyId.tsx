@@ -122,6 +122,10 @@ function CompanyDetailContent() {
   const checklistItems = useOnboardingStore((s) => s.checklistItems);
   const employees = useEmployeeStore((s) => s.employees);
   const users = useUserStore((s) => s.users);
+  const companyFormOptions = useMemo(
+    () => (company ? [{ id: company.id, name: company.name, city: company.city }] : []),
+    [company],
+  );
   const progress = useCompanyProgress(companyId);
   const modulesWithProgress = useCompanyModulesWithProgress(companyId);
 
@@ -586,7 +590,7 @@ function CompanyDetailContent() {
           setProjectModalOpen(open);
           if (!open) setEditingProject(null);
         }}
-        companies={[{ id: company.id, name: company.name, city: company.city }]}
+        companies={companyFormOptions}
         editing={editingProject}
         defaultCompanyId={companyId}
         onSave={onSaveProject}

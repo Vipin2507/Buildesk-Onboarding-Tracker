@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Building2, FolderKanban, Layers, MapPin, Ruler } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -126,7 +126,15 @@ export function ProjectFormModal({
 
   const showFullDetails = Boolean(editing) || adminMode;
   const otherCharges = form.watch("otherCharges") ?? [];
+  const startDate = form.watch("startDate") ?? "";
+  const editingId = editing?.id ?? "";
+  const companyOptionsKey = useMemo(
+    () => companies.map((c) => `${c.id}:${c.name}:${c.city ?? ""}`).join("|"),
+    [companies],
+  );
 
+  // Reset when the dialog opens or edited project / company options change —
+  // not on every new companies[] array reference (avoids update-depth loops).
   useEffect(() => {
     if (!open) return;
     if (editing) {
@@ -156,7 +164,8 @@ export function ProjectFormModal({
     } else {
       form.reset(emptyDefaults(companies, defaultCompanyId));
     }
-  }, [open, editing, companies, defaultCompanyId, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by open / editingId / companyOptionsKey
+  }, [open, editingId, companyOptionsKey, defaultCompanyId, form]);
 
   function submit() {
     void form.handleSubmit(
@@ -237,7 +246,7 @@ export function ProjectFormModal({
                 <label className="text-xs font-medium text-muted-foreground">Start Date</label>
                 <div className="mt-1.5">
                   <DatePickerField
-                    value={form.watch("startDate") ?? ""}
+                    value={startDate}
                     onChange={(v) => form.setValue("startDate", v, { shouldDirty: true, shouldValidate: true })}
                     placeholder="Pick start date"
                     yearsBack={40}
