@@ -209,6 +209,11 @@ export const useOnboardingStore = createStore<OnboardingState>((set, get) => ({
     serverSync("completeProjectChecklist", () =>
       apiCompleteProjectChecklist({ data: { projectId } }),
     );
+    queueMicrotask(() => {
+      void import("@/lib/progress-onboarding-bridge").then((m) =>
+        m.syncProgressFromChecklist(projectId),
+      );
+    });
   },
 
   setChecklistNotApplicable: (id, notApplicable, who = "You") => {

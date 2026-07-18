@@ -37,6 +37,7 @@ export function ProjectImportModal({
   const companies = useCompanyStore((s) => s.companies);
   const addCompany = useCompanyStore((s) => s.addCompany);
   const updateCompany = useCompanyStore((s) => s.updateCompany);
+  const enableModule = useCompanyStore((s) => s.enableModule);
   const projects = useProjectStore((s) => s.projects);
   const addProject = useProjectStore((s) => s.addProject);
   const updateProject = useProjectStore((s) => s.updateProject);
@@ -124,7 +125,7 @@ export function ProjectImportModal({
               onboardingManagerId: "",
               csmId: "",
               status: "not_started",
-              modules: createCompanyModules([], action.startDate),
+              modules: createCompanyModules(["project-management"], action.startDate),
               agreementDate: action.startDate,
               startDate: action.startDate,
               goLiveTarget: goLive,
@@ -186,6 +187,16 @@ export function ProjectImportModal({
             updatedProjects += 1;
           }
         }
+      }
+
+      // Sheet projects are onboarding projects — ensure Project Management is opted so
+      // company Overall / Modules progress tracks checklist completion.
+      for (const companyId of touchedCompanyIds) {
+        const company = useCompanyStore.getState().getById(companyId);
+        if (!company) continue;
+        const modules = company.modules ?? [];
+        const pm = modules.find((m) => m.moduleKey === "project-management");
+        if (!pm?.optedIn) enableModule(companyId, "project-management");
       }
 
       toast.success("Import complete", {

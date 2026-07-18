@@ -16,10 +16,12 @@ import { useDetailLoading } from "@/hooks/use-detail-loading";
 import {
   useCompanyStore,
   useModuleProgress,
+  useOnboardingStore,
   usePostSalesProjectsForCompany,
   usePostSalesStore,
   useProjectProgressStore,
   useProjectStore,
+  calcProjectProgress,
 } from "@/stores";
 import { MODULE_CATALOG, getModuleLabel } from "@/data/module-catalog";
 import { milestonesForModule } from "@/lib/module-progress";
@@ -133,6 +135,7 @@ function GenericModuleHub({
     [allProjects, companyId],
   );
   const byProjectId = useProjectProgressStore((s) => s.byProjectId);
+  const checklistItems = useOnboardingStore((s) => s.checklistItems);
   const crud = CRUD_LINKS[moduleKey];
   const milestones = milestonesForModule(moduleKey);
 
@@ -145,10 +148,15 @@ function GenericModuleHub({
       let total = 0;
       for (const p of projects) {
         const row = byProjectId[p.id];
-        if (!row) continue;
-        if (row.notApplicable?.[m.key]) continue;
+        if (row) {
+          if (row.notApplicable?.[m.key]) continue;
+          total += 1;
+          if (row.checks[m.key]) done += 1;
+          continue;
+        }
+        // No Progress Tracker row yet — fall back to onboarding checklist completion.
         total += 1;
-        if (row.checks[m.key]) done += 1;
+        if (calcProjectProgress(p.id, checklistItems) >= 100) done += 1;
       }
       return {
         key: m.key,
@@ -159,7 +167,7 @@ function GenericModuleHub({
         complete: total > 0 ? done === total : false,
       };
     });
-  }, [milestones, projects, byProjectId]);
+  }, [milestones, projects, byProjectId, checklistItems]);
 
   function savePoc() {
     updateModuleMeta(companyId, moduleKey, {
@@ -284,18 +292,39 @@ function GenericModuleHub({
 
       {projects.length > 0 ? (
         <div className="mt-4 card-soft p-4">
-          <h3 className="mb-3 text-sm font-semibold">Linked projects</h3>
-          <div className="flex flex-wrap gap-2">
-            {projects.map((p) => (
-              <Button key={p.id} size="sm" variant="outline" asChild>
-                <Link to="/projects/$projectId" params={{ projectId: p.id }} search={{ tab: "onboarding" }}>
-                  {p.name}
+          <h3 className="mb-3 text-sm font-semibold">Linked onboarding projects</h3>
+          <div className="space-y-2">
+            {projects.map((p) => {
+              const pct = calcProjectProgress(p.id, checklistItems);
+              return (
+                <Link
+                  key={p.id}
+                  to="/projects/$projectId"
+                  params={{ projectId: p.id }}
+                  search={{ tab: "onboarding" }}
+                  className="flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors hover:bg-muted/40"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">{p.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {p.status === "completed" || p.goLiveAt ? "Completed" : "In progress"}
+                    </div>
+                  </div>
+                  <ProgressBar value={pct} className="w-24" />
+                  <span className="w-10 text-right text-xs tabular-nums text-muted-foreground">{pct}%</span>
                 </Link>
-              </Button>
-            ))}
+              );
+            })}
           </div>
         </div>
-      ) : null}
+      ) : (
+        <div className="mt-4">
+          <EmptyState
+            title="No onboarding projects yet"
+            description="Import a sheet or add a project on the company Project tab. Module progress follows those projects."
+          />
+        </div>
+      )}
     </PageWrap>
   );
 }

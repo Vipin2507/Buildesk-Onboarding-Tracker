@@ -40,6 +40,17 @@ function calcCombinedProjectProgress(
   return Math.max(checklist, manual);
 }
 
+function calcCompanyOnboardingProjectsAverage(companyId: string): number | null {
+  const projects = useProjectStore.getState().projects.filter((p) => p.companyId === companyId);
+  if (projects.length === 0) return null;
+  const checklistItems = useOnboardingStore.getState().checklistItems;
+  const total = projects.reduce(
+    (sum, p) => sum + calcCombinedProjectProgress(p.id, checklistItems),
+    0,
+  );
+  return Math.round(total / projects.length);
+}
+
 export function getModuleProgressPercent(
   companyId: string,
   moduleKey: ModuleKey,
@@ -59,10 +70,16 @@ export function getModuleProgressPercent(
     .getState()
     .projects.filter((p) => p.companyId === companyId)
     .map((p) => p.id);
+  if (projectIds.length === 0) return 0;
+
+  // Sheet / checklist onboarding is the live source of truth (Progress Tracker UI removed).
+  // Module hubs still describe progress as "from project onboarding" — honor that.
+  const onboardingAvg = calcCompanyOnboardingProjectsAverage(companyId) ?? 0;
   const progressRows = projectIds
     .map((id) => useProjectProgressStore.getState().byProjectId[id])
     .filter(Boolean);
-  return calcManualGroupProgress(progressRows, groups);
+  const manualPct = calcManualGroupProgress(progressRows, groups);
+  return Math.max(onboardingAvg, manualPct);
 }
 
 export function getCompanyOverallProgress(
@@ -71,7 +88,11 @@ export function getCompanyOverallProgress(
   postSalesProjects: ReturnType<typeof usePostSalesStore.getState>["projects"],
 ): number {
   const opted = modules.filter((m) => m.optedIn);
-  if (opted.length === 0) return 0;
+  // Sheet import historically created companies with no modules opted — still track
+  // overall from onboarding projects so completed projects move company %.
+  if (opted.length === 0) {
+    return calcCompanyOnboardingProjectsAverage(companyId) ?? 0;
+  }
   const total = opted.reduce(
     (sum, m) => sum + getModuleProgressPercent(companyId, m.moduleKey, postSalesProjects),
     0,
@@ -84,21 +105,23 @@ export function useCompanyProgress(companyId: string) {
   const postSalesProjects = usePostSalesStore((s) => s.projects);
   const projects = useProjectStore((s) => s.projects);
   const progressByProject = useProjectProgressStore((s) => s.byProjectId);
+  const checklistItems = useOnboardingStore((s) => s.checklistItems);
 
   return useMemo(() => {
     if (!company) return 0;
     const modules = normalizeCompanyModules(company.modules);
     return getCompanyOverallProgress(companyId, modules, postSalesProjects);
-  }, [company, companyId, postSalesProjects, projects, progressByProject]);
+  }, [company, companyId, postSalesProjects, projects, progressByProject, checklistItems]);
 }
 
 export function useModuleProgress(companyId: string, moduleKey: ModuleKey) {
   const postSalesProjects = usePostSalesStore((s) => s.projects);
   const projects = useProjectStore((s) => s.projects);
   const progressByProject = useProjectProgressStore((s) => s.byProjectId);
+  const checklistItems = useOnboardingStore((s) => s.checklistItems);
   return useMemo(
     () => getModuleProgressPercent(companyId, moduleKey, postSalesProjects),
-    [companyId, moduleKey, postSalesProjects, projects, progressByProject],
+    [companyId, moduleKey, postSalesProjects, projects, progressByProject, checklistItems],
   );
 }
 
@@ -107,6 +130,7 @@ export function useCompanyModulesWithProgress(companyId: string) {
   const postSalesProjects = usePostSalesStore((s) => s.projects);
   const projects = useProjectStore((s) => s.projects);
   const progressByProject = useProjectProgressStore((s) => s.byProjectId);
+  const checklistItems = useOnboardingStore((s) => s.checklistItems);
 
   return useMemo(() => {
     if (!company) return [];
@@ -121,7 +145,7 @@ export function useCompanyModulesWithProgress(companyId: string) {
         isLive: Boolean(m.liveAt) || progressPercent >= 100,
       };
     });
-  }, [company, companyId, postSalesProjects, projects, progressByProject]);
+  }, [company, companyId, postSalesProjects, projects, progressByProject, checklistItems]);
 }
 
 export function companyIsLive(companyId: string): boolean {
@@ -129,8 +153,10 @@ export function companyIsLive(companyId: string): boolean {
   if (!company) return false;
   const modules = normalizeCompanyModules(company.modules);
   const opted = modules.filter((m) => m.optedIn);
-  if (opted.length === 0) return false;
   const postSalesProjects = usePostSalesStore.getState().projects;
+  if (opted.length === 0) {
+    return (calcCompanyOnboardingProjectsAverage(companyId) ?? 0) >= 100;
+  }
   return opted.every((m) => {
     if (m.liveAt) return true;
     return getModuleProgressPercent(companyId, m.moduleKey, postSalesProjects) >= 100;
@@ -178,21 +204,23 @@ export function useDashboardKpis() {
   const tickets = useTicketStore((s) => s.tickets);
   const postSalesProjects = usePostSalesStore((s) => s.projects);
   const progressByProject = useProjectProgressStore((s) => s.byProjectId);
+  const checklistItems = useOnboardingStore((s) => s.checklistItems);
+  const projects = useProjectStore((s) => s.projects);
 
   return useMemo(() => {
     const companiesWithProgress = companies.map((c) => {
       const modules = normalizeCompanyModules(c.modules);
       const progress = getCompanyOverallProgress(c.id, modules, postSalesProjects);
+      const opted = modules.filter((m) => m.optedIn);
       const live =
         isCompanyModulesAllLive(modules) ||
-        (modules.filter((m) => m.optedIn).length > 0 &&
-          modules
-            .filter((m) => m.optedIn)
-            .every(
+        (opted.length > 0
+          ? opted.every(
               (m) =>
                 Boolean(m.liveAt) ||
                 getModuleProgressPercent(c.id, m.moduleKey, postSalesProjects) >= 100,
-            ));
+            )
+          : progress >= 100);
       const computedStatus = live
         ? ("completed" as const)
         : progress > 0
@@ -216,7 +244,7 @@ export function useDashboardKpis() {
       upcomingRenewals,
       companiesWithProgress,
     };
-  }, [companies, tickets, postSalesProjects, progressByProject]);
+  }, [companies, tickets, postSalesProjects, progressByProject, checklistItems, projects]);
 }
 
 export function useModuleAdoption() {
