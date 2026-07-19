@@ -22,6 +22,11 @@ import {
   listUsers,
   listNotifications,
   getAppConfig,
+  listFollowUpTasks,
+  listClientVisits,
+  listModuleSubscriptions,
+  listModuleSubscriptionEvents,
+  listCrmEvents,
 } from "@/lib/api";
 import { wireConfigPersistence } from "@/lib/config-persistence";
 import {
@@ -44,6 +49,9 @@ import {
   useVendorStore,
   useMasterStore,
   useSettingsStore,
+  useTaskStore,
+  useClientVisitStore,
+  useCrmEventStore,
 } from "@/stores";
 
 /**
@@ -93,6 +101,11 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           uploads,
           progressRows,
           customerApps,
+          followUpTasks,
+          clientVisits,
+          moduleSubscriptions,
+          subscriptionEvents,
+          crmEvents,
         ] = await Promise.all([
           listCompanies(),
           listProjects({ data: {} }),
@@ -118,6 +131,11 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           listAllUploads().catch(() => []),
           listAllProgress().catch(() => []),
           listAllCustomerAppConfigs().catch(() => []),
+          listFollowUpTasks({ data: {} }).catch(() => []),
+          listClientVisits({ data: {} }).catch(() => []),
+          listModuleSubscriptions({ data: {} }).catch(() => []),
+          listModuleSubscriptionEvents({ data: {} }).catch(() => []),
+          listCrmEvents({ data: { limit: 200 } }).catch(() => []),
         ]);
 
         if (cancelled) return;
@@ -164,6 +182,13 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
               },
             ]),
           ),
+        });
+        useTaskStore.setState({ tasks: followUpTasks });
+        useClientVisitStore.setState({ visits: clientVisits });
+        useCrmEventStore.setState({
+          subscriptions: moduleSubscriptions,
+          subscriptionEvents,
+          events: crmEvents,
         });
         useVendorStore.setState({
           materials: vendors.materials,

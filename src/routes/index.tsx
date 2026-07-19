@@ -4,7 +4,7 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
 import {
-  Building2, TrendingUp, CheckCircle2, PauseCircle, ListChecks, RefreshCw, ArrowRight,
+  Building2, TrendingUp, CheckCircle2, ListChecks, RefreshCw, ArrowRight, MapPin, AlarmClock,
 } from "lucide-react";
 
 import { PageHeader, PageWrap } from "@/components/page-header";
@@ -44,8 +44,10 @@ function Dashboard() {
     { label: "Total Companies", value: kpis.totalCompanies, icon: Building2, tone: "bg-primary/10 text-primary" },
     { label: "Active Onboarding", value: kpis.activeOnboarding, icon: TrendingUp, tone: "bg-warning/15 text-warning-foreground" },
     { label: "Completed", value: kpis.completed, icon: CheckCircle2, tone: "bg-success/15 text-success" },
-    { label: "On Hold", value: kpis.onHold, icon: PauseCircle, tone: "bg-destructive/15 text-destructive" },
-    { label: "Pending Tasks", value: kpis.pendingTasks, icon: ListChecks, tone: "bg-info/15 text-info" },
+    { label: "Open Tickets", value: kpis.openTickets ?? kpis.pendingTasks, icon: ListChecks, tone: "bg-info/15 text-info" },
+    { label: "Overdue Follow-ups", value: kpis.overdueFollowUpTasks ?? 0, icon: AlarmClock, tone: "bg-destructive/15 text-destructive" },
+    { label: "Tasks Due Today", value: kpis.tasksDueToday ?? 0, icon: CheckCircle2, tone: "bg-warning/15 text-warning-foreground" },
+    { label: "Upcoming Visits", value: kpis.upcomingVisits ?? 0, icon: MapPin, tone: "bg-info/15 text-info" },
     { label: "Upcoming Renewals", value: kpis.upcomingRenewals, icon: RefreshCw, tone: "bg-primary/15 text-primary" },
   ];
 
@@ -76,7 +78,7 @@ function Dashboard() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-8">
         {kpiCards.map((k, i) => (
           <motion.div
             key={k.label}

@@ -17,6 +17,8 @@ import { usePostSalesStore } from "./usePostSalesStore";
 import { useTicketStore } from "./useTicketStore";
 import { useEmployeeStore } from "./useEmployeeStore";
 import { useUserStore } from "./useUserStore";
+import { useTaskStore } from "./useTaskStore";
+import { useClientVisitStore } from "./useClientVisitStore";
 import { resolveAssigneeName } from "@/lib/managers";
 import { getDaysUntilExpiry, getRenewalUrgency } from "./useRenewalStore";
 
@@ -206,6 +208,8 @@ export function useDashboardKpis() {
   const progressByProject = useProjectProgressStore((s) => s.byProjectId);
   const checklistItems = useOnboardingStore((s) => s.checklistItems);
   const projects = useProjectStore((s) => s.projects);
+  const followUpTasks = useTaskStore((s) => s.tasks);
+  const clientVisits = useClientVisitStore((s) => s.visits);
 
   return useMemo(() => {
     const companiesWithProgress = companies.map((c) => {
@@ -230,6 +234,15 @@ export function useDashboardKpis() {
     });
 
     const openTickets = tickets.filter((t) => t.status !== "Closed").length;
+    const today = new Date().toISOString().slice(0, 10);
+    const openFollowUps = followUpTasks.filter((t) =>
+      ["open", "in_progress", "blocked"].includes(t.status),
+    );
+    const overdueFollowUps = openFollowUps.filter((t) => t.dueDate && t.dueDate < today).length;
+    const tasksDueToday = openFollowUps.filter((t) => t.dueDate === today).length;
+    const upcomingVisits = clientVisits.filter(
+      (v) => v.status === "scheduled" && v.scheduledAt.slice(0, 10) >= today,
+    ).length;
     const upcomingRenewals = companies.filter((c) => {
       const u = getRenewalUrgency(c.planExpiry);
       return u === "upcoming" || u === "urgent";
@@ -240,11 +253,26 @@ export function useDashboardKpis() {
       activeOnboarding: companiesWithProgress.filter((c) => c.computedStatus === "in_progress").length,
       completed: companiesWithProgress.filter((c) => c.isLive || c.computedStatus === "completed").length,
       onHold: companiesWithProgress.filter((c) => c.status === "on_hold").length,
+      /** Existing meaning: open support tickets (unchanged). */
       pendingTasks: openTickets,
+      openTickets,
+      openFollowUpTasks: openFollowUps.length,
+      overdueFollowUpTasks: overdueFollowUps,
+      tasksDueToday,
+      upcomingVisits,
       upcomingRenewals,
       companiesWithProgress,
     };
-  }, [companies, tickets, postSalesProjects, progressByProject, checklistItems, projects]);
+  }, [
+    companies,
+    tickets,
+    postSalesProjects,
+    progressByProject,
+    checklistItems,
+    projects,
+    followUpTasks,
+    clientVisits,
+  ]);
 }
 
 export function useModuleAdoption() {
@@ -319,9 +347,19 @@ export function useGlobalSearch(query: string) {
   const companies = useCompanyStore((s) => s.companies);
   const projects = useProjectStore((s) => s.projects);
   const employees = useEmployeeStore((s) => s.employees);
+  const tasks = useTaskStore((s) => s.tasks);
+  const visits = useClientVisitStore((s) => s.visits);
 
   return useMemo(() => {
-    if (!q) return { companies: [], projects: [], managers: [] as typeof employees };
+    if (!q) {
+      return {
+        companies: [],
+        projects: [],
+        managers: [] as typeof employees,
+        tasks: [] as typeof tasks,
+        visits: [] as typeof visits,
+      };
+    }
 
     return {
       companies: companies
@@ -331,8 +369,16 @@ export function useGlobalSearch(query: string) {
         .filter((p) => p.name.toLowerCase().includes(q) || p.city.toLowerCase().includes(q))
         .slice(0, 5),
       managers: employees.filter((e) => e.name.toLowerCase().includes(q)).slice(0, 3),
+      tasks: tasks.filter((t) => t.title.toLowerCase().includes(q)).slice(0, 5),
+      visits: visits
+        .filter(
+          (v) =>
+            v.purpose.toLowerCase().includes(q) ||
+            (v.outcome ?? "").toLowerCase().includes(q),
+        )
+        .slice(0, 5),
     };
-  }, [q, companies, projects, employees]);
+  }, [q, companies, projects, employees, tasks, visits]);
 }
 
 export { calcCombinedProjectProgress as calcProjectProgress };

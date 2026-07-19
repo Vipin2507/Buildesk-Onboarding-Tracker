@@ -58,6 +58,7 @@ export const useCompanyStore = createStore<CompanyState>((set, get) => ({
           billingInfo: company.billingInfo,
           onboardingManagerId: company.onboardingManagerId,
           csmId: company.csmId,
+          salesAgentId: company.salesAgentId || undefined,
           status: company.status,
           agreementDate: company.agreementDate,
           startDate: company.startDate,

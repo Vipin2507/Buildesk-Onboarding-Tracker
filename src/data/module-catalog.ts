@@ -94,15 +94,36 @@ export function getModuleLabel(key: ModuleKey): string {
 }
 
 export function createCompanyModules(optedKeys: ModuleKey[], optedOnDate?: string) {
-  return MODULE_CATALOG.map((m) => ({
-    moduleKey: m.key,
-    label: m.label,
-    optedIn: optedKeys.includes(m.key),
-    optedOnDate: optedKeys.includes(m.key) ? (optedOnDate ?? new Date().toISOString().slice(0, 10)) : undefined,
-    liveAt: undefined as string | undefined,
-    pocName: undefined as string | undefined,
-    pocMobile: undefined as string | undefined,
-  }));
+  const today = optedOnDate ?? new Date().toISOString().slice(0, 10);
+  return MODULE_CATALOG.map((m) => {
+    const optedIn = optedKeys.includes(m.key);
+    return {
+      moduleKey: m.key,
+      label: m.label,
+      optedIn,
+      optedOnDate: optedIn ? today : undefined,
+      liveAt: undefined as string | undefined,
+      pocName: undefined as string | undefined,
+      pocMobile: undefined as string | undefined,
+      subscriptionStatus: (optedIn ? "active" : "inactive") as CompanyModule["subscriptionStatus"],
+      subscriptionStartDate: optedIn ? today : undefined,
+      subscriptionValidUntil: undefined as string | undefined,
+    };
+  });
+}
+
+/** Project subscription fields for legacy rows that only have optedIn/optedOnDate. */
+export function withSubscriptionProjection(m: CompanyModule): CompanyModule {
+  const start = m.subscriptionStartDate ?? m.optedOnDate;
+  const status =
+    m.subscriptionStatus ??
+    (m.optedIn ? ("active" as const) : ("inactive" as const));
+  return {
+    ...m,
+    subscriptionStatus: status,
+    subscriptionStartDate: start,
+    subscriptionValidUntil: m.subscriptionValidUntil,
+  };
 }
 
 function legacyModuleStringToKey(value: string): ModuleKey | null {
@@ -131,7 +152,7 @@ export function normalizeCompanyModules(input: unknown): CompanyModule[] {
         .filter((m) => m && typeof m === "object" && MODULE_CATALOG.some((c) => c.key === m.moduleKey))
         .map((m) => [
           m.moduleKey,
-          {
+          withSubscriptionProjection({
             moduleKey: m.moduleKey,
             label: m.label ?? getModuleLabel(m.moduleKey),
             optedIn: Boolean(m.optedIn),
@@ -139,10 +160,14 @@ export function normalizeCompanyModules(input: unknown): CompanyModule[] {
             liveAt: m.liveAt,
             pocName: m.pocName,
             pocMobile: m.pocMobile,
-          } satisfies CompanyModule,
+            subscriptionId: m.subscriptionId,
+            subscriptionStatus: m.subscriptionStatus,
+            subscriptionStartDate: m.subscriptionStartDate,
+            subscriptionValidUntil: m.subscriptionValidUntil,
+          }),
         ]),
     );
-    return catalog.map((base) => byKey.get(base.moduleKey) ?? base);
+    return catalog.map((base) => withSubscriptionProjection(byKey.get(base.moduleKey) ?? base));
   }
 
   // Legacy shape: string[]

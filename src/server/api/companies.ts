@@ -1,13 +1,112 @@
 import { createServerFn } from "@tanstack/react-start";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { createCompanyModules } from "@/data/module-catalog";
+import { requireActiveUserId, requirePermission } from "@/server/auth/permissions";
 import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { loadCompanies, loadCompany, logActivity } from "@/server/api/mappers";
 import type { ModuleKey } from "@/types";
+
+type ModuleUpsertRow = {
+  moduleKey: string;
+  label: string;
+  optedIn: boolean;
+  optedOnDate?: string | null;
+  liveAt?: string | null;
+  pocName?: string | null;
+  pocMobile?: string | null;
+};
+
+/** Keyed upsert by (companyId, moduleKey) — preserves row ids and metadata. */
+function upsertCompanyModules(companyId: string, modules: ModuleUpsertRow[], now: string) {
+  const db = getDb();
+  const existing = db
+    .select()
+    .from(t.companyModules)
+    .where(eq(t.companyModules.companyId, companyId))
+    .all();
+  const byKey = new Map(existing.map((m) => [m.moduleKey, m]));
+  const keep = new Set(modules.map((m) => m.moduleKey));
+
+  for (const m of modules) {
+    const prev = byKey.get(m.moduleKey);
+    if (prev) {
+      db.update(t.companyModules)
+        .set({
+          label: m.label,
+          optedIn: m.optedIn,
+          optedOnDate: m.optedOnDate ?? prev.optedOnDate,
+          liveAt: m.liveAt !== undefined ? m.liveAt : prev.liveAt,
+          pocName: m.pocName !== undefined ? m.pocName : prev.pocName,
+          pocMobile: m.pocMobile !== undefined ? m.pocMobile : prev.pocMobile,
+        })
+        .where(eq(t.companyModules.id, prev.id))
+        .run();
+    } else {
+      db.insert(t.companyModules)
+        .values({
+          id: newId(),
+          companyId,
+          moduleKey: m.moduleKey,
+          label: m.label,
+          optedIn: m.optedIn,
+          optedOnDate: m.optedOnDate ?? null,
+          liveAt: m.liveAt ?? null,
+          pocName: m.pocName ?? null,
+          pocMobile: m.pocMobile ?? null,
+        })
+        .run();
+    }
+
+    // Keep a compatibility subscription row in sync with opt-in (does not overwrite validity).
+    try {
+      const sub = db
+        .select()
+        .from(t.moduleSubscriptions)
+        .where(
+          and(
+            eq(t.moduleSubscriptions.companyId, companyId),
+            eq(t.moduleSubscriptions.moduleKey, m.moduleKey),
+          ),
+        )
+        .get();
+      if (!sub) {
+        db.insert(t.moduleSubscriptions)
+          .values({
+            id: newId(),
+            companyId,
+            moduleKey: m.moduleKey,
+            status: m.optedIn ? "active" : "inactive",
+            startDate: m.optedOnDate || now.slice(0, 10),
+            validUntil: null,
+            notes: null,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .run();
+      } else if (m.optedIn && sub.status === "inactive") {
+        db.update(t.moduleSubscriptions)
+          .set({ status: "active", updatedAt: now })
+          .where(eq(t.moduleSubscriptions.id, sub.id))
+          .run();
+      }
+    } catch {
+      // module_subscriptions may not exist until db:ensure runs
+    }
+  }
+
+  for (const prev of existing) {
+    if (keep.has(prev.moduleKey)) continue;
+    // Soft-disable unknown modules rather than delete (preserve history).
+    db.update(t.companyModules)
+      .set({ optedIn: false })
+      .where(eq(t.companyModules.id, prev.id))
+      .run();
+  }
+}
 
 export const listCompanies = createServerFn({ method: "GET" }).handler(async () => {
   requireUser();
@@ -41,6 +140,7 @@ const companyInput = z.object({
   billingInfo: z.string().optional(),
   onboardingManagerId: z.string(),
   csmId: z.string(),
+  salesAgentId: z.string().optional().nullable(),
   status: z.enum(["not_started", "in_progress", "review", "completed", "on_hold"]),
   agreementDate: z.string(),
   startDate: z.string().optional(),
@@ -68,6 +168,10 @@ export const createCompany = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => companyInput.parse(data))
   .handler(async ({ data }) => {
     const user = requireUser(["Admin", "Manager"]);
+    if (data.salesAgentId) {
+      requirePermission("assignSalesAgent");
+      requireActiveUserId(data.salesAgentId, "Sales agent");
+    }
     const db = getDb();
     const id = data.id ?? newId();
     const already = loadCompany(id);
@@ -93,6 +197,7 @@ export const createCompany = createServerFn({ method: "POST" })
         billingInfo: data.billingInfo,
         onboardingManagerId: data.onboardingManagerId,
         csmId: data.csmId,
+        salesAgentId: data.salesAgentId || null,
         status: data.status,
         agreementDate: data.agreementDate,
         startDate: data.startDate || data.agreementDate,
@@ -115,21 +220,7 @@ export const createCompany = createServerFn({ method: "POST" })
         pocName: m.pocName,
         pocMobile: m.pocMobile,
       }));
-    for (const m of modules) {
-      db.insert(t.companyModules)
-        .values({
-          id: newId(),
-          companyId: id,
-          moduleKey: m.moduleKey,
-          label: m.label,
-          optedIn: m.optedIn,
-          optedOnDate: m.optedOnDate,
-          liveAt: m.liveAt ?? null,
-          pocName: m.pocName ?? null,
-          pocMobile: m.pocMobile ?? null,
-        })
-        .run();
-    }
+    upsertCompanyModules(id, modules, now);
     logActivity({ who: user.name, what: `Created company ${data.name}`, kind: "success", companyId: id });
     return loadCompany(id)!;
   });
@@ -163,28 +254,21 @@ export const updateCompany = createServerFn({ method: "POST" })
     const db = getDb();
     const existing = loadCompany(data.id);
     if (!existing) throw new ApiError(404, "Company not found");
-    const { modules, moduleKeys: _mk, ...rest } = data.patch as typeof data.patch & { moduleKeys?: string[] };
+    const { modules, moduleKeys: _mk, salesAgentId, ...rest } = data.patch as typeof data.patch & {
+      moduleKeys?: string[];
+    };
+    if (salesAgentId !== undefined && salesAgentId !== (existing.salesAgentId ?? null)) {
+      requirePermission("assignSalesAgent");
+      requireActiveUserId(salesAgentId, "Sales agent");
+    }
+    const set: Record<string, unknown> = { ...rest, updatedAt: nowIso() };
+    if (salesAgentId !== undefined) set.salesAgentId = salesAgentId || null;
     db.update(t.companies)
-      .set({ ...rest, updatedAt: nowIso() })
+      .set(set)
       .where(eq(t.companies.id, data.id))
       .run();
     if (modules) {
-      db.delete(t.companyModules).where(eq(t.companyModules.companyId, data.id)).run();
-      for (const m of modules) {
-        db.insert(t.companyModules)
-          .values({
-            id: newId(),
-            companyId: data.id,
-            moduleKey: m.moduleKey,
-            label: m.label,
-            optedIn: m.optedIn,
-            optedOnDate: m.optedOnDate,
-            liveAt: m.liveAt ?? null,
-            pocName: m.pocName ?? null,
-            pocMobile: m.pocMobile ?? null,
-          })
-          .run();
-      }
+      upsertCompanyModules(data.id, modules, nowIso());
     }
     logActivity({ who: user.name, what: `Updated company ${existing.name}`, kind: "info", companyId: data.id });
     return loadCompany(data.id)!;

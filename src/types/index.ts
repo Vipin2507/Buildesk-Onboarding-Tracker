@@ -15,3 +15,4 @@ export * from "./notes";
 export * from "./master";
 export * from "./settings";
 export * from "./notification";
+export * from "./crm";

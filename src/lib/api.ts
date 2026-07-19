@@ -109,3 +109,20 @@ export {
   markNotificationRead,
   markAllNotificationsRead,
 } from "@/server/api/notifications";
+
+export {
+  listModuleSubscriptions,
+  listModuleSubscriptionEvents,
+  upsertModuleSubscription,
+  listFollowUpTasks,
+  getFollowUpTask,
+  createFollowUpTask,
+  updateFollowUpTask,
+  cancelFollowUpTask,
+  listClientVisits,
+  getClientVisit,
+  createClientVisit,
+  updateClientVisit,
+  listCrmEvents,
+  getCrmDashboardSummary,
+} from "@/server/api/crm";

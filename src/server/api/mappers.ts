@@ -25,6 +25,7 @@ export function mapCompany(row: typeof t.companies.$inferSelect, modules: Compan
     billingInfo: row.billingInfo ?? undefined,
     onboardingManagerId: row.onboardingManagerId,
     csmId: row.csmId,
+    salesAgentId: row.salesAgentId ?? undefined,
     status: row.status as Company["status"],
     modules,
     agreementDate: row.agreementDate,
@@ -41,20 +42,39 @@ export function mapCompany(row: typeof t.companies.$inferSelect, modules: Compan
 
 export function loadCompanyModules(companyId: string): CompanyModule[] {
   const db = getDb();
+  let subByKey = new Map<string, typeof t.moduleSubscriptions.$inferSelect>();
+  try {
+    const subs = db
+      .select()
+      .from(t.moduleSubscriptions)
+      .where(eq(t.moduleSubscriptions.companyId, companyId))
+      .all();
+    subByKey = new Map(subs.map((s) => [s.moduleKey, s]));
+  } catch {
+    // Table may not exist until db:ensure / migrate runs.
+  }
+
   return db
     .select()
     .from(t.companyModules)
     .where(eq(t.companyModules.companyId, companyId))
     .all()
-    .map((m) => ({
-      moduleKey: m.moduleKey as ModuleKey,
-      label: m.label,
-      optedIn: m.optedIn,
-      optedOnDate: m.optedOnDate ?? undefined,
-      liveAt: m.liveAt ?? undefined,
-      pocName: m.pocName ?? undefined,
-      pocMobile: m.pocMobile ?? undefined,
-    }));
+    .map((m) => {
+      const sub = subByKey.get(m.moduleKey);
+      return {
+        moduleKey: m.moduleKey as ModuleKey,
+        label: m.label,
+        optedIn: m.optedIn,
+        optedOnDate: m.optedOnDate ?? undefined,
+        liveAt: m.liveAt ?? undefined,
+        pocName: m.pocName ?? undefined,
+        pocMobile: m.pocMobile ?? undefined,
+        subscriptionId: sub?.id,
+        subscriptionStatus: (sub?.status as CompanyModule["subscriptionStatus"]) ?? undefined,
+        subscriptionStartDate: sub?.startDate ?? m.optedOnDate ?? undefined,
+        subscriptionValidUntil: sub?.validUntil ?? undefined,
+      };
+    });
 }
 
 export function loadCompany(id: string): Company | null {

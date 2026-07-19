@@ -1,4 +1,5 @@
 import type { Timestamps } from "./common";
+import type { ModuleSubscriptionStatus } from "./crm";
 
 export type ModuleKey =
   | "post-sales"
@@ -18,6 +19,11 @@ export type CompanyModule = {
   /** Optional POC override for this module. */
   pocName?: string;
   pocMobile?: string;
+  /** Commercial subscription projection (compat: derived from optedIn when missing). */
+  subscriptionId?: string;
+  subscriptionStatus?: ModuleSubscriptionStatus;
+  subscriptionStartDate?: string;
+  subscriptionValidUntil?: string;
 };
 
 export type TemplateStatus = "not-required" | "not-sent" | "sent" | "received";

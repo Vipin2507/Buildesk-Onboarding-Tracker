@@ -44,6 +44,7 @@ const detailSchema = z.object({
   billingInfo: z.string().optional(),
   onboardingManagerId: z.string().min(1),
   csmId: z.string().min(1),
+  salesAgentId: z.string().optional(),
   plan: z.enum(["Annual", "Half-Yearly", "AMC"]),
   health: z.enum(["Healthy", "Moderate", "Critical"]),
   status: z.enum(["not_started", "in_progress", "review", "completed", "on_hold"]),
@@ -88,7 +89,8 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
   const updateCompany = useCompanyStore((s) => s.updateCompany);
   const employees = useEmployeeStore((s) => s.employees);
   const users = useUserStore((s) => s.users);
-  const { isAdmin } = usePermissions();
+  const { can, isAdmin } = usePermissions();
+  const canAssignSalesAgent = isAdmin || can("assignSalesAgent");
   const [editing, setEditing] = useState(false);
 
   const form = useForm<DetailForm>({
@@ -99,8 +101,8 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
   useEffect(() => {
     if (!editing) form.reset(toFormValues(company));
   }, [company, editing, form]);
-
   const managerName = resolveAssigneeName(company.onboardingManagerId, users, employees);
+  const salesAgentName = resolveAssigneeName(company.salesAgentId, users, employees);
   const csmName = resolveAssigneeName(company.csmId, users, employees);
   const managers = assignableManagerUsers(users);
   const csms = assignableManagerUsers(users);
@@ -112,6 +114,7 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
         officeAddress: data.officeAddress || undefined,
         gstNumber: data.gstNumber || undefined,
         billingInfo: data.billingInfo || undefined,
+        salesAgentId: data.salesAgentId || undefined,
         plan: data.plan as CompanyPlan,
         health: data.health as CompanyHealth,
         status: data.status as StatusKey,
@@ -272,6 +275,21 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
                 ))}
               </select>
             </label>
+            <label className="block text-xs font-medium">
+              Sales Agent
+              <select
+                {...form.register("salesAgentId")}
+                className={inputClass()}
+                disabled={!canAssignSalesAgent}
+              >
+                <option value="">Unassigned</option>
+                {managers.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} · {u.role}
+                  </option>
+                ))}
+              </select>
+            </label>
           </Section>
 
           <Section title="Commercial">
@@ -352,6 +370,7 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
           <Section title="Ownership">
             <Field label="Onboarding Manager" icon={UserCog}>{managerName ?? "—"}</Field>
             <Field label="CSM" icon={UserCog}>{csmName ?? "—"}</Field>
+            <Field label="Sales Agent" icon={UserCog}>{salesAgentName ?? "—"}</Field>
           </Section>
 
           <Section title="Commercial">
@@ -400,6 +419,7 @@ function toFormValues(company: Company): DetailForm {
     billingInfo: company.billingInfo ?? "",
     onboardingManagerId: company.onboardingManagerId,
     csmId: company.csmId,
+    salesAgentId: company.salesAgentId ?? "",
     plan: company.plan,
     health: company.health,
     status: company.status,

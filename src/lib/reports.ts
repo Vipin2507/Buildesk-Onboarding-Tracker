@@ -304,7 +304,10 @@ function laborReport(s: ReportSnapshot): ReportResult {
 function teamReport(s: ReportSnapshot): ReportResult {
   const managers = s.employees.filter((e) => e.role === "Onboarding Manager" || e.role === "CSM");
   const rows = (managers.length ? managers : s.employees).map((e) => {
-    const companies = s.companies.filter((c) => c.onboardingManagerId === e.id || c.csmId === e.id);
+    const companies = s.companies.filter(
+      (c) => c.onboardingManagerId === e.id || c.csmId === e.id || c.salesAgentId === e.id,
+    );
+    const asSales = s.companies.filter((c) => c.salesAgentId === e.id).length;
     const projects = s.projects.filter((p) => companies.some((c) => c.id === p.companyId));
     const avg =
       projects.length === 0
@@ -316,19 +319,23 @@ function teamReport(s: ReportSnapshot): ReportResult {
       name: e.name,
       role: e.role,
       companies: companies.length,
+      salesAgentCompanies: asSales,
       projects: projects.length,
       avgProgress: avg,
       region: e.region,
     };
   });
 
+  const assignedSales = s.companies.filter((c) => Boolean(c.salesAgentId)).length;
+
   return {
     id: "team",
     title: "Team Productivity",
-    description: "Onboarding manager & CSM workload",
+    description: "Onboarding manager, CSM, and sales agent workload",
     kpis: [
       { label: "Team members", value: rows.length },
       { label: "Companies covered", value: s.companies.length },
+      { label: "With sales agent", value: assignedSales },
       {
         label: "Avg team progress",
         value: rows.length
@@ -342,6 +349,7 @@ function teamReport(s: ReportSnapshot): ReportResult {
       { key: "name", label: "Name" },
       { key: "role", label: "Role" },
       { key: "companies", label: "Companies" },
+      { key: "salesAgentCompanies", label: "As sales agent" },
       { key: "projects", label: "Projects" },
       { key: "avgProgress", label: "Avg %" },
       { key: "region", label: "Region" },
@@ -543,6 +551,8 @@ function customReport(s: ReportSnapshot): ReportResult {
       { key: "company", label: "Company" },
       { key: "health", label: "Health" },
       { key: "status", label: "Company status" },
+      { key: "salesAgentId", label: "Sales agent ID" },
+      { key: "salesAgentAssigned", label: "Sales agent assigned" },
       { key: "project", label: "Project" },
       { key: "type", label: "Type" },
       { key: "city", label: "City" },
@@ -555,6 +565,8 @@ function customReport(s: ReportSnapshot): ReportResult {
         company: c?.name ?? "—",
         health: c?.health ?? "—",
         status: c ? STATUS_LABEL[c.status] ?? c.status : "—",
+        salesAgentId: c?.salesAgentId || "",
+        salesAgentAssigned: c?.salesAgentId ? "Yes" : "No",
         project: p.name,
         type: p.type,
         city: p.city,

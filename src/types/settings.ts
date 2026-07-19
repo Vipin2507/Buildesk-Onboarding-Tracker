@@ -70,7 +70,11 @@ export type RolePermissionKey =
   | "manageMaster"
   | "manageUsers"
   | "manageSettings"
-  | "manageRoles";
+  | "manageRoles"
+  | "manageTasks"
+  | "manageClientVisits"
+  | "manageModuleSubscriptions"
+  | "assignSalesAgent";
 
 export type RolePermissionMap = Record<RolePermissionKey, boolean>;
 
@@ -98,6 +102,10 @@ export const ALL_PERMISSION_KEYS: RolePermissionKey[] = [
   "manageUsers",
   "manageSettings",
   "manageRoles",
+  "manageTasks",
+  "manageClientVisits",
+  "manageModuleSubscriptions",
+  "assignSalesAgent",
 ];
 
 /** Admin system role always retains these — cannot be toggled off. */
@@ -118,7 +126,16 @@ export const PERMISSION_GROUPS: Array<{
     id: "operations",
     label: "Operations",
     description: "Day-to-day onboarding and client delivery",
-    keys: ["manageCompanies", "manageProjects", "approvePostSales", "manageTickets"],
+    keys: [
+      "manageCompanies",
+      "manageProjects",
+      "approvePostSales",
+      "manageTickets",
+      "manageTasks",
+      "manageClientVisits",
+      "manageModuleSubscriptions",
+      "assignSalesAgent",
+    ],
   },
   {
     id: "insights",
@@ -151,6 +168,10 @@ export const PERMISSION_LABELS: Record<RolePermissionKey, string> = {
   manageUsers: "Invite & manage users",
   manageSettings: "Change organization settings",
   manageRoles: "Manage roles & permissions",
+  manageTasks: "Manage follow-up tasks",
+  manageClientVisits: "Manage client visits",
+  manageModuleSubscriptions: "Manage module subscriptions",
+  assignSalesAgent: "Assign sales agents",
 };
 
 export const PERMISSION_DESCRIPTIONS: Record<RolePermissionKey, string> = {
@@ -164,4 +185,8 @@ export const PERMISSION_DESCRIPTIONS: Record<RolePermissionKey, string> = {
   manageUsers: "Invite users, reset access, and deactivate accounts",
   manageSettings: "Update org profile, notifications, and document defaults",
   manageRoles: "Create roles and configure the permission matrix",
+  manageTasks: "Create and update company follow-up tasks and remarks",
+  manageClientVisits: "Log and update client visits and outcomes",
+  manageModuleSubscriptions: "Activate, renew, pause, or cancel module subscriptions",
+  assignSalesAgent: "Assign or clear a company's sales agent",
 };

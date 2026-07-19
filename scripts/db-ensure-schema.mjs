@@ -213,6 +213,11 @@ const EXTRA_COLUMNS = [
     name: "poc_mobile",
     ddl: "TEXT",
   },
+  {
+    table: "companies",
+    name: "sales_agent_id",
+    ddl: "TEXT",
+  },
 ];
 
 for (const col of EXTRA_COLUMNS) {
@@ -434,6 +439,195 @@ if (tableExists("onboarding_checklist_items")) {
       .prepare(`INSERT INTO _schema_patches (name, applied_at) VALUES (?, ?)`)
       .run(restructure, new Date().toISOString());
     console.log(`checklist: restructure removed ${del.changes} obsolete item(s) (${restructure})`);
+  }
+}
+
+/** CRM tables: subscriptions, tasks, visits, events */
+function ensureCrmTables() {
+  if (!tableExists("module_subscriptions")) {
+    sqlite.exec(`
+      CREATE TABLE module_subscriptions (
+        id TEXT PRIMARY KEY NOT NULL,
+        company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        module_key TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'inactive',
+        start_date TEXT NOT NULL,
+        valid_until TEXT,
+        notes TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS module_subscriptions_company_idx ON module_subscriptions(company_id);
+      CREATE UNIQUE INDEX IF NOT EXISTS module_subscriptions_company_key_uidx ON module_subscriptions(company_id, module_key);
+      CREATE INDEX IF NOT EXISTS module_subscriptions_status_idx ON module_subscriptions(status);
+    `);
+    console.log("+ CREATE TABLE module_subscriptions");
+  }
+
+  if (!tableExists("module_subscription_events")) {
+    sqlite.exec(`
+      CREATE TABLE module_subscription_events (
+        id TEXT PRIMARY KEY NOT NULL,
+        subscription_id TEXT NOT NULL REFERENCES module_subscriptions(id) ON DELETE CASCADE,
+        company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        module_key TEXT NOT NULL,
+        previous_status TEXT,
+        new_status TEXT NOT NULL,
+        previous_start_date TEXT,
+        new_start_date TEXT,
+        previous_valid_until TEXT,
+        new_valid_until TEXT,
+        actor_user_id TEXT,
+        actor_name TEXT NOT NULL,
+        reason TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS module_subscription_events_sub_idx ON module_subscription_events(subscription_id);
+      CREATE INDEX IF NOT EXISTS module_subscription_events_company_idx ON module_subscription_events(company_id);
+    `);
+    console.log("+ CREATE TABLE module_subscription_events");
+  }
+
+  if (!tableExists("follow_up_tasks")) {
+    sqlite.exec(`
+      CREATE TABLE follow_up_tasks (
+        id TEXT PRIMARY KEY NOT NULL,
+        company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        onboarding_project_id TEXT,
+        post_sales_project_id TEXT,
+        source_visit_id TEXT,
+        title TEXT NOT NULL,
+        description TEXT,
+        status TEXT NOT NULL DEFAULT 'open',
+        priority TEXT NOT NULL DEFAULT 'medium',
+        progress_percent INTEGER NOT NULL DEFAULT 0,
+        due_date TEXT,
+        assignee_user_id TEXT,
+        created_by_user_id TEXT,
+        completed_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS follow_up_tasks_company_idx ON follow_up_tasks(company_id);
+      CREATE INDEX IF NOT EXISTS follow_up_tasks_assignee_idx ON follow_up_tasks(assignee_user_id);
+      CREATE INDEX IF NOT EXISTS follow_up_tasks_status_idx ON follow_up_tasks(status);
+      CREATE INDEX IF NOT EXISTS follow_up_tasks_due_idx ON follow_up_tasks(due_date);
+    `);
+    console.log("+ CREATE TABLE follow_up_tasks");
+  }
+
+  if (!tableExists("client_visits")) {
+    sqlite.exec(`
+      CREATE TABLE client_visits (
+        id TEXT PRIMARY KEY NOT NULL,
+        company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        onboarding_project_id TEXT,
+        post_sales_project_id TEXT,
+        scheduled_at TEXT NOT NULL,
+        started_at TEXT,
+        ended_at TEXT,
+        status TEXT NOT NULL DEFAULT 'scheduled',
+        visit_type TEXT,
+        purpose TEXT NOT NULL,
+        location TEXT,
+        assigned_user_id TEXT,
+        contact_name TEXT,
+        contact_phone TEXT,
+        outcome TEXT,
+        remarks TEXT,
+        notes TEXT,
+        next_action TEXT,
+        next_follow_up_date TEXT,
+        created_by_user_id TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS client_visits_company_idx ON client_visits(company_id);
+      CREATE INDEX IF NOT EXISTS client_visits_assigned_idx ON client_visits(assigned_user_id);
+      CREATE INDEX IF NOT EXISTS client_visits_status_idx ON client_visits(status);
+      CREATE INDEX IF NOT EXISTS client_visits_scheduled_idx ON client_visits(scheduled_at);
+    `);
+    console.log("+ CREATE TABLE client_visits");
+  }
+
+  if (!tableExists("crm_events")) {
+    sqlite.exec(`
+      CREATE TABLE crm_events (
+        id TEXT PRIMARY KEY NOT NULL,
+        company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        entity_type TEXT NOT NULL,
+        task_id TEXT,
+        visit_id TEXT,
+        subscription_id TEXT,
+        event_type TEXT NOT NULL,
+        actor_user_id TEXT,
+        actor_name TEXT NOT NULL,
+        remark TEXT,
+        old_values_json TEXT,
+        new_values_json TEXT,
+        progress_percent INTEGER,
+        due_date TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS crm_events_company_idx ON crm_events(company_id);
+      CREATE INDEX IF NOT EXISTS crm_events_task_idx ON crm_events(task_id);
+      CREATE INDEX IF NOT EXISTS crm_events_visit_idx ON crm_events(visit_id);
+      CREATE INDEX IF NOT EXISTS crm_events_created_idx ON crm_events(created_at);
+    `);
+    console.log("+ CREATE TABLE crm_events");
+  }
+
+  // Unique (company_id, module_key) on company_modules when possible
+  try {
+    sqlite.exec(
+      `CREATE UNIQUE INDEX IF NOT EXISTS company_modules_company_key_uidx ON company_modules(company_id, module_key)`,
+    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.log(`company_modules unique index skipped: ${msg}`);
+  }
+}
+
+ensureCrmTables();
+
+/** Backfill module_subscriptions from opted-in company_modules (idempotent). */
+if (tableExists("module_subscriptions") && tableExists("company_modules")) {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS _schema_patches (
+      name TEXT PRIMARY KEY,
+      applied_at TEXT NOT NULL
+    )
+  `);
+  const patch = "backfill_module_subscriptions_v1";
+  const done = sqlite.prepare(`SELECT 1 AS ok FROM _schema_patches WHERE name = ?`).get(patch);
+  if (!done) {
+    const rows = sqlite
+      .prepare(
+        `SELECT company_id, module_key, opted_in, opted_on_date FROM company_modules`,
+      )
+      .all();
+    const exists = sqlite.prepare(
+      `SELECT 1 AS ok FROM module_subscriptions WHERE company_id = ? AND module_key = ?`,
+    );
+    const insert = sqlite.prepare(
+      `INSERT INTO module_subscriptions
+        (id, company_id, module_key, status, start_date, valid_until, notes, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, ?)`,
+    );
+    const now = new Date().toISOString();
+    let n = 0;
+    for (const row of rows) {
+      if (exists.get(row.company_id, row.module_key)) continue;
+      const start = row.opted_on_date || now.slice(0, 10);
+      const status = row.opted_in ? "active" : "inactive";
+      const id = `sub_${row.company_id}_${row.module_key}`.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
+      insert.run(id, row.company_id, row.module_key, status, start, now, now);
+      n += 1;
+    }
+    sqlite
+      .prepare(`INSERT INTO _schema_patches (name, applied_at) VALUES (?, ?)`)
+      .run(patch, now);
+    console.log(`subscriptions: backfilled ${n} row(s) (${patch})`);
   }
 }
 

@@ -497,8 +497,18 @@ function CompanyAdminEditModal({
     void form.handleSubmit((data) => {
       const modules = createCompanyModules(data.modules as ModuleKey[], data.startDate).map((m) => {
         const prev = company.modules.find((x) => x.moduleKey === m.moduleKey);
-        if (m.optedIn && prev?.optedIn) return { ...m, optedOnDate: prev.optedOnDate ?? m.optedOnDate };
-        return m;
+        if (!prev) return m;
+        return {
+          ...m,
+          optedOnDate: m.optedIn ? prev.optedOnDate ?? m.optedOnDate : prev.optedOnDate,
+          liveAt: m.optedIn ? prev.liveAt : undefined,
+          pocName: prev.pocName,
+          pocMobile: prev.pocMobile,
+          subscriptionId: prev.subscriptionId,
+          subscriptionStatus: prev.subscriptionStatus,
+          subscriptionStartDate: prev.subscriptionStartDate,
+          subscriptionValidUntil: prev.subscriptionValidUntil,
+        };
       });
       onSave(company.id, {
         name: data.name.trim(),
@@ -517,6 +527,7 @@ function CompanyAdminEditModal({
         billingInfo: data.billingInfo?.trim() || undefined,
         onboardingManagerId: data.onboardingManagerId,
         csmId: data.csmId,
+        salesAgentId: (data as { salesAgentId?: string }).salesAgentId || undefined,
         status: data.status as StatusKey,
         plan: data.plan as CompanyPlan,
         health: data.health as CompanyHealth,

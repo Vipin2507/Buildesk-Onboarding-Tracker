@@ -34,6 +34,8 @@ export type Company = Timestamps & {
   billingInfo?: string;
   onboardingManagerId: string;
   csmId: string;
+  /** Login user id of the assigned sales agent (optional). */
+  salesAgentId?: string;
   status: StatusKey;
   modules: CompanyModule[];
   agreementDate: string;

@@ -11,6 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VendorsRouteImport } from './routes/vendors'
 import { Route as TrainingRouteImport } from './routes/training'
+import { Route as TasksRouteImport } from './routes/tasks'
+import { Route as ClientVisitsRouteImport } from './routes/client-visits'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReportsRouteImport } from './routes/reports'
@@ -42,6 +44,16 @@ const VendorsRoute = VendorsRouteImport.update({
 const TrainingRoute = TrainingRouteImport.update({
   id: '/training',
   path: '/training',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TasksRoute = TasksRouteImport.update({
+  id: '/tasks',
+  path: '/tasks',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClientVisitsRoute = ClientVisitsRouteImport.update({
+  id: '/client-visits',
+  path: '/client-visits',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SupportRoute = SupportRouteImport.update({
@@ -176,6 +188,8 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/support': typeof SupportRouteWithChildren
   '/training': typeof TrainingRoute
+  '/tasks': typeof TasksRoute
+  '/client-visits': typeof ClientVisitsRoute
   '/vendors': typeof VendorsRoute
   '/companies/$companyId': typeof CompaniesCompanyIdRouteWithChildren
   '/projects/$projectId': typeof ProjectsProjectIdRoute
@@ -202,6 +216,8 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/support': typeof SupportRouteWithChildren
   '/training': typeof TrainingRoute
+  '/tasks': typeof TasksRoute
+  '/client-visits': typeof ClientVisitsRoute
   '/vendors': typeof VendorsRoute
   '/companies/$companyId': typeof CompaniesCompanyIdRouteWithChildren
   '/projects/$projectId': typeof ProjectsProjectIdRoute
@@ -229,6 +245,8 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/support': typeof SupportRouteWithChildren
   '/training': typeof TrainingRoute
+  '/tasks': typeof TasksRoute
+  '/client-visits': typeof ClientVisitsRoute
   '/vendors': typeof VendorsRoute
   '/companies/$companyId': typeof CompaniesCompanyIdRouteWithChildren
   '/projects/$projectId': typeof ProjectsProjectIdRoute
@@ -257,6 +275,8 @@ export interface FileRouteTypes {
     | '/settings'
     | '/support'
     | '/training'
+    | '/tasks'
+    | '/client-visits'
     | '/vendors'
     | '/companies/$companyId'
     | '/projects/$projectId'
@@ -283,6 +303,8 @@ export interface FileRouteTypes {
     | '/settings'
     | '/support'
     | '/training'
+    | '/tasks'
+    | '/client-visits'
     | '/vendors'
     | '/companies/$companyId'
     | '/projects/$projectId'
@@ -309,6 +331,8 @@ export interface FileRouteTypes {
     | '/settings'
     | '/support'
     | '/training'
+    | '/tasks'
+    | '/client-visits'
     | '/vendors'
     | '/companies/$companyId'
     | '/projects/$projectId'
@@ -336,6 +360,8 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   SupportRoute: typeof SupportRouteWithChildren
   TrainingRoute: typeof TrainingRoute
+  TasksRoute: typeof TasksRoute
+  ClientVisitsRoute: typeof ClientVisitsRoute
   VendorsRoute: typeof VendorsRoute
 }
 
@@ -353,6 +379,20 @@ declare module '@tanstack/react-router' {
       path: '/training'
       fullPath: '/training'
       preLoaderRoute: typeof TrainingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tasks': {
+      id: '/tasks'
+      path: '/tasks'
+      fullPath: '/tasks'
+      preLoaderRoute: typeof TasksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/client-visits': {
+      id: '/client-visits'
+      path: '/client-visits'
+      fullPath: '/client-visits'
+      preLoaderRoute: typeof ClientVisitsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/support': {
@@ -581,6 +621,8 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   SupportRoute: SupportRouteWithChildren,
   TrainingRoute: TrainingRoute,
+  TasksRoute: TasksRoute,
+  ClientVisitsRoute: ClientVisitsRoute,
   VendorsRoute: VendorsRoute,
 }
 export const routeTree = rootRouteImport

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 const timestamps = {
   createdAt: text("created_at").notNull(),
@@ -64,6 +64,7 @@ export const companies = sqliteTable("companies", {
   billingInfo: text("billing_info"),
   onboardingManagerId: text("onboarding_manager_id").notNull(),
   csmId: text("csm_id").notNull(),
+  salesAgentId: text("sales_agent_id"),
   status: text("status").notNull(),
   agreementDate: text("agreement_date").notNull(),
   startDate: text("start_date"),
@@ -90,7 +91,154 @@ export const companyModules = sqliteTable(
     pocName: text("poc_name"),
     pocMobile: text("poc_mobile"),
   },
-  (t) => [index("company_modules_company_idx").on(t.companyId)],
+  (t) => [
+    index("company_modules_company_idx").on(t.companyId),
+    uniqueIndex("company_modules_company_key_uidx").on(t.companyId, t.moduleKey),
+  ],
+);
+
+/* ---------- CRM: subscriptions, tasks, visits, events ---------- */
+
+export const moduleSubscriptions = sqliteTable(
+  "module_subscriptions",
+  {
+    id: text("id").primaryKey(),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    moduleKey: text("module_key").notNull(),
+    status: text("status").notNull().default("inactive"),
+    startDate: text("start_date").notNull(),
+    validUntil: text("valid_until"),
+    notes: text("notes"),
+    ...timestamps,
+  },
+  (t) => [
+    index("module_subscriptions_company_idx").on(t.companyId),
+    uniqueIndex("module_subscriptions_company_key_uidx").on(t.companyId, t.moduleKey),
+    index("module_subscriptions_status_idx").on(t.status),
+  ],
+);
+
+export const moduleSubscriptionEvents = sqliteTable(
+  "module_subscription_events",
+  {
+    id: text("id").primaryKey(),
+    subscriptionId: text("subscription_id")
+      .notNull()
+      .references(() => moduleSubscriptions.id, { onDelete: "cascade" }),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    moduleKey: text("module_key").notNull(),
+    previousStatus: text("previous_status"),
+    newStatus: text("new_status").notNull(),
+    previousStartDate: text("previous_start_date"),
+    newStartDate: text("new_start_date"),
+    previousValidUntil: text("previous_valid_until"),
+    newValidUntil: text("new_valid_until"),
+    actorUserId: text("actor_user_id"),
+    actorName: text("actor_name").notNull(),
+    reason: text("reason"),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [
+    index("module_subscription_events_sub_idx").on(t.subscriptionId),
+    index("module_subscription_events_company_idx").on(t.companyId),
+  ],
+);
+
+export const followUpTasks = sqliteTable(
+  "follow_up_tasks",
+  {
+    id: text("id").primaryKey(),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    onboardingProjectId: text("onboarding_project_id"),
+    postSalesProjectId: text("post_sales_project_id"),
+    sourceVisitId: text("source_visit_id"),
+    title: text("title").notNull(),
+    description: text("description"),
+    status: text("status").notNull().default("open"),
+    priority: text("priority").notNull().default("medium"),
+    progressPercent: integer("progress_percent").notNull().default(0),
+    dueDate: text("due_date"),
+    assigneeUserId: text("assignee_user_id"),
+    createdByUserId: text("created_by_user_id"),
+    completedAt: text("completed_at"),
+    ...timestamps,
+  },
+  (t) => [
+    index("follow_up_tasks_company_idx").on(t.companyId),
+    index("follow_up_tasks_assignee_idx").on(t.assigneeUserId),
+    index("follow_up_tasks_status_idx").on(t.status),
+    index("follow_up_tasks_due_idx").on(t.dueDate),
+  ],
+);
+
+export const clientVisits = sqliteTable(
+  "client_visits",
+  {
+    id: text("id").primaryKey(),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    onboardingProjectId: text("onboarding_project_id"),
+    postSalesProjectId: text("post_sales_project_id"),
+    scheduledAt: text("scheduled_at").notNull(),
+    startedAt: text("started_at"),
+    endedAt: text("ended_at"),
+    status: text("status").notNull().default("scheduled"),
+    visitType: text("visit_type"),
+    purpose: text("purpose").notNull(),
+    location: text("location"),
+    assignedUserId: text("assigned_user_id"),
+    contactName: text("contact_name"),
+    contactPhone: text("contact_phone"),
+    outcome: text("outcome"),
+    remarks: text("remarks"),
+    notes: text("notes"),
+    nextAction: text("next_action"),
+    nextFollowUpDate: text("next_follow_up_date"),
+    createdByUserId: text("created_by_user_id"),
+    ...timestamps,
+  },
+  (t) => [
+    index("client_visits_company_idx").on(t.companyId),
+    index("client_visits_assigned_idx").on(t.assignedUserId),
+    index("client_visits_status_idx").on(t.status),
+    index("client_visits_scheduled_idx").on(t.scheduledAt),
+  ],
+);
+
+export const crmEvents = sqliteTable(
+  "crm_events",
+  {
+    id: text("id").primaryKey(),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    entityType: text("entity_type").notNull(),
+    taskId: text("task_id"),
+    visitId: text("visit_id"),
+    subscriptionId: text("subscription_id"),
+    eventType: text("event_type").notNull(),
+    actorUserId: text("actor_user_id"),
+    actorName: text("actor_name").notNull(),
+    remark: text("remark"),
+    oldValuesJson: text("old_values_json"),
+    newValuesJson: text("new_values_json"),
+    progressPercent: integer("progress_percent"),
+    dueDate: text("due_date"),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [
+    index("crm_events_company_idx").on(t.companyId),
+    index("crm_events_task_idx").on(t.taskId),
+    index("crm_events_visit_idx").on(t.visitId),
+    index("crm_events_created_idx").on(t.createdAt),
+  ],
 );
 
 export const projects = sqliteTable(

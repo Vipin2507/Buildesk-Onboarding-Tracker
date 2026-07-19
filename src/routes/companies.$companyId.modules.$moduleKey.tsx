@@ -25,6 +25,7 @@ import {
 } from "@/stores";
 import { MODULE_CATALOG, getModuleLabel } from "@/data/module-catalog";
 import { milestonesForModule } from "@/lib/module-progress";
+import { ModuleSubscriptionPanel } from "@/components/module-subscription-panel";
 import type { ModuleKey, PostSalesProject } from "@/types";
 import { formatRelativeTime } from "@/types/common";
 import { cn } from "@/lib/utils";
@@ -91,6 +92,7 @@ function ModuleLandingPage() {
       moduleKey={moduleKey as ModuleKey}
       label={catalog?.label ?? moduleKey}
       description={catalog?.description}
+      companyModule={companyModule}
       optedOnDate={companyModule.optedOnDate}
       liveAt={companyModule.liveAt}
       pocName={companyModule.pocName}
@@ -108,6 +110,7 @@ function GenericModuleHub({
   moduleKey,
   label,
   description,
+  companyModule,
   optedOnDate,
   liveAt,
   pocName,
@@ -121,6 +124,19 @@ function GenericModuleHub({
   moduleKey: ModuleKey;
   label: string;
   description?: string;
+  companyModule: {
+    moduleKey: ModuleKey;
+    label: string;
+    optedIn: boolean;
+    optedOnDate?: string;
+    liveAt?: string;
+    pocName?: string;
+    pocMobile?: string;
+    subscriptionId?: string;
+    subscriptionStatus?: import("@/types").ModuleSubscriptionStatus;
+    subscriptionStartDate?: string;
+    subscriptionValidUntil?: string;
+  };
   optedOnDate?: string;
   liveAt?: string;
   pocName?: string;
@@ -210,6 +226,10 @@ function GenericModuleHub({
           </div>
         }
       />
+
+      <div className="mb-4">
+        <ModuleSubscriptionPanel companyId={companyId} module={companyModule} />
+      </div>
 
       <div className="mb-4 grid gap-4 lg:grid-cols-3">
         <div className="card-soft p-4 lg:col-span-2">

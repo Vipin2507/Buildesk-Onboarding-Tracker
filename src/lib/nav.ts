@@ -17,6 +17,8 @@ import {
   BarChart3,
   Settings,
   Database,
+  CheckSquare,
+  MapPin,
 } from "lucide-react";
 import type { RolePermissionKey } from "@/types";
 
@@ -44,6 +46,8 @@ export const APP_NAV: NavItem[] = [
   { to: "/integrations", label: "Integrations & Triggers", icon: Plug },
   { to: "/training", label: "Training", icon: GraduationCap },
   { to: "/support", label: "Support Desk", icon: LifeBuoy },
+  { to: "/tasks", label: "Follow-up Tasks", icon: CheckSquare, permission: "manageTasks" },
+  { to: "/client-visits", label: "Client Visits", icon: MapPin, permission: "manageClientVisits" },
   { to: "/renewals", label: "Renewals", icon: RefreshCw },
   { to: "/employees", label: "Employees", icon: Users, permission: "manageEmployees" },
   { to: "/reports", label: "Reports", icon: BarChart3, permission: "viewReports" },

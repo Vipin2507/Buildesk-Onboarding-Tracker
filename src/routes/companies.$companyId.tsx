@@ -25,6 +25,8 @@ import { CompanyOverviewTab } from "@/components/company-overview-tab";
 import { CompanyNotesAttachmentsTab } from "@/components/company-notes-attachments";
 import { CompanyHistoryTab } from "@/components/company-history";
 import { CompanyTicketsPanel } from "@/components/company-tickets-panel";
+import { CompanyTasksPanel } from "@/components/company-tasks-panel";
+import { CompanyVisitsPanel } from "@/components/company-visits-panel";
 import { EntityNotFound, EmptyState } from "@/components/empty-state";
 import { DetailPageSkeleton } from "@/components/loading-skeleton";
 import { ConfirmDeleteDialog } from "@/components/entity-form-modal";
@@ -45,7 +47,11 @@ import {
   calcProjectProgress,
   useOnboardingStore,
   useUserStore,
+  useClientVisitStore,
+  useTaskStore,
+  useCrmEventStore,
 } from "@/stores";
+import { getModuleLabel } from "@/data/module-catalog";
 import { calcPostSalesProjectProgress } from "@/lib/post-sales-status";
 import { resolveAssigneeName } from "@/lib/managers";
 import { cn, formatDate } from "@/lib/utils";
@@ -57,6 +63,8 @@ const tabSchema = z.enum([
   "Progress",
   "Project",
   "Tickets",
+  "Tasks",
+  "Visits",
   "Notes & Attachments",
   "History",
   "Billing",
@@ -83,6 +91,8 @@ const TABS = [
   { id: "Progress", label: "Progress" },
   { id: "Project", label: "Project" },
   { id: "Tickets", label: "Tickets" },
+  { id: "Tasks", label: "Tasks" },
+  { id: "Visits", label: "Visits" },
   { id: "Notes & Attachments", label: "Notes & Files" },
   { id: "History", label: "History" },
   { id: "Billing", label: "Billing" },
@@ -128,11 +138,47 @@ function CompanyDetailContent() {
   );
   const progress = useCompanyProgress(companyId);
   const modulesWithProgress = useCompanyModulesWithProgress(companyId);
+  const allTasks = useTaskStore((s) => s.tasks);
+  const allVisits = useClientVisitStore((s) => s.visits);
+  const allSubscriptions = useCrmEventStore((s) => s.subscriptions);
+  const companyTasks = useMemo(
+    () => allTasks.filter((t) => t.companyId === companyId),
+    [allTasks, companyId],
+  );
+  const companyVisits = useMemo(
+    () => allVisits.filter((v) => v.companyId === companyId),
+    [allVisits, companyId],
+  );
+  const companySubscriptions = useMemo(
+    () => allSubscriptions.filter((s) => s.companyId === companyId),
+    [allSubscriptions, companyId],
+  );
+  const subscriptionSummary = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const in30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+    const active = companySubscriptions.filter((s) => s.status === "active").length;
+    const expired = companySubscriptions.filter(
+      (s) => s.status === "expired" || (s.validUntil && s.validUntil < today),
+    ).length;
+    const expiring = companySubscriptions.filter(
+      (s) =>
+        s.status === "active" &&
+        s.validUntil &&
+        s.validUntil >= today &&
+        s.validUntil <= in30,
+    ).length;
+    return { active, expiring, expired, rows: companySubscriptions };
+  }, [companySubscriptions]);
 
   if (loading) return <DetailPageSkeleton />;
   if (!company) return <EntityNotFound entity="Company" listPath="/companies" listLabel="Companies" />;
 
   const managerName = resolveAssigneeName(company.onboardingManagerId, users, employees);
+  const salesAgentName = resolveAssigneeName(company.salesAgentId, users, employees);
+  const openTasks = companyTasks.filter((t) =>
+    ["open", "in_progress", "blocked"].includes(t.status),
+  ).length;
+  const visitCount = companyVisits.length;
   const optedModules = modulesWithProgress.filter((m) => m.optedIn);
   const liveModules = optedModules.filter((m) => m.isLive);
   const companyLive =
@@ -247,7 +293,7 @@ function CompanyDetailContent() {
         }
       />
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard
           label="Overall Progress"
           icon={TrendingUp}
@@ -264,7 +310,21 @@ function CompanyDetailContent() {
           label="Onboarding Manager"
           icon={Building2}
           value={managerName ?? "—"}
-          foot={<span className="text-xs text-muted-foreground">Avg module {avgModuleProgress}%</span>}
+          foot={
+            <span className="text-xs text-muted-foreground">
+              Sales {salesAgentName ?? "—"} · Avg module {avgModuleProgress}%
+            </span>
+          }
+        />
+        <StatCard
+          label="CRM Follow-ups"
+          icon={CalendarClock}
+          value={`${openTasks} open`}
+          foot={
+            <span className="text-xs text-muted-foreground">
+              {visitCount} visits · {companyTasks.length} tasks
+            </span>
+          }
         />
         <StatCard
           label="Go-Live Target"
@@ -522,6 +582,10 @@ function CompanyDetailContent() {
 
       {tab === "Tickets" && <CompanyTicketsPanel companyId={companyId} />}
 
+      {tab === "Tasks" && <CompanyTasksPanel companyId={companyId} />}
+
+      {tab === "Visits" && <CompanyVisitsPanel companyId={companyId} />}
+
       {tab === "Notes & Attachments" && <CompanyNotesAttachmentsTab companyId={companyId} />}
 
       {tab === "History" && <CompanyHistoryTab companyId={companyId} />}
@@ -578,6 +642,62 @@ function CompanyDetailContent() {
               <div className="mt-1 text-sm">{company.officeAddress || company.city}</div>
             </div>
           </div>
+
+          <div className="card-soft space-y-3 p-5">
+            <div>
+              <div className="text-sm font-semibold">Module subscriptions</div>
+              <p className="text-xs text-muted-foreground">
+                Commercial entitlement status (separate from module go-live). Legacy opted modules
+                remain accessible during rollout.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <div className="text-xs text-muted-foreground">Active</div>
+                <div className="mt-1 text-xl font-semibold">{subscriptionSummary.active}</div>
+              </div>
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <div className="text-xs text-muted-foreground">Expiring (30d)</div>
+                <div className="mt-1 text-xl font-semibold">{subscriptionSummary.expiring}</div>
+              </div>
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <div className="text-xs text-muted-foreground">Expired</div>
+                <div className="mt-1 text-xl font-semibold">{subscriptionSummary.expired}</div>
+              </div>
+            </div>
+            {subscriptionSummary.rows.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="text-xs text-muted-foreground">
+                    <tr>
+                      <th className="py-1.5 pr-3 font-medium">Module</th>
+                      <th className="py-1.5 pr-3 font-medium">Status</th>
+                      <th className="py-1.5 pr-3 font-medium">Start</th>
+                      <th className="py-1.5 font-medium">Valid until</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {subscriptionSummary.rows.map((s) => (
+                      <tr key={s.id} className="border-t">
+                        <td className="py-2 pr-3">{getModuleLabel(s.moduleKey)}</td>
+                        <td className="py-2 pr-3">
+                          <Pill>{s.status}</Pill>
+                        </td>
+                        <td className="py-2 pr-3">{formatDate(s.startDate)}</td>
+                        <td className="py-2">{s.validUntil ? formatDate(s.validUntil) : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                No subscription rows yet — they are created when modules are opted in or managed
+                from each module hub.
+              </p>
+            )}
+          </div>
+
           <p className="text-xs text-muted-foreground">
             Edit plan, dates, GST, and billing notes from the Details tab.
           </p>

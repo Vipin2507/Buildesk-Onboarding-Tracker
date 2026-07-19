@@ -1,6 +1,18 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Search, ChevronDown, Building2, Boxes, LogOut, Settings, User, UserRound, Menu } from "lucide-react";
+import {
+  Search,
+  ChevronDown,
+  Building2,
+  Boxes,
+  LogOut,
+  Settings,
+  User,
+  UserRound,
+  Menu,
+  CheckSquare,
+  MapPin,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { EditProfileDialog } from "@/components/edit-profile-dialog";
@@ -29,7 +41,12 @@ export function TopBar() {
   const currentUser = useCurrentUser();
   const ref = useRef<HTMLDivElement>(null);
 
-  const hasResults = query.length > 0 && (results.companies.length > 0 || results.projects.length > 0);
+  const hasResults =
+    query.length > 0 &&
+    (results.companies.length > 0 ||
+      results.projects.length > 0 ||
+      (results.tasks?.length ?? 0) > 0 ||
+      (results.visits?.length ?? 0) > 0);
   const initials = currentUser?.name.split(" ").map((n) => n[0]).join("").slice(0, 2) ?? "??";
 
   useEffect(() => {
@@ -68,9 +85,9 @@ export function TopBar() {
               setOpen(true);
             }}
             onFocus={() => setOpen(true)}
-            placeholder="Search company, project…"
+            placeholder="Search company, project, task, visit…"
             className="h-10 w-full rounded-lg border border-input bg-card pl-9 pr-3 text-sm outline-none transition-shadow focus:ring-2 focus:ring-ring/40"
-            aria-label="Search company, project, manager"
+            aria-label="Search company, project, task, visit"
           />
           {open && hasResults && (
             <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-[70vh] overflow-auto rounded-lg border bg-popover shadow-lg">
@@ -111,6 +128,50 @@ export function TopBar() {
                   <div>
                     <div className="font-medium">{p.name}</div>
                     <div className="text-xs text-muted-foreground">{p.city}</div>
+                  </div>
+                </button>
+              ))}
+              {(results.tasks ?? []).map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-muted"
+                  onClick={() => {
+                    void navigate({
+                      to: "/companies/$companyId",
+                      params: { companyId: t.companyId },
+                      search: { tab: "Tasks" },
+                    });
+                    setQuery("");
+                    setOpen(false);
+                  }}
+                >
+                  <CheckSquare className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <div className="font-medium">{t.title}</div>
+                    <div className="text-xs text-muted-foreground">Task · {t.status}</div>
+                  </div>
+                </button>
+              ))}
+              {(results.visits ?? []).map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-muted"
+                  onClick={() => {
+                    void navigate({
+                      to: "/companies/$companyId",
+                      params: { companyId: v.companyId },
+                      search: { tab: "Visits" },
+                    });
+                    setQuery("");
+                    setOpen(false);
+                  }}
+                >
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <div className="font-medium">{v.purpose}</div>
+                    <div className="text-xs text-muted-foreground">Visit · {v.status}</div>
                   </div>
                 </button>
               ))}

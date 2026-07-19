@@ -57,6 +57,7 @@ function defaultCompanyFormValues(users: User[]): CompanyForm {
     pocMobile: "",
     onboardingManagerId: managers[0]?.id ?? "",
     csmId: "",
+    salesAgentId: "",
     plan: "Half-Yearly",
     health: "Healthy",
     modules: [],
@@ -103,6 +104,7 @@ const companySchema = z.object({
   pocMobile: z.string().optional(),
   onboardingManagerId: z.string().min(1, "Select an onboarding manager"),
   csmId: z.string().optional(),
+  salesAgentId: z.string().optional(),
   plan: z.enum(["Annual", "Half-Yearly", "AMC"]),
   health: z.enum(["Healthy", "Moderate", "Critical"]),
   modules: z.array(
@@ -152,6 +154,7 @@ function CompaniesListPage() {
   const navigate = useNavigate();
   const { can, isAdmin } = usePermissions();
   const canManageCompanies = can("manageCompanies");
+  const canAssignSalesAgent = isAdmin || can("assignSalesAgent");
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -159,6 +162,7 @@ function CompaniesListPage() {
   const [healthFilter, setHealthFilter] = useState("all");
   const [progressFilter, setProgressFilter] = useState("all");
   const [managerFilter, setManagerFilter] = useState("all");
+  const [salesAgentFilter, setSalesAgentFilter] = useState("all");
   const [cityFilter, setCityFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -185,7 +189,18 @@ function CompaniesListPage() {
     const baseline = createCompanyModules(selected);
     return baseline.map((m) => {
       const prev = existing.find((x) => x.moduleKey === m.moduleKey);
-      if (!m.optedIn) return { ...m, liveAt: undefined, pocName: prev?.pocName, pocMobile: prev?.pocMobile };
+      if (!m.optedIn) {
+        return {
+          ...m,
+          liveAt: undefined,
+          pocName: prev?.pocName,
+          pocMobile: prev?.pocMobile,
+          subscriptionId: prev?.subscriptionId,
+          subscriptionStatus: prev?.subscriptionStatus,
+          subscriptionStartDate: prev?.subscriptionStartDate,
+          subscriptionValidUntil: prev?.subscriptionValidUntil,
+        };
+      }
       if (prev?.optedIn) {
         return {
           ...m,
@@ -193,6 +208,10 @@ function CompaniesListPage() {
           liveAt: prev.liveAt,
           pocName: prev.pocName,
           pocMobile: prev.pocMobile,
+          subscriptionId: prev.subscriptionId,
+          subscriptionStatus: prev.subscriptionStatus,
+          subscriptionStartDate: prev.subscriptionStartDate,
+          subscriptionValidUntil: prev.subscriptionValidUntil,
         };
       }
       return m;
@@ -218,6 +237,21 @@ function CompaniesListPage() {
 
   const unassignedCount = useMemo(
     () => enriched.filter((c) => !c.onboardingManagerId).length,
+    [enriched],
+  );
+
+  const salesAgents = useMemo(() => {
+    const ids = [...new Set(enriched.map((c) => c.salesAgentId).filter(Boolean))];
+    return ids
+      .map((id) => ({
+        id: id as string,
+        name: resolveAssigneeLabel(id, users, employees),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [enriched, users, employees]);
+
+  const unassignedSalesCount = useMemo(
+    () => enriched.filter((c) => !c.salesAgentId).length,
     [enriched],
   );
 
@@ -298,6 +332,14 @@ function CompaniesListPage() {
       if (managerFilter !== "all" && managerFilter !== "unassigned" && c.onboardingManagerId !== managerFilter) {
         return false;
       }
+      if (salesAgentFilter === "unassigned" && c.salesAgentId) return false;
+      if (
+        salesAgentFilter !== "all" &&
+        salesAgentFilter !== "unassigned" &&
+        c.salesAgentId !== salesAgentFilter
+      ) {
+        return false;
+      }
       if (cityFilter !== "all" && c.city !== cityFilter) return false;
       if (progressFilter === "0" && c.progress !== 0) return false;
       if (progressFilter === "1-49" && !(c.progress >= 1 && c.progress <= 49)) return false;
@@ -343,6 +385,7 @@ function CompaniesListPage() {
     planFilter,
     healthFilter,
     managerFilter,
+    salesAgentFilter,
     cityFilter,
     progressFilter,
     dateFrom,
@@ -357,6 +400,7 @@ function CompaniesListPage() {
     healthFilter !== "all",
     progressFilter !== "all",
     managerFilter !== "all",
+    salesAgentFilter !== "all",
     cityFilter !== "all",
     Boolean(dateFrom),
     Boolean(dateTo),
@@ -397,6 +441,7 @@ function CompaniesListPage() {
     setHealthFilter("all");
     setProgressFilter("all");
     setManagerFilter("all");
+    setSalesAgentFilter("all");
     setCityFilter("all");
     setDateFrom("");
     setDateTo("");
@@ -419,6 +464,7 @@ function CompaniesListPage() {
       pocName: c.pocName || c.contact,
       pocMobile: c.pocMobile || c.phone,
       onboardingManagerId: c.onboardingManagerId, csmId: c.csmId,
+      salesAgentId: c.salesAgentId ?? "",
       plan: c.plan,
       health: c.health,
       modules: normalizeCompanyModules(c.modules).filter((m) => m.optedIn).map((m) => m.moduleKey),
@@ -589,6 +635,19 @@ function CompaniesListPage() {
               ...managers.map((m) => ({ value: m.id, label: m.name })),
             ],
           },
+          {
+            id: "salesAgent",
+            label: "Sales Agent",
+            value: salesAgentFilter,
+            onChange: setSalesAgentFilter,
+            options: [
+              { value: "all", label: "All sales agents" },
+              ...(unassignedSalesCount > 0
+                ? [{ value: "unassigned", label: `Unassigned (${unassignedSalesCount})` }]
+                : []),
+              ...salesAgents.map((m) => ({ value: m.id, label: m.name })),
+            ],
+          },
           ...citySelect,
         ]}
         sortOptions={[
@@ -692,6 +751,11 @@ function CompaniesListPage() {
                 key: "onboardingManagerId",
                 header: "Manager",
                 render: (c) => resolveAssigneeLabel(c.onboardingManagerId, users, employees),
+              },
+              {
+                key: "salesAgentId",
+                header: "Sales Agent",
+                render: (c) => resolveAssigneeLabel(c.salesAgentId, users, employees),
               },
               {
                 key: "startDate",
@@ -871,6 +935,26 @@ function CompaniesListPage() {
             ) : null}
             {!isAdmin ? (
               <p className="mt-1 text-xs text-muted-foreground">Only admins can assign onboarding managers.</p>
+            ) : null}
+          </div>
+          <div>
+            <label className="text-xs font-medium">Sales Agent</label>
+            <select
+              {...form.register("salesAgentId")}
+              className={inputClass()}
+              disabled={!canAssignSalesAgent}
+            >
+              <option value="">Unassigned</option>
+              {assignableUsers.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name} · {u.role}
+                </option>
+              ))}
+            </select>
+            {!canAssignSalesAgent ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                You do not have permission to assign sales agents.
+              </p>
             ) : null}
           </div>
           <div>
