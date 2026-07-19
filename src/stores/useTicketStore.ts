@@ -1,4 +1,4 @@
-import type { Ticket, TicketStatus } from "@/types";
+import type { Ticket, TicketActivity, TicketStatus } from "@/types";
 import { nowIso } from "@/types";
 import { logActivity } from "./useActivityStore";
 import { notifyInApp } from "./useNotificationStore";
@@ -7,13 +7,33 @@ import {
   createTicket as apiCreate,
   updateTicket as apiUpdate,
   deleteTicket as apiDelete,
+  listTicketActivities as apiListActivities,
 } from "@/lib/api";
 import { serverSync } from "@/lib/sync";
 
 type TicketState = {
   tickets: Ticket[];
-  addTicket: (data: Omit<Ticket, "id" | "createdAt" | "updatedAt">) => Ticket;
-  updateTicket: (id: string, data: Partial<Ticket>) => void;
+  activities: TicketActivity[];
+  setActivities: (activities: TicketActivity[]) => void;
+  addTicket: (
+    data: Omit<
+      Ticket,
+      | "id"
+      | "createdAt"
+      | "updatedAt"
+      | "backendAssigned"
+      | "resolutionStatus"
+      | "actionTaken"
+      | "resolutionNotes"
+    > &
+      Partial<
+        Pick<
+          Ticket,
+          "backendAssigned" | "resolutionStatus" | "actionTaken" | "resolutionNotes"
+        >
+      >,
+  ) => Ticket;
+  updateTicket: (id: string, data: Partial<Ticket> & { updateRemark?: string }) => void;
   deleteTicket: (id: string) => Ticket | undefined;
   moveTicket: (id: string, status: TicketStatus) => void;
   getById: (id: string) => Ticket | undefined;
@@ -21,6 +41,8 @@ type TicketState = {
 
 export const useTicketStore = createStore<TicketState>((set, get) => ({
   tickets: [],
+  activities: [],
+  setActivities: (activities) => set({ activities }),
 
   addTicket: (data) => {
     const now = nowIso();
@@ -28,6 +50,15 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
       ...data,
       description: data.description ?? "",
       projectId: data.projectId ?? "",
+      assignedUserId: data.assignedUserId,
+      actionTaken: data.actionTaken ?? "",
+      backendAssigned: data.backendAssigned ?? false,
+      backendAssigneeId: data.backendAssigneeId,
+      backendForwardedAt: data.backendForwardedAt,
+      resolutionStatus: data.resolutionStatus ?? "Not Resolved",
+      resolutionAt: data.resolutionAt,
+      etaRevisedAt: data.etaRevisedAt,
+      resolutionNotes: data.resolutionNotes ?? "",
       id: `TKT-${1000 + get().tickets.length + 1}`,
       createdAt: now,
       updatedAt: now,
@@ -56,7 +87,25 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
           companyId: ticket.companyId,
           projectId: ticket.projectId || undefined,
           description: ticket.description,
+          assignedUserId: ticket.assignedUserId,
+          actionTaken: ticket.actionTaken,
+          backendAssigned: ticket.backendAssigned,
+          backendAssigneeId: ticket.backendAssigneeId,
+          backendForwardedAt: ticket.backendForwardedAt,
+          resolutionStatus: ticket.resolutionStatus,
+          resolutionAt: ticket.resolutionAt,
+          etaRevisedAt: ticket.etaRevisedAt,
+          resolutionNotes: ticket.resolutionNotes,
         },
+      }).then(async (saved) => {
+        if (saved) {
+          set((s) => ({ tickets: s.tickets.map((t) => (t.id === ticket.id ? saved as Ticket : t)) }));
+        }
+        const activities = await apiListActivities({ data: { ticketId: ticket.id } });
+        set((s) => ({
+          activities: [...activities, ...s.activities.filter((a) => a.ticketId !== ticket.id)],
+        }));
+        return saved;
       }),
     );
     return ticket;
@@ -64,7 +113,8 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
 
   updateTicket: (id, data) => {
     const prev = get().getById(id);
-    set((s) => ({ tickets: s.tickets.map((t) => (t.id === id ? touch({ ...t, ...data }) : t)) }));
+    const { updateRemark, ...patch } = data;
+    set((s) => ({ tickets: s.tickets.map((t) => (t.id === id ? touch({ ...t, ...patch }) : t)) }));
     const ticket = get().getById(id);
     if (ticket) logActivity({ who: "You", what: `Updated ticket ${id}`, kind: "info" });
     if (prev && data.status && data.status !== prev.status) {
@@ -87,7 +137,18 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
         ticketId: id,
       });
     }
-    serverSync("updateTicket", () => apiUpdate({ data: { id, patch: data } }));
+    serverSync("updateTicket", () =>
+      apiUpdate({ data: { id, patch: { ...patch, updateRemark } } }).then(async (saved) => {
+        if (saved) {
+          set((s) => ({ tickets: s.tickets.map((t) => (t.id === id ? saved as Ticket : t)) }));
+        }
+        const activities = await apiListActivities({ data: { ticketId: id } });
+        set((s) => ({
+          activities: [...activities, ...s.activities.filter((a) => a.ticketId !== id)],
+        }));
+        return saved;
+      }),
+    );
   },
 
   deleteTicket: (id) => {

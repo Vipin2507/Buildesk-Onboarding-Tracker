@@ -20,6 +20,7 @@ import { useUserStore } from "./useUserStore";
 import { useTaskStore } from "./useTaskStore";
 import { useClientVisitStore } from "./useClientVisitStore";
 import { resolveAssigneeName } from "@/lib/managers";
+import { isTicketOpen } from "@/lib/tickets";
 import { getDaysUntilExpiry, getRenewalUrgency } from "./useRenewalStore";
 
 function calcOnboardingProjectProgress(
@@ -233,7 +234,7 @@ export function useDashboardKpis() {
       return { ...c, progress, computedStatus, isLive: live };
     });
 
-    const openTickets = tickets.filter((t) => t.status !== "Closed").length;
+    const openTickets = tickets.filter((t) => isTicketOpen(t)).length;
     const today = new Date().toISOString().slice(0, 10);
     const openFollowUps = followUpTasks.filter((t) =>
       ["open", "in_progress", "blocked"].includes(t.status),
@@ -242,6 +243,18 @@ export function useDashboardKpis() {
     const tasksDueToday = openFollowUps.filter((t) => t.dueDate === today).length;
     const upcomingVisits = clientVisits.filter(
       (v) => v.status === "scheduled" && v.scheduledAt.slice(0, 10) >= today,
+    ).length;
+    const upcomingVisitFollowUps = clientVisits.filter(
+      (v) =>
+        v.status !== "cancelled" &&
+        v.nextFollowUpDate &&
+        v.nextFollowUpDate >= today,
+    ).length;
+    const overdueVisitFollowUps = clientVisits.filter(
+      (v) =>
+        v.status !== "cancelled" &&
+        v.nextFollowUpDate &&
+        v.nextFollowUpDate < today,
     ).length;
     const upcomingRenewals = companies.filter((c) => {
       const u = getRenewalUrgency(c.planExpiry);
@@ -257,9 +270,10 @@ export function useDashboardKpis() {
       pendingTasks: openTickets,
       openTickets,
       openFollowUpTasks: openFollowUps.length,
-      overdueFollowUpTasks: overdueFollowUps,
+      overdueFollowUpTasks: overdueFollowUps + overdueVisitFollowUps,
       tasksDueToday,
       upcomingVisits,
+      upcomingVisitFollowUps,
       upcomingRenewals,
       companiesWithProgress,
     };

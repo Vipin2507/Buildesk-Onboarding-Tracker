@@ -20,6 +20,7 @@ import {
   completeProjectChecklist as apiCompleteProjectChecklist,
   setChecklistNotApplicable as apiSetNotApplicable,
   updateChecklistRemarks as apiUpdateRemarks,
+  updateChecklistAssignment as apiUpdateAssignment,
   setDocumentRequired as apiSetDocumentRequired,
   addOtherCharge as apiAddCharge,
   updateOtherCharge as apiUpdateCharge,
@@ -48,6 +49,10 @@ type OnboardingState = {
   setChecklistPhaseDate: (id: string, phase: ChecklistPhase, at: string, who?: string) => void;
   setChecklistNotApplicable: (id: string, notApplicable: boolean, who?: string) => void;
   updateChecklistRemarks: (id: string, remarks: string) => void;
+  updateChecklistAssignment: (
+    id: string,
+    data: Pick<OnboardingChecklistItem, "assigneeUserId" | "dueDate">,
+  ) => void;
   /** Mark every applicable checklist item fully complete for a project. */
   completeAllChecklistForProject: (projectId: string, who?: string) => void;
   /** When required, adds a Documents checklist step for this customer project. */
@@ -259,6 +264,35 @@ export const useOnboardingStore = createStore<OnboardingState>((set, get) => ({
       checklistItems: s.checklistItems.map((i) => (i.id === id ? touch({ ...i, remarks }) : i)),
     }));
     serverSync("checklistRemarks", () => apiUpdateRemarks({ data: { id, remarks } }));
+  },
+
+  updateChecklistAssignment: (id, data) => {
+    const previous = get().checklistItems.find((i) => i.id === id);
+    if (!previous) return;
+    const updated = touch({ ...previous, ...data });
+    set((s) => ({
+      checklistItems: s.checklistItems.map((i) => (i.id === id ? updated : i)),
+    }));
+    serverSyncWithRollback(
+      "checklistAssignment",
+      () =>
+        apiUpdateAssignment({
+          data: {
+            id,
+            assigneeUserId: data.assigneeUserId || null,
+            dueDate: data.dueDate || null,
+          },
+        }).then((saved) => {
+          set((s) => ({
+            checklistItems: s.checklistItems.map((i) => (i.id === id ? saved : i)),
+          }));
+          return saved;
+        }),
+      () =>
+        set((s) => ({
+          checklistItems: s.checklistItems.map((i) => (i.id === id ? previous : i)),
+        })),
+    );
   },
 
   isDocumentRequired: (projectId, documentName) =>

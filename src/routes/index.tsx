@@ -12,6 +12,7 @@ import { ProgressBar, ProgressRing } from "@/components/progress-bar";
 import { StatusPill, Pill } from "@/components/status-pill";
 import { CountUp } from "@/components/count-up";
 import { Button } from "@/components/ui/button";
+import { PendingWorkDashboard } from "@/components/pending-work-dashboard";
 import {
   useDashboardKpis,
   useModuleAdoption,
@@ -97,6 +98,8 @@ function Dashboard() {
           </motion.div>
         ))}
       </div>
+
+      <PendingWorkDashboard />
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
         <div className="card-soft p-5 lg:col-span-1">

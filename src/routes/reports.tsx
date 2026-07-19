@@ -50,6 +50,8 @@ import {
   useOnboardingStore,
   useProjectStore,
   useTicketStore,
+  useTaskStore,
+  useCrmEventStore,
   useVendorStore,
 } from "@/stores";
 
@@ -64,6 +66,7 @@ const ICONS = {
   integrations: Plug,
   "ticket-aging": Timer,
   "bug-resolution": Bug,
+  "follow-ups": Timer,
   custom: Wrench,
   executive: PieChart,
 } as const;
@@ -101,6 +104,8 @@ function useReportSnapshot(): ReportSnapshot {
   const employees = useEmployeeStore((s) => s.employees);
   const integrations = useIntegrationStore((s) => s.integrations);
   const tickets = useTicketStore((s) => s.tickets);
+  const followUpTasks = useTaskStore((s) => s.tasks);
+  const crmEvents = useCrmEventStore((s) => s.events);
 
   return useMemo(
     () => ({
@@ -116,6 +121,8 @@ function useReportSnapshot(): ReportSnapshot {
       employees,
       integrations,
       tickets,
+      followUpTasks,
+      crmEvents,
     }),
     [
       companies,
@@ -130,6 +137,8 @@ function useReportSnapshot(): ReportSnapshot {
       employees,
       integrations,
       tickets,
+      followUpTasks,
+      crmEvents,
     ],
   );
 }

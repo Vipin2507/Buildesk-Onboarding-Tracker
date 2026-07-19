@@ -144,6 +144,16 @@ const EXTRA_COLUMNS = [
     ddl: "TEXT",
   },
   {
+    table: "onboarding_checklist_items",
+    name: "assignee_user_id",
+    ddl: "TEXT",
+  },
+  {
+    table: "onboarding_checklist_items",
+    name: "due_date",
+    ddl: "TEXT",
+  },
+  {
     table: "project_manual_progress",
     name: "not_applicable_json",
     ddl: "TEXT NOT NULL DEFAULT '{}'",
@@ -162,6 +172,51 @@ const EXTRA_COLUMNS = [
     table: "tickets",
     name: "project_id",
     ddl: "TEXT",
+  },
+  {
+    table: "tickets",
+    name: "assigned_user_id",
+    ddl: "TEXT",
+  },
+  {
+    table: "tickets",
+    name: "action_taken",
+    ddl: "TEXT NOT NULL DEFAULT ''",
+  },
+  {
+    table: "tickets",
+    name: "backend_assigned",
+    ddl: "INTEGER NOT NULL DEFAULT 0",
+  },
+  {
+    table: "tickets",
+    name: "backend_assignee_id",
+    ddl: "TEXT",
+  },
+  {
+    table: "tickets",
+    name: "backend_forwarded_at",
+    ddl: "TEXT",
+  },
+  {
+    table: "tickets",
+    name: "resolution_status",
+    ddl: "TEXT NOT NULL DEFAULT 'Not Resolved'",
+  },
+  {
+    table: "tickets",
+    name: "resolution_at",
+    ddl: "TEXT",
+  },
+  {
+    table: "tickets",
+    name: "eta_revised_at",
+    ddl: "TEXT",
+  },
+  {
+    table: "tickets",
+    name: "resolution_notes",
+    ddl: "TEXT NOT NULL DEFAULT ''",
   },
   {
     table: "companies",
@@ -256,6 +311,32 @@ if (!tableExists("notifications")) {
   console.log("+ CREATE TABLE notifications");
 } else {
   console.log("notifications: table already present");
+}
+
+if (tableExists("tickets") && !tableExists("ticket_activities")) {
+  sqlite.exec(`
+    CREATE TABLE ticket_activities (
+      id TEXT PRIMARY KEY NOT NULL,
+      ticket_id TEXT NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+      event_type TEXT NOT NULL,
+      actor_user_id TEXT,
+      actor_name TEXT NOT NULL,
+      remark TEXT,
+      old_values_json TEXT,
+      new_values_json TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ticket_activities_ticket_idx ON ticket_activities(ticket_id);
+    CREATE INDEX IF NOT EXISTS ticket_activities_created_idx ON ticket_activities(created_at);
+  `);
+  console.log("+ CREATE TABLE ticket_activities");
+}
+
+if (tableExists("onboarding_checklist_items")) {
+  sqlite.exec(`
+    CREATE INDEX IF NOT EXISTS checklist_assignee_idx ON onboarding_checklist_items(assignee_user_id);
+    CREATE INDEX IF NOT EXISTS checklist_due_idx ON onboarding_checklist_items(due_date);
+  `);
 }
 
 // Backfill ticket.project_id from company projects when missing

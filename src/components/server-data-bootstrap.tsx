@@ -18,6 +18,7 @@ import {
   listProjects,
   listPostSalesProjects,
   listTickets,
+  listTicketActivities,
   listTraining,
   listUsers,
   listNotifications,
@@ -29,6 +30,7 @@ import {
   listCrmEvents,
 } from "@/lib/api";
 import { wireConfigPersistence } from "@/lib/config-persistence";
+import { mapTicket, mapTicketActivity } from "@/lib/tickets";
 import {
   useActivityStore,
   useAuthStore,
@@ -84,6 +86,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           employees,
           users,
           tickets,
+          ticketActivities,
           training,
           activity,
           notifications,
@@ -114,6 +117,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
             .then((u) => ({ ok: true as const, users: u }))
             .catch(() => ({ ok: false as const, users: [] as Awaited<ReturnType<typeof listUsers>> })),
           listTickets(),
+          listTicketActivities({ data: {} }).catch(() => []),
           listTraining(),
           listActivity({ data: { limit: 100 } }),
           listNotifications({ data: { limit: 80 } }).catch(() => []),
@@ -146,16 +150,10 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
         // Always apply server users (including empty) so deletes stay deleted — never fall back to seed.
         if (users.ok) useUserStore.setState({ users: users.users });
         useTicketStore.setState({
-          tickets: tickets.map((t) => ({
-            ...t,
-            type: t.type as never,
-            priority: t.priority as never,
-            status: t.status as never,
-            developerId: t.developerId ?? "",
-            companyId: t.companyId ?? "",
-            projectId: t.projectId ?? "",
-            description: t.description ?? "",
-          })),
+          tickets: tickets.map((t) => mapTicket(t as Record<string, unknown>)),
+          activities: ticketActivities.map((a) =>
+            mapTicketActivity(a as Record<string, unknown>),
+          ),
         });
         useTrainingStore.setState({ sessions: training as never });
         useActivityStore.setState({ activities: activity });
@@ -167,6 +165,8 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
             ...c,
             notApplicable: c.notApplicable ?? false,
             source: c.source ?? "default",
+            assigneeUserId: c.assigneeUserId ?? undefined,
+            dueDate: c.dueDate ?? undefined,
           })),
           otherCharges: charges,
           uploads: uploads as never,

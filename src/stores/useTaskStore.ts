@@ -5,6 +5,7 @@ import {
   cancelFollowUpTask as apiCancel,
   createFollowUpTask as apiCreate,
   updateFollowUpTask as apiUpdate,
+  listCrmEvents as apiListCrmEvents,
 } from "@/lib/api";
 import { serverSyncWithRollback } from "@/lib/sync";
 
@@ -105,6 +106,17 @@ export const useTaskStore = createStore<TaskState>((set, get) => ({
             set((s) => ({
               tasks: s.tasks.map((t) => (t.id === id ? saved : t)),
             }));
+            void apiListCrmEvents({
+              data: { companyId: saved.companyId, taskId: saved.id, limit: 100 },
+            }).then(async (events) => {
+              const { useCrmEventStore } = await import("./useCrmEventStore");
+              useCrmEventStore.setState((state) => ({
+                events: [
+                  ...events,
+                  ...state.events.filter((event) => event.taskId !== saved.id),
+                ],
+              }));
+            });
           }
           return saved;
         }),

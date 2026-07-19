@@ -29,7 +29,15 @@ import {
   inDateRange,
 } from "@/components/list-toolbar";
 import { TICKET_KANBAN_COLUMNS } from "@/data/constants";
-import { useTicketStore, useCompanyStore, useEmployeeStore, useProjectStore } from "@/stores";
+import {
+  useTicketStore,
+  useCompanyStore,
+  useEmployeeStore,
+  useProjectStore,
+  useUserStore,
+} from "@/stores";
+import { usePermissions } from "@/hooks/use-permissions";
+import { isTicketOpen } from "@/lib/tickets";
 import type { Ticket, TicketStatus } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -42,20 +50,14 @@ const TABS = ["All", "Requirements", "Customizations", "Bugs", "Kanban"] as cons
 const ticketSchema = z.object({
   title: z.string().min(3),
   description: z.string().optional(),
-  type: z.enum(["Bug", "Customization", "Requirement"]),
+  type: z.enum(["Bug", "Feature Request", "Customization", "Enhancement", "Requirement", "Other"]),
   priority: z.enum(["Critical", "High", "Medium", "Low"]),
-  status: z.enum([
-    "New",
-    "Assigned",
-    "In Progress",
-    "QA",
-    "Ready for Release",
-    "Released",
-    "Closed",
-  ]),
+  status: z.enum(TICKET_KANBAN_COLUMNS),
   companyId: z.string().min(1),
   projectId: z.string().min(1, "Select a project"),
   developerId: z.string(),
+  assignedUserId: z.string().optional(),
+  backendAssigned: z.boolean(),
   eta: z.string(),
 });
 
@@ -75,6 +77,9 @@ function SupportListPage() {
   const companies = useCompanyStore((s) => s.companies);
   const projects = useProjectStore((s) => s.projects);
   const employees = useEmployeeStore((s) => s.employees);
+  const users = useUserStore((s) => s.users.filter((u) => u.active));
+  const { can, isAdmin } = usePermissions();
+  const canManageTickets = isAdmin || can("manageTickets");
 
   const [tab, setTab] = useState<(typeof TABS)[number]>("All");
   const [modalOpen, setModalOpen] = useState(false);
@@ -104,10 +109,12 @@ function SupportListPage() {
       description: "",
       type: "Bug" as const,
       priority: "Medium" as const,
-      status: "New" as const,
+      status: "Open" as const,
       companyId: defaultCompanyId,
       projectId: defaultProjectId,
       developerId: employees[0]?.id ?? "",
+      assignedUserId: "",
+      backendAssigned: false,
       eta: "",
     },
   });
@@ -135,8 +142,11 @@ function SupportListPage() {
         company: companies.find((c) => c.id === t.companyId)?.name ?? "",
         project: projects.find((p) => p.id === t.projectId)?.name ?? "",
         developer: employees.find((e) => e.id === t.developerId)?.name ?? "",
+        owner: users.find((u) => u.id === t.assignedUserId)?.name ?? "Unassigned",
+        backendAssignee:
+          employees.find((e) => e.id === t.backendAssigneeId)?.name ?? "Unassigned",
       })),
-    [tickets, companies, projects, employees],
+    [tickets, companies, projects, employees, users],
   );
 
   const tabFiltered = useMemo(() => {
@@ -162,7 +172,9 @@ function SupportListPage() {
         (t.description ?? "").toLowerCase().includes(q) ||
         t.company.toLowerCase().includes(q) ||
         t.project.toLowerCase().includes(q) ||
-        t.developer.toLowerCase().includes(q)
+        t.developer.toLowerCase().includes(q) ||
+        t.owner.toLowerCase().includes(q) ||
+        t.backendAssignee.toLowerCase().includes(q)
       );
     });
 
@@ -203,7 +215,7 @@ function SupportListPage() {
     Boolean(dateTo),
   ].filter(Boolean).length;
 
-  const bugs = tickets.filter((t) => t.type === "Bug" && t.status !== "Closed");
+  const bugs = tickets.filter((t) => t.type === "Bug" && isTicketOpen(t));
   const counts = {
     Critical: bugs.filter((b) => b.priority === "Critical").length,
     High: bugs.filter((b) => b.priority === "High").length,
@@ -215,6 +227,10 @@ function SupportListPage() {
     const { active, over } = event;
     setActiveId(null);
     if (!over) return;
+    if (!canManageTickets) {
+      toast.error("You do not have permission to move tickets");
+      return;
+    }
     const status = over.id as TicketStatus;
     if (TICKET_KANBAN_COLUMNS.includes(status as (typeof TICKET_KANBAN_COLUMNS)[number])) {
       moveTicket(String(active.id), status);
@@ -223,6 +239,10 @@ function SupportListPage() {
   }
 
   function openCreate() {
+    if (!canManageTickets) {
+      toast.error("You do not have permission to manage tickets");
+      return;
+    }
     setEditing(null);
     const companyId = companies[0]?.id ?? "";
     const projectId = projects.find((p) => p.companyId === companyId)?.id ?? "";
@@ -231,10 +251,12 @@ function SupportListPage() {
       description: "",
       type: "Bug",
       priority: "Medium",
-      status: "New",
+      status: "Open",
       companyId,
       projectId,
       developerId: employees[0]?.id ?? "",
+      assignedUserId: "",
+      backendAssigned: false,
       eta: "",
     });
     setModalOpen(true);
@@ -251,6 +273,8 @@ function SupportListPage() {
       companyId: t.companyId,
       projectId: t.projectId ?? "",
       developerId: t.developerId,
+      assignedUserId: t.assignedUserId ?? "",
+      backendAssigned: t.backendAssigned,
       eta: t.eta,
     });
     setModalOpen(true);
@@ -284,9 +308,11 @@ function SupportListPage() {
         title="Support Desk"
         subtitle="Tickets, bugs, customizations and release pipeline."
         actions={
-          <Button className="gap-1.5 bg-primary" onClick={openCreate}>
-            <Plus className="h-4 w-4" /> New Ticket
-          </Button>
+          canManageTickets ? (
+            <Button className="gap-1.5 bg-primary" onClick={openCreate}>
+              <Plus className="h-4 w-4" /> New Ticket
+            </Button>
+          ) : undefined
         }
       />
 
@@ -368,8 +394,11 @@ function SupportListPage() {
                 options: [
                   { value: "all", label: "All types" },
                   { value: "Bug", label: "Bug" },
+                  { value: "Feature Request", label: "Feature Request" },
                   { value: "Customization", label: "Customization" },
+                  { value: "Enhancement", label: "Enhancement" },
                   { value: "Requirement", label: "Requirement" },
+                  { value: "Other", label: "Other" },
                 ],
               },
               {
@@ -454,21 +483,23 @@ function SupportListPage() {
                       {t.project ? <span>· {t.project}</span> : null}
                       <span>· {t.developer}</span>
                     </div>
-                    <div className="mt-2 flex justify-end gap-1 border-t border-border/60 pt-2">
-                      <Button size="icon" variant="ghost" onClick={() => openEdit(t)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => {
-                          setEditing(t);
-                          setDeleteOpen(true);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
+                    {canManageTickets ? (
+                      <div className="mt-2 flex justify-end gap-1 border-t border-border/60 pt-2">
+                        <Button size="icon" variant="ghost" onClick={() => openEdit(t)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            setEditing(t);
+                            setDeleteOpen(true);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -485,6 +516,10 @@ function SupportListPage() {
                         <th className="px-4 py-2 text-left">Company</th>
                         <th className="px-4 py-2 text-left">Project</th>
                         <th className="px-4 py-2 text-left">Developer</th>
+                        <th className="px-4 py-2 text-left">Owner</th>
+                        <th className="px-4 py-2 text-left">Backend</th>
+                        <th className="px-4 py-2 text-left">Resolution</th>
+                        <th className="px-4 py-2 text-left">ETA</th>
                         <th className="px-4 py-2"></th>
                       </tr>
                     </thead>
@@ -520,20 +555,30 @@ function SupportListPage() {
                           <td className="px-4 py-2.5">{t.company}</td>
                           <td className="px-4 py-2.5">{t.project || "—"}</td>
                           <td className="px-4 py-2.5">{t.developer}</td>
+                          <td className="px-4 py-2.5">{t.owner}</td>
+                          <td className="px-4 py-2.5">
+                            {t.backendAssigned ? t.backendAssignee : "Not forwarded"}
+                          </td>
+                          <td className="px-4 py-2.5">{t.resolutionStatus}</td>
+                          <td className="px-4 py-2.5">{t.eta || "—"}</td>
                           <td className="px-4 py-2.5 text-right">
-                            <Button size="icon" variant="ghost" onClick={() => openEdit(t)}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => {
-                                setEditing(t);
-                                setDeleteOpen(true);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                            {canManageTickets ? (
+                              <>
+                                <Button size="icon" variant="ghost" onClick={() => openEdit(t)}>
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setEditing(t);
+                                    setDeleteOpen(true);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </>
+                            ) : null}
                           </td>
                         </tr>
                       ))}
@@ -588,7 +633,7 @@ function SupportListPage() {
             {...form.register("type")}
             className="h-9 rounded-md border border-input bg-card px-3 text-sm"
           >
-            {["Bug", "Customization", "Requirement"].map((t) => (
+            {["Bug", "Feature Request", "Customization", "Enhancement", "Requirement", "Other"].map((t) => (
               <option key={t} value={t}>
                 {t}
               </option>
@@ -655,6 +700,21 @@ function SupportListPage() {
               </option>
             ))}
           </select>
+          <select
+            {...form.register("assignedUserId")}
+            className="h-9 rounded-md border border-input bg-card px-3 text-sm"
+          >
+            <option value="">Unassigned internal owner</option>
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.name}
+              </option>
+            ))}
+          </select>
+          <label className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
+            <input type="checkbox" {...form.register("backendAssigned")} />
+            Forwarded / assigned to Backend
+          </label>
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">ETA</label>
             <DatePickerField

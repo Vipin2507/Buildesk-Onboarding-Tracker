@@ -35,6 +35,7 @@ export {
   completeProjectChecklist,
   setChecklistNotApplicable,
   updateChecklistRemarks,
+  updateChecklistAssignment,
   setDocumentRequired,
   listOtherCharges,
   addOtherCharge,
@@ -83,6 +84,7 @@ export {
 export {
   listTickets,
   getTicket,
+  listTicketActivities,
   createTicket,
   updateTicket,
   deleteTicket,

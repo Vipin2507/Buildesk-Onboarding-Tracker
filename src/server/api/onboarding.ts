@@ -32,6 +32,8 @@ function ensureDefaultChecklist(projectId: string) {
           live: false,
           notApplicable: false,
           remarks: "",
+          assigneeUserId: null,
+          dueDate: null,
           source: "default",
           createdAt: now,
           updatedAt: now,
@@ -55,6 +57,8 @@ function mapChecklist(row: typeof t.onboardingChecklistItems.$inferSelect): Onbo
     liveAt: row.liveAt ?? (row.live ? row.updatedAt : undefined),
     notApplicable: row.notApplicable ?? false,
     remarks: row.remarks,
+    assigneeUserId: row.assigneeUserId ?? undefined,
+    dueDate: row.dueDate ?? undefined,
     source: (row.source as OnboardingChecklistItem["source"]) || "default",
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -332,6 +336,48 @@ export const updateChecklistRemarks = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const updateChecklistAssignment = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string(),
+        assigneeUserId: z.string().optional().nullable(),
+        dueDate: z.string().optional().nullable(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const user = requireUser(["Admin", "Manager"]);
+    const db = getDb();
+    const row = db
+      .select()
+      .from(t.onboardingChecklistItems)
+      .where(eq(t.onboardingChecklistItems.id, data.id))
+      .get();
+    if (!row) throw new ApiError(404, "Checklist item not found");
+    if (data.assigneeUserId) {
+      const assignee = db.select().from(t.users).where(eq(t.users.id, data.assigneeUserId)).get();
+      if (!assignee?.active) throw new ApiError(400, "Assignee must be an active login user");
+    }
+    const next = {
+      assigneeUserId:
+        data.assigneeUserId === undefined ? row.assigneeUserId : data.assigneeUserId || null,
+      dueDate: data.dueDate === undefined ? row.dueDate : data.dueDate || null,
+      updatedAt: nowIso(),
+    };
+    db.update(t.onboardingChecklistItems)
+      .set(next)
+      .where(eq(t.onboardingChecklistItems.id, data.id))
+      .run();
+    logActivity({
+      who: user.name,
+      what: `Updated checklist assignment for "${row.label}"`,
+      kind: "info",
+      projectId: row.projectId,
+    });
+    return mapChecklist({ ...row, ...next });
+  });
+
 /** Mark a document template as required for a customer project — adds/removes an onboarding Documents step. */
 export const setDocumentRequired = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
@@ -378,6 +424,8 @@ export const setDocumentRequired = createServerFn({ method: "POST" })
         liveAt: null as string | null,
         notApplicable: false,
         remarks: "",
+        assigneeUserId: null as string | null,
+        dueDate: null as string | null,
         source: "required-document" as const,
         createdAt: now,
         updatedAt: now,

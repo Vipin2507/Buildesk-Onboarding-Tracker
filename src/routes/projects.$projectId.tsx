@@ -24,6 +24,7 @@ import {
   useProjectStore,
   useOnboardingStore,
   useActivityStore,
+  useUserStore,
   calcProjectProgress,
 } from "@/stores";
 import { ONBOARDING_STEPS, ONBOARDING_SECTIONS } from "@/data/constants";
@@ -92,6 +93,7 @@ function ProjectDetailPage() {
   const allChecklist = useOnboardingStore((s) => s.checklistItems);
   const allCharges = useOnboardingStore((s) => s.otherCharges);
   const allActivities = useActivityStore((s) => s.activities);
+  const users = useUserStore((s) => s.users.filter((u) => u.active));
   const checklist = useMemo(() => allChecklist.filter((i) => i.projectId === projectId), [allChecklist, projectId]);
   const progress = useMemo(
     () => calcProjectProgress(projectId, allChecklist),
@@ -111,6 +113,7 @@ function ProjectDetailPage() {
   const setChecklistPhaseDate = useOnboardingStore((s) => s.setChecklistPhaseDate);
   const setNotApplicable = useOnboardingStore((s) => s.setChecklistNotApplicable);
   const updateRemarks = useOnboardingStore((s) => s.updateChecklistRemarks);
+  const updateAssignment = useOnboardingStore((s) => s.updateChecklistAssignment);
   const initChecklistForProject = useOnboardingStore((s) => s.initChecklistForProject);
   const goLive = useProjectStore((s) => s.goLive);
   const completeProject = useProjectStore((s) => s.completeProject);
@@ -505,6 +508,38 @@ function ProjectDetailPage() {
                           placeholder="Add note…"
                           className="mt-3 h-10 w-full rounded-lg border bg-background px-3 text-sm"
                         />
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          <select
+                            value={item.assigneeUserId ?? ""}
+                            onChange={(e) =>
+                              updateAssignment(item.id, {
+                                assigneeUserId: e.target.value || undefined,
+                                dueDate: item.dueDate,
+                              })
+                            }
+                            className="h-9 rounded-md border bg-background px-2 text-xs"
+                            aria-label={`Assignee for ${item.label}`}
+                          >
+                            <option value="">Company manager</option>
+                            {users.map((user) => (
+                              <option key={user.id} value={user.id}>
+                                {user.name}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="date"
+                            value={item.dueDate ?? ""}
+                            onChange={(e) =>
+                              updateAssignment(item.id, {
+                                assigneeUserId: item.assigneeUserId,
+                                dueDate: e.target.value || undefined,
+                              })
+                            }
+                            className="h-9 rounded-md border bg-background px-2 text-xs"
+                            aria-label={`Due date for ${item.label}`}
+                          />
+                        </div>
                           </>
                         )}
                         {na && (
@@ -529,6 +564,8 @@ function ProjectDetailPage() {
                           <th className="px-3 py-2 text-center">Uploaded</th>
                           <th className="px-3 py-2 text-center">Live</th>
                           <th className="px-3 py-2 text-center">N/A</th>
+                          <th className="px-3 py-2 text-left">Assignee</th>
+                          <th className="px-3 py-2 text-left">Due</th>
                           <th className="px-3 py-2 text-left">Remarks</th>
                         </tr>
                       </thead>
@@ -605,6 +642,40 @@ function ProjectDetailPage() {
                                 <Ban className="h-3 w-3" />
                                 N/A
                               </button>
+                            </td>
+                            <td className="px-3 py-3">
+                              <select
+                                value={item.assigneeUserId ?? ""}
+                                onChange={(e) =>
+                                  updateAssignment(item.id, {
+                                    assigneeUserId: e.target.value || undefined,
+                                    dueDate: item.dueDate,
+                                  })
+                                }
+                                className="h-8 w-36 rounded border bg-background px-2 text-xs"
+                                aria-label={`Assignee for ${item.label}`}
+                              >
+                                <option value="">Company manager</option>
+                                {users.map((user) => (
+                                  <option key={user.id} value={user.id}>
+                                    {user.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="px-3 py-3">
+                              <input
+                                type="date"
+                                value={item.dueDate ?? ""}
+                                onChange={(e) =>
+                                  updateAssignment(item.id, {
+                                    assigneeUserId: item.assigneeUserId,
+                                    dueDate: e.target.value || undefined,
+                                  })
+                                }
+                                className="h-8 w-32 rounded border bg-background px-2 text-xs"
+                                aria-label={`Due date for ${item.label}`}
+                              />
                             </td>
                             <td className="px-3 py-3">
                               <input

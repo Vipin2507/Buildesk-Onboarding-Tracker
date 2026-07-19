@@ -12,23 +12,17 @@ import { EmptyState } from "@/components/empty-state";
 import { ConfirmDeleteDialog, EntityFormModal } from "@/components/entity-form-modal";
 import { DatePickerField } from "@/components/date-picker-field";
 import { TICKET_KANBAN_COLUMNS } from "@/data/constants";
+import { usePermissions } from "@/hooks/use-permissions";
+import { isTicketOpen } from "@/lib/tickets";
 import { useTicketStore, useEmployeeStore, useProjectStore } from "@/stores";
 import type { Ticket } from "@/types";
 
 const ticketSchema = z.object({
   title: z.string().min(3),
   description: z.string().optional(),
-  type: z.enum(["Bug", "Customization", "Requirement"]),
+  type: z.enum(["Bug", "Feature Request", "Customization", "Enhancement", "Requirement", "Other"]),
   priority: z.enum(["Critical", "High", "Medium", "Low"]),
-  status: z.enum([
-    "New",
-    "Assigned",
-    "In Progress",
-    "QA",
-    "Ready for Release",
-    "Released",
-    "Closed",
-  ]),
+  status: z.enum(TICKET_KANBAN_COLUMNS),
   projectId: z.string().min(1, "Select a project"),
   developerId: z.string(),
   eta: z.string(),
@@ -44,6 +38,8 @@ export function CompanyTicketsPanel({ companyId }: Props) {
   const updateTicket = useTicketStore((s) => s.updateTicket);
   const deleteTicket = useTicketStore((s) => s.deleteTicket);
   const employees = useEmployeeStore((s) => s.employees);
+  const { can, isAdmin } = usePermissions();
+  const canManageTickets = isAdmin || can("manageTickets");
   const allProjects = useProjectStore((s) => s.projects);
   const projects = useMemo(
     () => allProjects.filter((p) => p.companyId === companyId),
@@ -66,7 +62,7 @@ export function CompanyTicketsPanel({ companyId }: Props) {
     [tickets, companyId, employees, projects],
   );
 
-  const openCount = companyTickets.filter((t) => t.status !== "Closed").length;
+  const openCount = companyTickets.filter((t) => isTicketOpen(t)).length;
 
   const form = useForm({
     resolver: zodResolver(ticketSchema),
@@ -75,7 +71,7 @@ export function CompanyTicketsPanel({ companyId }: Props) {
       description: "",
       type: "Bug" as const,
       priority: "Medium" as const,
-      status: "New" as const,
+      status: "Open" as const,
       projectId: projects[0]?.id ?? "",
       developerId: employees[0]?.id ?? "",
       eta: "",
@@ -83,6 +79,10 @@ export function CompanyTicketsPanel({ companyId }: Props) {
   });
 
   function openCreate() {
+    if (!canManageTickets) {
+      toast.error("You do not have permission to manage tickets");
+      return;
+    }
     if (projects.length === 0) {
       toast.error("Add a project first", {
         description: "Tickets must be linked to a project under this company.",
@@ -95,7 +95,7 @@ export function CompanyTicketsPanel({ companyId }: Props) {
       description: "",
       type: "Bug",
       priority: "Medium",
-      status: "New",
+      status: "Open",
       projectId: projects[0]?.id ?? "",
       developerId: employees[0]?.id ?? "",
       eta: "",
@@ -154,9 +154,11 @@ export function CompanyTicketsPanel({ companyId }: Props) {
           <Button variant="outline" asChild>
             <Link to="/support">Open Support Desk</Link>
           </Button>
-          <Button className="gap-1.5 bg-primary" onClick={openCreate}>
-            <Plus className="h-4 w-4" /> New Ticket
-          </Button>
+          {canManageTickets ? (
+            <Button className="gap-1.5 bg-primary" onClick={openCreate}>
+              <Plus className="h-4 w-4" /> New Ticket
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -221,19 +223,23 @@ export function CompanyTicketsPanel({ companyId }: Props) {
                     <td className="px-4 py-2.5">{t.status}</td>
                     <td className="px-4 py-2.5">{t.developer}</td>
                     <td className="px-4 py-2.5 text-right">
-                      <Button size="icon" variant="ghost" onClick={() => openEdit(t)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => {
-                          setEditing(t);
-                          setDeleteOpen(true);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      {canManageTickets ? (
+                        <>
+                          <Button size="icon" variant="ghost" onClick={() => openEdit(t)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => {
+                              setEditing(t);
+                              setDeleteOpen(true);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </>
+                      ) : null}
                     </td>
                   </tr>
                 ))}
@@ -275,7 +281,7 @@ export function CompanyTicketsPanel({ companyId }: Props) {
             {...form.register("type")}
             className="h-9 rounded-md border border-input bg-card px-3 text-sm"
           >
-            {["Bug", "Customization", "Requirement"].map((t) => (
+            {["Bug", "Feature Request", "Customization", "Enhancement", "Requirement", "Other"].map((t) => (
               <option key={t} value={t}>
                 {t}
               </option>

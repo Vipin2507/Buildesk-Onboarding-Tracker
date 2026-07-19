@@ -19,6 +19,10 @@ export type OnboardingChecklistItem = Timestamps & {
   /** When true, item is skipped for this project and counts as complete. */
   notApplicable: boolean;
   remarks: string;
+  /** Explicit owner; dashboard falls back to the company's onboarding manager. */
+  assigneeUserId?: string;
+  /** Optional target date used for upcoming/overdue work. */
+  dueDate?: string;
   /**
    * `default` = standard onboarding template item.
    * `required-document` = customer-required doc added from Documents tab.

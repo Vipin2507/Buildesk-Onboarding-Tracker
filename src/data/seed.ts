@@ -429,6 +429,23 @@ export const seedTickets: Ticket[] = Array.from({ length: 22 }).map((_, i) => {
     companyId: company.id,
     projectId: project?.id ?? "",
     description: `Details for ticket TKT-${1000 + i}: reported by onboarding team.`,
+    assignedUserId: undefined,
+    actionTaken: "",
+    backendAssigned: i % 3 === 0,
+    backendAssigneeId: i % 3 === 0 ? seedEmployees[(i + 1) % managers.length].id : undefined,
+    backendForwardedAt: i % 3 === 0 ? ts : undefined,
+    resolutionStatus:
+      ticketStatuses[i % ticketStatuses.length] === "Closed" ||
+      ticketStatuses[i % ticketStatuses.length] === "Released"
+        ? "Resolved"
+        : "Not Resolved",
+    resolutionAt:
+      ticketStatuses[i % ticketStatuses.length] === "Closed" ||
+      ticketStatuses[i % ticketStatuses.length] === "Released"
+        ? ts
+        : undefined,
+    etaRevisedAt: i % 4 === 0 ? ts : undefined,
+    resolutionNotes: "",
     createdAt: ts,
     updatedAt: ts,
   };

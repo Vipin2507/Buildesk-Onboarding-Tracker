@@ -11,9 +11,12 @@ import type {
   PurchaseOrder,
   Ticket,
   WorkOrder,
+  FollowUpTask,
+  CrmEvent,
 } from "@/types";
 import { STATUS_LABEL } from "@/types/common";
 import { calcChecklistProgress } from "@/lib/checklist";
+import { isTicketOpen, isTicketResolved } from "@/lib/tickets";
 
 export const REPORT_IDS = [
   "onboarding",
@@ -26,6 +29,7 @@ export const REPORT_IDS = [
   "integrations",
   "ticket-aging",
   "bug-resolution",
+  "follow-ups",
   "custom",
   "executive",
 ] as const;
@@ -61,6 +65,8 @@ export type ReportSnapshot = {
   employees: Employee[];
   integrations: Integration[];
   tickets: Ticket[];
+  followUpTasks: FollowUpTask[];
+  crmEvents: CrmEvent[];
 };
 
 function projectProgress(projectId: string, checklist: OnboardingChecklistItem[]) {
@@ -452,7 +458,7 @@ function integrationsReport(s: ReportSnapshot): ReportResult {
 }
 
 function ticketAgingReport(s: ReportSnapshot): ReportResult {
-  const open = s.tickets.filter((t) => t.status !== "Closed" && t.status !== "Released");
+  const open = s.tickets.filter((t) => isTicketOpen(t));
   const bands = { "0-7d": 0, "8-14d": 0, "15-30d": 0, "30d+": 0 };
   for (const t of open) {
     const d = daysBetween(t.raisedOn);
@@ -478,6 +484,14 @@ function ticketAgingReport(s: ReportSnapshot): ReportResult {
       { key: "title", label: "Title" },
       { key: "priority", label: "Priority" },
       { key: "status", label: "Status" },
+      { key: "actionTaken", label: "Action Taken" },
+      { key: "backendAssigned", label: "Backend Assigned" },
+      { key: "backendForwardedAt", label: "Backend Forwarded At" },
+      { key: "eta", label: "Latest ETA" },
+      { key: "etaRevisedAt", label: "ETA Revised At" },
+      { key: "resolutionStatus", label: "Resolution Status" },
+      { key: "resolutionAt", label: "Resolution Date" },
+      { key: "resolutionNotes", label: "Resolution Notes" },
       { key: "age", label: "Age (days)" },
       { key: "company", label: "Company" },
     ],
@@ -487,6 +501,14 @@ function ticketAgingReport(s: ReportSnapshot): ReportResult {
         title: t.title,
         priority: t.priority,
         status: t.status,
+        actionTaken: t.actionTaken ?? "",
+        backendAssigned: t.backendAssigned ? "Yes" : "No",
+        backendForwardedAt: t.backendForwardedAt ?? "",
+        eta: t.eta,
+        etaRevisedAt: t.etaRevisedAt ?? "",
+        resolutionStatus: t.resolutionStatus,
+        resolutionAt: t.resolutionAt ?? "",
+        resolutionNotes: t.resolutionNotes ?? "",
         age: daysBetween(t.raisedOn),
         company: companyName(s.companies, t.companyId),
       }))
@@ -496,21 +518,35 @@ function ticketAgingReport(s: ReportSnapshot): ReportResult {
 
 function bugResolutionReport(s: ReportSnapshot): ReportResult {
   const bugs = s.tickets.filter((t) => t.type === "Bug");
-  const closed = bugs.filter((t) => t.status === "Closed" || t.status === "Released");
-  const open = bugs.filter((t) => t.status !== "Closed" && t.status !== "Released");
+  const closed = bugs.filter((t) => isTicketResolved(t));
+  const open = bugs.filter((t) => isTicketOpen(t));
   const byPriority: Record<string, number> = {};
   for (const b of open) byPriority[b.priority] = (byPriority[b.priority] ?? 0) + 1;
   const rate = bugs.length ? Math.round((closed.length / bugs.length) * 100) : 0;
+  const mttrSamples = closed
+    .map((t) => {
+      if (!t.resolutionAt) return null;
+      const raised = new Date(t.raisedOn).getTime();
+      const resolved = new Date(t.resolutionAt).getTime();
+      if (Number.isNaN(raised) || Number.isNaN(resolved) || resolved < raised) return null;
+      return Math.floor((resolved - raised) / 86400000);
+    })
+    .filter((days): days is number => days !== null);
+  const mttr =
+    mttrSamples.length === 0
+      ? "n/a"
+      : `${Math.round(mttrSamples.reduce((a, b) => a + b, 0) / mttrSamples.length)}d`;
 
   return {
     id: "bug-resolution",
     title: "Bug Resolution",
-    description: "Bug closure rate and open bugs by priority",
+    description: "Bug closure rate, MTTR (when resolution date is known), and open bugs by priority",
     kpis: [
       { label: "Bugs", value: bugs.length },
       { label: "Open", value: open.length, tone: open.length ? "warning" : "success" },
       { label: "Closed", value: closed.length, tone: "success" },
       { label: "Closure rate", value: `${rate}%` },
+      { label: "MTTR", value: mttr },
     ],
     chart: Object.entries(byPriority).map(([name, value]) => ({ name, value })),
     chartLabel: "Open bugs by priority",
@@ -519,6 +555,8 @@ function bugResolutionReport(s: ReportSnapshot): ReportResult {
       { key: "title", label: "Title" },
       { key: "priority", label: "Priority" },
       { key: "status", label: "Status" },
+      { key: "resolutionAt", label: "Resolved At" },
+      { key: "mttrDays", label: "Resolve Days" },
       { key: "age", label: "Age (days)" },
       { key: "developer", label: "Developer" },
     ],
@@ -527,6 +565,11 @@ function bugResolutionReport(s: ReportSnapshot): ReportResult {
       title: t.title,
       priority: t.priority,
       status: t.status,
+      resolutionAt: t.resolutionAt ?? "",
+      mttrDays:
+        t.resolutionAt && !Number.isNaN(new Date(t.resolutionAt).getTime())
+          ? Math.max(0, Math.floor((new Date(t.resolutionAt).getTime() - new Date(t.raisedOn).getTime()) / 86400000))
+          : "date unavailable",
       age: daysBetween(t.raisedOn),
       developer: employeeName(s.employees, t.developerId),
     })),
@@ -574,6 +617,71 @@ function customReport(s: ReportSnapshot): ReportResult {
         progress: projectProgress(p.id, s.checklist),
       };
     }),
+  };
+}
+
+function followUpReport(s: ReportSnapshot): ReportResult {
+  const today = new Date().toISOString().slice(0, 10);
+  const open = s.followUpTasks.filter(
+    (task) => !["completed", "cancelled"].includes(task.status),
+  );
+  const overdue = open.filter((task) => task.dueDate && task.dueDate < today);
+  const dueToday = open.filter((task) => task.dueDate === today);
+
+  const rows = s.followUpTasks
+    .map((task) => {
+      const latestUpdate = s.crmEvents
+        .filter((event) => event.taskId === task.id && Boolean(event.remark))
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+      return {
+        id: task.id,
+        company: companyName(s.companies, task.companyId),
+        title: task.title,
+        status: task.status,
+        priority: task.priority,
+        progress: task.progressPercent,
+        dueDate: task.dueDate ?? "",
+        assigneeUserId: task.assigneeUserId ?? "",
+        latestFollowUp: latestUpdate?.remark ?? "",
+        latestFollowUpAt: latestUpdate?.createdAt ?? "",
+        latestFollowUpBy: latestUpdate?.actorName ?? "",
+      };
+    })
+    .sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate)));
+
+  return {
+    id: "follow-ups",
+    title: "Follow-up Activity",
+    description: "Open, overdue, and completed CRM follow-ups with latest discussion notes",
+    kpis: [
+      { label: "Open", value: open.length, tone: open.length ? "warning" : "success" },
+      { label: "Overdue", value: overdue.length, tone: overdue.length ? "danger" : "success" },
+      { label: "Due today", value: dueToday.length },
+      { label: "Total", value: s.followUpTasks.length },
+    ],
+    chart: [
+      { name: "Open", value: open.length },
+      { name: "Overdue", value: overdue.length },
+      {
+        name: "Completed",
+        value: s.followUpTasks.filter((task) => task.status === "completed").length,
+      },
+    ],
+    chartLabel: "Follow-up status",
+    columns: [
+      { key: "id", label: "ID" },
+      { key: "company", label: "Company" },
+      { key: "title", label: "Follow-up" },
+      { key: "status", label: "Status" },
+      { key: "priority", label: "Priority" },
+      { key: "progress", label: "Progress %" },
+      { key: "dueDate", label: "Due Date" },
+      { key: "assigneeUserId", label: "Assignee User ID" },
+      { key: "latestFollowUp", label: "Latest Update" },
+      { key: "latestFollowUpAt", label: "Update Date" },
+      { key: "latestFollowUpBy", label: "Updated By" },
+    ],
+    rows,
   };
 }
 
@@ -646,6 +754,8 @@ export function buildReport(id: ReportId, snapshot: ReportSnapshot): ReportResul
       return ticketAgingReport(snapshot);
     case "bug-resolution":
       return bugResolutionReport(snapshot);
+    case "follow-ups":
+      return followUpReport(snapshot);
     case "custom":
       return customReport(snapshot);
     case "executive":
@@ -670,6 +780,7 @@ export const REPORT_META: {
   { id: "integrations", name: "Integration Status", desc: "Connected & tested integrations" },
   { id: "ticket-aging", name: "Ticket Aging", desc: "Open tickets by age band" },
   { id: "bug-resolution", name: "Bug Resolution", desc: "Bug MTTR and closure rate" },
+  { id: "follow-ups", name: "Follow-up Activity", desc: "CRM discussion updates and due work" },
   { id: "custom", name: "Custom Report", desc: "Flat extract for your own filters" },
   { id: "executive", name: "Executive Summary", desc: "One-pager for leadership" },
 ];

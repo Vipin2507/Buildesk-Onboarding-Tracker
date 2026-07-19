@@ -57,6 +57,8 @@ function ensureChecklist(projectId: string) {
         liveAt: null as string | null,
         notApplicable: false,
         remarks: "",
+        assigneeUserId: null as string | null,
+        dueDate: null as string | null,
         source: "default",
         createdAt: now,
         updatedAt: now,

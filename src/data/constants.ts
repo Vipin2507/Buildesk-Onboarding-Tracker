@@ -84,11 +84,15 @@ export const TRIGGER_EVENTS = [
 ];
 
 export const TICKET_KANBAN_COLUMNS = [
+  "Open",
+  "In Progress",
+  "Pending",
+  "Resolved",
+  "Closed",
+  // Legacy statuses kept so existing records remain editable during migration.
   "New",
   "Assigned",
-  "In Progress",
   "QA",
   "Ready for Release",
   "Released",
-  "Closed",
 ] as const;

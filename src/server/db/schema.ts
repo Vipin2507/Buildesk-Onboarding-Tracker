@@ -302,11 +302,17 @@ export const onboardingChecklistItems = sqliteTable(
     liveAt: text("live_at"),
     notApplicable: integer("not_applicable", { mode: "boolean" }).notNull().default(false),
     remarks: text("remarks").notNull().default(""),
+    assigneeUserId: text("assignee_user_id").references(() => users.id, { onDelete: "set null" }),
+    dueDate: text("due_date"),
     /** default | required-document */
     source: text("source").notNull().default("default"),
     ...timestamps,
   },
-  (t) => [index("checklist_project_idx").on(t.projectId)],
+  (t) => [
+    index("checklist_project_idx").on(t.projectId),
+    index("checklist_assignee_idx").on(t.assigneeUserId),
+    index("checklist_due_idx").on(t.dueDate),
+  ],
 );
 
 export const otherCharges = sqliteTable(
@@ -458,8 +464,38 @@ export const tickets = sqliteTable("tickets", {
   companyId: text("company_id"),
   projectId: text("project_id"),
   description: text("description").notNull().default(""),
+  assignedUserId: text("assigned_user_id").references(() => users.id, { onDelete: "set null" }),
+  actionTaken: text("action_taken").notNull().default(""),
+  backendAssigned: integer("backend_assigned", { mode: "boolean" }).notNull().default(false),
+  backendAssigneeId: text("backend_assignee_id"),
+  backendForwardedAt: text("backend_forwarded_at"),
+  resolutionStatus: text("resolution_status").notNull().default("Not Resolved"),
+  resolutionAt: text("resolution_at"),
+  etaRevisedAt: text("eta_revised_at"),
+  resolutionNotes: text("resolution_notes").notNull().default(""),
   ...timestamps,
 });
+
+export const ticketActivities = sqliteTable(
+  "ticket_activities",
+  {
+    id: text("id").primaryKey(),
+    ticketId: text("ticket_id")
+      .notNull()
+      .references(() => tickets.id, { onDelete: "cascade" }),
+    eventType: text("event_type").notNull(),
+    actorUserId: text("actor_user_id"),
+    actorName: text("actor_name").notNull(),
+    remark: text("remark"),
+    oldValuesJson: text("old_values_json"),
+    newValuesJson: text("new_values_json"),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [
+    index("ticket_activities_ticket_idx").on(t.ticketId),
+    index("ticket_activities_created_idx").on(t.createdAt),
+  ],
+);
 
 export const notifications = sqliteTable(
   "notifications",

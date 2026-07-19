@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, History, MessageSquareText, Pencil, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,7 +16,14 @@ import { DetailPageSkeleton } from "@/components/loading-skeleton";
 import { EntityNotFound } from "@/components/empty-state";
 import { useDetailLoading } from "@/hooks/use-detail-loading";
 import { TICKET_KANBAN_COLUMNS } from "@/data/constants";
-import { useTicketStore, useCompanyStore, useEmployeeStore, useProjectStore } from "@/stores";
+import {
+  useTicketStore,
+  useCompanyStore,
+  useEmployeeStore,
+  useProjectStore,
+  useUserStore,
+} from "@/stores";
+import { usePermissions } from "@/hooks/use-permissions";
 import type { TicketStatus } from "@/types";
 import { formatDate } from "@/lib/utils";
 
@@ -27,20 +34,20 @@ export const Route = createFileRoute("/support/$ticketId")({
 const ticketSchema = z.object({
   title: z.string().min(3),
   description: z.string().optional(),
-  type: z.enum(["Bug", "Customization", "Requirement"]),
+  type: z.enum(["Bug", "Feature Request", "Customization", "Enhancement", "Requirement", "Other"]),
   priority: z.enum(["Critical", "High", "Medium", "Low"]),
-  status: z.enum([
-    "New",
-    "Assigned",
-    "In Progress",
-    "QA",
-    "Ready for Release",
-    "Released",
-    "Closed",
-  ]),
+  status: z.enum(TICKET_KANBAN_COLUMNS),
   companyId: z.string().min(1),
   projectId: z.string().min(1),
   developerId: z.string(),
+  assignedUserId: z.string().optional(),
+  actionTaken: z.string().optional(),
+  backendAssigned: z.boolean(),
+  backendAssigneeId: z.string().optional(),
+  backendForwardedAt: z.string().optional(),
+  resolutionStatus: z.enum(["Resolved", "Not Resolved"]),
+  resolutionAt: z.string().optional(),
+  resolutionNotes: z.string().optional(),
   eta: z.string(),
 });
 
@@ -50,15 +57,25 @@ function TicketDetail() {
   const loading = useDetailLoading();
   const ticket = useTicketStore((s) => s.tickets.find((t) => t.id === ticketId));
   const updateTicket = useTicketStore((s) => s.updateTicket);
+  const ticketActivities = useTicketStore((s) =>
+    s.activities.filter((activity) => activity.ticketId === ticketId),
+  );
   const deleteTicket = useTicketStore((s) => s.deleteTicket);
   const companies = useCompanyStore((s) => s.companies);
   const projects = useProjectStore((s) => s.projects);
   const employees = useEmployeeStore((s) => s.employees);
+  const users = useUserStore((s) => s.users.filter((u) => u.active));
+  const { can, isAdmin } = usePermissions();
+  const canManageTickets = isAdmin || can("manageTickets");
   const company = companies.find((c) => c.id === ticket?.companyId);
   const project = projects.find((p) => p.id === ticket?.projectId);
   const developer = employees.find((e) => e.id === ticket?.developerId);
+  const owner = users.find((user) => user.id === ticket?.assignedUserId);
+  const backendAssignee = employees.find((e) => e.id === ticket?.backendAssigneeId);
 
   const [modalOpen, setModalOpen] = useState(false);
+  const [updateOpen, setUpdateOpen] = useState(false);
+  const [updateRemark, setUpdateRemark] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const form = useForm({
@@ -68,10 +85,18 @@ function TicketDetail() {
       description: "",
       type: "Bug" as const,
       priority: "Medium" as const,
-      status: "New" as const,
+      status: "Open" as const,
       companyId: "",
       projectId: "",
       developerId: "",
+      assignedUserId: "",
+      actionTaken: "",
+      backendAssigned: false,
+      backendAssigneeId: "",
+      backendForwardedAt: "",
+      resolutionStatus: "Not Resolved" as const,
+      resolutionAt: "",
+      resolutionNotes: "",
       eta: "",
     },
   });
@@ -95,12 +120,24 @@ function TicketDetail() {
       companyId: ticket!.companyId,
       projectId: ticket!.projectId ?? "",
       developerId: ticket!.developerId,
+      assignedUserId: ticket!.assignedUserId ?? "",
+      actionTaken: ticket!.actionTaken ?? "",
+      backendAssigned: ticket!.backendAssigned,
+      backendAssigneeId: ticket!.backendAssigneeId ?? "",
+      backendForwardedAt: ticket!.backendForwardedAt ?? "",
+      resolutionStatus: ticket!.resolutionStatus,
+      resolutionAt: ticket!.resolutionAt ?? "",
+      resolutionNotes: ticket!.resolutionNotes ?? "",
       eta: ticket!.eta,
     });
     setModalOpen(true);
   }
 
   function onStatusChange(status: TicketStatus) {
+    if (!canManageTickets) {
+      toast.error("You do not have permission to update tickets");
+      return;
+    }
     if (status === ticket!.status) return;
     updateTicket(ticket!.id, { status });
     toast.success(`Status → ${status}`);
@@ -112,6 +149,17 @@ function TicketDetail() {
       toast.success("Ticket updated");
       setModalOpen(false);
     })();
+  }
+
+  function saveUpdate() {
+    if (!updateRemark.trim()) {
+      toast.error("Enter an update or discussion note");
+      return;
+    }
+    updateTicket(ticket!.id, { updateRemark: updateRemark.trim() });
+    toast.success("Ticket update recorded");
+    setUpdateRemark("");
+    setUpdateOpen(false);
   }
 
   return (
@@ -132,20 +180,30 @@ function TicketDetail() {
         title={ticket.title}
         subtitle={ticket.id}
         actions={
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" className="gap-1.5" onClick={openEdit}>
-              <Pencil className="h-4 w-4" />
-              Edit
-            </Button>
-            <Button
-              variant="outline"
-              className="gap-1.5 text-destructive hover:text-destructive"
-              onClick={() => setDeleteOpen(true)}
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete
-            </Button>
-          </div>
+          canManageTickets ? (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                className="gap-1.5"
+                onClick={() => setUpdateOpen(true)}
+              >
+                <MessageSquareText className="h-4 w-4" />
+                Add Update
+              </Button>
+              <Button variant="outline" className="gap-1.5" onClick={openEdit}>
+                <Pencil className="h-4 w-4" />
+                Edit
+              </Button>
+              <Button
+                variant="outline"
+                className="gap-1.5 text-destructive hover:text-destructive"
+                onClick={() => setDeleteOpen(true)}
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </Button>
+            </div>
+          ) : undefined
         }
       />
 
@@ -184,8 +242,9 @@ function TicketDetail() {
             </div>
             <select
               value={ticket.status}
+              disabled={!canManageTickets}
               onChange={(e) => onStatusChange(e.target.value as TicketStatus)}
-              className="h-10 w-full max-w-xs rounded-lg border border-input bg-card px-3 text-sm outline-none focus:ring-2 focus:ring-ring/40"
+              className="h-10 w-full max-w-xs rounded-lg border border-input bg-card px-3 text-sm outline-none focus:ring-2 focus:ring-ring/40 disabled:opacity-60"
             >
               {TICKET_KANBAN_COLUMNS.map((s) => (
                 <option key={s} value={s}>
@@ -193,6 +252,45 @@ function TicketDetail() {
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="grid gap-4 border-t pt-4 sm:grid-cols-2">
+            <Meta label="Action Taken" value={ticket.actionTaken || "—"} />
+            <Meta label="Resolution Notes" value={ticket.resolutionNotes || "—"} />
+          </div>
+
+          <div className="border-t pt-4">
+            <div className="mb-3 flex items-center gap-2">
+              <History className="h-4 w-4 text-muted-foreground" />
+              <h3 className="text-sm font-semibold">Complete Activity Log</h3>
+            </div>
+            {ticketActivities.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No tracked updates yet.</p>
+            ) : (
+              <ol className="space-y-3">
+                {ticketActivities
+                  .slice()
+                  .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+                  .map((activity) => (
+                    <li key={activity.id} className="rounded-lg border p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="text-sm font-medium">
+                          {activity.eventType.replaceAll("_", " ")}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {formatDate(activity.createdAt)}
+                        </div>
+                      </div>
+                      {activity.remark ? (
+                        <p className="mt-2 whitespace-pre-wrap text-sm">{activity.remark}</p>
+                      ) : null}
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {activity.actorName}
+                      </div>
+                    </li>
+                  ))}
+              </ol>
+            )}
           </div>
         </motion.div>
 
@@ -236,8 +334,24 @@ function TicketDetail() {
             }
           />
           <Meta label="Developer" value={developer?.name ?? "—"} />
+          <Meta label="Internal Owner" value={owner?.name ?? "Unassigned"} />
+          <Meta label="Backend Assigned" value={ticket.backendAssigned ? "Yes" : "No"} />
+          <Meta label="Backend Assignee" value={backendAssignee?.name ?? "—"} />
+          <Meta
+            label="Forwarded to Backend"
+            value={ticket.backendForwardedAt ? formatDate(ticket.backendForwardedAt) : "—"}
+          />
           <Meta label="Raised on" value={formatDate(ticket.raisedOn)} />
           <Meta label="ETA" value={formatDate(ticket.eta)} />
+          <Meta
+            label="ETA Revised"
+            value={ticket.etaRevisedAt ? formatDate(ticket.etaRevisedAt) : "—"}
+          />
+          <Meta label="Resolution Status" value={ticket.resolutionStatus} />
+          <Meta
+            label="Resolution Date"
+            value={ticket.resolutionAt ? formatDate(ticket.resolutionAt) : "—"}
+          />
           <Meta label="Updated" value={formatDate(ticket.updatedAt)} />
         </motion.aside>
       </div>
@@ -264,7 +378,7 @@ function TicketDetail() {
             {...form.register("type")}
             className="h-9 rounded-md border border-input bg-card px-3 text-sm"
           >
-            {["Bug", "Customization", "Requirement"].map((t) => (
+            {["Bug", "Feature Request", "Customization", "Enhancement", "Requirement", "Other"].map((t) => (
               <option key={t} value={t}>
                 {t}
               </option>
@@ -330,6 +444,50 @@ function TicketDetail() {
               </option>
             ))}
           </select>
+          <select
+            {...form.register("assignedUserId")}
+            className="h-9 rounded-md border border-input bg-card px-3 text-sm"
+          >
+            <option value="">Unassigned internal owner</option>
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.name}
+              </option>
+            ))}
+          </select>
+          <textarea
+            {...form.register("actionTaken")}
+            placeholder="Action taken"
+            rows={3}
+            className="rounded-md border border-input bg-card px-3 py-2 text-sm"
+          />
+          <label className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
+            <input type="checkbox" {...form.register("backendAssigned")} />
+            Forwarded / assigned to Backend
+          </label>
+          {form.watch("backendAssigned") ? (
+            <>
+              <select
+                {...form.register("backendAssigneeId")}
+                className="h-9 rounded-md border border-input bg-card px-3 text-sm"
+              >
+                <option value="">Select Backend assignee</option>
+                {employees.map((employee) => (
+                  <option key={employee.id} value={employee.id}>
+                    {employee.name}
+                  </option>
+                ))}
+              </select>
+              <label className="space-y-1 text-xs text-muted-foreground">
+                Forwarded date & time
+                <input
+                  type="datetime-local"
+                  {...form.register("backendForwardedAt")}
+                  className="mt-1 h-9 w-full rounded-md border border-input bg-card px-3 text-sm text-foreground"
+                />
+              </label>
+            </>
+          ) : null}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">ETA</label>
             <DatePickerField
@@ -341,6 +499,70 @@ function TicketDetail() {
               yearsForward={3}
             />
           </div>
+          {ticket.etaRevisedAt ? (
+            <p className="text-xs text-muted-foreground">
+              Latest ETA revision: {formatDate(ticket.etaRevisedAt)}
+            </p>
+          ) : null}
+          <select
+            {...form.register("resolutionStatus")}
+            className="h-9 rounded-md border border-input bg-card px-3 text-sm"
+          >
+            <option value="Not Resolved">Not Resolved</option>
+            <option value="Resolved">Resolved</option>
+          </select>
+          {form.watch("resolutionStatus") === "Resolved" ? (
+            <label className="space-y-1 text-xs text-muted-foreground">
+              Resolution date & time
+              <input
+                type="datetime-local"
+                {...form.register("resolutionAt")}
+                className="mt-1 h-9 w-full rounded-md border border-input bg-card px-3 text-sm text-foreground"
+              />
+            </label>
+          ) : null}
+          <textarea
+            {...form.register("resolutionNotes")}
+            placeholder="Resolution notes / comments"
+            rows={3}
+            className="rounded-md border border-input bg-card px-3 py-2 text-sm"
+          />
+        </div>
+      </EntityFormModal>
+
+      <EntityFormModal
+        open={updateOpen}
+        onOpenChange={setUpdateOpen}
+        title="Add Ticket Update"
+        submitLabel="Record Update"
+        onSubmit={saveUpdate}
+      >
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {["Follow-up taken", "Customer contacted", "Backend discussion completed"].map(
+              (preset) => (
+                <Button
+                  key={preset}
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setUpdateRemark(preset)}
+                >
+                  {preset}
+                </Button>
+              ),
+            )}
+          </div>
+          <textarea
+            value={updateRemark}
+            onChange={(e) => setUpdateRemark(e.target.value)}
+            rows={5}
+            placeholder="Record action, communication, customer discussion, or follow-up notes…"
+            className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm"
+          />
+          <p className="text-xs text-muted-foreground">
+            Updates are stored in the immutable ticket activity log for audit and reporting.
+          </p>
         </div>
       </EntityFormModal>
 
