@@ -21,7 +21,8 @@ import {
   useCompanyStore,
   useEmployeeStore,
   useProjectStore,
-  useUserStore,
+  useActiveUsers,
+  useTicketActivities,
 } from "@/stores";
 import { usePermissions } from "@/hooks/use-permissions";
 import type { TicketStatus } from "@/types";
@@ -57,14 +58,12 @@ function TicketDetail() {
   const loading = useDetailLoading();
   const ticket = useTicketStore((s) => s.tickets.find((t) => t.id === ticketId));
   const updateTicket = useTicketStore((s) => s.updateTicket);
-  const ticketActivities = useTicketStore((s) =>
-    s.activities.filter((activity) => activity.ticketId === ticketId),
-  );
+  const ticketActivities = useTicketActivities(ticketId);
   const deleteTicket = useTicketStore((s) => s.deleteTicket);
   const companies = useCompanyStore((s) => s.companies);
   const projects = useProjectStore((s) => s.projects);
   const employees = useEmployeeStore((s) => s.employees);
-  const users = useUserStore((s) => s.users.filter((u) => u.active));
+  const users = useActiveUsers();
   const { can, isAdmin } = usePermissions();
   const canManageTickets = isAdmin || can("manageTickets");
   const company = companies.find((c) => c.id === ticket?.companyId);

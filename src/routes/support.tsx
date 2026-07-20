@@ -34,7 +34,7 @@ import {
   useCompanyStore,
   useEmployeeStore,
   useProjectStore,
-  useUserStore,
+  useActiveUsers,
 } from "@/stores";
 import { usePermissions } from "@/hooks/use-permissions";
 import { isTicketOpen } from "@/lib/tickets";
@@ -77,7 +77,7 @@ function SupportListPage() {
   const companies = useCompanyStore((s) => s.companies);
   const projects = useProjectStore((s) => s.projects);
   const employees = useEmployeeStore((s) => s.employees);
-  const users = useUserStore((s) => s.users.filter((u) => u.active));
+  const users = useActiveUsers();
   const { can, isAdmin } = usePermissions();
   const canManageTickets = isAdmin || can("manageTickets");
 

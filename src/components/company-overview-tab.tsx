@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Building2,
   Calendar,
@@ -98,9 +98,11 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
     defaultValues: toFormValues(company),
   });
 
+  const companyFormSnapshot = useMemo(() => toFormValues(company), [company]);
+
   useEffect(() => {
-    if (!editing) form.reset(toFormValues(company));
-  }, [company, editing, form]);
+    if (!editing) form.reset(companyFormSnapshot);
+  }, [companyFormSnapshot, editing, form]);
   const managerName = resolveAssigneeName(company.onboardingManagerId, users, employees);
   const salesAgentName = resolveAssigneeName(company.salesAgentId, users, employees);
   const csmName = resolveAssigneeName(company.csmId, users, employees);

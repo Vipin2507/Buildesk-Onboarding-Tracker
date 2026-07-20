@@ -36,6 +36,8 @@ export {
   useRecentActivity,
   useUpcomingRenewals,
   useGlobalSearch,
+  useActiveUsers,
+  useTicketActivities,
   useCompanyProgress,
   useProjectWithProgress,
   useModuleProgress,

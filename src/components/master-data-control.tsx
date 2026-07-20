@@ -484,10 +484,14 @@ function CompanyAdminEditModal({
   });
 
   const open = !!company;
+  const companyFormSnapshot = useMemo(
+    () => (company ? companyToForm(company) : null),
+    [company],
+  );
 
   useEffect(() => {
-    if (company) form.reset(companyToForm(company));
-  }, [company, form]);
+    if (companyFormSnapshot) form.reset(companyFormSnapshot);
+  }, [companyFormSnapshot, form]);
 
   const managers = assignableManagerUsers(users);
   const csms = managers;

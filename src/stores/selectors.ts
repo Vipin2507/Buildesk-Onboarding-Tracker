@@ -356,6 +356,20 @@ export function useProjectWithProgress(projectId: string) {
   }, [project, checklistItems, companies, projectId, progressByProject]);
 }
 
+/** Active users — select raw store slice, then derive (avoids update-depth loops). */
+export function useActiveUsers() {
+  const users = useUserStore((s) => s.users);
+  return useMemo(() => users.filter((u) => u.active), [users]);
+}
+
+export function useTicketActivities(ticketId: string) {
+  const activities = useTicketStore((s) => s.activities);
+  return useMemo(
+    () => activities.filter((activity) => activity.ticketId === ticketId),
+    [activities, ticketId],
+  );
+}
+
 export function useGlobalSearch(query: string) {
   const q = query.toLowerCase().trim();
   const companies = useCompanyStore((s) => s.companies);

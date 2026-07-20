@@ -24,7 +24,7 @@ import {
   useProjectStore,
   useOnboardingStore,
   useActivityStore,
-  useUserStore,
+  useActiveUsers,
   calcProjectProgress,
 } from "@/stores";
 import { ONBOARDING_STEPS, ONBOARDING_SECTIONS } from "@/data/constants";
@@ -93,7 +93,7 @@ function ProjectDetailPage() {
   const allChecklist = useOnboardingStore((s) => s.checklistItems);
   const allCharges = useOnboardingStore((s) => s.otherCharges);
   const allActivities = useActivityStore((s) => s.activities);
-  const users = useUserStore((s) => s.users.filter((u) => u.active));
+  const users = useActiveUsers();
   const checklist = useMemo(() => allChecklist.filter((i) => i.projectId === projectId), [allChecklist, projectId]);
   const progress = useMemo(
     () => calcProjectProgress(projectId, allChecklist),
