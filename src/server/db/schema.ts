@@ -628,6 +628,65 @@ export const triggers = sqliteTable("triggers", {
   ...timestamps,
 });
 
+/** Client design-ticket portal slug per company (public lookup by slug). */
+export const companyPortalAccess = sqliteTable(
+  "company_portal_access",
+  {
+    companyId: text("company_id")
+      .primaryKey()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    companyName: text("company_name").notNull(),
+    slug: text("slug").notNull().unique(),
+    contactName: text("contact_name").notNull(),
+    contactEmail: text("contact_email").notNull(),
+    isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("company_portal_access_slug_uidx").on(t.slug)],
+);
+
+export const designTickets = sqliteTable(
+  "design_tickets",
+  {
+    id: text("id").primaryKey(),
+    ticketNumber: text("ticket_number").notNull().unique(),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    subject: text("subject").notNull(),
+    description: text("description").notNull(),
+    category: text("category"),
+    priority: text("priority").notNull(),
+    status: text("status").notNull(),
+    assigneeId: text("assignee_id"),
+    createdByType: text("created_by_type").notNull(),
+    createdByName: text("created_by_name").notNull(),
+    resolvedAt: text("resolved_at"),
+    ...timestamps,
+  },
+  (t) => [
+    index("design_tickets_company_idx").on(t.companyId),
+    index("design_tickets_status_idx").on(t.status),
+  ],
+);
+
+export const designTicketMessages = sqliteTable(
+  "design_ticket_messages",
+  {
+    id: text("id").primaryKey(),
+    ticketId: text("ticket_id")
+      .notNull()
+      .references(() => designTickets.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    authorType: text("author_type").notNull(),
+    authorName: text("author_name").notNull(),
+    message: text("message").notNull(),
+    attachmentsJson: text("attachments_json"),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [index("design_ticket_messages_ticket_idx").on(t.ticketId)],
+);
+
 /** JSON blob stores for admin config catalogs (master + app settings). */
 export const appConfig = sqliteTable("app_config", {
   key: text("key").primaryKey(),

@@ -70,12 +70,16 @@ function PortalTicketDetail() {
           reply={{
             placeholder: "Reply to the Buildesk team…",
             onSend: (message, attachments) => {
-              addMessage(ticketId, {
-                authorType: "client",
-                authorName: access.contactName,
-                message,
-                attachments,
-              });
+              addMessage(
+                ticketId,
+                {
+                  authorType: "client",
+                  authorName: access.contactName,
+                  message,
+                  attachments,
+                },
+                { portalSlug: slug },
+              );
               toast.success("Reply sent");
             },
           }}

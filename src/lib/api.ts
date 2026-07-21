@@ -128,3 +128,28 @@ export {
   listCrmEvents,
   getCrmDashboardSummary,
 } from "@/server/api/crm";
+
+export {
+  getPortalBySlug,
+  listCompanyPortalAccess,
+  ensureCompanyPortals,
+  upsertCompanyPortalAccess,
+  regenerateCompanyPortalSlug,
+  setCompanyPortalActive,
+  updateCompanyPortalContact,
+} from "@/server/api/portal";
+
+export {
+  listDesignTickets,
+  getDesignTicket,
+  createDesignTicket,
+  addDesignTicketMessage,
+  updateDesignTicketStatus,
+  updateDesignTicketPriority,
+  assignDesignTicket,
+  deleteDesignTicket,
+  listPortalDesignTickets,
+  getPortalDesignTicket,
+  createPortalDesignTicket,
+  addPortalDesignTicketMessage,
+} from "@/server/api/design-tickets";

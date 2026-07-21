@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/sheet";
 import type { CompanyPortalAccess } from "@/types/design-ticket";
 import { cn } from "@/lib/utils";
+import { PortalDesignTicketBootstrap } from "@/components/portal-design-ticket-bootstrap";
 
 const NAV = [
   { to: "dashboard", label: "Dashboard", shortLabel: "Home", icon: LayoutDashboard },
@@ -131,6 +132,7 @@ export function ClientPortalLayout({ access }: { access: CompanyPortalAccess }) 
 
   return (
     <div className="flex min-h-[100dvh] bg-background text-foreground">
+      <PortalDesignTicketBootstrap access={access} />
       <aside className="hidden w-60 shrink-0 flex-col border-r bg-card/50 md:flex">
         <div className="border-b p-4">
           <div className="flex items-center gap-2">

@@ -28,6 +28,8 @@ import {
   listModuleSubscriptions,
   listModuleSubscriptionEvents,
   listCrmEvents,
+  ensureCompanyPortals,
+  listDesignTickets,
 } from "@/lib/api";
 import { wireConfigPersistence } from "@/lib/config-persistence";
 import { mapTicket, mapTicketActivity } from "@/lib/tickets";
@@ -55,6 +57,8 @@ import {
   useClientVisitStore,
   useCrmEventStore,
 } from "@/stores";
+import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
+import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
 
 /**
  * After session hydrate, pull authoritative data from SQLite into Zustand caches
@@ -109,6 +113,8 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           moduleSubscriptions,
           subscriptionEvents,
           crmEvents,
+          portalAccess,
+          designTickets,
         ] = await Promise.all([
           listCompanies(),
           listProjects({ data: {} }),
@@ -140,6 +146,8 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           listModuleSubscriptions({ data: {} }).catch(() => []),
           listModuleSubscriptionEvents({ data: {} }).catch(() => []),
           listCrmEvents({ data: { limit: 200 } }).catch(() => []),
+          ensureCompanyPortals().catch(() => []),
+          listDesignTickets({ data: {} }).catch(() => []),
         ]);
 
         if (cancelled) return;
@@ -190,6 +198,8 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           subscriptionEvents,
           events: crmEvents,
         });
+        useCompanyPortalStore.getState().hydrateAccess(portalAccess);
+        useDesignTicketStore.getState().hydrateTickets(designTickets);
         useVendorStore.setState({
           materials: vendors.materials,
           suppliers: vendors.suppliers,

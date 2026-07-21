@@ -658,6 +658,59 @@ function ensureCrmTables() {
     console.log("+ CREATE TABLE crm_events");
   }
 
+  if (!tableExists("company_portal_access")) {
+    sqlite.exec(`
+      CREATE TABLE company_portal_access (
+        company_id TEXT PRIMARY KEY NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        company_name TEXT NOT NULL,
+        slug TEXT NOT NULL UNIQUE,
+        contact_name TEXT NOT NULL,
+        contact_email TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS company_portal_access_slug_uidx ON company_portal_access(slug);
+    `);
+    console.log("+ CREATE TABLE company_portal_access");
+  }
+
+  if (!tableExists("design_tickets")) {
+    sqlite.exec(`
+      CREATE TABLE design_tickets (
+        id TEXT PRIMARY KEY NOT NULL,
+        ticket_number TEXT NOT NULL UNIQUE,
+        company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        subject TEXT NOT NULL,
+        description TEXT NOT NULL,
+        category TEXT,
+        priority TEXT NOT NULL,
+        status TEXT NOT NULL,
+        assignee_id TEXT,
+        created_by_type TEXT NOT NULL,
+        created_by_name TEXT NOT NULL,
+        resolved_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS design_tickets_company_idx ON design_tickets(company_id);
+      CREATE INDEX IF NOT EXISTS design_tickets_status_idx ON design_tickets(status);
+
+      CREATE TABLE design_ticket_messages (
+        id TEXT PRIMARY KEY NOT NULL,
+        ticket_id TEXT NOT NULL REFERENCES design_tickets(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL,
+        author_type TEXT NOT NULL,
+        author_name TEXT NOT NULL,
+        message TEXT NOT NULL,
+        attachments_json TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS design_ticket_messages_ticket_idx ON design_ticket_messages(ticket_id);
+    `);
+    console.log("+ CREATE TABLE design_tickets + design_ticket_messages");
+  }
+
   // Unique (company_id, module_key) on company_modules when possible
   try {
     sqlite.exec(
