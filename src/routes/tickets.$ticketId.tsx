@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 
@@ -9,7 +10,12 @@ import {
   DESIGN_TICKET_PRIORITIES,
   DESIGN_TICKET_STATUSES,
 } from "@/components/design-ticket/design-ticket-chips";
-import { PageHeader, PageWrap } from "@/components/page-header";
+import {
+  InternalTicketsNav,
+  TICKET_EASE,
+  ticketSelectClass,
+} from "@/components/design-ticket/design-ticket-shared";
+import { PageWrap } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { EntityNotFound } from "@/components/empty-state";
 import { formatDate } from "@/lib/utils";
@@ -55,6 +61,8 @@ function InternalTicketDetail() {
 
   return (
     <PageWrap>
+      <InternalTicketsNav />
+
       <Button
         variant="ghost"
         size="sm"
@@ -62,27 +70,39 @@ function InternalTicketDetail() {
         onClick={() => void navigate({ to: "/tickets" })}
       >
         <ArrowLeft className="h-4 w-4" />
-        Ticket Tracking
+        All Tickets
       </Button>
 
-      <PageHeader
-        title={`${ticket.ticketNumber} — ${ticket.subject}`}
-        subtitle={company?.name ?? "Unknown company"}
-      />
-      {company ? (
-        <p className="-mt-4 mb-4 text-sm">
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: TICKET_EASE }}
+        className="mb-4"
+      >
+        <h1 className="text-lg font-semibold leading-snug sm:text-xl">
+          <span className="text-primary">{ticket.ticketNumber}</span>
+          <span className="text-muted-foreground"> — </span>
+          {ticket.subject}
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">{company?.name ?? "Unknown company"}</p>
+        {company ? (
           <Link
             to="/companies/$companyId"
             params={{ companyId: company.id }}
-            className="text-primary hover:underline"
+            className="mt-1 inline-block text-sm text-primary hover:underline"
           >
             View company profile
           </Link>
-        </p>
-      ) : null}
+        ) : null}
+      </motion.div>
 
-      <div className="mb-4 flex flex-wrap gap-3">
-        <label className="flex items-center gap-2 text-sm">
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, delay: 0.05, ease: TICKET_EASE }}
+        className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+      >
+        <label className="space-y-1 text-xs font-medium">
           Status
           <select
             value={ticket.status}
@@ -90,7 +110,7 @@ function InternalTicketDetail() {
               updateStatus(ticketId, e.target.value as DesignTicketStatus, actorName);
               toast.success("Status updated");
             }}
-            className="h-9 rounded-md border bg-card px-2 text-sm"
+            className={ticketSelectClass}
           >
             {DESIGN_TICKET_STATUSES.map((s) => (
               <option key={s} value={s}>
@@ -99,7 +119,7 @@ function InternalTicketDetail() {
             ))}
           </select>
         </label>
-        <label className="flex items-center gap-2 text-sm">
+        <label className="space-y-1 text-xs font-medium">
           Priority
           <select
             value={ticket.priority}
@@ -107,7 +127,7 @@ function InternalTicketDetail() {
               updatePriority(ticketId, e.target.value as DesignTicketPriority, actorName);
               toast.success("Priority updated");
             }}
-            className="h-9 rounded-md border bg-card px-2 text-sm"
+            className={ticketSelectClass}
           >
             {DESIGN_TICKET_PRIORITIES.map((p) => (
               <option key={p} value={p}>
@@ -116,7 +136,7 @@ function InternalTicketDetail() {
             ))}
           </select>
         </label>
-        <label className="flex items-center gap-2 text-sm">
+        <label className="space-y-1 text-xs font-medium sm:col-span-2 xl:col-span-1">
           Assignee
           <select
             value={ticket.assigneeId ?? ""}
@@ -126,7 +146,7 @@ function InternalTicketDetail() {
               assignTicket(ticketId, id, name, actorName);
               toast.success("Assignee updated");
             }}
-            className="h-9 min-w-[160px] rounded-md border bg-card px-2 text-sm"
+            className={ticketSelectClass}
           >
             <option value="">Unassigned</option>
             {assigneeOptions.map((o) => (
@@ -136,12 +156,19 @@ function InternalTicketDetail() {
             ))}
           </select>
         </label>
-        <DesignTicketStatusPill status={ticket.status} />
-        <DesignTicketPriorityChip priority={ticket.priority} />
-      </div>
+        <div className="flex flex-wrap items-end gap-2 sm:col-span-2 xl:col-span-1">
+          <DesignTicketStatusPill status={ticket.status} />
+          <DesignTicketPriorityChip priority={ticket.priority} />
+        </div>
+      </motion.div>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
-        <div className="card-soft p-4">
+        <motion.div
+          initial={{ opacity: 0, x: -10 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4, delay: 0.08, ease: TICKET_EASE }}
+          className="card-soft p-3 sm:p-4"
+        >
           <DesignTicketThread
             ticket={ticket}
             mode="internal"
@@ -158,9 +185,14 @@ function InternalTicketDetail() {
               },
             }}
           />
-        </div>
+        </motion.div>
 
-        <aside className="card-soft space-y-4 p-4 text-sm">
+        <motion.aside
+          initial={{ opacity: 0, x: 10 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4, delay: 0.12, ease: TICKET_EASE }}
+          className="card-soft space-y-4 p-4 text-sm lg:sticky lg:top-20 lg:self-start"
+        >
           <div>
             <div className="text-xs text-muted-foreground">Created by</div>
             <div className="font-medium">
@@ -186,12 +218,12 @@ function InternalTicketDetail() {
             {statusHistory.length === 0 ? (
               <p className="text-xs text-muted-foreground">No status changes yet.</p>
             ) : (
-              <ol className="space-y-2 text-xs">
+              <ol className="max-h-48 space-y-2 overflow-y-auto text-xs">
                 {statusHistory
                   .slice()
                   .reverse()
                   .map((m) => (
-                    <li key={m.id} className="rounded border px-2 py-1.5">
+                    <li key={m.id} className="rounded-lg border px-2.5 py-1.5">
                       {m.message}
                       <div className="text-muted-foreground">{formatDate(m.createdAt)}</div>
                     </li>
@@ -199,7 +231,7 @@ function InternalTicketDetail() {
               </ol>
             )}
           </div>
-        </aside>
+        </motion.aside>
       </div>
     </PageWrap>
   );

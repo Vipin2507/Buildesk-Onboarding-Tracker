@@ -1,9 +1,9 @@
 import { createFileRoute, Link, Outlet, useChildMatches, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { MoreHorizontal, Trash2 } from "lucide-react";
+import { motion } from "framer-motion";
+import { Link2, MoreHorizontal, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { CountUp } from "@/components/count-up";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import {
@@ -12,7 +12,16 @@ import {
   DESIGN_TICKET_PRIORITIES,
   DESIGN_TICKET_STATUSES,
 } from "@/components/design-ticket/design-ticket-chips";
-import { PageHeader, PageWrap } from "@/components/page-header";
+import {
+  DesignTicketInfoBanner,
+  DesignTicketKpiGrid,
+  DesignTicketPageHeader,
+  DesignTicketSection,
+  InternalTicketsNav,
+  TICKET_EASE,
+  ticketSelectClass,
+} from "@/components/design-ticket/design-ticket-shared";
+import { PageWrap } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -100,10 +109,10 @@ function TicketsDashboard() {
 
   const kpiCards = [
     { label: "Total Tickets", value: stats.total },
-    { label: "Open", value: stats.open },
-    { label: "In Progress", value: stats.inProgress },
-    { label: "Resolved", value: stats.resolved },
-    { label: "Closed", value: stats.closed },
+    { label: "Open", value: stats.open, tone: "text-info" },
+    { label: "In Progress", value: stats.inProgress, tone: "text-warning-foreground" },
+    { label: "Resolved", value: stats.resolved, tone: "text-success" },
+    { label: "Closed", value: stats.closed, tone: "text-muted-foreground" },
   ];
 
   function applyFilters() {
@@ -118,35 +127,34 @@ function TicketsDashboard() {
 
   return (
     <PageWrap>
-      <PageHeader
+      <DesignTicketPageHeader
         title="Ticket Tracking"
         subtitle="Design & client support desk — triage tickets across all companies."
         actions={
-          <Button variant="outline" asChild>
-            <Link to="/tickets/links">Company Portal Links</Link>
+          <Button variant="outline" className="gap-1.5" asChild>
+            <Link to="/tickets/links">
+              <Link2 className="h-4 w-4" />
+              Portal Links
+            </Link>
           </Button>
         }
       />
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        {kpiCards.map((k) => (
-          <div key={k.label} className="card-soft p-4">
-            <div className="text-xs text-muted-foreground">{k.label}</div>
-            <div className="mt-1 text-2xl font-semibold">
-              <CountUp to={k.value} />
-            </div>
-          </div>
-        ))}
+      <InternalTicketsNav />
+
+      <div className="mb-6">
+        <DesignTicketKpiGrid items={kpiCards} columns={5} />
       </div>
 
-      <div className="card-soft mb-4 grid gap-3 p-4 md:grid-cols-2 lg:grid-cols-5">
-        <label className="space-y-1 text-xs">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, delay: 0.08, ease: TICKET_EASE }}
+        className="card-soft mb-4 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
+      >
+        <label className="space-y-1.5 text-xs font-medium">
           Company
-          <select
-            value={companyFilter}
-            onChange={(e) => setCompanyFilter(e.target.value)}
-            className="h-9 w-full rounded-md border bg-card px-2 text-sm"
-          >
+          <select value={companyFilter} onChange={(e) => setCompanyFilter(e.target.value)} className={ticketSelectClass}>
             <option value="all">All Companies</option>
             {companies.map((c) => (
               <option key={c.id} value={c.id}>
@@ -155,12 +163,12 @@ function TicketsDashboard() {
             ))}
           </select>
         </label>
-        <label className="space-y-1 text-xs">
+        <label className="space-y-1.5 text-xs font-medium">
           Status
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-            className="h-9 w-full rounded-md border bg-card px-2 text-sm"
+            className={ticketSelectClass}
           >
             <option value="all">All</option>
             {DESIGN_TICKET_STATUSES.map((s) => (
@@ -170,12 +178,12 @@ function TicketsDashboard() {
             ))}
           </select>
         </label>
-        <label className="space-y-1 text-xs">
+        <label className="space-y-1.5 text-xs font-medium">
           Priority
           <select
             value={priorityFilter}
             onChange={(e) => setPriorityFilter(e.target.value as typeof priorityFilter)}
-            className="h-9 w-full rounded-md border bg-card px-2 text-sm"
+            className={ticketSelectClass}
           >
             <option value="all">All</option>
             {DESIGN_TICKET_PRIORITIES.map((p) => (
@@ -185,28 +193,29 @@ function TicketsDashboard() {
             ))}
           </select>
         </label>
-        <label className="space-y-1 text-xs">
+        <label className="space-y-1.5 text-xs font-medium">
           Created from
-          <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9" />
+          <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-10" />
         </label>
-        <label className="space-y-1 text-xs">
+        <label className="space-y-1.5 text-xs font-medium">
           Created to
-          <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9" />
+          <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-10" />
         </label>
-        <div className="flex items-end lg:col-span-5">
-          <Button type="button" onClick={applyFilters}>
+        <div className="flex items-end sm:col-span-2 lg:col-span-3 xl:col-span-5">
+          <Button type="button" className="w-full sm:w-auto" onClick={applyFilters}>
             Apply Filters
           </Button>
         </div>
-      </div>
+      </motion.div>
 
-      {filtered.length === 0 ? (
-        <EmptyState
-          title="No tickets yet"
-          description="When a client submits a ticket from their portal, it will appear here instantly."
-        />
-      ) : (
-        <DataTable
+      <DesignTicketSection title="Recent Tickets" delay={0.12}>
+        {filtered.length === 0 ? (
+          <EmptyState
+            title="No tickets yet"
+            description="When a client submits a ticket from their portal, it will appear here instantly."
+          />
+        ) : (
+          <DataTable
           data={filtered}
           getRowId={(r) => r.id}
           hideSearch
@@ -288,21 +297,24 @@ function TicketsDashboard() {
             </DropdownMenu>
           )}
         />
-      )}
+        )}
+      </DesignTicketSection>
 
-      <div className="mt-6 rounded-lg border border-info/30 bg-info/5 px-4 py-3 text-center text-sm text-muted-foreground">
-        Team replies, updates and status changes are visible to the client in real time.
+      <div className="mt-6 space-y-4">
+        <DesignTicketInfoBanner>
+          Team replies, updates and status changes are visible to the client in real time.
+        </DesignTicketInfoBanner>
+
+        {portalAccess.length > 0 ? (
+          <p className="text-center text-xs text-muted-foreground">
+            {portalAccess.filter((a) => a.isActive).length} active client portal
+            {portalAccess.filter((a) => a.isActive).length === 1 ? "" : "s"} —{" "}
+            <Link to="/tickets/links" className="text-primary hover:underline">
+              manage links
+            </Link>
+          </p>
+        ) : null}
       </div>
-
-      {portalAccess.length > 0 ? (
-        <div className="mt-4 text-xs text-muted-foreground">
-          {portalAccess.filter((a) => a.isActive).length} active client portal
-          {portalAccess.filter((a) => a.isActive).length === 1 ? "" : "s"} —{" "}
-          <Link to="/tickets/links" className="text-primary hover:underline">
-            manage links
-          </Link>
-        </div>
-      ) : null}
     </PageWrap>
   );
 }

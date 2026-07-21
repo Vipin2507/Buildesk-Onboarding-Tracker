@@ -2,7 +2,15 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { PageWrap } from "@/components/page-header";
+import {
+  DesignTicketFormCard,
+  DesignTicketFormField,
+  DesignTicketPageHeader,
+  PortalPageWrap,
+  ticketFieldClass,
+  ticketSelectClass,
+  ticketTextareaClass,
+} from "@/components/design-ticket/design-ticket-shared";
 import { Button } from "@/components/ui/button";
 import { DESIGN_TICKET_CATEGORIES } from "@/types/design-ticket";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
@@ -51,73 +59,66 @@ function PortalCreateTicket() {
   }
 
   return (
-    <PageWrap>
-      <h1 className="mb-1 text-xl font-semibold">Create New Ticket</h1>
-      <p className="mb-6 text-sm text-muted-foreground">
-        Describe your design or support request — our team will respond in the thread.
-      </p>
+    <PortalPageWrap>
+      <DesignTicketPageHeader
+        title="Create New Ticket"
+        subtitle="Describe your design or support request — our team will respond in the thread."
+      />
 
-      <form onSubmit={onSubmit} className="card-soft mx-auto max-w-2xl space-y-4 p-5">
-        <label className="block space-y-1 text-sm">
-          Subject
-          <input
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-            className="h-10 w-full rounded-md border bg-card px-3"
-            required
-          />
-        </label>
-        <label className="block space-y-1 text-sm">
-          Category
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="h-10 w-full rounded-md border bg-card px-3"
-          >
-            {DESIGN_TICKET_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block space-y-1 text-sm">
-          Priority
-          <select
-            value={priority}
-            onChange={(e) => setPriority(e.target.value as DesignTicketPriority)}
-            className="h-10 w-full rounded-md border bg-card px-3"
-          >
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
-        </label>
-        <label className="block space-y-1 text-sm">
-          Description
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={6}
-            className="w-full rounded-md border bg-card px-3 py-2"
-            required
-          />
-        </label>
-        <label className="block space-y-1 text-sm">
-          Attachments
-          <input
-            type="file"
-            multiple
-            onChange={(e) => {
-              setAttachments(Array.from(e.target.files ?? []).map((f) => ({ name: f.name })));
-            }}
-            className="block w-full text-sm"
-          />
-        </label>
-        <Button type="submit" className="w-full sm:w-auto">
-          Submit Ticket
-        </Button>
+      <form onSubmit={onSubmit}>
+        <DesignTicketFormCard>
+          <DesignTicketFormField label="Subject">
+            <input
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              className={ticketFieldClass}
+              required
+            />
+          </DesignTicketFormField>
+          <DesignTicketFormField label="Category">
+            <select value={category} onChange={(e) => setCategory(e.target.value)} className={ticketSelectClass}>
+              {DESIGN_TICKET_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </DesignTicketFormField>
+          <DesignTicketFormField label="Priority">
+            <select
+              value={priority}
+              onChange={(e) => setPriority(e.target.value as DesignTicketPriority)}
+              className={ticketSelectClass}
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </DesignTicketFormField>
+          <DesignTicketFormField label="Description">
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={6}
+              className={ticketTextareaClass}
+              required
+            />
+          </DesignTicketFormField>
+          <DesignTicketFormField label="Attachments">
+            <input
+              type="file"
+              multiple
+              onChange={(e) => {
+                setAttachments(Array.from(e.target.files ?? []).map((f) => ({ name: f.name })));
+              }}
+              className="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary"
+            />
+          </DesignTicketFormField>
+          <Button type="submit" className="w-full sm:w-auto">
+            Submit Ticket
+          </Button>
+        </DesignTicketFormCard>
       </form>
-    </PageWrap>
+    </PortalPageWrap>
   );
 }

@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import { DesignTicketStatusPill } from "@/components/design-ticket/design-ticket-chips";
-import { PageWrap } from "@/components/page-header";
+import { DesignTicketPageHeader, PortalPageWrap } from "@/components/design-ticket/design-ticket-shared";
 import { formatDate } from "@/lib/utils";
 import { isDesignTicketSolved } from "@/stores/design-ticket-selectors";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
@@ -26,8 +26,12 @@ function PortalSolvedTickets() {
     .sort((a, b) => (b.resolvedAt ?? b.updatedAt).localeCompare(a.resolvedAt ?? a.updatedAt));
 
   return (
-    <PageWrap>
-      <h1 className="mb-6 text-xl font-semibold">Solved Tickets</h1>
+    <PortalPageWrap>
+      <DesignTicketPageHeader
+        title="Solved Tickets"
+        subtitle="Resolved and closed requests from your company."
+      />
+
       {rows.length === 0 ? (
         <EmptyState title="No solved tickets yet" description="Resolved and closed tickets will appear here." />
       ) : (
@@ -50,6 +54,6 @@ function PortalSolvedTickets() {
           ]}
         />
       )}
-    </PageWrap>
+    </PortalPageWrap>
   );
 }

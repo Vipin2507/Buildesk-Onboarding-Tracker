@@ -6,7 +6,7 @@ import {
   DesignTicketPriorityChip,
   DesignTicketStatusPill,
 } from "@/components/design-ticket/design-ticket-chips";
-import { PageWrap } from "@/components/page-header";
+import { DesignTicketPageHeader, PortalPageWrap } from "@/components/design-ticket/design-ticket-shared";
 import { formatDate } from "@/lib/utils";
 import { isDesignTicketActive } from "@/stores/design-ticket-selectors";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
@@ -29,8 +29,12 @@ function PortalMyTickets() {
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
   return (
-    <PageWrap>
-      <h1 className="mb-6 text-xl font-semibold">My Tickets</h1>
+    <PortalPageWrap>
+      <DesignTicketPageHeader
+        title="My Tickets"
+        subtitle="Open and in-progress requests for your company."
+      />
+
       {rows.length === 0 ? (
         <EmptyState title="No open tickets" description="Create a ticket to start a conversation with our team." />
       ) : (
@@ -54,6 +58,6 @@ function PortalMyTickets() {
           ]}
         />
       )}
-    </PageWrap>
+    </PortalPageWrap>
   );
 }

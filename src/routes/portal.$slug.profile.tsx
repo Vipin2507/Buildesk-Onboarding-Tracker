@@ -1,7 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 
-import { PageWrap } from "@/components/page-header";
+import {
+  DesignTicketFormCard,
+  DesignTicketFormField,
+  DesignTicketPageHeader,
+  PortalPageWrap,
+  ticketFieldClass,
+} from "@/components/design-ticket/design-ticket-shared";
 import { Button } from "@/components/ui/button";
 import { portalPublicCreateUrl } from "@/lib/design-ticket-portal";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
@@ -18,26 +25,25 @@ function PortalProfile() {
   if (!access) return null;
 
   return (
-    <PageWrap>
-      <h1 className="mb-6 text-xl font-semibold">Profile</h1>
-      <div className="card-soft mx-auto max-w-lg space-y-4 p-5 text-sm">
+    <PortalPageWrap>
+      <DesignTicketPageHeader title="Profile" subtitle="Your contact details for this client portal." />
+
+      <DesignTicketFormCard>
         <div>
           <div className="text-xs text-muted-foreground">Company</div>
           <div className="font-medium">{access.companyName}</div>
         </div>
-        <label className="block space-y-1">
-          Contact name
+        <DesignTicketFormField label="Contact name">
           <input
             defaultValue={access.contactName}
             onBlur={(e) => {
               updateContact(access.companyId, { contactName: e.target.value.trim() });
               toast.success("Profile updated");
             }}
-            className="h-10 w-full rounded-md border bg-card px-3"
+            className={ticketFieldClass}
           />
-        </label>
-        <label className="block space-y-1">
-          Email
+        </DesignTicketFormField>
+        <DesignTicketFormField label="Email">
           <input
             type="email"
             defaultValue={access.contactEmail}
@@ -45,17 +51,21 @@ function PortalProfile() {
               updateContact(access.companyId, { contactEmail: e.target.value.trim() });
               toast.success("Profile updated");
             }}
-            className="h-10 w-full rounded-md border bg-card px-3"
+            className={ticketFieldClass}
           />
-        </label>
+        </DesignTicketFormField>
         <div>
           <div className="text-xs text-muted-foreground">Your ticket link</div>
-          <div className="mt-1 break-all font-mono text-xs">{portalPublicCreateUrl(slug)}</div>
+          <div className="mt-1 break-all rounded-lg border bg-muted/30 p-2.5 font-mono text-xs">
+            {portalPublicCreateUrl(slug)}
+          </div>
         </div>
-        <Button type="button" variant="outline" asChild>
-          <a href={`/portal/${slug}/dashboard`}>Back to dashboard</a>
+        <Button type="button" variant="outline" className="w-full sm:w-auto" asChild>
+          <Link to="/portal/$slug/dashboard" params={{ slug }}>
+            Back to dashboard
+          </Link>
         </Button>
-      </div>
-    </PageWrap>
+      </DesignTicketFormCard>
+    </PortalPageWrap>
   );
 }

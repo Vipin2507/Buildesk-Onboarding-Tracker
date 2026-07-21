@@ -1,15 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import { Link } from "@tanstack/react-router";
 import { Copy, ExternalLink, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
-import { CountUp } from "@/components/count-up";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import {
   DesignTicketPriorityChip,
   DesignTicketStatusPill,
 } from "@/components/design-ticket/design-ticket-chips";
+import {
+  DesignTicketKpiGrid,
+  DesignTicketSection,
+  TICKET_EASE,
+} from "@/components/design-ticket/design-ticket-shared";
 import { ConfirmDeleteDialog } from "@/components/entity-form-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +24,7 @@ import {
   portalPublicDashboardUrl,
 } from "@/lib/design-ticket-portal";
 import { formatDate } from "@/lib/utils";
+import { copyTextToClipboard, selectInputText } from "@/lib/copy-to-clipboard";
 import {
   useCompanyPortalStore,
   useCompanyStore,
@@ -76,13 +82,14 @@ export function CompanyDesignTicketsPanel({ companyId }: Props) {
     [tickets, users, employees],
   );
 
-  async function copyLink() {
-    try {
-      await navigator.clipboard.writeText(publicUrl);
+  async function copyLink(inputEl?: HTMLInputElement | null) {
+    const ok = await copyTextToClipboard(publicUrl);
+    if (ok) {
       toast.success("Portal link copied");
-    } catch {
-      toast.error("Could not copy link");
+      return;
     }
+    if (inputEl) selectInputText(inputEl);
+    toast.error("Auto-copy blocked — link selected, press Ctrl+C / Cmd+C");
   }
 
   function onRegenerate() {
@@ -100,15 +107,33 @@ export function CompanyDesignTicketsPanel({ companyId }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="card-soft space-y-3 p-4">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: TICKET_EASE }}
+        className="card-soft space-y-3 p-4"
+      >
         <div className="text-sm font-semibold">Client ticket creation link</div>
         <p className="text-xs text-muted-foreground">
           Share this link with {companyName} so they can raise design & support tickets.
         </p>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Input readOnly value={publicUrl} className="font-mono text-xs" />
-          <div className="flex shrink-0 gap-2">
-            <Button type="button" variant="outline" className="gap-1.5" onClick={() => void copyLink()}>
+          <Input
+            readOnly
+            value={publicUrl}
+            className="font-mono text-xs"
+            onFocus={(e) => selectInputText(e.currentTarget)}
+          />
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-1.5"
+              onClick={(e) => {
+                const input = e.currentTarget.closest(".card-soft")?.querySelector("input");
+                void copyLink(input instanceof HTMLInputElement ? input : null);
+              }}
+            >
               <Copy className="h-4 w-4" />
               Copy Link
             </Button>
@@ -130,26 +155,18 @@ export function CompanyDesignTicketsPanel({ companyId }: Props) {
           . Update <code className="rounded bg-muted px-1">VITE_PORTAL_BASE_URL</code> in{" "}
           <code className="rounded bg-muted px-1">.env.production</code> if the host changes.
         </p>
-      </div>
+      </motion.div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {kpiCards.map((k) => (
-          <div key={k.label} className="card-soft p-4">
-            <div className="text-xs text-muted-foreground">{k.label}</div>
-            <div className={`mt-1 text-2xl font-semibold ${k.tone}`}>
-              <CountUp to={k.value} />
-            </div>
-          </div>
-        ))}
-      </div>
+      <DesignTicketKpiGrid items={kpiCards} columns={4} />
 
-      {enriched.length === 0 ? (
-        <EmptyState
-          title="No tickets for this company yet"
-          description="When the client creates a ticket from their portal, it will appear here instantly."
-        />
-      ) : (
-        <DataTable
+      <DesignTicketSection title="Company Tickets" delay={0.08}>
+        {enriched.length === 0 ? (
+          <EmptyState
+            title="No tickets for this company yet"
+            description="When the client creates a ticket from their portal, it will appear here instantly."
+          />
+        ) : (
+          <DataTable
           data={enriched}
           getRowId={(r) => r.id}
           hideSearch
@@ -188,7 +205,8 @@ export function CompanyDesignTicketsPanel({ companyId }: Props) {
             </Button>
           )}
         />
-      )}
+        )}
+      </DesignTicketSection>
 
       <p className="text-center text-xs text-muted-foreground">
         Engineering support tickets (TKT) remain in{" "}

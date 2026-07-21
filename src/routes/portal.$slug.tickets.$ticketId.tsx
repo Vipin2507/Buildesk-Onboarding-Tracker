@@ -1,10 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 
 import { DesignTicketThread } from "@/components/design-ticket/design-ticket-thread";
 import { DesignTicketPriorityChip, DesignTicketStatusPill } from "@/components/design-ticket/design-ticket-chips";
-import { PageWrap } from "@/components/page-header";
+import { PortalPageWrap, TICKET_EASE } from "@/components/design-ticket/design-ticket-shared";
 import { Button } from "@/components/ui/button";
 import { EntityNotFound } from "@/components/empty-state";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
@@ -28,7 +29,7 @@ function PortalTicketDetail() {
   }
 
   return (
-    <PageWrap>
+    <PortalPageWrap>
       <Button
         variant="ghost"
         size="sm"
@@ -39,15 +40,29 @@ function PortalTicketDetail() {
         My Tickets
       </Button>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <h1 className="text-lg font-semibold">
-          {ticket.ticketNumber} — {ticket.subject}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: TICKET_EASE }}
+        className="mb-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center"
+      >
+        <h1 className="min-w-0 text-base font-semibold leading-snug sm:text-lg">
+          <span className="text-primary">{ticket.ticketNumber}</span>
+          <span className="text-muted-foreground"> — </span>
+          {ticket.subject}
         </h1>
-        <DesignTicketStatusPill status={ticket.status} />
-        <DesignTicketPriorityChip priority={ticket.priority} />
-      </div>
+        <div className="flex flex-wrap gap-2">
+          <DesignTicketStatusPill status={ticket.status} />
+          <DesignTicketPriorityChip priority={ticket.priority} />
+        </div>
+      </motion.div>
 
-      <div className="card-soft p-4">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.06, ease: TICKET_EASE }}
+        className="card-soft p-3 sm:p-4"
+      >
         <DesignTicketThread
           ticket={ticket}
           mode="client"
@@ -65,7 +80,7 @@ function PortalTicketDetail() {
             },
           }}
         />
-      </div>
-    </PageWrap>
+      </motion.div>
+    </PortalPageWrap>
   );
 }
