@@ -24,7 +24,7 @@ import { ModuleCard } from "@/components/module-card";
 import { CompanyOverviewTab } from "@/components/company-overview-tab";
 import { CompanyNotesAttachmentsTab } from "@/components/company-notes-attachments";
 import { CompanyHistoryTab } from "@/components/company-history";
-import { CompanyTicketsPanel } from "@/components/company-tickets-panel";
+import { CompanyDesignTicketsPanel } from "@/components/company-design-tickets-panel";
 import { CompanyTasksPanel } from "@/components/company-tasks-panel";
 import { CompanyVisitsPanel } from "@/components/company-visits-panel";
 import { EntityNotFound, EmptyState } from "@/components/empty-state";
@@ -580,7 +580,7 @@ function CompanyDetailContent() {
         </div>
       )}
 
-      {tab === "Tickets" && <CompanyTicketsPanel companyId={companyId} />}
+      {tab === "Tickets" && <CompanyDesignTicketsPanel companyId={companyId} />}
 
       {tab === "Tasks" && <CompanyTasksPanel companyId={companyId} />}
 

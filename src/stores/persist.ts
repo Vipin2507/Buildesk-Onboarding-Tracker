@@ -14,6 +14,8 @@ const BUILDESK_PREFIX = "buildesk-";
 const PERSIST_ALLOWLIST = new Set([
   `${BUILDESK_PREFIX}master-config-v2`,
   `${BUILDESK_PREFIX}app-settings-v1`,
+  `${BUILDESK_PREFIX}design-tickets-v1`,
+  `${BUILDESK_PREFIX}company-portal-v1`,
 ]);
 
 /** Legacy / oversized entity caches — safe to wipe; SQLite is authoritative. */

@@ -10,6 +10,7 @@ import {
   renewCompany as apiRenewCompany,
 } from "@/lib/api";
 import { serverSync, serverSyncTracked, serverSyncWithRollback } from "@/lib/sync";
+import { useCompanyPortalStore } from "./useCompanyPortalStore";
 
 type CompanyState = {
   companies: Company[];
@@ -37,6 +38,7 @@ export const useCompanyStore = createStore<CompanyState>((set, get) => ({
     const now = nowIso();
     const company: Company = { ...data, id: newId(), createdAt: now, updatedAt: now };
     set((s) => ({ companies: [company, ...s.companies] }));
+    useCompanyPortalStore.getState().generateAccessForCompany(company);
     logActivity({ who: "You", what: `Added company ${company.name}`, kind: "success", companyId: company.id });
     serverSyncTracked(`company:${company.id}`, "createCompany", () =>
       apiCreateCompany({

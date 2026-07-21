@@ -6,6 +6,10 @@ import { useAuthStore } from "@/stores";
 
 const PUBLIC_PATHS = ["/login"];
 
+function isPublicPath(pathname: string) {
+  return PUBLIC_PATHS.includes(pathname) || pathname.startsWith("/portal/");
+}
+
 export function AuthGate({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -13,7 +17,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const hydrated = useAuthStore((s) => s.hydrated);
   const setUser = useAuthStore((s) => s.setUser);
   const setHydrated = useAuthStore((s) => s.setHydrated);
-  const isPublic = PUBLIC_PATHS.includes(pathname);
+  const isPublic = isPublicPath(pathname);
 
   useEffect(() => {
     let cancelled = false;

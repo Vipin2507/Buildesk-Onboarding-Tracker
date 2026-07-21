@@ -1,9 +1,16 @@
 import { purgeLegacyEntityCaches } from "./persist";
 import { useMasterStore } from "./useMasterStore";
 import { useSettingsStore } from "./useSettingsStore";
+import { useDesignTicketStore } from "./useDesignTicketStore";
+import { useCompanyPortalStore } from "./useCompanyPortalStore";
 
-/** Only config stores persist to disk; entity data loads from SQLite. */
-const persistedStores = [useMasterStore, useSettingsStore] as const;
+/** Config + client-portal ticket stores persist to disk; entity data loads from SQLite. */
+const persistedStores = [
+  useMasterStore,
+  useSettingsStore,
+  useDesignTicketStore,
+  useCompanyPortalStore,
+] as const;
 
 export async function rehydrateAllStores() {
   purgeLegacyEntityCaches();

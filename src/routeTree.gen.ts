@@ -11,8 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VendorsRouteImport } from './routes/vendors'
 import { Route as TrainingRouteImport } from './routes/training'
+import { Route as TicketsRouteImport } from './routes/tickets'
 import { Route as TasksRouteImport } from './routes/tasks'
-import { Route as ClientVisitsRouteImport } from './routes/client-visits'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReportsRouteImport } from './routes/reports'
@@ -29,10 +29,21 @@ import { Route as DocumentsRouteImport } from './routes/documents'
 import { Route as DataMigrationRouteImport } from './routes/data-migration'
 import { Route as CustomerAppRouteImport } from './routes/customer-app'
 import { Route as CompaniesRouteImport } from './routes/companies'
+import { Route as ClientVisitsRouteImport } from './routes/client-visits'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TicketsLinksRouteImport } from './routes/tickets.links'
+import { Route as TicketsTicketIdRouteImport } from './routes/tickets.$ticketId'
 import { Route as SupportTicketIdRouteImport } from './routes/support.$ticketId'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects.$projectId'
+import { Route as PortalSlugRouteImport } from './routes/portal.$slug'
 import { Route as CompaniesCompanyIdRouteImport } from './routes/companies.$companyId'
+import { Route as PortalSlugIndexRouteImport } from './routes/portal.$slug.index'
+import { Route as PortalSlugTicketsRouteImport } from './routes/portal.$slug.tickets'
+import { Route as PortalSlugSolvedRouteImport } from './routes/portal.$slug.solved'
+import { Route as PortalSlugProfileRouteImport } from './routes/portal.$slug.profile'
+import { Route as PortalSlugDashboardRouteImport } from './routes/portal.$slug.dashboard'
+import { Route as PortalSlugCreateTicketRouteImport } from './routes/portal.$slug.create-ticket'
+import { Route as PortalSlugTicketsTicketIdRouteImport } from './routes/portal.$slug.tickets.$ticketId'
 import { Route as CompaniesCompanyIdModulesModuleKeyRouteImport } from './routes/companies.$companyId.modules.$moduleKey'
 import { Route as CompaniesCompanyIdModulesPostSalesProjectsProjectIdRouteImport } from './routes/companies.$companyId.modules.post-sales.projects.$projectId'
 
@@ -46,14 +57,14 @@ const TrainingRoute = TrainingRouteImport.update({
   path: '/training',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TicketsRoute = TicketsRouteImport.update({
+  id: '/tickets',
+  path: '/tickets',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TasksRoute = TasksRouteImport.update({
   id: '/tasks',
   path: '/tasks',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ClientVisitsRoute = ClientVisitsRouteImport.update({
-  id: '/client-visits',
-  path: '/client-visits',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SupportRoute = SupportRouteImport.update({
@@ -136,10 +147,25 @@ const CompaniesRoute = CompaniesRouteImport.update({
   path: '/companies',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ClientVisitsRoute = ClientVisitsRouteImport.update({
+  id: '/client-visits',
+  path: '/client-visits',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const TicketsLinksRoute = TicketsLinksRouteImport.update({
+  id: '/links',
+  path: '/links',
+  getParentRoute: () => TicketsRoute,
+} as any)
+const TicketsTicketIdRoute = TicketsTicketIdRouteImport.update({
+  id: '/$ticketId',
+  path: '/$ticketId',
+  getParentRoute: () => TicketsRoute,
 } as any)
 const SupportTicketIdRoute = SupportTicketIdRouteImport.update({
   id: '/$ticketId',
@@ -151,11 +177,52 @@ const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
   path: '/$projectId',
   getParentRoute: () => ProjectsRoute,
 } as any)
+const PortalSlugRoute = PortalSlugRouteImport.update({
+  id: '/portal/$slug',
+  path: '/portal/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CompaniesCompanyIdRoute = CompaniesCompanyIdRouteImport.update({
   id: '/$companyId',
   path: '/$companyId',
   getParentRoute: () => CompaniesRoute,
 } as any)
+const PortalSlugIndexRoute = PortalSlugIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PortalSlugRoute,
+} as any)
+const PortalSlugTicketsRoute = PortalSlugTicketsRouteImport.update({
+  id: '/tickets',
+  path: '/tickets',
+  getParentRoute: () => PortalSlugRoute,
+} as any)
+const PortalSlugSolvedRoute = PortalSlugSolvedRouteImport.update({
+  id: '/solved',
+  path: '/solved',
+  getParentRoute: () => PortalSlugRoute,
+} as any)
+const PortalSlugProfileRoute = PortalSlugProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => PortalSlugRoute,
+} as any)
+const PortalSlugDashboardRoute = PortalSlugDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => PortalSlugRoute,
+} as any)
+const PortalSlugCreateTicketRoute = PortalSlugCreateTicketRouteImport.update({
+  id: '/create-ticket',
+  path: '/create-ticket',
+  getParentRoute: () => PortalSlugRoute,
+} as any)
+const PortalSlugTicketsTicketIdRoute =
+  PortalSlugTicketsTicketIdRouteImport.update({
+    id: '/$ticketId',
+    path: '/$ticketId',
+    getParentRoute: () => PortalSlugTicketsRoute,
+  } as any)
 const CompaniesCompanyIdModulesModuleKeyRoute =
   CompaniesCompanyIdModulesModuleKeyRouteImport.update({
     id: '/modules/$moduleKey',
@@ -171,6 +238,7 @@ const CompaniesCompanyIdModulesPostSalesProjectsProjectIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/client-visits': typeof ClientVisitsRoute
   '/companies': typeof CompaniesRouteWithChildren
   '/customer-app': typeof CustomerAppRoute
   '/data-migration': typeof DataMigrationRoute
@@ -187,18 +255,29 @@ export interface FileRoutesByFullPath {
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/support': typeof SupportRouteWithChildren
-  '/training': typeof TrainingRoute
   '/tasks': typeof TasksRoute
-  '/client-visits': typeof ClientVisitsRoute
+  '/tickets': typeof TicketsRouteWithChildren
+  '/training': typeof TrainingRoute
   '/vendors': typeof VendorsRoute
   '/companies/$companyId': typeof CompaniesCompanyIdRouteWithChildren
+  '/portal/$slug': typeof PortalSlugRouteWithChildren
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/support/$ticketId': typeof SupportTicketIdRoute
+  '/tickets/$ticketId': typeof TicketsTicketIdRoute
+  '/tickets/links': typeof TicketsLinksRoute
+  '/portal/$slug/create-ticket': typeof PortalSlugCreateTicketRoute
+  '/portal/$slug/dashboard': typeof PortalSlugDashboardRoute
+  '/portal/$slug/profile': typeof PortalSlugProfileRoute
+  '/portal/$slug/solved': typeof PortalSlugSolvedRoute
+  '/portal/$slug/tickets': typeof PortalSlugTicketsRouteWithChildren
+  '/portal/$slug/': typeof PortalSlugIndexRoute
   '/companies/$companyId/modules/$moduleKey': typeof CompaniesCompanyIdModulesModuleKeyRoute
+  '/portal/$slug/tickets/$ticketId': typeof PortalSlugTicketsTicketIdRoute
   '/companies/$companyId/modules/post-sales/projects/$projectId': typeof CompaniesCompanyIdModulesPostSalesProjectsProjectIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/client-visits': typeof ClientVisitsRoute
   '/companies': typeof CompaniesRouteWithChildren
   '/customer-app': typeof CustomerAppRoute
   '/data-migration': typeof DataMigrationRoute
@@ -215,19 +294,29 @@ export interface FileRoutesByTo {
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/support': typeof SupportRouteWithChildren
-  '/training': typeof TrainingRoute
   '/tasks': typeof TasksRoute
-  '/client-visits': typeof ClientVisitsRoute
+  '/tickets': typeof TicketsRouteWithChildren
+  '/training': typeof TrainingRoute
   '/vendors': typeof VendorsRoute
   '/companies/$companyId': typeof CompaniesCompanyIdRouteWithChildren
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/support/$ticketId': typeof SupportTicketIdRoute
+  '/tickets/$ticketId': typeof TicketsTicketIdRoute
+  '/tickets/links': typeof TicketsLinksRoute
+  '/portal/$slug/create-ticket': typeof PortalSlugCreateTicketRoute
+  '/portal/$slug/dashboard': typeof PortalSlugDashboardRoute
+  '/portal/$slug/profile': typeof PortalSlugProfileRoute
+  '/portal/$slug/solved': typeof PortalSlugSolvedRoute
+  '/portal/$slug/tickets': typeof PortalSlugTicketsRouteWithChildren
+  '/portal/$slug': typeof PortalSlugIndexRoute
   '/companies/$companyId/modules/$moduleKey': typeof CompaniesCompanyIdModulesModuleKeyRoute
+  '/portal/$slug/tickets/$ticketId': typeof PortalSlugTicketsTicketIdRoute
   '/companies/$companyId/modules/post-sales/projects/$projectId': typeof CompaniesCompanyIdModulesPostSalesProjectsProjectIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/client-visits': typeof ClientVisitsRoute
   '/companies': typeof CompaniesRouteWithChildren
   '/customer-app': typeof CustomerAppRoute
   '/data-migration': typeof DataMigrationRoute
@@ -244,20 +333,31 @@ export interface FileRoutesById {
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/support': typeof SupportRouteWithChildren
-  '/training': typeof TrainingRoute
   '/tasks': typeof TasksRoute
-  '/client-visits': typeof ClientVisitsRoute
+  '/tickets': typeof TicketsRouteWithChildren
+  '/training': typeof TrainingRoute
   '/vendors': typeof VendorsRoute
   '/companies/$companyId': typeof CompaniesCompanyIdRouteWithChildren
+  '/portal/$slug': typeof PortalSlugRouteWithChildren
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/support/$ticketId': typeof SupportTicketIdRoute
+  '/tickets/$ticketId': typeof TicketsTicketIdRoute
+  '/tickets/links': typeof TicketsLinksRoute
+  '/portal/$slug/create-ticket': typeof PortalSlugCreateTicketRoute
+  '/portal/$slug/dashboard': typeof PortalSlugDashboardRoute
+  '/portal/$slug/profile': typeof PortalSlugProfileRoute
+  '/portal/$slug/solved': typeof PortalSlugSolvedRoute
+  '/portal/$slug/tickets': typeof PortalSlugTicketsRouteWithChildren
+  '/portal/$slug/': typeof PortalSlugIndexRoute
   '/companies/$companyId/modules/$moduleKey': typeof CompaniesCompanyIdModulesModuleKeyRoute
+  '/portal/$slug/tickets/$ticketId': typeof PortalSlugTicketsTicketIdRoute
   '/companies/$companyId/modules/post-sales/projects/$projectId': typeof CompaniesCompanyIdModulesPostSalesProjectsProjectIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/client-visits'
     | '/companies'
     | '/customer-app'
     | '/data-migration'
@@ -274,18 +374,29 @@ export interface FileRouteTypes {
     | '/reports'
     | '/settings'
     | '/support'
-    | '/training'
     | '/tasks'
-    | '/client-visits'
+    | '/tickets'
+    | '/training'
     | '/vendors'
     | '/companies/$companyId'
+    | '/portal/$slug'
     | '/projects/$projectId'
     | '/support/$ticketId'
+    | '/tickets/$ticketId'
+    | '/tickets/links'
+    | '/portal/$slug/create-ticket'
+    | '/portal/$slug/dashboard'
+    | '/portal/$slug/profile'
+    | '/portal/$slug/solved'
+    | '/portal/$slug/tickets'
+    | '/portal/$slug/'
     | '/companies/$companyId/modules/$moduleKey'
+    | '/portal/$slug/tickets/$ticketId'
     | '/companies/$companyId/modules/post-sales/projects/$projectId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/client-visits'
     | '/companies'
     | '/customer-app'
     | '/data-migration'
@@ -302,18 +413,28 @@ export interface FileRouteTypes {
     | '/reports'
     | '/settings'
     | '/support'
-    | '/training'
     | '/tasks'
-    | '/client-visits'
+    | '/tickets'
+    | '/training'
     | '/vendors'
     | '/companies/$companyId'
     | '/projects/$projectId'
     | '/support/$ticketId'
+    | '/tickets/$ticketId'
+    | '/tickets/links'
+    | '/portal/$slug/create-ticket'
+    | '/portal/$slug/dashboard'
+    | '/portal/$slug/profile'
+    | '/portal/$slug/solved'
+    | '/portal/$slug/tickets'
+    | '/portal/$slug'
     | '/companies/$companyId/modules/$moduleKey'
+    | '/portal/$slug/tickets/$ticketId'
     | '/companies/$companyId/modules/post-sales/projects/$projectId'
   id:
     | '__root__'
     | '/'
+    | '/client-visits'
     | '/companies'
     | '/customer-app'
     | '/data-migration'
@@ -330,19 +451,30 @@ export interface FileRouteTypes {
     | '/reports'
     | '/settings'
     | '/support'
-    | '/training'
     | '/tasks'
-    | '/client-visits'
+    | '/tickets'
+    | '/training'
     | '/vendors'
     | '/companies/$companyId'
+    | '/portal/$slug'
     | '/projects/$projectId'
     | '/support/$ticketId'
+    | '/tickets/$ticketId'
+    | '/tickets/links'
+    | '/portal/$slug/create-ticket'
+    | '/portal/$slug/dashboard'
+    | '/portal/$slug/profile'
+    | '/portal/$slug/solved'
+    | '/portal/$slug/tickets'
+    | '/portal/$slug/'
     | '/companies/$companyId/modules/$moduleKey'
+    | '/portal/$slug/tickets/$ticketId'
     | '/companies/$companyId/modules/post-sales/projects/$projectId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ClientVisitsRoute: typeof ClientVisitsRoute
   CompaniesRoute: typeof CompaniesRouteWithChildren
   CustomerAppRoute: typeof CustomerAppRoute
   DataMigrationRoute: typeof DataMigrationRoute
@@ -359,10 +491,11 @@ export interface RootRouteChildren {
   ReportsRoute: typeof ReportsRoute
   SettingsRoute: typeof SettingsRoute
   SupportRoute: typeof SupportRouteWithChildren
-  TrainingRoute: typeof TrainingRoute
   TasksRoute: typeof TasksRoute
-  ClientVisitsRoute: typeof ClientVisitsRoute
+  TicketsRoute: typeof TicketsRouteWithChildren
+  TrainingRoute: typeof TrainingRoute
   VendorsRoute: typeof VendorsRoute
+  PortalSlugRoute: typeof PortalSlugRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -381,18 +514,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TrainingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tickets': {
+      id: '/tickets'
+      path: '/tickets'
+      fullPath: '/tickets'
+      preLoaderRoute: typeof TicketsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tasks': {
       id: '/tasks'
       path: '/tasks'
       fullPath: '/tasks'
       preLoaderRoute: typeof TasksRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/client-visits': {
-      id: '/client-visits'
-      path: '/client-visits'
-      fullPath: '/client-visits'
-      preLoaderRoute: typeof ClientVisitsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/support': {
@@ -507,12 +640,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CompaniesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/client-visits': {
+      id: '/client-visits'
+      path: '/client-visits'
+      fullPath: '/client-visits'
+      preLoaderRoute: typeof ClientVisitsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/tickets/links': {
+      id: '/tickets/links'
+      path: '/links'
+      fullPath: '/tickets/links'
+      preLoaderRoute: typeof TicketsLinksRouteImport
+      parentRoute: typeof TicketsRoute
+    }
+    '/tickets/$ticketId': {
+      id: '/tickets/$ticketId'
+      path: '/$ticketId'
+      fullPath: '/tickets/$ticketId'
+      preLoaderRoute: typeof TicketsTicketIdRouteImport
+      parentRoute: typeof TicketsRoute
     }
     '/support/$ticketId': {
       id: '/support/$ticketId'
@@ -528,12 +682,68 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdRouteImport
       parentRoute: typeof ProjectsRoute
     }
+    '/portal/$slug': {
+      id: '/portal/$slug'
+      path: '/portal/$slug'
+      fullPath: '/portal/$slug'
+      preLoaderRoute: typeof PortalSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/companies/$companyId': {
       id: '/companies/$companyId'
       path: '/$companyId'
       fullPath: '/companies/$companyId'
       preLoaderRoute: typeof CompaniesCompanyIdRouteImport
       parentRoute: typeof CompaniesRoute
+    }
+    '/portal/$slug/': {
+      id: '/portal/$slug/'
+      path: '/'
+      fullPath: '/portal/$slug/'
+      preLoaderRoute: typeof PortalSlugIndexRouteImport
+      parentRoute: typeof PortalSlugRoute
+    }
+    '/portal/$slug/tickets': {
+      id: '/portal/$slug/tickets'
+      path: '/tickets'
+      fullPath: '/portal/$slug/tickets'
+      preLoaderRoute: typeof PortalSlugTicketsRouteImport
+      parentRoute: typeof PortalSlugRoute
+    }
+    '/portal/$slug/solved': {
+      id: '/portal/$slug/solved'
+      path: '/solved'
+      fullPath: '/portal/$slug/solved'
+      preLoaderRoute: typeof PortalSlugSolvedRouteImport
+      parentRoute: typeof PortalSlugRoute
+    }
+    '/portal/$slug/profile': {
+      id: '/portal/$slug/profile'
+      path: '/profile'
+      fullPath: '/portal/$slug/profile'
+      preLoaderRoute: typeof PortalSlugProfileRouteImport
+      parentRoute: typeof PortalSlugRoute
+    }
+    '/portal/$slug/dashboard': {
+      id: '/portal/$slug/dashboard'
+      path: '/dashboard'
+      fullPath: '/portal/$slug/dashboard'
+      preLoaderRoute: typeof PortalSlugDashboardRouteImport
+      parentRoute: typeof PortalSlugRoute
+    }
+    '/portal/$slug/create-ticket': {
+      id: '/portal/$slug/create-ticket'
+      path: '/create-ticket'
+      fullPath: '/portal/$slug/create-ticket'
+      preLoaderRoute: typeof PortalSlugCreateTicketRouteImport
+      parentRoute: typeof PortalSlugRoute
+    }
+    '/portal/$slug/tickets/$ticketId': {
+      id: '/portal/$slug/tickets/$ticketId'
+      path: '/$ticketId'
+      fullPath: '/portal/$slug/tickets/$ticketId'
+      preLoaderRoute: typeof PortalSlugTicketsTicketIdRouteImport
+      parentRoute: typeof PortalSlugTicketsRoute
     }
     '/companies/$companyId/modules/$moduleKey': {
       id: '/companies/$companyId/modules/$moduleKey'
@@ -602,8 +812,55 @@ const SupportRouteChildren: SupportRouteChildren = {
 const SupportRouteWithChildren =
   SupportRoute._addFileChildren(SupportRouteChildren)
 
+interface TicketsRouteChildren {
+  TicketsTicketIdRoute: typeof TicketsTicketIdRoute
+  TicketsLinksRoute: typeof TicketsLinksRoute
+}
+
+const TicketsRouteChildren: TicketsRouteChildren = {
+  TicketsTicketIdRoute: TicketsTicketIdRoute,
+  TicketsLinksRoute: TicketsLinksRoute,
+}
+
+const TicketsRouteWithChildren =
+  TicketsRoute._addFileChildren(TicketsRouteChildren)
+
+interface PortalSlugTicketsRouteChildren {
+  PortalSlugTicketsTicketIdRoute: typeof PortalSlugTicketsTicketIdRoute
+}
+
+const PortalSlugTicketsRouteChildren: PortalSlugTicketsRouteChildren = {
+  PortalSlugTicketsTicketIdRoute: PortalSlugTicketsTicketIdRoute,
+}
+
+const PortalSlugTicketsRouteWithChildren =
+  PortalSlugTicketsRoute._addFileChildren(PortalSlugTicketsRouteChildren)
+
+interface PortalSlugRouteChildren {
+  PortalSlugCreateTicketRoute: typeof PortalSlugCreateTicketRoute
+  PortalSlugDashboardRoute: typeof PortalSlugDashboardRoute
+  PortalSlugProfileRoute: typeof PortalSlugProfileRoute
+  PortalSlugSolvedRoute: typeof PortalSlugSolvedRoute
+  PortalSlugTicketsRoute: typeof PortalSlugTicketsRouteWithChildren
+  PortalSlugIndexRoute: typeof PortalSlugIndexRoute
+}
+
+const PortalSlugRouteChildren: PortalSlugRouteChildren = {
+  PortalSlugCreateTicketRoute: PortalSlugCreateTicketRoute,
+  PortalSlugDashboardRoute: PortalSlugDashboardRoute,
+  PortalSlugProfileRoute: PortalSlugProfileRoute,
+  PortalSlugSolvedRoute: PortalSlugSolvedRoute,
+  PortalSlugTicketsRoute: PortalSlugTicketsRouteWithChildren,
+  PortalSlugIndexRoute: PortalSlugIndexRoute,
+}
+
+const PortalSlugRouteWithChildren = PortalSlugRoute._addFileChildren(
+  PortalSlugRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ClientVisitsRoute: ClientVisitsRoute,
   CompaniesRoute: CompaniesRouteWithChildren,
   CustomerAppRoute: CustomerAppRoute,
   DataMigrationRoute: DataMigrationRoute,
@@ -620,10 +877,11 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsRoute: ReportsRoute,
   SettingsRoute: SettingsRoute,
   SupportRoute: SupportRouteWithChildren,
-  TrainingRoute: TrainingRoute,
   TasksRoute: TasksRoute,
-  ClientVisitsRoute: ClientVisitsRoute,
+  TicketsRoute: TicketsRouteWithChildren,
+  TrainingRoute: TrainingRoute,
   VendorsRoute: VendorsRoute,
+  PortalSlugRoute: PortalSlugRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

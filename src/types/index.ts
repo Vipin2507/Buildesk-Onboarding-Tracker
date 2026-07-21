@@ -6,6 +6,7 @@ export * from "./onboarding";
 export * from "./vendor";
 export * from "./labor";
 export * from "./ticket";
+export * from "./design-ticket";
 export * from "./training";
 export * from "./employee";
 export * from "./user";

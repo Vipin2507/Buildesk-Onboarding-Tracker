@@ -17,6 +17,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { StoreHydrationGate } from "@/components/store-hydration-gate";
 import { AuthGate } from "@/components/auth-gate";
 import { ServerDataBootstrap } from "@/components/server-data-bootstrap";
+import { DesignTicketBootstrap } from "@/components/design-ticket-bootstrap";
 import { ThemeProvider, useTheme } from "@/components/theme-provider";
 import { RouterDebug } from "@/components/router-debug";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
@@ -135,30 +136,40 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isAuthPage = pathname === "/login";
+  const isPortal = pathname.startsWith("/portal");
 
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <StoreHydrationGate>
-          <AuthGate>
-            {isAuthPage ? (
+          {isPortal ? (
+            <>
               <Outlet />
-            ) : (
-              <ServerDataBootstrap>
-                <div className="flex min-h-screen w-full bg-background text-foreground">
-                  <AppSidebar />
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <TopBar />
-                    <main className="min-w-0 flex-1 pb-[env(safe-area-inset-bottom)]">
-                      <Outlet />
-                    </main>
+              <RouterDebug />
+              <ThemedToaster />
+            </>
+          ) : (
+            <AuthGate>
+              {isAuthPage ? (
+                <Outlet />
+              ) : (
+                <ServerDataBootstrap>
+                  <DesignTicketBootstrap />
+                  <div className="flex min-h-screen w-full bg-background text-foreground">
+                    <AppSidebar />
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <TopBar />
+                      <main className="min-w-0 flex-1 pb-[env(safe-area-inset-bottom)]">
+                        <Outlet />
+                      </main>
+                    </div>
                   </div>
-                </div>
-              </ServerDataBootstrap>
-            )}
-            <RouterDebug />
-            <ThemedToaster />
-          </AuthGate>
+                </ServerDataBootstrap>
+              )}
+              <RouterDebug />
+              <ThemedToaster />
+            </AuthGate>
+          )}
         </StoreHydrationGate>
       </ThemeProvider>
     </QueryClientProvider>

@@ -28,6 +28,15 @@ export { useProjectProgressStore } from "./useProjectProgressStore";
 export { useTaskStore } from "./useTaskStore";
 export { useClientVisitStore } from "./useClientVisitStore";
 export { useCrmEventStore } from "./useCrmEventStore";
+export { useDesignTicketStore } from "./useDesignTicketStore";
+export { useCompanyPortalStore } from "./useCompanyPortalStore";
+export {
+  useDesignTicketStats,
+  useDesignTicketsForCompany,
+  useDesignTicketHighlights,
+  isDesignTicketActive,
+  isDesignTicketSolved,
+} from "./design-ticket-selectors";
 export {
   calcProjectProgress,
   useDashboardKpis,
