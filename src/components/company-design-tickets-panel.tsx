@@ -15,8 +15,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   portalCreatePath,
-  portalDashboardPath,
   portalPublicCreateUrl,
+  portalPublicDashboardUrl,
 } from "@/lib/design-ticket-portal";
 import { formatDate } from "@/lib/utils";
 import {
@@ -62,7 +62,7 @@ export function CompanyDesignTicketsPanel({ companyId }: Props) {
   const companyName = company.name;
 
   const publicUrl = portalPublicCreateUrl(access.slug);
-  const localPortal = portalDashboardPath(access.slug);
+  const previewUrl = portalPublicDashboardUrl(access.slug);
 
   const enriched = useMemo(
     () =>
@@ -117,7 +117,7 @@ export function CompanyDesignTicketsPanel({ companyId }: Props) {
               Regenerate
             </Button>
             <Button type="button" variant="secondary" className="gap-1.5" asChild>
-              <a href={localPortal} target="_blank" rel="noreferrer">
+              <a href={previewUrl} target="_blank" rel="noreferrer">
                 <ExternalLink className="h-4 w-4" />
                 Preview Portal
               </a>
@@ -125,7 +125,10 @@ export function CompanyDesignTicketsPanel({ companyId }: Props) {
           </div>
         </div>
         <p className="text-[11px] text-muted-foreground">
-          In-app path: {portalCreatePath(access.slug)}
+          Shareable links point to{" "}
+          <span className="font-mono">{publicUrl.replace(portalCreatePath(access.slug), "") || "this site"}</span>
+          . Update <code className="rounded bg-muted px-1">VITE_PORTAL_BASE_URL</code> in{" "}
+          <code className="rounded bg-muted px-1">.env.production</code> if the host changes.
         </p>
       </div>
 

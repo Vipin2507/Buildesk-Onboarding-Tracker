@@ -22,7 +22,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { inDateRange } from "@/components/list-toolbar";
-import { portalPublicCreateUrl } from "@/lib/design-ticket-portal";
 import { formatDate } from "@/lib/utils";
 import {
   useCompanyPortalStore,
