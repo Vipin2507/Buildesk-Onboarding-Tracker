@@ -56,3 +56,10 @@ export {
   getCompanyOverallProgress,
   getModuleProgressPercent,
 } from "./selectors";
+export { useDashboardOverview, drillDownTitle, drillDownSubtitle } from "./dashboard-selectors";
+export type {
+  DashboardDrillDownFilter,
+  ChecklistCompanyGroup,
+  ChecklistDrillDownRow,
+  CompanyStatusFilter,
+} from "./dashboard-selectors";

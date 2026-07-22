@@ -116,6 +116,51 @@ export function phaseAtToYmd(at?: string) {
   return at.slice(0, 10);
 }
 
+export type ChecklistPhaseBucket =
+  | "awaiting_collection"
+  | "awaiting_upload"
+  | "awaiting_live"
+  | "complete";
+
+/** Current blocking phase for an applicable checklist item. */
+export function getChecklistPhaseBucket(item: OnboardingChecklistItem): ChecklistPhaseBucket | null {
+  if (item.notApplicable) return null;
+  if (item.collected && item.uploaded && item.live) return "complete";
+  if (item.uploaded) return "awaiting_live";
+  if (item.collected) return "awaiting_upload";
+  return "awaiting_collection";
+}
+
+export function matchesChecklistPhaseBucket(
+  item: OnboardingChecklistItem,
+  bucket: ChecklistPhaseBucket,
+) {
+  return getChecklistPhaseBucket(item) === bucket;
+}
+
+export function summarizeChecklistPhases(items: OnboardingChecklistItem[]) {
+  const applicable = items.filter((i) => !i.notApplicable);
+  const awaitingCollection = applicable.filter((i) => !i.collected).length;
+  const awaitingUpload = applicable.filter((i) => i.collected && !i.uploaded).length;
+  const awaitingLive = applicable.filter((i) => i.uploaded && !i.live).length;
+  const complete = applicable.filter((i) => i.collected && i.uploaded && i.live).length;
+  const totalSteps = applicable.length * 3;
+  const completedSteps = applicable.reduce(
+    (sum, i) => sum + (i.collected ? 1 : 0) + (i.uploaded ? 1 : 0) + (i.live ? 1 : 0),
+    0,
+  );
+  return {
+    applicable: applicable.length,
+    awaitingCollection,
+    awaitingUpload,
+    awaitingLive,
+    complete,
+    totalSteps,
+    completedSteps,
+    progressPercent: totalSteps ? Math.round((completedSteps / totalSteps) * 100) : 100,
+  };
+}
+
 /** Stamp phase dates when setting absolute checklist state (e.g. progress sync). */
 export function stampChecklistPhaseDates(
   prev: OnboardingChecklistItem,

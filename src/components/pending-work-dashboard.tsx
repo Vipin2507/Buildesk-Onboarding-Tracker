@@ -57,6 +57,7 @@ export function PendingWorkDashboard() {
   const companies = useCompanyStore((s) => s.companies);
   const [userFilter, setUserFilter] = useState(currentUser?.id ?? "all");
   const [kindFilter, setKindFilter] = useState<"all" | PendingWork["kind"]>("all");
+  const [phaseFilter, setPhaseFilter] = useState<"all" | "collection" | "upload" | "live">("all");
   const [followUpTask, setFollowUpTask] = useState<FollowUpTask | null>(null);
   const [remark, setRemark] = useState("");
 
@@ -130,11 +131,19 @@ export function PendingWorkDashboard() {
     });
   }, [tickets, tasks, checklist, visits, projects, companies]);
 
-  const filtered = work.filter(
-    (item) =>
-      (userFilter === "all" || item.assigneeUserId === userFilter) &&
-      (kindFilter === "all" || item.kind === kindFilter),
-  );
+  const filtered = work.filter((item) => {
+    if (userFilter !== "all" && item.assigneeUserId !== userFilter) return false;
+    if (kindFilter !== "all" && item.kind !== kindFilter) return false;
+    if (phaseFilter !== "all" && item.kind === "checklist") {
+      const checklistItem = checklist.find((c) => c.id === item.id);
+      if (!checklistItem) return false;
+      if (phaseFilter === "collection" && checklistItem.collected) return false;
+      if (phaseFilter === "upload" && (!checklistItem.collected || checklistItem.uploaded)) return false;
+      if (phaseFilter === "live" && (!checklistItem.uploaded || checklistItem.live)) return false;
+    }
+    if (phaseFilter !== "all" && item.kind !== "checklist") return false;
+    return true;
+  });
   const today = new Date().toISOString().slice(0, 10);
   const overdue = filtered.filter((item) => item.dueDate && item.dueDate < today).length;
   const upcoming = filtered.filter((item) => item.dueDate && item.dueDate >= today).length;
@@ -194,6 +203,18 @@ export function PendingWorkDashboard() {
             <option value="checklist">Checklists</option>
             <option value="visit-followup">Visit follow-ups</option>
           </select>
+          {(kindFilter === "all" || kindFilter === "checklist") && (
+            <select
+              value={phaseFilter}
+              onChange={(e) => setPhaseFilter(e.target.value as typeof phaseFilter)}
+              className="h-9 rounded-md border border-input bg-card px-3 text-sm"
+            >
+              <option value="all">All checklist phases</option>
+              <option value="collection">Awaiting collection</option>
+              <option value="upload">Awaiting upload</option>
+              <option value="live">Awaiting go-live</option>
+            </select>
+          )}
         </div>
 
         <div className="mt-4 space-y-2">
