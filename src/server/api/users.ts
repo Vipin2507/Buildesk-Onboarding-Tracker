@@ -98,6 +98,24 @@ export const updateUser = createServerFn({ method: "POST" })
     return toPublicUser(row);
   });
 
+/** Admin-only — set a user's login password without their current password. */
+export const setUserPassword = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ id: z.string(), password: z.string().min(6) }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    requireUser(["Admin"]);
+    const db = getDb();
+    const row = db.select().from(t.users).where(eq(t.users.id, data.id)).get();
+    if (!row) throw new ApiError(404, "User not found");
+    const passwordHash = await hashPassword(data.password);
+    db.update(t.users)
+      .set({ passwordHash, updatedAt: nowIso() })
+      .where(eq(t.users.id, data.id))
+      .run();
+    return { ok: true };
+  });
+
 export const deleteUser = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ id: z.string() }).parse(data))
   .handler(async ({ data }) => {

@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useAuthStore, useSettingsStore, useUserStore } from "@/stores";
-import { createUser as apiCreateUser, updateUser as apiUpdateUser } from "@/lib/api";
+import { createUser as apiCreateUser, setUserPassword as apiSetUserPassword, updateUser as apiUpdateUser } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { ThemeMode } from "@/lib/theme";
 import {
@@ -937,6 +937,7 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
+  const [passwords, setPasswords] = useState({ next: "", confirm: "" });
   const [form, setForm] = useState<UserForm>({
     name: "",
     email: "",
@@ -950,6 +951,7 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
   useEffect(() => {
     if (!initialInviteOpen || !isAdmin) return;
     setEditing(null);
+    resetPasswordFields();
     setForm({
       name: "",
       email: "",
@@ -963,12 +965,17 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
     void navigate({ search: { section: "users", invite: false }, replace: true });
   }, [initialInviteOpen, isAdmin, navigate]);
 
+  function resetPasswordFields() {
+    setPasswords({ next: "", confirm: "" });
+  }
+
   function openInvite() {
     if (!isAdmin) {
       toast.error("Only admins can invite users");
       return;
     }
     setEditing(null);
+    resetPasswordFields();
     setForm({
       name: "",
       email: "",
@@ -1058,6 +1065,7 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
                         variant="ghost"
                         onClick={() => {
                           setEditing(u);
+                          resetPasswordFields();
                           setForm({
                             name: u.name,
                             email: u.email,
@@ -1095,7 +1103,10 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
 
       <EntityFormModal
         open={modalOpen}
-        onOpenChange={setModalOpen}
+        onOpenChange={(open) => {
+          setModalOpen(open);
+          if (!open) resetPasswordFields();
+        }}
         title={editing ? "Edit User" : "Invite User"}
         onSubmit={() => {
           if (!isAdmin) {
@@ -1110,6 +1121,17 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
             toast.error("Enter a valid email");
             return;
           }
+          const wantsPasswordChange = Boolean(passwords.next.trim() || passwords.confirm.trim());
+          if (wantsPasswordChange) {
+            if (passwords.next.length < 6) {
+              toast.error("New password must be at least 6 characters");
+              return;
+            }
+            if (passwords.next !== passwords.confirm) {
+              toast.error("New passwords do not match");
+              return;
+            }
+          }
           const payload = {
             name: form.name.trim(),
             email: form.email.trim().toLowerCase(),
@@ -1121,11 +1143,17 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
           };
           if (editing) {
             void apiUpdateUser({ data: { id: editing.id, patch: payload } })
-              .then((u) => {
+              .then(async (u) => {
                 useUserStore.setState((s) => ({
                   users: s.users.map((x) => (x.id === u.id ? u : x)),
                 }));
-                toast.success("User updated");
+                if (wantsPasswordChange) {
+                  await apiSetUserPassword({ data: { id: editing.id, password: passwords.next } });
+                  toast.success("User updated and password changed");
+                } else {
+                  toast.success("User updated");
+                }
+                resetPasswordFields();
                 setModalOpen(false);
               })
               .catch((e) => toast.error(e instanceof Error ? e.message : "Update failed"));
@@ -1193,6 +1221,30 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
             <p className="text-xs text-muted-foreground">
               New users get temporary password <code>buildesk123</code>. They can change it after sign-in.
             </p>
+          )}
+          {editing && (
+            <div className="mt-2 space-y-2 rounded-lg border border-dashed p-3">
+              <div className="text-xs font-medium text-muted-foreground">Change password (optional)</div>
+              <input
+                type="password"
+                placeholder="New password"
+                className={FIELD}
+                value={passwords.next}
+                onChange={(e) => setPasswords((p) => ({ ...p, next: e.target.value }))}
+                autoComplete="new-password"
+              />
+              <input
+                type="password"
+                placeholder="Confirm new password"
+                className={FIELD}
+                value={passwords.confirm}
+                onChange={(e) => setPasswords((p) => ({ ...p, confirm: e.target.value }))}
+                autoComplete="new-password"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Leave blank to keep the current password. Minimum 6 characters.
+              </p>
+            </div>
           )}
         </div>
       </EntityFormModal>

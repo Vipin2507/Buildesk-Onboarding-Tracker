@@ -74,6 +74,7 @@ export {
   listUsers,
   createUser,
   updateUser,
+  setUserPassword,
   deleteUser,
   listEmployees,
   createEmployee,
