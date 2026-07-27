@@ -72,7 +72,28 @@ function DataMigration() {
           <h3 className="font-semibold">Verification Dashboard</h3>
           <Pill tone="info">Excel ↔ CRM reconciliation</Pill>
         </div>
-        <div className="overflow-x-auto rounded-lg border">
+        <div className="space-y-2 md:hidden">
+          {verification.map((v) => {
+            const diff = v.excel - v.crm;
+            return (
+              <div key={v.metric} className="rounded-lg border bg-card p-3 text-sm">
+                <div className="font-medium">{v.metric}</div>
+                <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                  <dt className="text-muted-foreground">Excel</dt>
+                  <dd className="text-right font-mono">{v.excel}</dd>
+                  <dt className="text-muted-foreground">CRM</dt>
+                  <dd className="text-right font-mono">{v.crm}</dd>
+                  <dt className="text-muted-foreground">Diff</dt>
+                  <dd className="text-right font-mono">{diff}</dd>
+                </dl>
+                <div className="mt-2">
+                  {diff === 0 ? <Pill tone="success">Matched</Pill> : <Pill tone="warning">Not Matched</Pill>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="hidden overflow-x-auto rounded-lg border md:block">
           <table className="w-full min-w-[480px] text-sm">
             <thead className="bg-muted/60 text-xs text-muted-foreground">
               <tr>

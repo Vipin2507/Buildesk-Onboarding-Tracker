@@ -114,6 +114,9 @@ export function DataTable<T>({
   const tertiary = columns.find(
     (c) => /status|progress/i.test(c.key) || /status|progress/i.test(c.header),
   );
+  const mobileExtras = columns.slice(2, 5).filter(
+    (c) => c !== primary && c !== secondary && c !== tertiary,
+  );
 
   return (
     <div>
@@ -183,6 +186,15 @@ export function DataTable<T>({
                     {tertiary && tertiary !== primary && tertiary !== secondary && (
                       <div className="mt-2">{tertiary.render(row)}</div>
                     )}
+                    {mobileExtras.map((col) => (
+                      <div
+                        key={col.key}
+                        className="mt-1.5 flex items-start justify-between gap-2 text-xs"
+                      >
+                        <span className="shrink-0 text-muted-foreground">{col.header}</span>
+                        <span className="min-w-0 text-right">{col.render(row)}</span>
+                      </div>
+                    ))}
                   </div>
                   {onRowClick && (
                     <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground/70" />

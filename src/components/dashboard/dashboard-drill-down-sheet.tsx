@@ -67,6 +67,16 @@ type ResolvedData =
       }[];
     }
   | {
+      kind: "visit_followups";
+      visits: {
+        id: string;
+        companyId: string;
+        purpose: string;
+        nextFollowUpDate?: string;
+        status: string;
+      }[];
+    }
+  | {
       kind: "visits";
       visits: {
         id: string;
@@ -151,7 +161,7 @@ function ChecklistHierarchy({
           >
             <button
               type="button"
-              className="flex w-full items-center gap-2 bg-muted/40 px-3 py-2.5 text-left text-sm font-medium hover:bg-muted/60"
+              className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 bg-muted/40 px-3 py-2.5 text-left text-sm font-medium hover:bg-muted/60"
               onClick={() => {
                 setExpandedCompanies((prev) => {
                   const next = new Set(prev);
@@ -219,11 +229,13 @@ function ChecklistHierarchy({
                                   to="/projects/$projectId"
                                   params={{ projectId: row.projectId }}
                                   search={{ tab: "onboarding" }}
-                                  className="flex items-center gap-2 px-3 py-2 pl-14 text-sm transition-colors hover:bg-primary/5"
+                                  className="flex flex-col gap-1.5 px-3 py-2 pl-10 text-sm transition-colors hover:bg-primary/5 sm:flex-row sm:items-center sm:gap-2 sm:pl-14"
                                 >
-                                  <span className="min-w-0 flex-1 truncate">{row.item.label}</span>
-                                  <Pill tone="muted">{row.item.section}</Pill>
-                                  <Pill tone="info">{PHASE_LABEL[row.phase]}</Pill>
+                                  <span className="min-w-0 flex-1 sm:truncate">{row.item.label}</span>
+                                  <div className="flex flex-wrap gap-1 sm:shrink-0">
+                                    <Pill tone="muted">{row.item.section}</Pill>
+                                    <Pill tone="info">{PHASE_LABEL[row.phase]}</Pill>
+                                  </div>
                                 </Link>
                               </li>
                             ))}
@@ -278,8 +290,8 @@ export function DashboardDrillDownSheet({
         </SheetHeader>
 
         {data.kind === "checklist" ? (
-          <div className="flex flex-wrap gap-2 border-b px-5 py-3">
-            <div className="relative min-w-[180px] flex-1">
+          <div className="flex flex-col gap-2 border-b px-5 py-3 sm:flex-row sm:flex-wrap">
+            <div className="relative min-w-0 flex-1">
               <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={search}
@@ -291,7 +303,7 @@ export function DashboardDrillDownSheet({
             <select
               value={sectionFilter}
               onChange={(e) => setSectionFilter(e.target.value)}
-              className="h-9 rounded-lg border border-input bg-card px-2 text-sm"
+              className="h-9 w-full rounded-lg border border-input bg-card px-2 text-sm sm:w-auto"
             >
               <option value="all">All sections</option>
               {sections.map((s) => (
@@ -404,6 +416,26 @@ export function DashboardDrillDownSheet({
                   <div className="mt-1 text-xs text-muted-foreground">
                     Visit follow-up · {companyNameById(v.companyId)} ·{" "}
                     {v.nextFollowUpDate ? formatDate(v.nextFollowUpDate) : "—"}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : null}
+
+          {data.kind === "visit_followups" ? (
+            <div className="space-y-2">
+              {data.visits.map((v) => (
+                <Link
+                  key={v.id}
+                  to="/companies/$companyId"
+                  params={{ companyId: v.companyId }}
+                  search={{ tab: "Visits" }}
+                  className="block rounded-xl border p-3 transition-colors hover:bg-muted/30"
+                >
+                  <div className="font-medium">{v.purpose}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {companyNameById(v.companyId)} · Follow-up{" "}
+                    {v.nextFollowUpDate ? formatDate(v.nextFollowUpDate) : "—"} · {v.status}
                   </div>
                 </Link>
               ))}

@@ -15,6 +15,7 @@ export type DashboardKpiCardProps = {
   hint?: string;
   delay?: number;
   active?: boolean;
+  compact?: boolean;
   onClick?: () => void;
 };
 
@@ -26,9 +27,44 @@ export function DashboardKpiCard({
   hint,
   delay = 0,
   active,
+  compact = false,
   onClick,
 }: DashboardKpiCardProps) {
   const interactive = Boolean(onClick);
+
+  if (compact) {
+    return (
+      <motion.button
+        type="button"
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay, duration: 0.28, ease: EASE }}
+        whileHover={interactive ? { y: -1 } : undefined}
+        whileTap={interactive ? { scale: 0.98 } : undefined}
+        onClick={onClick}
+        disabled={!interactive}
+        className={cn(
+          "flex items-center gap-2 rounded-lg border bg-card/60 px-2 py-1.5 text-left",
+          interactive && "cursor-pointer hover:border-primary/30 hover:bg-card",
+          active && "ring-2 ring-primary/40",
+          !interactive && "cursor-default",
+        )}
+      >
+        <div className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-md", tone)}>
+          <Icon className="h-3.5 w-3.5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-base font-semibold tabular-nums leading-none">
+            <CountUp to={value} />
+          </div>
+          <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{label}</div>
+        </div>
+        {interactive ? (
+          <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground/70" />
+        ) : null}
+      </motion.button>
+    );
+  }
 
   return (
     <motion.button

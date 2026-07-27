@@ -170,7 +170,59 @@ export function CompanyTicketsPanel({ companyId }: Props) {
           onAction={openCreate}
         />
       ) : (
-        <div className="card-soft overflow-hidden">
+        <>
+          <div className="space-y-2.5 md:hidden">
+            {companyTickets.map((t) => (
+              <div key={t.id} className="rounded-xl border border-border bg-card p-3.5">
+                <div className="flex items-start justify-between gap-2">
+                  <Link
+                    to="/support/$ticketId"
+                    params={{ ticketId: t.id }}
+                    className="font-mono text-xs text-primary hover:underline"
+                  >
+                    {t.id}
+                  </Link>
+                  <Pill tone={t.priority === "Critical" ? "danger" : "warning"}>{t.priority}</Pill>
+                </div>
+                <div className="mt-1 text-sm font-medium">{t.title}</div>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <Pill tone={t.type === "Bug" ? "danger" : "info"}>{t.type}</Pill>
+                  <span>{t.status}</span>
+                  {t.projectId ? (
+                    <Link
+                      to="/projects/$projectId"
+                      params={{ projectId: t.projectId }}
+                      search={{ tab: "onboarding" }}
+                      className="text-primary hover:underline"
+                    >
+                      {t.project}
+                    </Link>
+                  ) : (
+                    <span>{t.project}</span>
+                  )}
+                  <span>· {t.developer}</span>
+                </div>
+                {canManageTickets ? (
+                  <div className="mt-2 flex justify-end gap-1 border-t border-border/60 pt-2">
+                    <Button size="icon" variant="ghost" onClick={() => openEdit(t)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        setEditing(t);
+                        setDeleteOpen(true);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+          <div className="card-soft hidden overflow-hidden md:block">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[40rem] text-sm">
               <thead className="bg-muted/60 text-xs text-muted-foreground">
@@ -247,6 +299,7 @@ export function CompanyTicketsPanel({ companyId }: Props) {
             </table>
           </div>
         </div>
+        </>
       )}
 
       <EntityFormModal

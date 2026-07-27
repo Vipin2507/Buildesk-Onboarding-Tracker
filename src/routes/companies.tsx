@@ -847,7 +847,7 @@ function CompaniesListPage() {
                 <p className="mt-1 text-xs text-destructive">{form.formState.errors.name.message}</p>
               ) : null}
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="text-xs font-medium">{FIELD_LABELS.city}</label>
                 <input {...form.register("city")} className={inputClass(!!form.formState.errors.city)} />
@@ -870,7 +870,7 @@ function CompaniesListPage() {
             <p className="text-xs text-muted-foreground">
               Main signatory / day-to-day contact. Owner and POC default to these if left blank.
             </p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {(["contact", "designation", "phone", "email"] as const).map((field) => (
                 <div key={field} className={field === "email" ? "col-span-2" : undefined}>
                   <label className="text-xs font-medium">{FIELD_LABELS[field]}</label>
@@ -892,7 +892,7 @@ function CompaniesListPage() {
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Owner & POC <span className="font-normal normal-case text-muted-foreground">(optional)</span>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="text-xs font-medium">Owner Name</label>
                 <input {...form.register("ownerName")} placeholder="Defaults to contact person" className={inputClass()} />
@@ -967,7 +967,7 @@ function CompaniesListPage() {
               ))}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="text-xs font-medium">Start Date</label>
               <input type="date" {...form.register("startDate")} className={inputClass(!!form.formState.errors.startDate)} />

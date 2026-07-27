@@ -408,7 +408,18 @@ function ProjectDetailPage() {
                         <h4 className="text-sm font-semibold">Other Charges</h4>
                         <Button size="sm" variant="outline" onClick={() => addOtherCharge({ projectId, name: "New Charge", amount: 0, type: "One-time" })}>+ Add</Button>
                       </div>
-                      <table className="w-full text-sm">
+                      <div className="space-y-2 md:hidden">
+                        {otherCharges.map((c) => (
+                          <div key={c.id} className="rounded-lg border p-3">
+                            <input defaultValue={c.name} onBlur={(e) => useOnboardingStore.getState().updateOtherCharge(c.id, { name: e.target.value })} className="mb-2 w-full rounded border px-2 py-1.5 text-sm" placeholder="Charge name" />
+                            <div className="flex items-center gap-2">
+                              <input type="number" defaultValue={c.amount} onBlur={(e) => useOnboardingStore.getState().updateOtherCharge(c.id, { amount: Number(e.target.value) })} className="w-full rounded border px-2 py-1.5 text-sm" placeholder="Amount" />
+                              <Button size="sm" variant="ghost" onClick={() => deleteOtherCharge(c.id)}>×</Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <table className="hidden w-full text-sm md:table">
                         <tbody>
                           {otherCharges.map((c) => (
                             <tr key={c.id} className="border-t">

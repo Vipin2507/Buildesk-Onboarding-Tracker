@@ -32,6 +32,7 @@ export type DashboardDrillDownFilter =
   | { type: "design_tickets" }
   | { type: "follow_ups"; scope: "overdue" | "due_today" | "open" }
   | { type: "visits" }
+  | { type: "visit_followups" }
   | { type: "renewals" }
   | { type: "account_health"; health: "Healthy" | "Moderate" | "Critical" };
 
@@ -195,6 +196,13 @@ export function useDashboardOverview() {
               (v) => v.status === "scheduled" && v.scheduledAt.slice(0, 10) >= today,
             ),
           };
+        case "visit_followups":
+          return {
+            kind: "visit_followups" as const,
+            visits: clientVisits.filter(
+              (v) => v.status !== "cancelled" && v.nextFollowUpDate,
+            ),
+          };
         case "renewals":
           return { kind: "renewals" as const, companies: renewalRows };
         case "account_health":
@@ -249,6 +257,8 @@ export function drillDownTitle(filter: DashboardDrillDownFilter): string {
       return "Open Follow-ups";
     case "visits":
       return "Upcoming Visits";
+    case "visit_followups":
+      return "Visit Follow-ups";
     case "renewals":
       return "Upcoming Renewals";
     case "account_health":

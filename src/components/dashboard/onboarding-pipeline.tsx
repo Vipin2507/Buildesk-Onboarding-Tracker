@@ -19,7 +19,7 @@ const PHASES: {
   {
     phase: "awaiting_collection",
     label: "Awaiting Collection",
-    shortLabel: "Collected",
+    shortLabel: "Collect",
     icon: Package,
     barClass: "bg-info",
     cardTone: "bg-info/15 text-info",
@@ -27,7 +27,7 @@ const PHASES: {
   {
     phase: "awaiting_upload",
     label: "Awaiting Upload",
-    shortLabel: "Uploaded",
+    shortLabel: "Upload",
     icon: CloudUpload,
     barClass: "bg-warning",
     cardTone: "bg-warning/15 text-warning-foreground",
@@ -61,9 +61,15 @@ type Props = {
   };
   activePhase?: ChecklistPhaseBucket;
   onPhaseClick: (filter: DashboardDrillDownFilter) => void;
+  compact?: boolean;
 };
 
-export function OnboardingPipelineSection({ stats, activePhase, onPhaseClick }: Props) {
+export function OnboardingPipelineSection({
+  stats,
+  activePhase,
+  onPhaseClick,
+  compact = false,
+}: Props) {
   const total =
     stats.awaitingCollection + stats.awaitingUpload + stats.awaitingLive + stats.complete || 1;
 
@@ -80,6 +86,68 @@ export function OnboardingPipelineSection({ stats, activePhase, onPhaseClick }: 
     awaiting_live: stats.awaitingLive,
     complete: stats.complete,
   };
+
+  if (compact) {
+    return (
+      <motion.section
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, delay: 0.06, ease: EASE }}
+        className="card-soft p-2.5 sm:p-3"
+      >
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="text-xs font-semibold">
+            Onboarding pipeline
+            <span className="ml-2 font-normal text-muted-foreground">
+              {stats.applicable} tasks
+            </span>
+          </div>
+          <div className="text-sm font-semibold tabular-nums text-primary">
+            <CountUp to={stats.progressPercent} format={(n) => `${Math.round(n)}%`} />
+          </div>
+        </div>
+        <div className="mb-2 flex h-2 overflow-hidden rounded-full bg-muted">
+          {segments.map((seg, i) =>
+            seg.count > 0 ? (
+              <div
+                key={i}
+                className={cn("h-full first:rounded-l-full last:rounded-r-full", seg.className)}
+                style={{ width: `${(seg.count / total) * 100}%` }}
+              />
+            ) : null,
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+          {PHASES.map((phase) => {
+            const Icon = phase.icon;
+            const value = values[phase.phase];
+            const isActive = activePhase === phase.phase;
+            return (
+              <button
+                key={phase.phase}
+                type="button"
+                onClick={() => onPhaseClick({ type: "checklist", phase: phase.phase })}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-md border px-1.5 py-1 text-left transition-colors hover:bg-muted/50",
+                  isActive && "border-primary/40 ring-1 ring-primary/30",
+                )}
+              >
+                <div className={cn("rounded p-1", phase.cardTone)}>
+                  <Icon className="h-3 w-3" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold tabular-nums leading-none">
+                    <CountUp to={value} />
+                  </div>
+                  <div className="truncate text-[9px] text-muted-foreground">{phase.shortLabel}</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </motion.section>
+    );
+  }
 
   return (
     <motion.section

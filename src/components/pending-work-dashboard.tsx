@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { EntityFormModal } from "@/components/entity-form-modal";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
+import { buildPendingWorkItems, type PendingWorkItem } from "@/hooks/use-pending-work-summary";
 import {
   useClientVisitStore,
   useCompanyStore,
@@ -22,20 +23,9 @@ import {
   useTicketStore,
   useUserStore,
 } from "@/stores";
-import { isTicketOpen } from "@/lib/tickets";
 import type { FollowUpTask } from "@/types";
 
-type PendingWork = {
-  id: string;
-  kind: "ticket" | "task" | "checklist" | "visit-followup";
-  title: string;
-  subtitle: string;
-  assigneeUserId?: string;
-  dueDate?: string;
-  href: string;
-  companyId?: string;
-  task?: FollowUpTask;
-};
+type PendingWork = PendingWorkItem;
 
 function dueTone(dueDate?: string) {
   if (!dueDate) return "muted" as const;
@@ -61,75 +51,18 @@ export function PendingWorkDashboard() {
   const [followUpTask, setFollowUpTask] = useState<FollowUpTask | null>(null);
   const [remark, setRemark] = useState("");
 
-  const work = useMemo(() => {
-    const rows: PendingWork[] = [];
-    for (const ticket of tickets) {
-      if (!isTicketOpen(ticket)) continue;
-      const company = companies.find((c) => c.id === ticket.companyId);
-      rows.push({
-        id: ticket.id,
-        kind: "ticket",
-        title: ticket.title,
-        subtitle: `${ticket.status} · ${company?.name ?? "Unknown company"}`,
-        assigneeUserId: ticket.assignedUserId,
-        dueDate: ticket.eta || undefined,
-        href: `/support/${ticket.id}`,
-        companyId: ticket.companyId,
-      });
-    }
-    for (const task of tasks) {
-      if (["completed", "cancelled"].includes(task.status)) continue;
-      const company = companies.find((c) => c.id === task.companyId);
-      rows.push({
-        id: task.id,
-        kind: "task",
-        title: task.title,
-        subtitle: `${task.status.replaceAll("_", " ")} · ${company?.name ?? "Unknown company"}`,
-        assigneeUserId: task.assigneeUserId,
-        dueDate: task.dueDate,
-        href: `/companies/${task.companyId}?tab=Tasks`,
-        companyId: task.companyId,
-        task,
-      });
-    }
-    for (const item of checklist) {
-      if (item.notApplicable || item.live) continue;
-      const project = projects.find((p) => p.id === item.projectId);
-      const company = companies.find((c) => c.id === project?.companyId);
-      rows.push({
-        id: item.id,
-        kind: "checklist",
-        title: item.label,
-        subtitle: `${project?.name ?? "Unknown project"} · ${
-          item.uploaded ? "Awaiting live" : item.collected ? "Awaiting upload" : "Awaiting collection"
-        }`,
-        assigneeUserId: item.assigneeUserId || company?.onboardingManagerId,
-        dueDate: item.dueDate,
-        href: `/projects/${item.projectId}?tab=onboarding`,
-        companyId: company?.id,
-      });
-    }
-    for (const visit of visits) {
-      if (visit.status === "cancelled" || !visit.nextFollowUpDate) continue;
-      const company = companies.find((c) => c.id === visit.companyId);
-      rows.push({
-        id: visit.id,
-        kind: "visit-followup",
-        title: visit.nextAction || visit.purpose,
-        subtitle: `Visit follow-up · ${company?.name ?? "Unknown company"}`,
-        assigneeUserId: visit.assignedUserId,
-        dueDate: visit.nextFollowUpDate,
-        href: `/companies/${visit.companyId}?tab=Visits`,
-        companyId: visit.companyId,
-      });
-    }
-    return rows.sort((a, b) => {
-      if (!a.dueDate && !b.dueDate) return a.title.localeCompare(b.title);
-      if (!a.dueDate) return 1;
-      if (!b.dueDate) return -1;
-      return a.dueDate.localeCompare(b.dueDate);
-    });
-  }, [tickets, tasks, checklist, visits, projects, companies]);
+  const work = useMemo(
+    () =>
+      buildPendingWorkItems({
+        tickets,
+        tasks,
+        checklist,
+        visits,
+        projects,
+        companies,
+      }),
+    [tickets, tasks, checklist, visits, projects, companies],
+  );
 
   const filtered = work.filter((item) => {
     if (userFilter !== "all" && item.assigneeUserId !== userFilter) return false;

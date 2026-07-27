@@ -627,14 +627,49 @@ function ExcelSection() {
 
   return (
     <div>
-      <div className="mb-4 flex items-start justify-between gap-3">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <SectionTitle title="Excel Templates" subtitle="Define import shapes and downloadable sample files." />
-        <Button onClick={openCreate}>
+        <Button className="w-full sm:w-auto" onClick={openCreate}>
           <Plus className="mr-1 h-4 w-4" /> Add Template
         </Button>
       </div>
       <div className="card-soft overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="space-y-2.5 p-3 md:hidden">
+          {templates.map((t) => (
+            <div key={t.id} className="rounded-xl border border-border bg-card p-3.5">
+              <div className="font-medium">{t.name}</div>
+              <div className="text-xs text-muted-foreground">{t.sampleFileName}</div>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                <span className="capitalize text-muted-foreground">{t.purpose}</span>
+                <Switch
+                  size="sm"
+                  checked={t.enabled}
+                  onCheckedChange={(v) => updateExcelTemplate(t.id, { enabled: v })}
+                />
+              </div>
+              <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{t.requiredColumns}</p>
+              <div className="mt-2 flex justify-end gap-1 border-t border-border/60 pt-2">
+                <Button size="icon" variant="ghost" title="Download sample" onClick={() => downloadSample(t)}>
+                  <Download className="h-4 w-4" />
+                </Button>
+                <Button size="icon" variant="ghost" onClick={() => openEdit(t)}>
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => {
+                    setEditing(t);
+                    setDeleteOpen(true);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-[560px] text-sm">
           <thead className="bg-muted/60 text-xs text-muted-foreground">
             <tr>
@@ -990,13 +1025,13 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
 
   return (
     <div>
-      <div className="mb-4 flex items-start justify-between gap-3">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <SectionTitle
           title="User Management"
           subtitle="Create login accounts with role, contact details, and access. Same form used from Invite user in the profile menu."
         />
         {isAdmin && (
-          <Button onClick={openInvite}>
+          <Button className="w-full sm:w-auto" onClick={openInvite}>
             <Plus className="mr-1 h-4 w-4" /> Invite User
           </Button>
         )}
@@ -1007,7 +1042,80 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
         </p>
       )}
       <div className="card-soft overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="space-y-2.5 p-3 md:hidden">
+          {users.map((u) => (
+            <div key={u.id} className="rounded-xl border border-border bg-card p-3.5">
+              <div className="flex items-center gap-3">
+                {u.avatarUrl ? (
+                  <img src={u.avatarUrl} alt="" className="h-9 w-9 rounded-full object-cover" />
+                ) : (
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
+                    {u.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium">
+                    {u.name}
+                    {u.id === currentUserId && (
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">(you)</span>
+                    )}
+                  </div>
+                  <div className="truncate text-xs text-muted-foreground">{u.email}</div>
+                </div>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                <span>{roles.find((r) => r.key === u.role)?.name ?? u.role}</span>
+                {u.department ? <span className="text-muted-foreground">· {u.department}</span> : null}
+                <span
+                  className={cn(
+                    "inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
+                    u.active
+                      ? "bg-success/15 text-success border border-success/30"
+                      : "bg-muted text-muted-foreground border border-border",
+                  )}
+                >
+                  {u.active ? "Active" : "Inactive"}
+                </span>
+              </div>
+              {isAdmin ? (
+                <div className="mt-2 flex justify-end gap-1 border-t border-border/60 pt-2">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => {
+                      setEditing(u);
+                      resetPasswordFields();
+                      setForm({
+                        name: u.name,
+                        email: u.email,
+                        role: u.role,
+                        active: u.active,
+                        phone: u.phone ?? "",
+                        jobTitle: u.jobTitle ?? "",
+                        department: u.department ?? "",
+                      });
+                      setModalOpen(true);
+                    }}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    disabled={u.id === currentUserId}
+                    onClick={() => {
+                      setEditing(u);
+                      setDeleteOpen(true);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+        <div className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-[560px] text-sm">
           <thead className="bg-muted/60 text-xs text-muted-foreground">
             <tr>

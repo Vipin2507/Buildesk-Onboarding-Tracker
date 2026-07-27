@@ -66,7 +66,7 @@ export function TopBar() {
 
   return (
     <>
-      <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b bg-background/80 px-3 backdrop-blur md:h-16 md:gap-4 md:px-6">
+      <header className="sticky top-0 z-20 flex h-14 min-w-0 items-center gap-2 border-b bg-background/80 px-3 backdrop-blur md:h-16 md:gap-4 md:px-6">
         <button
           type="button"
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-card text-foreground md:hidden"
@@ -85,9 +85,10 @@ export function TopBar() {
               setOpen(true);
             }}
             onFocus={() => setOpen(true)}
-            placeholder="Search company, project, task, visit…"
+            placeholder="Search…"
             className="h-10 w-full rounded-lg border border-input bg-card pl-9 pr-3 text-sm outline-none transition-shadow focus:ring-2 focus:ring-ring/40"
             aria-label="Search company, project, task, visit"
+            title="Search company, project, task, visit"
           />
           {open && hasResults && (
             <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-[70vh] overflow-auto rounded-lg border bg-popover shadow-lg">

@@ -666,7 +666,22 @@ function CompanyDetailContent() {
               </div>
             </div>
             {subscriptionSummary.rows.length > 0 ? (
-              <div className="overflow-x-auto">
+              <>
+                <div className="space-y-2 md:hidden">
+                  {subscriptionSummary.rows.map((s) => (
+                    <div key={s.id} className="rounded-lg border bg-card p-3 text-sm">
+                      <div className="font-medium">{getModuleLabel(s.moduleKey)}</div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                        <Pill>{s.status}</Pill>
+                        <span className="text-muted-foreground">Start {formatDate(s.startDate)}</span>
+                        <span className="text-muted-foreground">
+                          Until {s.validUntil ? formatDate(s.validUntil) : "—"}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="hidden overflow-x-auto md:block">
                 <table className="w-full text-left text-sm">
                   <thead className="text-xs text-muted-foreground">
                     <tr>
@@ -690,6 +705,7 @@ function CompanyDetailContent() {
                   </tbody>
                 </table>
               </div>
+              </>
             ) : (
               <p className="text-xs text-muted-foreground">
                 No subscription rows yet — they are created when modules are opted in or managed
