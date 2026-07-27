@@ -22,12 +22,21 @@ type ThreadProps = {
   showResolvedBanner?: boolean;
 };
 
-function MessageBubble({ msg, isTeam }: { msg: DesignTicketMessage; isTeam: boolean }) {
+function MessageBubble({
+  msg,
+  isTeam,
+  animateIn,
+}: {
+  msg: DesignTicketMessage;
+  isTeam: boolean;
+  animateIn: boolean;
+}) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
+      initial={animateIn ? { opacity: 0, y: 6 } : false}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.28, ease: TICKET_EASE }}
+      transition={{ duration: 0.22, ease: TICKET_EASE }}
+      layout="position"
       className={cn("flex", isTeam ? "justify-end" : "justify-start")}
     >
       <div
@@ -69,12 +78,13 @@ function MessageBubble({ msg, isTeam }: { msg: DesignTicketMessage; isTeam: bool
   );
 }
 
-function SystemEntry({ msg }: { msg: DesignTicketMessage }) {
+function SystemEntry({ msg, animateIn }: { msg: DesignTicketMessage; animateIn: boolean }) {
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.98 }}
+      initial={animateIn ? { opacity: 0, scale: 0.98 } : false}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.25, ease: TICKET_EASE }}
+      transition={{ duration: 0.2, ease: TICKET_EASE }}
+      layout="position"
       className="flex justify-center px-2 py-1"
     >
       <span className="rounded-full bg-muted px-3 py-1 text-center text-[11px] text-muted-foreground sm:text-xs">
@@ -95,7 +105,12 @@ export function DesignTicketThread({
   const [text, setText] = useState("");
   const [files, setFiles] = useState<{ name: string }[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const initialMessageCount = useRef<number | null>(null);
   const sorted = [...ticket.messages].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
+  if (initialMessageCount.current === null) {
+    initialMessageCount.current = sorted.length;
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -137,22 +152,29 @@ export function DesignTicketThread({
             {mode === "client" ? "Our team will reply here soon." : "Waiting for client or team replies."}
           </p>
         ) : (
-          sorted.map((msg) =>
-            msg.kind === "system" ? (
-              <SystemEntry key={msg.id} msg={msg} />
+          sorted.map((msg, index) => {
+            const animateIn = index >= (initialMessageCount.current ?? sorted.length);
+            return msg.kind === "system" ? (
+              <SystemEntry key={msg.id} msg={msg} animateIn={animateIn} />
             ) : (
-              <MessageBubble key={msg.id} msg={msg} isTeam={msg.authorType === "team"} />
-            ),
-          )
+              <MessageBubble
+                key={msg.id}
+                msg={msg}
+                isTeam={msg.authorType === "team"}
+                animateIn={animateIn}
+              />
+            );
+          })
         )}
         <div ref={bottomRef} />
       </div>
 
       {reply && !reply.disabled ? (
         <motion.div
-          initial={{ opacity: 0, y: 8 }}
+          layout
+          initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.1, ease: TICKET_EASE }}
+          transition={{ duration: 0.25, ease: TICKET_EASE }}
           className="mt-3 space-y-2 sm:mt-4"
         >
           {files.length > 0 ? (

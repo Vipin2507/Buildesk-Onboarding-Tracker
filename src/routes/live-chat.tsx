@@ -57,14 +57,18 @@ function LiveChatPage() {
   );
 
   const active = sessions.find((s) => s.id === activeId) ?? sorted[0];
+  const activeUnreadCustomer =
+    active?.messages.filter((m) => m.senderType === "customer" && !m.isRead).length ?? 0;
 
   useEffect(() => {
     if (active && activeId !== active.id) setActive(active.id);
   }, [active, activeId, setActive]);
 
   useEffect(() => {
-    if (active) markSessionRead(active.id, "agent");
-  }, [active?.id, active?.messages.length, markSessionRead]);
+    if (active?.id && activeUnreadCustomer > 0) {
+      markSessionRead(active.id, "agent");
+    }
+  }, [active?.id, activeUnreadCustomer, markSessionRead]);
 
   if (!canAccess) {
     return (

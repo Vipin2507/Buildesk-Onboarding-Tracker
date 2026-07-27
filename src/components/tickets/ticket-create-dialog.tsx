@@ -1,15 +1,16 @@
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { DesignTicketSelect } from "@/components/design-ticket/design-ticket-fields";
 import {
   DesignTicketFormField,
   ticketFieldClass,
-  ticketSelectClass,
   ticketTextareaClass,
 } from "@/components/design-ticket/design-ticket-shared";
 import { EntityFormModal } from "@/components/entity-form-modal";
 import { DESIGN_TICKET_CATEGORIES } from "@/types/design-ticket";
 import type { DesignTicketPriority } from "@/types/design-ticket";
+import { DESIGN_TICKET_PRIORITY_LABEL } from "@/types/design-ticket";
 import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
 
 export function TicketCreateDialog({
@@ -70,19 +71,13 @@ export function TicketCreateDialog({
       submitLabel={saving ? "Creating…" : "Create ticket"}
       onSubmit={() => void submit()}
     >
-      <div className="space-y-3">
+      <div className="space-y-4">
         <DesignTicketFormField label="Company">
-          <select
+          <DesignTicketSelect
             value={companyId}
-            onChange={(e) => setCompanyId(e.target.value)}
-            className={ticketSelectClass}
-          >
-            {companies.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+            onChange={setCompanyId}
+            options={companies.map((c) => ({ value: c.id, label: c.name }))}
+          />
         </DesignTicketFormField>
         <DesignTicketFormField label="Subject">
           <input
@@ -93,24 +88,20 @@ export function TicketCreateDialog({
           />
         </DesignTicketFormField>
         <DesignTicketFormField label="Category">
-          <select value={category} onChange={(e) => setCategory(e.target.value)} className={ticketSelectClass}>
-            {DESIGN_TICKET_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+          <DesignTicketSelect
+            value={category}
+            onChange={setCategory}
+            options={DESIGN_TICKET_CATEGORIES.map((c) => ({ value: c, label: c }))}
+          />
         </DesignTicketFormField>
         <DesignTicketFormField label="Priority">
-          <select
+          <DesignTicketSelect
             value={priority}
-            onChange={(e) => setPriority(e.target.value as DesignTicketPriority)}
-            className={ticketSelectClass}
-          >
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
+            onChange={(v) => setPriority(v as DesignTicketPriority)}
+            options={(
+              ["low", "medium", "high"] as const
+            ).map((p) => ({ value: p, label: DESIGN_TICKET_PRIORITY_LABEL[p] }))}
+          />
         </DesignTicketFormField>
         <DesignTicketFormField label="Description">
           <textarea

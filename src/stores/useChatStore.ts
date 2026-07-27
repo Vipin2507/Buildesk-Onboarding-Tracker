@@ -323,19 +323,34 @@ export const useChatStore = createPersistedStore<ChatState>("chat-v1", (set, get
   },
 
   markSessionRead: (sessionId, reader) => {
-    set((s) => ({
-      sessions: s.sessions.map((session) => {
-        if (session.id !== sessionId) return session;
-        return {
-          ...session,
-          messages: session.messages.map((m) => {
-            if (reader === "agent" && m.senderType === "customer") return { ...m, isRead: true };
-            if (reader === "customer" && m.senderType !== "customer") return { ...m, isRead: true };
-            return m;
-          }),
-        };
-      }),
-    }));
+    set((s) => {
+      const session = s.sessions.find((x) => x.id === sessionId);
+      if (!session) return s;
+
+      const hasUnread = session.messages.some((m) => {
+        if (reader === "agent") return m.senderType === "customer" && !m.isRead;
+        return m.senderType !== "customer" && !m.isRead;
+      });
+      if (!hasUnread) return s;
+
+      return {
+        sessions: s.sessions.map((sess) => {
+          if (sess.id !== sessionId) return sess;
+          return {
+            ...sess,
+            messages: sess.messages.map((m) => {
+              if (reader === "agent" && m.senderType === "customer" && !m.isRead) {
+                return { ...m, isRead: true };
+              }
+              if (reader === "customer" && m.senderType !== "customer" && !m.isRead) {
+                return { ...m, isRead: true };
+              }
+              return m;
+            }),
+          };
+        }),
+      };
+    });
   },
 
   getLiveChatBadgeCount: () => {

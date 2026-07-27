@@ -1,18 +1,39 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { motion } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { CountUp } from "@/components/count-up";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 export const TICKET_EASE = [0.22, 1, 0.36, 1] as const;
 
+/** Staggered page entrance — use on ticket list/detail roots */
+export const ticketPageVariants: Variants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.06, delayChildren: 0.02 },
+  },
+};
+
+export const ticketSectionVariants: Variants = {
+  hidden: { opacity: 0, y: 10 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.35, ease: TICKET_EASE },
+  },
+};
+
+export { ticketFieldControl } from "@/components/design-ticket/design-ticket-fields";
+
 export const ticketFieldClass =
-  "h-10 w-full rounded-lg border border-input bg-card px-3 text-sm outline-none transition-shadow focus:ring-2 focus:ring-primary/25";
+  "h-10 w-full rounded-lg border border-input bg-card px-3 text-sm outline-none transition-shadow focus:ring-2 focus:ring-primary/25 dark:bg-muted/40";
 
 export const ticketSelectClass =
-  "h-10 w-full rounded-lg border border-input bg-card px-3 text-sm outline-none transition-shadow focus:ring-2 focus:ring-primary/25";
+  "h-10 w-full rounded-lg border border-input bg-card px-3 text-sm outline-none transition-shadow focus:ring-2 focus:ring-primary/25 dark:bg-muted/40 appearance-none";
 
 export const ticketTextareaClass =
   "w-full resize-none rounded-lg border border-input bg-card px-3 py-2.5 text-sm outline-none transition-shadow focus:ring-2 focus:ring-primary/25";
@@ -238,9 +259,24 @@ export function DesignTicketFormField({
   children: ReactNode;
 }) {
   return (
-    <label className="block space-y-1.5 text-sm">
-      <span className="font-medium text-foreground">{label}</span>
+    <div className="block space-y-1.5">
+      <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
       {children}
-    </label>
+    </div>
+  );
+}
+
+export function DesignTicketDetailSkeleton() {
+  return (
+    <div className="space-y-4">
+      <Skeleton className="h-8 w-48" />
+      <Skeleton className="h-20 w-full rounded-xl" />
+      <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
+        <Skeleton className="h-[420px] rounded-xl" />
+        <Skeleton className="h-64 rounded-xl" />
+      </div>
+    </div>
   );
 }

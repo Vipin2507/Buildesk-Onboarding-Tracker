@@ -34,6 +34,10 @@ export function PortalChatWidget({ access }: { access: CompanyPortalAccess }) {
 
   const unread = session?.messages.some((m) => m.senderType !== "customer" && !m.isRead) ?? false;
 
+  const sessionId = session?.id;
+  const unreadAgentCount =
+    session?.messages.filter((m) => m.senderType !== "customer" && !m.isRead).length ?? 0;
+
   useEffect(() => {
     if (open && !session) {
       const s = startSession({
@@ -43,13 +47,13 @@ export function PortalChatWidget({ access }: { access: CompanyPortalAccess }) {
       });
       setActivePortalSession(s.id);
     }
-  }, [open, session, startSession, access, setActivePortalSession]);
+  }, [open, session, startSession, access.companyId, access.contactName, access.slug, setActivePortalSession]);
 
   useEffect(() => {
-    if (open && session) {
-      markSessionRead(session.id, "customer");
+    if (open && sessionId && unreadAgentCount > 0) {
+      markSessionRead(sessionId, "customer");
     }
-  }, [open, session, markSessionRead, session?.messages.length]);
+  }, [open, sessionId, unreadAgentCount, markSessionRead]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });

@@ -23,13 +23,17 @@ import {
   DESIGN_TICKET_STATUSES,
 } from "@/components/design-ticket/design-ticket-chips";
 import {
+  DesignTicketDateField,
+  DesignTicketFilterField,
+  DesignTicketSelect,
+} from "@/components/design-ticket/design-ticket-fields";
+import {
   DesignTicketInfoBanner,
   DesignTicketKpiGrid,
   DesignTicketPageHeader,
   DesignTicketSection,
   InternalTicketsNav,
-  TICKET_EASE,
-  ticketSelectClass,
+  ticketSectionVariants,
 } from "@/components/design-ticket/design-ticket-shared";
 import { TicketCreateDialog } from "@/components/tickets/ticket-create-dialog";
 import { PageWrap } from "@/components/page-header";
@@ -45,13 +49,13 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { inDateRange } from "@/components/list-toolbar";
 import {
   matchesTicketKpiFilter,
@@ -70,7 +74,12 @@ import {
 } from "@/stores";
 import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
 import type { DesignTicketPriority, DesignTicketStatus } from "@/types/design-ticket";
-import { DESIGN_TICKET_STATUS_LABEL } from "@/types/design-ticket";
+import {
+  DESIGN_TICKET_PRIORITY_LABEL,
+  DESIGN_TICKET_STATUS_LABEL,
+} from "@/types/design-ticket";
+
+const UNASSIGNED = "__unassigned__";
 
 export const Route = createFileRoute("/tickets")({
   validateSearch: (search) => ticketsSearchSchema.parse(search),
@@ -355,60 +364,59 @@ function TicketsDashboard() {
       </div>
 
       <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, delay: 0.08, ease: TICKET_EASE }}
-        className="card-soft mb-4 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
+        variants={ticketSectionVariants}
+        initial="hidden"
+        animate="show"
+        className="card-soft mb-4 grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
       >
-        <label className="space-y-1.5 text-xs font-medium">
-          Company
-          <select value={companyFilter} onChange={(e) => setCompanyFilter(e.target.value)} className={ticketSelectClass}>
-            <option value="all">All Companies</option>
-            {companies.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="space-y-1.5 text-xs font-medium">
-          Status
-          <select
+        <DesignTicketFilterField label="Company">
+          <DesignTicketSelect
+            value={companyFilter}
+            onChange={setCompanyFilter}
+            options={[
+              { value: "all", label: "All Companies" },
+              ...companies.map((c) => ({ value: c.id, label: c.name })),
+            ]}
+          />
+        </DesignTicketFilterField>
+        <DesignTicketFilterField label="Status">
+          <DesignTicketSelect
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-            className={ticketSelectClass}
-          >
-            <option value="all">All</option>
-            {DESIGN_TICKET_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {DESIGN_TICKET_STATUS_LABEL[s]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="space-y-1.5 text-xs font-medium">
-          Priority
-          <select
+            onChange={(v) => setStatusFilter(v as typeof statusFilter)}
+            options={[
+              { value: "all", label: "All statuses" },
+              ...DESIGN_TICKET_STATUSES.map((s) => ({
+                value: s,
+                label: DESIGN_TICKET_STATUS_LABEL[s],
+              })),
+            ]}
+          />
+        </DesignTicketFilterField>
+        <DesignTicketFilterField label="Priority">
+          <DesignTicketSelect
             value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value as typeof priorityFilter)}
-            className={ticketSelectClass}
-          >
-            <option value="all">All</option>
-            {DESIGN_TICKET_PRIORITIES.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="space-y-1.5 text-xs font-medium">
-          Created from
-          <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-10" />
-        </label>
-        <label className="space-y-1.5 text-xs font-medium">
-          Created to
-          <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-10" />
-        </label>
+            onChange={(v) => setPriorityFilter(v as typeof priorityFilter)}
+            options={[
+              { value: "all", label: "All priorities" },
+              ...DESIGN_TICKET_PRIORITIES.map((p) => ({
+                value: p,
+                label: DESIGN_TICKET_PRIORITY_LABEL[p],
+              })),
+            ]}
+          />
+        </DesignTicketFilterField>
+        <DesignTicketDateField
+          label="Created from"
+          value={dateFrom}
+          onChange={setDateFrom}
+          placeholder="From date"
+        />
+        <DesignTicketDateField
+          label="Created to"
+          value={dateTo}
+          onChange={setDateTo}
+          placeholder="To date"
+        />
         <div className="flex items-end sm:col-span-2 lg:col-span-3 xl:col-span-5">
           <Button type="button" className="w-full sm:w-auto" onClick={applyFilters}>
             Apply Filters
@@ -564,18 +572,16 @@ function TicketsDashboard() {
           <DialogHeader>
             <DialogTitle>Assign {selectedCount} tickets</DialogTitle>
           </DialogHeader>
-          <select
-            className={ticketSelectClass}
-            value={bulkAssigneeId}
-            onChange={(e) => setBulkAssigneeId(e.target.value)}
-          >
-            <option value="">Unassigned</option>
-            {assigneeOptions.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
+          <DesignTicketFilterField label="Assignee">
+            <DesignTicketSelect
+              value={bulkAssigneeId || UNASSIGNED}
+              onChange={(v) => setBulkAssigneeId(v === UNASSIGNED ? "" : v)}
+              options={[
+                { value: UNASSIGNED, label: "Unassigned" },
+                ...assigneeOptions.map((a) => ({ value: a.id, label: a.name })),
+              ]}
+            />
+          </DesignTicketFilterField>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBulkAction(null)}>
               Cancel
@@ -590,17 +596,16 @@ function TicketsDashboard() {
           <DialogHeader>
             <DialogTitle>Change status ({selectedCount})</DialogTitle>
           </DialogHeader>
-          <select
-            className={ticketSelectClass}
-            value={bulkStatus}
-            onChange={(e) => setBulkStatus(e.target.value as DesignTicketStatus)}
-          >
-            {DESIGN_TICKET_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {DESIGN_TICKET_STATUS_LABEL[s]}
-              </option>
-            ))}
-          </select>
+          <DesignTicketFilterField label="Status">
+            <DesignTicketSelect
+              value={bulkStatus}
+              onChange={(v) => setBulkStatus(v as DesignTicketStatus)}
+              options={DESIGN_TICKET_STATUSES.map((s) => ({
+                value: s,
+                label: DESIGN_TICKET_STATUS_LABEL[s],
+              }))}
+            />
+          </DesignTicketFilterField>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBulkAction(null)}>
               Cancel
@@ -615,17 +620,16 @@ function TicketsDashboard() {
           <DialogHeader>
             <DialogTitle>Change priority ({selectedCount})</DialogTitle>
           </DialogHeader>
-          <select
-            className={ticketSelectClass}
-            value={bulkPriority}
-            onChange={(e) => setBulkPriority(e.target.value as DesignTicketPriority)}
-          >
-            {DESIGN_TICKET_PRIORITIES.map((p) => (
-              <option key={p} value={p}>
-                {p.charAt(0).toUpperCase() + p.slice(1)}
-              </option>
-            ))}
-          </select>
+          <DesignTicketFilterField label="Priority">
+            <DesignTicketSelect
+              value={bulkPriority}
+              onChange={(v) => setBulkPriority(v as DesignTicketPriority)}
+              options={DESIGN_TICKET_PRIORITIES.map((p) => ({
+                value: p,
+                label: DESIGN_TICKET_PRIORITY_LABEL[p],
+              }))}
+            />
+          </DesignTicketFilterField>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBulkAction(null)}>
               Cancel
@@ -660,7 +664,10 @@ function TicketRowActions({
           <MoreHorizontal className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+      <DropdownMenuContent align="end" className="w-52" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenuLabel className="text-[11px] uppercase tracking-wide text-muted-foreground">
+          Assignment
+        </DropdownMenuLabel>
         {currentUserId ? (
           <DropdownMenuItem
             onClick={() => {
@@ -668,13 +675,15 @@ function TicketRowActions({
               if (me) onAssign(me.id, me.name);
             }}
           >
+            <UserPlus className="mr-2 h-4 w-4" />
             Assign to me
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>Assign to…</DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
+          <DropdownMenuSubContent className="max-h-64 overflow-y-auto">
             <DropdownMenuItem onClick={() => onAssign(undefined, "Unassigned")}>Unassigned</DropdownMenuItem>
+            <DropdownMenuSeparator />
             {assigneeOptions.map((a) => (
               <DropdownMenuItem key={a.id} onClick={() => onAssign(a.id, a.name)}>
                 {a.name}
@@ -682,8 +691,12 @@ function TicketRowActions({
             ))}
           </DropdownMenuSubContent>
         </DropdownMenuSub>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="text-[11px] uppercase tracking-wide text-muted-foreground">
+          Ticket
+        </DropdownMenuLabel>
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger>Status</DropdownMenuSubTrigger>
+          <DropdownMenuSubTrigger>Change status</DropdownMenuSubTrigger>
           <DropdownMenuSubContent>
             {DESIGN_TICKET_STATUSES.map((s) => (
               <DropdownMenuItem key={s} onClick={() => onStatus(s)}>
@@ -693,17 +706,17 @@ function TicketRowActions({
           </DropdownMenuSubContent>
         </DropdownMenuSub>
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger>Priority</DropdownMenuSubTrigger>
+          <DropdownMenuSubTrigger>Change priority</DropdownMenuSubTrigger>
           <DropdownMenuSubContent>
             {DESIGN_TICKET_PRIORITIES.map((p) => (
               <DropdownMenuItem key={p} onClick={() => onPriority(p)}>
-                {p.charAt(0).toUpperCase() + p.slice(1)}
+                {DESIGN_TICKET_PRIORITY_LABEL[p]}
               </DropdownMenuItem>
             ))}
           </DropdownMenuSubContent>
         </DropdownMenuSub>
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-destructive" onClick={onDelete}>
+        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={onDelete}>
           <Trash2 className="mr-2 h-4 w-4" />
           Delete
         </DropdownMenuItem>

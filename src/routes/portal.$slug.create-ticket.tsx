@@ -8,14 +8,15 @@ import {
   DesignTicketPageHeader,
   PortalPageWrap,
   ticketFieldClass,
-  ticketSelectClass,
   ticketTextareaClass,
 } from "@/components/design-ticket/design-ticket-shared";
+import { DesignTicketSelect } from "@/components/design-ticket/design-ticket-fields";
 import { Button } from "@/components/ui/button";
 import { DESIGN_TICKET_CATEGORIES } from "@/types/design-ticket";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
 import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
 import type { DesignTicketPriority } from "@/types/design-ticket";
+import { DESIGN_TICKET_PRIORITY_LABEL } from "@/types/design-ticket";
 
 export const Route = createFileRoute("/portal/$slug/create-ticket")({
   component: PortalCreateTicket,
@@ -83,24 +84,20 @@ function PortalCreateTicket() {
             />
           </DesignTicketFormField>
           <DesignTicketFormField label="Category">
-            <select value={category} onChange={(e) => setCategory(e.target.value)} className={ticketSelectClass}>
-              {DESIGN_TICKET_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+            <DesignTicketSelect
+              value={category}
+              onChange={setCategory}
+              options={DESIGN_TICKET_CATEGORIES.map((c) => ({ value: c, label: c }))}
+            />
           </DesignTicketFormField>
           <DesignTicketFormField label="Priority">
-            <select
+            <DesignTicketSelect
               value={priority}
-              onChange={(e) => setPriority(e.target.value as DesignTicketPriority)}
-              className={ticketSelectClass}
-            >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
+              onChange={(v) => setPriority(v as DesignTicketPriority)}
+              options={(
+                ["low", "medium", "high"] as const
+              ).map((p) => ({ value: p, label: DESIGN_TICKET_PRIORITY_LABEL[p] }))}
+            />
           </DesignTicketFormField>
           <DesignTicketFormField label="Description">
             <textarea
