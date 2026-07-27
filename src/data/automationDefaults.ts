@@ -2,12 +2,17 @@ import type {
   AutomationEndpoint,
   AutomationHealthConfig,
   AutomationRule,
+  AutomationSettings,
 } from "@/types/automation";
 import { nowIso } from "@/types";
 
+export const DEFAULT_N8N_WEBHOOK_BASE = "http://72.60.200.185:5678/webhook";
+export const N8N_EMAIL_SEGMENT = "buildesk-email";
+export const N8N_HEALTH_SEGMENT = "buildesk-health";
+
 export const DEFAULT_WHATSAPP_WEBHOOK = "http://72.60.200.185:5678/webhook/buildesk-whatsapp";
-export const DEFAULT_EMAIL_WEBHOOK = "http://72.60.200.185:5678/webhook/buildesk-email";
-export const DEFAULT_HEALTH_WEBHOOK = "http://72.60.200.185:5678/webhook/buildesk-health";
+export const DEFAULT_EMAIL_WEBHOOK = `${DEFAULT_N8N_WEBHOOK_BASE}/${N8N_EMAIL_SEGMENT}`;
+export const DEFAULT_HEALTH_WEBHOOK = `${DEFAULT_N8N_WEBHOOK_BASE}/${N8N_HEALTH_SEGMENT}`;
 
 export const DEFAULT_WAHA_API_URL = "http://72.60.200.185:3000";
 export const DEFAULT_WAHA_API_KEY = "MySecretWAHAKey";
@@ -18,6 +23,11 @@ export const DEFAULT_WAHA_CONFIG = {
   apiKey: DEFAULT_WAHA_API_KEY,
   sessionName: DEFAULT_WAHA_SESSION,
   isEnabled: true,
+};
+
+export const DEFAULT_AUTOMATION_SETTINGS: AutomationSettings = {
+  n8nWebhookBase: DEFAULT_N8N_WEBHOOK_BASE,
+  automationsEnabled: true,
 };
 
 export const DEFAULT_AUTOMATION_ENDPOINTS: AutomationEndpoint[] = [

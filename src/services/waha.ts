@@ -1,65 +1,26 @@
 import type { WahaConfig } from "@/types/automation";
+import {
+  fetchWahaSendText,
+  fetchWahaSession,
+  phoneToWahaChatId,
+  normalizeIndiaPhone,
+} from "@/lib/automationEndpoints";
 
-export type WahaSendTextRequest = {
-  session: string;
-  chatId: string;
-  text: string;
-};
-
-export type WahaSendResult = {
-  ok: boolean;
-  status: number;
-  body: string;
-  request: WahaSendTextRequest;
-};
-
-function trimSlash(url: string) {
-  return url.replace(/\/+$/, "");
-}
-
-/** Convert phone to WAHA chatId (digits only + @c.us). */
-export function phoneToWahaChatId(phone: string | undefined): string | null {
-  if (!phone?.trim()) return null;
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length < 8) return null;
-  return `${digits}@c.us`;
-}
-
-export function buildWahaSendUrl(apiUrl: string) {
-  return `${trimSlash(apiUrl)}/api/sendText`;
-}
-
-export function buildWahaSessionUrl(apiUrl: string, sessionName: string) {
-  return `${trimSlash(apiUrl)}/api/sessions/${encodeURIComponent(sessionName)}`;
-}
-
-function wahaHeaders(apiKey: string): HeadersInit {
-  return {
-    Accept: "application/json",
-    "Content-Type": "application/json",
-    "X-Api-Key": apiKey,
-  };
-}
+export type { WahaSendTextRequest } from "@/lib/automationEndpoints";
+export { phoneToWahaChatId, normalizeIndiaPhone };
 
 export async function sendWahaText(
   config: WahaConfig,
   chatId: string,
   text: string,
-): Promise<WahaSendResult> {
-  const request: WahaSendTextRequest = {
-    session: config.sessionName,
-    chatId,
-    text,
+) {
+  const result = await fetchWahaSendText(config, chatId, text);
+  return {
+    ok: result.ok,
+    status: result.status,
+    body: result.text,
+    request: result.request,
   };
-
-  const res = await fetch(buildWahaSendUrl(config.apiUrl), {
-    method: "POST",
-    headers: wahaHeaders(config.apiKey),
-    body: JSON.stringify(request),
-  });
-
-  const body = await res.text().catch(() => "");
-  return { ok: res.ok, status: res.status, body, request };
 }
 
 export async function checkWahaSession(config: WahaConfig): Promise<{
@@ -73,26 +34,23 @@ export async function checkWahaSession(config: WahaConfig): Promise<{
   const checkedAt = new Date().toISOString();
 
   try {
-    const res = await fetch(buildWahaSessionUrl(config.apiUrl, config.sessionName), {
-      method: "GET",
-      headers: wahaHeaders(config.apiKey),
-    });
-    const text = await res.text().catch(() => "");
+    const result = await fetchWahaSession(config);
     const latencyMs = Math.round(performance.now() - started);
+    const text = result.text;
 
-    if (!res.ok) {
+    if (!result.ok) {
       return {
         status: "unhealthy",
         checkedAt,
         latencyMs,
-        message: `HTTP ${res.status}`,
+        message: `HTTP ${result.status}`,
         rawResponse: text.slice(0, 400),
       };
     }
 
     let sessionStatus = "";
     try {
-      const json = JSON.parse(text) as { status?: string; name?: string };
+      const json = JSON.parse(text) as { status?: string };
       sessionStatus = json.status ?? "";
     } catch {
       sessionStatus = "";

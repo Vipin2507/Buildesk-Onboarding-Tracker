@@ -170,7 +170,7 @@ export function AutomationRulesPanel() {
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="font-semibold">Automation rules</h3>
-          <p className="text-sm text-muted-foreground">Email & WhatsApp notifications via n8n webhooks.</p>
+          <p className="text-sm text-muted-foreground">Email via n8n · WhatsApp via WAHA.</p>
         </div>
         <Button onClick={openCreate} className="gap-1.5 bg-primary">
           <Plus className="h-4 w-4" /> New Rule

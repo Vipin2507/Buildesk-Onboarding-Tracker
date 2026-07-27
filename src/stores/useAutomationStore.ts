@@ -3,18 +3,21 @@ import type {
   AutomationHealthConfig,
   AutomationLog,
   AutomationRule,
+  AutomationSettings,
   WahaConfig,
 } from "@/types/automation";
 import { nowIso } from "@/types";
 import {
   DEFAULT_AUTOMATION_ENDPOINTS,
   DEFAULT_AUTOMATION_RULES,
+  DEFAULT_AUTOMATION_SETTINGS,
   DEFAULT_HEALTH_CONFIG,
   DEFAULT_WAHA_CONFIG,
 } from "@/data/automationDefaults";
 import { createPersistedStore, touch } from "./persist";
 
 type AutomationState = {
+  settings: AutomationSettings;
   endpoints: AutomationEndpoint[];
   waha: WahaConfig;
   healthCheck: AutomationHealthConfig;
@@ -22,6 +25,8 @@ type AutomationState = {
   logs: AutomationLog[];
   seeded: boolean;
   ensureDefaults: () => void;
+  setSettings: (partial: Partial<AutomationSettings>) => void;
+  restoreDefaultSettings: () => void;
   setEndpointUrl: (channel: AutomationEndpoint["channel"], webhookUrl: string) => void;
   setEndpointEnabled: (channel: AutomationEndpoint["channel"], isEnabled: boolean) => void;
   restoreDefaultEndpoints: () => void;
@@ -49,8 +54,9 @@ function ruleId() {
 }
 
 export const useAutomationStore = createPersistedStore<AutomationState>(
-  "automation-v2",
+  "automation-v3",
   (set, get) => ({
+    settings: DEFAULT_AUTOMATION_SETTINGS,
     endpoints: DEFAULT_AUTOMATION_ENDPOINTS,
     waha: DEFAULT_WAHA_CONFIG,
     healthCheck: DEFAULT_HEALTH_CONFIG,
@@ -62,14 +68,30 @@ export const useAutomationStore = createPersistedStore<AutomationState>(
       const s = get();
       const needsWaha = !s.waha?.apiUrl;
       const needsProvider = s.endpoints.some((e) => !e.provider);
-      if (s.seeded && s.rules.length > 0 && !needsWaha && !needsProvider) return;
+      const needsSettings = !s.settings?.n8nWebhookBase;
+      if (s.seeded && s.rules.length > 0 && !needsWaha && !needsProvider && !needsSettings) return;
       set({
+        settings: s.settings?.n8nWebhookBase ? s.settings : { ...DEFAULT_AUTOMATION_SETTINGS },
         endpoints: DEFAULT_AUTOMATION_ENDPOINTS.map((e) => ({ ...e })),
         waha: s.waha?.apiUrl ? s.waha : { ...DEFAULT_WAHA_CONFIG },
         healthCheck: s.healthCheck?.webhookUrl ? s.healthCheck : { ...DEFAULT_HEALTH_CONFIG },
         rules: s.rules.length > 0 ? s.rules : DEFAULT_AUTOMATION_RULES,
         seeded: true,
       });
+    },
+
+    setSettings: (partial) => {
+      set((s) => ({
+        settings: {
+          ...s.settings,
+          ...partial,
+          n8nWebhookBase: partial.n8nWebhookBase?.trim() ?? s.settings.n8nWebhookBase,
+        },
+      }));
+    },
+
+    restoreDefaultSettings: () => {
+      set({ settings: { ...DEFAULT_AUTOMATION_SETTINGS } });
     },
 
     setEndpointUrl: (channel, webhookUrl) => {

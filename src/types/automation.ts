@@ -70,6 +70,15 @@ export interface AutomationLog {
 
 export type AutomationHealthMethod = "GET" | "POST";
 
+export interface AutomationSettings {
+  /** e.g. http://host:5678/webhook — segments appended (buildesk-email, buildesk-health). */
+  n8nWebhookBase: string;
+  automationsEnabled: boolean;
+  emailCc?: string;
+  emailFromAddress?: string;
+  emailFromName?: string;
+}
+
 export interface AutomationHealthConfig {
   label: string;
   webhookUrl: string;

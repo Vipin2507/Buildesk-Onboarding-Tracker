@@ -18,6 +18,7 @@ const PERSIST_ALLOWLIST = new Set([
   `${BUILDESK_PREFIX}company-portal-v1`,
   `${BUILDESK_PREFIX}automation-v1`,
   `${BUILDESK_PREFIX}automation-v2`,
+  `${BUILDESK_PREFIX}automation-v3`,
   `${BUILDESK_PREFIX}chat-v1`,
 ]);
 

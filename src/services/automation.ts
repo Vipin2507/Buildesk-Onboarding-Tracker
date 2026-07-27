@@ -17,6 +17,8 @@ import {
   renderAutomationTemplate,
 } from "@/services/automationTemplate";
 import { checkWahaSession, phoneToWahaChatId, sendWahaText } from "@/services/waha";
+import { fetchN8nHealth, fetchN8nWebhook, normalizeIndiaPhone } from "@/lib/automationEndpoints";
+import { N8N_EMAIL_SEGMENT, N8N_HEALTH_SEGMENT } from "@/data/automationDefaults";
 import type { AutomationRule } from "@/types/automation";
 import type { TicketStatus } from "@/types";
 
@@ -30,12 +32,75 @@ function summarizeResponse(body: string, max = 180) {
   return trimmed.length > max ? `${trimmed.slice(0, max)}…` : trimmed;
 }
 
+function buildN8nPayload(
+  payload: AutomationPayload,
+  ruleMeta?: { templateId?: string; templateName?: string },
+): Record<string, unknown> {
+  const store = useAutomationStore.getState();
+  const { waha, settings } = store;
+
+  return {
+    channel: payload.channel,
+    templateId: ruleMeta?.templateId,
+    templateName: ruleMeta?.templateName,
+    trigger: payload.trigger,
+    recipientPhone: normalizeIndiaPhone(payload.customerPhone) ?? payload.customerPhone,
+    recipientEmail: payload.customerEmail,
+    recipientName: payload.customerName,
+    messageBody: payload.message,
+    emailSubject: payload.subject,
+    emailCc: settings.emailCc ?? "",
+    delayHours: 0,
+    entityType: "ticket",
+    entityId: payload.ticketNumber,
+    entityName: payload.subject,
+    wahaApiUrl: waha.apiUrl,
+    wahaApiKey: waha.apiKey,
+    wahaSession: waha.sessionName,
+    test: payload.test ?? false,
+    ticketNumber: payload.ticketNumber,
+    companyName: payload.companyName,
+    customerName: payload.customerName,
+    customerEmail: payload.customerEmail,
+    customerPhone: payload.customerPhone,
+    subject: payload.subject,
+    status: payload.status,
+    message: payload.message,
+    ticketUrl: payload.ticketUrl,
+  };
+}
+
 export async function sendAutomationRequest(
   endpoint: AutomationEndpoint,
   payload: AutomationPayload,
-  meta?: { ticketId?: string; companyId?: string; existingLogId?: string },
+  meta?: {
+    ticketId?: string;
+    companyId?: string;
+    existingLogId?: string;
+    templateId?: string;
+    templateName?: string;
+  },
 ): Promise<AutomationLog> {
   const store = useAutomationStore.getState();
+
+  if (!store.settings.automationsEnabled) {
+    const attemptedAt = new Date().toISOString();
+    const log: AutomationLog = {
+      id: meta?.existingLogId ?? logId(),
+      ticketId: meta?.ticketId,
+      ticketNumber: payload.ticketNumber,
+      companyId: meta?.companyId,
+      channel: payload.channel,
+      trigger: payload.trigger,
+      status: "failed",
+      requestPayload: payload as unknown as Record<string, unknown>,
+      errorMessage: "Automations are globally disabled",
+      attemptedAt,
+      retryCount: 0,
+    };
+    store.upsertLog(log);
+    return log;
+  }
   const attemptedAt = new Date().toISOString();
   const baseLog: AutomationLog = {
     id: meta?.existingLogId ?? logId(),
@@ -68,19 +133,29 @@ export async function sendAutomationRequest(
     return sendViaWaha(store.waha, baseLog, payload);
   }
 
+  const n8nBody = buildN8nPayload(payload, {
+    templateId: meta?.templateId,
+    templateName: meta?.templateName,
+  });
+
+  store.upsertLog({
+    ...baseLog,
+    requestPayload: n8nBody,
+  });
+
   try {
-    const res = await fetch(endpoint.webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const text = await res.text().catch(() => "");
-    if (!res.ok) {
+    const result = await fetchN8nWebhook(
+      N8N_EMAIL_SEGMENT,
+      n8nBody,
+      store.settings.n8nWebhookBase,
+    );
+    if (!result.ok) {
       const log: AutomationLog = {
         ...baseLog,
         status: "failed",
-        errorMessage: `HTTP ${res.status}: ${summarizeResponse(text, 240)}`,
-        responseSummary: summarizeResponse(text),
+        errorMessage: `HTTP ${result.status}: ${summarizeResponse(result.text, 240)}`,
+        responseSummary: summarizeResponse(result.text),
+        requestPayload: n8nBody,
       };
       store.upsertLog(log);
       return log;
@@ -88,7 +163,8 @@ export async function sendAutomationRequest(
     const log: AutomationLog = {
       ...baseLog,
       status: "success",
-      responseSummary: summarizeResponse(text),
+      responseSummary: summarizeResponse(result.text),
+      requestPayload: n8nBody,
     };
     store.upsertLog(log);
     return log;
@@ -98,6 +174,7 @@ export async function sendAutomationRequest(
       ...baseLog,
       status: "failed",
       errorMessage: message,
+      requestPayload: n8nBody,
     };
     store.upsertLog(log);
     return log;
@@ -201,7 +278,7 @@ export async function checkHealth(): Promise<{
   health: AutomationHealthConfig["lastHealthCheck"];
 }> {
   const store = useAutomationStore.getState();
-  const { healthCheck, endpoints, waha } = store;
+  const { healthCheck, endpoints, waha, settings } = store;
 
   const emailStarted = performance.now();
   const emailCheckedAt = new Date().toISOString();
@@ -210,18 +287,14 @@ export async function checkHealth(): Promise<{
   let emailMessage = "";
 
   try {
-    const init: RequestInit = {
-      method: healthCheck.httpMethod,
-      headers: { Accept: "application/json" },
-    };
-    if (healthCheck.httpMethod === "POST") {
-      init.headers = { ...init.headers, "Content-Type": "application/json" };
-      init.body = JSON.stringify({ ping: true, source: "buildesk-compass" });
-    }
-    const res = await fetch(healthCheck.webhookUrl, init);
-    emailRaw = await res.text().catch(() => "");
-    emailOk = res.ok;
-    emailMessage = emailOk ? "n8n connection OK" : `HTTP ${res.status}`;
+    const result = await fetchN8nHealth(
+      settings.n8nWebhookBase,
+      N8N_HEALTH_SEGMENT,
+      healthCheck.httpMethod,
+    );
+    emailRaw = result.text;
+    emailOk = result.ok;
+    emailMessage = emailOk ? "n8n connection OK" : `HTTP ${result.status}`;
   } catch (err) {
     emailMessage = err instanceof Error ? err.message : "Network error";
   }
@@ -319,6 +392,8 @@ export function dispatchAutomationTrigger(
       const log = await sendAutomationRequest(endpoint, payload, {
         ticketId: ticket.id,
         companyId: ticket.companyId,
+        templateId: rule.id,
+        templateName: rule.name,
       });
 
       const channelLabel = rule.channel === "email" ? "Email" : "WhatsApp";

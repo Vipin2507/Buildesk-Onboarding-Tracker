@@ -5,26 +5,27 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import {
-  DEFAULT_EMAIL_WEBHOOK,
-  DEFAULT_HEALTH_WEBHOOK,
   DEFAULT_WAHA_API_KEY,
   DEFAULT_WAHA_API_URL,
   DEFAULT_WAHA_SESSION,
+  N8N_EMAIL_SEGMENT,
+  N8N_HEALTH_SEGMENT,
 } from "@/data/automationDefaults";
 import { useAutomationStore } from "@/stores/useAutomationStore";
 
 export function AutomationWebhookSettings() {
+  const settings = useAutomationStore((s) => s.settings);
   const endpoints = useAutomationStore((s) => s.endpoints);
   const waha = useAutomationStore((s) => s.waha);
   const healthCheck = useAutomationStore((s) => s.healthCheck);
-  const setEndpointUrl = useAutomationStore((s) => s.setEndpointUrl);
+  const setSettings = useAutomationStore((s) => s.setSettings);
   const setEndpointEnabled = useAutomationStore((s) => s.setEndpointEnabled);
   const setWahaConfig = useAutomationStore((s) => s.setWahaConfig);
-  const setHealthCheckUrl = useAutomationStore((s) => s.setHealthCheckUrl);
   const setHealthCheckMethod = useAutomationStore((s) => s.setHealthCheckMethod);
-  const restoreDefaultEndpoints = useAutomationStore((s) => s.restoreDefaultEndpoints);
+  const restoreDefaultSettings = useAutomationStore((s) => s.restoreDefaultSettings);
   const restoreDefaultWaha = useAutomationStore((s) => s.restoreDefaultWaha);
   const restoreDefaultHealth = useAutomationStore((s) => s.restoreDefaultHealth);
+  const restoreDefaultEndpoints = useAutomationStore((s) => s.restoreDefaultEndpoints);
 
   const emailEndpoint = endpoints.find((e) => e.channel === "email");
   const whatsappEndpoint = endpoints.find((e) => e.channel === "whatsapp");
@@ -35,49 +36,76 @@ export function AutomationWebhookSettings() {
       <div>
         <h3 className="font-semibold">Integration settings</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Email uses n8n webhooks. WhatsApp uses WAHA — update credentials here without redeploying.
+          Email via n8n webhooks (<code className="rounded bg-muted px-1">{N8N_EMAIL_SEGMENT}</code>
+          ). WhatsApp via WAHA direct.
         </p>
       </div>
 
-      {emailEndpoint ? (
-        <div className="card-soft p-4">
-          <div className="mb-1 font-medium">{emailEndpoint.label}</div>
-          <p className="mb-2 text-xs text-muted-foreground">n8n webhook URL for outbound email</p>
-          <Input
-            value={emailEndpoint.webhookUrl}
-            onChange={(e) => setEndpointUrl("email", e.target.value)}
-            className="font-mono text-xs"
+      <div className="card-soft p-4">
+        <label className="flex items-center justify-between gap-3 text-sm">
+          <div>
+            <div className="font-medium">Automations enabled</div>
+            <div className="text-xs text-muted-foreground">Master kill switch — disables all sends</div>
+          </div>
+          <Switch
+            checked={settings.automationsEnabled}
+            onCheckedChange={(v) => setSettings({ automationsEnabled: v })}
+            size="sm"
           />
+        </label>
+      </div>
+
+      <div className="card-soft p-4">
+        <div className="mb-1 font-medium">{emailEndpoint?.label ?? "Email (n8n)"}</div>
+        <p className="mb-2 text-xs text-muted-foreground">
+          Webhook base — app appends segment <code className="rounded bg-muted px-1">{N8N_EMAIL_SEGMENT}</code>
+        </p>
+        <Input
+          value={settings.n8nWebhookBase}
+          onChange={(e) => setSettings({ n8nWebhookBase: e.target.value })}
+          className="font-mono text-xs"
+          placeholder="http://host:5678/webhook"
+        />
+        <div className="mt-2">
+          <label className="mb-1 block text-xs text-muted-foreground">Global email CC (optional)</label>
+          <Input
+            value={settings.emailCc ?? ""}
+            onChange={(e) => setSettings({ emailCc: e.target.value })}
+            className="font-mono text-xs"
+            placeholder="manager@company.com"
+          />
+        </div>
+        {emailEndpoint ? (
           <label className="mt-3 flex items-center gap-2 text-sm">
             <Switch
               checked={emailEndpoint.isEnabled}
               onCheckedChange={(v) => setEndpointEnabled("email", v)}
               size="sm"
             />
-            Enabled
+            Email channel enabled
           </label>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => toast.success("Email webhook saved")}>
-              Save
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setEndpointUrl("email", DEFAULT_EMAIL_WEBHOOK);
-                toast.success("Email defaults restored");
-              }}
-            >
-              Restore default
-            </Button>
-          </div>
+        ) : null}
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Button size="sm" onClick={() => toast.success("n8n settings saved")}>
+            Save
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              restoreDefaultSettings();
+              toast.success("n8n defaults restored");
+            }}
+          >
+            Restore defaults
+          </Button>
         </div>
-      ) : null}
+      </div>
 
       <div className="card-soft p-4">
         <div className="mb-1 font-medium">{whatsappEndpoint?.label ?? "WhatsApp (WAHA)"}</div>
         <p className="mb-3 text-xs text-muted-foreground">
-          Messages sent via <code className="rounded bg-muted px-1">POST /api/sendText</code>
+          Text messages via <code className="rounded bg-muted px-1">POST /api/sendText</code>
         </p>
         <div className="space-y-2">
           <div>
@@ -86,7 +114,7 @@ export function AutomationWebhookSettings() {
               value={waha.apiUrl}
               onChange={(e) => setWahaConfig({ apiUrl: e.target.value })}
               className="font-mono text-xs"
-              placeholder="http://host:3000"
+              placeholder={DEFAULT_WAHA_API_URL}
             />
           </div>
           <div>
@@ -97,6 +125,7 @@ export function AutomationWebhookSettings() {
                 value={waha.apiKey}
                 onChange={(e) => setWahaConfig({ apiKey: e.target.value })}
                 className="font-mono text-xs"
+                placeholder={DEFAULT_WAHA_API_KEY}
               />
               <Button size="sm" variant="outline" type="button" onClick={() => setShowApiKey((v) => !v)}>
                 {showApiKey ? "Hide" : "Show"}
@@ -109,7 +138,7 @@ export function AutomationWebhookSettings() {
               value={waha.sessionName}
               onChange={(e) => setWahaConfig({ sessionName: e.target.value })}
               className="font-mono text-xs"
-              placeholder="first"
+              placeholder={DEFAULT_WAHA_SESSION}
             />
           </div>
         </div>
@@ -136,12 +165,9 @@ export function AutomationWebhookSettings() {
 
       <div className="card-soft p-4">
         <div className="mb-2 font-medium">{healthCheck.label}</div>
-        <p className="mb-2 text-xs text-muted-foreground">n8n health ping (email pipeline)</p>
-        <Input
-          value={healthCheck.webhookUrl}
-          onChange={(e) => setHealthCheckUrl(e.target.value)}
-          className="mb-2 font-mono text-xs"
-        />
+        <p className="mb-2 text-xs text-muted-foreground">
+          Pings <code className="rounded bg-muted px-1">{N8N_HEALTH_SEGMENT}</code> under the n8n webhook base
+        </p>
         <select
           className="mb-2 h-9 w-full rounded-md border bg-background px-2 text-sm"
           value={healthCheck.httpMethod}
@@ -151,7 +177,7 @@ export function AutomationWebhookSettings() {
           <option value="GET">GET</option>
         </select>
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" onClick={() => toast.success("Health check URL saved")}>
+          <Button size="sm" onClick={() => toast.success("Health check method saved")}>
             Save
           </Button>
           <Button
@@ -170,6 +196,7 @@ export function AutomationWebhookSettings() {
       <Button
         variant="outline"
         onClick={() => {
+          restoreDefaultSettings();
           restoreDefaultEndpoints();
           restoreDefaultWaha();
           restoreDefaultHealth();

@@ -9,6 +9,18 @@ export default defineConfig({
     port: 3000,
     host: true,
     strictPort: true,
+    proxy: {
+      "/n8n": {
+        target: "http://72.60.200.185:5678",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/n8n/, ""),
+      },
+      "/waha": {
+        target: "http://72.60.200.185:3000",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/waha/, ""),
+      },
+    },
   },
   // Downlevel modern syntax (?. , ?? , #private) so production
   // bundles don't throw "Unexpected token '.'" in older browsers / WebViews.
