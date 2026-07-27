@@ -40,6 +40,11 @@ type TicketState = {
   updateTicket: (id: string, data: Partial<Ticket> & { updateRemark?: string }) => void;
   deleteTicket: (id: string) => Ticket | undefined;
   moveTicket: (id: string, status: TicketStatus) => void;
+  bulkDeleteTickets: (ticketIds: string[]) => void;
+  bulkAssignDeveloper: (ticketIds: string[], developerId: string) => void;
+  bulkAssignOwner: (ticketIds: string[], assignedUserId: string | undefined) => void;
+  bulkUpdateStatus: (ticketIds: string[], status: TicketStatus) => void;
+  bulkUpdatePriority: (ticketIds: string[], priority: Ticket["priority"]) => void;
   getById: (id: string) => Ticket | undefined;
 };
 
@@ -208,4 +213,34 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
   },
 
   getById: (id) => get().tickets.find((t) => t.id === id),
+
+  bulkDeleteTickets: (ticketIds) => {
+    for (const id of ticketIds) {
+      get().deleteTicket(id);
+    }
+  },
+
+  bulkAssignDeveloper: (ticketIds, developerId) => {
+    for (const id of ticketIds) {
+      get().updateTicket(id, { developerId });
+    }
+  },
+
+  bulkAssignOwner: (ticketIds, assignedUserId) => {
+    for (const id of ticketIds) {
+      get().updateTicket(id, { assignedUserId: assignedUserId || undefined });
+    }
+  },
+
+  bulkUpdateStatus: (ticketIds, status) => {
+    for (const id of ticketIds) {
+      get().moveTicket(id, status);
+    }
+  },
+
+  bulkUpdatePriority: (ticketIds, priority) => {
+    for (const id of ticketIds) {
+      get().updateTicket(id, { priority });
+    }
+  },
 }));

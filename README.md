@@ -2,7 +2,7 @@
 
 Internal operations platform for **Buildesk** — track real-estate CRM/ERP clients from company signup through module adoption, project onboarding, data migration, go-live, post-sales, support, training, renewals, and reporting.
 
-Built for onboarding managers, CSMs, and admins who need one place to run implementation — not a customer-facing portal.
+Built for onboarding managers, CSMs, and admins who need one place to run implementation. Each company can also get a **client portal** (`/portal/$slug`) where customers raise design/support requests, track tickets, and chat with the Buildesk team.
 
 ---
 
@@ -30,7 +30,7 @@ Buildesk Onboarding Tracker replaces scattered sheets and chat with a structured
 1. **Company** is created with plan, health, managers, and module opt-ins  
 2. **Projects** are onboarded with checklists, documents, migrations, and go-live gates  
 3. **Post-sales** workflows continue after live where needed  
-4. **Support, training, renewals, and reports** keep the account healthy  
+4. **Support, training, renewals, and reports** keep the account healthy — including internal Support Desk work and client portal requests  
 
 The app ships with seed data sized for real ops use (dozens of companies and hundreds of projects) so demos and local development feel like production.
 
@@ -62,6 +62,7 @@ Permissions are configurable under **Settings → Roles**.
 At-a-glance ops view:
 
 - KPI cards (companies, active onboarding, completed, on hold, pending work, renewals)
+- Pending work drill-down: **Support tickets** (`TKT-*`) and **Client tickets** (`DT-*` from portal)
 - Progress and module-adoption charts
 - Account health snapshot
 - Recent activity feed
@@ -89,10 +90,41 @@ Company
 ### 4. After go-live
 
 - **Post-sales** project trackers (template → upload → approval style steps)
-- **Support Desk** for bugs, customizations, and requirements
+- **Support Desk** (`TKT-*`) for internal engineering work — bugs, customizations, requirements
+- **Ticket Tracking** (`DT-*`) for client-raised requests from the portal
+- **Live Chat** — portal widget + admin inbox; bot-first with agent handoff
 - **Training** sessions and recordings
 - **Renewals** against plan expiry
 - **Reports** for leadership and delivery metrics
+
+### 5. Client portal (per company)
+
+Share a unique link from **Ticket Tracking → Portal Links** (`/tickets/links`):
+
+```
+/portal/{slug}
+  ├── Dashboard      — KPI cards, recent active & solved tickets
+  ├── Create ticket  — self-service request form
+  ├── My Tickets     — search, KPI filters, active list
+  ├── Solved         — resolved & closed history
+  └── Profile        — contact details
+```
+
+- **Buildesk Assistant** chatbot — knowledge base for portal navigation, tickets, billing, onboarding; can escalate to a live agent
+- Themed selects, date pickers, and page transitions consistent with the admin app
+- Closed tickets disable reply; open tickets support threaded messages
+
+### 6. Two ticket systems (how they relate)
+
+| | **Ticket Tracking** | **Support Desk** |
+| --- | --- | --- |
+| **Route** | `/tickets` | `/support` |
+| **IDs** | `DT-*` (client portal) | `TKT-*` (internal) |
+| **Raised by** | Clients via portal | Internal team / project workspace |
+| **Scope** | Company-level design & support requests | Company + project engineering pipeline |
+| **Status flow** | open → in-progress → resolved → closed | New → Assigned → In Progress → QA → Ready for Release → Released → Closed |
+
+Admins see portal activity on the dashboard as **Client tickets**; notifications route to the correct detail page (`DT-*` → Ticket Tracking, `TKT-*` → Support Desk).
 
 ---
 
@@ -116,11 +148,17 @@ Company
 | **Labor Management** | `/labor` | Labor roster KPIs, attendance Excel upload history |
 | **Integrations & Triggers** | `/integrations` | Connect/test integrations; event → channel triggers CRUD |
 | **Training** | `/training` | Sessions (type, trainer, company, attendance, recording, status) |
-| **Support Desk** | `/support` | Global tickets: filters, list, Kanban, detail |
+| **Support Desk** | `/support` | Internal `TKT-*` tickets: KPI cards, type tabs, filters, list + bulk ops, Kanban DnD, detail |
+| **Ticket Tracking** | `/tickets` | Client `DT-*` tickets from portal: KPI cards, filters, list + bulk ops, detail, threaded messages |
+| **Portal links** | `/tickets/links` | Per-company client portal URLs to copy and share |
+| **Live Chat** | `/live-chat` | Agent inbox for portal chat sessions; claim, reply, convert to ticket, close |
+| **Follow-up Tasks** | `/tasks` | Cross-company task list with assignees, due dates, and status |
+| **Client Visits** | `/client-visits` | Field visit scheduling and tracking |
 | **Renewals** | `/renewals` | Upcoming / overdue plan expiry; mark renewed |
 | **Employees** | `/employees` | Managers & CSMs; transfer companies between managers |
 | **Reports** | `/reports` | Multiple report types with charts/tables + CSV export |
 | **Master Config** | `/master` | Platform fields, picklists, inventory, workflow, checklist defs, templates, modules, integrations, reset |
+| **Automation** | `/automation` | n8n / WAHA webhook routing, rules, logs, health checks (admin) |
 | **Settings** | `/settings` | Appearance, org profile, notifications, documents, Excel templates, payment plans, roles, users |
 
 ### Project workspace tabs
@@ -136,32 +174,53 @@ Company
 | **Tickets** | Create and manage tickets **for this project** |
 | **Go Live** | Gated on go-live checklist completion; marks project live and can notify in-app |
 
-### Support & notifications
+### Support Desk, Ticket Tracking & client portal
 
-**Support Desk**
+Both admin ticket modules share a consistent UI: KPI summary cards, themed filter bar (`DesignTicketSelect`, date picker), `DataTable` with row selection, Framer Motion transitions, and structured row ⋮ menus.
 
-- Ticket types: Bug, Customization, Requirement  
-- Priority: Critical → Low  
-- Status pipeline: New → Assigned → In Progress → QA → Ready for Release → Released → Closed  
+**Support Desk** (`/support`, `TKT-*`)
+
+- **Types:** Bug, Feature Request, Customization, Enhancement, Requirement, Other  
+- **Priority:** Critical → Low  
+- **Status pipeline:** New → Assigned → In Progress → QA → Ready for Release → Released → Closed  
 - Always tied to a **company** and **project**  
-- Description, ETA (themed date picker), assignee  
-- Filters: search, status, priority, type, company, project, raised-on range, sort  
-- **Kanban** board with drag-and-drop (`@dnd-kit`)  
-- Full detail page: edit, status change, delete, links to company & project  
+- **KPI cards** (clickable): Total, Open, In Progress, Critical, Resolved — sync to `?filter=` in the URL  
+- **View tabs:** All · Requirements · Customizations · Bugs · **Kanban**  
+- **Filters:** search, status, priority, type, company, project, raised-on range, sort  
+- **Bulk actions:** assign developer, assign owner, change status, change priority, delete  
+- **Kanban:** drag-and-drop columns (`@dnd-kit`) with animated cards  
+- Create / edit via themed `SupportTicketForm`; full detail page with company & project links  
+
+**Ticket Tracking** (`/tickets`, `DT-*`)
+
+- Client requests raised through the **company portal** or converted from live chat  
+- **KPI cards:** All, Pending, Open, In Progress, Resolved, Closed (`?filter=`)  
+- **Bulk actions:** assign, change status, change priority, delete  
+- Threaded messages on detail page; assignee and status managed by the internal team  
+- **Portal Links** tab lists shareable `/portal/{slug}` URLs per company  
+
+**Client portal** (`/portal/$slug`)
+
+- Dashboard with clickable KPIs → filtered ticket lists  
+- Create ticket, My Tickets (search + filters), Solved, Profile  
+- **Buildesk Assistant** chatbot (22-article knowledge base, ticket lookup by `DT-*`, open-tickets summary)  
+- Live chat widget with bot → agent escalation; sessions visible in **Live Chat** admin view  
 
 **In-app notifications**
 
 - Top-bar bell with unread badge  
-- Emitted on ticket create, status change, reassignment (and optionally project go-live)  
-- Mark one / mark all read; click opens the ticket  
-- Respects profile **notify in-app** and Settings notification toggles  
+- Emitted on portal ticket create/update, support ticket changes, reassignment, and optionally project go-live  
+- `DesignTicketBootstrap` polls tickets and notifications every **15s** so portal activity appears without a refresh  
+- Smart routing: `DT-*` → Ticket Tracking detail, `TKT-*` → Support Desk detail  
+- Mark one / mark all read; respects profile **notify in-app** and Settings notification toggles  
 
 ### Cross-cutting UX
 
 - Collapsible sidebar + mobile navigation sheet  
 - Global search (companies & projects)  
-- Shared **ListToolbar**: search, chips, selects, date range (themed picker), sort, clear, result counts  
-- Framer Motion page transitions and detail motion  
+- Shared ticket UI kit under `components/design-ticket/` — page headers, KPI grids, themed selects, date fields, status chips  
+- **ListToolbar** on legacy list pages; ticket modules use **DataTable** with sort, pagination, and row selection  
+- Framer Motion page transitions, staggered section reveals, and Kanban card animations  
 - Toast feedback (Sonner)  
 - Light / dark theme toggle  
 - Responsive layouts for desk and field use  
@@ -200,6 +259,7 @@ Onboarding progress, due items, collections, vendor, labor, team load, delays, i
 
 - SQLite is the source of truth for entities (companies, projects, tickets, checklist, etc.)  
 - After login, `ServerDataBootstrap` hydrates Zustand caches used by screens  
+- `DesignTicketBootstrap` keeps portal slugs, `DT-*` tickets, and admin notifications in sync (15s poll)  
 - Optimistic UI updates sync back through server functions  
 - **Master** and **Settings** also persist locally and sync into an `app_config` JSON blob  
 - `db:ensure` safely patches missing columns/tables on existing databases (no destructive migrate required for common ops patches)  
@@ -223,7 +283,7 @@ Onboarding progress, due items, collections, vendor, labor, team load, delays, i
 | Client state | Zustand |
 | Database | SQLite + Drizzle ORM (`better-sqlite3`) |
 | Auth | httpOnly session cookie + bcrypt |
-| DnD | `@dnd-kit` (Support Kanban, vendor approval stages) |
+| DnD | `@dnd-kit` (Support Desk Kanban, vendor approval stages) |
 | Spreadsheets | `xlsx` (sample / import UX) |
 | Runtime | Node.js **22.x** |
 
@@ -324,13 +384,18 @@ GitHub Actions (`.github/workflows/deploy.yml`) deploys on push to `main` (or `w
 
 ```
 src/
-  routes/           # File-based pages (dashboard, companies, projects, support, …)
-  components/       # UI, toolbars, panels, date picker, notifications bell
-  stores/           # Zustand domain stores
+  routes/           # File-based pages (dashboard, companies, projects, support, tickets, portal, …)
+  components/
+    design-ticket/  # Shared ticket UI (KPI grid, filters, portal tables)
+    support/        # Support Desk form + Kanban
+    chat/           # Portal widget, live-chat thread, notification listener
+    automation/     # n8n / WAHA automation panels
+  stores/           # Zustand domain stores (tickets, design tickets, chat, notifications, …)
   server/           # Auth, Drizzle schema, server functions
+  services/         # Automation, chatbot, WAHA integrations
   types/            # Shared TypeScript models
-  data/             # Seed + constants
-  lib/              # API client wrappers, nav, sync helpers
+  data/             # Seed, constants, chatbot knowledge base
+  lib/              # API wrappers, nav, ticket/support KPI filters, portal helpers
 scripts/
   db-ensure-schema.mjs
   db-seed.ts
@@ -348,9 +413,11 @@ data/               # SQLite file (local)
 3. **Add projects** → open Progress + Onboarding checklist  
 4. Mark **required documents**; run **data migration** uploads  
 5. Complete go-live checklist → **Go Live**  
-6. Track **post-sales** where sold; raise **tickets** per project  
-7. Schedule **training**; watch **renewals** and **reports**  
-8. Tune **Master Config** and **Settings** as the catalog evolves  
+6. Track **post-sales** where sold; raise **Support Desk** tickets per project  
+7. Share **portal links** so clients raise **Ticket Tracking** requests; monitor via dashboard **Client tickets** KPI  
+8. Handle **Live Chat** escalations from the portal chatbot  
+9. Schedule **training**; watch **renewals** and **reports**  
+10. Tune **Master Config**, **Automation**, and **Settings** as the catalog evolves  
 
 ---
 
