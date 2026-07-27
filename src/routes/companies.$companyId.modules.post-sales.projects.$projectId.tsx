@@ -87,7 +87,7 @@ function PostSalesProjectTrackerPage() {
       <PageHeader
         title={`${project.projectNumber} · ${project.projectName}`}
         subtitle={`Steps completed ${counts.done} / ${counts.total}`}
-        actions={<ProgressRing value={progress} size={72} stroke={7} />}
+        actions={<ProgressRing value={progress} size={72} className="shrink-0" />}
       />
 
       <div className="card-soft mb-6 overflow-x-auto p-4">

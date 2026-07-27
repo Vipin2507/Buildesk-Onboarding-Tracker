@@ -284,8 +284,8 @@ function Dashboard() {
           >
             <h3 className="mb-2 text-xs font-semibold">Account health</h3>
             <div className="flex items-center gap-3">
-              <ProgressRing value={healthPct} size={56} />
-              <div className="flex-1 space-y-1 text-xs">
+              <ProgressRing value={healthPct} size={64} className="shrink-0" />
+              <div className="min-w-0 flex-1 space-y-1 text-xs">
                 {(
                   [
                     { label: "Healthy" as const, dot: "bg-success", count: health.Healthy },

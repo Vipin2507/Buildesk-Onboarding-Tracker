@@ -114,7 +114,7 @@ export function ModuleCard({
       {optedIn ? (
         <div className="mt-auto space-y-2 pt-1">
           <div className="flex items-center gap-3">
-            <ProgressRing value={progressPercent} size={56} stroke={6} />
+            <ProgressRing value={progressPercent} size={64} className="shrink-0" />
             <div className="text-xs text-muted-foreground">Module progress</div>
           </div>
           <div className="flex flex-wrap gap-2">
