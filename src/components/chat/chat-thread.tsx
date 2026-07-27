@@ -7,6 +7,25 @@ import { formatDate } from "@/lib/utils";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
+/** Renders bot knowledge-base text: newlines + **bold** */
+function ChatMessageBody({ text }: { text: string }) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return (
+    <span className="whitespace-pre-line">
+      {parts.map((part, i) => {
+        if (part.startsWith("**") && part.endsWith("**")) {
+          return (
+            <strong key={i} className="font-semibold">
+              {part.slice(2, -2)}
+            </strong>
+          );
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </span>
+  );
+}
+
 export function ChatThread({ messages, className }: { messages: ChatMessage[]; className?: string }) {
   return (
     <div className={cn("space-y-3", className)}>
@@ -42,7 +61,7 @@ export function ChatThread({ messages, className }: { messages: ChatMessage[]; c
                     : "rounded-tl-md border bg-card",
                 )}
               >
-                {m.text}
+                <ChatMessageBody text={m.text} />
               </div>
             </div>
           </motion.div>

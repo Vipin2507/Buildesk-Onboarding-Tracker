@@ -140,7 +140,10 @@ export const useChatStore = createPersistedStore<ChatState>("chat-v1", (set, get
       return;
     }
 
-    const botReply = getBotResponse(trimmed);
+    const botReply = getBotResponse(trimmed, {
+      companyId: next.companyId,
+      visitorName: next.visitorName,
+    });
     if (botReply === "__ESCALATE__") {
       get().escalateToAgent(sessionId);
       return;

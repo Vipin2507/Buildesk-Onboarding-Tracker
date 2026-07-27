@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { ChatThread } from "@/components/chat/chat-thread";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CHATBOT_QUICK_REPLIES, type ChatbotQuickReply } from "@/data/chatbotResponses";
+import { CHATBOT_QUICK_REPLIES } from "@/data/chatbotResponses";
 import type { CompanyPortalAccess } from "@/types/design-ticket";
 import { useChatStore } from "@/stores/useChatStore";
 import { cn } from "@/lib/utils";
@@ -89,7 +89,7 @@ export function PortalChatWidget({ access }: { access: CompanyPortalAccess }) {
 
             {session?.status === "bot-handling" ? (
               <div className="flex flex-wrap gap-1.5 border-t px-3 py-2">
-                {CHATBOT_QUICK_REPLIES.map((q: ChatbotQuickReply) => (
+                {CHATBOT_QUICK_REPLIES.map((q) => (
                   <button
                     key={q.id}
                     type="button"
