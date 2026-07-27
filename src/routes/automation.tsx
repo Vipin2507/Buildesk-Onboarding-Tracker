@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { Bolt, FileText, List, Settings2, LayoutDashboard } from "lucide-react";
 import { toast } from "sonner";
 
@@ -18,6 +18,8 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { checkHealth } from "@/services/automation";
 import { useAutomationStore } from "@/stores/useAutomationStore";
 import { cn } from "@/lib/utils";
+
+const EASE = [0.22, 1, 0.36, 1] as const;
 
 const TABS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -119,22 +121,31 @@ function AutomationPage() {
             type="button"
             onClick={() => void navigate({ search: { tab: id } })}
             className={cn(
-              "flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              tab === id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
+              "relative flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200",
+              tab === id ? "text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
           >
-            <Icon className="h-4 w-4" />
-            {label}
+            {tab === id ? (
+              <motion.span
+                layoutId="automation-tab-bg"
+                className="absolute inset-0 rounded-lg bg-primary"
+                transition={{ type: "spring", stiffness: 380, damping: 32 }}
+              />
+            ) : null}
+            <Icon className="relative h-4 w-4" />
+            <span className="relative">{label}</span>
           </button>
         ))}
       </div>
 
-      <motion.div
-        key={tab}
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-      >
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={tab}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.28, ease: EASE }}
+        >
         {tab === "overview" ? (
           <div className="space-y-4">
             <AutomationStatsRow
@@ -161,7 +172,8 @@ function AutomationPage() {
         {tab === "rules" ? <AutomationRulesPanel /> : null}
         {tab === "logs" ? <AutomationLogsPanel /> : null}
         {tab === "settings" ? <AutomationWebhookSettings /> : null}
-      </motion.div>
+        </motion.div>
+      </AnimatePresence>
     </PageWrap>
   );
 }

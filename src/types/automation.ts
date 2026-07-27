@@ -42,11 +42,15 @@ export type AutomationTrigger =
 export interface AutomationRule {
   id: string;
   name: string;
+  /** Short internal note (optional). */
+  description?: string;
   trigger: AutomationTrigger;
   channel: AutomationChannel;
   isActive: boolean;
   templateSubject?: string;
   templateBody: string;
+  /** Rule-level CC merged with global settings CC for email sends. */
+  emailCc?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -32,9 +32,21 @@ function summarizeResponse(body: string, max = 180) {
   return trimmed.length > max ? `${trimmed.slice(0, max)}…` : trimmed;
 }
 
+function mergeEmailCc(globalCc?: string, ruleCc?: string): string {
+  const parts = [globalCc, ruleCc].flatMap((value) =>
+    value
+      ? value
+          .split(/[,;]/)
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [],
+  );
+  return [...new Set(parts)].join(", ");
+}
+
 function buildN8nPayload(
   payload: AutomationPayload,
-  ruleMeta?: { templateId?: string; templateName?: string },
+  ruleMeta?: { templateId?: string; templateName?: string; emailCc?: string },
 ): Record<string, unknown> {
   const store = useAutomationStore.getState();
   const { waha, settings } = store;
@@ -49,7 +61,7 @@ function buildN8nPayload(
     recipientName: payload.customerName,
     messageBody: payload.message,
     emailSubject: payload.subject,
-    emailCc: settings.emailCc ?? "",
+    emailCc: mergeEmailCc(settings.emailCc, ruleMeta?.emailCc),
     delayHours: 0,
     entityType: "ticket",
     entityId: payload.ticketNumber,
@@ -79,6 +91,7 @@ export async function sendAutomationRequest(
     existingLogId?: string;
     templateId?: string;
     templateName?: string;
+    emailCc?: string;
   },
 ): Promise<AutomationLog> {
   const store = useAutomationStore.getState();
@@ -136,6 +149,7 @@ export async function sendAutomationRequest(
   const n8nBody = buildN8nPayload(payload, {
     templateId: meta?.templateId,
     templateName: meta?.templateName,
+    emailCc: meta?.emailCc,
   });
 
   store.upsertLog({
@@ -394,6 +408,7 @@ export function dispatchAutomationTrigger(
         companyId: ticket.companyId,
         templateId: rule.id,
         templateName: rule.name,
+        emailCc: rule.emailCc,
       });
 
       const channelLabel = rule.channel === "email" ? "Email" : "WhatsApp";
