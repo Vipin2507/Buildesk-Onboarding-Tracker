@@ -91,7 +91,7 @@ export function AutomationTestPanel({ className }: { className?: string }) {
         <div>
           <h3 className="font-semibold">Test automation</h3>
           <p className="text-sm text-muted-foreground">
-            Send a sample payload to n8n using rendered templates — appears in Logs like a real send.
+            Send a sample payload — email via n8n, WhatsApp via WAHA. Logged under Logs.
           </p>
         </div>
         <AnimatePresence mode="wait">
@@ -165,7 +165,11 @@ export function AutomationTestPanel({ className }: { className?: string }) {
                 key={ep.channel}
                 variant="outline"
                 size="sm"
-                disabled={sending || !ep.isEnabled}
+                disabled={
+                  sending ||
+                  !ep.isEnabled ||
+                  (ep.channel === "whatsapp" && !useAutomationStore.getState().waha.isEnabled)
+                }
                 onClick={() => void sendTest(ep.channel)}
                 className="gap-1"
               >

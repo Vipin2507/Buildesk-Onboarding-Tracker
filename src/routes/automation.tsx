@@ -104,7 +104,7 @@ function AutomationPage() {
     <PageWrap>
       <PageHeader
         title="Automation"
-        subtitle="n8n-powered email & WhatsApp notifications for support tickets — provider-agnostic webhooks."
+        subtitle="Email via n8n webhooks · WhatsApp via WAHA — provider-agnostic configuration."
         actions={
           <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
             <Bolt className="h-3.5 w-3.5" /> Admin

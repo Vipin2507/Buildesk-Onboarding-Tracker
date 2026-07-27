@@ -3,17 +3,20 @@ import type {
   AutomationHealthConfig,
   AutomationLog,
   AutomationRule,
+  WahaConfig,
 } from "@/types/automation";
 import { nowIso } from "@/types";
 import {
   DEFAULT_AUTOMATION_ENDPOINTS,
   DEFAULT_AUTOMATION_RULES,
   DEFAULT_HEALTH_CONFIG,
+  DEFAULT_WAHA_CONFIG,
 } from "@/data/automationDefaults";
 import { createPersistedStore, touch } from "./persist";
 
 type AutomationState = {
   endpoints: AutomationEndpoint[];
+  waha: WahaConfig;
   healthCheck: AutomationHealthConfig;
   rules: AutomationRule[];
   logs: AutomationLog[];
@@ -22,6 +25,9 @@ type AutomationState = {
   setEndpointUrl: (channel: AutomationEndpoint["channel"], webhookUrl: string) => void;
   setEndpointEnabled: (channel: AutomationEndpoint["channel"], isEnabled: boolean) => void;
   restoreDefaultEndpoints: () => void;
+  setWahaConfig: (partial: Partial<WahaConfig>) => void;
+  restoreDefaultWaha: () => void;
+  setWahaHealth: (check: NonNullable<WahaConfig["lastHealthCheck"]>) => void;
   setHealthCheckUrl: (webhookUrl: string) => void;
   setHealthCheckMethod: (httpMethod: AutomationHealthConfig["httpMethod"]) => void;
   restoreDefaultHealth: () => void;
@@ -43,20 +49,25 @@ function ruleId() {
 }
 
 export const useAutomationStore = createPersistedStore<AutomationState>(
-  "automation-v1",
+  "automation-v2",
   (set, get) => ({
     endpoints: DEFAULT_AUTOMATION_ENDPOINTS,
+    waha: DEFAULT_WAHA_CONFIG,
     healthCheck: DEFAULT_HEALTH_CONFIG,
     rules: DEFAULT_AUTOMATION_RULES,
     logs: [],
     seeded: true,
 
     ensureDefaults: () => {
-      if (get().seeded && get().rules.length > 0) return;
+      const s = get();
+      const needsWaha = !s.waha?.apiUrl;
+      const needsProvider = s.endpoints.some((e) => !e.provider);
+      if (s.seeded && s.rules.length > 0 && !needsWaha && !needsProvider) return;
       set({
-        endpoints: DEFAULT_AUTOMATION_ENDPOINTS,
-        healthCheck: DEFAULT_HEALTH_CONFIG,
-        rules: DEFAULT_AUTOMATION_RULES,
+        endpoints: DEFAULT_AUTOMATION_ENDPOINTS.map((e) => ({ ...e })),
+        waha: s.waha?.apiUrl ? s.waha : { ...DEFAULT_WAHA_CONFIG },
+        healthCheck: s.healthCheck?.webhookUrl ? s.healthCheck : { ...DEFAULT_HEALTH_CONFIG },
+        rules: s.rules.length > 0 ? s.rules : DEFAULT_AUTOMATION_RULES,
         seeded: true,
       });
     },
@@ -72,11 +83,43 @@ export const useAutomationStore = createPersistedStore<AutomationState>(
     setEndpointEnabled: (channel, isEnabled) => {
       set((s) => ({
         endpoints: s.endpoints.map((e) => (e.channel === channel ? { ...e, isEnabled } : e)),
+        waha: channel === "whatsapp" ? { ...s.waha, isEnabled } : s.waha,
       }));
     },
 
     restoreDefaultEndpoints: () => {
       set({ endpoints: DEFAULT_AUTOMATION_ENDPOINTS.map((e: AutomationEndpoint) => ({ ...e })) });
+    },
+
+    setWahaConfig: (partial) => {
+      set((s) => ({
+        waha: {
+          ...s.waha,
+          ...partial,
+          apiUrl: partial.apiUrl?.trim() ?? s.waha.apiUrl,
+          apiKey: partial.apiKey?.trim() ?? s.waha.apiKey,
+          sessionName: partial.sessionName?.trim() ?? s.waha.sessionName,
+        },
+        endpoints:
+          partial.isEnabled !== undefined
+            ? s.endpoints.map((e) =>
+                e.channel === "whatsapp" ? { ...e, isEnabled: partial.isEnabled! } : e,
+              )
+            : s.endpoints,
+      }));
+    },
+
+    restoreDefaultWaha: () => {
+      set({ waha: { ...DEFAULT_WAHA_CONFIG } });
+    },
+
+    setWahaHealth: (check) => {
+      set((s) => ({
+        waha: { ...s.waha, lastHealthCheck: check },
+        endpoints: s.endpoints.map((e) =>
+          e.channel === "whatsapp" ? { ...e, lastHealthCheck: check } : e,
+        ),
+      }));
     },
 
     setHealthCheckUrl: (webhookUrl) => {

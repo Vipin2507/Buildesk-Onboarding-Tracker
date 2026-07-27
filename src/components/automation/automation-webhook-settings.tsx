@@ -1,65 +1,142 @@
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   DEFAULT_EMAIL_WEBHOOK,
   DEFAULT_HEALTH_WEBHOOK,
-  DEFAULT_WHATSAPP_WEBHOOK,
+  DEFAULT_WAHA_API_KEY,
+  DEFAULT_WAHA_API_URL,
+  DEFAULT_WAHA_SESSION,
 } from "@/data/automationDefaults";
 import { useAutomationStore } from "@/stores/useAutomationStore";
 
 export function AutomationWebhookSettings() {
   const endpoints = useAutomationStore((s) => s.endpoints);
+  const waha = useAutomationStore((s) => s.waha);
   const healthCheck = useAutomationStore((s) => s.healthCheck);
   const setEndpointUrl = useAutomationStore((s) => s.setEndpointUrl);
+  const setEndpointEnabled = useAutomationStore((s) => s.setEndpointEnabled);
+  const setWahaConfig = useAutomationStore((s) => s.setWahaConfig);
   const setHealthCheckUrl = useAutomationStore((s) => s.setHealthCheckUrl);
   const setHealthCheckMethod = useAutomationStore((s) => s.setHealthCheckMethod);
   const restoreDefaultEndpoints = useAutomationStore((s) => s.restoreDefaultEndpoints);
+  const restoreDefaultWaha = useAutomationStore((s) => s.restoreDefaultWaha);
   const restoreDefaultHealth = useAutomationStore((s) => s.restoreDefaultHealth);
+
+  const emailEndpoint = endpoints.find((e) => e.channel === "email");
+  const whatsappEndpoint = endpoints.find((e) => e.channel === "whatsapp");
+  const [showApiKey, setShowApiKey] = useState(false);
 
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="font-semibold">Webhook settings</h3>
+        <h3 className="font-semibold">Integration settings</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          n8n-powered today — update URLs here to swap providers without code changes.
+          Email uses n8n webhooks. WhatsApp uses WAHA — update credentials here without redeploying.
         </p>
       </div>
 
-      {endpoints.map((endpoint) => (
-        <div key={endpoint.channel} className="card-soft p-4">
-          <div className="mb-2 font-medium">{endpoint.label}</div>
+      {emailEndpoint ? (
+        <div className="card-soft p-4">
+          <div className="mb-1 font-medium">{emailEndpoint.label}</div>
+          <p className="mb-2 text-xs text-muted-foreground">n8n webhook URL for outbound email</p>
           <Input
-            value={endpoint.webhookUrl}
-            onChange={(e) => setEndpointUrl(endpoint.channel, e.target.value)}
+            value={emailEndpoint.webhookUrl}
+            onChange={(e) => setEndpointUrl("email", e.target.value)}
             className="font-mono text-xs"
           />
-          <div className="mt-2 flex flex-wrap gap-2">
-            <Button
+          <label className="mt-3 flex items-center gap-2 text-sm">
+            <Switch
+              checked={emailEndpoint.isEnabled}
+              onCheckedChange={(v) => setEndpointEnabled("email", v)}
               size="sm"
-              onClick={() => toast.success(`${endpoint.label} URL saved`)}
-            >
+            />
+            Enabled
+          </label>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => toast.success("Email webhook saved")}>
               Save
             </Button>
             <Button
               size="sm"
               variant="outline"
               onClick={() => {
-                const url =
-                  endpoint.channel === "email" ? DEFAULT_EMAIL_WEBHOOK : DEFAULT_WHATSAPP_WEBHOOK;
-                setEndpointUrl(endpoint.channel, url);
-                toast.success("Restored default URL");
+                setEndpointUrl("email", DEFAULT_EMAIL_WEBHOOK);
+                toast.success("Email defaults restored");
               }}
             >
               Restore default
             </Button>
           </div>
         </div>
-      ))}
+      ) : null}
+
+      <div className="card-soft p-4">
+        <div className="mb-1 font-medium">{whatsappEndpoint?.label ?? "WhatsApp (WAHA)"}</div>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Messages sent via <code className="rounded bg-muted px-1">POST /api/sendText</code>
+        </p>
+        <div className="space-y-2">
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">WAHA API URL</label>
+            <Input
+              value={waha.apiUrl}
+              onChange={(e) => setWahaConfig({ apiUrl: e.target.value })}
+              className="font-mono text-xs"
+              placeholder="http://host:3000"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">API Key</label>
+            <div className="flex gap-2">
+              <Input
+                type={showApiKey ? "text" : "password"}
+                value={waha.apiKey}
+                onChange={(e) => setWahaConfig({ apiKey: e.target.value })}
+                className="font-mono text-xs"
+              />
+              <Button size="sm" variant="outline" type="button" onClick={() => setShowApiKey((v) => !v)}>
+                {showApiKey ? "Hide" : "Show"}
+              </Button>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">Session name</label>
+            <Input
+              value={waha.sessionName}
+              onChange={(e) => setWahaConfig({ sessionName: e.target.value })}
+              className="font-mono text-xs"
+              placeholder="first"
+            />
+          </div>
+        </div>
+        <label className="mt-3 flex items-center gap-2 text-sm">
+          <Switch checked={waha.isEnabled} onCheckedChange={(v) => setWahaConfig({ isEnabled: v })} size="sm" />
+          WAHA enabled
+        </label>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Button size="sm" onClick={() => toast.success("WAHA settings saved")}>
+            Save
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              restoreDefaultWaha();
+              toast.success("WAHA defaults restored");
+            }}
+          >
+            Restore defaults
+          </Button>
+        </div>
+      </div>
 
       <div className="card-soft p-4">
         <div className="mb-2 font-medium">{healthCheck.label}</div>
+        <p className="mb-2 text-xs text-muted-foreground">n8n health ping (email pipeline)</p>
         <Input
           value={healthCheck.webhookUrl}
           onChange={(e) => setHealthCheckUrl(e.target.value)}
@@ -90,7 +167,15 @@ export function AutomationWebhookSettings() {
         </div>
       </div>
 
-      <Button variant="outline" onClick={() => { restoreDefaultEndpoints(); restoreDefaultHealth(); toast.success("All defaults restored"); }}>
+      <Button
+        variant="outline"
+        onClick={() => {
+          restoreDefaultEndpoints();
+          restoreDefaultWaha();
+          restoreDefaultHealth();
+          toast.success("All integration defaults restored");
+        }}
+      >
         Restore all defaults
       </Button>
     </div>

@@ -16,6 +16,7 @@ import {
   renderAutomationSubject,
   renderAutomationTemplate,
 } from "@/services/automationTemplate";
+import { checkWahaSession, phoneToWahaChatId, sendWahaText } from "@/services/waha";
 import type { AutomationRule } from "@/types/automation";
 import type { TicketStatus } from "@/types";
 
@@ -63,6 +64,10 @@ export async function sendAutomationRequest(
 
   store.upsertLog(baseLog);
 
+  if (payload.channel === "whatsapp") {
+    return sendViaWaha(store.waha, baseLog, payload);
+  }
+
   try {
     const res = await fetch(endpoint.webhookUrl, {
       method: "POST",
@@ -99,6 +104,84 @@ export async function sendAutomationRequest(
   }
 }
 
+async function sendViaWaha(
+  waha: ReturnType<typeof useAutomationStore.getState>["waha"],
+  baseLog: AutomationLog,
+  payload: AutomationPayload,
+): Promise<AutomationLog> {
+  const store = useAutomationStore.getState();
+
+  if (!waha.isEnabled) {
+    const log: AutomationLog = {
+      ...baseLog,
+      status: "failed",
+      errorMessage: "WAHA WhatsApp is disabled",
+    };
+    store.upsertLog(log);
+    return log;
+  }
+
+  const chatId = phoneToWahaChatId(payload.customerPhone);
+  if (!chatId) {
+    const log: AutomationLog = {
+      ...baseLog,
+      status: "failed",
+      errorMessage: "No valid customer phone number for WhatsApp",
+      requestPayload: {
+        ...(payload as unknown as Record<string, unknown>),
+        provider: "waha",
+      },
+    };
+    store.upsertLog(log);
+    return log;
+  }
+
+  const wahaRequest = {
+    provider: "waha" as const,
+    session: waha.sessionName,
+    chatId,
+    text: payload.message,
+  };
+
+  store.upsertLog({
+    ...baseLog,
+    requestPayload: { ...(payload as unknown as Record<string, unknown>), ...wahaRequest },
+  });
+
+  try {
+    const result = await sendWahaText(waha, chatId, payload.message);
+    if (!result.ok) {
+      const log: AutomationLog = {
+        ...baseLog,
+        status: "failed",
+        errorMessage: `WAHA HTTP ${result.status}: ${summarizeResponse(result.body, 240)}`,
+        responseSummary: summarizeResponse(result.body),
+        requestPayload: { ...(payload as unknown as Record<string, unknown>), ...wahaRequest },
+      };
+      store.upsertLog(log);
+      return log;
+    }
+    const log: AutomationLog = {
+      ...baseLog,
+      status: "success",
+      responseSummary: summarizeResponse(result.body),
+      requestPayload: { ...(payload as unknown as Record<string, unknown>), ...wahaRequest },
+    };
+    store.upsertLog(log);
+    return log;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Network error";
+    const log: AutomationLog = {
+      ...baseLog,
+      status: "failed",
+      errorMessage: message,
+      requestPayload: { ...(payload as unknown as Record<string, unknown>), ...wahaRequest },
+    };
+    store.upsertLog(log);
+    return log;
+  }
+}
+
 export async function retryAutomationLog(logId: string): Promise<AutomationLog | null> {
   const store = useAutomationStore.getState();
   const log = store.logs.find((l) => l.id === logId);
@@ -118,13 +201,13 @@ export async function checkHealth(): Promise<{
   health: AutomationHealthConfig["lastHealthCheck"];
 }> {
   const store = useAutomationStore.getState();
-  const { healthCheck, endpoints } = store;
-  const started = performance.now();
-  const checkedAt = new Date().toISOString();
+  const { healthCheck, endpoints, waha } = store;
 
-  let rawResponse = "";
-  let ok = false;
-  let message = "";
+  const emailStarted = performance.now();
+  const emailCheckedAt = new Date().toISOString();
+  let emailRaw = "";
+  let emailOk = false;
+  let emailMessage = "";
 
   try {
     const init: RequestInit = {
@@ -136,37 +219,38 @@ export async function checkHealth(): Promise<{
       init.body = JSON.stringify({ ping: true, source: "buildesk-compass" });
     }
     const res = await fetch(healthCheck.webhookUrl, init);
-    rawResponse = await res.text().catch(() => "");
-    ok = res.ok;
-    message = ok ? "Connection OK" : `HTTP ${res.status}`;
+    emailRaw = await res.text().catch(() => "");
+    emailOk = res.ok;
+    emailMessage = emailOk ? "n8n connection OK" : `HTTP ${res.status}`;
   } catch (err) {
-    message = err instanceof Error ? err.message : "Network error";
+    emailMessage = err instanceof Error ? err.message : "Network error";
   }
 
-  const latencyMs = Math.round(performance.now() - started);
-  const status = ok ? ("healthy" as const) : ("unhealthy" as const);
-
-  const endpointCheck = {
-    status,
-    checkedAt,
-    latencyMs,
-    message,
+  const emailLatency = Math.round(performance.now() - emailStarted);
+  const emailStatus = emailOk ? ("healthy" as const) : ("unhealthy" as const);
+  const emailCheck = {
+    status: emailStatus,
+    checkedAt: emailCheckedAt,
+    latencyMs: emailLatency,
+    message: emailMessage,
   };
 
-  store.setEndpointHealth("email", endpointCheck);
-  store.setEndpointHealth("whatsapp", endpointCheck);
+  const wahaCheck = await checkWahaSession(waha);
+
+  store.setEndpointHealth("email", emailCheck);
+  store.setWahaHealth(wahaCheck);
   store.setHealthCheckResult({
-    status,
-    checkedAt,
-    latencyMs,
-    message,
-    rawResponse: summarizeResponse(rawResponse, 400),
+    status: emailStatus,
+    checkedAt: emailCheckedAt,
+    latencyMs: emailLatency,
+    message: emailMessage,
+    rawResponse: summarizeResponse(emailRaw, 400),
   });
 
   return {
-    email: endpoints.find((e) => e.channel === "email")?.lastHealthCheck ?? endpointCheck,
-    whatsapp: endpoints.find((e) => e.channel === "whatsapp")?.lastHealthCheck ?? endpointCheck,
-    health: store.healthCheck.lastHealthCheck ?? endpointCheck,
+    email: endpoints.find((e) => e.channel === "email")?.lastHealthCheck ?? emailCheck,
+    whatsapp: endpoints.find((e) => e.channel === "whatsapp")?.lastHealthCheck ?? wahaCheck,
+    health: store.healthCheck.lastHealthCheck ?? emailCheck,
   };
 }
 

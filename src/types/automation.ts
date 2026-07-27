@@ -2,9 +2,13 @@ import type { TicketStatus } from "./ticket";
 
 export type AutomationChannel = "email" | "whatsapp";
 
+export type AutomationProvider = "n8n-webhook" | "waha";
+
 export interface AutomationEndpoint {
   channel: AutomationChannel;
   label: string;
+  provider: AutomationProvider;
+  /** Used when provider is n8n-webhook (email). */
   webhookUrl: string;
   isEnabled: boolean;
   lastHealthCheck?: {
@@ -12,6 +16,20 @@ export interface AutomationEndpoint {
     checkedAt: string;
     latencyMs?: number;
     message?: string;
+  };
+}
+
+export interface WahaConfig {
+  apiUrl: string;
+  apiKey: string;
+  sessionName: string;
+  isEnabled: boolean;
+  lastHealthCheck?: {
+    status: "healthy" | "unhealthy" | "unknown";
+    checkedAt: string;
+    latencyMs?: number;
+    message?: string;
+    rawResponse?: string;
   };
 }
 

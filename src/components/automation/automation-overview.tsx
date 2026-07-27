@@ -61,7 +61,11 @@ export function ChannelStatusCard({
           </div>
           <div>
             <div className="font-semibold">{endpoint.label}</div>
-            <div className="text-xs text-muted-foreground">n8n webhook · provider swappable</div>
+            <div className="text-xs text-muted-foreground">
+              {endpoint.provider === "waha"
+                ? "WAHA · sendText API"
+                : "n8n webhook · provider swappable"}
+            </div>
           </div>
         </div>
         <StatusBadge status={check?.status} checking={checking} />

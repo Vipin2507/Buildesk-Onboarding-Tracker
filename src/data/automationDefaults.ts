@@ -9,17 +9,30 @@ export const DEFAULT_WHATSAPP_WEBHOOK = "http://72.60.200.185:5678/webhook/build
 export const DEFAULT_EMAIL_WEBHOOK = "http://72.60.200.185:5678/webhook/buildesk-email";
 export const DEFAULT_HEALTH_WEBHOOK = "http://72.60.200.185:5678/webhook/buildesk-health";
 
+export const DEFAULT_WAHA_API_URL = "http://72.60.200.185:3000";
+export const DEFAULT_WAHA_API_KEY = "MySecretWAHAKey";
+export const DEFAULT_WAHA_SESSION = "first";
+
+export const DEFAULT_WAHA_CONFIG = {
+  apiUrl: DEFAULT_WAHA_API_URL,
+  apiKey: DEFAULT_WAHA_API_KEY,
+  sessionName: DEFAULT_WAHA_SESSION,
+  isEnabled: true,
+};
+
 export const DEFAULT_AUTOMATION_ENDPOINTS: AutomationEndpoint[] = [
   {
     channel: "email",
     label: "Email (n8n)",
+    provider: "n8n-webhook",
     webhookUrl: DEFAULT_EMAIL_WEBHOOK,
     isEnabled: true,
   },
   {
     channel: "whatsapp",
-    label: "WhatsApp (n8n)",
-    webhookUrl: DEFAULT_WHATSAPP_WEBHOOK,
+    label: "WhatsApp (WAHA)",
+    provider: "waha",
+    webhookUrl: DEFAULT_WAHA_API_URL,
     isEnabled: true,
   },
 ];
