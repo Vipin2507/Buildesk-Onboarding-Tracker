@@ -76,7 +76,7 @@ export const useAutomationStore = createPersistedStore<AutomationState>(
     },
 
     restoreDefaultEndpoints: () => {
-      set({ endpoints: DEFAULT_AUTOMATION_ENDPOINTS.map((e) => ({ ...e })) });
+      set({ endpoints: DEFAULT_AUTOMATION_ENDPOINTS.map((e: AutomationEndpoint) => ({ ...e })) });
     },
 
     setHealthCheckUrl: (webhookUrl) => {

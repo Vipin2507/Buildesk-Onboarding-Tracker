@@ -15,7 +15,7 @@ dist-ssr
 .tanstack/**
 .nitro
 *.local
-data/
+/data/
 *.db
 *.db-shm
 *.db-wal
