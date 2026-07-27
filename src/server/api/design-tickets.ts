@@ -169,6 +169,25 @@ function assertPortalTicket(
   return { portal, ticket };
 }
 
+function insertPortalTicketNotification(db: ReturnType<typeof getDb>, ticket: DesignTicket) {
+  const now = nowIso();
+  db.insert(t.notifications)
+    .values({
+      id: newId(),
+      userId: null,
+      title: `New client ticket ${ticket.ticketNumber}`,
+      body: ticket.subject,
+      kind: "info",
+      href: `/tickets/${ticket.id}`,
+      readAt: null,
+      companyId: ticket.companyId,
+      ticketId: ticket.ticketNumber,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .run();
+}
+
 const createInputSchema = z.object({
   id: z.string().optional(),
   companyId: z.string(),
@@ -186,7 +205,9 @@ const createInputSchema = z.object({
 /* ---------- Admin (authenticated) ---------- */
 
 export const listDesignTickets = createServerFn({ method: "GET" })
-  .validator(z.object({ companyId: z.string().optional() }).optional())
+  .inputValidator((data: unknown) =>
+    z.object({ companyId: z.string().optional() }).optional().parse(data ?? {}),
+  )
   .handler(async ({ data }) => {
     requireUser();
     const db = getDb();
@@ -194,7 +215,7 @@ export const listDesignTickets = createServerFn({ method: "GET" })
   });
 
 export const getDesignTicket = createServerFn({ method: "GET" })
-  .validator(z.object({ id: z.string() }))
+  .inputValidator((data: unknown) => z.object({ id: z.string() }).parse(data))
   .handler(async ({ data }) => {
     requireUser();
     const db = getDb();
@@ -204,7 +225,7 @@ export const getDesignTicket = createServerFn({ method: "GET" })
   });
 
 export const createDesignTicket = createServerFn({ method: "POST" })
-  .validator(createInputSchema)
+  .inputValidator((data: unknown) => createInputSchema.parse(data))
   .handler(async ({ data }) => {
     requireUser();
     const db = getDb();
@@ -250,14 +271,16 @@ export const createDesignTicket = createServerFn({ method: "POST" })
   });
 
 export const addDesignTicketMessage = createServerFn({ method: "POST" })
-  .validator(
-    z.object({
-      ticketId: z.string(),
-      authorType: z.enum(["client", "team"]),
-      authorName: z.string(),
-      message: z.string().min(1),
-      attachments: z.array(attachmentSchema).optional(),
-    }),
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        ticketId: z.string(),
+        authorType: z.enum(["client", "team"]),
+        authorName: z.string(),
+        message: z.string().min(1),
+        attachments: z.array(attachmentSchema).optional(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     requireUser();
@@ -287,12 +310,14 @@ export const addDesignTicketMessage = createServerFn({ method: "POST" })
   });
 
 export const updateDesignTicketStatus = createServerFn({ method: "POST" })
-  .validator(
-    z.object({
-      ticketId: z.string(),
-      status: z.enum(["open", "in-progress", "resolved", "closed"]),
-      actorName: z.string(),
-    }),
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        ticketId: z.string(),
+        status: z.enum(["open", "in-progress", "resolved", "closed"]),
+        actorName: z.string(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     requireUser();
@@ -325,12 +350,14 @@ export const updateDesignTicketStatus = createServerFn({ method: "POST" })
   });
 
 export const updateDesignTicketPriority = createServerFn({ method: "POST" })
-  .validator(
-    z.object({
-      ticketId: z.string(),
-      priority: z.enum(["low", "medium", "high"]),
-      actorName: z.string(),
-    }),
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        ticketId: z.string(),
+        priority: z.enum(["low", "medium", "high"]),
+        actorName: z.string(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     requireUser();
@@ -354,13 +381,15 @@ export const updateDesignTicketPriority = createServerFn({ method: "POST" })
   });
 
 export const assignDesignTicket = createServerFn({ method: "POST" })
-  .validator(
-    z.object({
-      ticketId: z.string(),
-      assigneeId: z.string().optional(),
-      assigneeName: z.string(),
-      actorName: z.string(),
-    }),
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        ticketId: z.string(),
+        assigneeId: z.string().optional(),
+        assigneeName: z.string(),
+        actorName: z.string(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     requireUser();
@@ -383,7 +412,7 @@ export const assignDesignTicket = createServerFn({ method: "POST" })
   });
 
 export const deleteDesignTicket = createServerFn({ method: "POST" })
-  .validator(z.object({ id: z.string() }))
+  .inputValidator((data: unknown) => z.object({ id: z.string() }).parse(data))
   .handler(async ({ data }) => {
     requireUser();
     const db = getDb();
@@ -397,7 +426,7 @@ export const deleteDesignTicket = createServerFn({ method: "POST" })
 /* ---------- Portal (public, slug-scoped) ---------- */
 
 export const listPortalDesignTickets = createServerFn({ method: "GET" })
-  .validator(z.object({ slug: z.string().min(1) }))
+  .inputValidator((data: unknown) => z.object({ slug: z.string().min(1) }).parse(data))
   .handler(async ({ data }) => {
     const db = getDb();
     const portal = resolveActivePortal(db, data.slug);
@@ -405,7 +434,9 @@ export const listPortalDesignTickets = createServerFn({ method: "GET" })
   });
 
 export const getPortalDesignTicket = createServerFn({ method: "GET" })
-  .validator(z.object({ slug: z.string().min(1), ticketId: z.string() }))
+  .inputValidator((data: unknown) =>
+    z.object({ slug: z.string().min(1), ticketId: z.string() }).parse(data),
+  )
   .handler(async ({ data }) => {
     const db = getDb();
     assertPortalTicket(db, data.slug, data.ticketId);
@@ -415,16 +446,18 @@ export const getPortalDesignTicket = createServerFn({ method: "GET" })
   });
 
 export const createPortalDesignTicket = createServerFn({ method: "POST" })
-  .validator(
-    z.object({
-      slug: z.string().min(1),
-      subject: z.string().min(1),
-      description: z.string().min(1),
-      category: z.string().optional(),
-      priority: z.enum(["low", "medium", "high"]).optional(),
-      authorName: z.string().min(1),
-      attachments: z.array(attachmentSchema).optional(),
-    }),
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        slug: z.string().min(1),
+        subject: z.string().min(1),
+        description: z.string().min(1),
+        category: z.string().optional(),
+        priority: z.enum(["low", "medium", "high"]).optional(),
+        authorName: z.string().min(1),
+        attachments: z.array(attachmentSchema).optional(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     const db = getDb();
@@ -465,18 +498,22 @@ export const createPortalDesignTicket = createServerFn({ method: "POST" })
       })
       .run();
 
-    return loadTicket(db, id)!;
+    const created = loadTicket(db, id)!;
+    insertPortalTicketNotification(db, created);
+    return created;
   });
 
 export const addPortalDesignTicketMessage = createServerFn({ method: "POST" })
-  .validator(
-    z.object({
-      slug: z.string().min(1),
-      ticketId: z.string(),
-      authorName: z.string().min(1),
-      message: z.string().min(1),
-      attachments: z.array(attachmentSchema).optional(),
-    }),
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        slug: z.string().min(1),
+        ticketId: z.string(),
+        authorName: z.string().min(1),
+        message: z.string().min(1),
+        attachments: z.array(attachmentSchema).optional(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     const db = getDb();

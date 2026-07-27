@@ -1,16 +1,14 @@
 import { purgeLegacyEntityCaches } from "./persist";
 import { useMasterStore } from "./useMasterStore";
 import { useSettingsStore } from "./useSettingsStore";
-import { useDesignTicketStore } from "./useDesignTicketStore";
 import { useCompanyPortalStore } from "./useCompanyPortalStore";
 import { useAutomationStore } from "./useAutomationStore";
 import { useChatStore } from "./useChatStore";
 
-/** Config + client-portal ticket stores persist to disk; entity data loads from SQLite. */
+/** Config stores persist to disk; entity data (incl. design tickets) loads from SQLite. */
 const persistedStores = [
   useMasterStore,
   useSettingsStore,
-  useDesignTicketStore,
   useCompanyPortalStore,
   useAutomationStore,
   useChatStore,

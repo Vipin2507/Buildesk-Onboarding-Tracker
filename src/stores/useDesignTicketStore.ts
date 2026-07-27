@@ -12,11 +12,12 @@ import {
   assignDesignTicket,
   createPortalDesignTicket,
   deleteDesignTicket,
+  listPortalDesignTickets,
   updateDesignTicketPriority,
   updateDesignTicketStatus,
 } from "@/lib/api";
 import { serverSync } from "@/lib/sync";
-import { createPersistedStore, touch } from "./persist";
+import { createStore, touch } from "./persist";
 
 export type CreateDesignTicketInput = {
   companyId: string;
@@ -108,9 +109,7 @@ function highlightTicket(get: () => DesignTicketState, set: (fn: (s: DesignTicke
   }
 }
 
-export const useDesignTicketStore = createPersistedStore<DesignTicketState>(
-  "design-tickets-v1",
-  (set, get) => ({
+export const useDesignTicketStore = createStore<DesignTicketState>((set, get) => ({
     tickets: [],
     highlightIds: [],
 
@@ -148,6 +147,12 @@ export const useDesignTicketStore = createPersistedStore<DesignTicketState>(
         },
       });
       get().mergeTicket(ticket);
+      try {
+        const tickets = await listPortalDesignTickets({ data: { slug } });
+        get().hydrateCompanyTickets(ticket.companyId, tickets);
+      } catch (err) {
+        console.warn("[portal tickets] refresh after create failed", err);
+      }
       highlightTicket(get, set, ticket.id);
       return ticket;
     },

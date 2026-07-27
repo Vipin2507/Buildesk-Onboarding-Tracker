@@ -147,7 +147,10 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           listModuleSubscriptionEvents({ data: {} }).catch(() => []),
           listCrmEvents({ data: { limit: 200 } }).catch(() => []),
           ensureCompanyPortals().catch(() => []),
-          listDesignTickets({ data: {} }).catch(() => []),
+          listDesignTickets({ data: {} }).catch((err) => {
+            console.warn("[bootstrap] listDesignTickets failed", err);
+            return null;
+          }),
         ]);
 
         if (cancelled) return;
@@ -199,7 +202,9 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           events: crmEvents,
         });
         useCompanyPortalStore.getState().hydrateAccess(portalAccess);
-        useDesignTicketStore.getState().hydrateTickets(designTickets);
+        if (designTickets) {
+          useDesignTicketStore.getState().hydrateTickets(designTickets);
+        }
         useVendorStore.setState({
           materials: vendors.materials,
           suppliers: vendors.suppliers,

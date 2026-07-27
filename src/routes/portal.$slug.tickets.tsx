@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
@@ -8,6 +9,7 @@ import {
 } from "@/components/design-ticket/design-ticket-chips";
 import { DesignTicketPageHeader, PortalPageWrap } from "@/components/design-ticket/design-ticket-shared";
 import { formatDate } from "@/lib/utils";
+import { listPortalDesignTickets } from "@/lib/api";
 import { isDesignTicketActive } from "@/stores/design-ticket-selectors";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
 import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
@@ -21,6 +23,25 @@ function PortalMyTickets() {
   const navigate = useNavigate();
   const access = useCompanyPortalStore((s) => s.getBySlug(slug));
   const tickets = useDesignTicketStore((s) => s.tickets);
+  const hydrateCompanyTickets = useDesignTicketStore((s) => s.hydrateCompanyTickets);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!access) return;
+    let cancelled = false;
+    setLoading(true);
+    void listPortalDesignTickets({ data: { slug } })
+      .then((rows) => {
+        if (!cancelled) hydrateCompanyTickets(access.companyId, rows);
+      })
+      .catch((err) => console.warn("[portal tickets]", err))
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, access?.companyId, hydrateCompanyTickets]);
 
   if (!access) return null;
 
@@ -35,7 +56,9 @@ function PortalMyTickets() {
         subtitle="Open and in-progress requests for your company."
       />
 
-      {rows.length === 0 ? (
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Loading your tickets…</p>
+      ) : rows.length === 0 ? (
         <EmptyState title="No open tickets" description="Create a ticket to start a conversation with our team." />
       ) : (
         <DataTable

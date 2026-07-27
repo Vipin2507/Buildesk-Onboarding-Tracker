@@ -23,7 +23,7 @@ function mapPortalRow(row: typeof t.companyPortalAccess.$inferSelect): CompanyPo
 
 /** Public — used by client portal routes (no login). */
 export const getPortalBySlug = createServerFn({ method: "GET" })
-  .validator(z.object({ slug: z.string().min(1) }))
+  .inputValidator((data: unknown) => z.object({ slug: z.string().min(1) }).parse(data))
   .handler(async ({ data }) => {
     const db = getDb();
     const row = db
@@ -102,7 +102,7 @@ const portalAccessSchema = z.object({
 });
 
 export const upsertCompanyPortalAccess = createServerFn({ method: "POST" })
-  .validator(portalAccessSchema)
+  .inputValidator((data: unknown) => portalAccessSchema.parse(data))
   .handler(async ({ data }) => {
     requireUser();
     const db = getDb();
@@ -149,7 +149,7 @@ export const upsertCompanyPortalAccess = createServerFn({ method: "POST" })
   });
 
 export const regenerateCompanyPortalSlug = createServerFn({ method: "POST" })
-  .validator(z.object({ companyId: z.string() }))
+  .inputValidator((data: unknown) => z.object({ companyId: z.string() }).parse(data))
   .handler(async ({ data }) => {
     requireUser();
     const db = getDb();
@@ -178,7 +178,9 @@ export const regenerateCompanyPortalSlug = createServerFn({ method: "POST" })
   });
 
 export const setCompanyPortalActive = createServerFn({ method: "POST" })
-  .validator(z.object({ companyId: z.string(), isActive: z.boolean() }))
+  .inputValidator((data: unknown) =>
+    z.object({ companyId: z.string(), isActive: z.boolean() }).parse(data),
+  )
   .handler(async ({ data }) => {
     requireUser();
     const db = getDb();
@@ -197,13 +199,15 @@ export const setCompanyPortalActive = createServerFn({ method: "POST" })
   });
 
 export const updateCompanyPortalContact = createServerFn({ method: "POST" })
-  .validator(
-    z.object({
-      companyId: z.string(),
-      contactName: z.string().optional(),
-      contactEmail: z.string().optional(),
-      companyName: z.string().optional(),
-    }),
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        companyId: z.string(),
+        contactName: z.string().optional(),
+        contactEmail: z.string().optional(),
+        companyName: z.string().optional(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     requireUser();

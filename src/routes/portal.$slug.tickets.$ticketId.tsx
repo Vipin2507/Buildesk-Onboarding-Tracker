@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
@@ -8,6 +9,7 @@ import { DesignTicketPriorityChip, DesignTicketStatusPill } from "@/components/d
 import { PortalPageWrap, TICKET_EASE } from "@/components/design-ticket/design-ticket-shared";
 import { Button } from "@/components/ui/button";
 import { EntityNotFound } from "@/components/empty-state";
+import { getPortalDesignTicket } from "@/lib/api";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
 import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
 
@@ -20,11 +22,41 @@ function PortalTicketDetail() {
   const navigate = useNavigate();
   const access = useCompanyPortalStore((s) => s.getBySlug(slug));
   const ticket = useDesignTicketStore((s) => s.getById(ticketId));
+  const mergeTicket = useDesignTicketStore((s) => s.mergeTicket);
   const addMessage = useDesignTicketStore((s) => s.addMessage);
+  const [loading, setLoading] = useState(!ticket);
+  const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setNotFound(false);
+    void getPortalDesignTicket({ data: { slug, ticketId } })
+      .then((row) => {
+        if (!cancelled) mergeTicket(row);
+      })
+      .catch(() => {
+        if (!cancelled) setNotFound(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, ticketId, mergeTicket]);
 
   if (!access) return null;
 
-  if (!ticket || ticket.companyId !== access.companyId) {
+  if (loading && !ticket) {
+    return (
+      <PortalPageWrap>
+        <p className="text-sm text-muted-foreground">Loading ticket…</p>
+      </PortalPageWrap>
+    );
+  }
+
+  if (notFound || !ticket || ticket.companyId !== access.companyId) {
     return <EntityNotFound entity="Ticket" listPath={`/portal/${slug}/tickets`} listLabel="My Tickets" />;
   }
 

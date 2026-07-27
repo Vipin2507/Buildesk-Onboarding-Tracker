@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
@@ -18,6 +19,7 @@ import {
 import { PageWrap } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { EntityNotFound } from "@/components/empty-state";
+import { getDesignTicket } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 import {
   useCompanyStore,
@@ -37,6 +39,7 @@ function InternalTicketDetail() {
   const navigate = useNavigate();
   const currentUser = useCurrentUser();
   const ticket = useDesignTicketStore((s) => s.getById(ticketId));
+  const mergeTicket = useDesignTicketStore((s) => s.mergeTicket);
   const addMessage = useDesignTicketStore((s) => s.addMessage);
   const updateStatus = useDesignTicketStore((s) => s.updateStatus);
   const updatePriority = useDesignTicketStore((s) => s.updatePriority);
@@ -44,10 +47,40 @@ function InternalTicketDetail() {
   const companies = useCompanyStore((s) => s.companies);
   const employees = useEmployeeStore((s) => s.employees);
   const users = useUserStore((s) => s.users);
+  const [loading, setLoading] = useState(!ticket);
+  const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setNotFound(false);
+    void getDesignTicket({ data: { id: ticketId } })
+      .then((row) => {
+        if (!cancelled) mergeTicket(row);
+      })
+      .catch(() => {
+        if (!cancelled) setNotFound(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ticketId, mergeTicket]);
 
   const actorName = currentUser?.name ?? "Team";
 
-  if (!ticket) {
+  if (loading && !ticket) {
+    return (
+      <PageWrap>
+        <InternalTicketsNav />
+        <p className="text-sm text-muted-foreground">Loading ticket…</p>
+      </PageWrap>
+    );
+  }
+
+  if (notFound || !ticket) {
     return <EntityNotFound entity="Ticket" listPath="/tickets" listLabel="Ticket Tracking" />;
   }
 
