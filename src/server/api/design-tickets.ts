@@ -181,7 +181,7 @@ function insertPortalTicketNotification(db: ReturnType<typeof getDb>, ticket: De
       href: `/tickets/${ticket.id}`,
       readAt: null,
       companyId: ticket.companyId,
-      ticketId: ticket.ticketNumber,
+      ticketId: ticket.id,
       createdAt: now,
       updatedAt: now,
     })

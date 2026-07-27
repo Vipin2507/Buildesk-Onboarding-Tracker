@@ -99,10 +99,10 @@ export function CompanyDesignTicketsPanel({ companyId }: Props) {
   }
 
   const kpiCards = [
-    { label: "Open", value: stats.open, tone: "text-info" },
-    { label: "In Progress", value: stats.inProgress, tone: "text-warning-foreground" },
-    { label: "Resolved", value: stats.resolved, tone: "text-success" },
-    { label: "Closed", value: stats.closed, tone: "text-muted-foreground" },
+    { id: "open", label: "Open", value: stats.open, tone: "text-info" },
+    { id: "in-progress", label: "In Progress", value: stats.inProgress, tone: "text-warning-foreground" },
+    { id: "resolved", label: "Resolved", value: stats.resolved, tone: "text-success" },
+    { id: "closed", label: "Closed", value: stats.closed, tone: "text-muted-foreground" },
   ];
 
   return (

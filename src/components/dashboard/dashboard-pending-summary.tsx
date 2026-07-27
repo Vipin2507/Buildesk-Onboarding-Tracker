@@ -7,7 +7,6 @@ import {
   ClipboardList,
   ListChecks,
   MapPin,
-  Palette,
   RefreshCw,
   Ticket,
 } from "lucide-react";
@@ -83,9 +82,9 @@ export function DashboardPendingSummary({
     },
     {
       id: "design",
-      label: "Design tickets",
+      label: "Client tickets",
       value: openDesignTickets,
-      icon: Palette,
+      icon: Ticket,
       tone: "border-primary/30 bg-primary/10 text-primary",
       filter: { type: "design_tickets" },
     },

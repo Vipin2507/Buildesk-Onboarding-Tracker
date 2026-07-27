@@ -10,6 +10,7 @@ import {
   addDesignTicketMessage,
   addPortalDesignTicketMessage,
   assignDesignTicket,
+  createDesignTicket,
   createPortalDesignTicket,
   deleteDesignTicket,
   listPortalDesignTickets,
@@ -40,6 +41,23 @@ type DesignTicketState = {
     slug: string,
     input: Omit<CreateDesignTicketInput, "companyId" | "createdBy"> & { authorName: string },
   ) => Promise<DesignTicket>;
+  createTeamTicket: (
+    input: Omit<CreateDesignTicketInput, "createdBy">,
+    actorName: string,
+  ) => Promise<DesignTicket>;
+  bulkDeleteTickets: (ticketIds: string[]) => void;
+  bulkAssignTickets: (
+    ticketIds: string[],
+    assigneeId: string | undefined,
+    assigneeName: string,
+    actorName: string,
+  ) => void;
+  bulkUpdateStatus: (ticketIds: string[], status: DesignTicketStatus, actorName: string) => void;
+  bulkUpdatePriority: (
+    ticketIds: string[],
+    priority: DesignTicketPriority,
+    actorName: string,
+  ) => void;
   addMessage: (
     ticketId: string,
     input: {
@@ -155,6 +173,52 @@ export const useDesignTicketStore = createStore<DesignTicketState>((set, get) =>
       }
       highlightTicket(get, set, ticket.id);
       return ticket;
+    },
+
+    createTeamTicket: async (input, actorName) => {
+      const ticket = await createDesignTicket({
+        data: {
+          companyId: input.companyId,
+          subject: input.subject,
+          description: input.description,
+          category: input.category,
+          priority: input.priority ?? "medium",
+          createdBy: { type: "team", name: actorName },
+          attachments: input.attachments,
+        },
+      });
+      get().mergeTicket(ticket);
+      highlightTicket(get, set, ticket.id);
+      return ticket;
+    },
+
+    bulkDeleteTickets: (ticketIds) => {
+      const ids = new Set(ticketIds);
+      set((s) => ({
+        tickets: s.tickets.filter((t) => !ids.has(t.id)),
+        highlightIds: s.highlightIds.filter((id) => !ids.has(id)),
+      }));
+      for (const id of ticketIds) {
+        serverSync("delete design ticket", () => deleteDesignTicket({ data: { id } }));
+      }
+    },
+
+    bulkAssignTickets: (ticketIds, assigneeId, assigneeName, actorName) => {
+      for (const id of ticketIds) {
+        get().assignTicket(id, assigneeId, assigneeName, actorName);
+      }
+    },
+
+    bulkUpdateStatus: (ticketIds, status, actorName) => {
+      for (const id of ticketIds) {
+        get().updateStatus(id, status, actorName);
+      }
+    },
+
+    bulkUpdatePriority: (ticketIds, priority, actorName) => {
+      for (const id of ticketIds) {
+        get().updatePriority(id, priority, actorName);
+      }
     },
 
     addMessage: (ticketId, input, opts) => {

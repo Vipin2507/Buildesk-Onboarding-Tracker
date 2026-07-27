@@ -369,22 +369,31 @@ export function DashboardDrillDownSheet({
           ) : null}
 
           {data.kind === "design_tickets" ? (
-            <div className="space-y-2">
-              {data.tickets.map((t) => (
-                <Link
-                  key={t.id}
-                  to="/tickets/$ticketId"
-                  params={{ ticketId: t.id }}
-                  className="block rounded-xl border p-3 transition-colors hover:bg-muted/30"
-                >
-                  <div className="font-medium">
-                    <span className="text-primary">{t.ticketNumber}</span> — {t.subject}
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {companyNameById(t.companyId)} · {t.status}
-                  </div>
-                </Link>
-              ))}
+            <div className="space-y-3">
+              <div className="space-y-2">
+                {data.tickets.map((t) => (
+                  <Link
+                    key={t.id}
+                    to="/tickets/$ticketId"
+                    params={{ ticketId: t.id }}
+                    className="block rounded-xl border p-3 transition-colors hover:bg-muted/30"
+                  >
+                    <div className="font-medium">
+                      <span className="text-primary">{t.ticketNumber}</span> — {t.subject}
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {companyNameById(t.companyId)} · {t.status}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+              <Link
+                to="/tickets"
+                search={{ filter: "pending" }}
+                className="inline-flex text-sm font-medium text-primary hover:underline"
+              >
+                View all in Ticket Tracking →
+              </Link>
             </div>
           ) : null}
 

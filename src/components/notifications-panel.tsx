@@ -83,13 +83,26 @@ export function NotificationsBell() {
                     )}
                     onClick={() => {
                       markRead(n.id);
+                      if (n.href) {
+                        void router.navigate({ to: n.href });
+                        return;
+                      }
                       if (n.ticketId) {
+                        if (n.ticketId.startsWith("TKT-")) {
+                          void navigate({
+                            to: "/support/$ticketId",
+                            params: { ticketId: n.ticketId },
+                          });
+                          return;
+                        }
+                        if (n.ticketId.startsWith("DT-")) {
+                          void navigate({ to: "/tickets", search: { filter: "pending" } });
+                          return;
+                        }
                         void navigate({
-                          to: "/support/$ticketId",
+                          to: "/tickets/$ticketId",
                           params: { ticketId: n.ticketId },
                         });
-                      } else if (n.href) {
-                        void router.navigate({ to: n.href });
                       }
                     }}
                   >

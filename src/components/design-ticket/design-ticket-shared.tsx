@@ -17,47 +17,80 @@ export const ticketSelectClass =
 export const ticketTextareaClass =
   "w-full resize-none rounded-lg border border-input bg-card px-3 py-2.5 text-sm outline-none transition-shadow focus:ring-2 focus:ring-primary/25";
 
-type KpiItem = {
+export type TicketKpiItem = {
+  id: string;
   label: string;
   value: number;
   tone?: string;
   icon?: LucideIcon;
+  onClick?: () => void;
+  active?: boolean;
 };
 
-export function DesignTicketKpiGrid({ items, columns = 4 }: { items: KpiItem[]; columns?: 2 | 3 | 4 | 5 }) {
+export function DesignTicketKpiGrid({
+  items,
+  columns = 4,
+}: {
+  items: TicketKpiItem[];
+  columns?: 2 | 3 | 4 | 5 | 6;
+}) {
   const colClass =
-    columns === 5
-      ? "sm:grid-cols-2 lg:grid-cols-5"
-      : columns === 3
-        ? "sm:grid-cols-3"
-        : columns === 2
-          ? "sm:grid-cols-2"
-          : "sm:grid-cols-2 lg:grid-cols-4";
+    columns === 6
+      ? "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
+      : columns === 5
+        ? "sm:grid-cols-2 lg:grid-cols-5"
+        : columns === 3
+          ? "sm:grid-cols-3"
+          : columns === 2
+            ? "sm:grid-cols-2"
+            : "sm:grid-cols-2 lg:grid-cols-4";
 
   return (
     <div className={cn("grid grid-cols-2 gap-2.5 sm:gap-3", colClass)}>
       {items.map((k, i) => {
         const Icon = k.icon;
+        const clickable = Boolean(k.onClick);
+        const Wrapper = clickable ? "button" : "div";
         return (
           <motion.div
-            key={k.label}
+            key={k.id}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: Math.min(i * 0.05, 0.25), ease: TICKET_EASE }}
-            whileHover={{ y: -2, transition: { duration: 0.2 } }}
-            className="card-soft group p-3.5 sm:p-4"
+            whileHover={clickable ? { y: -2, transition: { duration: 0.2 } } : undefined}
+            className="h-full"
           >
-            <div className="flex items-start justify-between gap-2">
-              <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground sm:text-xs">
-                {k.label}
+            <Wrapper
+              type={clickable ? "button" : undefined}
+              onClick={k.onClick}
+              className={cn(
+                "card-soft group h-full w-full p-3.5 text-left transition-all sm:p-4",
+                clickable && "cursor-pointer hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                k.active && "border-primary/40 bg-primary/5 ring-1 ring-primary/20",
+              )}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground sm:text-xs">
+                  {k.label}
+                </div>
+                {Icon ? (
+                  <Icon
+                    className={cn(
+                      "h-4 w-4 shrink-0 text-muted-foreground/60 transition-colors group-hover:text-primary",
+                      k.active && "text-primary",
+                    )}
+                  />
+                ) : null}
               </div>
-              {Icon ? (
-                <Icon className="h-4 w-4 shrink-0 text-muted-foreground/60 transition-colors group-hover:text-primary" />
+              <div className={cn("mt-1.5 text-xl font-semibold tabular-nums sm:text-2xl", k.tone)}>
+                <CountUp to={k.value} />
+              </div>
+              {clickable ? (
+                <div className="mt-1 text-[10px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+                  Click to filter
+                </div>
               ) : null}
-            </div>
-            <div className={cn("mt-1.5 text-xl font-semibold tabular-nums sm:text-2xl", k.tone)}>
-              <CountUp to={k.value} />
-            </div>
+            </Wrapper>
           </motion.div>
         );
       })}

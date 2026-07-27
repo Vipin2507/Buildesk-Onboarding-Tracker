@@ -250,7 +250,7 @@ export function drillDownTitle(filter: DashboardDrillDownFilter): string {
     case "support_tickets":
       return "Open Support Tickets";
     case "design_tickets":
-      return "Open Design Tickets";
+      return "Pending Client Tickets";
     case "follow_ups":
       if (filter.scope === "overdue") return "Overdue Follow-ups";
       if (filter.scope === "due_today") return "Due Today";
