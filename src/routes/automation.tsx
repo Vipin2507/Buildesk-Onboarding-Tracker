@@ -12,6 +12,7 @@ import {
 import { AutomationLogsPanel } from "@/components/automation/automation-logs-panel";
 import { AutomationRulesPanel } from "@/components/automation/automation-rules-panel";
 import { AutomationWebhookSettings } from "@/components/automation/automation-webhook-settings";
+import { AutomationTestPanel } from "@/components/automation/automation-test-panel";
 import { PageHeader, PageWrap } from "@/components/page-header";
 import { usePermissions } from "@/hooks/use-permissions";
 import { checkHealth } from "@/services/automation";
@@ -141,6 +142,7 @@ function AutomationPage() {
               range={statsRange}
               onRangeChange={setStatsRange}
             />
+            <AutomationTestPanel />
             <div className="grid gap-3 lg:grid-cols-2">
               {endpoints.map((endpoint) => (
                 <ChannelStatusCard

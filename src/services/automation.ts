@@ -12,9 +12,12 @@ import { useAutomationStore } from "@/stores/useAutomationStore";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
 import { useCompanyStore } from "@/stores/useCompanyStore";
 import {
+  AUTOMATION_SAMPLE_VARS,
   renderAutomationSubject,
   renderAutomationTemplate,
 } from "@/services/automationTemplate";
+import type { AutomationRule } from "@/types/automation";
+import type { TicketStatus } from "@/types";
 
 function logId() {
   return `AL-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -254,4 +257,86 @@ export function dispatchAutomationTrigger(
 
 export function isClosedTicketStatus(status: string) {
   return status === "Closed" || status === "Resolved";
+}
+
+function buildPayloadFromRule(
+  rule: AutomationRule,
+  opts?: { customerEmail?: string; customerPhone?: string; test?: boolean },
+): AutomationPayload {
+  const vars = { ...AUTOMATION_SAMPLE_VARS };
+  const message = renderAutomationTemplate(rule.templateBody, vars);
+  const prefix = opts?.test ? "[TEST] " : "";
+
+  return {
+    channel: rule.channel,
+    trigger: rule.trigger,
+    ticketNumber: vars.ticketNumber,
+    companyName: vars.companyName,
+    customerName: vars.customerName,
+    customerEmail: opts?.customerEmail?.trim() || "test@example.com",
+    customerPhone: opts?.customerPhone?.trim() || "+919999999999",
+    subject: renderAutomationSubject(rule.templateSubject, vars),
+    status: vars.status as TicketStatus,
+    message: `${prefix}${message}`,
+    ticketUrl: vars.ticketUrl,
+    test: opts?.test ?? false,
+  };
+}
+
+/** Send a sample notification for a rule (logged like production sends). */
+export async function testAutomationRule(
+  ruleId: string,
+  overrides?: { customerEmail?: string; customerPhone?: string },
+): Promise<AutomationLog | null> {
+  const store = useAutomationStore.getState();
+  const rule = store.rules.find((r) => r.id === ruleId);
+  if (!rule) return null;
+
+  const endpoint = store.endpoints.find((e) => e.channel === rule.channel);
+  if (!endpoint) return null;
+
+  const payload = buildPayloadFromRule(rule, { ...overrides, test: true });
+  return sendAutomationRequest(endpoint, payload);
+}
+
+/** Send test using the first rule for a channel, or a minimal default template. */
+export async function testAutomationChannel(
+  channel: AutomationEndpoint["channel"],
+  overrides?: { customerEmail?: string; customerPhone?: string },
+): Promise<AutomationLog | null> {
+  const store = useAutomationStore.getState();
+  const rule =
+    store.rules.find((r) => r.channel === channel) ??
+    ({
+      id: "test-fallback",
+      name: `Test ${channel}`,
+      trigger: "ticket-created" as const,
+      channel,
+      isActive: true,
+      templateSubject: "Test notification — {{ticketNumber}}",
+      templateBody: "Hi {{customerName}}, this is a test from Buildesk automation ({{companyName}}).",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    } satisfies AutomationRule);
+
+  const endpoint = store.endpoints.find((e) => e.channel === channel);
+  if (!endpoint) return null;
+
+  const payload = buildPayloadFromRule(rule, { ...overrides, test: true });
+  return sendAutomationRequest(endpoint, payload);
+}
+
+export function notifyAutomationResult(log: AutomationLog, label: string) {
+  const channelLabel = log.channel === "email" ? "Email" : "WhatsApp";
+  if (log.status === "success") {
+    toast.success(`${label} — ${channelLabel} sent`, {
+      description: log.responseSummary ?? "Webhook accepted the test payload",
+      duration: 4500,
+    });
+  } else {
+    toast.warning(`${label} — ${channelLabel} failed`, {
+      description: log.errorMessage ?? "See Automation logs to retry",
+      duration: 5500,
+    });
+  }
 }

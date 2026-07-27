@@ -77,6 +77,8 @@ export type AutomationPayload = {
   status: TicketStatus;
   message: string;
   ticketUrl?: string;
+  /** Set when sent from Automation → Test (not a real ticket event). */
+  test?: boolean;
 };
 
 export const AUTOMATION_TRIGGERS: { value: AutomationTrigger; label: string }[] = [

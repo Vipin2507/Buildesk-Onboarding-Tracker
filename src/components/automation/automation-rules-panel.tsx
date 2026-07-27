@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { Mail, MessageCircle, Pencil, Plus, Trash2 } from "lucide-react";
+import { Mail, MessageCircle, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ConfirmDeleteDialog } from "@/components/entity-form-modal";
@@ -29,6 +29,7 @@ import {
   renderAutomationTemplate,
 } from "@/services/automationTemplate";
 import { useAutomationStore } from "@/stores/useAutomationStore";
+import { notifyAutomationResult, testAutomationRule } from "@/services/automation";
 import { formatRelativeTime } from "@/types/common";
 
 const TRIGGER_LABEL = Object.fromEntries(AUTOMATION_TRIGGERS.map((t) => [t.value, t.label])) as Record<
@@ -45,6 +46,7 @@ export function AutomationRulesPanel() {
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [testingRuleId, setTestingRuleId] = useState<string | null>(null);
   const [editing, setEditing] = useState<AutomationRule | null>(null);
   const [form, setForm] = useState({
     name: "",
@@ -88,6 +90,20 @@ export function AutomationRulesPanel() {
 
   function insertVariable(variable: string) {
     setForm((f) => ({ ...f, templateBody: `${f.templateBody}${variable}` }));
+  }
+
+  async function runRuleTest(rule: AutomationRule) {
+    setTestingRuleId(rule.id);
+    try {
+      const log = await testAutomationRule(rule.id);
+      if (!log) {
+        toast.error("Test failed — endpoint not found");
+        return;
+      }
+      notifyAutomationResult(log, rule.name);
+    } finally {
+      setTestingRuleId(null);
+    }
   }
 
   function saveRule() {
@@ -168,6 +184,15 @@ export function AutomationRulesPanel() {
         searchKeys={["name", "trigger", "channel"]}
         actions={(r) => (
           <>
+            <Button
+              size="icon"
+              variant="ghost"
+              title="Send test notification"
+              disabled={testingRuleId === r.id}
+              onClick={() => void runRuleTest(r)}
+            >
+              <Play className={testingRuleId === r.id ? "h-4 w-4 animate-pulse" : "h-4 w-4"} />
+            </Button>
             <Button size="icon" variant="ghost" onClick={() => openEdit(r)}>
               <Pencil className="h-4 w-4" />
             </Button>
@@ -246,9 +271,22 @@ export function AutomationRulesPanel() {
                 <Switch checked={form.isActive} onCheckedChange={(v) => setForm({ ...form, isActive: v })} size="sm" />
                 Active
               </label>
-              <Button onClick={saveRule} className="w-full bg-primary">
-                {editing ? "Save changes" : "Create rule"}
-              </Button>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button onClick={saveRule} className="flex-1 bg-primary">
+                  {editing ? "Save changes" : "Create rule"}
+                </Button>
+                {editing ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="gap-1.5"
+                    disabled={testingRuleId === editing.id}
+                    onClick={() => void runRuleTest(editing)}
+                  >
+                    <Play className="h-4 w-4" /> Test send
+                  </Button>
+                ) : null}
+              </div>
             </div>
             <motion.div
               initial={{ opacity: 0, x: 8 }}
