@@ -169,14 +169,18 @@ function assertPortalTicket(
   return { portal, ticket };
 }
 
-function insertPortalTicketNotification(db: ReturnType<typeof getDb>, ticket: DesignTicket) {
+function insertPortalTicketNotification(
+  db: ReturnType<typeof getDb>,
+  ticket: DesignTicket,
+  opts?: { title?: string; body?: string },
+) {
   const now = nowIso();
   db.insert(t.notifications)
     .values({
       id: newId(),
       userId: null,
-      title: `New client ticket ${ticket.ticketNumber}`,
-      body: ticket.subject,
+      title: opts?.title ?? `New client ticket ${ticket.ticketNumber}`,
+      body: opts?.body ?? ticket.subject,
       kind: "info",
       href: `/tickets/${ticket.id}`,
       readAt: null,
@@ -537,5 +541,10 @@ export const addPortalDesignTicketMessage = createServerFn({ method: "POST" })
       .where(eq(t.designTickets.id, data.ticketId))
       .run();
 
-    return loadTicket(db, data.ticketId)!;
+    const updated = loadTicket(db, data.ticketId)!;
+    insertPortalTicketNotification(db, updated, {
+      title: `Client reply on ${updated.ticketNumber}`,
+      body: data.message.trim().slice(0, 120),
+    });
+    return updated;
   });

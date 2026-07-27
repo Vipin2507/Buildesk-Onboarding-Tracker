@@ -23,6 +23,7 @@ type NotifyInput = {
 
 type NotificationState = {
   notifications: AppNotification[];
+  hydrateNotifications: (notifications: AppNotification[]) => void;
   push: (input: NotifyInput) => AppNotification | null;
   markRead: (id: string) => void;
   markAllRead: () => void;
@@ -38,6 +39,10 @@ function isGateOpen(gate: NotifyInput["gate"] = "ticket") {
 
 export const useNotificationStore = createStore<NotificationState>((set, get) => ({
   notifications: [],
+
+  hydrateNotifications: (notifications) => {
+    set({ notifications });
+  },
 
   push: (input) => {
     if (!isGateOpen(input.gate)) {

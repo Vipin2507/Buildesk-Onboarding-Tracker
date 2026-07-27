@@ -1,21 +1,21 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useMemo } from "react";
+import { motion } from "framer-motion";
 import { Plus } from "lucide-react";
 
-import { DataTable } from "@/components/data-table";
-import { EmptyState } from "@/components/empty-state";
-import {
-  DesignTicketPriorityChip,
-  DesignTicketStatusPill,
-} from "@/components/design-ticket/design-ticket-chips";
 import {
   DesignTicketInfoBanner,
   DesignTicketKpiGrid,
   DesignTicketPageHeader,
-  DesignTicketSection,
   PortalPageWrap,
+  ticketSectionVariants,
 } from "@/components/design-ticket/design-ticket-shared";
+import {
+  PortalActiveTicketsTable,
+  PortalSolvedTicketsTable,
+  PortalTicketTableCard,
+} from "@/components/design-ticket/portal-ticket-shared";
 import { Button } from "@/components/ui/button";
-import { formatDate } from "@/lib/utils";
 import { isDesignTicketActive, isDesignTicketSolved, useDesignTicketStats } from "@/stores/design-ticket-selectors";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
 import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
@@ -40,18 +40,69 @@ function PortalDashboard() {
   const current = companyTickets.filter((t) => isDesignTicketActive(t.status));
   const solved = companyTickets.filter((t) => isDesignTicketSolved(t.status));
 
-  const kpis = [
-    { id: "open", label: "Open", value: stats.open, tone: "text-info" },
-    { id: "in-progress", label: "In Progress", value: stats.inProgress, tone: "text-warning-foreground" },
-    { id: "solved", label: "Solved", value: stats.resolved, tone: "text-success" },
-    { id: "closed", label: "Closed", value: stats.closed, tone: "text-muted-foreground" },
-  ];
+  const pendingCount = stats.open + stats.inProgress;
+
+  const kpiCards = useMemo(
+    () => [
+      {
+        id: "pending",
+        label: "Pending",
+        value: pendingCount,
+        tone: "text-primary",
+        onClick: () =>
+          void navigate({
+            to: "/portal/$slug/tickets",
+            params: { slug },
+            search: { filter: "pending" },
+          }),
+      },
+      {
+        id: "open",
+        label: "Open",
+        value: stats.open,
+        tone: "text-info",
+        onClick: () =>
+          void navigate({
+            to: "/portal/$slug/tickets",
+            params: { slug },
+            search: { filter: "open" },
+          }),
+      },
+      {
+        id: "in-progress",
+        label: "In Progress",
+        value: stats.inProgress,
+        tone: "text-warning-foreground",
+        onClick: () =>
+          void navigate({
+            to: "/portal/$slug/tickets",
+            params: { slug },
+            search: { filter: "in-progress" },
+          }),
+      },
+      {
+        id: "solved",
+        label: "Solved",
+        value: stats.resolved + stats.closed,
+        tone: "text-success",
+        onClick: () => void navigate({ to: "/portal/$slug/solved", params: { slug } }),
+      },
+    ],
+    [navigate, slug, pendingCount, stats],
+  );
+
+  function openTicket(ticketId: string) {
+    void navigate({
+      to: "/portal/$slug/tickets/$ticketId",
+      params: { slug, ticketId },
+    });
+  }
 
   return (
     <PortalPageWrap>
       <DesignTicketPageHeader
         title="Dashboard"
-        subtitle={`Track design and support requests for ${access.companyName}.`}
+        subtitle={`Track requests and replies for ${access.companyName}.`}
         actions={
           <Button size="sm" className="gap-1.5" asChild>
             <Link to="/portal/$slug/create-ticket" params={{ slug }}>
@@ -62,84 +113,85 @@ function PortalDashboard() {
         }
       />
 
-      <div className="mb-6">
-        <DesignTicketKpiGrid items={kpis} columns={4} />
-      </div>
+      <motion.div
+        variants={ticketSectionVariants}
+        initial="hidden"
+        animate="show"
+        className="mb-6"
+      >
+        <DesignTicketKpiGrid items={kpiCards} columns={4} />
+      </motion.div>
 
-      <DesignTicketSection title="My Current Tickets" delay={0.08}>
+      <PortalTicketTableCard title="My Current Tickets" delay={0.06}>
         {current.length === 0 ? (
-          <EmptyState
-            title="No tickets yet — create your first ticket"
-            description="Submit a design or support request and track replies here in real time."
-            actionLabel="Create New Ticket"
-            href={`/portal/${slug}/create-ticket`}
-          />
+          <div className="p-4">
+            <EmptyPortalCurrent slug={slug} />
+          </div>
         ) : (
-          <DataTable
-            data={current}
-            getRowId={(r) => r.id}
-            hideSearch
+          <PortalActiveTicketsTable
+            rows={current}
+            slug={slug}
             pageSize={6}
-            onRowClick={(row) =>
-              void navigate({
-                to: "/portal/$slug/tickets/$ticketId",
-                params: { slug, ticketId: row.id },
-              })
-            }
-            columns={[
-              { key: "ticketNumber", header: "Ticket ID", render: (r) => r.ticketNumber },
-              { key: "subject", header: "Subject", render: (r) => r.subject },
-              { key: "status", header: "Status", render: (r) => <DesignTicketStatusPill status={r.status} /> },
-              { key: "priority", header: "Priority", render: (r) => <DesignTicketPriorityChip priority={r.priority} /> },
-              { key: "createdAt", header: "Created", render: (r) => formatDate(r.createdAt) },
-            ]}
+            onRowClick={(row) => openTicket(row.id)}
           />
         )}
-      </DesignTicketSection>
+      </PortalTicketTableCard>
 
-      <DesignTicketSection
-        title="Solved Tickets"
-        delay={0.14}
+      <PortalTicketTableCard
+        title="Recently Solved"
+        delay={0.1}
         action={
-          <Link
-            to="/portal/$slug/solved"
-            params={{ slug }}
-            className="text-xs font-medium text-primary hover:underline"
-          >
-            View all
-          </Link>
+          solved.length > 0 ? (
+            <Link
+              to="/portal/$slug/solved"
+              params={{ slug }}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              View all
+            </Link>
+          ) : null
         }
         className="mt-8"
       >
         {solved.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No solved tickets yet.</p>
+          <p className="p-4 text-sm text-muted-foreground">No solved tickets yet.</p>
         ) : (
-          <DataTable
-            data={solved.slice(0, 5)}
-            getRowId={(r) => r.id}
-            hideSearch
+          <PortalSolvedTicketsTable
+            rows={solved.slice(0, 5)}
+            slug={slug}
             pageSize={5}
-            onRowClick={(row) =>
-              void navigate({
-                to: "/portal/$slug/tickets/$ticketId",
-                params: { slug, ticketId: row.id },
-              })
-            }
-            columns={[
-              { key: "ticketNumber", header: "Ticket ID", render: (r) => r.ticketNumber },
-              { key: "subject", header: "Subject", render: (r) => r.subject },
-              { key: "resolvedAt", header: "Resolved", render: (r) => formatDate(r.resolvedAt ?? r.updatedAt) },
-              { key: "status", header: "Status", render: (r) => <DesignTicketStatusPill status={r.status} /> },
-            ]}
+            onRowClick={(row) => openTicket(row.id)}
           />
         )}
-      </DesignTicketSection>
+      </PortalTicketTableCard>
 
-      <div className="mt-8">
+      <motion.div
+        variants={ticketSectionVariants}
+        initial="hidden"
+        animate="show"
+        className="mt-8"
+      >
         <DesignTicketInfoBanner>
-          You can view the status, timeline and all replies from our team in real time.
+          Replies from our team appear in real time. Use live chat for quick questions.
         </DesignTicketInfoBanner>
-      </div>
+      </motion.div>
     </PortalPageWrap>
+  );
+}
+
+function EmptyPortalCurrent({ slug }: { slug: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-muted/20 px-6 py-12 text-center">
+      <h3 className="font-semibold">No open tickets yet</h3>
+      <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+        Submit a design or support request and track replies here.
+      </p>
+      <Button className="mt-4 gap-1.5" asChild>
+        <Link to="/portal/$slug/create-ticket" params={{ slug }}>
+          <Plus className="h-4 w-4" />
+          Create your first ticket
+        </Link>
+      </Button>
+    </div>
   );
 }

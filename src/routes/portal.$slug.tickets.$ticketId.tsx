@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { DesignTicketThread } from "@/components/design-ticket/design-ticket-thread";
 import { DesignTicketPriorityChip, DesignTicketStatusPill } from "@/components/design-ticket/design-ticket-chips";
+import { PortalTicketMetaAside } from "@/components/design-ticket/portal-ticket-shared";
 import {
   DesignTicketDetailSkeleton,
   PortalPageWrap,
@@ -15,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { EntityNotFound } from "@/components/empty-state";
 import { getPortalDesignTicket } from "@/lib/api";
+import { isDesignTicketSolved } from "@/stores/design-ticket-selectors";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
 import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
 
@@ -65,6 +67,10 @@ function PortalTicketDetail() {
     return <EntityNotFound entity="Ticket" listPath={`/portal/${slug}/tickets`} listLabel="My Tickets" />;
   }
 
+  const isClosed = ticket.status === "closed";
+  const backTo = isDesignTicketSolved(ticket.status) ? "/portal/$slug/solved" : "/portal/$slug/tickets";
+  const backLabel = isDesignTicketSolved(ticket.status) ? "Solved Tickets" : "My Tickets";
+
   return (
     <PortalPageWrap>
       <motion.div variants={ticketPageVariants} initial="hidden" animate="show" className="space-y-4">
@@ -73,10 +79,10 @@ function PortalTicketDetail() {
             variant="ghost"
             size="sm"
             className="-ml-2 gap-1.5 text-muted-foreground"
-            onClick={() => void navigate({ to: "/portal/$slug/tickets", params: { slug } })}
+            onClick={() => void navigate({ to: backTo, params: { slug } })}
           >
             <ArrowLeft className="h-4 w-4" />
-            My Tickets
+            {backLabel}
           </Button>
         </motion.div>
 
@@ -94,13 +100,20 @@ function PortalTicketDetail() {
           </div>
         </motion.header>
 
+        <motion.div variants={ticketSectionVariants}>
+          <PortalTicketMetaAside ticket={ticket} />
+        </motion.div>
+
         <motion.div variants={ticketSectionVariants} className="card-soft p-3 sm:p-4">
           <DesignTicketThread
             ticket={ticket}
             mode="client"
             contactName={access.contactName}
             reply={{
-              placeholder: "Reply to the Buildesk team…",
+              placeholder: isClosed
+                ? "This ticket is closed — create a new ticket for further requests."
+                : "Reply to the Buildesk team…",
+              disabled: isClosed,
               onSend: (message, attachments) => {
                 addMessage(
                   ticketId,
@@ -117,6 +130,18 @@ function PortalTicketDetail() {
             }}
           />
         </motion.div>
+
+        {isClosed ? (
+          <motion.p
+            variants={ticketSectionVariants}
+            className="text-center text-sm text-muted-foreground"
+          >
+            Need more help?{" "}
+            <Link to="/portal/$slug/create-ticket" params={{ slug }} className="text-primary hover:underline">
+              Create a new ticket
+            </Link>
+          </motion.p>
+        ) : null}
       </motion.div>
     </PortalPageWrap>
   );

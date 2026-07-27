@@ -1,86 +1,142 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useMemo } from "react";
+import { motion } from "framer-motion";
+import { Plus } from "lucide-react";
+import { z } from "zod";
 
-import { DataTable } from "@/components/data-table";
-import { EmptyState } from "@/components/empty-state";
 import {
-  DesignTicketPriorityChip,
-  DesignTicketStatusPill,
-} from "@/components/design-ticket/design-ticket-chips";
-import { DesignTicketPageHeader, PortalPageWrap } from "@/components/design-ticket/design-ticket-shared";
-import { formatDate } from "@/lib/utils";
-import { listPortalDesignTickets } from "@/lib/api";
+  DesignTicketKpiGrid,
+  DesignTicketPageHeader,
+  PortalPageWrap,
+  ticketSectionVariants,
+} from "@/components/design-ticket/design-ticket-shared";
+import {
+  matchesPortalTicketFilter,
+  PortalActiveTicketsTable,
+  PortalTicketListSkeleton,
+  PortalTicketTableCard,
+  portalTicketFilterLabel,
+  type PortalTicketFilter,
+} from "@/components/design-ticket/portal-ticket-shared";
+import { Button } from "@/components/ui/button";
 import { isDesignTicketActive } from "@/stores/design-ticket-selectors";
+import { useDesignTicketStats } from "@/stores/design-ticket-selectors";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
 import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
 
+const searchSchema = z.object({
+  filter: z.enum(["all", "pending", "open", "in-progress"]).optional(),
+});
+
 export const Route = createFileRoute("/portal/$slug/tickets")({
+  validateSearch: (search) => searchSchema.parse(search),
   component: PortalMyTickets,
 });
 
 function PortalMyTickets() {
   const { slug } = Route.useParams();
-  const navigate = useNavigate();
+  const navigate = useNavigate({ from: "/portal/$slug/tickets" });
+  const { filter: kpiFilter = "all" } = Route.useSearch();
   const access = useCompanyPortalStore((s) => s.getBySlug(slug));
   const tickets = useDesignTicketStore((s) => s.tickets);
-  const hydrateCompanyTickets = useDesignTicketStore((s) => s.hydrateCompanyTickets);
-  const [loading, setLoading] = useState(true);
+  const stats = useDesignTicketStats(access?.companyId);
+  const hydrated = useDesignTicketStore((s) =>
+    s.tickets.some((t) => t.companyId === access?.companyId),
+  );
 
-  useEffect(() => {
-    if (!access) return;
-    let cancelled = false;
-    setLoading(true);
-    void listPortalDesignTickets({ data: { slug } })
-      .then((rows) => {
-        if (!cancelled) hydrateCompanyTickets(access.companyId, rows);
-      })
-      .catch((err) => console.warn("[portal tickets]", err))
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [slug, access?.companyId, hydrateCompanyTickets]);
+  const setKpiFilter = (filter: PortalTicketFilter) => {
+    void navigate({ search: { filter }, replace: true });
+  };
 
   if (!access) return null;
 
-  const rows = tickets
+  const allActive = tickets
     .filter((t) => t.companyId === access.companyId && isDesignTicketActive(t.status))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+
+  const rows = useMemo(
+    () => allActive.filter((t) => matchesPortalTicketFilter(t.status, kpiFilter)),
+    [allActive, kpiFilter],
+  );
+
+  const pendingCount = stats.open + stats.inProgress;
+
+  const kpiCards = [
+    {
+      id: "all",
+      label: "All active",
+      value: allActive.length,
+      onClick: () => setKpiFilter("all"),
+      active: kpiFilter === "all",
+    },
+    {
+      id: "pending",
+      label: "Pending",
+      value: pendingCount,
+      tone: "text-primary",
+      onClick: () => setKpiFilter("pending"),
+      active: kpiFilter === "pending",
+    },
+    {
+      id: "open",
+      label: "Open",
+      value: stats.open,
+      tone: "text-info",
+      onClick: () => setKpiFilter("open"),
+      active: kpiFilter === "open",
+    },
+    {
+      id: "in-progress",
+      label: "In Progress",
+      value: stats.inProgress,
+      tone: "text-warning-foreground",
+      onClick: () => setKpiFilter("in-progress"),
+      active: kpiFilter === "in-progress",
+    },
+  ];
+
+  const loading = !hydrated && allActive.length === 0;
 
   return (
     <PortalPageWrap>
       <DesignTicketPageHeader
         title="My Tickets"
-        subtitle="Open and in-progress requests for your company."
+        subtitle="Open and in-progress requests — click a row to view the conversation."
+        actions={
+          <Button size="sm" className="gap-1.5" asChild>
+            <Link to="/portal/$slug/create-ticket" params={{ slug }}>
+              <Plus className="h-4 w-4" />
+              New ticket
+            </Link>
+          </Button>
+        }
       />
 
-      {loading ? (
-        <p className="text-sm text-muted-foreground">Loading your tickets…</p>
-      ) : rows.length === 0 ? (
-        <EmptyState title="No open tickets" description="Create a ticket to start a conversation with our team." />
-      ) : (
-        <DataTable
-          data={rows}
-          getRowId={(r) => r.id}
-          hideSearch
-          pageSize={10}
-          onRowClick={(row) =>
-            void navigate({
-              to: "/portal/$slug/tickets/$ticketId",
-              params: { slug, ticketId: row.id },
-            })
-          }
-          columns={[
-            { key: "ticketNumber", header: "Ticket ID", render: (r) => r.ticketNumber },
-            { key: "subject", header: "Subject", render: (r) => r.subject },
-            { key: "status", header: "Status", render: (r) => <DesignTicketStatusPill status={r.status} /> },
-            { key: "priority", header: "Priority", render: (r) => <DesignTicketPriorityChip priority={r.priority} /> },
-            { key: "createdAt", header: "Created", render: (r) => formatDate(r.createdAt) },
-          ]}
-        />
-      )}
+      <motion.div
+        variants={ticketSectionVariants}
+        initial="hidden"
+        animate="show"
+        className="mb-6"
+      >
+        <DesignTicketKpiGrid items={kpiCards} columns={4} />
+      </motion.div>
+
+      <PortalTicketTableCard title={portalTicketFilterLabel(kpiFilter)} delay={0.06}>
+        {loading ? (
+          <PortalTicketListSkeleton />
+        ) : (
+          <PortalActiveTicketsTable
+            rows={rows}
+            slug={slug}
+            onRowClick={(row) =>
+              void navigate({
+                to: "/portal/$slug/tickets/$ticketId",
+                params: { slug, ticketId: row.id },
+              })
+            }
+          />
+        )}
+      </PortalTicketTableCard>
     </PortalPageWrap>
   );
 }

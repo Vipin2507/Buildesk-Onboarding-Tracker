@@ -1,10 +1,17 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { motion } from "framer-motion";
+import { Plus } from "lucide-react";
 
-import { DataTable } from "@/components/data-table";
-import { EmptyState } from "@/components/empty-state";
-import { DesignTicketStatusPill } from "@/components/design-ticket/design-ticket-chips";
-import { DesignTicketPageHeader, PortalPageWrap } from "@/components/design-ticket/design-ticket-shared";
-import { formatDate } from "@/lib/utils";
+import {
+  DesignTicketPageHeader,
+  PortalPageWrap,
+  ticketSectionVariants,
+} from "@/components/design-ticket/design-ticket-shared";
+import {
+  PortalSolvedTicketsTable,
+  PortalTicketTableCard,
+} from "@/components/design-ticket/portal-ticket-shared";
+import { Button } from "@/components/ui/button";
 import { isDesignTicketSolved } from "@/stores/design-ticket-selectors";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
 import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
@@ -30,30 +37,29 @@ function PortalSolvedTickets() {
       <DesignTicketPageHeader
         title="Solved Tickets"
         subtitle="Resolved and closed requests from your company."
+        actions={
+          <Button size="sm" variant="outline" className="gap-1.5" asChild>
+            <Link to="/portal/$slug/tickets" params={{ slug }}>
+              View active tickets
+            </Link>
+          </Button>
+        }
       />
 
-      {rows.length === 0 ? (
-        <EmptyState title="No solved tickets yet" description="Resolved and closed tickets will appear here." />
-      ) : (
-        <DataTable
-          data={rows}
-          getRowId={(r) => r.id}
-          hideSearch
-          pageSize={10}
-          onRowClick={(row) =>
-            void navigate({
-              to: "/portal/$slug/tickets/$ticketId",
-              params: { slug, ticketId: row.id },
-            })
-          }
-          columns={[
-            { key: "ticketNumber", header: "Ticket ID", render: (r) => r.ticketNumber },
-            { key: "subject", header: "Subject", render: (r) => r.subject },
-            { key: "resolvedAt", header: "Resolved On", render: (r) => formatDate(r.resolvedAt ?? r.updatedAt) },
-            { key: "status", header: "Status", render: (r) => <DesignTicketStatusPill status={r.status} /> },
-          ]}
-        />
-      )}
+      <motion.div variants={ticketSectionVariants} initial="hidden" animate="show">
+        <PortalTicketTableCard>
+          <PortalSolvedTicketsTable
+            rows={rows}
+            slug={slug}
+            onRowClick={(row) =>
+              void navigate({
+                to: "/portal/$slug/tickets/$ticketId",
+                params: { slug, ticketId: row.id },
+              })
+            }
+          />
+        </PortalTicketTableCard>
+      </motion.div>
     </PortalPageWrap>
   );
 }

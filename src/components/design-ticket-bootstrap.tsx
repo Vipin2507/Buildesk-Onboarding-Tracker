@@ -1,17 +1,19 @@
 import { useEffect } from "react";
 
-import { ensureCompanyPortals, listDesignTickets } from "@/lib/api";
+import { ensureCompanyPortals, listDesignTickets, listNotifications } from "@/lib/api";
 import { useCompanyStore } from "@/stores/useCompanyStore";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
 import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
+import { useNotificationStore } from "@/stores/useNotificationStore";
 
-const POLL_MS = 20_000;
+const POLL_MS = 15_000;
 
-/** Keeps server-backed portal slugs and design tickets in sync for admins. */
+/** Keeps portal slugs, client tickets, and in-app notifications in sync for admins. */
 export function DesignTicketBootstrap() {
   const companies = useCompanyStore((s) => s.companies);
   const hydrateAccess = useCompanyPortalStore((s) => s.hydrateAccess);
   const hydrateTickets = useDesignTicketStore((s) => s.hydrateTickets);
+  const hydrateNotifications = useNotificationStore((s) => s.hydrateNotifications);
 
   useEffect(() => {
     if (companies.length === 0) return;
@@ -23,22 +25,27 @@ export function DesignTicketBootstrap() {
   useEffect(() => {
     let cancelled = false;
 
-    async function syncTickets() {
+    async function sync() {
       try {
-        const tickets = await listDesignTickets({ data: {} });
-        if (!cancelled) hydrateTickets(tickets);
+        const [tickets, notifications] = await Promise.all([
+          listDesignTickets({ data: {} }),
+          listNotifications({ data: { limit: 80 } }).catch(() => []),
+        ]);
+        if (cancelled) return;
+        hydrateTickets(tickets);
+        hydrateNotifications(notifications);
       } catch (e) {
         console.warn("[design tickets bootstrap]", e);
       }
     }
 
-    void syncTickets();
-    const timer = window.setInterval(() => void syncTickets(), POLL_MS);
+    void sync();
+    const timer = window.setInterval(() => void sync(), POLL_MS);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [hydrateTickets]);
+  }, [hydrateTickets, hydrateNotifications]);
 
   return null;
 }

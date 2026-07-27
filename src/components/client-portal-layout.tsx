@@ -184,7 +184,7 @@ export function ClientPortalLayout({ access }: { access: CompanyPortalAccess }) 
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-semibold">{access.companyName}</div>
             <div className="hidden text-xs text-muted-foreground sm:block">
-              Design & support tracking
+              Client ticket portal
             </div>
           </div>
           <div className="hidden items-center gap-2 text-sm sm:flex">
@@ -198,10 +198,10 @@ export function ClientPortalLayout({ access }: { access: CompanyPortalAccess }) 
         <AnimatePresence mode="wait">
           <motion.main
             key={pathname}
-            initial={{ opacity: 0, x: 8 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -6 }}
-            transition={{ duration: 0.28, ease: TICKET_EASE }}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.22, ease: TICKET_EASE }}
             className="flex-1 overflow-auto"
           >
             <Outlet />
