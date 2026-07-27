@@ -22,6 +22,7 @@ import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as ModulesRouteImport } from './routes/modules'
 import { Route as MasterRouteImport } from './routes/master'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as LiveChatRouteImport } from './routes/live-chat'
 import { Route as LaborRouteImport } from './routes/labor'
 import { Route as IntegrationsRouteImport } from './routes/integrations'
 import { Route as EmployeesRouteImport } from './routes/employees'
@@ -30,6 +31,7 @@ import { Route as DataMigrationRouteImport } from './routes/data-migration'
 import { Route as CustomerAppRouteImport } from './routes/customer-app'
 import { Route as CompaniesRouteImport } from './routes/companies'
 import { Route as ClientVisitsRouteImport } from './routes/client-visits'
+import { Route as AutomationRouteImport } from './routes/automation'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TicketsLinksRouteImport } from './routes/tickets.links'
 import { Route as TicketsTicketIdRouteImport } from './routes/tickets.$ticketId'
@@ -112,6 +114,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LiveChatRoute = LiveChatRouteImport.update({
+  id: '/live-chat',
+  path: '/live-chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LaborRoute = LaborRouteImport.update({
   id: '/labor',
   path: '/labor',
@@ -150,6 +157,11 @@ const CompaniesRoute = CompaniesRouteImport.update({
 const ClientVisitsRoute = ClientVisitsRouteImport.update({
   id: '/client-visits',
   path: '/client-visits',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AutomationRoute = AutomationRouteImport.update({
+  id: '/automation',
+  path: '/automation',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -238,6 +250,7 @@ const CompaniesCompanyIdModulesPostSalesProjectsProjectIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/automation': typeof AutomationRoute
   '/client-visits': typeof ClientVisitsRoute
   '/companies': typeof CompaniesRouteWithChildren
   '/customer-app': typeof CustomerAppRoute
@@ -246,6 +259,7 @@ export interface FileRoutesByFullPath {
   '/employees': typeof EmployeesRoute
   '/integrations': typeof IntegrationsRoute
   '/labor': typeof LaborRoute
+  '/live-chat': typeof LiveChatRoute
   '/login': typeof LoginRoute
   '/master': typeof MasterRoute
   '/modules': typeof ModulesRoute
@@ -277,6 +291,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/automation': typeof AutomationRoute
   '/client-visits': typeof ClientVisitsRoute
   '/companies': typeof CompaniesRouteWithChildren
   '/customer-app': typeof CustomerAppRoute
@@ -285,6 +300,7 @@ export interface FileRoutesByTo {
   '/employees': typeof EmployeesRoute
   '/integrations': typeof IntegrationsRoute
   '/labor': typeof LaborRoute
+  '/live-chat': typeof LiveChatRoute
   '/login': typeof LoginRoute
   '/master': typeof MasterRoute
   '/modules': typeof ModulesRoute
@@ -316,6 +332,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/automation': typeof AutomationRoute
   '/client-visits': typeof ClientVisitsRoute
   '/companies': typeof CompaniesRouteWithChildren
   '/customer-app': typeof CustomerAppRoute
@@ -324,6 +341,7 @@ export interface FileRoutesById {
   '/employees': typeof EmployeesRoute
   '/integrations': typeof IntegrationsRoute
   '/labor': typeof LaborRoute
+  '/live-chat': typeof LiveChatRoute
   '/login': typeof LoginRoute
   '/master': typeof MasterRoute
   '/modules': typeof ModulesRoute
@@ -357,6 +375,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/automation'
     | '/client-visits'
     | '/companies'
     | '/customer-app'
@@ -365,6 +384,7 @@ export interface FileRouteTypes {
     | '/employees'
     | '/integrations'
     | '/labor'
+    | '/live-chat'
     | '/login'
     | '/master'
     | '/modules'
@@ -396,6 +416,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/automation'
     | '/client-visits'
     | '/companies'
     | '/customer-app'
@@ -404,6 +425,7 @@ export interface FileRouteTypes {
     | '/employees'
     | '/integrations'
     | '/labor'
+    | '/live-chat'
     | '/login'
     | '/master'
     | '/modules'
@@ -434,6 +456,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/automation'
     | '/client-visits'
     | '/companies'
     | '/customer-app'
@@ -442,6 +465,7 @@ export interface FileRouteTypes {
     | '/employees'
     | '/integrations'
     | '/labor'
+    | '/live-chat'
     | '/login'
     | '/master'
     | '/modules'
@@ -474,6 +498,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AutomationRoute: typeof AutomationRoute
   ClientVisitsRoute: typeof ClientVisitsRoute
   CompaniesRoute: typeof CompaniesRouteWithChildren
   CustomerAppRoute: typeof CustomerAppRoute
@@ -482,6 +507,7 @@ export interface RootRouteChildren {
   EmployeesRoute: typeof EmployeesRoute
   IntegrationsRoute: typeof IntegrationsRoute
   LaborRoute: typeof LaborRoute
+  LiveChatRoute: typeof LiveChatRoute
   LoginRoute: typeof LoginRoute
   MasterRoute: typeof MasterRoute
   ModulesRoute: typeof ModulesRoute
@@ -591,6 +617,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/live-chat': {
+      id: '/live-chat'
+      path: '/live-chat'
+      fullPath: '/live-chat'
+      preLoaderRoute: typeof LiveChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/labor': {
       id: '/labor'
       path: '/labor'
@@ -645,6 +678,13 @@ declare module '@tanstack/react-router' {
       path: '/client-visits'
       fullPath: '/client-visits'
       preLoaderRoute: typeof ClientVisitsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/automation': {
+      id: '/automation'
+      path: '/automation'
+      fullPath: '/automation'
+      preLoaderRoute: typeof AutomationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -860,6 +900,7 @@ const PortalSlugRouteWithChildren = PortalSlugRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AutomationRoute: AutomationRoute,
   ClientVisitsRoute: ClientVisitsRoute,
   CompaniesRoute: CompaniesRouteWithChildren,
   CustomerAppRoute: CustomerAppRoute,
@@ -868,6 +909,7 @@ const rootRouteChildren: RootRouteChildren = {
   EmployeesRoute: EmployeesRoute,
   IntegrationsRoute: IntegrationsRoute,
   LaborRoute: LaborRoute,
+  LiveChatRoute: LiveChatRoute,
   LoginRoute: LoginRoute,
   MasterRoute: MasterRoute,
   ModulesRoute: ModulesRoute,

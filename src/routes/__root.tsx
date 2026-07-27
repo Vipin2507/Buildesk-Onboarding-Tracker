@@ -18,6 +18,7 @@ import { StoreHydrationGate } from "@/components/store-hydration-gate";
 import { AuthGate } from "@/components/auth-gate";
 import { ServerDataBootstrap } from "@/components/server-data-bootstrap";
 import { DesignTicketBootstrap } from "@/components/design-ticket-bootstrap";
+import { ChatNotificationListener } from "@/components/chat/chat-notification-listener";
 import { ThemeProvider, useTheme } from "@/components/theme-provider";
 import { RouterDebug } from "@/components/router-debug";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
@@ -155,6 +156,7 @@ function RootComponent() {
               ) : (
                 <ServerDataBootstrap>
                   <DesignTicketBootstrap />
+                  <ChatNotificationListener />
                   <div className="flex min-h-screen w-full bg-background text-foreground">
                     <AppSidebar />
                     <div className="flex min-w-0 flex-1 flex-col">

@@ -10,6 +10,10 @@ import {
   listTicketActivities as apiListActivities,
 } from "@/lib/api";
 import { serverSync } from "@/lib/sync";
+import {
+  dispatchAutomationTrigger,
+  isClosedTicketStatus,
+} from "@/services/automation";
 
 type TicketState = {
   tickets: Ticket[];
@@ -108,6 +112,7 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
         return saved;
       }),
     );
+    dispatchAutomationTrigger("ticket-created", ticket);
     return ticket;
   },
 
@@ -149,6 +154,24 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
         return saved;
       }),
     );
+    const updated = get().getById(id);
+    if (updated) {
+      if (updateRemark?.trim()) {
+        dispatchAutomationTrigger("ticket-reply-from-team", updated, {
+          replyMessage: updateRemark.trim(),
+        });
+      } else if (data.status && prev && data.status !== prev.status) {
+        dispatchAutomationTrigger(
+          isClosedTicketStatus(data.status) ? "ticket-closed" : "ticket-updated",
+          updated,
+        );
+      } else if (data.status && !prev) {
+        dispatchAutomationTrigger(
+          isClosedTicketStatus(data.status) ? "ticket-closed" : "ticket-updated",
+          updated,
+        );
+      }
+    }
   },
 
   deleteTicket: (id) => {
@@ -175,6 +198,13 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
       ticketId: id,
     });
     serverSync("moveTicket", () => apiUpdate({ data: { id, patch: { status } } }));
+    const updated = get().getById(id);
+    if (updated) {
+      dispatchAutomationTrigger(
+        isClosedTicketStatus(status) ? "ticket-closed" : "ticket-updated",
+        updated,
+      );
+    }
   },
 
   getById: (id) => get().tickets.find((t) => t.id === id),

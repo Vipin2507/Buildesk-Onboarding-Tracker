@@ -30,6 +30,8 @@ export { useClientVisitStore } from "./useClientVisitStore";
 export { useCrmEventStore } from "./useCrmEventStore";
 export { useDesignTicketStore } from "./useDesignTicketStore";
 export { useCompanyPortalStore } from "./useCompanyPortalStore";
+export { useAutomationStore } from "./useAutomationStore";
+export { useChatStore } from "./useChatStore";
 export {
   useDesignTicketStats,
   useDesignTicketsForCompany,

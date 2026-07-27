@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/sheet";
 import { APP_NAV, filterNavItems, isNavActive } from "@/lib/nav";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useChatStore } from "@/stores/useChatStore";
 import { cn } from "@/lib/utils";
 
 const ease = [0.22, 1, 0.36, 1] as const;
@@ -24,6 +25,7 @@ export function MobileNavSheet({
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { isAdmin, can } = usePermissions();
   const navItems = filterNavItems(APP_NAV, { isAdmin, can });
+  const chatBadge = useChatStore((s) => s.getLiveChatBadgeCount());
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -79,6 +81,11 @@ export function MobileNavSheet({
                     )}
                     <Icon className="h-4 w-4 shrink-0" />
                     <span className="truncate">{item.label}</span>
+                    {item.to === "/live-chat" && chatBadge > 0 ? (
+                      <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground">
+                        {chatBadge > 9 ? "9+" : chatBadge}
+                      </span>
+                    ) : null}
                   </Link>
                 </motion.div>
               </div>

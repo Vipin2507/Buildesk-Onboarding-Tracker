@@ -5,6 +5,7 @@ import { Building, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { APP_NAV, filterNavItems, isNavActive } from "@/lib/nav";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useChatStore } from "@/stores/useChatStore";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "buildesk-sidebar-collapsed";
@@ -13,6 +14,7 @@ export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { isAdmin, can } = usePermissions();
   const navItems = filterNavItems(APP_NAV, { isAdmin, can });
+  const chatBadge = useChatStore((s) => s.getLiveChatBadgeCount());
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -123,6 +125,11 @@ export function AppSidebar() {
                   >
                     {item.label}
                   </span>
+                  {item.to === "/live-chat" && chatBadge > 0 ? (
+                    <span className="relative z-10 ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground">
+                      {chatBadge > 9 ? "9+" : chatBadge}
+                    </span>
+                  ) : null}
                 </Link>
               </div>
             );
