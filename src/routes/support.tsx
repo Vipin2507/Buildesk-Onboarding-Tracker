@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, useChildMatches, useNavigate } from "@tanstack/react-router";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
   Archive,
@@ -155,6 +155,7 @@ function SupportListPage() {
   const users = useActiveUsers();
   const { can, isAdmin } = usePermissions();
   const canManageTickets = isAdmin || can("manageTickets");
+  const [showClientTickets, setShowClientTickets] = useState(false);
 
   const [typeTab, setTypeTab] = useState<TypeTab>("list");
   const [modalOpen, setModalOpen] = useState(false);
@@ -826,7 +827,29 @@ function SupportListPage() {
         </>
       )}
 
-      <SupportClientTicketsSection />
+      <div className="mt-3">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-full gap-1.5"
+          onClick={() => setShowClientTickets((v) => !v)}
+        >
+          {showClientTickets ? "Hide" : "Show"} client tickets (Ticket Tracking)
+        </Button>
+        <AnimatePresence>
+          {showClientTickets ? (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <SupportClientTicketsSection />
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </div>
 
       <EntityFormModal
         open={modalOpen}
