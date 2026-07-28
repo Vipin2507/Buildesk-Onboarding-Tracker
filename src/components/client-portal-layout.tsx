@@ -1,4 +1,4 @@
-import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   LayoutDashboard,
@@ -7,14 +7,12 @@ import {
   CheckCircle2,
   Clock,
   UserRound,
-  LogOut,
   Building2,
   Menu,
 } from "lucide-react";
 import { useState } from "react";
 
 import { TICKET_EASE } from "@/components/design-ticket/design-ticket-shared";
-import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
@@ -120,7 +118,6 @@ function PortalNavLink({
 
 export function ClientPortalLayout({ access }: { access: CompanyPortalAccess }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const base = `/portal/${access.slug}`;
 
@@ -159,16 +156,6 @@ export function ClientPortalLayout({ access }: { access: CompanyPortalAccess }) 
             />
           ))}
         </nav>
-        <div className="border-t p-3">
-          <Button
-            variant="ghost"
-            className="w-full justify-start gap-2 text-muted-foreground"
-            onClick={() => void navigate({ to: "/login", search: { mode: "login" } })}
-          >
-            <LogOut className="h-4 w-4" />
-            Logout
-          </Button>
-        </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -242,19 +229,6 @@ export function ClientPortalLayout({ access }: { access: CompanyPortalAccess }) 
               />
             ))}
           </nav>
-          <div className="border-t p-3">
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-2"
-              onClick={() => {
-                setMenuOpen(false);
-                void navigate({ to: "/login", search: { mode: "login" } });
-              }}
-            >
-              <LogOut className="h-4 w-4" />
-              Logout
-            </Button>
-          </div>
         </SheetContent>
       </Sheet>
     </div>

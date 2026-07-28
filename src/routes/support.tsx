@@ -49,6 +49,7 @@ import {
   SupportKanbanOverlay,
   type EnrichedSupportTicket,
 } from "@/components/support/support-kanban";
+import { SupportClientTicketsSection } from "@/components/support/support-client-tickets";
 import {
   SupportTicketForm,
   type SupportTicketFormValues,
@@ -824,6 +825,8 @@ function SupportListPage() {
           </div>
         </>
       )}
+
+      <SupportClientTicketsSection />
 
       <EntityFormModal
         open={modalOpen}
