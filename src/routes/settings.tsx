@@ -18,7 +18,11 @@ import {
 import { toast } from "sonner";
 
 import { ConfirmDeleteDialog, EntityFormModal } from "@/components/entity-form-modal";
-import { PageHeader, PageWrap } from "@/components/page-header";
+import { AnimatedSection, PageWrap } from "@/components/page-header";
+import {
+  DesignTicketPageHeader,
+  TICKET_EASE,
+} from "@/components/design-ticket/design-ticket-shared";
 import { RolesPermissionsPanel } from "@/components/roles-permissions-panel";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useTheme } from "@/components/theme-provider";
@@ -29,6 +33,7 @@ import { useAuthStore, useSettingsStore, useUserStore } from "@/stores";
 import { createUser as apiCreateUser, setUserPassword as apiSetUserPassword, updateUser as apiUpdateUser } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { ThemeMode } from "@/lib/theme";
+import { motion } from "framer-motion";
 import {
   type DocumentSettings,
   type ExcelTemplateSetting,
@@ -130,30 +135,43 @@ function Settings() {
   }
 
   return (
-    <PageWrap>
-      <PageHeader title="Settings" subtitle="Configure the tracker to match your workflow." />
+    <PageWrap compact>
+      <DesignTicketPageHeader
+        compact
+        title="Settings"
+        subtitle="Configure the tracker to match your workflow."
+      />
       {!section ? (
-        <div className="grid gap-3 md:grid-cols-2">
-          {visibleSections.map((s) => (
-            <button
+        <div className="grid gap-2 md:grid-cols-2">
+          {visibleSections.map((s, i) => (
+            <motion.button
               key={s.id}
               type="button"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.28, delay: Math.min(i * 0.03, 0.2), ease: TICKET_EASE }}
+              whileHover={{ y: -1 }}
               onClick={() => openSection(s.id)}
-              className="card-soft flex gap-4 p-5 text-left transition-shadow hover:shadow-[var(--shadow-elevated)]"
+              className="card-soft flex gap-3 px-3 py-2.5 text-left transition-shadow hover:shadow-sm"
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <s.icon className="h-5 w-5" />
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <s.icon className="h-4 w-4" />
               </div>
-              <div>
-                <div className="font-semibold">{s.title}</div>
-                <div className="text-sm text-muted-foreground">{s.desc}</div>
+              <div className="min-w-0">
+                <div className="text-sm font-semibold">{s.title}</div>
+                <div className="text-[11px] text-muted-foreground">{s.desc}</div>
               </div>
-            </button>
+            </motion.button>
           ))}
         </div>
       ) : (
-        <div>
-          <Button variant="ghost" size="sm" className="mb-4" onClick={() => openSection(null)}>
+        <AnimatedSection>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="-ml-2 mb-2 gap-1.5 text-muted-foreground"
+            onClick={() => openSection(null)}
+          >
             ← Back to Settings
           </Button>
           {section === "appearance" && <AppearanceSection />}
@@ -166,7 +184,7 @@ function Settings() {
           {section === "users" && isAdmin && (
             <UsersSection initialInviteOpen={Boolean(search.invite)} />
           )}
-        </div>
+        </AnimatedSection>
       )}
     </PageWrap>
   );
@@ -182,23 +200,23 @@ function AppearanceSection() {
   ];
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       <SectionTitle
         title="Appearance"
-        subtitle="Theme applies across every screen, control, and chart — contrast is tuned for both modes."
+        subtitle="Theme applies across every screen, control, and chart."
       />
 
-      <div className="card-soft flex flex-wrap items-center justify-between gap-4 p-5">
+      <div className="card-soft flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
         <div>
-          <div className="text-sm font-semibold">Quick switch</div>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          <div className="text-xs font-semibold">Quick switch</div>
+          <p className="mt-0.5 text-[10px] text-muted-foreground">
             Currently {resolved} · preference: {mode}
           </p>
         </div>
         <ThemeToggle />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-2 sm:grid-cols-3">
         {options.map((opt) => {
           const active = mode === opt.id;
           return (
@@ -210,19 +228,19 @@ function AppearanceSection() {
                 setMode(opt.id, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
               }}
               className={cn(
-                "card-soft p-4 text-left transition-all",
+                "card-soft p-3 text-left transition-all",
                 active
-                  ? "ring-2 ring-primary/50 shadow-[var(--shadow-elevated)]"
+                  ? "ring-2 ring-primary/50 shadow-sm"
                   : "hover:border-primary/30",
               )}
             >
-              <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <opt.icon className="h-4 w-4" />
+              <div className="mb-2 flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <opt.icon className="h-3.5 w-3.5" />
               </div>
-              <div className="font-semibold">{opt.label}</div>
-              <p className="mt-1 text-xs text-muted-foreground">{opt.desc}</p>
+              <div className="text-sm font-semibold">{opt.label}</div>
+              <p className="mt-0.5 text-[10px] text-muted-foreground">{opt.desc}</p>
               {active && (
-                <span className="mt-3 inline-flex text-[10px] font-semibold uppercase tracking-wide text-primary">
+                <span className="mt-2 inline-flex text-[9px] font-semibold uppercase tracking-wide text-primary">
                   Active
                 </span>
               )}
@@ -236,9 +254,9 @@ function AppearanceSection() {
 
 function SectionTitle({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <div className="mb-4">
-      <h3 className="text-lg font-semibold">{title}</h3>
-      {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+    <div className="mb-2.5">
+      <h3 className="text-sm font-semibold">{title}</h3>
+      {subtitle && <p className="text-[11px] text-muted-foreground">{subtitle}</p>}
     </div>
   );
 }
@@ -283,7 +301,7 @@ function CompanySection() {
   }
 
   return (
-    <div className="card-soft p-5">
+    <div className="card-soft p-3">
       <SectionTitle title="Company Settings" subtitle="Organization identity used on documents and notifications." />
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Legal name">
@@ -348,7 +366,7 @@ function CompanySection() {
           <input className={FIELD} value={form.supportPhone} onChange={(e) => setForm({ ...form, supportPhone: e.target.value })} />
         </Field>
       </div>
-      <div className="mt-4 flex justify-end">
+      <div className="mt-3 flex justify-end">
         <Button onClick={save}>Save Company Settings</Button>
       </div>
     </div>
@@ -387,8 +405,8 @@ function NotificationsSection() {
   ];
 
   return (
-    <div className="space-y-4">
-      <div className="card-soft p-5">
+    <div className="space-y-3">
+      <div className="card-soft p-3">
         <SectionTitle title="SMTP Configuration" subtitle="Outbound mail used for digests and alerts (prototype — values are stored locally)." />
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="SMTP host">
@@ -419,7 +437,7 @@ function NotificationsSection() {
         </div>
       </div>
 
-      <div className="card-soft p-5">
+      <div className="card-soft p-3">
         <SectionTitle title="Digest & Quiet Hours" />
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Digest cadence">
@@ -443,7 +461,7 @@ function NotificationsSection() {
               onChange={(e) => setForm({ ...form, digestHour: Number(e.target.value) })}
             />
           </Field>
-          <div className="flex items-center justify-between rounded-lg border p-3 sm:col-span-2">
+          <div className="flex items-center justify-between rounded-lg border px-2.5 py-2 sm:col-span-2">
             <div>
               <div className="text-sm font-medium">Quiet hours</div>
               <div className="text-xs text-muted-foreground">Suppress non-critical emails overnight</div>
@@ -476,11 +494,11 @@ function NotificationsSection() {
         </div>
       </div>
 
-      <div className="card-soft p-5">
+      <div className="card-soft p-3">
         <SectionTitle title="Event Notifications" />
         <div className="space-y-2">
           {eventToggles.map((t) => (
-            <div key={t.key} className="flex items-center justify-between rounded-lg border p-3">
+            <div key={t.key} className="flex items-center justify-between rounded-lg border px-2.5 py-2">
               <div>
                 <div className="text-sm font-medium">{t.label}</div>
                 <div className="text-xs text-muted-foreground">{t.desc}</div>
@@ -492,7 +510,7 @@ function NotificationsSection() {
             </div>
           ))}
         </div>
-        <div className="mt-4 flex justify-end">
+        <div className="mt-3 flex justify-end">
           <Button onClick={save}>Save Notification Settings</Button>
         </div>
       </div>
@@ -523,7 +541,7 @@ function DocumentsSection() {
   }
 
   return (
-    <div className="card-soft p-5">
+    <div className="card-soft p-3">
       <SectionTitle title="Document Settings" subtitle="Defaults applied when generating letters, proposals, and agreements." />
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Default format">
@@ -554,14 +572,14 @@ function DocumentsSection() {
         <Field label="Footer text" className="sm:col-span-2">
           <input className={FIELD} value={form.footerText} onChange={(e) => setForm({ ...form, footerText: e.target.value })} />
         </Field>
-        <div className="flex items-center justify-between rounded-lg border p-3">
+        <div className="flex items-center justify-between rounded-lg border px-2.5 py-2">
           <div>
             <div className="text-sm font-medium">Include GST on documents</div>
             <div className="text-xs text-muted-foreground">Show GSTIN in letterheads</div>
           </div>
           <Switch checked={form.includeGstOnDocs} onCheckedChange={(v) => setForm({ ...form, includeGstOnDocs: v })} />
         </div>
-        <div className="flex items-center justify-between rounded-lg border p-3">
+        <div className="flex items-center justify-between rounded-lg border px-2.5 py-2">
           <div>
             <div className="text-sm font-medium">Auto-versioning</div>
             <div className="text-xs text-muted-foreground">Keep prior versions when regenerating</div>
@@ -569,7 +587,7 @@ function DocumentsSection() {
           <Switch checked={form.autoVersioning} onCheckedChange={(v) => setForm({ ...form, autoVersioning: v })} />
         </div>
       </div>
-      <div className="mt-4 flex justify-end">
+      <div className="mt-3 flex justify-end">
         <Button onClick={save}>Save Document Settings</Button>
       </div>
     </div>
@@ -627,19 +645,19 @@ function ExcelSection() {
 
   return (
     <div>
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="mb-2.5 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <SectionTitle title="Excel Templates" subtitle="Define import shapes and downloadable sample files." />
-        <Button className="w-full sm:w-auto" onClick={openCreate}>
-          <Plus className="mr-1 h-4 w-4" /> Add Template
+        <Button size="sm" className="h-8 w-full gap-1 text-xs sm:w-auto" onClick={openCreate}>
+          <Plus className="h-3.5 w-3.5" /> Add Template
         </Button>
       </div>
       <div className="card-soft overflow-hidden">
-        <div className="space-y-2.5 p-3 md:hidden">
+        <div className="space-y-1.5 p-2.5 md:hidden">
           {templates.map((t) => (
-            <div key={t.id} className="rounded-xl border border-border bg-card p-3.5">
-              <div className="font-medium">{t.name}</div>
-              <div className="text-xs text-muted-foreground">{t.sampleFileName}</div>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+            <div key={t.id} className="rounded-lg border border-border bg-card p-2.5">
+              <div className="text-sm font-medium">{t.name}</div>
+              <div className="text-[10px] text-muted-foreground">{t.sampleFileName}</div>
+              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
                 <span className="capitalize text-muted-foreground">{t.purpose}</span>
                 <Switch
                   size="sm"
@@ -647,71 +665,73 @@ function ExcelSection() {
                   onCheckedChange={(v) => updateExcelTemplate(t.id, { enabled: v })}
                 />
               </div>
-              <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{t.requiredColumns}</p>
-              <div className="mt-2 flex justify-end gap-1 border-t border-border/60 pt-2">
-                <Button size="icon" variant="ghost" title="Download sample" onClick={() => downloadSample(t)}>
-                  <Download className="h-4 w-4" />
+              <p className="mt-1.5 line-clamp-2 text-[10px] text-muted-foreground">{t.requiredColumns}</p>
+              <div className="mt-1.5 flex justify-end gap-0.5 border-t border-border/60 pt-1.5">
+                <Button size="icon" variant="ghost" className="h-7 w-7" title="Download sample" onClick={() => downloadSample(t)}>
+                  <Download className="h-3.5 w-3.5" />
                 </Button>
-                <Button size="icon" variant="ghost" onClick={() => openEdit(t)}>
-                  <Pencil className="h-4 w-4" />
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(t)}>
+                  <Pencil className="h-3.5 w-3.5" />
                 </Button>
                 <Button
                   size="icon"
                   variant="ghost"
+                  className="h-7 w-7"
                   onClick={() => {
                     setEditing(t);
                     setDeleteOpen(true);
                   }}
                 >
-                  <Trash2 className="h-4 w-4 text-destructive" />
+                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
                 </Button>
               </div>
             </div>
           ))}
         </div>
         <div className="hidden overflow-x-auto md:block">
-        <table className="w-full min-w-[560px] text-sm">
-          <thead className="bg-muted/60 text-xs text-muted-foreground">
+        <table className="w-full min-w-[560px] text-xs">
+          <thead className="bg-muted/60 text-[10px] uppercase tracking-wide text-muted-foreground">
             <tr>
-              <th className="px-4 py-2 text-left">Name</th>
-              <th className="px-4 py-2 text-left">Purpose</th>
-              <th className="px-4 py-2 text-left">Columns</th>
-              <th className="px-4 py-2 text-left">Status</th>
-              <th className="px-4 py-2 text-right">Actions</th>
+              <th className="px-3 py-1.5 text-left">Name</th>
+              <th className="px-3 py-1.5 text-left">Purpose</th>
+              <th className="px-3 py-1.5 text-left">Columns</th>
+              <th className="px-3 py-1.5 text-left">Status</th>
+              <th className="px-3 py-1.5 text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
             {templates.map((t) => (
               <tr key={t.id} className="border-t">
-                <td className="px-4 py-3">
+                <td className="px-3 py-2">
                   <div className="font-medium">{t.name}</div>
-                  <div className="text-xs text-muted-foreground">{t.sampleFileName}</div>
+                  <div className="text-[10px] text-muted-foreground">{t.sampleFileName}</div>
                 </td>
-                <td className="px-4 py-3 capitalize">{t.purpose}</td>
-                <td className="max-w-[240px] truncate px-4 py-3 text-muted-foreground">{t.requiredColumns}</td>
-                <td className="px-4 py-3">
+                <td className="px-3 py-2 capitalize">{t.purpose}</td>
+                <td className="max-w-[240px] truncate px-3 py-2 text-muted-foreground">{t.requiredColumns}</td>
+                <td className="px-3 py-2">
                   <Switch
                     size="sm"
                     checked={t.enabled}
                     onCheckedChange={(v) => updateExcelTemplate(t.id, { enabled: v })}
                   />
                 </td>
-                <td className="px-4 py-3 text-right">
-                  <Button size="icon" variant="ghost" title="Download sample" onClick={() => downloadSample(t)}>
-                    <Download className="h-4 w-4" />
+                <td className="px-3 py-2 text-right">
+                  <Button size="icon" variant="ghost" className="h-7 w-7" title="Download sample" onClick={() => downloadSample(t)}>
+                    <Download className="h-3.5 w-3.5" />
                   </Button>
-                  <Button size="icon" variant="ghost" onClick={() => openEdit(t)}>
-                    <Pencil className="h-4 w-4" />
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(t)}>
+                    <Pencil className="h-3.5 w-3.5" />
                   </Button>
                   <Button
                     size="icon"
                     variant="ghost"
+                    className="h-7 w-7"
                     onClick={() => {
                       setEditing(t);
                       setDeleteOpen(true);
                     }}
                   >
-                    <Trash2 className="h-4 w-4 text-destructive" />
+                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
                   </Button>
                 </td>
               </tr>
@@ -834,38 +854,39 @@ function PaymentsSection() {
 
   return (
     <div>
-      <div className="mb-4 flex items-start justify-between gap-3">
+      <div className="mb-2.5 flex flex-wrap items-start justify-between gap-2">
         <SectionTitle title="Payment Plan Settings" subtitle="Presets available when configuring company billing." />
-        <Button onClick={openCreate}>
-          <Plus className="mr-1 h-4 w-4" /> Add Plan
+        <Button size="sm" className="h-8 gap-1 text-xs" onClick={openCreate}>
+          <Plus className="h-3.5 w-3.5" /> Add Plan
         </Button>
       </div>
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-2 md:grid-cols-2">
         {plans.map((p) => (
-          <div key={p.id} className="card-soft p-4">
-            <div className="mb-2 flex items-start justify-between gap-2">
+          <div key={p.id} className="card-soft p-3">
+            <div className="mb-1.5 flex items-start justify-between gap-2">
               <div>
-                <div className="font-semibold">{p.name}</div>
-                <div className="text-xs text-muted-foreground">
+                <div className="text-sm font-semibold">{p.name}</div>
+                <div className="text-[10px] text-muted-foreground">
                   {p.installments} installments · {p.frequency} · {p.downPaymentPercent}% down
                 </div>
               </div>
               <Switch size="sm" checked={p.enabled} onCheckedChange={(v) => updatePaymentPlan(p.id, { enabled: v })} />
             </div>
-            {p.notes && <p className="mb-3 text-sm text-muted-foreground">{p.notes}</p>}
-            <div className="flex justify-end gap-1">
-              <Button size="icon" variant="ghost" onClick={() => openEdit(p)}>
-                <Pencil className="h-4 w-4" />
+            {p.notes && <p className="mb-2 text-xs text-muted-foreground">{p.notes}</p>}
+            <div className="flex justify-end gap-0.5">
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(p)}>
+                <Pencil className="h-3.5 w-3.5" />
               </Button>
               <Button
                 size="icon"
                 variant="ghost"
+                className="h-7 w-7"
                 onClick={() => {
                   setEditing(p);
                   setDeleteOpen(true);
                 }}
               >
-                <Trash2 className="h-4 w-4 text-destructive" />
+                <Trash2 className="h-3.5 w-3.5 text-destructive" />
               </Button>
             </div>
           </div>
@@ -1025,50 +1046,50 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
 
   return (
     <div>
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="mb-2.5 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <SectionTitle
           title="User Management"
-          subtitle="Create login accounts with role, contact details, and access. Same form used from Invite user in the profile menu."
+          subtitle="Create login accounts with role, contact details, and access."
         />
         {isAdmin && (
-          <Button className="w-full sm:w-auto" onClick={openInvite}>
-            <Plus className="mr-1 h-4 w-4" /> Invite User
+          <Button size="sm" className="h-8 w-full gap-1 text-xs sm:w-auto" onClick={openInvite}>
+            <Plus className="h-3.5 w-3.5" /> Invite User
           </Button>
         )}
       </div>
       {!isAdmin && (
-        <p className="mb-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+        <p className="mb-2 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-[10px] text-muted-foreground">
           Viewing accounts only. Ask an Admin to invite or edit users.
         </p>
       )}
       <div className="card-soft overflow-hidden">
-        <div className="space-y-2.5 p-3 md:hidden">
+        <div className="space-y-1.5 p-2.5 md:hidden">
           {users.map((u) => (
-            <div key={u.id} className="rounded-xl border border-border bg-card p-3.5">
-              <div className="flex items-center gap-3">
+            <div key={u.id} className="rounded-lg border border-border bg-card p-2.5">
+              <div className="flex items-center gap-2.5">
                 {u.avatarUrl ? (
-                  <img src={u.avatarUrl} alt="" className="h-9 w-9 rounded-full object-cover" />
+                  <img src={u.avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover" />
                 ) : (
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-[10px] font-semibold text-primary">
                     {u.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <div className="font-medium">
+                  <div className="text-sm font-medium">
                     {u.name}
                     {u.id === currentUserId && (
-                      <span className="ml-2 text-xs font-normal text-muted-foreground">(you)</span>
+                      <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">(you)</span>
                     )}
                   </div>
-                  <div className="truncate text-xs text-muted-foreground">{u.email}</div>
+                  <div className="truncate text-[10px] text-muted-foreground">{u.email}</div>
                 </div>
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
                 <span>{roles.find((r) => r.key === u.role)?.name ?? u.role}</span>
                 {u.department ? <span className="text-muted-foreground">· {u.department}</span> : null}
                 <span
                   className={cn(
-                    "inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
+                    "inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium",
                     u.active
                       ? "bg-success/15 text-success border border-success/30"
                       : "bg-muted text-muted-foreground border border-border",
@@ -1078,10 +1099,11 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
                 </span>
               </div>
               {isAdmin ? (
-                <div className="mt-2 flex justify-end gap-1 border-t border-border/60 pt-2">
+                <div className="mt-1.5 flex justify-end gap-0.5 border-t border-border/60 pt-1.5">
                   <Button
                     size="icon"
                     variant="ghost"
+                    className="h-7 w-7"
                     onClick={() => {
                       setEditing(u);
                       resetPasswordFields();
@@ -1097,18 +1119,19 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
                       setModalOpen(true);
                     }}
                   >
-                    <Pencil className="h-4 w-4" />
+                    <Pencil className="h-3.5 w-3.5" />
                   </Button>
                   <Button
                     size="icon"
                     variant="ghost"
+                    className="h-7 w-7"
                     disabled={u.id === currentUserId}
                     onClick={() => {
                       setEditing(u);
                       setDeleteOpen(true);
                     }}
                   >
-                    <Trash2 className="h-4 w-4 text-destructive" />
+                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
                   </Button>
                 </div>
               ) : null}
@@ -1116,20 +1139,20 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
           ))}
         </div>
         <div className="hidden overflow-x-auto md:block">
-        <table className="w-full min-w-[560px] text-sm">
-          <thead className="bg-muted/60 text-xs text-muted-foreground">
+        <table className="w-full min-w-[560px] text-xs">
+          <thead className="bg-muted/60 text-[10px] uppercase tracking-wide text-muted-foreground">
             <tr>
-              <th className="px-4 py-2 text-left">User</th>
-              <th className="px-4 py-2 text-left">Role</th>
-              <th className="px-4 py-2 text-left">Department</th>
-              <th className="px-4 py-2 text-left">Status</th>
+              <th className="px-3 py-1.5 text-left">User</th>
+              <th className="px-3 py-1.5 text-left">Role</th>
+              <th className="px-3 py-1.5 text-left">Department</th>
+              <th className="px-3 py-1.5 text-left">Status</th>
               <th />
             </tr>
           </thead>
           <tbody>
             {users.map((u) => (
               <tr key={u.id} className="border-t">
-                <td className="px-4 py-3">
+                <td className="px-3 py-2">
                   <div className="flex items-center gap-3">
                     {u.avatarUrl ? (
                       <img src={u.avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover" />
@@ -1149,11 +1172,11 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-3 py-2">
                   {roles.find((r) => r.key === u.role)?.name ?? u.role}
                 </td>
-                <td className="px-4 py-3 text-muted-foreground">{u.department ?? "—"}</td>
-                <td className="px-4 py-3">
+                <td className="px-3 py-2 text-muted-foreground">{u.department ?? "—"}</td>
+                <td className="px-3 py-2">
                   <span
                     className={cn(
                       "inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
@@ -1165,7 +1188,7 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
                     {u.active ? "Active" : "Inactive"}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-right">
+                <td className="px-3 py-2 text-right">
                   {isAdmin && (
                     <>
                       <Button

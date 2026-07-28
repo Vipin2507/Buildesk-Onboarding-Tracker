@@ -119,33 +119,33 @@ export function RolesPermissionsPanel() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h3 className="text-lg font-semibold">Roles & Permissions</h3>
-          <p className="text-sm text-muted-foreground">
+          <h3 className="text-sm font-semibold">Roles & Permissions</h3>
+          <p className="text-[11px] text-muted-foreground">
             Create roles, assign capabilities, and control who sees Administration.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => {
+        <div className="flex flex-wrap gap-1.5">
+          <Button variant="outline" size="sm" className="h-8 gap-1 text-xs" onClick={() => {
             resetRoles();
             toast.success("Roles reset to defaults");
           }}>
-            <RotateCcw className="h-3.5 w-3.5" /> Reset defaults
+            <RotateCcw className="h-3.5 w-3.5" /> Reset
           </Button>
-          <Button size="sm" className="gap-1.5" onClick={openCreate}>
+          <Button size="sm" className="h-8 gap-1 text-xs" onClick={openCreate}>
             <Plus className="h-3.5 w-3.5" /> New role
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(220px,280px)_1fr]">
+      <div className="grid gap-2.5 lg:grid-cols-[minmax(200px,240px)_1fr]">
         <motion.div layout className="card-soft overflow-hidden">
-          <div className="border-b px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="border-b px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
             Roles ({roles.length})
           </div>
-          <ul className="max-h-[min(70vh,520px)] overflow-y-auto p-2">
+          <ul className="max-h-[min(70vh,520px)] overflow-y-auto p-1.5">
             {roles.map((role) => {
               const active = role.id === selected?.id;
               const enabled = countEnabledPermissions(role.permissions);
@@ -156,21 +156,21 @@ export function RolesPermissionsPanel() {
                     type="button"
                     onClick={() => setSelectedId(role.id)}
                     className={cn(
-                      "mb-1 flex w-full flex-col rounded-lg px-3 py-2.5 text-left transition-all",
+                      "mb-0.5 flex w-full flex-col rounded-md px-2.5 py-2 text-left transition-all",
                       active
                         ? "bg-primary/10 ring-1 ring-primary/30"
                         : "hover:bg-muted/60",
                     )}
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{role.name}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-medium">{role.name}</span>
                       {role.isSystem && (
-                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">
                           System
                         </span>
                       )}
                     </div>
-                    <div className="mt-0.5 text-[11px] text-muted-foreground">
+                    <div className="mt-0.5 text-[10px] text-muted-foreground">
                       {enabled} permissions · {assigned} user{assigned === 1 ? "" : "s"}
                     </div>
                   </button>
@@ -190,22 +190,22 @@ export function RolesPermissionsPanel() {
               transition={{ duration: 0.28, ease }}
               className="card-soft overflow-hidden"
             >
-              <div className="flex flex-wrap items-start justify-between gap-3 border-b p-5">
+              <div className="flex flex-wrap items-start justify-between gap-2 border-b px-3 py-2.5">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-base font-semibold">{selected.name}</h4>
+                  <div className="flex items-center gap-1.5">
+                    <h4 className="text-sm font-semibold">{selected.name}</h4>
                     {selected.isSystem && (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[10px] font-medium">
-                        <Lock className="h-3 w-3" /> System role
+                      <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-1.5 py-0.5 text-[9px] font-medium">
+                        <Lock className="h-2.5 w-2.5" /> System
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">
                     Key: <code className="rounded bg-muted px-1 py-0.5">{selected.key}</code>
                     {selected.description ? ` · ${selected.description}` : ""}
                   </p>
-                  <p className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground">
-                    <Users className="h-3.5 w-3.5" />
+                  <p className="mt-1 inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <Users className="h-3 w-3" />
                     {usersOnRole} user{usersOnRole === 1 ? "" : "s"} assigned
                   </p>
                 </div>
@@ -248,7 +248,7 @@ export function RolesPermissionsPanel() {
                 </div>
               </div>
 
-              <div className="space-y-4 p-5">
+              <div className="space-y-3 p-3">
                 {PERMISSION_GROUPS.map((group, gi) => (
                   <motion.div
                     key={group.id}
