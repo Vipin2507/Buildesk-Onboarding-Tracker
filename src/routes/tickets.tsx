@@ -70,6 +70,7 @@ import {
   useCurrentUser,
   useDesignTicketHighlights,
   useEmployeeStore,
+  useProjectStore,
   useUserStore,
 } from "@/stores";
 import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
@@ -111,6 +112,7 @@ function TicketsDashboard() {
   const bulkUpdatePriority = useDesignTicketStore((s) => s.bulkUpdatePriority);
   const highlights = useDesignTicketHighlights();
   const companies = useCompanyStore((s) => s.companies);
+  const projects = useProjectStore((s) => s.projects);
   const employees = useEmployeeStore((s) => s.employees);
   const users = useUserStore((s) => s.users);
   const portalAccess = useCompanyPortalStore((s) => s.access);
@@ -601,6 +603,7 @@ function TicketsDashboard() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         companies={companies}
+        projects={projects}
         actorName={actorName}
         onCreated={(id) => void navigate({ to: "/tickets/$ticketId", params: { ticketId: id } })}
       />

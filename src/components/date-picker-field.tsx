@@ -102,7 +102,13 @@ export function DatePickerField({
     return maxDate && maxDate > end ? endOfMonth(maxDate) : end;
   }, [yearsForward, maxDate]);
 
-  const defaultMonth = selected ?? minDate ?? maxDate ?? startMonth;
+  const defaultMonth = useMemo(() => {
+    if (selected) return selected;
+    const now = new Date();
+    if (minDate && now < minDate) return minDate;
+    if (maxDate && now > maxDate) return maxDate;
+    return now;
+  }, [selected, minDate, maxDate]);
 
   function commitTyped(raw: string) {
     const trimmed = raw.trim();

@@ -1,7 +1,10 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { DesignTicketSelect } from "@/components/design-ticket/design-ticket-fields";
+import {
+  DesignTicketSearchableSelect,
+  DesignTicketSelect,
+} from "@/components/design-ticket/design-ticket-fields";
 import {
   DesignTicketFormField,
   ticketFieldClass,
@@ -13,26 +16,52 @@ import type { DesignTicketPriority } from "@/types/design-ticket";
 import { DESIGN_TICKET_PRIORITY_LABEL } from "@/types/design-ticket";
 import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
 
+const NONE_PROJECT = "__none__";
+
 export function TicketCreateDialog({
   open,
   onOpenChange,
   companies,
+  projects = [],
   actorName,
   onCreated,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   companies: { id: string; name: string }[];
+  projects?: { id: string; name: string; companyId: string }[];
   actorName: string;
   onCreated?: (ticketId: string) => void;
 }) {
   const createTeamTicket = useDesignTicketStore((s) => s.createTeamTicket);
   const [companyId, setCompanyId] = useState(companies[0]?.id ?? "");
+  const [projectId, setProjectId] = useState("");
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<string>(DESIGN_TICKET_CATEGORIES[0]);
   const [priority, setPriority] = useState<DesignTicketPriority>("medium");
   const [saving, setSaving] = useState(false);
+
+  const companyProjects = useMemo(
+    () => projects.filter((p) => p.companyId === companyId),
+    [projects, companyId],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    const nextCompanyId = companies[0]?.id ?? "";
+    setCompanyId(nextCompanyId);
+    setProjectId("");
+    setSubject("");
+    setDescription("");
+    setCategory(DESIGN_TICKET_CATEGORIES[0]);
+    setPriority("medium");
+  }, [open, companies]);
+
+  function handleCompanyChange(nextCompanyId: string) {
+    setCompanyId(nextCompanyId);
+    setProjectId("");
+  }
 
   async function submit() {
     if (!companyId || !subject.trim() || !description.trim()) {
@@ -53,8 +82,6 @@ export function TicketCreateDialog({
       );
       toast.success(`Ticket ${ticket.ticketNumber} created`);
       onOpenChange(false);
-      setSubject("");
-      setDescription("");
       onCreated?.(ticket.id);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create ticket");
@@ -71,14 +98,34 @@ export function TicketCreateDialog({
       submitLabel={saving ? "Creating…" : "Create ticket"}
       onSubmit={() => void submit()}
     >
-      <div className="space-y-4">
-        <DesignTicketFormField label="Company">
-          <DesignTicketSelect
-            value={companyId}
-            onChange={setCompanyId}
-            options={companies.map((c) => ({ value: c.id, label: c.name }))}
-          />
-        </DesignTicketFormField>
+      <div className="grid gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <DesignTicketFormField label="Company">
+            <DesignTicketSearchableSelect
+              value={companyId}
+              placeholder="Search company..."
+              emptyLabel="No companies found"
+              options={companies.map((c) => ({ value: c.id, label: c.name }))}
+              onChange={handleCompanyChange}
+            />
+          </DesignTicketFormField>
+          <DesignTicketFormField label="Project (optional)">
+            <DesignTicketSearchableSelect
+              value={projectId || NONE_PROJECT}
+              placeholder="Search project..."
+              emptyLabel={
+                companyProjects.length ? "No projects found" : "No projects for this company"
+              }
+              options={[
+                { value: NONE_PROJECT, label: "No specific project" },
+                ...companyProjects.map((p) => ({ value: p.id, label: p.name })),
+              ]}
+              onChange={(v) => setProjectId(v === NONE_PROJECT ? "" : v)}
+              disabled={!companyId}
+            />
+          </DesignTicketFormField>
+        </div>
+
         <DesignTicketFormField label="Subject">
           <input
             value={subject}
@@ -87,22 +134,27 @@ export function TicketCreateDialog({
             placeholder="Brief summary"
           />
         </DesignTicketFormField>
-        <DesignTicketFormField label="Category">
-          <DesignTicketSelect
-            value={category}
-            onChange={setCategory}
-            options={DESIGN_TICKET_CATEGORIES.map((c) => ({ value: c, label: c }))}
-          />
-        </DesignTicketFormField>
-        <DesignTicketFormField label="Priority">
-          <DesignTicketSelect
-            value={priority}
-            onChange={(v) => setPriority(v as DesignTicketPriority)}
-            options={(
-              ["low", "medium", "high"] as const
-            ).map((p) => ({ value: p, label: DESIGN_TICKET_PRIORITY_LABEL[p] }))}
-          />
-        </DesignTicketFormField>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <DesignTicketFormField label="Category">
+            <DesignTicketSelect
+              value={category}
+              onChange={setCategory}
+              options={DESIGN_TICKET_CATEGORIES.map((c) => ({ value: c, label: c }))}
+            />
+          </DesignTicketFormField>
+          <DesignTicketFormField label="Priority">
+            <DesignTicketSelect
+              value={priority}
+              onChange={(v) => setPriority(v as DesignTicketPriority)}
+              options={(["low", "medium", "high"] as const).map((p) => ({
+                value: p,
+                label: DESIGN_TICKET_PRIORITY_LABEL[p],
+              }))}
+            />
+          </DesignTicketFormField>
+        </div>
+
         <DesignTicketFormField label="Description">
           <textarea
             value={description}

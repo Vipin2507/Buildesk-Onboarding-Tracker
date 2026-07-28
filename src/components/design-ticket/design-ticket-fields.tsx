@@ -1,6 +1,16 @@
 import type { ReactNode } from "react";
+import { Check, ChevronsUpDown } from "lucide-react";
 
 import { DatePickerField } from "@/components/date-picker-field";
+import { Button } from "@/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -105,6 +115,69 @@ export function DesignTicketFilterField({
       <DesignTicketFieldLabel compact={compact}>{label}</DesignTicketFieldLabel>
       {children}
     </div>
+  );
+}
+
+/** Searchable combobox for long company/project lists in ticket forms. */
+export function DesignTicketSearchableSelect({
+  value,
+  options,
+  onChange,
+  placeholder = "Search…",
+  emptyLabel = "No results found",
+  disabled,
+}: {
+  value: string;
+  options: DesignTicketSelectOption[];
+  onChange: (value: string) => void;
+  placeholder?: string;
+  emptyLabel?: string;
+  disabled?: boolean;
+}) {
+  const selected = options.find((option) => option.value === value);
+
+  return (
+    <Popover modal>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          disabled={disabled}
+          className={cn(
+            ticketFieldControl,
+            "w-full justify-between font-normal hover:bg-card dark:hover:bg-muted/40",
+            !selected && "text-muted-foreground",
+          )}
+        >
+          <span className="truncate">{selected?.label ?? placeholder}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command shouldFilter>
+          <CommandInput placeholder={placeholder} />
+          <CommandList>
+            <CommandEmpty>{emptyLabel}</CommandEmpty>
+            {options.map((option) => (
+              <CommandItem
+                key={option.value}
+                value={option.label}
+                onSelect={() => onChange(option.value)}
+              >
+                <Check
+                  className={cn(
+                    "mr-2 h-4 w-4",
+                    value === option.value ? "opacity-100 text-primary" : "opacity-0",
+                  )}
+                />
+                {option.label}
+              </CommandItem>
+            ))}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
 

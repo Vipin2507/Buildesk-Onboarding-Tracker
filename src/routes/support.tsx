@@ -112,7 +112,7 @@ const ticketSchema = z.object({
   priority: z.enum(["Critical", "High", "Medium", "Low"]),
   status: z.enum(TICKET_KANBAN_COLUMNS),
   companyId: z.string().min(1),
-  projectId: z.string().min(1, "Select a project"),
+  projectId: z.string(),
   developerId: z.string(),
   assignedUserId: z.string().optional(),
   backendAssigned: z.boolean(),
@@ -188,8 +188,6 @@ function SupportListPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const defaultCompanyId = companies[0]?.id ?? "";
-  const defaultProjectId =
-    projects.find((p) => p.companyId === defaultCompanyId)?.id ?? projects[0]?.id ?? "";
 
   const form = useForm<SupportTicketFormValues>({
     resolver: zodResolver(ticketSchema),
@@ -200,7 +198,7 @@ function SupportListPage() {
       priority: "Medium",
       status: "Open",
       companyId: defaultCompanyId,
-      projectId: defaultProjectId,
+      projectId: "",
       developerId: employees[0]?.id ?? "",
       assignedUserId: "",
       backendAssigned: false,
@@ -367,7 +365,6 @@ function SupportListPage() {
     }
     setEditing(null);
     const companyId = companies[0]?.id ?? "";
-    const projectId = projects.find((p) => p.companyId === companyId)?.id ?? "";
     form.reset({
       title: "",
       description: "",
@@ -375,7 +372,7 @@ function SupportListPage() {
       priority: "Medium",
       status: "Open",
       companyId,
-      projectId,
+      projectId: "",
       developerId: employees[0]?.id ?? "",
       assignedUserId: "",
       backendAssigned: false,
@@ -842,8 +839,8 @@ function SupportListPage() {
           employees={employees}
           users={users}
           onCompanyChange={(companyId) => {
-            const nextProject = projects.find((p) => p.companyId === companyId)?.id ?? "";
-            form.setValue("projectId", nextProject);
+            void companyId;
+            form.setValue("projectId", "", { shouldDirty: true });
           }}
         />
       </EntityFormModal>
