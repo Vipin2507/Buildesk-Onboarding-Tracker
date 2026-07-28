@@ -1,13 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState, type ReactNode } from "react";
-import { motion } from "framer-motion";
 import { ArrowLeft, History, MessageSquareText, Pencil, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 
-import { PageHeader, PageWrap } from "@/components/page-header";
+import { PageHeader, PageWrap, AnimatedSection } from "@/components/page-header";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { ConfirmDeleteDialog, EntityFormModal } from "@/components/entity-form-modal";
@@ -163,7 +162,7 @@ function TicketDetail() {
 
   return (
     <PageWrap>
-      <div className="mb-4">
+      <AnimatedSection className="mb-2">
         <Button
           variant="ghost"
           size="sm"
@@ -173,7 +172,7 @@ function TicketDetail() {
           <ArrowLeft className="h-4 w-4" />
           Support
         </Button>
-      </div>
+      </AnimatedSection>
 
       <PageHeader
         title={ticket.title}
@@ -206,24 +205,14 @@ function TicketDetail() {
         }
       />
 
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-        className="mb-4 flex flex-wrap items-center gap-2"
-      >
+      <AnimatedSection delay={0.04} className="mb-3 flex flex-wrap items-center gap-1.5">
         <Pill tone={ticket.type === "Bug" ? "danger" : "info"}>{ticket.type}</Pill>
         <Pill tone={ticket.priority === "Critical" ? "danger" : "warning"}>{ticket.priority}</Pill>
         <Pill tone="muted">{ticket.status}</Pill>
-      </motion.div>
+      </AnimatedSection>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
-        <motion.div
-          initial={{ opacity: 0, x: 12 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.05 }}
-          className="card-soft space-y-5 p-4 sm:p-5"
-        >
+      <div className="grid gap-3 lg:grid-cols-[1fr_260px]">
+        <AnimatedSection delay={0.06} className="card-soft space-y-4 p-3 sm:p-4">
           <div>
             <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Description
@@ -291,13 +280,11 @@ function TicketDetail() {
               </ol>
             )}
           </div>
-        </motion.div>
+        </AnimatedSection>
 
-        <motion.aside
-          initial={{ opacity: 0, x: 12 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
-          className="card-soft space-y-4 p-4 sm:p-5"
+        <AnimatedSection
+          delay={0.1}
+          className="card-soft space-y-3 p-3 sm:p-4 lg:sticky lg:top-20 lg:self-start"
         >
           <Meta
             label="Company"
@@ -352,7 +339,7 @@ function TicketDetail() {
             value={ticket.resolutionAt ? formatDate(ticket.resolutionAt) : "—"}
           />
           <Meta label="Updated" value={formatDate(ticket.updatedAt)} />
-        </motion.aside>
+        </AnimatedSection>
       </div>
 
       <EntityFormModal

@@ -40,7 +40,7 @@ export function DataTable<T>({
   actions,
   getRowId,
   selection,
-  density = "default",
+  density = "compact",
 }: {
   data: T[];
   columns: {

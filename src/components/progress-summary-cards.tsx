@@ -17,13 +17,13 @@ export function ProgressSummaryCards({
   className?: string;
 }) {
   return (
-    <div className={cn("mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6", className)}>
+    <div className={cn("mb-3 grid grid-cols-2 gap-1.5 md:grid-cols-3 xl:grid-cols-6", className)}>
       {cards.map((card) => (
-        <div key={card.id} className="card-soft p-3 sm:p-4">
-          <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        <div key={card.id} className="card-soft px-2.5 py-2 sm:px-3 sm:py-2.5">
+          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
             {card.label}
           </div>
-          <div className="mt-2 text-xl font-semibold tabular-nums sm:text-2xl">
+          <div className="mt-1 text-lg font-semibold tabular-nums sm:text-xl">
             <CountUp to={card.value} />
             {card.suffix ? <span className="text-base font-medium">{card.suffix}</span> : null}
           </div>

@@ -125,7 +125,7 @@ function InternalTicketDetail() {
     <PageWrap>
       <InternalTicketsNav />
 
-      <motion.div variants={ticketPageVariants} initial="hidden" animate="show" className="space-y-4">
+      <motion.div variants={ticketPageVariants} initial="hidden" animate="show" className="space-y-3">
         <motion.div variants={ticketSectionVariants}>
           <Button
             variant="ghost"
@@ -138,10 +138,10 @@ function InternalTicketDetail() {
           </Button>
         </motion.div>
 
-        <motion.header variants={ticketSectionVariants} className="space-y-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+        <motion.header variants={ticketSectionVariants} className="space-y-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
             <div className="min-w-0 flex-1">
-              <h1 className="text-xl font-semibold leading-snug tracking-tight sm:text-2xl">
+              <h1 className="text-lg font-semibold leading-snug tracking-tight sm:text-xl">
                 <span className="text-primary">{ticket.ticketNumber}</span>
                 <span className="text-muted-foreground"> — </span>
                 {ticket.subject}
@@ -171,7 +171,7 @@ function InternalTicketDetail() {
 
         <motion.div
           variants={ticketSectionVariants}
-          className="card-soft grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3"
+          className="card-soft grid gap-3 p-3 sm:grid-cols-2 lg:grid-cols-3"
         >
           <DesignTicketFilterField label="Status">
             <DesignTicketSelect
@@ -207,8 +207,8 @@ function InternalTicketDetail() {
           </DesignTicketFilterField>
         </motion.div>
 
-        <motion.div variants={ticketSectionVariants} className="grid gap-4 lg:grid-cols-[1fr_300px]">
-          <div className="card-soft min-h-0 p-3 sm:p-4">
+        <motion.div variants={ticketSectionVariants} className="grid gap-3 lg:grid-cols-[1fr_280px]">
+          <div className="card-soft min-h-0 p-3">
             <DesignTicketThread
               ticket={ticket}
               mode="internal"
@@ -227,7 +227,7 @@ function InternalTicketDetail() {
             />
           </div>
 
-          <aside className="card-soft space-y-4 p-4 text-sm lg:sticky lg:top-20 lg:self-start">
+          <aside className="card-soft space-y-3 p-3 text-sm lg:sticky lg:top-20 lg:self-start">
             <MetaRow label="Created by" value={`${ticket.createdBy.name} (${ticket.createdBy.type})`} />
             <MetaRow label="Created on" value={formatDate(ticket.createdAt)} />
             <MetaRow label="Category" value={ticket.category ?? "—"} />

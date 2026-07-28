@@ -167,6 +167,46 @@ export const syncChatSession = createServerFn({ method: "POST" })
 
 /* ---------- Portal (public, slug-scoped) ---------- */
 
+export const listPortalChatSessions = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) =>
+    z.object({ slug: z.string().min(1), visitorName: z.string().min(1) }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const db = getDb();
+    resolveActivePortal(db, data.slug);
+
+    const rows = db
+      .select()
+      .from(t.chatSessions)
+      .where(
+        and(
+          eq(t.chatSessions.portalSlug, data.slug),
+          eq(t.chatSessions.visitorName, data.visitorName),
+        ),
+      )
+      .orderBy(desc(t.chatSessions.updatedAt))
+      .all();
+
+    if (rows.length === 0) return [];
+
+    const sessionIds = rows.map((r) => r.id);
+    const allMessages = db
+      .select()
+      .from(t.chatMessages)
+      .orderBy(asc(t.chatMessages.createdAt))
+      .all()
+      .filter((m) => sessionIds.includes(m.sessionId));
+
+    const bySession = new Map<string, typeof t.chatMessages.$inferSelect[]>();
+    for (const msg of allMessages) {
+      const list = bySession.get(msg.sessionId) ?? [];
+      list.push(msg);
+      bySession.set(msg.sessionId, list);
+    }
+
+    return rows.map((row) => mapSession(row, bySession.get(row.id) ?? []));
+  });
+
 export const getPortalChatSession = createServerFn({ method: "GET" })
   .inputValidator((data: unknown) =>
     z.object({ slug: z.string().min(1), visitorName: z.string().min(1) }).parse(data),

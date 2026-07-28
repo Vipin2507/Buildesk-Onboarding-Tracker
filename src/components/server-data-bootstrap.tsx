@@ -217,7 +217,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           useDesignTicketStore.getState().hydrateTickets(designTickets);
         }
         if (chatSessions) {
-          useChatStore.getState().hydrateSessions(chatSessions);
+          useChatStore.getState().syncSessionsFromServer(chatSessions);
         }
         useVendorStore.setState({
           materials: vendors.materials,

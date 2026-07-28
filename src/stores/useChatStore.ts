@@ -24,6 +24,7 @@ type ChatState = {
   activeInternalSessionId: string | null;
   activePortalSessionId: string | null;
   hydrateSessions: (sessions: ChatSession[]) => void;
+  syncSessionsFromServer: (sessions: ChatSession[]) => void;
   mergeSession: (session: ChatSession) => void;
   setActiveInternalSession: (id: string | null) => void;
   setActivePortalSession: (id: string | null) => void;
@@ -94,6 +95,29 @@ export const useChatStore = createStore<ChatState>((set, get) => ({
   activePortalSessionId: null,
 
   hydrateSessions: (sessions) => set({ sessions }),
+
+  syncSessionsFromServer: (incoming) => {
+    set((s) => {
+      const next = new Map(s.sessions.map((x) => [x.id, x]));
+      for (const session of incoming) {
+        const prev = next.get(session.id);
+        if (!prev) {
+          next.set(session.id, session);
+          continue;
+        }
+        if (
+          session.updatedAt < prev.updatedAt &&
+          session.messages.length < prev.messages.length
+        ) {
+          continue;
+        }
+        next.set(session.id, session);
+      }
+      return {
+        sessions: [...next.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+      };
+    });
+  },
 
   mergeSession: (session) => {
     set((s) => {

@@ -158,6 +158,7 @@ export {
 export {
   listChatSessions,
   syncChatSession,
+  listPortalChatSessions,
   getPortalChatSession,
   createPortalChatSession,
   syncPortalChatSession,

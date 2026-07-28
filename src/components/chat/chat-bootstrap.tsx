@@ -7,7 +7,7 @@ const POLL_MS = 3_000;
 
 /** Keeps live chat sessions in sync for the internal support team. */
 export function ChatBootstrap() {
-  const hydrateSessions = useChatStore((s) => s.hydrateSessions);
+  const syncSessionsFromServer = useChatStore((s) => s.syncSessionsFromServer);
 
   useEffect(() => {
     let cancelled = false;
@@ -15,7 +15,7 @@ export function ChatBootstrap() {
     async function sync() {
       try {
         const sessions = await listChatSessions();
-        if (!cancelled) hydrateSessions(sessions);
+        if (!cancelled) syncSessionsFromServer(sessions);
       } catch (e) {
         console.warn("[chat bootstrap]", e);
       }
@@ -27,7 +27,7 @@ export function ChatBootstrap() {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [hydrateSessions]);
+  }, [syncSessionsFromServer]);
 
   return null;
 }
