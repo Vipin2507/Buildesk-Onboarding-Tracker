@@ -1,18 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { Copy } from "lucide-react";
+import { Copy, Link2, ShieldCheck, ShieldOff } from "lucide-react";
 import { toast } from "sonner";
 
 import {
+  DesignTicketKpiGrid,
   DesignTicketPageHeader,
+  DesignTicketSection,
+  DesignTicketInfoBanner,
   InternalTicketsNav,
-  TICKET_EASE,
+  ticketSectionVariants,
 } from "@/components/design-ticket/design-ticket-shared";
+import { DataTable } from "@/components/data-table";
 import { PageWrap } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { portalPublicCreateUrl } from "@/lib/design-ticket-portal";
-import { copyTextToClipboard, selectInputText } from "@/lib/copy-to-clipboard";
+import { copyTextToClipboard } from "@/lib/copy-to-clipboard";
 import { useCompanyPortalStore, useCompanyStore } from "@/stores";
 
 export const Route = createFileRoute("/tickets/links")({
@@ -26,84 +29,145 @@ function TicketLinksPage() {
 
   const rows = companies.map((c) => {
     const portal = access.find((a) => a.companyId === c.id);
-    return { company: c, portal };
+    return {
+      id: c.id,
+      companyName: c.name,
+      slug: portal?.slug ?? "",
+      url: portal ? portalPublicCreateUrl(portal.slug) : "—",
+      isActive: portal?.isActive ?? false,
+      hasPortal: Boolean(portal),
+    };
   });
 
-  async function copy(url: string, inputEl?: HTMLInputElement | null) {
+  async function copy(url: string) {
     const ok = await copyTextToClipboard(url);
     if (ok) {
       toast.success("Link copied");
       return;
     }
-    if (inputEl) selectInputText(inputEl);
-    toast.error("Auto-copy blocked — link selected, press Ctrl+C / Cmd+C");
+    toast.error("Auto-copy blocked. Please copy manually.");
   }
 
+  const total = rows.length;
+  const active = rows.filter((r) => r.isActive).length;
+  const inactive = rows.filter((r) => r.hasPortal && !r.isActive).length;
+  const missing = rows.filter((r) => !r.hasPortal).length;
+
   return (
-    <PageWrap>
+    <PageWrap compact>
       <DesignTicketPageHeader
+        compact
         title="Company Portal Links"
-        subtitle="Unique ticket creation links per company — share with clients to enable self-service."
+        subtitle="Share secure ticket links with clients and control portal access from one place."
       />
 
-      <InternalTicketsNav />
+      <InternalTicketsNav compact />
 
-      <div className="space-y-3">
-        {rows.map(({ company, portal }, i) => {
-          const url = portal ? portalPublicCreateUrl(portal.slug) : "—";
-          return (
-            <motion.div
-              key={company.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.32, delay: Math.min(i * 0.04, 0.2), ease: TICKET_EASE }}
-              className="card-soft flex flex-col gap-3 p-4 sm:flex-row sm:items-center"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="font-medium">{company.name}</div>
-                <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-                  <Input
-                    readOnly
-                    value={url}
-                    className="h-10 font-mono text-xs"
-                    onFocus={(e) => selectInputText(e.currentTarget)}
-                  />
-                  {portal ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="shrink-0 gap-1.5 sm:w-auto"
-                      onClick={(e) => {
-                        const input = e.currentTarget
-                          .closest(".card-soft")
-                          ?.querySelector("input");
-                        void copy(url, input instanceof HTMLInputElement ? input : null);
+      <div className="mb-3">
+        <DesignTicketKpiGrid
+          size="compact"
+          columns={4}
+          items={[
+            { id: "total", label: "Companies", value: total, icon: Link2 },
+            { id: "active", label: "Active links", value: active, tone: "text-success", icon: ShieldCheck },
+            { id: "inactive", label: "Inactive links", value: inactive, tone: "text-warning-foreground", icon: ShieldOff },
+            { id: "missing", label: "Not generated", value: missing, tone: "text-muted-foreground" },
+          ]}
+        />
+      </div>
+
+      <motion.div variants={ticketSectionVariants} initial="hidden" animate="show">
+        <DesignTicketSection title="Portal Access by Company" compact>
+          <div className="card-soft overflow-hidden p-0.5">
+            <DataTable
+              data={rows}
+              getRowId={(r) => r.id}
+              searchKeys={["companyName", "slug", "url"]}
+              pageSize={15}
+              density="compact"
+              columns={[
+                {
+                  key: "companyName",
+                  header: "Company",
+                  render: (r) => <span className="font-medium">{r.companyName}</span>,
+                  sortable: true,
+                },
+                {
+                  key: "slug",
+                  header: "Slug",
+                  render: (r) =>
+                    r.hasPortal ? (
+                      <code className="rounded bg-muted px-1.5 py-px text-[11px]">{r.slug}</code>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    ),
+                  sortable: true,
+                },
+                {
+                  key: "url",
+                  header: "Portal Link",
+                  render: (r) =>
+                    r.hasPortal ? (
+                      <span className="line-clamp-1 max-w-[360px] font-mono text-[11px]">{r.url}</span>
+                    ) : (
+                      <span className="text-muted-foreground">Not generated yet</span>
+                    ),
+                },
+                {
+                  key: "isActive",
+                  header: "Status",
+                  render: (r) =>
+                    r.hasPortal ? (
+                      <span
+                        className={`inline-flex rounded px-1.5 py-px text-[10px] font-medium ${
+                          r.isActive
+                            ? "bg-success/15 text-success"
+                            : "bg-warning/15 text-warning-foreground"
+                        }`}
+                      >
+                        {r.isActive ? "Active" : "Inactive"}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">Unavailable</span>
+                    ),
+                },
+              ]}
+              actions={(r) => (
+                <div className="flex items-center justify-end gap-1.5">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-xs"
+                    disabled={!r.hasPortal}
+                    onClick={() => void copy(r.url)}
+                  >
+                    <Copy className="mr-1 h-3 w-3" />
+                    Copy
+                  </Button>
+                  <label className="inline-flex h-7 items-center gap-1.5 rounded border px-2 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={r.isActive}
+                      disabled={!r.hasPortal}
+                      onChange={(e) => {
+                        setActive(r.id, e.target.checked);
+                        toast.success(e.target.checked ? "Portal activated" : "Portal deactivated");
                       }}
-                    >
-                      <Copy className="h-4 w-4" />
-                      Copy
-                    </Button>
-                  ) : null}
+                    />
+                    Active
+                  </label>
                 </div>
-              </div>
-              {portal ? (
-                <label className="flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={portal.isActive}
-                    onChange={(e) => {
-                      setActive(company.id, e.target.checked);
-                      toast.success(e.target.checked ? "Portal activated" : "Portal deactivated");
-                    }}
-                  />
-                  Active
-                </label>
-              ) : (
-                <span className="text-xs text-muted-foreground">Portal not generated yet</span>
               )}
-            </motion.div>
-          );
-        })}
+            />
+          </div>
+        </DesignTicketSection>
+      </motion.div>
+
+      <div className="mt-3">
+        <DesignTicketInfoBanner compact>
+          Changes are synced instantly in Ticket Tracking and client portal access checks.
+        </DesignTicketInfoBanner>
       </div>
     </PageWrap>
   );
