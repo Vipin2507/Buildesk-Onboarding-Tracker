@@ -5,7 +5,12 @@ import { Check, ArrowRight, Clock, ChevronRight, ArrowLeft, Rocket, Ban, Pencil,
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { PageHeader, PageWrap } from "@/components/page-header";
+import { AnimatedSection, PageWrap } from "@/components/page-header";
+import {
+  DesignTicketPageHeader,
+  DesignTicketTabNav,
+  TICKET_EASE,
+} from "@/components/design-ticket/design-ticket-shared";
 import { ProgressBar } from "@/components/progress-bar";
 import { ProjectDocumentsPanel } from "@/components/project-documents-panel";
 import { DatePickerField } from "@/components/date-picker-field";
@@ -256,93 +261,114 @@ function ProjectDetailPage() {
   }
 
   return (
-    <PageWrap>
-      <div className="mb-4">
-        <Button variant="ghost" size="sm" asChild>
+    <PageWrap compact>
+      <AnimatedSection className="mb-2">
+        <Button variant="ghost" size="sm" className="-ml-2 gap-1.5 text-muted-foreground" asChild>
           <Link
             to="/companies/$companyId"
             params={{ companyId: project.companyId }}
             search={{ tab: "Project" }}
           >
-            <ArrowLeft className="mr-1 h-4 w-4" /> Company
+            <ArrowLeft className="h-4 w-4" /> Company
           </Link>
         </Button>
-      </div>
+      </AnimatedSection>
 
-      <PageHeader
+      <DesignTicketPageHeader
+        compact
         title={project.name}
-        subtitle={`${company?.name ?? ""} · ${project.city}${project.pocName ? ` · POC ${project.pocName}` : ""}${project.startDate ? ` · Started ${formatDate(project.startDate)}` : ""} · Complete checklist phases to track onboarding`}
+        subtitle={`${company?.name ?? ""} · ${project.city}${project.pocName ? ` · POC ${project.pocName}` : ""}${project.startDate ? ` · Started ${formatDate(project.startDate)}` : ""}`}
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm text-muted-foreground">{progress}% complete</span>
-            <Button type="button" size="sm" variant="outline" className="gap-1.5" onClick={() => setEditOpen(true)}>
-              <Pencil className="h-4 w-4" /> Edit details
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs tabular-nums text-muted-foreground">{progress}%</span>
+            <Button type="button" size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={() => setEditOpen(true)}>
+              <Pencil className="h-3.5 w-3.5" /> Edit
             </Button>
             <Button
               type="button"
               size="sm"
-              className="gap-1.5 bg-primary hover:bg-primary/90"
+              className="h-8 gap-1 bg-primary text-xs"
               disabled={project.status === "completed" && progress === 100}
               onClick={handleCompleteProject}
             >
-              <CheckCheck className="h-4 w-4" /> Complete project
+              <CheckCheck className="h-3.5 w-3.5" /> Complete
             </Button>
             <Button
-              className={cn("gap-1.5 bg-primary", goLiveAnim && "animate-pulse ring-4 ring-success/40")}
+              size="sm"
+              className={cn("h-8 gap-1 bg-primary text-xs", goLiveAnim && "animate-pulse ring-4 ring-success/40")}
               disabled={!canGoLive || !!project.goLiveAt}
               onClick={handleGoLive}
             >
-              <Rocket className="h-4 w-4" /> {project.goLiveAt ? "Live" : "Go Live"}
+              <Rocket className="h-3.5 w-3.5" /> {project.goLiveAt ? "Live" : "Go Live"}
             </Button>
           </div>
         }
       />
 
-      <div className="mb-4">
-        <ProgressBar value={progress} className="h-2" />
-      </div>
+      <AnimatedSection delay={0.04} className="mb-3">
+        <ProgressBar value={progress} className="h-1.5" />
+      </AnimatedSection>
 
-      <div className="card-soft mb-6 -mx-1 flex gap-1 overflow-x-auto px-1 py-1 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:flex-wrap md:overflow-visible">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => navigate({ search: { tab: t.key } })}
-            className={cn(
-              "min-h-10 shrink-0 rounded-md px-3 py-2 text-xs font-medium md:py-1.5",
-              tab === t.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
-            )}
-          >{t.label}</button>
-        ))}
-      </div>
+      <DesignTicketTabNav
+        compact
+        tabs={TABS.map((t) => ({ id: t.key, label: t.label }))}
+        activeId={tab}
+        onChange={(id) => void navigate({ search: { tab: id as typeof tab } })}
+      />
 
       {tab === "onboarding" && (
-        <>
-          <div className="card-soft mb-6 p-5">
-            <div className="mb-4 flex items-center justify-between">
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, ease: TICKET_EASE }}
+        >
+          <div className="card-soft mb-3 p-3">
+            <div className="mb-2.5 flex items-center justify-between gap-2">
               <div>
-                <div className="text-xs text-muted-foreground">Current Step</div>
-                <div className="font-semibold">{ONBOARDING_STEPS[currentStep]}</div>
+                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Current step
+                </div>
+                <div className="text-sm font-semibold">{ONBOARDING_STEPS[currentStep]}</div>
               </div>
-              <div className="text-xs text-muted-foreground">Step {currentStep + 1} of {ONBOARDING_STEPS.length}</div>
+              <div className="text-[10px] text-muted-foreground">
+                Step {currentStep + 1} of {ONBOARDING_STEPS.length}
+              </div>
             </div>
-            <div className="flex items-center gap-1 overflow-x-auto pb-1">
+            <div className="flex items-center gap-0.5 overflow-x-auto pb-0.5">
               {ONBOARDING_STEPS.map((s, i) => {
                 const done = i < currentStep;
                 const active = i === currentStep;
                 return (
-                  <div key={s} className="flex flex-1 items-center gap-1 min-w-[110px]">
-                    <button onClick={() => goToStep(i)} className="group flex flex-col items-center gap-1.5">
+                  <div key={s} className="flex min-w-[88px] flex-1 items-center gap-0.5">
+                    <button type="button" onClick={() => goToStep(i)} className="group flex flex-col items-center gap-1">
                       <motion.div
                         initial={false}
-                        animate={{ scale: active ? 1.1 : 1, backgroundColor: done ? "var(--color-success)" : active ? "var(--color-primary)" : "var(--color-muted)" }}
-                        className={cn("flex h-9 w-9 items-center justify-center rounded-full text-xs font-semibold text-white", active && "ring-4 ring-primary/25")}
+                        animate={{
+                          scale: active ? 1.08 : 1,
+                          backgroundColor: done
+                            ? "var(--color-success)"
+                            : active
+                              ? "var(--color-primary)"
+                              : "var(--color-muted)",
+                        }}
+                        className={cn(
+                          "flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-semibold text-white",
+                          active && "ring-2 ring-primary/25",
+                        )}
                       >
-                        {done ? <Check className="h-4 w-4" /> : i + 1}
+                        {done ? <Check className="h-3.5 w-3.5" /> : i + 1}
                       </motion.div>
-                      <span className={cn("text-[11px] max-w-[110px] text-center", active ? "font-semibold" : "text-muted-foreground")}>{s}</span>
+                      <span
+                        className={cn(
+                          "max-w-[88px] text-center text-[9px] leading-tight",
+                          active ? "font-semibold" : "text-muted-foreground",
+                        )}
+                      >
+                        {s}
+                      </span>
                     </button>
                     {i < ONBOARDING_STEPS.length - 1 && (
-                      <div className="mb-4 h-0.5 flex-1 bg-muted">
+                      <div className="mb-3 h-0.5 flex-1 bg-muted">
                         <motion.div animate={{ width: done ? "100%" : "0%" }} className="h-full bg-success" />
                       </div>
                     )}
@@ -352,26 +378,34 @@ function ProjectDetailPage() {
             </div>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-            <nav className="card-soft flex h-fit gap-1 overflow-x-auto p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:block lg:overflow-visible">
+          <div className="grid gap-2.5 lg:grid-cols-[240px_1fr]">
+            <nav className="card-soft flex h-fit gap-0.5 overflow-x-auto p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:block lg:overflow-visible">
               {ONBOARDING_SECTIONS.map((s) => {
                 const active = s.key === section;
                 const pct = sectionProgress(s.key);
                 const items = sectionItems[s.key] ?? [];
                 const { done, total, na } = countApplicableChecklist(items);
                 return (
-                  <button key={s.key} onClick={() => goToSection(s.key)} className={cn("relative flex min-w-[9.5rem] shrink-0 items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm lg:min-w-0 lg:w-full", active ? "bg-primary/15 text-primary" : "hover:bg-muted")}>
-                    <div className="flex-1">
-                      <div className="font-medium">{s.label}</div>
-                      <div className="mt-1 flex items-center gap-2">
-                        <ProgressBar value={pct} className="h-1 w-24" />
-                        <span className="text-[10px] text-muted-foreground">
+                  <button
+                    key={s.key}
+                    type="button"
+                    onClick={() => goToSection(s.key)}
+                    className={cn(
+                      "relative flex min-w-[8.5rem] shrink-0 items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs lg:min-w-0 lg:w-full",
+                      active ? "bg-primary/15 text-primary" : "hover:bg-muted",
+                    )}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-medium">{s.label}</div>
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <ProgressBar value={pct} className="h-1 w-16" />
+                        <span className="text-[9px] text-muted-foreground">
                           {done}/{total}
                           {na > 0 ? ` · ${na} N/A` : ""}
                         </span>
                       </div>
                     </div>
-                    <ChevronRight className="hidden h-4 w-4 text-muted-foreground lg:block" />
+                    <ChevronRight className="hidden h-3.5 w-3.5 shrink-0 text-muted-foreground lg:block" />
                   </button>
                 );
               })}
@@ -379,12 +413,21 @@ function ProjectDetailPage() {
 
             <div className="min-w-0">
               <AnimatePresence mode="wait">
-                <motion.div key={section} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} className="card-soft p-5">
-                  <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <h3 className="font-semibold">{ONBOARDING_SECTIONS.find((s) => s.key === section)?.label}</h3>
+                <motion.div
+                  key={section}
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  transition={{ duration: 0.25, ease: TICKET_EASE }}
+                  className="card-soft p-3 sm:p-4"
+                >
+                  <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <h3 className="text-sm font-semibold">
+                      {ONBOARDING_SECTIONS.find((s) => s.key === section)?.label}
+                    </h3>
                     <Button
                       size="sm"
-                      className="w-full sm:w-auto"
+                      className="h-8 w-full gap-1 text-xs sm:w-auto"
                       onClick={() => {
                         const idx = ONBOARDING_SECTIONS.findIndex((s) => s.key === section);
                         if (idx < 0) return;
@@ -398,23 +441,51 @@ function ProjectDetailPage() {
                         toast.success(`Saved — moved to ${next.label}`);
                       }}
                     >
-                      Save & Continue <ArrowRight className="ml-1 h-3 w-3" />
+                      Save & Continue <ArrowRight className="h-3 w-3" />
                     </Button>
                   </div>
 
                   {section === "project" && (
-                    <div className="mb-4">
-                      <div className="mb-2 flex items-center justify-between">
-                        <h4 className="text-sm font-semibold">Other Charges</h4>
-                        <Button size="sm" variant="outline" onClick={() => addOtherCharge({ projectId, name: "New Charge", amount: 0, type: "One-time" })}>+ Add</Button>
+                    <div className="mb-3">
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <h4 className="text-xs font-semibold text-muted-foreground">Other Charges</h4>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          onClick={() =>
+                            addOtherCharge({ projectId, name: "New Charge", amount: 0, type: "One-time" })
+                          }
+                        >
+                          + Add
+                        </Button>
                       </div>
-                      <div className="space-y-2 md:hidden">
+                      <div className="space-y-1.5 md:hidden">
                         {otherCharges.map((c) => (
-                          <div key={c.id} className="rounded-lg border p-3">
-                            <input defaultValue={c.name} onBlur={(e) => useOnboardingStore.getState().updateOtherCharge(c.id, { name: e.target.value })} className="mb-2 w-full rounded border px-2 py-1.5 text-sm" placeholder="Charge name" />
+                          <div key={c.id} className="rounded-lg border p-2.5">
+                            <input
+                              defaultValue={c.name}
+                              onBlur={(e) =>
+                                useOnboardingStore.getState().updateOtherCharge(c.id, { name: e.target.value })
+                              }
+                              className="mb-1.5 w-full rounded border px-2 py-1 text-sm"
+                              placeholder="Charge name"
+                            />
                             <div className="flex items-center gap-2">
-                              <input type="number" defaultValue={c.amount} onBlur={(e) => useOnboardingStore.getState().updateOtherCharge(c.id, { amount: Number(e.target.value) })} className="w-full rounded border px-2 py-1.5 text-sm" placeholder="Amount" />
-                              <Button size="sm" variant="ghost" onClick={() => deleteOtherCharge(c.id)}>×</Button>
+                              <input
+                                type="number"
+                                defaultValue={c.amount}
+                                onBlur={(e) =>
+                                  useOnboardingStore
+                                    .getState()
+                                    .updateOtherCharge(c.id, { amount: Number(e.target.value) })
+                                }
+                                className="w-full rounded border px-2 py-1 text-sm"
+                                placeholder="Amount"
+                              />
+                              <Button size="sm" variant="ghost" className="h-7" onClick={() => deleteOtherCharge(c.id)}>
+                                ×
+                              </Button>
                             </div>
                           </div>
                         ))}
@@ -423,9 +494,32 @@ function ProjectDetailPage() {
                         <tbody>
                           {otherCharges.map((c) => (
                             <tr key={c.id} className="border-t">
-                              <td className="py-2"><input defaultValue={c.name} onBlur={(e) => useOnboardingStore.getState().updateOtherCharge(c.id, { name: e.target.value })} className="w-full rounded border px-2 py-1 text-sm" /></td>
-                              <td className="py-2"><input type="number" defaultValue={c.amount} onBlur={(e) => useOnboardingStore.getState().updateOtherCharge(c.id, { amount: Number(e.target.value) })} className="w-24 rounded border px-2 py-1 text-sm" /></td>
-                              <td className="py-2 text-right"><Button size="sm" variant="ghost" onClick={() => deleteOtherCharge(c.id)}>×</Button></td>
+                              <td className="py-1.5">
+                                <input
+                                  defaultValue={c.name}
+                                  onBlur={(e) =>
+                                    useOnboardingStore.getState().updateOtherCharge(c.id, { name: e.target.value })
+                                  }
+                                  className="w-full rounded border px-2 py-1 text-sm"
+                                />
+                              </td>
+                              <td className="py-1.5">
+                                <input
+                                  type="number"
+                                  defaultValue={c.amount}
+                                  onBlur={(e) =>
+                                    useOnboardingStore
+                                      .getState()
+                                      .updateOtherCharge(c.id, { amount: Number(e.target.value) })
+                                  }
+                                  className="w-24 rounded border px-2 py-1 text-sm"
+                                />
+                              </td>
+                              <td className="py-1.5 text-right">
+                                <Button size="sm" variant="ghost" className="h-7" onClick={() => deleteOtherCharge(c.id)}>
+                                  ×
+                                </Button>
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -433,13 +527,13 @@ function ProjectDetailPage() {
                     </div>
                   )}
 
-                  <div className="space-y-3 md:hidden">
+                  <div className="space-y-2 md:hidden">
                     {(sectionItems[section] ?? []).map((item) => {
                       const na = !!item.notApplicable;
                       return (
-                      <div key={item.id} className={cn("rounded-xl border border-border p-3.5", na && "bg-muted/30 opacity-90")}>
+                      <div key={item.id} className={cn("rounded-lg border border-border p-3", na && "bg-muted/30 opacity-90")}>
                         <div className="flex items-start justify-between gap-2">
-                          <div className={cn("font-medium text-sm", na && "text-muted-foreground line-through")}>
+                          <div className={cn("text-sm font-medium", na && "text-muted-foreground line-through")}>
                             {item.label}
                             {item.source === "required-document" && (
                               <span className="ml-2 inline-flex align-middle rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
@@ -567,17 +661,17 @@ function ProjectDetailPage() {
                   </div>
 
                   <div className="hidden overflow-hidden rounded-lg border md:block">
-                    <table className="w-full text-sm">
-                      <thead className="bg-muted/60 text-xs text-muted-foreground">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted/60 text-[10px] uppercase tracking-wide text-muted-foreground">
                         <tr>
-                          <th className="px-4 py-2 text-left">Checklist Item</th>
-                          <th className="px-3 py-2 text-center">Collected</th>
-                          <th className="px-3 py-2 text-center">Uploaded</th>
-                          <th className="px-3 py-2 text-center">Live</th>
-                          <th className="px-3 py-2 text-center">N/A</th>
-                          <th className="px-3 py-2 text-left">Assignee</th>
-                          <th className="px-3 py-2 text-left">Due</th>
-                          <th className="px-3 py-2 text-left">Remarks</th>
+                          <th className="px-3 py-1.5 text-left">Checklist Item</th>
+                          <th className="px-2 py-1.5 text-center">Collected</th>
+                          <th className="px-2 py-1.5 text-center">Uploaded</th>
+                          <th className="px-2 py-1.5 text-center">Live</th>
+                          <th className="px-2 py-1.5 text-center">N/A</th>
+                          <th className="px-2 py-1.5 text-left">Assignee</th>
+                          <th className="px-2 py-1.5 text-left">Due</th>
+                          <th className="px-2 py-1.5 text-left">Remarks</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -585,7 +679,7 @@ function ProjectDetailPage() {
                           const na = !!item.notApplicable;
                           return (
                           <tr key={item.id} className={cn("border-t", na && "bg-muted/20")}>
-                            <td className={cn("px-4 py-3 font-medium", na && "text-muted-foreground line-through")}>
+                            <td className={cn("px-3 py-2 font-medium", na && "text-muted-foreground line-through")}>
                               {item.label}
                               {item.source === "required-document" && (
                                 <span className="ml-2 inline-flex align-middle rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
@@ -602,7 +696,7 @@ function ProjectDetailPage() {
                                     ? item.uploadedAt
                                     : item.liveAt;
                               return (
-                              <td key={phase} className="px-3 py-3 text-center">
+                              <td key={phase} className="px-2 py-2 text-center">
                                 <button
                                   type="button"
                                   disabled={na || (!allowed && !item[phase])}
@@ -638,13 +732,13 @@ function ProjectDetailPage() {
                               </td>
                               );
                             })}
-                            <td className="px-3 py-3 text-center">
+                            <td className="px-2 py-2 text-center">
                               <button
                                 type="button"
                                 title={na ? "Mark as applicable" : "Not applicable for this project"}
                                 onClick={() => setNotApplicable(item.id, !na)}
                                 className={cn(
-                                  "inline-flex h-7 items-center gap-1 rounded-md border px-2 text-[11px] font-medium",
+                                  "inline-flex h-7 items-center gap-1 rounded-md border px-1.5 text-[10px] font-medium",
                                   na
                                     ? "border-muted-foreground/50 bg-muted text-muted-foreground"
                                     : "border-input hover:border-foreground/40 hover:bg-muted/50",
@@ -654,7 +748,7 @@ function ProjectDetailPage() {
                                 N/A
                               </button>
                             </td>
-                            <td className="px-3 py-3">
+                            <td className="px-2 py-2">
                               <select
                                 value={item.assigneeUserId ?? ""}
                                 onChange={(e) =>
@@ -663,7 +757,7 @@ function ProjectDetailPage() {
                                     dueDate: item.dueDate,
                                   })
                                 }
-                                className="h-8 w-36 rounded border bg-background px-2 text-xs"
+                                className="h-7 w-32 rounded border bg-background px-1.5 text-[11px]"
                                 aria-label={`Assignee for ${item.label}`}
                               >
                                 <option value="">Company manager</option>
@@ -674,7 +768,7 @@ function ProjectDetailPage() {
                                 ))}
                               </select>
                             </td>
-                            <td className="px-3 py-3">
+                            <td className="px-2 py-2">
                               <input
                                 type="date"
                                 value={item.dueDate ?? ""}
@@ -684,16 +778,16 @@ function ProjectDetailPage() {
                                     dueDate: e.target.value || undefined,
                                   })
                                 }
-                                className="h-8 w-32 rounded border bg-background px-2 text-xs"
+                                className="h-7 w-28 rounded border bg-background px-1.5 text-[11px]"
                                 aria-label={`Due date for ${item.label}`}
                               />
                             </td>
-                            <td className="px-3 py-3">
+                            <td className="px-2 py-2">
                               <input
                                 value={item.remarks}
                                 onChange={(e) => updateRemarks(item.id, e.target.value)}
                                 placeholder={na ? "Why not applicable…" : "Add note…"}
-                                className="h-8 w-full rounded border bg-background px-2 text-xs"
+                                className="h-7 w-full rounded border bg-background px-1.5 text-[11px]"
                               />
                             </td>
                           </tr>
@@ -703,15 +797,15 @@ function ProjectDetailPage() {
                     </table>
                   </div>
 
-                  <div className="mt-6">
-                    <h4 className="mb-3 text-sm font-semibold">Activity Log</h4>
-                    <ol className="relative space-y-4 border-l-2 border-border pl-4">
+                  <div className="mt-4">
+                    <h4 className="mb-2 text-xs font-semibold text-muted-foreground">Activity log</h4>
+                    <ol className="relative space-y-2.5 border-l-2 border-border pl-3.5">
                       {activities.slice(0, 5).map((a) => (
                         <li key={a.id} className="relative">
-                          <span className="absolute -left-[22px] top-1.5 h-3 w-3 rounded-full bg-primary ring-4 ring-primary/20" />
-                          <div className="text-sm font-medium">{a.what}</div>
-                          <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                            <Clock className="h-3 w-3" /> {formatRelativeTime(a.createdAt)} · {a.who}
+                          <span className="absolute -left-[19px] top-1.5 h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-primary/20" />
+                          <div className="text-xs font-medium">{a.what}</div>
+                          <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                            <Clock className="h-2.5 w-2.5" /> {formatRelativeTime(a.createdAt)} · {a.who}
                           </div>
                         </li>
                       ))}
@@ -721,10 +815,18 @@ function ProjectDetailPage() {
               </AnimatePresence>
             </div>
           </div>
-        </>
+        </motion.div>
       )}
 
-      {tab === "documents" && <ProjectDocumentsPanel projectId={projectId} />}
+      {tab === "documents" && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, ease: TICKET_EASE }}
+        >
+          <ProjectDocumentsPanel projectId={projectId} />
+        </motion.div>
+      )}
 
       <EntityFormModal
         open={!!phaseDialog}
