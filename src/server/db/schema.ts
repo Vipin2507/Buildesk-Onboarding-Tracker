@@ -687,6 +687,43 @@ export const designTicketMessages = sqliteTable(
   (t) => [index("design_ticket_messages_ticket_idx").on(t.ticketId)],
 );
 
+export const chatSessions = sqliteTable(
+  "chat_sessions",
+  {
+    id: text("id").primaryKey(),
+    companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
+    portalSlug: text("portal_slug"),
+    visitorName: text("visitor_name").notNull(),
+    status: text("status").notNull(),
+    assignedAgentId: text("assigned_agent_id"),
+    assignedAgentName: text("assigned_agent_name"),
+    linkedTicketId: text("linked_ticket_id"),
+    botAttempts: integer("bot_attempts").notNull().default(0),
+    ...timestamps,
+  },
+  (t) => [
+    index("chat_sessions_portal_idx").on(t.portalSlug),
+    index("chat_sessions_status_idx").on(t.status),
+    index("chat_sessions_updated_idx").on(t.updatedAt),
+  ],
+);
+
+export const chatMessages = sqliteTable(
+  "chat_messages",
+  {
+    id: text("id").primaryKey(),
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => chatSessions.id, { onDelete: "cascade" }),
+    senderType: text("sender_type").notNull(),
+    senderName: text("sender_name").notNull(),
+    text: text("text").notNull(),
+    isRead: integer("is_read", { mode: "boolean" }).notNull().default(false),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [index("chat_messages_session_idx").on(t.sessionId)],
+);
+
 /** JSON blob stores for admin config catalogs (master + app settings). */
 export const appConfig = sqliteTable("app_config", {
   key: text("key").primaryKey(),

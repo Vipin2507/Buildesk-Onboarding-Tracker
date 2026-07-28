@@ -711,6 +711,39 @@ function ensureCrmTables() {
     console.log("+ CREATE TABLE design_tickets + design_ticket_messages");
   }
 
+  if (!tableExists("chat_sessions")) {
+    sqlite.exec(`
+      CREATE TABLE chat_sessions (
+        id TEXT PRIMARY KEY NOT NULL,
+        company_id TEXT REFERENCES companies(id) ON DELETE SET NULL,
+        portal_slug TEXT,
+        visitor_name TEXT NOT NULL,
+        status TEXT NOT NULL,
+        assigned_agent_id TEXT,
+        assigned_agent_name TEXT,
+        linked_ticket_id TEXT,
+        bot_attempts INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS chat_sessions_portal_idx ON chat_sessions(portal_slug);
+      CREATE INDEX IF NOT EXISTS chat_sessions_status_idx ON chat_sessions(status);
+      CREATE INDEX IF NOT EXISTS chat_sessions_updated_idx ON chat_sessions(updated_at);
+
+      CREATE TABLE chat_messages (
+        id TEXT PRIMARY KEY NOT NULL,
+        session_id TEXT NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+        sender_type TEXT NOT NULL,
+        sender_name TEXT NOT NULL,
+        text TEXT NOT NULL,
+        is_read INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS chat_messages_session_idx ON chat_messages(session_id);
+    `);
+    console.log("+ CREATE TABLE chat_sessions + chat_messages");
+  }
+
   // Unique (company_id, module_key) on company_modules when possible
   try {
     sqlite.exec(

@@ -5,18 +5,26 @@ import {
   CHATBOT_FALLBACK,
   CHATBOT_GREETING,
 } from "@/data/chatbotResponses";
+import {
+  createPortalChatSession,
+  syncChatSession,
+  syncPortalChatSession,
+} from "@/lib/api";
 import { getBotResponse, matchQuickReplyLabel } from "@/services/chatbot";
 import type { ChatMessage, ChatSession, ChatSessionStatus } from "@/types/chat";
 import { nowIso } from "@/types";
+import { serverSync } from "@/lib/sync";
 import { useTicketStore } from "./useTicketStore";
 import { useCompanyStore } from "./useCompanyStore";
 import { useProjectStore } from "./useProjectStore";
-import { createPersistedStore, touch } from "./persist";
+import { createStore, touch } from "./persist";
 
 type ChatState = {
   sessions: ChatSession[];
   activeInternalSessionId: string | null;
   activePortalSessionId: string | null;
+  hydrateSessions: (sessions: ChatSession[]) => void;
+  mergeSession: (session: ChatSession) => void;
   setActiveInternalSession: (id: string | null) => void;
   setActivePortalSession: (id: string | null) => void;
   startSession: (input: {
@@ -62,10 +70,47 @@ function pushMessage(session: ChatSession, message: Omit<ChatMessage, "id" | "se
   });
 }
 
-export const useChatStore = createPersistedStore<ChatState>("chat-v1", (set, get) => ({
+function pushToServer(get: () => ChatState, sessionId: string) {
+  const session = get().getSession(sessionId);
+  if (!session) return;
+
+  if (session.portalSlug) {
+    serverSync("portal chat", () =>
+      syncPortalChatSession({
+        data: { slug: session.portalSlug!, session },
+      }).then((saved) => get().mergeSession(saved)),
+    );
+    return;
+  }
+
+  serverSync("chat", () =>
+    syncChatSession({ data: session }).then((saved) => get().mergeSession(saved)),
+  );
+}
+
+export const useChatStore = createStore<ChatState>((set, get) => ({
   sessions: [],
   activeInternalSessionId: null,
   activePortalSessionId: null,
+
+  hydrateSessions: (sessions) => set({ sessions }),
+
+  mergeSession: (session) => {
+    set((s) => {
+      const idx = s.sessions.findIndex((x) => x.id === session.id);
+      if (idx === -1) return { sessions: [session, ...s.sessions] };
+      const prev = s.sessions[idx];
+      if (
+        session.updatedAt < prev.updatedAt &&
+        session.messages.length < prev.messages.length
+      ) {
+        return s;
+      }
+      const next = [...s.sessions];
+      next[idx] = session;
+      return { sessions: next };
+    });
+  },
 
   setActiveInternalSession: (id) => set({ activeInternalSessionId: id }),
   setActivePortalSession: (id) => set({ activePortalSessionId: id }),
@@ -84,8 +129,9 @@ export const useChatStore = createPersistedStore<ChatState>("chat-v1", (set, get
     }
 
     const now = nowIso();
+    const id = sessionId();
     const session: ChatSession = {
-      id: sessionId(),
+      id,
       companyId,
       portalSlug,
       visitorName,
@@ -108,15 +154,25 @@ export const useChatStore = createPersistedStore<ChatState>("chat-v1", (set, get
       sessions: [withGreeting, ...s.sessions],
       activePortalSessionId: withGreeting.id,
     }));
+
+    if (portalSlug) {
+      serverSync("portal chat create", () =>
+        createPortalChatSession({
+          data: { slug: portalSlug, visitorName, sessionId: id },
+        }).then((saved) => {
+          get().mergeSession(saved);
+          set({ activePortalSessionId: saved.id });
+        }),
+      );
+    }
+
     return withGreeting;
   },
 
   getSession: (id) => get().sessions.find((s) => s.id === id),
 
   getPortalSession: (portalSlug) =>
-    get().sessions.find(
-      (s) => s.portalSlug === portalSlug && s.status !== "closed",
-    ),
+    get().sessions.find((s) => s.portalSlug === portalSlug && s.status !== "closed"),
 
   sendCustomerMessage: (sessionId, text, opts) => {
     const trimmed = text.trim();
@@ -137,6 +193,7 @@ export const useChatStore = createPersistedStore<ChatState>("chat-v1", (set, get
     }));
 
     if (opts?.skipBot || next.status === "waiting-for-agent" || next.status === "agent-active") {
+      pushToServer(get, sessionId);
       return;
     }
 
@@ -160,12 +217,16 @@ export const useChatStore = createPersistedStore<ChatState>("chat-v1", (set, get
       set((s) => ({
         sessions: s.sessions.map((x) => (x.id === sessionId ? next : x)),
       }));
+      pushToServer(get, sessionId);
       return;
     }
 
     const attempts = next.botAttempts + 1;
     next = { ...next, botAttempts: attempts };
     if (attempts >= 2) {
+      set((s) => ({
+        sessions: s.sessions.map((x) => (x.id === sessionId ? next : x)),
+      }));
       get().escalateToAgent(sessionId);
       return;
     }
@@ -180,6 +241,7 @@ export const useChatStore = createPersistedStore<ChatState>("chat-v1", (set, get
     set((s) => ({
       sessions: s.sessions.map((x) => (x.id === sessionId ? next : x)),
     }));
+    pushToServer(get, sessionId);
   },
 
   sendQuickReply: (sessionId, label) => {
@@ -214,6 +276,7 @@ export const useChatStore = createPersistedStore<ChatState>("chat-v1", (set, get
         sessions: s.sessions.map((x) => (x.id === sessionId ? next : x)),
       }));
     }
+    pushToServer(get, sessionId);
   },
 
   sendAgentMessage: (sessionId, agentId, agentName, text) => {
@@ -238,6 +301,7 @@ export const useChatStore = createPersistedStore<ChatState>("chat-v1", (set, get
     set((s) => ({
       sessions: s.sessions.map((x) => (x.id === sessionId ? next : x)),
     }));
+    pushToServer(get, sessionId);
   },
 
   escalateToAgent: (sessionId) => {
@@ -258,6 +322,7 @@ export const useChatStore = createPersistedStore<ChatState>("chat-v1", (set, get
     set((s) => ({
       sessions: s.sessions.map((x) => (x.id === sessionId ? next : x)),
     }));
+    pushToServer(get, sessionId);
   },
 
   claimSession: (sessionId, agentId, agentName) => {
@@ -273,6 +338,7 @@ export const useChatStore = createPersistedStore<ChatState>("chat-v1", (set, get
       sessions: s.sessions.map((x) => (x.id === sessionId ? next : x)),
       activeInternalSessionId: sessionId,
     }));
+    pushToServer(get, sessionId);
   },
 
   convertToTicket: (sessionId) => {
@@ -282,16 +348,15 @@ export const useChatStore = createPersistedStore<ChatState>("chat-v1", (set, get
       return null;
     }
 
-    const transcript = session.messages
-      .map((m) => `[${m.senderName}] ${m.text}`)
-      .join("\n");
+    const transcript = session.messages.map((m) => `[${m.senderName}] ${m.text}`).join("\n");
 
     const projects = useProjectStore
       .getState()
       .projects.filter((p) => p.companyId === session.companyId);
     const projectId = projects[0]?.id ?? "";
-    const developerId = useCompanyStore.getState().companies.find((c) => c.id === session.companyId)
-      ?.onboardingManagerId ?? "";
+    const developerId =
+      useCompanyStore.getState().companies.find((c) => c.id === session.companyId)
+        ?.onboardingManagerId ?? "";
 
     const ticket = useTicketStore.getState().addTicket({
       type: "Other",
@@ -310,6 +375,7 @@ export const useChatStore = createPersistedStore<ChatState>("chat-v1", (set, get
     set((s) => ({
       sessions: s.sessions.map((x) => (x.id === sessionId ? next : x)),
     }));
+    pushToServer(get, sessionId);
     toast.success(`Ticket ${ticket.id} created from chat`);
     return ticket.id;
   },
@@ -320,6 +386,7 @@ export const useChatStore = createPersistedStore<ChatState>("chat-v1", (set, get
         x.id === sessionId ? touch({ ...x, status: "closed" as ChatSessionStatus }) : x,
       ),
     }));
+    pushToServer(get, sessionId);
   },
 
   markSessionRead: (sessionId, reader) => {
@@ -336,7 +403,7 @@ export const useChatStore = createPersistedStore<ChatState>("chat-v1", (set, get
       return {
         sessions: s.sessions.map((sess) => {
           if (sess.id !== sessionId) return sess;
-          return {
+          return touch({
             ...sess,
             messages: sess.messages.map((m) => {
               if (reader === "agent" && m.senderType === "customer" && !m.isRead) {
@@ -347,10 +414,11 @@ export const useChatStore = createPersistedStore<ChatState>("chat-v1", (set, get
               }
               return m;
             }),
-          };
+          });
         }),
       };
     });
+    pushToServer(get, sessionId);
   },
 
   getLiveChatBadgeCount: () => {

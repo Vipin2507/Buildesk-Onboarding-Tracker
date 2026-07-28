@@ -22,6 +22,7 @@ import {
 import type { CompanyPortalAccess } from "@/types/design-ticket";
 import { cn } from "@/lib/utils";
 import { PortalDesignTicketBootstrap } from "@/components/portal-design-ticket-bootstrap";
+import { PortalChatBootstrap } from "@/components/chat/portal-chat-bootstrap";
 import { PortalChatWidget } from "@/components/chat/portal-chat-widget";
 
 const NAV = [
@@ -131,6 +132,7 @@ export function ClientPortalLayout({ access }: { access: CompanyPortalAccess }) 
   return (
     <div className="flex min-h-[100dvh] bg-background text-foreground">
       <PortalDesignTicketBootstrap access={access} />
+      <PortalChatBootstrap access={access} />
       <PortalChatWidget access={access} />
       <aside className="hidden w-60 shrink-0 flex-col border-r bg-card/50 md:flex">
         <div className="border-b p-4">

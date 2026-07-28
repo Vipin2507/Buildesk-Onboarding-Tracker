@@ -154,3 +154,11 @@ export {
   createPortalDesignTicket,
   addPortalDesignTicketMessage,
 } from "@/server/api/design-tickets";
+
+export {
+  listChatSessions,
+  syncChatSession,
+  getPortalChatSession,
+  createPortalChatSession,
+  syncPortalChatSession,
+} from "@/server/api/chat";

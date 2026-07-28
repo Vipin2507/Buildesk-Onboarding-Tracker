@@ -31,6 +31,7 @@ import {
   listCrmEvents,
   ensureCompanyPortals,
   listDesignTickets,
+  listChatSessions,
 } from "@/lib/api";
 import { wireConfigPersistence } from "@/lib/config-persistence";
 import { mapTicket, mapTicketActivity } from "@/lib/tickets";
@@ -60,6 +61,7 @@ import {
 } from "@/stores";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
 import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
+import { useChatStore } from "@/stores/useChatStore";
 import { hydrateAutomationFromServer, useAutomationStore } from "@/stores/useAutomationStore";
 
 /**
@@ -118,6 +120,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           crmEvents,
           portalAccess,
           designTickets,
+          chatSessions,
         ] = await Promise.all([
           listCompanies(),
           listProjects({ data: {} }),
@@ -153,6 +156,10 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           ensureCompanyPortals().catch(() => []),
           listDesignTickets({ data: {} }).catch((err) => {
             console.warn("[bootstrap] listDesignTickets failed", err);
+            return null;
+          }),
+          listChatSessions().catch((err) => {
+            console.warn("[bootstrap] listChatSessions failed", err);
             return null;
           }),
         ]);
@@ -208,6 +215,9 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
         useCompanyPortalStore.getState().hydrateAccess(portalAccess);
         if (designTickets) {
           useDesignTicketStore.getState().hydrateTickets(designTickets);
+        }
+        if (chatSessions) {
+          useChatStore.getState().hydrateSessions(chatSessions);
         }
         useVendorStore.setState({
           materials: vendors.materials,
