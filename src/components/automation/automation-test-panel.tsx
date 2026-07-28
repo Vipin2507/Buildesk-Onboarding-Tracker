@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, Play, Send } from "lucide-react";
 import { toast } from "sonner";
 
+import { TICKET_EASE } from "@/components/design-ticket/design-ticket-shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -75,7 +76,7 @@ export function AutomationTestPanel({ className }: { className?: string }) {
 
   if (rules.length === 0) {
     return (
-      <div className={cn("card-soft p-4 text-sm text-muted-foreground", className)}>
+      <div className={cn("card-soft p-3 text-xs text-muted-foreground", className)}>
         Add an automation rule to send test notifications.
       </div>
     );
@@ -83,14 +84,15 @@ export function AutomationTestPanel({ className }: { className?: string }) {
 
   return (
     <motion.section
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      className={cn("card-soft p-4", className)}
+      transition={{ ease: TICKET_EASE }}
+      className={cn("card-soft p-3", className)}
     >
-      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+      <div className="mb-2 flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="font-semibold">Test automation</h3>
-          <p className="text-sm text-muted-foreground">
+          <h3 className="text-sm font-semibold">Test automation</h3>
+          <p className="text-[10px] text-muted-foreground">
             Send a sample payload — email via n8n, WhatsApp via WAHA. Logged under Logs.
           </p>
         </div>
@@ -102,7 +104,7 @@ export function AutomationTestPanel({ className }: { className?: string }) {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
               className={cn(
-                "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium",
+                "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium",
                 lastResult === "success"
                   ? "border-success/30 bg-success/10 text-success"
                   : "border-destructive/30 bg-destructive/10 text-destructive",
@@ -114,11 +116,11 @@ export function AutomationTestPanel({ className }: { className?: string }) {
         </AnimatePresence>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="space-y-3">
-          <label className="block text-xs font-medium text-muted-foreground">Automation rule</label>
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="space-y-2">
+          <label className="block text-[10px] font-medium text-muted-foreground">Automation rule</label>
           <select
-            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+            className="h-8 w-full rounded-md border bg-background px-2 text-xs"
             value={selectedRule?.id ?? ""}
             onChange={(e) => setRuleId(e.target.value)}
           >
@@ -132,32 +134,33 @@ export function AutomationTestPanel({ className }: { className?: string }) {
 
           <div className="grid gap-2 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs text-muted-foreground">Test email</label>
+              <label className="mb-1 block text-[10px] text-muted-foreground">Test email</label>
               <Input
                 value={customerEmail}
                 onChange={(e) => setCustomerEmail(e.target.value)}
                 placeholder="test@example.com"
-                className="text-sm"
+                className="h-8 text-xs"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-muted-foreground">Test phone</label>
+              <label className="mb-1 block text-[10px] text-muted-foreground">Test phone</label>
               <Input
                 value={customerPhone}
                 onChange={(e) => setCustomerPhone(e.target.value)}
                 placeholder="+91…"
-                className="text-sm"
+                className="h-8 text-xs"
               />
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2 pt-1">
+          <div className="flex flex-wrap gap-1.5 pt-0.5">
             <Button
-              className="gap-1.5 bg-primary"
+              size="sm"
+              className="h-7 gap-1 px-2.5 text-xs bg-primary"
               disabled={sending || !selectedRule}
               onClick={() => void sendTest("rule")}
             >
-              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
               Send test (selected rule)
             </Button>
             {endpoints.map((ep) => (
@@ -171,28 +174,28 @@ export function AutomationTestPanel({ className }: { className?: string }) {
                   (ep.channel === "whatsapp" && !useAutomationStore.getState().waha.isEnabled)
                 }
                 onClick={() => void sendTest(ep.channel)}
-                className="gap-1"
+                className="h-7 gap-1 px-2 text-xs"
               >
-                <Play className="h-3.5 w-3.5" />
+                <Play className="h-3 w-3" />
                 Quick test · {ep.channel}
               </Button>
             ))}
           </div>
           {!selectedRule?.isActive ? (
-            <p className="text-xs text-warning-foreground">
+            <p className="text-[10px] text-warning-foreground">
               Selected rule is inactive — test still sends if the channel endpoint is enabled.
             </p>
           ) : null}
         </div>
 
-        <div className="rounded-lg border bg-muted/30 p-3">
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="rounded-lg border bg-muted/30 p-2.5">
+          <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
             Payload preview
           </div>
           {preview && selectedRule?.channel === "email" && preview.subject ? (
-            <div className="mb-2 text-sm font-medium">Subject: {preview.subject}</div>
+            <div className="mb-1.5 text-xs font-medium">Subject: {preview.subject}</div>
           ) : null}
-          <pre className="max-h-40 overflow-auto whitespace-pre-wrap text-xs leading-relaxed text-foreground/90">
+          <pre className="max-h-32 overflow-auto whitespace-pre-wrap text-[10px] leading-relaxed text-foreground/90">
             {preview ? `[TEST] ${preview.body}` : "—"}
           </pre>
         </div>

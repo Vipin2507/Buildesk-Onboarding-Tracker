@@ -113,20 +113,20 @@ export function AutomationLogsPanel() {
   ];
 
   return (
-    <div>
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="font-semibold">Automation logs</h3>
-          <p className="text-sm text-muted-foreground">Every webhook attempt with retry support.</p>
+          <h2 className="text-xs font-semibold text-muted-foreground">Automation logs</h2>
+          <p className="text-[10px] text-muted-foreground">Every webhook attempt with retry support.</p>
         </div>
-        <Button variant="outline" onClick={() => void retryAllFailed()} className="gap-1.5">
-          <RefreshCw className="h-4 w-4" /> Retry all failed
+        <Button variant="outline" size="sm" onClick={() => void retryAllFailed()} className="h-7 gap-1 px-2.5 text-xs">
+          <RefreshCw className="h-3.5 w-3.5" /> Retry all failed
         </Button>
       </div>
 
-      <div className="mb-3 flex flex-wrap gap-2">
+      <div className="mb-2 flex flex-wrap gap-1.5">
         <select
-          className="h-9 rounded-md border bg-background px-2 text-sm"
+          className="h-8 rounded-md border bg-background px-2 text-xs"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
         >
@@ -136,7 +136,7 @@ export function AutomationLogsPanel() {
           <option value="retrying">Retrying</option>
         </select>
         <select
-          className="h-9 rounded-md border bg-background px-2 text-sm"
+          className="h-8 rounded-md border bg-background px-2 text-xs"
           value={channelFilter}
           onChange={(e) => setChannelFilter(e.target.value as typeof channelFilter)}
         >

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { DesignTicketSection } from "@/components/design-ticket/design-ticket-shared";
 import {
   DEFAULT_WAHA_API_KEY,
   DEFAULT_WAHA_API_URL,
@@ -32,20 +33,19 @@ export function AutomationWebhookSettings() {
   const [showApiKey, setShowApiKey] = useState(false);
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h3 className="font-semibold">Integration settings</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
+    <div className="space-y-2">
+      <DesignTicketSection compact title="Integration settings">
+        <p className="text-[10px] text-muted-foreground -mt-1">
           Email via n8n webhooks (<code className="rounded bg-muted px-1">{N8N_EMAIL_SEGMENT}</code>
           ). WhatsApp via WAHA direct.
         </p>
-      </div>
+      </DesignTicketSection>
 
-      <div className="card-soft p-4">
-        <label className="flex items-center justify-between gap-3 text-sm">
+      <div className="card-soft p-3">
+        <label className="flex items-center justify-between gap-2 text-xs">
           <div>
             <div className="font-medium">Automations enabled</div>
-            <div className="text-xs text-muted-foreground">Master kill switch — disables all sends</div>
+            <div className="text-[10px] text-muted-foreground">Master kill switch — disables all sends</div>
           </div>
           <Switch
             checked={settings.automationsEnabled}
@@ -55,28 +55,28 @@ export function AutomationWebhookSettings() {
         </label>
       </div>
 
-      <div className="card-soft p-4">
-        <div className="mb-1 font-medium">{emailEndpoint?.label ?? "Email (n8n)"}</div>
-        <p className="mb-2 text-xs text-muted-foreground">
+      <div className="card-soft p-3">
+        <div className="mb-1 text-sm font-medium">{emailEndpoint?.label ?? "Email (n8n)"}</div>
+        <p className="mb-2 text-[10px] text-muted-foreground">
           Webhook base — app appends segment <code className="rounded bg-muted px-1">{N8N_EMAIL_SEGMENT}</code>
         </p>
         <Input
           value={settings.n8nWebhookBase}
           onChange={(e) => setSettings({ n8nWebhookBase: e.target.value })}
-          className="font-mono text-xs"
+          className="h-8 font-mono text-xs"
           placeholder="http://host:5678/webhook"
         />
         <div className="mt-2">
-          <label className="mb-1 block text-xs text-muted-foreground">Global email CC (optional)</label>
+          <label className="mb-1 block text-[10px] text-muted-foreground">Global email CC (optional)</label>
           <Input
             value={settings.emailCc ?? ""}
             onChange={(e) => setSettings({ emailCc: e.target.value })}
-            className="font-mono text-xs"
+            className="h-8 font-mono text-xs"
             placeholder="manager@company.com"
           />
         </div>
         {emailEndpoint ? (
-          <label className="mt-3 flex items-center gap-2 text-sm">
+          <label className="mt-2.5 flex items-center gap-1.5 text-xs">
             <Switch
               checked={emailEndpoint.isEnabled}
               onCheckedChange={(v) => setEndpointEnabled("email", v)}
@@ -85,13 +85,14 @@ export function AutomationWebhookSettings() {
             Email channel enabled
           </label>
         ) : null}
-        <div className="mt-2 flex flex-wrap gap-2">
-          <Button size="sm" onClick={() => toast.success("n8n settings saved")}>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <Button size="sm" className="h-7 px-2.5 text-xs" onClick={() => toast.success("n8n settings saved")}>
             Save
           </Button>
           <Button
             size="sm"
             variant="outline"
+            className="h-7 px-2.5 text-xs"
             onClick={() => {
               restoreDefaultSettings();
               toast.success("n8n defaults restored");
@@ -102,57 +103,58 @@ export function AutomationWebhookSettings() {
         </div>
       </div>
 
-      <div className="card-soft p-4">
-        <div className="mb-1 font-medium">{whatsappEndpoint?.label ?? "WhatsApp (WAHA)"}</div>
-        <p className="mb-3 text-xs text-muted-foreground">
+      <div className="card-soft p-3">
+        <div className="mb-1 text-sm font-medium">{whatsappEndpoint?.label ?? "WhatsApp (WAHA)"}</div>
+        <p className="mb-2 text-[10px] text-muted-foreground">
           Text messages via <code className="rounded bg-muted px-1">POST /api/sendText</code>
         </p>
         <div className="space-y-2">
           <div>
-            <label className="mb-1 block text-xs text-muted-foreground">WAHA API URL</label>
+            <label className="mb-1 block text-[10px] text-muted-foreground">WAHA API URL</label>
             <Input
               value={waha.apiUrl}
               onChange={(e) => setWahaConfig({ apiUrl: e.target.value })}
-              className="font-mono text-xs"
+              className="h-8 font-mono text-xs"
               placeholder={DEFAULT_WAHA_API_URL}
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs text-muted-foreground">API Key</label>
-            <div className="flex gap-2">
+            <label className="mb-1 block text-[10px] text-muted-foreground">API Key</label>
+            <div className="flex gap-1.5">
               <Input
                 type={showApiKey ? "text" : "password"}
                 value={waha.apiKey}
                 onChange={(e) => setWahaConfig({ apiKey: e.target.value })}
-                className="font-mono text-xs"
+                className="h-8 font-mono text-xs"
                 placeholder={DEFAULT_WAHA_API_KEY}
               />
-              <Button size="sm" variant="outline" type="button" onClick={() => setShowApiKey((v) => !v)}>
+              <Button size="sm" variant="outline" type="button" className="h-8 px-2 text-xs" onClick={() => setShowApiKey((v) => !v)}>
                 {showApiKey ? "Hide" : "Show"}
               </Button>
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-xs text-muted-foreground">Session name</label>
+            <label className="mb-1 block text-[10px] text-muted-foreground">Session name</label>
             <Input
               value={waha.sessionName}
               onChange={(e) => setWahaConfig({ sessionName: e.target.value })}
-              className="font-mono text-xs"
+              className="h-8 font-mono text-xs"
               placeholder={DEFAULT_WAHA_SESSION}
             />
           </div>
         </div>
-        <label className="mt-3 flex items-center gap-2 text-sm">
+        <label className="mt-2.5 flex items-center gap-1.5 text-xs">
           <Switch checked={waha.isEnabled} onCheckedChange={(v) => setWahaConfig({ isEnabled: v })} size="sm" />
           WAHA enabled
         </label>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <Button size="sm" onClick={() => toast.success("WAHA settings saved")}>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <Button size="sm" className="h-7 px-2.5 text-xs" onClick={() => toast.success("WAHA settings saved")}>
             Save
           </Button>
           <Button
             size="sm"
             variant="outline"
+            className="h-7 px-2.5 text-xs"
             onClick={() => {
               restoreDefaultWaha();
               toast.success("WAHA defaults restored");
@@ -163,26 +165,27 @@ export function AutomationWebhookSettings() {
         </div>
       </div>
 
-      <div className="card-soft p-4">
-        <div className="mb-2 font-medium">{healthCheck.label}</div>
-        <p className="mb-2 text-xs text-muted-foreground">
+      <div className="card-soft p-3">
+        <div className="mb-1 text-sm font-medium">{healthCheck.label}</div>
+        <p className="mb-2 text-[10px] text-muted-foreground">
           Pings <code className="rounded bg-muted px-1">{N8N_HEALTH_SEGMENT}</code> under the n8n webhook base
         </p>
         <select
-          className="mb-2 h-9 w-full rounded-md border bg-background px-2 text-sm"
+          className="mb-2 h-8 w-full rounded-md border bg-background px-2 text-xs"
           value={healthCheck.httpMethod}
           onChange={(e) => setHealthCheckMethod(e.target.value as "GET" | "POST")}
         >
           <option value="POST">POST</option>
           <option value="GET">GET</option>
         </select>
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" onClick={() => toast.success("Health check method saved")}>
+        <div className="flex flex-wrap gap-1.5">
+          <Button size="sm" className="h-7 px-2.5 text-xs" onClick={() => toast.success("Health check method saved")}>
             Save
           </Button>
           <Button
             size="sm"
             variant="outline"
+            className="h-7 px-2.5 text-xs"
             onClick={() => {
               restoreDefaultHealth();
               toast.success("Health check defaults restored");
@@ -195,6 +198,8 @@ export function AutomationWebhookSettings() {
 
       <Button
         variant="outline"
+        size="sm"
+        className="h-7 text-xs"
         onClick={() => {
           restoreDefaultSettings();
           restoreDefaultEndpoints();

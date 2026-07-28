@@ -132,37 +132,37 @@ export function AutomationRulesPanel() {
   ];
 
   return (
-    <div>
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="font-semibold">Automation rules</h3>
-          <p className="text-sm text-muted-foreground">Email via n8n · WhatsApp via WAHA.</p>
+          <h2 className="text-xs font-semibold text-muted-foreground">Automation rules</h2>
+          <p className="text-[10px] text-muted-foreground">Email via n8n · WhatsApp via WAHA.</p>
         </div>
-        <Button onClick={openCreate} className="gap-1.5 bg-primary">
-          <Plus className="h-4 w-4" /> New Rule
+        <Button onClick={openCreate} size="sm" className="h-7 gap-1 px-2.5 text-xs bg-primary">
+          <Plus className="h-3.5 w-3.5" /> New Rule
         </Button>
       </div>
 
       <motion.div
-        initial={{ opacity: 0, y: 6 }}
+        initial={{ opacity: 0, y: 4 }}
         animate={{ opacity: 1, y: 0 }}
         className={cn(
-          "card-soft mb-4 flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between",
+          "card-soft mb-2 flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between",
           !rulesEnabled && "border-warning/40 bg-warning/5",
         )}
       >
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-2.5">
           <div
             className={cn(
-              "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+              "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
               rulesEnabled ? "bg-primary/10 text-primary" : "bg-warning/15 text-warning-foreground",
             )}
           >
-            <Power className="h-5 w-5" />
+            <Power className="h-4 w-4" />
           </div>
           <div>
-            <div className="font-medium">Enable automation rules</div>
-            <p className="mt-0.5 max-w-xl text-sm text-muted-foreground">
+            <div className="text-sm font-medium">Enable automation rules</div>
+            <p className="mt-0.5 max-w-xl text-[10px] text-muted-foreground">
               {rulesEnabled
                 ? "Rules that are turned on will run on ticket events."
                 : "All rules are paused. Individual on/off settings are kept, but nothing will trigger until you turn this back on."}
@@ -171,7 +171,7 @@ export function AutomationRulesPanel() {
         </div>
         <Switch
           checked={rulesEnabled}
-          size="md"
+          size="sm"
           onCheckedChange={(v) => {
             setSettings({ automationsEnabled: v === true });
             toast.success(v ? "Automation rules enabled" : "All automation rules paused");
@@ -181,19 +181,19 @@ export function AutomationRulesPanel() {
 
       {rules.length === 0 ? (
         <motion.div
-          initial={{ opacity: 0, y: 8 }}
+          initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          className="card-soft flex flex-col items-center justify-center px-6 py-14 text-center"
+          className="card-soft flex flex-col items-center justify-center px-4 py-10 text-center"
         >
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            <Zap className="h-7 w-7" />
+          <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Zap className="h-5 w-5" />
           </div>
-          <h4 className="text-lg font-semibold">No automation rules yet</h4>
-          <p className="mt-2 max-w-md text-sm text-muted-foreground">
+          <h4 className="text-sm font-semibold">No automation rules yet</h4>
+          <p className="mt-1.5 max-w-md text-xs text-muted-foreground">
             Create rules to notify customers by email or WhatsApp when tickets are created, updated, or closed.
           </p>
-          <Button onClick={openCreate} className="mt-6 gap-1.5 bg-primary">
-            <Plus className="h-4 w-4" /> Create your first rule
+          <Button onClick={openCreate} size="sm" className="mt-4 gap-1 h-7 px-2.5 text-xs bg-primary">
+            <Plus className="h-3.5 w-3.5" /> Create your first rule
           </Button>
         </motion.div>
       ) : (

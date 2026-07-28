@@ -13,13 +13,17 @@ import { AutomationLogsPanel } from "@/components/automation/automation-logs-pan
 import { AutomationRulesPanel } from "@/components/automation/automation-rules-panel";
 import { AutomationWebhookSettings } from "@/components/automation/automation-webhook-settings";
 import { AutomationTestPanel } from "@/components/automation/automation-test-panel";
-import { PageHeader, PageWrap } from "@/components/page-header";
+import { PageWrap } from "@/components/page-header";
+import {
+  DesignTicketPageHeader,
+  DesignTicketTabNav,
+  TICKET_EASE,
+} from "@/components/design-ticket/design-ticket-shared";
 import { usePermissions } from "@/hooks/use-permissions";
 import { checkHealth } from "@/services/automation";
 import { useAutomationStore } from "@/stores/useAutomationStore";
-import { cn } from "@/lib/utils";
 
-const EASE = [0.22, 1, 0.36, 1] as const;
+const EASE = TICKET_EASE;
 
 const TABS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -95,66 +99,50 @@ function AutomationPage() {
 
   if (!isAdmin) {
     return (
-      <PageWrap>
-        <PageHeader title="Automation" subtitle="Admin access required." />
-        <p className="text-sm text-muted-foreground">Ask an administrator to manage ticket automation.</p>
+      <PageWrap compact>
+        <DesignTicketPageHeader compact title="Automation" subtitle="Admin access required." />
+        <p className="text-xs text-muted-foreground">Ask an administrator to manage ticket automation.</p>
       </PageWrap>
     );
   }
 
   return (
-    <PageWrap>
-      <PageHeader
+    <PageWrap compact>
+      <DesignTicketPageHeader
+        compact
         title="Automation"
         subtitle="Email via n8n webhooks · WhatsApp via WAHA — provider-agnostic configuration."
         actions={
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-            <Bolt className="h-3.5 w-3.5" /> Admin
+          <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+            <Bolt className="h-3 w-3" /> Admin
           </span>
         }
       />
 
-      <div className="card-soft mb-4 -mx-1 flex gap-1 overflow-x-auto px-1 py-1 [scrollbar-width:none] md:mx-0 md:flex-wrap md:overflow-visible [&::-webkit-scrollbar]:hidden">
-        {TABS.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => void navigate({ search: { tab: id } })}
-            className={cn(
-              "relative flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200",
-              tab === id ? "text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
-            )}
-          >
-            {tab === id ? (
-              <motion.span
-                layoutId="automation-tab-bg"
-                className="absolute inset-0 rounded-lg bg-primary"
-                transition={{ type: "spring", stiffness: 380, damping: 32 }}
-              />
-            ) : null}
-            <Icon className="relative h-4 w-4" />
-            <span className="relative">{label}</span>
-          </button>
-        ))}
-      </div>
+      <DesignTicketTabNav
+        compact
+        tabs={TABS.map(({ id, label, icon }) => ({ id, label, icon }))}
+        activeId={tab}
+        onChange={(id) => void navigate({ search: { tab: id as TabId } })}
+      />
 
       <AnimatePresence mode="wait">
         <motion.div
           key={tab}
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -6 }}
           transition={{ duration: 0.28, ease: EASE }}
         >
         {tab === "overview" ? (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <AutomationStatsRow
               {...stats}
               range={statsRange}
               onRangeChange={setStatsRange}
             />
             <AutomationTestPanel />
-            <div className="grid gap-3 lg:grid-cols-2">
+            <div className="grid gap-2 lg:grid-cols-2">
               {endpoints.map((endpoint) => (
                 <ChannelStatusCard
                   key={endpoint.channel}
