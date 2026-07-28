@@ -550,7 +550,9 @@ export const mutateIntegration = createServerFn({ method: "POST" })
   });
 
 export const getAppConfig = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) => z.object({ key: z.enum(["master", "settings"]) }).parse(data))
+  .inputValidator(
+    (data: unknown) => z.object({ key: z.enum(["master", "settings", "automation"]) }).parse(data),
+  )
   .handler(async ({ data }) => {
     requireUser(["Admin"]);
     const row = getDb().select().from(t.appConfig).where(eq(t.appConfig.key, data.key)).get();
@@ -559,7 +561,7 @@ export const getAppConfig = createServerFn({ method: "GET" })
 
 export const setAppConfig = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({ key: z.enum(["master", "settings"]), value: z.any() }).parse(data),
+    z.object({ key: z.enum(["master", "settings", "automation"]), value: z.any() }).parse(data),
   )
   .handler(async ({ data }) => {
     requireUser(["Admin"]);

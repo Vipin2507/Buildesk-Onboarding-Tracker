@@ -1,6 +1,7 @@
 import { setAppConfig } from "@/lib/api";
 import { serverSyncDebounced } from "@/lib/sync";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { useAutomationStore } from "@/stores/useAutomationStore";
 import { useMasterStore } from "@/stores/useMasterStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 
@@ -33,6 +34,17 @@ function settingsSnapshot() {
   };
 }
 
+function automationSnapshot() {
+  const s = useAutomationStore.getState();
+  return {
+    settings: s.settings,
+    endpoints: s.endpoints,
+    waha: s.waha,
+    healthCheck: s.healthCheck,
+    rules: s.rules,
+  };
+}
+
 let wired = false;
 
 /** Subscribe master/settings stores so changes persist to SQLite app_config. */
@@ -51,6 +63,13 @@ export function wireConfigPersistence() {
     if (!useAuthStore.getState().user) return;
     serverSyncDebounced("settings-config", 1000, () =>
       setAppConfig({ data: { key: "settings", value: settingsSnapshot() } }),
+    );
+  });
+
+  useAutomationStore.subscribe(() => {
+    if (!useAuthStore.getState().user) return;
+    serverSyncDebounced("automation-config", 1000, () =>
+      setAppConfig({ data: { key: "automation", value: automationSnapshot() } }),
     );
   });
 }

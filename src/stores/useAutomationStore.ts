@@ -53,6 +53,14 @@ function ruleId() {
   return `AR-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
+type AutomationSnapshot = {
+  settings?: AutomationSettings;
+  endpoints?: AutomationEndpoint[];
+  waha?: WahaConfig;
+  healthCheck?: AutomationHealthConfig;
+  rules?: AutomationRule[];
+};
+
 export const useAutomationStore = createPersistedStore<AutomationState>(
   "automation-v3",
   (set, get) => ({
@@ -213,3 +221,22 @@ export const useAutomationStore = createPersistedStore<AutomationState>(
     clearLogs: () => set({ logs: [] }),
   }),
 );
+
+/** Hydrate automation state from server app_config snapshot. */
+export function hydrateAutomationFromServer(snapshot: AutomationSnapshot | null | undefined) {
+  if (!snapshot || typeof snapshot !== "object") return;
+  const patch: Partial<AutomationState> = {};
+  if (snapshot.settings) patch.settings = snapshot.settings;
+  if (Array.isArray(snapshot.endpoints) && snapshot.endpoints.length > 0) {
+    patch.endpoints = snapshot.endpoints;
+  }
+  if (snapshot.waha) patch.waha = snapshot.waha;
+  if (snapshot.healthCheck) patch.healthCheck = snapshot.healthCheck;
+  if (Array.isArray(snapshot.rules)) patch.rules = snapshot.rules;
+  if (Object.keys(patch).length === 0) return;
+  useAutomationStore.setState((s) => ({
+    ...s,
+    ...patch,
+    seeded: true,
+  }));
+}

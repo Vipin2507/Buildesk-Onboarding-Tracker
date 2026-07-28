@@ -23,6 +23,7 @@ import {
   listUsers,
   listNotifications,
   getAppConfig,
+  setAppConfig,
   listFollowUpTasks,
   listClientVisits,
   listModuleSubscriptions,
@@ -59,6 +60,7 @@ import {
 } from "@/stores";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
 import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
+import { hydrateAutomationFromServer, useAutomationStore } from "@/stores/useAutomationStore";
 
 /**
  * After session hydrate, pull authoritative data from SQLite into Zustand caches
@@ -101,6 +103,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           postSales,
           master,
           settings,
+          automation,
           notes,
           attachments,
           checklist,
@@ -134,6 +137,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           listPostSalesProjects({ data: {} }),
           getAppConfig({ data: { key: "master" } }).catch(() => ({})),
           getAppConfig({ data: { key: "settings" } }).catch(() => ({})),
+          getAppConfig({ data: { key: "automation" } }).catch(() => ({})),
           listAllNotes().catch(() => []),
           listAllAttachments().catch(() => []),
           listAllChecklist().catch(() => []),
@@ -235,6 +239,24 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
         if (settings && typeof settings === "object" && Object.keys(settings).length > 1) {
           const { hydrateSettingsFromServer } = await import("@/stores/useSettingsStore");
           hydrateSettingsFromServer(settings as Record<string, unknown>);
+        }
+        if (automation && typeof automation === "object" && Object.keys(automation).length > 0) {
+          hydrateAutomationFromServer(automation as Record<string, unknown>);
+        } else {
+          // Backfill server config so automation ON/OFF state survives deploys and device changes.
+          const localAutomation = useAutomationStore.getState();
+          await setAppConfig({
+            data: {
+              key: "automation",
+              value: {
+                settings: localAutomation.settings,
+                endpoints: localAutomation.endpoints,
+                waha: localAutomation.waha,
+                healthCheck: localAutomation.healthCheck,
+                rules: localAutomation.rules,
+              },
+            },
+          }).catch(() => {});
         }
 
         setReady(true);
