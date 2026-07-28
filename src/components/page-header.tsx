@@ -1,6 +1,8 @@
 import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 
+import { cn } from "@/lib/utils";
+
 export function PageHeader({
   title,
   subtitle,
@@ -30,13 +32,16 @@ export function PageHeader({
   );
 }
 
-export function PageWrap({ children }: { children: ReactNode }) {
+export function PageWrap({ children, compact }: { children: ReactNode; compact?: boolean }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-      className="min-w-0 overflow-x-hidden p-4 md:p-6 lg:p-8"
+      className={cn(
+        "min-w-0 overflow-x-hidden",
+        compact ? "p-3 md:p-4 lg:p-5" : "p-4 md:p-6 lg:p-8",
+      )}
     >
       {children}
     </motion.div>

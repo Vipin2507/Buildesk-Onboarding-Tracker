@@ -29,11 +29,11 @@ import {
 } from "@/components/design-ticket/design-ticket-fields";
 import {
   DesignTicketInfoBanner,
+  DesignTicketFilterBar,
   DesignTicketKpiGrid,
   DesignTicketPageHeader,
   DesignTicketSection,
   InternalTicketsNav,
-  ticketSectionVariants,
 } from "@/components/design-ticket/design-ticket-shared";
 import { TicketCreateDialog } from "@/components/tickets/ticket-create-dialog";
 import { PageWrap } from "@/components/page-header";
@@ -229,6 +229,33 @@ function TicketsDashboard() {
     });
   }
 
+  function clearFilters() {
+    setCompanyFilter("all");
+    setStatusFilter("all");
+    setPriorityFilter("all");
+    setDateFrom("");
+    setDateTo("");
+    setApplied({
+      company: "all",
+      status: "all",
+      priority: "all",
+      dateFrom: "",
+      dateTo: "",
+    });
+  }
+
+  const activeFilterCount = useMemo(
+    () =>
+      [
+        applied.company !== "all",
+        applied.status !== "all",
+        applied.priority !== "all",
+        applied.dateFrom,
+        applied.dateTo,
+      ].filter(Boolean).length,
+    [applied],
+  );
+
   function toggleSelection(id: string, checked: boolean) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -337,19 +364,20 @@ function TicketsDashboard() {
   ];
 
   return (
-    <PageWrap>
+    <PageWrap compact>
       <DesignTicketPageHeader
+        compact
         title="Ticket Tracking"
         subtitle="Client portal tickets — triage, assign, and resolve across all companies."
         actions={
-          <div className="flex flex-wrap gap-2">
-            <Button className="gap-1.5 bg-primary" onClick={() => setCreateOpen(true)}>
-              <Plus className="h-4 w-4" />
+          <div className="flex flex-wrap gap-1.5">
+            <Button size="sm" className="gap-1 bg-primary" onClick={() => setCreateOpen(true)}>
+              <Plus className="h-3.5 w-3.5" />
               New Ticket
             </Button>
-            <Button variant="outline" className="gap-1.5" asChild>
+            <Button size="sm" variant="outline" className="gap-1" asChild>
               <Link to="/tickets/links">
-                <Link2 className="h-4 w-4" />
+                <Link2 className="h-3.5 w-3.5" />
                 Portal Links
               </Link>
             </Button>
@@ -357,20 +385,24 @@ function TicketsDashboard() {
         }
       />
 
-      <InternalTicketsNav />
+      <InternalTicketsNav compact />
 
-      <div className="mb-6">
-        <DesignTicketKpiGrid items={kpiCards} columns={6} />
+      <div className="mb-3">
+        <DesignTicketKpiGrid items={kpiCards} columns={6} size="compact" />
       </div>
 
-      <motion.div
-        variants={ticketSectionVariants}
-        initial="hidden"
-        animate="show"
-        className="card-soft mb-4 grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
+      <DesignTicketFilterBar
+        compact
+        className="xl:grid-cols-5"
+        activeFilterCount={activeFilterCount}
+        onClear={clearFilters}
+        onApply={applyFilters}
+        resultCount={filtered.length}
+        resultLabel={filtered.length === 1 ? "ticket" : "tickets"}
       >
-        <DesignTicketFilterField label="Company">
+        <DesignTicketFilterField label="Company" compact>
           <DesignTicketSelect
+            compact
             value={companyFilter}
             onChange={setCompanyFilter}
             options={[
@@ -379,8 +411,9 @@ function TicketsDashboard() {
             ]}
           />
         </DesignTicketFilterField>
-        <DesignTicketFilterField label="Status">
+        <DesignTicketFilterField label="Status" compact>
           <DesignTicketSelect
+            compact
             value={statusFilter}
             onChange={(v) => setStatusFilter(v as typeof statusFilter)}
             options={[
@@ -392,8 +425,9 @@ function TicketsDashboard() {
             ]}
           />
         </DesignTicketFilterField>
-        <DesignTicketFilterField label="Priority">
+        <DesignTicketFilterField label="Priority" compact>
           <DesignTicketSelect
+            compact
             value={priorityFilter}
             onChange={(v) => setPriorityFilter(v as typeof priorityFilter)}
             options={[
@@ -406,33 +440,30 @@ function TicketsDashboard() {
           />
         </DesignTicketFilterField>
         <DesignTicketDateField
+          compact
           label="Created from"
           value={dateFrom}
           onChange={setDateFrom}
-          placeholder="From date"
+          placeholder="From"
         />
         <DesignTicketDateField
+          compact
           label="Created to"
           value={dateTo}
           onChange={setDateTo}
-          placeholder="To date"
+          placeholder="To"
         />
-        <div className="flex items-end sm:col-span-2 lg:col-span-3 xl:col-span-5">
-          <Button type="button" className="w-full sm:w-auto" onClick={applyFilters}>
-            Apply Filters
-          </Button>
-        </div>
-      </motion.div>
+      </DesignTicketFilterBar>
 
       <div ref={tableRef}>
-        <DesignTicketSection title={ticketKpiFilterLabel(kpiFilter)} delay={0.12}>
+        <DesignTicketSection title={ticketKpiFilterLabel(kpiFilter)} delay={0.06} compact>
           {selectedCount > 0 ? (
             <motion.div
               initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-primary/25 bg-primary/5 px-3 py-2.5"
+              className="mb-2 flex flex-wrap items-center gap-1.5 rounded-lg border border-primary/25 bg-primary/5 px-2.5 py-1.5"
             >
-              <span className="text-sm font-medium">{selectedCount} selected</span>
+              <span className="text-xs font-medium">{selectedCount} selected</span>
               <Button size="sm" variant="outline" className="gap-1" onClick={() => setBulkAction("assign")}>
                 <UserPlus className="h-3.5 w-3.5" />
                 Assign
@@ -472,7 +503,8 @@ function TicketsDashboard() {
               data={filtered}
               getRowId={(r) => r.id}
               searchKeys={["ticketNumber", "subject", "companyName", "assigneeName"]}
-              pageSize={12}
+              pageSize={15}
+              density="compact"
               selection={{
                 selectedIds,
                 onToggle: toggleSelection,
@@ -482,12 +514,12 @@ function TicketsDashboard() {
               columns={[
                 {
                   key: "ticketNumber",
-                  header: "Ticket ID",
+                  header: "ID",
                   render: (r) => (
-                    <span className="inline-flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 font-medium">
                       {r.ticketNumber}
                       {r.isNew ? (
-                        <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                        <span className="rounded bg-primary/15 px-1 py-px text-[9px] font-semibold text-primary">
                           New
                         </span>
                       ) : null}
@@ -495,8 +527,18 @@ function TicketsDashboard() {
                   ),
                   sortable: true,
                 },
-                { key: "subject", header: "Subject", render: (r) => r.subject, sortable: true },
-                { key: "companyName", header: "Company", render: (r) => r.companyName, sortable: true },
+                {
+                  key: "subject",
+                  header: "Subject",
+                  render: (r) => <span className="line-clamp-1 max-w-[200px]">{r.subject}</span>,
+                  sortable: true,
+                },
+                {
+                  key: "companyName",
+                  header: "Company",
+                  render: (r) => <span className="line-clamp-1 max-w-[120px]">{r.companyName}</span>,
+                  sortable: true,
+                },
                 {
                   key: "priority",
                   header: "Priority",
@@ -508,8 +550,12 @@ function TicketsDashboard() {
                   render: (r) => <DesignTicketStatusPill status={r.status} />,
                 },
                 { key: "assigneeName", header: "Assignee", render: (r) => r.assigneeName },
-                { key: "createdAt", header: "Created", render: (r) => formatDate(r.createdAt), sortable: true },
-                { key: "updatedAt", header: "Updated", render: (r) => formatDate(r.updatedAt), sortable: true },
+                {
+                  key: "updatedAt",
+                  header: "Updated",
+                  render: (r) => formatDate(r.updatedAt),
+                  sortable: true,
+                },
               ]}
               actions={(row) => (
                 <TicketRowActions
@@ -535,8 +581,8 @@ function TicketsDashboard() {
         </DesignTicketSection>
       </div>
 
-      <div className="mt-6 space-y-4">
-        <DesignTicketInfoBanner>
+      <div className="mt-3 space-y-2">
+        <DesignTicketInfoBanner compact>
           Team replies, updates and status changes are visible to the client in real time.
         </DesignTicketInfoBanner>
 

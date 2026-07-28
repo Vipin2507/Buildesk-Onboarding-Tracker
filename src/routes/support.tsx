@@ -37,9 +37,11 @@ import {
 } from "@/components/design-ticket/design-ticket-fields";
 import {
   DesignTicketInfoBanner,
+  DesignTicketFilterBar,
   DesignTicketKpiGrid,
   DesignTicketPageHeader,
   DesignTicketSection,
+  DesignTicketTabNav,
   ticketSectionVariants,
 } from "@/components/design-ticket/design-ticket-shared";
 import {
@@ -294,6 +296,39 @@ function SupportListPage() {
     });
   }
 
+  function clearFilters() {
+    setCompanyFilter("all");
+    setStatusFilter("all");
+    setPriorityFilter("all");
+    setTypeFilter("all");
+    setProjectFilter("all");
+    setDateFrom("");
+    setDateTo("");
+    setApplied({
+      company: "all",
+      status: "all",
+      priority: "all",
+      type: "all",
+      project: "all",
+      dateFrom: "",
+      dateTo: "",
+    });
+  }
+
+  const activeFilterCount = useMemo(
+    () =>
+      [
+        applied.company !== "all",
+        applied.status !== "all",
+        applied.priority !== "all",
+        applied.type !== "all",
+        applied.project !== "all",
+        applied.dateFrom,
+        applied.dateTo,
+      ].filter(Boolean).length,
+    [applied],
+  );
+
   function toggleSelection(id: string, checked: boolean) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -496,51 +531,31 @@ function SupportListPage() {
     p === "Critical" ? "danger" : p === "High" ? "warning" : p === "Medium" ? "info" : "muted";
 
   return (
-    <PageWrap>
+    <PageWrap compact>
       <DesignTicketPageHeader
+        compact
         title="Support Desk"
         subtitle="Engineering tickets — bugs, customizations, requirements, and release pipeline."
         actions={
           canManageTickets ? (
-            <Button className="gap-1.5 bg-primary" onClick={openCreate}>
-              <Plus className="h-4 w-4" />
+            <Button size="sm" className="gap-1 bg-primary" onClick={openCreate}>
+              <Plus className="h-3.5 w-3.5" />
               New Ticket
             </Button>
           ) : undefined
         }
       />
 
-      <div className="mb-6">
-        <DesignTicketKpiGrid items={kpiCards} columns={5} />
+      <div className="mb-3">
+        <DesignTicketKpiGrid items={kpiCards} columns={5} size="compact" />
       </div>
 
-      <motion.nav
-        variants={ticketSectionVariants}
-        initial="hidden"
-        animate="show"
-        className="mb-5 flex gap-1 overflow-x-auto rounded-xl border bg-muted/30 p-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        {TYPE_TAB_CONFIG.map((tab) => {
-          const Icon = tab.icon;
-          const active = typeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setTypeTab(tab.id)}
-              className={cn(
-                "flex shrink-0 items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition-all duration-300",
-                active
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-card/60 hover:text-foreground",
-              )}
-            >
-              <Icon className="h-4 w-4" />
-              {tab.label}
-            </button>
-          );
-        })}
-      </motion.nav>
+      <DesignTicketTabNav
+        compact
+        tabs={TYPE_TAB_CONFIG}
+        activeId={typeTab}
+        onChange={(id) => setTypeTab(id as TypeTab)}
+      />
 
       {typeTab === "kanban" ? (
         <motion.div
@@ -565,14 +580,18 @@ function SupportListPage() {
         </motion.div>
       ) : (
         <>
-          <motion.div
-            variants={ticketSectionVariants}
-            initial="hidden"
-            animate="show"
-            className="card-soft mb-4 grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
+          <DesignTicketFilterBar
+            compact
+            className="xl:grid-cols-6"
+            activeFilterCount={activeFilterCount}
+            onClear={clearFilters}
+            onApply={applyFilters}
+            resultCount={filtered.length}
+            resultLabel={filtered.length === 1 ? "ticket" : "tickets"}
           >
-            <DesignTicketFilterField label="Company">
+            <DesignTicketFilterField label="Company" compact>
               <DesignTicketSelect
+                compact
                 value={companyFilter}
                 onChange={(v) => {
                   setCompanyFilter(v);
@@ -584,8 +603,9 @@ function SupportListPage() {
                 ]}
               />
             </DesignTicketFilterField>
-            <DesignTicketFilterField label="Status">
+            <DesignTicketFilterField label="Status" compact>
               <DesignTicketSelect
+                compact
                 value={statusFilter}
                 onChange={setStatusFilter}
                 options={[
@@ -594,8 +614,9 @@ function SupportListPage() {
                 ]}
               />
             </DesignTicketFilterField>
-            <DesignTicketFilterField label="Priority">
+            <DesignTicketFilterField label="Priority" compact>
               <DesignTicketSelect
+                compact
                 value={priorityFilter}
                 onChange={setPriorityFilter}
                 options={[
@@ -604,8 +625,9 @@ function SupportListPage() {
                 ]}
               />
             </DesignTicketFilterField>
-            <DesignTicketFilterField label="Type">
+            <DesignTicketFilterField label="Type" compact>
               <DesignTicketSelect
+                compact
                 value={typeFilter}
                 onChange={setTypeFilter}
                 options={[
@@ -615,19 +637,22 @@ function SupportListPage() {
               />
             </DesignTicketFilterField>
             <DesignTicketDateField
+              compact
               label="Raised from"
               value={dateFrom}
               onChange={setDateFrom}
-              placeholder="From date"
+              placeholder="From"
             />
             <DesignTicketDateField
+              compact
               label="Raised to"
               value={dateTo}
               onChange={setDateTo}
-              placeholder="To date"
+              placeholder="To"
             />
-            <DesignTicketFilterField label="Project" className="sm:col-span-2 lg:col-span-3">
+            <DesignTicketFilterField label="Project" className="sm:col-span-2 lg:col-span-3" compact>
               <DesignTicketSelect
+                compact
                 value={projectFilter}
                 onChange={setProjectFilter}
                 options={[
@@ -636,22 +661,17 @@ function SupportListPage() {
                 ]}
               />
             </DesignTicketFilterField>
-            <div className="flex items-end sm:col-span-2 lg:col-span-3 xl:col-span-6">
-              <Button type="button" className="w-full sm:w-auto" onClick={applyFilters}>
-                Apply Filters
-              </Button>
-            </div>
-          </motion.div>
+          </DesignTicketFilterBar>
 
           <div ref={tableRef}>
-            <DesignTicketSection title={supportKpiFilterLabel(kpiFilter)} delay={0.06}>
+            <DesignTicketSection title={supportKpiFilterLabel(kpiFilter)} delay={0.06} compact>
               {selectedCount > 0 && canManageTickets ? (
                 <motion.div
                   initial={{ opacity: 0, y: -6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-primary/25 bg-primary/5 px-3 py-2.5"
+                  className="mb-2 flex flex-wrap items-center gap-1.5 rounded-lg border border-primary/25 bg-primary/5 px-2.5 py-1.5"
                 >
-                  <span className="text-sm font-medium">{selectedCount} selected</span>
+                  <span className="text-xs font-medium">{selectedCount} selected</span>
                   <Button size="sm" variant="outline" className="gap-1" onClick={() => setBulkAction("developer")}>
                     <UserPlus className="h-3.5 w-3.5" />
                     Assign dev
@@ -688,12 +708,13 @@ function SupportListPage() {
                   onAction={canManageTickets ? openCreate : undefined}
                 />
               ) : (
-                <div className="card-soft overflow-hidden p-1 sm:p-2">
+                <div className="card-soft overflow-hidden p-0.5">
                   <DataTable
                     data={filtered}
                     getRowId={(r) => r.id}
                     searchKeys={["id", "title", "company", "project", "developer", "owner", "description"]}
-                    pageSize={12}
+                    pageSize={15}
+                    density="compact"
                     selection={
                       canManageTickets
                         ? {
@@ -709,7 +730,7 @@ function SupportListPage() {
                     columns={[
                       {
                         key: "id",
-                        header: "Ticket ID",
+                        header: "ID",
                         render: (r) => <span className="font-medium text-primary">{r.id}</span>,
                         sortable: true,
                       },
@@ -717,33 +738,43 @@ function SupportListPage() {
                         key: "type",
                         header: "Type",
                         render: (r) => (
-                          <Pill tone={r.type === "Bug" ? "danger" : "info"}>{r.type}</Pill>
+                          <Pill tone={r.type === "Bug" ? "danger" : "info"} className="text-[10px] px-1.5 py-px">
+                            {r.type}
+                          </Pill>
                         ),
                       },
                       {
                         key: "title",
                         header: "Title",
                         render: (r) => (
-                          <div>
-                            <div className="font-medium">{r.title}</div>
-                            {r.description ? (
-                              <div className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                                {r.description}
-                              </div>
-                            ) : null}
-                          </div>
+                          <span className="line-clamp-1 max-w-[180px] font-medium" title={r.title}>
+                            {r.title}
+                          </span>
                         ),
                         sortable: true,
                       },
                       {
                         key: "priority",
-                        header: "Priority",
-                        render: (r) => <Pill tone={priorityTone(r.priority)}>{r.priority}</Pill>,
+                        header: "Pri",
+                        render: (r) => (
+                          <Pill tone={priorityTone(r.priority)} className="text-[10px] px-1.5 py-px">
+                            {r.priority}
+                          </Pill>
+                        ),
                       },
                       { key: "status", header: "Status", render: (r) => r.status, sortable: true },
-                      { key: "company", header: "Company", render: (r) => r.company, sortable: true },
-                      { key: "project", header: "Project", render: (r) => r.project },
-                      { key: "developer", header: "Developer", render: (r) => r.developer },
+                      {
+                        key: "company",
+                        header: "Company",
+                        render: (r) => <span className="line-clamp-1 max-w-[100px]">{r.company}</span>,
+                        sortable: true,
+                      },
+                      {
+                        key: "project",
+                        header: "Project",
+                        render: (r) => <span className="line-clamp-1 max-w-[100px]">{r.project}</span>,
+                      },
+                      { key: "developer", header: "Dev", render: (r) => r.developer },
                       { key: "owner", header: "Owner", render: (r) => r.owner },
                       {
                         key: "raisedOn",
@@ -788,17 +819,12 @@ function SupportListPage() {
             </DesignTicketSection>
           </div>
 
-          <motion.div
-            variants={ticketSectionVariants}
-            initial="hidden"
-            animate="show"
-            className="mt-6"
-          >
-            <DesignTicketInfoBanner>
+          <div className="mt-3">
+            <DesignTicketInfoBanner compact>
               Drag tickets on the Kanban board to move them through the release pipeline. Bulk actions
               apply to selected rows in the list view.
             </DesignTicketInfoBanner>
-          </motion.div>
+          </div>
         </>
       )}
 

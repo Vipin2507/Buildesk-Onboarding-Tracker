@@ -40,6 +40,7 @@ export function DataTable<T>({
   actions,
   getRowId,
   selection,
+  density = "default",
 }: {
   data: T[];
   columns: {
@@ -57,6 +58,7 @@ export function DataTable<T>({
   actions?: (row: T) => ReactNode;
   getRowId?: (row: T) => string;
   selection?: DataTableSelection;
+  density?: "default" | "compact";
 }) {
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<string | null>(null);
@@ -109,6 +111,12 @@ export function DataTable<T>({
 
   if (data.length === 0 && emptyState) return <>{emptyState}</>;
 
+  const compact = density === "compact";
+  const cellPad = compact ? "px-2.5 py-1.5" : "px-4 py-3";
+  const headPad = compact ? "px-2.5 py-1.5" : "px-4 py-2.5";
+  const tableText = compact ? "text-xs" : "text-sm";
+  const headText = compact ? "text-[11px]" : "text-xs";
+
   const primary = columns[0];
   const secondary = columns[1];
   const tertiary = columns.find(
@@ -121,8 +129,8 @@ export function DataTable<T>({
   return (
     <div>
       {!hideSearch && searchKeys && (
-        <div className="relative mb-3 max-w-sm">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <div className="relative mb-2 max-w-xs">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <input
             value={search}
             onChange={(e) => {
@@ -130,7 +138,10 @@ export function DataTable<T>({
               setPage(0);
             }}
             placeholder="Search…"
-            className="h-10 w-full rounded-md border bg-background pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring/40 md:h-9"
+            className={cn(
+              "w-full rounded-md border bg-background pr-3 text-sm outline-none focus:ring-2 focus:ring-ring/40",
+              compact ? "h-8 pl-8 text-xs" : "h-10 pl-9 md:h-9",
+            )}
           />
         </div>
       )}
@@ -221,11 +232,11 @@ export function DataTable<T>({
 
       <div className="hidden overflow-hidden rounded-lg border md:block">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/60 text-xs text-muted-foreground">
+          <table className={cn("w-full", tableText)}>
+            <thead className={cn("bg-muted/60 text-muted-foreground", headText)}>
               <tr>
                 {selection && (
-                  <th className="w-10 px-3 py-2.5">
+                  <th className={cn("w-9", headPad)}>
                     <Checkbox
                       checked={allFilteredSelected ? true : someFilteredSelected ? "indeterminate" : false}
                       onCheckedChange={(checked) =>
@@ -239,7 +250,8 @@ export function DataTable<T>({
                   <th
                     key={col.key}
                     className={cn(
-                      "px-4 py-2.5 text-left font-medium",
+                      headPad,
+                      "text-left font-medium",
                       col.sortable && "cursor-pointer select-none",
                     )}
                     onClick={() => {
@@ -264,7 +276,7 @@ export function DataTable<T>({
                     </span>
                   </th>
                 ))}
-                {actions && <th className="px-4 py-2.5 text-right font-medium">Actions</th>}
+                {actions && <th className={cn(headPad, "text-right font-medium")}>Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -282,7 +294,7 @@ export function DataTable<T>({
                     onClick={() => onRowClick?.(row)}
                   >
                     {selection && (
-                      <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                      <td className={cn(cellPad, "w-9")} onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           checked={selected}
                           onCheckedChange={(checked) => selection.onToggle(id, checked === true)}
@@ -291,12 +303,12 @@ export function DataTable<T>({
                       </td>
                     )}
                     {columns.map((col) => (
-                      <td key={col.key} className="px-4 py-3">
+                      <td key={col.key} className={cellPad}>
                         {col.render(row)}
                       </td>
                     ))}
                     {actions && (
-                      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                      <td className={cn(cellPad, "text-right")} onClick={(e) => e.stopPropagation()}>
                         {actions(row)}
                       </td>
                     )}
@@ -314,7 +326,7 @@ export function DataTable<T>({
       </div>
 
       {filtered.length > pageSize && (
-        <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+        <div className={cn("mt-2 flex items-center justify-between text-muted-foreground", compact ? "text-[11px]" : "text-xs")}>
           <span>
             Showing {safePage * pageSize + 1}–
             {Math.min((safePage + 1) * pageSize, filtered.length)} of {filtered.length}

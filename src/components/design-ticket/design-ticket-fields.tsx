@@ -14,20 +14,26 @@ import { cn } from "@/lib/utils";
 export const ticketFieldControl =
   "h-10 rounded-lg border-input bg-card text-foreground shadow-none transition-[box-shadow,border-color,background-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] focus-visible:border-primary/45 focus-visible:ring-2 focus-visible:ring-primary/20 dark:bg-muted/40 dark:hover:bg-muted/55";
 
+export const ticketFieldControlCompact =
+  "h-8 rounded-md border-input bg-card text-xs text-foreground shadow-none transition-[box-shadow,border-color,background-color] duration-200 focus-visible:border-primary/45 focus-visible:ring-2 focus-visible:ring-primary/20 dark:bg-muted/40";
+
 export function DesignTicketFieldLabel({
   htmlFor,
   children,
   className,
+  compact,
 }: {
   htmlFor?: string;
   children: ReactNode;
   className?: string;
+  compact?: boolean;
 }) {
   return (
     <label
       htmlFor={htmlFor}
       className={cn(
-        "mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground",
+        "mb-1 block font-medium uppercase tracking-wide text-muted-foreground",
+        compact ? "text-[10px]" : "mb-1.5 text-[11px]",
         className,
       )}
     >
@@ -49,6 +55,7 @@ export function DesignTicketSelect({
   placeholder = "Select…",
   className,
   disabled,
+  compact,
 }: {
   id?: string;
   value: string;
@@ -57,10 +64,14 @@ export function DesignTicketSelect({
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  compact?: boolean;
 }) {
   return (
     <Select value={value} onValueChange={onChange} disabled={disabled}>
-      <SelectTrigger id={id} className={cn(ticketFieldControl, "w-full", className)}>
+      <SelectTrigger
+        id={id}
+        className={cn(compact ? ticketFieldControlCompact : ticketFieldControl, "w-full", className)}
+      >
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent className="max-h-[min(16rem,70vh)] border-border bg-popover text-popover-foreground">
@@ -82,14 +93,16 @@ export function DesignTicketFilterField({
   label,
   children,
   className,
+  compact,
 }: {
   label: string;
   children: ReactNode;
   className?: string;
+  compact?: boolean;
 }) {
   return (
     <div className={cn("min-w-0", className)}>
-      <DesignTicketFieldLabel>{label}</DesignTicketFieldLabel>
+      <DesignTicketFieldLabel compact={compact}>{label}</DesignTicketFieldLabel>
       {children}
     </div>
   );
@@ -101,20 +114,22 @@ export function DesignTicketDateField({
   onChange,
   placeholder,
   className,
+  compact,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  compact?: boolean;
 }) {
   return (
-    <DesignTicketFilterField label={label} className={className}>
+    <DesignTicketFilterField label={label} className={className} compact={compact}>
       <DatePickerField
         value={value}
         onChange={onChange}
         placeholder={placeholder ?? "Pick a date"}
-        className="w-full [&_input]:h-10"
+        className={cn("w-full", compact ? "[&_input]:h-8 [&_input]:text-xs" : "[&_input]:h-10")}
       />
     </DesignTicketFilterField>
   );
