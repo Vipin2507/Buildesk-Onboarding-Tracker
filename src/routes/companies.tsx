@@ -1,12 +1,35 @@
 import { createFileRoute, Outlet, useChildMatches, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState, useCallback } from "react";
-import { Plus, Pencil, Trash2, UserRound, FileSpreadsheet } from "lucide-react";
+import { useMemo, useState, useCallback, useRef } from "react";
+import { motion } from "framer-motion";
+import {
+  Building2,
+  CheckCircle2,
+  Clock,
+  Plus,
+  Pencil,
+  Trash2,
+  UserRound,
+  FileSpreadsheet,
+  TrendingUp,
+} from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 
-import { PageHeader, PageWrap } from "@/components/page-header";
+import { PageWrap } from "@/components/page-header";
+import {
+  DesignTicketDateField,
+  DesignTicketFilterField,
+  DesignTicketSelect,
+} from "@/components/design-ticket/design-ticket-fields";
+import {
+  DesignTicketFilterBar,
+  DesignTicketKpiGrid,
+  DesignTicketPageHeader,
+  DesignTicketSection,
+  DesignTicketTabNav,
+} from "@/components/design-ticket/design-ticket-shared";
 import { StatusPill, Pill } from "@/components/status-pill";
 import { ProgressBar } from "@/components/progress-bar";
 import { Button } from "@/components/ui/button";
@@ -14,10 +37,9 @@ import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDeleteDialog, EntityFormModal } from "@/components/entity-form-modal";
 import { ProjectImportModal } from "@/components/project-import-modal";
-import { ListToolbar, compareNumber, compareText, inDateRange } from "@/components/list-toolbar";
+import { inDateRange } from "@/components/list-toolbar";
 import { usePermissions } from "@/hooks/use-permissions";
 import { MODULE_CATALOG, createCompanyModules, normalizeCompanyModules } from "@/data/module-catalog";
-import { ProgressSummaryCards } from "@/components/progress-summary-cards";
 import {
   useCompanyStore,
   useEmployeeStore,
@@ -133,7 +155,47 @@ const STATUS_CHIPS = [
   { id: "not_started", label: "Not Started", status: "not_started" },
 ] as const;
 
-type CompanySort = "name" | "progress" | "startDate" | "city" | "plan" | "health";
+
+type CompanyKpiFilter = "all" | "pending" | "in_progress" | "live";
+
+function matchesCompanyKpi(
+  c: {
+    progress: number;
+    computedStatus: string;
+    status: string;
+    isLive?: boolean;
+    modules: Company["modules"];
+  },
+  filter: CompanyKpiFilter,
+): boolean {
+  if (filter === "all") return true;
+  const isLive =
+    Boolean(c.isLive) ||
+    c.progress >= 100 ||
+    c.computedStatus === "completed" ||
+    isCompanyModulesAllLive(normalizeCompanyModules(c.modules));
+  const isPending =
+    c.progress === 0 || c.computedStatus === "not_started" || c.status === "not_started";
+  const isInProgress =
+    !isLive && c.progress > 0 && c.progress < 100 && c.computedStatus !== "completed";
+  if (filter === "pending") return isPending;
+  if (filter === "in_progress") return isInProgress;
+  if (filter === "live") return isLive;
+  return true;
+}
+
+function companyKpiFilterLabel(filter: CompanyKpiFilter): string {
+  switch (filter) {
+    case "pending":
+      return "Pending onboarding";
+    case "in_progress":
+      return "In progress";
+    case "live":
+      return "Live companies";
+    default:
+      return "All companies";
+  }
+}
 
 function CompaniesPage() {
   const childMatches = useChildMatches();
@@ -156,7 +218,9 @@ function CompaniesListPage() {
   const canManageCompanies = can("manageCompanies");
   const canAssignSalesAgent = isAdmin || can("assignSalesAgent");
 
-  const [search, setSearch] = useState("");
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  const [kpiFilter, setKpiFilter] = useState<CompanyKpiFilter>("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [planFilter, setPlanFilter] = useState("all");
   const [healthFilter, setHealthFilter] = useState("all");
@@ -166,8 +230,6 @@ function CompaniesListPage() {
   const [cityFilter, setCityFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [sortBy, setSortBy] = useState<CompanySort>("startDate");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -318,8 +380,8 @@ function CompaniesListPage() {
   }, [enriched]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    let rows = enriched.filter((c) => {
+    return enriched.filter((c) => {
+      if (!matchesCompanyKpi(c, kpiFilter)) return false;
       if (statusFilter !== "all") {
         const chip = STATUS_CHIPS.find((s) => s.id === statusFilter);
         if (chip?.status && c.computedStatus !== chip.status && c.status !== chip.status) {
@@ -346,41 +408,11 @@ function CompaniesListPage() {
       if (progressFilter === "50-99" && !(c.progress >= 50 && c.progress <= 99)) return false;
       if (progressFilter === "100" && c.progress !== 100) return false;
       if (!inDateRange(c.startDate || c.agreementDate, dateFrom, dateTo)) return false;
-      if (q) {
-        const hay = [c.name, c.city, c.contact, c.email, c.plan, c.health]
-          .join(" ")
-          .toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
       return true;
     });
-
-    rows = [...rows].sort((a, b) => {
-      switch (sortBy) {
-        case "progress":
-          return compareNumber(a.progress, b.progress, sortDir);
-        case "startDate":
-          return compareText(
-            a.startDate || a.agreementDate || "",
-            b.startDate || b.agreementDate || "",
-            sortDir,
-          );
-        case "city":
-          return compareText(a.city, b.city, sortDir);
-        case "plan":
-          return compareText(a.plan, b.plan, sortDir);
-        case "health":
-          return compareText(a.health, b.health, sortDir);
-        case "name":
-        default:
-          return compareText(a.name, b.name, sortDir);
-      }
-    });
-
-    return rows;
   }, [
     enriched,
-    search,
+    kpiFilter,
     statusFilter,
     planFilter,
     healthFilter,
@@ -390,8 +422,6 @@ function CompaniesListPage() {
     progressFilter,
     dateFrom,
     dateTo,
-    sortBy,
-    sortDir,
   ]);
 
   const activeFilterCount = [
@@ -404,38 +434,73 @@ function CompaniesListPage() {
     cityFilter !== "all",
     Boolean(dateFrom),
     Boolean(dateTo),
-    search.trim() !== "",
+    kpiFilter !== "all",
   ].filter(Boolean).length;
 
-  const portfolioCards = useMemo(() => {
-    const total = filtered.length;
-    const pending = filtered.filter(
-      (c) => c.progress === 0 || c.computedStatus === "not_started" || c.status === "not_started",
-    ).length;
-    const inProgress = filtered.filter(
-      (c) => !c.isLive && c.progress > 0 && c.progress < 100 && c.computedStatus !== "completed",
-    ).length;
-    const live = filtered.filter(
-      (c) =>
-        c.isLive ||
-        c.progress >= 100 ||
-        c.computedStatus === "completed" ||
-        isCompanyModulesAllLive(normalizeCompanyModules(c.modules)),
-    ).length;
-    const avg =
-      total === 0 ? 0 : Math.round(filtered.reduce((sum, c) => sum + c.progress, 0) / total);
-    return [
-      { id: "total", label: "Total", value: total },
-      { id: "pending", label: "Pending", value: pending, hint: "Not started / 0%" },
-      { id: "in_progress", label: "In Progress", value: inProgress },
-      { id: "live", label: "Live", value: live },
-      { id: "avg", label: "Average %", value: avg, suffix: "%" },
-      { id: "overall", label: "Overall %", value: avg, suffix: "%", hint: "Mean of company %" },
-    ];
-  }, [filtered]);
+  const kpiStats = useMemo(() => {
+    const pending = enriched.filter((c) => matchesCompanyKpi(c, "pending")).length;
+    const inProgress = enriched.filter((c) => matchesCompanyKpi(c, "in_progress")).length;
+    const live = enriched.filter((c) => matchesCompanyKpi(c, "live")).length;
+    const avg = enriched.length
+      ? Math.round(enriched.reduce((sum, c) => sum + c.progress, 0) / enriched.length)
+      : 0;
+    return { total: enriched.length, pending, inProgress, live, avg };
+  }, [enriched]);
+
+  const kpiCards = [
+    {
+      id: "all",
+      label: "Total",
+      value: kpiStats.total,
+      icon: Building2,
+      onClick: () => setKpiFilter("all"),
+      active: kpiFilter === "all",
+    },
+    {
+      id: "pending",
+      label: "Pending",
+      value: kpiStats.pending,
+      icon: Clock,
+      tone: "text-amber-600 dark:text-amber-400",
+      onClick: () => setKpiFilter("pending"),
+      active: kpiFilter === "pending",
+    },
+    {
+      id: "in_progress",
+      label: "In Progress",
+      value: kpiStats.inProgress,
+      icon: TrendingUp,
+      tone: "text-primary",
+      onClick: () => setKpiFilter("in_progress"),
+      active: kpiFilter === "in_progress",
+    },
+    {
+      id: "live",
+      label: "Live",
+      value: kpiStats.live,
+      icon: CheckCircle2,
+      tone: "text-emerald-600 dark:text-emerald-400",
+      onClick: () => setKpiFilter("live"),
+      active: kpiFilter === "live",
+    },
+    {
+      id: "avg",
+      label: "Avg %",
+      value: kpiStats.avg,
+    },
+  ];
+
+  const statusTabs = STATUS_CHIPS.map((c) => ({
+    id: c.id,
+    label: `${c.label} (${statusCounts[c.id] ?? 0})`,
+  }));
+
+  function applyFilters() {
+    tableRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
 
   function clearFilters() {
-    setSearch("");
+    setKpiFilter("all");
     setStatusFilter("all");
     setPlanFilter("all");
     setHealthFilter("all");
@@ -527,195 +592,201 @@ function CompaniesListPage() {
     setDeleting(null);
   }
 
-  const citySelect =
-    cities.length > 1
-      ? [
-          {
-            id: "city",
-            label: "City",
-            value: cityFilter,
-            onChange: setCityFilter,
-            options: [
-              { value: "all", label: "All cities" },
-              ...cities.map((city) => ({ value: city, label: city })),
-            ],
-          },
-        ]
-      : [];
-
   return (
-    <PageWrap>
-      <PageHeader
+    <PageWrap compact>
+      <DesignTicketPageHeader
+        compact
         title="Companies"
-        subtitle="All client companies onboarding to Buildesk."
+        subtitle="Client onboarding portfolio — track progress, modules, and go-live status."
         actions={
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-            {canManageCompanies && (
-              <Button variant="outline" className="gap-1.5" onClick={() => setImportOpen(true)}>
-                <FileSpreadsheet className="h-4 w-4" /> Import sheet
+          canManageCompanies ? (
+            <div className="flex flex-wrap gap-1.5">
+              <Button size="sm" variant="outline" className="gap-1" onClick={() => setImportOpen(true)}>
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                Import
               </Button>
-            )}
-            {canManageCompanies && (
-              <Button className="gap-1.5 bg-primary hover:bg-primary/90" onClick={openCreate}>
-                <Plus className="h-4 w-4" /> Add Company
+              <Button size="sm" className="gap-1 bg-primary" onClick={openCreate}>
+                <Plus className="h-3.5 w-3.5" />
+                Add Company
               </Button>
-            )}
-          </div>
+            </div>
+          ) : undefined
         }
       />
 
-      <ProgressSummaryCards cards={portfolioCards} />
+      <div className="mb-3">
+        <DesignTicketKpiGrid items={kpiCards} columns={5} size="compact" />
+      </div>
 
-      <ListToolbar
-        search={search}
-        onSearchChange={setSearch}
-        searchPlaceholder="Search companies, cities, contacts…"
-        chips={STATUS_CHIPS.map((c) => ({
-          id: c.id,
-          label: c.label,
-          count: statusCounts[c.id] ?? 0,
-        }))}
-        activeChip={statusFilter}
-        onChipChange={setStatusFilter}
-        dateRange={{
-          label: "Start date",
-          from: dateFrom,
-          to: dateTo,
-          onFromChange: setDateFrom,
-          onToChange: setDateTo,
-        }}
-        selects={[
-          {
-            id: "plan",
-            label: "Plan",
-            value: planFilter,
-            onChange: setPlanFilter,
-            options: [
+      <DesignTicketTabNav
+        compact
+        tabs={statusTabs}
+        activeId={statusFilter}
+        onChange={setStatusFilter}
+      />
+
+      <DesignTicketFilterBar
+        compact
+        className="xl:grid-cols-4"
+        activeFilterCount={activeFilterCount}
+        onClear={clearFilters}
+        onApply={applyFilters}
+        resultCount={filtered.length}
+        resultLabel={filtered.length === 1 ? "company" : "companies"}
+      >
+        <DesignTicketFilterField label="Plan" compact>
+          <DesignTicketSelect
+            compact
+            value={planFilter}
+            onChange={setPlanFilter}
+            options={[
               { value: "all", label: "All plans" },
               { value: "Annual", label: "Annual" },
               { value: "Half-Yearly", label: "Half-Yearly" },
               { value: "AMC", label: "AMC" },
-            ],
-          },
-          {
-            id: "health",
-            label: "Health",
-            value: healthFilter,
-            onChange: setHealthFilter,
-            options: [
+            ]}
+          />
+        </DesignTicketFilterField>
+        <DesignTicketFilterField label="Health" compact>
+          <DesignTicketSelect
+            compact
+            value={healthFilter}
+            onChange={setHealthFilter}
+            options={[
               { value: "all", label: "All health" },
               { value: "Healthy", label: "Healthy" },
               { value: "Moderate", label: "Moderate" },
               { value: "Critical", label: "Critical" },
-            ],
-          },
-          {
-            id: "progress",
-            label: "Progress",
-            value: progressFilter,
-            onChange: setProgressFilter,
-            options: [
+            ]}
+          />
+        </DesignTicketFilterField>
+        <DesignTicketFilterField label="Progress" compact>
+          <DesignTicketSelect
+            compact
+            value={progressFilter}
+            onChange={setProgressFilter}
+            options={[
               { value: "all", label: "Any progress" },
               { value: "0", label: "Not started (0%)" },
               { value: "1-49", label: "Early (1–49%)" },
               { value: "50-99", label: "Advanced (50–99%)" },
               { value: "100", label: "Complete (100%)" },
-            ],
-          },
-          {
-            id: "manager",
-            label: "Manager",
-            value: managerFilter,
-            onChange: setManagerFilter,
-            options: [
+            ]}
+          />
+        </DesignTicketFilterField>
+        <DesignTicketFilterField label="Manager" compact>
+          <DesignTicketSelect
+            compact
+            value={managerFilter}
+            onChange={setManagerFilter}
+            options={[
               { value: "all", label: "All managers" },
               ...(unassignedCount > 0
                 ? [{ value: "unassigned", label: `Unassigned (${unassignedCount})` }]
                 : []),
               ...managers.map((m) => ({ value: m.id, label: m.name })),
-            ],
-          },
-          {
-            id: "salesAgent",
-            label: "Sales Agent",
-            value: salesAgentFilter,
-            onChange: setSalesAgentFilter,
-            options: [
+            ]}
+          />
+        </DesignTicketFilterField>
+        <DesignTicketFilterField label="Sales Agent" compact>
+          <DesignTicketSelect
+            compact
+            value={salesAgentFilter}
+            onChange={setSalesAgentFilter}
+            options={[
               { value: "all", label: "All sales agents" },
               ...(unassignedSalesCount > 0
                 ? [{ value: "unassigned", label: `Unassigned (${unassignedSalesCount})` }]
                 : []),
               ...salesAgents.map((m) => ({ value: m.id, label: m.name })),
-            ],
-          },
-          ...citySelect,
-        ]}
-        sortOptions={[
-          { value: "name", label: "Sort: Name" },
-          { value: "progress", label: "Sort: Progress" },
-          { value: "startDate", label: "Sort: Start date" },
-          { value: "city", label: "Sort: City" },
-          { value: "plan", label: "Sort: Plan" },
-          { value: "health", label: "Sort: Health" },
-        ]}
-        sortBy={sortBy}
-        sortDir={sortDir}
-        onSortByChange={(v) => setSortBy(v as CompanySort)}
-        onSortDirChange={setSortDir}
-        resultCount={filtered.length}
-        resultLabel={filtered.length === 1 ? "company" : "companies"}
-        activeFilterCount={activeFilterCount}
-        onClear={clearFilters}
-      />
-
-      {isAdmin && selectedIds.size > 0 && (
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5">
-          <span className="text-sm font-medium">
-            {selectedIds.size} {selectedIds.size === 1 ? "company" : "companies"} selected
-          </span>
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" onClick={() => setSelectedIds(new Set())}>
-              Clear
-            </Button>
-            <Button size="sm" className="gap-1.5" onClick={openBulkAssign}>
-              <UserRound className="h-3.5 w-3.5" />
-              Assign Onboarding Manager
-            </Button>
-          </div>
-        </div>
-      )}
-
-      <div className="card-soft overflow-hidden p-4">
-        {enriched.length === 0 ? (
-          <EmptyState
-            title="No companies yet"
-            description="Add your first client company to start onboarding."
-            actionLabel="+ Add Company"
-            onAction={openCreate}
+            ]}
           />
-        ) : filtered.length === 0 ? (
-          <EmptyState
-            title="No matches"
-            description="Try clearing filters or adjusting your search."
-            actionLabel="Clear filters"
-            onAction={clearFilters}
-          />
-        ) : (
-          <DataTable
-            data={filtered}
-            hideSearch
-            getRowId={(c) => c.id}
-            selection={
-              isAdmin
-                ? {
-                    selectedIds,
-                    onToggle: toggleSelection,
-                    onToggleAll: toggleSelectionAll,
-                  }
-                : undefined
-            }
-            onRowClick={(c) => navigate({ to: "/companies/$companyId", params: { companyId: c.id } })}
-            columns={[
+        </DesignTicketFilterField>
+        {cities.length > 1 ? (
+          <DesignTicketFilterField label="City" compact>
+            <DesignTicketSelect
+              compact
+              value={cityFilter}
+              onChange={setCityFilter}
+              options={[
+                { value: "all", label: "All cities" },
+                ...cities.map((city) => ({ value: city, label: city })),
+              ]}
+            />
+          </DesignTicketFilterField>
+        ) : null}
+        <DesignTicketDateField
+          compact
+          label="Start from"
+          value={dateFrom}
+          onChange={setDateFrom}
+          placeholder="From"
+        />
+        <DesignTicketDateField
+          compact
+          label="Start to"
+          value={dateTo}
+          onChange={setDateTo}
+          placeholder="To"
+        />
+      </DesignTicketFilterBar>
+
+      <div ref={tableRef}>
+        <DesignTicketSection title={companyKpiFilterLabel(kpiFilter)} delay={0.06} compact>
+          {isAdmin && selectedIds.size > 0 ? (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-2 flex flex-wrap items-center gap-1.5 rounded-lg border border-primary/25 bg-primary/5 px-2.5 py-1.5"
+            >
+              <span className="text-xs font-medium">
+                {selectedIds.size} {selectedIds.size === 1 ? "company" : "companies"} selected
+              </span>
+              <Button size="sm" variant="outline" className="gap-1" onClick={openBulkAssign}>
+                <UserRound className="h-3.5 w-3.5" />
+                Assign manager
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
+                Clear
+              </Button>
+            </motion.div>
+          ) : null}
+
+          {enriched.length === 0 ? (
+            <EmptyState
+              title="No companies yet"
+              description="Add your first client company to start onboarding."
+              actionLabel="+ Add Company"
+              onAction={openCreate}
+            />
+          ) : filtered.length === 0 ? (
+            <EmptyState
+              title="No matches"
+              description="Try another KPI card, clear filters, or adjust your search."
+              actionLabel="Clear filters"
+              onAction={clearFilters}
+            />
+          ) : (
+            <div className="card-soft overflow-hidden p-0.5">
+              <DataTable
+                data={filtered}
+                getRowId={(c) => c.id}
+                searchKeys={["name", "city", "contact", "email", "plan", "health"]}
+                pageSize={15}
+                density="compact"
+                selection={
+                  isAdmin
+                    ? {
+                        selectedIds,
+                        onToggle: toggleSelection,
+                        onToggleAll: toggleSelectionAll,
+                      }
+                    : undefined
+                }
+                onRowClick={(c) =>
+                  navigate({ to: "/companies/$companyId", params: { companyId: c.id } })
+                }
+                columns={[
               {
                 key: "name",
                 header: "Company",
@@ -792,8 +863,8 @@ function CompaniesListPage() {
                 sortable: true,
                 render: (c) => (
                   <div className="flex items-center gap-2">
-                    <ProgressBar value={c.progress} className="w-28" />
-                    <span className="text-xs text-muted-foreground">{c.progress}%</span>
+                    <ProgressBar value={c.progress} className="w-20" />
+                    <span className="text-[11px] tabular-nums text-muted-foreground">{c.progress}%</span>
                   </div>
                 ),
               },
@@ -810,24 +881,27 @@ function CompaniesListPage() {
               },
             ]}
             actions={(c) => (
-              <div className="flex justify-end gap-1">
-                <Button size="icon" variant="ghost" onClick={() => openEdit(c)}>
-                  <Pencil className="h-4 w-4" />
+              <div className="flex justify-end gap-0.5">
+                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(c)}>
+                  <Pencil className="h-3.5 w-3.5" />
                 </Button>
                 <Button
                   size="icon"
                   variant="ghost"
+                  className="h-8 w-8"
                   onClick={() => {
                     setDeleting(c);
                     setDeleteOpen(true);
                   }}
                 >
-                  <Trash2 className="h-4 w-4 text-destructive" />
+                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
                 </Button>
               </div>
             )}
           />
-        )}
+            </div>
+          )}
+        </DesignTicketSection>
       </div>
 
       <EntityFormModal
