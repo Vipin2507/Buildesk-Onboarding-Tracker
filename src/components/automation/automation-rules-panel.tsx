@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { Mail, MessageCircle, Pencil, Play, Plus, Trash2, Zap } from "lucide-react";
+import { Mail, MessageCircle, Pencil, Play, Plus, Power, Trash2, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 import { AutomationRuleDialog } from "@/components/automation/automation-rule-dialog";
@@ -17,6 +17,7 @@ import {
 import { useAutomationStore } from "@/stores/useAutomationStore";
 import { notifyAutomationResult, testAutomationRule } from "@/services/automation";
 import { formatRelativeTime } from "@/types/common";
+import { cn } from "@/lib/utils";
 
 const TRIGGER_LABEL = Object.fromEntries(AUTOMATION_TRIGGERS.map((t) => [t.value, t.label])) as Record<
   AutomationTrigger,
@@ -25,6 +26,8 @@ const TRIGGER_LABEL = Object.fromEntries(AUTOMATION_TRIGGERS.map((t) => [t.value
 
 export function AutomationRulesPanel() {
   const rules = useAutomationStore((s) => s.rules);
+  const rulesEnabled = useAutomationStore((s) => s.settings.automationsEnabled);
+  const setSettings = useAutomationStore((s) => s.setSettings);
   const deleteRule = useAutomationStore((s) => s.deleteRule);
   const toggleRule = useAutomationStore((s) => s.toggleRule);
 
@@ -44,6 +47,12 @@ export function AutomationRulesPanel() {
   }
 
   async function runRuleTest(rule: AutomationRule) {
+    if (!rulesEnabled) {
+      toast.info("Automation rules are paused", {
+        description: "Turn on the master switch above to send test notifications.",
+      });
+      return;
+    }
     setTestingRuleId(rule.id);
     try {
       const log = await testAutomationRule(rule.id);
@@ -107,7 +116,12 @@ export function AutomationRulesPanel() {
       key: "isActive",
       header: "Active",
       render: (r) => (
-        <Switch checked={r.isActive} size="sm" onCheckedChange={(v) => toggleRule(r.id, v === true)} />
+        <div className="flex items-center gap-2">
+          <Switch checked={r.isActive} size="sm" onCheckedChange={(v) => toggleRule(r.id, v === true)} />
+          {!rulesEnabled ? (
+            <span className="text-xs text-muted-foreground">Paused</span>
+          ) : null}
+        </div>
       ),
     },
     {
@@ -129,6 +143,42 @@ export function AutomationRulesPanel() {
         </Button>
       </div>
 
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={cn(
+          "card-soft mb-4 flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between",
+          !rulesEnabled && "border-warning/40 bg-warning/5",
+        )}
+      >
+        <div className="flex items-start gap-3">
+          <div
+            className={cn(
+              "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+              rulesEnabled ? "bg-primary/10 text-primary" : "bg-warning/15 text-warning-foreground",
+            )}
+          >
+            <Power className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="font-medium">Enable automation rules</div>
+            <p className="mt-0.5 max-w-xl text-sm text-muted-foreground">
+              {rulesEnabled
+                ? "Rules that are turned on will run on ticket events."
+                : "All rules are paused. Individual on/off settings are kept, but nothing will trigger until you turn this back on."}
+            </p>
+          </div>
+        </div>
+        <Switch
+          checked={rulesEnabled}
+          size="md"
+          onCheckedChange={(v) => {
+            setSettings({ automationsEnabled: v === true });
+            toast.success(v ? "Automation rules enabled" : "All automation rules paused");
+          }}
+        />
+      </motion.div>
+
       {rules.length === 0 ? (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
@@ -147,6 +197,7 @@ export function AutomationRulesPanel() {
           </Button>
         </motion.div>
       ) : (
+        <div className={cn(!rulesEnabled && "opacity-80")}>
         <DataTable
           data={rules}
           columns={columns}
@@ -157,8 +208,8 @@ export function AutomationRulesPanel() {
               <Button
                 size="icon"
                 variant="ghost"
-                title="Send test notification"
-                disabled={testingRuleId === r.id}
+                title={rulesEnabled ? "Send test notification" : "Turn on automation rules to test"}
+                disabled={testingRuleId === r.id || !rulesEnabled}
                 onClick={() => void runRuleTest(r)}
               >
                 <Play className={testingRuleId === r.id ? "h-4 w-4 animate-pulse" : "h-4 w-4"} />
@@ -180,6 +231,7 @@ export function AutomationRulesPanel() {
             </>
           )}
         />
+        </div>
       )}
 
       <AutomationRuleDialog

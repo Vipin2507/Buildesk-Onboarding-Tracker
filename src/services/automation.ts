@@ -366,6 +366,7 @@ export function dispatchAutomationTrigger(
 ): void {
   void (async () => {
     const store = useAutomationStore.getState();
+    if (!store.settings.automationsEnabled) return;
     const rules = store.rules.filter((r) => r.isActive && r.trigger === trigger);
     if (rules.length === 0) return;
 
