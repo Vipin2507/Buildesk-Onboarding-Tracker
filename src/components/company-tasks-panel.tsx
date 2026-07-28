@@ -118,17 +118,17 @@ export function CompanyTasksPanel({ companyId }: { companyId: string }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="font-semibold">Follow-up Tasks</h3>
-          <p className="text-xs text-muted-foreground">
+          <h3 className="text-xs font-semibold text-muted-foreground">Follow-up tasks</h3>
+          <p className="text-[10px] text-muted-foreground">
             {openCount} open · {overdueCount} overdue · {companyTasks.length} total
           </p>
         </div>
         {canManage ? (
-          <Button size="sm" className="gap-1.5" onClick={openCreate}>
-            <Plus className="h-3.5 w-3.5" /> Add task
+          <Button size="sm" className="h-7 gap-1 text-xs" onClick={openCreate}>
+            <Plus className="h-3 w-3" /> Add task
           </Button>
         ) : null}
       </div>
@@ -141,18 +141,18 @@ export function CompanyTasksPanel({ companyId }: { companyId: string }) {
           onAction={canManage ? openCreate : undefined}
         />
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {companyTasks.map((task) => (
             <button
               key={task.id}
               type="button"
-              className="card-soft flex w-full flex-col gap-2 p-4 text-left transition-colors hover:bg-muted/30"
+              className="card-soft flex w-full flex-col gap-1.5 px-3 py-2 text-left transition-colors hover:bg-muted/30"
               onClick={() => canManage && openEdit(task)}
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="font-medium">{task.title}</div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-sm font-medium">{task.title}</div>
+                  <div className="text-[10px] text-muted-foreground">
                     {resolveAssigneeLabel(task.assigneeUserId, users)} · Due{" "}
                     {task.dueDate ? formatDate(task.dueDate) : "—"}
                   </div>
@@ -166,7 +166,7 @@ export function CompanyTasksPanel({ companyId }: { companyId: string }) {
               </div>
               <div className="flex items-center gap-2">
                 <ProgressBar value={task.progressPercent} className="flex-1" />
-                <span className="text-xs tabular-nums text-muted-foreground">{task.progressPercent}%</span>
+                <span className="text-[10px] tabular-nums text-muted-foreground">{task.progressPercent}%</span>
               </div>
             </button>
           ))}

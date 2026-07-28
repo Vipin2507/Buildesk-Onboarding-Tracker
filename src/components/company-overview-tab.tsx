@@ -68,9 +68,9 @@ function Field({
   className?: string;
 }) {
   return (
-    <div className={cn("space-y-1", className)}>
-      <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-        {Icon && <Icon className="h-3.5 w-3.5" />}
+    <div className={cn("space-y-0.5", className)}>
+      <div className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        {Icon && <Icon className="h-3 w-3" />}
         {label}
       </div>
       <div className="text-sm">{children}</div>
@@ -132,27 +132,27 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="font-semibold">Company Details</h3>
-          <p className="text-xs text-muted-foreground">
-            Contact, account ownership, and commercial information
+          <h3 className="text-xs font-semibold text-muted-foreground">Company details</h3>
+          <p className="text-[10px] text-muted-foreground">
+            Contact, ownership, and commercial information
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1.5">
           {editing ? (
             <>
-              <Button size="sm" variant="outline" className="gap-1.5" onClick={onCancel}>
-                <X className="h-3.5 w-3.5" /> Cancel
+              <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={onCancel}>
+                <X className="h-3 w-3" /> Cancel
               </Button>
-              <Button size="sm" className="gap-1.5" onClick={onSave}>
-                <Save className="h-3.5 w-3.5" /> Save Changes
+              <Button size="sm" className="h-7 gap-1 text-xs" onClick={onSave}>
+                <Save className="h-3 w-3" /> Save
               </Button>
             </>
           ) : (
-            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setEditing(true)}>
-              <Pencil className="h-3.5 w-3.5" /> Edit Details
+            <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={() => setEditing(true)}>
+              <Pencil className="h-3 w-3" /> Edit
             </Button>
           )}
         </div>
@@ -160,7 +160,7 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
 
       {editing ? (
         <form
-          className="grid gap-4 md:grid-cols-2"
+          className="grid gap-2.5 md:grid-cols-2"
           onSubmit={(e) => {
             e.preventDefault();
             onSave();
@@ -326,7 +326,7 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
           </Section>
         </form>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-2.5 md:grid-cols-2">
           <Section title="Profile">
             <Field label="Company" icon={Building2}>
               <span className="font-medium">{company.name}</span>
@@ -396,9 +396,9 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="card-soft space-y-3 p-5 md:col-span-1">
-      <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h4>
-      <div className="grid gap-3 sm:grid-cols-2">{children}</div>
+    <section className="card-soft space-y-2 p-3 md:col-span-1">
+      <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{title}</h4>
+      <div className="grid gap-2.5 sm:grid-cols-2">{children}</div>
     </section>
   );
 }

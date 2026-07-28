@@ -1,5 +1,6 @@
 import { createFileRoute, Link, Outlet, useChildMatches, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import { z } from "zod";
 import {
   ArrowLeft,
@@ -16,7 +17,13 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { PageHeader, PageWrap } from "@/components/page-header";
+import { AnimatedSection, PageWrap } from "@/components/page-header";
+import {
+  DesignTicketPageHeader,
+  DesignTicketSection,
+  DesignTicketTabNav,
+  TICKET_EASE,
+} from "@/components/design-ticket/design-ticket-shared";
 import { StatusPill, Pill } from "@/components/status-pill";
 import { ProgressBar } from "@/components/progress-bar";
 import { Button } from "@/components/ui/button";
@@ -54,7 +61,7 @@ import {
 import { getModuleLabel } from "@/data/module-catalog";
 import { calcPostSalesProjectProgress } from "@/lib/post-sales-status";
 import { resolveAssigneeName } from "@/lib/managers";
-import { cn, formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import type { Project } from "@/types";
 
 const tabSchema = z.enum([
@@ -248,20 +255,21 @@ function CompanyDetailContent() {
   }
 
   return (
-    <PageWrap>
-      <div className="mb-4">
-        <Button variant="ghost" size="sm" asChild>
+    <PageWrap compact>
+      <AnimatedSection className="mb-2">
+        <Button variant="ghost" size="sm" className="-ml-2 gap-1.5 text-muted-foreground" asChild>
           <Link to="/companies">
-            <ArrowLeft className="mr-1 h-4 w-4" /> Companies
+            <ArrowLeft className="h-4 w-4" /> Companies
           </Link>
         </Button>
-      </div>
+      </AnimatedSection>
 
-      <PageHeader
+      <DesignTicketPageHeader
+        compact
         title={company.name}
-        subtitle={`${company.city}${company.region ? ` · ${company.region}` : ""} · ${company.plan} plan · Started ${formatDate(company.startDate || company.agreementDate)}`}
+        subtitle={`${company.city}${company.region ? ` · ${company.region}` : ""} · ${company.plan} · Started ${formatDate(company.startDate || company.agreementDate)}`}
         actions={
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             {companyLive ? (
               <Pill tone="success">Live</Pill>
             ) : (
@@ -278,93 +286,89 @@ function CompanyDetailContent() {
             >
               {company.health}
             </Pill>
-            <Button size="sm" className="gap-1.5 bg-primary hover:bg-primary/90" onClick={openAddProject}>
-              <Plus className="h-4 w-4" /> Add Project
+            <Button size="sm" className="h-8 gap-1 bg-primary" onClick={openAddProject}>
+              <Plus className="h-3.5 w-3.5" /> Add Project
             </Button>
             <Button
               variant="outline"
               size="sm"
-              className="text-destructive hover:bg-destructive/10"
+              className="h-8 text-destructive hover:bg-destructive/10"
               onClick={() => setDeleteOpen(true)}
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </div>
         }
       />
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <AnimatedSection delay={0.04} className="mb-3 grid grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-5">
         <StatCard
-          label="Overall Progress"
+          label="Progress"
           icon={TrendingUp}
           value={`${progress}%`}
-          foot={<ProgressBar value={progress} className="mt-2" />}
+          foot={<ProgressBar value={progress} className="mt-1.5" />}
         />
         <StatCard
-          label="Modules Opted"
+          label="Modules"
           icon={Layers}
           value={String(optedModules.length)}
-          foot={<span className="text-xs text-muted-foreground">{modulesWithProgress.length} available</span>}
-        />
-        <StatCard
-          label="Onboarding Manager"
-          icon={Building2}
-          value={managerName ?? "—"}
           foot={
-            <span className="text-xs text-muted-foreground">
-              Sales {salesAgentName ?? "—"} · Avg module {avgModuleProgress}%
+            <span className="text-[10px] text-muted-foreground">
+              {modulesWithProgress.length} available · avg {avgModuleProgress}%
             </span>
           }
         />
         <StatCard
-          label="CRM Follow-ups"
+          label="Manager"
+          icon={Building2}
+          value={managerName ?? "—"}
+          foot={
+            <span className="text-[10px] text-muted-foreground">Sales {salesAgentName ?? "—"}</span>
+          }
+        />
+        <StatCard
+          label="Follow-ups"
           icon={CalendarClock}
           value={`${openTasks} open`}
           foot={
-            <span className="text-xs text-muted-foreground">
+            <span className="text-[10px] text-muted-foreground">
               {visitCount} visits · {companyTasks.length} tasks
             </span>
           }
         />
         <StatCard
-          label="Go-Live Target"
+          label="Go-Live"
           icon={CalendarClock}
-          value={company.goLiveTarget}
+          value={formatDate(company.goLiveTarget)}
           foot={
-            <span className="text-xs text-muted-foreground">
+            <span className="text-[10px] text-muted-foreground">
               {projects.length + postSalesProjects.length} projects
             </span>
           }
         />
-      </div>
+      </AnimatedSection>
 
-      <div className="card-soft mb-5 -mx-1 flex gap-1 overflow-x-auto px-1.5 py-1.5 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className={cn(
-              "min-h-10 shrink-0 snap-start rounded-md px-3.5 py-2 text-sm font-medium transition-colors",
-              tab === t.id
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground",
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <DesignTicketTabNav
+        compact
+        tabs={TABS.map((t) => ({ id: t.id, label: t.label }))}
+        activeId={tab}
+        onChange={(id) => setTab(id as TabId)}
+      />
 
+      <motion.div
+        key={tab}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.28, ease: TICKET_EASE }}
+      >
       {tab === "Overview" && <CompanyOverviewTab company={company} />}
 
       {tab === "Modules" && (
-        <div className="space-y-4">
-          <TabIntro
-            title="Module Catalog"
-            description="Enable or disable purchased modules and mark Live. Open a module hub for company-scoped Customer App, Vendors, or Labor tools."
-          />
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <DesignTicketSection compact title="Module catalog" delay={0.02}>
+          <p className="mb-2 text-xs text-muted-foreground">
+            Enable modules, mark Live, and open hubs for Customer App, Vendors, or Labor.
+          </p>
+          <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
             {modulesWithProgress.map((m) => (
               <ModuleCard
                 key={m.moduleKey}
@@ -377,15 +381,14 @@ function CompanyDetailContent() {
               />
             ))}
           </div>
-        </div>
+        </DesignTicketSection>
       )}
 
       {tab === "Progress" && (
-        <div className="space-y-4">
-          <TabIntro
-            title="Module Progress"
-            description="Completion across each opted-in module. Drill into projects to update steps."
-          />
+        <DesignTicketSection compact title="Module progress" delay={0.02}>
+          <p className="mb-2 text-xs text-muted-foreground">
+            Completion across opted-in modules. Drill into a module to update steps.
+          </p>
           <ProgressSummaryCards cards={progressCards} />
           {optedModules.length === 0 ? (
             <EmptyState
@@ -395,15 +398,15 @@ function CompanyDetailContent() {
               onAction={() => setTab("Modules")}
             />
           ) : (
-            <div className="space-y-3">
+            <div className="mt-2 space-y-1.5">
               {optedModules.map((m) => (
                 <div
                   key={m.moduleKey}
-                  className="card-soft flex flex-wrap items-center gap-4 p-4 transition-shadow hover:shadow-md"
+                  className="card-soft flex flex-wrap items-center gap-2.5 px-3 py-2 transition-shadow hover:shadow-sm"
                 >
-                  <div className="min-w-[160px]">
-                    <div className="font-medium">{m.label}</div>
-                    <div className="text-xs text-muted-foreground">
+                  <div className="min-w-[140px]">
+                    <div className="text-sm font-medium">{m.label}</div>
+                    <div className="text-[10px] text-muted-foreground">
                       {m.isLive
                         ? "Live"
                         : m.progressPercent >= 100
@@ -413,15 +416,17 @@ function CompanyDetailContent() {
                             : "In progress"}
                     </div>
                   </div>
-                  <div className="min-w-[140px] flex-1">
+                  <div className="min-w-[120px] flex-1">
                     <ProgressBar value={m.progressPercent} />
                   </div>
-                  <span className="w-12 text-right text-sm font-semibold">{m.progressPercent}%</span>
+                  <span className="w-10 text-right text-xs font-semibold tabular-nums">
+                    {m.progressPercent}%
+                  </span>
                   <Pill tone={m.isLive ? "success" : "muted"}>{m.isLive ? "Live" : "Not Live"}</Pill>
                   <Button
                     size="sm"
                     variant="outline"
-                    className="gap-1"
+                    className="h-7 gap-1 text-xs"
                     onClick={() =>
                       navigate({
                         to: "/companies/$companyId/modules/$moduleKey",
@@ -429,38 +434,39 @@ function CompanyDetailContent() {
                       })
                     }
                   >
-                    Open <ArrowRight className="h-3.5 w-3.5" />
+                    Open <ArrowRight className="h-3 w-3" />
                   </Button>
                 </div>
               ))}
             </div>
           )}
-        </div>
+        </DesignTicketSection>
       )}
 
       {tab === "Project" && (
-        <div className="space-y-6">
-          <TabIntro
-            title="Project"
-            description="Onboarding projects and Post Sales trackers. Use Edit to fill address, towers, floors, units, and commercial details after import or create."
-          />
+        <div className="space-y-4">
+          <DesignTicketSection compact title="Projects" delay={0.02}>
+            <p className="mb-2 text-xs text-muted-foreground">
+              Onboarding and Post Sales trackers — edit address, towers, floors, and commercial details.
+            </p>
+          </DesignTicketSection>
 
-          <section className="space-y-3">
+          <section className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <FolderKanban className="h-4 w-4 text-muted-foreground" />
-                <h4 className="text-sm font-semibold">Onboarding Projects</h4>
+              <div className="flex items-center gap-1.5">
+                <FolderKanban className="h-3.5 w-3.5 text-muted-foreground" />
+                <h4 className="text-xs font-semibold text-muted-foreground">Onboarding</h4>
                 <Pill>{projects.length}</Pill>
               </div>
               <Button
                 size="sm"
-                className="gap-1.5 bg-primary hover:bg-primary/90"
+                className="h-7 gap-1 bg-primary text-xs"
                 onClick={() => {
                   setEditingProject(null);
                   setProjectModalOpen(true);
                 }}
               >
-                <Plus className="h-3.5 w-3.5" /> Add Project
+                <Plus className="h-3 w-3" /> Add Project
               </Button>
             </div>
             {projects.length === 0 ? (
@@ -474,13 +480,13 @@ function CompanyDetailContent() {
                 }}
               />
             ) : (
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-2 md:grid-cols-2">
                 {projects.map((p) => {
                   const pct = calcProjectProgress(p.id, checklistItems);
                   return (
                     <div
                       key={p.id}
-                      className="card-soft group p-4 transition-all hover:-translate-y-0.5 hover:shadow-md"
+                      className="card-soft group p-3 transition-all hover:-translate-y-0.5 hover:shadow-sm"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <Link
@@ -489,22 +495,22 @@ function CompanyDetailContent() {
                           search={{ tab: "onboarding" }}
                           className="min-w-0 flex-1"
                         >
-                          <div className="font-semibold group-hover:text-primary">{p.name}</div>
-                          <div className="mt-0.5 text-xs text-muted-foreground">
+                          <div className="text-sm font-semibold group-hover:text-primary">{p.name}</div>
+                          <div className="mt-0.5 text-[11px] text-muted-foreground">
                             {p.type} · {p.units} units · {p.city || "No city"}
                             {p.address ? ` · ${p.address}` : ""}
                           </div>
                         </Link>
-                        <div className="flex shrink-0 items-center gap-1.5">
+                        <div className="flex shrink-0 items-center gap-1">
                           <StatusPill status={p.status} />
                           <Button
                             type="button"
                             size="sm"
                             variant="outline"
-                            className="h-8 gap-1 px-2"
+                            className="h-7 gap-1 px-2 text-xs"
                             onClick={() => openEditProject(p)}
                           >
-                            <Pencil className="h-3.5 w-3.5" /> Edit
+                            <Pencil className="h-3 w-3" /> Edit
                           </Button>
                         </div>
                       </div>
@@ -512,10 +518,10 @@ function CompanyDetailContent() {
                         to="/projects/$projectId"
                         params={{ projectId: p.id }}
                         search={{ tab: "onboarding" }}
-                        className="mt-3 block"
+                        className="mt-2 block"
                       >
                         <ProgressBar value={pct} />
-                        <div className="mt-1 text-xs text-muted-foreground">{pct}% complete</div>
+                        <div className="mt-0.5 text-[10px] text-muted-foreground">{pct}% complete</div>
                       </Link>
                     </div>
                   );
@@ -524,16 +530,17 @@ function CompanyDetailContent() {
             )}
           </section>
 
-          <section className="space-y-3">
+          <section className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Layers className="h-4 w-4 text-muted-foreground" />
-                <h4 className="text-sm font-semibold">Post Sales Projects</h4>
+              <div className="flex items-center gap-1.5">
+                <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+                <h4 className="text-xs font-semibold text-muted-foreground">Post Sales</h4>
                 <Pill>{postSalesProjects.length}</Pill>
               </div>
               <Button
                 size="sm"
                 variant="outline"
+                className="h-7 text-xs"
                 onClick={() =>
                   navigate({
                     to: "/companies/$companyId/modules/$moduleKey",
@@ -545,11 +552,11 @@ function CompanyDetailContent() {
               </Button>
             </div>
             {postSalesProjects.length === 0 ? (
-              <div className="rounded-lg border border-dashed bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
+              <div className="rounded-lg border border-dashed bg-muted/20 px-3 py-6 text-center text-xs text-muted-foreground">
                 No Post Sales projects. Open the Post Sales module to create one.
               </div>
             ) : (
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-2 md:grid-cols-2">
                 {postSalesProjects.map((p) => {
                   const pct = calcPostSalesProjectProgress(p);
                   return (
@@ -557,18 +564,18 @@ function CompanyDetailContent() {
                       key={p.id}
                       to="/companies/$companyId/modules/post-sales/projects/$projectId"
                       params={{ companyId, projectId: p.id }}
-                      className="card-soft group block p-4 transition-all hover:-translate-y-0.5 hover:shadow-md"
+                      className="card-soft group block p-3 transition-all hover:-translate-y-0.5 hover:shadow-sm"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <div className="text-xs text-muted-foreground">{p.projectNumber}</div>
-                          <div className="font-semibold group-hover:text-primary">{p.projectName}</div>
+                          <div className="text-[10px] text-muted-foreground">{p.projectNumber}</div>
+                          <div className="text-sm font-semibold group-hover:text-primary">{p.projectName}</div>
                         </div>
                         <Pill tone={pct >= 100 ? "success" : pct > 0 ? "accent" : "muted"}>
                           {pct}%
                         </Pill>
                       </div>
-                      <div className="mt-3">
+                      <div className="mt-2">
                         <ProgressBar value={pct} />
                       </div>
                     </Link>
@@ -591,78 +598,80 @@ function CompanyDetailContent() {
       {tab === "History" && <CompanyHistoryTab companyId={companyId} />}
 
       {tab === "Billing" && (
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <TabIntro
-              title="Billing & Subscription"
-              description="Plan, agreement, and renewal details for this account."
-            />
+        <DesignTicketSection compact title="Billing & subscription" delay={0.02}>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">
+              Plan, agreement, and renewal details for this account.
+            </p>
             <Button
               size="sm"
-              className="gap-1.5"
+              className="h-7 gap-1 text-xs"
               onClick={() => {
                 markRenewed(companyId);
                 toast.success("Plan renewed for 12 months");
               }}
             >
-              <RefreshCw className="h-3.5 w-3.5" /> Mark Renewed
+              <RefreshCw className="h-3 w-3" /> Mark Renewed
             </Button>
           </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <div className="card-soft p-5">
-              <div className="text-xs text-muted-foreground">Plan</div>
-              <div className="mt-2">
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            <div className="card-soft p-3">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Plan</div>
+              <div className="mt-1.5">
                 <Pill tone="accent">{company.plan}</Pill>
               </div>
-              <p className="mt-3 text-sm text-muted-foreground">
+              <p className="mt-2 text-xs text-muted-foreground">
                 {company.billingInfo || "No custom billing notes"}
               </p>
             </div>
-            <div className="card-soft p-5">
-              <div className="text-xs text-muted-foreground">Start Date</div>
-              <div className="mt-2 text-lg font-semibold">{formatDate(company.startDate || company.agreementDate)}</div>
+            <div className="card-soft p-3">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Start Date</div>
+              <div className="mt-1.5 text-base font-semibold">
+                {formatDate(company.startDate || company.agreementDate)}
+              </div>
             </div>
-            <div className="card-soft p-5">
-              <div className="text-xs text-muted-foreground">Agreement Date</div>
-              <div className="mt-2 text-lg font-semibold">{formatDate(company.agreementDate)}</div>
+            <div className="card-soft p-3">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Agreement</div>
+              <div className="mt-1.5 text-base font-semibold">{formatDate(company.agreementDate)}</div>
             </div>
-            <div className="card-soft p-5">
-              <div className="text-xs text-muted-foreground">Plan Expiry</div>
-              <div className="mt-2 text-lg font-semibold">{formatDate(company.planExpiry)}</div>
+            <div className="card-soft p-3">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Plan Expiry</div>
+              <div className="mt-1.5 text-base font-semibold">{formatDate(company.planExpiry)}</div>
               {company.renewedAt && (
-                <p className="mt-2 text-xs text-muted-foreground">
+                <p className="mt-1 text-[10px] text-muted-foreground">
                   Last renewed {new Date(company.renewedAt).toLocaleDateString()}
                 </p>
               )}
             </div>
-            <div className="card-soft p-5 md:col-span-2 xl:col-span-3">
-              <div className="text-xs text-muted-foreground">GST / Tax</div>
-              <div className="mt-1 font-medium">{company.gstNumber || "—"}</div>
-              <div className="mt-3 text-xs text-muted-foreground">Billing Address</div>
-              <div className="mt-1 text-sm">{company.officeAddress || company.city}</div>
+            <div className="card-soft p-3 md:col-span-2 xl:col-span-2">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">GST / Tax</div>
+              <div className="mt-1 text-sm font-medium">{company.gstNumber || "—"}</div>
+              <div className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+                Billing Address
+              </div>
+              <div className="mt-0.5 text-xs">{company.officeAddress || company.city}</div>
             </div>
           </div>
 
-          <div className="card-soft space-y-3 p-5">
+          <div className="card-soft mt-2 space-y-2.5 p-3">
             <div>
-              <div className="text-sm font-semibold">Module subscriptions</div>
-              <p className="text-xs text-muted-foreground">
-                Commercial entitlement status (separate from module go-live). Legacy opted modules
-                remain accessible during rollout.
+              <div className="text-xs font-semibold">Module subscriptions</div>
+              <p className="text-[10px] text-muted-foreground">
+                Commercial entitlement status (separate from module go-live).
               </p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-lg border bg-muted/30 p-3">
-                <div className="text-xs text-muted-foreground">Active</div>
-                <div className="mt-1 text-xl font-semibold">{subscriptionSummary.active}</div>
+            <div className="grid gap-1.5 sm:grid-cols-3">
+              <div className="rounded-lg border bg-muted/30 px-2.5 py-2">
+                <div className="text-[10px] text-muted-foreground">Active</div>
+                <div className="mt-0.5 text-lg font-semibold tabular-nums">{subscriptionSummary.active}</div>
               </div>
-              <div className="rounded-lg border bg-muted/30 p-3">
-                <div className="text-xs text-muted-foreground">Expiring (30d)</div>
-                <div className="mt-1 text-xl font-semibold">{subscriptionSummary.expiring}</div>
+              <div className="rounded-lg border bg-muted/30 px-2.5 py-2">
+                <div className="text-[10px] text-muted-foreground">Expiring (30d)</div>
+                <div className="mt-0.5 text-lg font-semibold tabular-nums">{subscriptionSummary.expiring}</div>
               </div>
-              <div className="rounded-lg border bg-muted/30 p-3">
-                <div className="text-xs text-muted-foreground">Expired</div>
-                <div className="mt-1 text-xl font-semibold">{subscriptionSummary.expired}</div>
+              <div className="rounded-lg border bg-muted/30 px-2.5 py-2">
+                <div className="text-[10px] text-muted-foreground">Expired</div>
+                <div className="mt-0.5 text-lg font-semibold tabular-nums">{subscriptionSummary.expired}</div>
               </div>
             </div>
             {subscriptionSummary.rows.length > 0 ? (
@@ -707,18 +716,18 @@ function CompanyDetailContent() {
               </div>
               </>
             ) : (
-              <p className="text-xs text-muted-foreground">
-                No subscription rows yet — they are created when modules are opted in or managed
-                from each module hub.
+              <p className="text-[10px] text-muted-foreground">
+                No subscription rows yet — created when modules are opted in or managed from each hub.
               </p>
             )}
           </div>
 
-          <p className="text-xs text-muted-foreground">
+          <p className="mt-2 text-[10px] text-muted-foreground">
             Edit plan, dates, GST, and billing notes from the Details tab.
           </p>
-        </div>
+        </DesignTicketSection>
       )}
+      </motion.div>
 
       <ProjectFormModal
         open={projectModalOpen}
@@ -755,22 +764,15 @@ function StatCard({
   foot?: React.ReactNode;
 }) {
   return (
-    <div className="card-soft p-4">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="text-xs text-muted-foreground">{label}</div>
-        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+    <div className="card-soft flex flex-col gap-0.5 px-2.5 py-2">
+      <div className="flex items-center justify-between gap-1">
+        <div className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          {label}
+        </div>
+        <Icon className="h-3 w-3 shrink-0 text-muted-foreground/70" />
       </div>
-      <div className="truncate text-lg font-semibold">{value}</div>
+      <div className="truncate text-sm font-semibold leading-tight">{value}</div>
       {foot}
-    </div>
-  );
-}
-
-function TabIntro({ title, description }: { title: string; description: string }) {
-  return (
-    <div>
-      <h3 className="font-semibold">{title}</h3>
-      <p className="text-xs text-muted-foreground">{description}</p>
     </div>
   );
 }

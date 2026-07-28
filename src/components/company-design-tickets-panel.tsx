@@ -106,50 +106,51 @@ export function CompanyDesignTicketsPanel({ companyId }: Props) {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, ease: TICKET_EASE }}
-        className="card-soft space-y-3 p-4"
+        className="card-soft space-y-2 p-3"
       >
-        <div className="text-sm font-semibold">Client ticket creation link</div>
-        <p className="text-xs text-muted-foreground">
+        <div className="text-xs font-semibold">Client ticket creation link</div>
+        <p className="text-[10px] text-muted-foreground">
           Share this link with {companyName} so they can raise design & support tickets.
         </p>
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex flex-col gap-1.5 sm:flex-row">
           <Input
             readOnly
             value={publicUrl}
-            className="font-mono text-xs"
+            className="h-8 font-mono text-xs"
             onFocus={(e) => selectInputText(e.currentTarget)}
           />
-          <div className="flex shrink-0 flex-wrap gap-2">
+          <div className="flex shrink-0 flex-wrap gap-1.5">
             <Button
               type="button"
+              size="sm"
               variant="outline"
-              className="gap-1.5"
+              className="h-8 gap-1 text-xs"
               onClick={(e) => {
                 const input = e.currentTarget.closest(".card-soft")?.querySelector("input");
                 void copyLink(input instanceof HTMLInputElement ? input : null);
               }}
             >
-              <Copy className="h-4 w-4" />
-              Copy Link
+              <Copy className="h-3.5 w-3.5" />
+              Copy
             </Button>
-            <Button type="button" variant="outline" className="gap-1.5" onClick={() => setRegenOpen(true)}>
-              <RefreshCw className="h-4 w-4" />
+            <Button type="button" size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={() => setRegenOpen(true)}>
+              <RefreshCw className="h-3.5 w-3.5" />
               Regenerate
             </Button>
-            <Button type="button" variant="secondary" className="gap-1.5" asChild>
+            <Button type="button" size="sm" variant="secondary" className="h-8 gap-1 text-xs" asChild>
               <a href={previewUrl} target="_blank" rel="noreferrer">
-                <ExternalLink className="h-4 w-4" />
-                Preview Portal
+                <ExternalLink className="h-3.5 w-3.5" />
+                Preview
               </a>
             </Button>
           </div>
         </div>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-[10px] text-muted-foreground">
           Shareable links point to{" "}
           <span className="font-mono">{publicUrl.replace(portalCreatePath(access.slug), "") || "this site"}</span>
           . Update <code className="rounded bg-muted px-1">VITE_PORTAL_BASE_URL</code> in{" "}
@@ -157,20 +158,22 @@ export function CompanyDesignTicketsPanel({ companyId }: Props) {
         </p>
       </motion.div>
 
-      <DesignTicketKpiGrid items={kpiCards} columns={4} />
+      <DesignTicketKpiGrid items={kpiCards} columns={4} size="compact" />
 
-      <DesignTicketSection title="Company Tickets" delay={0.08}>
+      <DesignTicketSection title="Company tickets" delay={0.08} compact>
         {enriched.length === 0 ? (
           <EmptyState
             title="No tickets for this company yet"
             description="When the client creates a ticket from their portal, it will appear here instantly."
           />
         ) : (
+          <div className="card-soft overflow-hidden p-0.5">
           <DataTable
           data={enriched}
           getRowId={(r) => r.id}
           hideSearch
           pageSize={8}
+          density="compact"
           onRowClick={(row) => {
             window.location.href = `/tickets/${row.id}`;
           }}
@@ -194,7 +197,7 @@ export function CompanyDesignTicketsPanel({ companyId }: Props) {
             <Button
               size="sm"
               variant="ghost"
-              className="text-destructive"
+              className="h-7 text-xs text-destructive"
               onClick={(e) => {
                 e.stopPropagation();
                 deleteTicket(row.id);
@@ -205,10 +208,11 @@ export function CompanyDesignTicketsPanel({ companyId }: Props) {
             </Button>
           )}
         />
+          </div>
         )}
       </DesignTicketSection>
 
-      <p className="text-center text-xs text-muted-foreground">
+      <p className="text-center text-[10px] text-muted-foreground">
         Engineering support tickets (TKT) remain in{" "}
         <Link to="/support" className="text-primary hover:underline">
           Support Desk
