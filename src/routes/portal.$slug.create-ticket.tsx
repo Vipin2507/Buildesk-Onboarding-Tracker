@@ -22,6 +22,39 @@ import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
 import type { DesignTicketPriority } from "@/types/design-ticket";
 import { DESIGN_TICKET_PRIORITY_LABEL } from "@/types/design-ticket";
 
+const PORTAL_CATEGORY_OPTIONS: { value: string; label: string; hint: string }[] = [
+  {
+    value: "Dashboard Issue",
+    label: "Something is not working",
+    hint: "Errors, broken pages, or unexpected behavior",
+  },
+  {
+    value: "Feature Request",
+    label: "Request a new feature",
+    hint: "New capability or workflow you'd like added",
+  },
+  {
+    value: "Design",
+    label: "Design/UI change",
+    hint: "Layout, styling, or visual improvement requests",
+  },
+  {
+    value: "Banner Design",
+    label: "Creative/banner request",
+    hint: "Promotional banners and visual assets",
+  },
+  {
+    value: "Development",
+    label: "Integration or technical setup",
+    hint: "API, data flow, or implementation support",
+  },
+  {
+    value: "Other",
+    label: "General request",
+    hint: "Anything that doesn't fit the options above",
+  },
+].filter((option) => DESIGN_TICKET_CATEGORIES.includes(option.value as never));
+
 export const Route = createFileRoute("/portal/$slug/create-ticket")({
   component: PortalCreateTicket,
 });
@@ -33,7 +66,9 @@ function PortalCreateTicket() {
   const createPortalTicket = useDesignTicketStore((s) => s.createPortalTicket);
 
   const [subject, setSubject] = useState("");
-  const [category, setCategory] = useState<string>(DESIGN_TICKET_CATEGORIES[0]);
+  const [category, setCategory] = useState<string>(
+    PORTAL_CATEGORY_OPTIONS[0]?.value ?? DESIGN_TICKET_CATEGORIES[0],
+  );
   const [priority, setPriority] = useState<DesignTicketPriority>("medium");
   const [description, setDescription] = useState("");
   const [attachments, setAttachments] = useState<{ name: string }[]>([]);
@@ -91,8 +126,8 @@ function PortalCreateTicket() {
 
         <motion.div variants={ticketSectionVariants}>
           <DesignTicketPageHeader
-            title="Create New Ticket"
-            subtitle="Describe your request — our team will respond in the ticket thread."
+            title="Create Ticket"
+            subtitle="Share your request with details so our team can respond faster."
           />
         </motion.div>
 
@@ -108,12 +143,19 @@ function PortalCreateTicket() {
               />
             </DesignTicketFormField>
             <div className="grid gap-4 sm:grid-cols-2">
-              <DesignTicketFormField label="Category">
+              <DesignTicketFormField label="Request type">
                 <DesignTicketSelect
                   value={category}
                   onChange={setCategory}
-                  options={DESIGN_TICKET_CATEGORIES.map((c) => ({ value: c, label: c }))}
+                  options={PORTAL_CATEGORY_OPTIONS.map((option) => ({
+                    value: option.value,
+                    label: option.label,
+                  }))}
                 />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {PORTAL_CATEGORY_OPTIONS.find((option) => option.value === category)?.hint ??
+                    "Choose the option that best matches your request."}
+                </p>
               </DesignTicketFormField>
               <DesignTicketFormField label="Priority">
                 <DesignTicketSelect
@@ -130,17 +172,19 @@ function PortalCreateTicket() {
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                rows={6}
+                rows={5}
                 className={ticketTextareaClass}
-                placeholder="Include as much detail as possible — steps to reproduce, screenshots, etc."
+                placeholder="What do you need? Include expected outcome, links, and issue steps if relevant."
                 required
               />
             </DesignTicketFormField>
             <DesignTicketFormField label="Attachments">
-              <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-input bg-muted/20 px-4 py-6 text-center transition-colors hover:bg-muted/40">
+              <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-input bg-muted/20 px-4 py-4 text-center transition-colors hover:bg-muted/40">
                 <Paperclip className="mb-2 h-5 w-5 text-muted-foreground" />
                 <span className="text-sm font-medium">Click to attach files</span>
-                <span className="mt-1 text-xs text-muted-foreground">Images, PDFs, or documents</span>
+                <span className="mt-1 text-xs text-muted-foreground">
+                  Images, PDFs, or supporting documents
+                </span>
                 <input
                   type="file"
                   multiple

@@ -1,7 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { Plus } from "lucide-react";
-
 import {
   DesignTicketPageHeader,
   PortalPageWrap,
@@ -51,6 +49,7 @@ function PortalSolvedTickets() {
           <PortalSolvedTicketsTable
             rows={rows}
             slug={slug}
+            pageSize={15}
             onRowClick={(row) =>
               void navigate({
                 to: "/portal/$slug/tickets/$ticketId",

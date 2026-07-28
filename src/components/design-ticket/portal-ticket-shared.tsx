@@ -77,7 +77,7 @@ export function PortalTicketTableCard({
 }) {
   return (
     <DesignTicketSection title={title} action={action} delay={delay} className={className}>
-      <div className="card-soft overflow-hidden p-1 sm:p-2">{children}</div>
+      <div className="card-soft overflow-hidden p-1">{children}</div>
     </DesignTicketSection>
   );
 }
@@ -137,7 +137,7 @@ export function PortalActiveTicketsTable({
   rows,
   slug,
   onRowClick,
-  pageSize = 10,
+  pageSize = 12,
 }: {
   rows: DesignTicket[];
   slug: string;
@@ -161,6 +161,7 @@ export function PortalActiveTicketsTable({
       getRowId={(r) => r.id}
       searchKeys={["ticketNumber", "subject", "category"]}
       pageSize={pageSize}
+      density="compact"
       onRowClick={onRowClick}
       columns={activeColumns}
     />
@@ -171,7 +172,7 @@ export function PortalSolvedTicketsTable({
   rows,
   slug,
   onRowClick,
-  pageSize = 10,
+  pageSize = 12,
 }: {
   rows: DesignTicket[];
   slug: string;
@@ -193,6 +194,7 @@ export function PortalSolvedTicketsTable({
       getRowId={(r) => r.id}
       searchKeys={["ticketNumber", "subject"]}
       pageSize={pageSize}
+      density="compact"
       onRowClick={onRowClick}
       columns={solvedColumns}
     />

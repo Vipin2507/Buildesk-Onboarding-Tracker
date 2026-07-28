@@ -116,9 +116,9 @@ function PortalMyTickets() {
         variants={ticketSectionVariants}
         initial="hidden"
         animate="show"
-        className="mb-6"
+        className="mb-4"
       >
-        <DesignTicketKpiGrid items={kpiCards} columns={4} />
+        <DesignTicketKpiGrid items={kpiCards} columns={4} size="compact" />
       </motion.div>
 
       <PortalTicketTableCard title={portalTicketFilterLabel(kpiFilter)} delay={0.06}>
@@ -128,6 +128,7 @@ function PortalMyTickets() {
           <PortalActiveTicketsTable
             rows={rows}
             slug={slug}
+            pageSize={15}
             onRowClick={(row) =>
               void navigate({
                 to: "/portal/$slug/tickets/$ticketId",

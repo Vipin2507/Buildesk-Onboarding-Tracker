@@ -117,9 +117,9 @@ function PortalDashboard() {
         variants={ticketSectionVariants}
         initial="hidden"
         animate="show"
-        className="mb-6"
+        className="mb-4"
       >
-        <DesignTicketKpiGrid items={kpiCards} columns={4} />
+        <DesignTicketKpiGrid items={kpiCards} columns={4} size="compact" />
       </motion.div>
 
       <PortalTicketTableCard title="My Current Tickets" delay={0.06}>
@@ -131,7 +131,7 @@ function PortalDashboard() {
           <PortalActiveTicketsTable
             rows={current}
             slug={slug}
-            pageSize={6}
+            pageSize={8}
             onRowClick={(row) => openTicket(row.id)}
           />
         )}
