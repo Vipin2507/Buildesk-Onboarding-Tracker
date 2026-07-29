@@ -129,7 +129,7 @@ export function DataTable<T>({
   return (
     <div>
       {!hideSearch && searchKeys && (
-        <div className="relative mb-2 max-w-xs">
+        <div className="relative mb-2 w-full max-w-full sm:max-w-xs">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <input
             value={search}
@@ -146,9 +146,9 @@ export function DataTable<T>({
         </div>
       )}
 
-      <div className="space-y-2.5 md:hidden">
+      <div className="space-y-2 md:hidden">
         {selection && filtered.length > 0 && (
-          <label className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-xs">
+          <label className="flex items-center gap-2 rounded-lg border bg-muted/30 px-2.5 py-1.5 text-xs">
             <Checkbox
               checked={allFilteredSelected ? true : someFilteredSelected ? "indeterminate" : false}
               onCheckedChange={(checked) =>
@@ -172,7 +172,7 @@ export function DataTable<T>({
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.25, delay: Math.min(i * 0.03, 0.24), ease }}
                 className={cn(
-                  "rounded-xl border border-border bg-card p-3.5",
+                  "rounded-lg border border-border bg-card p-3",
                   onRowClick && "active:bg-muted/50",
                   selected && "border-primary/40 bg-primary/5",
                 )}
@@ -190,7 +190,9 @@ export function DataTable<T>({
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-foreground">{primary?.render(row)}</div>
+                    <div className={cn("font-medium text-foreground", compact ? "text-xs" : "text-sm")}>
+                      {primary?.render(row)}
+                    </div>
                     {secondary && (
                       <div className="mt-1 text-xs text-muted-foreground">{secondary.render(row)}</div>
                     )}
@@ -213,7 +215,7 @@ export function DataTable<T>({
                 </div>
                 {actions && (
                   <div
-                    className="mt-3 flex justify-end gap-1 border-t border-border/60 pt-2.5"
+                    className="mt-2.5 flex flex-wrap justify-end gap-1 border-t border-border/60 pt-2"
                     onClick={(e) => e.stopPropagation()}
                   >
                     {actions(row)}
@@ -224,7 +226,7 @@ export function DataTable<T>({
           })}
         </AnimatePresence>
         {paged.length === 0 && (
-          <div className="rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+          <div className="rounded-lg border border-dashed px-3 py-8 text-center text-xs text-muted-foreground">
             No results
           </div>
         )}
@@ -326,26 +328,33 @@ export function DataTable<T>({
       </div>
 
       {filtered.length > pageSize && (
-        <div className={cn("mt-2 flex items-center justify-between text-muted-foreground", compact ? "text-[11px]" : "text-xs")}>
-          <span>
+        <div
+          className={cn(
+            "mt-2 flex flex-wrap items-center justify-between gap-2 text-muted-foreground",
+            compact ? "text-[11px]" : "text-xs",
+          )}
+        >
+          <span className="min-w-0">
             Showing {safePage * pageSize + 1}–
             {Math.min((safePage + 1) * pageSize, filtered.length)} of {filtered.length}
           </span>
-          <div className="flex gap-1">
+          <div className="flex shrink-0 gap-1">
             <Button
               size="sm"
               variant="outline"
+              className={compact ? "h-7 px-2 text-xs" : undefined}
               disabled={safePage === 0}
               onClick={() => setPage((p) => Math.max(0, p - 1))}
             >
               Prev
             </Button>
-            <span className="flex items-center px-2">
+            <span className="flex items-center px-2 tabular-nums">
               {safePage + 1} / {totalPages}
             </span>
             <Button
               size="sm"
               variant="outline"
+              className={compact ? "h-7 px-2 text-xs" : undefined}
               disabled={safePage >= totalPages - 1}
               onClick={() => setPage((p) => p + 1)}
             >

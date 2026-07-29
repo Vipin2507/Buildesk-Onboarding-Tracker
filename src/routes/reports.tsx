@@ -204,7 +204,7 @@ function Reports() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.25, ease: TICKET_EASE }}
-            className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3"
+            className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3"
           >
             {REPORT_META.map((r, i) => {
               const Icon = ICONS[r.id];
@@ -238,7 +238,7 @@ function Reports() {
             transition={{ duration: 0.28, ease: TICKET_EASE }}
             className="space-y-3"
           >
-            <div className="grid gap-1.5 grid-cols-2 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-1.5 md:grid-cols-4">
               {active.kpis.map((k) => (
                 <div key={k.label} className="card-soft p-2.5">
                   <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -258,10 +258,10 @@ function Reports() {
               ))}
             </div>
 
-            <div className="grid gap-2.5 lg:grid-cols-5">
-              <DesignTicketSection title={active.chartLabel ?? "Distribution"} delay={0.02} compact className="lg:col-span-2">
+            <div className="grid min-w-0 gap-2.5 lg:grid-cols-5">
+              <DesignTicketSection title={active.chartLabel ?? "Distribution"} delay={0.02} compact className="min-w-0 lg:col-span-2">
                 <div className="card-soft p-3">
-                  <div className="h-48 sm:h-56">
+                  <div className="h-44 w-full min-w-0 sm:h-56">
                     {active.chart.length === 0 ? (
                       <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
                         No chart data
@@ -303,7 +303,7 @@ function Reports() {
                 </div>
               </DesignTicketSection>
 
-              <DesignTicketSection title="Details" delay={0.04} compact className="lg:col-span-3">
+              <DesignTicketSection title="Details" delay={0.04} compact className="min-w-0 lg:col-span-3">
                 <ReportTable columns={active.columns} rows={active.rows} />
               </DesignTicketSection>
             </div>

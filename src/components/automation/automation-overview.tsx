@@ -149,7 +149,7 @@ export function AutomationStatsRow({
 }) {
   const sent = range === "24h" ? sent24h : range === "7d" ? sent7d : sent30d;
   return (
-    <div className="grid gap-1.5 sm:grid-cols-3">
+    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
       <div className="card-soft p-2.5">
         <div className="mb-1.5 flex gap-0.5">
           {(["24h", "7d", "30d"] as const).map((r) => (

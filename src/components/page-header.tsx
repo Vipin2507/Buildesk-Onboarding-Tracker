@@ -32,15 +32,15 @@ export function PageHeader({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: PAGE_EASE }}
       className={cn(
-        "flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:justify-between",
+        "flex max-w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between md:items-center",
         compact ? "mb-3" : "mb-5 gap-3 md:mb-6 md:items-end",
       )}
     >
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <h1
           className={cn(
-            "font-semibold tracking-tight text-foreground",
-            compact ? "text-lg" : "text-xl md:text-2xl",
+            "font-semibold tracking-tight break-words text-foreground",
+            compact ? "text-base sm:text-lg" : "text-xl md:text-2xl",
           )}
         >
           {title}
@@ -49,7 +49,7 @@ export function PageHeader({
           <p
             className={cn(
               "text-muted-foreground",
-              compact ? "mt-0.5 line-clamp-2 text-xs" : "mt-1 text-sm",
+              compact ? "mt-0.5 line-clamp-2 text-xs sm:line-clamp-1" : "mt-1 text-sm",
             )}
           >
             {subtitle}
@@ -59,8 +59,8 @@ export function PageHeader({
       {actions ? (
         <div
           className={cn(
-            "flex flex-wrap items-center",
-            compact ? "gap-1.5" : "w-full gap-2 md:w-auto md:justify-end",
+            "flex w-full min-w-0 flex-wrap items-center sm:w-auto sm:justify-end",
+            compact ? "gap-1.5" : "gap-2",
           )}
         >
           {actions}
@@ -84,8 +84,10 @@ export function PageWrap({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: PAGE_EASE }}
       className={cn(
-        "min-w-0 overflow-x-hidden",
-        compact ? "p-3 md:p-4 lg:p-5" : "p-4 md:p-6 lg:p-8",
+        "min-w-0 max-w-full overflow-x-hidden",
+        compact
+          ? "p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4 lg:p-5"
+          : "p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:p-6 lg:p-8",
       )}
     >
       {children}

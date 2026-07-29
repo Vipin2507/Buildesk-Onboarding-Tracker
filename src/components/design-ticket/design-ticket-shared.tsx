@@ -62,7 +62,7 @@ export function DesignTicketKpiGrid({
   const colClass =
     columns === 6
       ? size === "compact"
-        ? "sm:grid-cols-3 lg:grid-cols-6"
+        ? "sm:grid-cols-3 md:grid-cols-3 xl:grid-cols-6"
         : "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
       : columns === 5
         ? size === "compact"
@@ -73,13 +73,13 @@ export function DesignTicketKpiGrid({
           : columns === 2
             ? "sm:grid-cols-2"
             : size === "compact"
-              ? "sm:grid-cols-2 lg:grid-cols-4"
+              ? "sm:grid-cols-2 md:grid-cols-4"
               : "sm:grid-cols-2 lg:grid-cols-4";
 
   const gapClass = size === "compact" ? "gap-1.5" : "gap-2.5 sm:gap-3";
 
   return (
-    <div className={cn("grid grid-cols-2", gapClass, colClass)}>
+    <div className={cn("grid min-w-0 grid-cols-2", gapClass, colClass)}>
       {items.map((k, i) => {
         const Icon = k.icon;
         const clickable = Boolean(k.onClick);
@@ -91,14 +91,14 @@ export function DesignTicketKpiGrid({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: Math.min(i * 0.04, 0.2), ease: TICKET_EASE }}
             whileHover={clickable ? { y: -1, transition: { duration: 0.15 } } : undefined}
-            className="h-full"
+            className="min-w-0 h-full"
           >
             <Wrapper
               type={clickable ? "button" : undefined}
               onClick={k.onClick}
               className={cn(
                 size === "compact"
-                  ? "flex h-full w-full items-center justify-between gap-2 rounded-lg border border-border/80 bg-card px-2.5 py-2 text-left shadow-sm transition-all"
+                  ? "flex h-full w-full min-w-0 flex-col gap-1 rounded-lg border border-border/80 bg-card px-2.5 py-2 text-left shadow-sm transition-all sm:flex-row sm:items-center sm:justify-between sm:gap-2"
                   : "card-soft group h-full w-full p-3.5 text-left transition-all sm:p-4",
                 clickable &&
                   "cursor-pointer hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
@@ -174,15 +174,15 @@ export function DesignTicketPageHeader({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: TICKET_EASE }}
       className={cn(
-        "flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:justify-between",
+        "flex max-w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between md:items-center",
         compact ? "mb-3" : "mb-5 sm:mb-6 md:items-end",
       )}
     >
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <h1
           className={cn(
-            "font-semibold tracking-tight",
-            compact ? "text-lg" : "text-xl sm:text-2xl",
+            "font-semibold tracking-tight break-words",
+            compact ? "text-base sm:text-lg" : "text-xl sm:text-2xl",
           )}
         >
           {title}
@@ -191,14 +191,20 @@ export function DesignTicketPageHeader({
           <p
             className={cn(
               "text-muted-foreground",
-              compact ? "mt-0.5 line-clamp-1 text-xs" : "mt-1 text-sm",
+              compact
+                ? "mt-0.5 line-clamp-2 text-xs sm:line-clamp-1"
+                : "mt-1 text-sm",
             )}
           >
             {subtitle}
           </p>
         ) : null}
       </div>
-      {actions ? <div className="flex flex-wrap gap-1.5">{actions}</div> : null}
+      {actions ? (
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-1.5 sm:w-auto sm:justify-end">
+          {actions}
+        </div>
+      ) : null}
     </motion.div>
   );
 }
@@ -282,7 +288,7 @@ export function DesignTicketTabNav({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: TICKET_EASE }}
       className={cn(
-        "flex gap-0.5 overflow-x-auto rounded-lg border bg-muted/30 p-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        "flex w-full max-w-full gap-0.5 overflow-x-auto overscroll-x-contain rounded-lg border bg-muted/30 p-0.5 touch-pan-x [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         compact ? "mb-3" : "mb-5",
       )}
     >
@@ -295,7 +301,7 @@ export function DesignTicketTabNav({
             type="button"
             onClick={() => onChange(tab.id)}
             className={cn(
-              "flex shrink-0 items-center gap-1 rounded-md font-medium transition-all duration-200",
+              "flex shrink-0 snap-start items-center gap-1 rounded-md font-medium transition-all duration-200",
               compact ? "px-2.5 py-1.5 text-xs" : "px-3.5 py-2 text-sm",
               active
                 ? "bg-card text-foreground shadow-sm"
@@ -303,7 +309,7 @@ export function DesignTicketTabNav({
             )}
           >
             {Icon ? <Icon className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} /> : null}
-            {tab.label}
+            <span className="whitespace-nowrap">{tab.label}</span>
           </button>
         );
       })}
@@ -426,8 +432,13 @@ export function DesignTicketFilterBar({
               {children}
             </div>
             {onApply ? (
-              <div className="mt-2.5 flex justify-end">
-                <Button type="button" size="sm" onClick={onApply}>
+              <div className="mt-2.5 flex justify-stretch sm:justify-end">
+                <Button
+                  type="button"
+                  size="sm"
+                  className={cn("w-full sm:w-auto", compact && "h-8 text-xs")}
+                  onClick={onApply}
+                >
                   {applyLabel}
                 </Button>
               </div>

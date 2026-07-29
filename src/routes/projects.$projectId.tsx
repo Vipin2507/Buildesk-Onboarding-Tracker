@@ -379,7 +379,7 @@ function ProjectDetailPage() {
           </div>
 
           <div className="grid gap-2.5 lg:grid-cols-[240px_1fr]">
-            <nav className="card-soft flex h-fit gap-0.5 overflow-x-auto p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:block lg:overflow-visible">
+            <nav className="card-soft flex h-fit max-w-full gap-0.5 overflow-x-auto overscroll-x-contain p-1.5 touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:block lg:overflow-visible">
               {ONBOARDING_SECTIONS.map((s) => {
                 const active = s.key === section;
                 const pct = sectionProgress(s.key);

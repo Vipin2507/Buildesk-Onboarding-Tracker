@@ -142,7 +142,7 @@ function Settings() {
         subtitle="Configure the tracker to match your workflow."
       />
       {!section ? (
-        <div className="grid gap-2 md:grid-cols-2">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-2">
           {visibleSections.map((s, i) => (
             <motion.button
               key={s.id}

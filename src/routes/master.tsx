@@ -115,7 +115,7 @@ function MasterPage() {
       />
 
       <div className="grid gap-3 lg:grid-cols-[200px_1fr]">
-        <aside className="card-soft flex h-fit gap-0.5 overflow-x-auto p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:sticky lg:top-16 lg:block lg:space-y-0.5 lg:overflow-visible">
+        <aside className="card-soft flex h-fit max-w-full gap-0.5 overflow-x-auto overscroll-x-contain p-1.5 touch-pan-x [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:sticky lg:top-16 lg:block lg:max-h-[calc(100vh-5rem)] lg:space-y-0.5 lg:overflow-y-auto lg:overflow-x-visible">
           {SECTIONS.map((s) => {
             const Icon = s.icon;
             return (
@@ -1359,7 +1359,8 @@ function TemplatesPanel() {
         action={<Button size="sm" className="h-7 gap-1 px-2.5 text-xs" onClick={openCreate}><Plus className="h-3.5 w-3.5" /> Add Template</Button>}
       />
       <div className="card-soft overflow-hidden">
-        <table className="w-full text-xs">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[480px] text-xs">
           <thead className="bg-muted/50 text-xs text-muted-foreground">
             <tr>
               <th className="px-2.5 py-1.5 text-left">Name</th>
@@ -1388,6 +1389,7 @@ function TemplatesPanel() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       <EntityFormModal open={modalOpen} onOpenChange={setModalOpen} title={editing ? "Edit Template" : "Add Template"} onSubmit={save}>
@@ -1625,7 +1627,8 @@ function IntegrationsPanel() {
           action={<Button size="sm" className="h-7 gap-1 px-2.5 text-xs" onClick={() => setModalOpen(true)}><Plus className="h-3.5 w-3.5" /> Add Trigger</Button>}
         />
         <div className="card-soft overflow-hidden">
-          <table className="w-full text-xs">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[520px] text-xs">
             <thead className="bg-muted/50 text-xs text-muted-foreground">
               <tr>
                 <th className="px-2.5 py-1.5 text-left">Name</th>
@@ -1637,8 +1640,8 @@ function IntegrationsPanel() {
             <tbody>
               {triggers.map((t) => (
                 <tr key={t.id} className="border-t">
-                  <td className="px-3 py-2 font-medium">{t.name}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{t.event}</td>
+                  <td className="px-2.5 py-1.5 font-medium">{t.name}</td>
+                  <td className="px-2.5 py-1.5 font-mono text-[10px]">{t.event}</td>
                   <td className="px-2.5 py-1.5"><Pill tone="accent">{t.channel}</Pill></td>
                   <td className="px-2.5 py-1.5">
                     <div className="flex items-center justify-end gap-0.5">
@@ -1650,6 +1653,7 @@ function IntegrationsPanel() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 
@@ -1812,12 +1816,12 @@ function SectionHead({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-2">
-      <div>
+    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+      <div className="min-w-0">
         <h3 className="text-xs font-semibold text-muted-foreground">{title}</h3>
         <p className="text-[10px] text-muted-foreground">{description}</p>
       </div>
-      {action}
+      {action ? <div className="flex w-full flex-wrap gap-1.5 sm:w-auto sm:justify-end">{action}</div> : null}
     </div>
   );
 }

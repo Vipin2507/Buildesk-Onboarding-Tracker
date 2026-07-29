@@ -614,7 +614,7 @@ function CompaniesListPage() {
         }
       />
 
-      <div className="mb-3">
+      <div className="mb-3 min-w-0">
         <DesignTicketKpiGrid items={kpiCards} columns={5} size="compact" />
       </div>
 

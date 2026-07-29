@@ -88,7 +88,7 @@ export function ModuleCard({
         if (optedIn && (e.key === "Enter" || e.key === " ")) handleClick();
       }}
       className={cn(
-        "card-soft flex flex-col gap-2 p-3 transition-all",
+        "card-soft flex min-w-0 flex-col gap-2 p-3 transition-all",
         optedIn
           ? "cursor-pointer hover:-translate-y-0.5 hover:shadow-[var(--shadow-elevated)]"
           : "opacity-60",
@@ -106,7 +106,7 @@ export function ModuleCard({
         </div>
       </div>
       <div>
-        <div className="text-sm font-semibold">{label}</div>
+        <div className="truncate text-sm font-semibold">{label}</div>
         <p className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">
           {catalog?.description}
         </p>

@@ -144,8 +144,8 @@ function OnboardingList() {
   const statusTabs = [
     { id: "all", label: `All (${stats.active})` },
     { id: "early", label: `Early (${stats.early})` },
-    { id: "mid", label: `In progress (${stats.mid})` },
-    { id: "near", label: `Near done (${stats.near})` },
+    { id: "mid", label: `Mid (${stats.mid})` },
+    { id: "near", label: `Near (${stats.near})` },
   ];
 
   const columns: {
@@ -209,7 +209,7 @@ function OnboardingList() {
         subtitle="Active project onboardings — Continue opens Checklist Detail."
       />
 
-      <div className="mb-3">
+      <div className="mb-3 min-w-0">
         <DesignTicketKpiGrid items={kpiCards} columns={4} size="compact" />
       </div>
 
