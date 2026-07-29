@@ -23,7 +23,11 @@ import {
 import { toast } from "sonner";
 import { createFileRoute, Link } from "@tanstack/react-router";
 
-import { PageHeader, PageWrap } from "@/components/page-header";
+import { PageWrap } from "@/components/page-header";
+import {
+  DesignTicketPageHeader,
+  TICKET_EASE,
+} from "@/components/design-ticket/design-ticket-shared";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Pill } from "@/components/status-pill";
@@ -47,6 +51,7 @@ import type {
 } from "@/types";
 import { MASTER_INVENTORY_CATEGORIES } from "@/types/master";
 import { cn } from "@/lib/utils";
+import { AnimatePresence, motion } from "framer-motion";
 
 export const Route = createFileRoute("/master")({
   component: MasterPage,
@@ -80,16 +85,20 @@ function MasterPage() {
 
   if (user?.role !== "Admin") {
     return (
-      <PageWrap>
-        <PageHeader title="Master Config" subtitle="Central control plane for the tracker." />
-        <div className="card-soft mx-auto max-w-lg p-8 text-center">
-          <ShieldAlert className="mx-auto mb-3 h-10 w-10 text-destructive" />
-          <h3 className="font-semibold">Admin access required</h3>
-          <p className="mt-2 text-sm text-muted-foreground">
+      <PageWrap compact>
+        <DesignTicketPageHeader
+          compact
+          title="Master Config"
+          subtitle="Central control plane for the tracker."
+        />
+        <div className="card-soft mx-auto max-w-lg p-5 text-center">
+          <ShieldAlert className="mx-auto mb-2 h-8 w-8 text-destructive" />
+          <h3 className="text-sm font-semibold">Admin access required</h3>
+          <p className="mt-1.5 text-xs text-muted-foreground">
             Master Config controls every catalog, field definition, workflow step, and template
             used across the product. Only Admins can view or change it.
           </p>
-          <Button asChild className="mt-4" variant="outline">
+          <Button asChild size="sm" className="mt-3 h-7 text-xs" variant="outline">
             <Link to="/">Back to Dashboard</Link>
           </Button>
         </div>
@@ -98,14 +107,15 @@ function MasterPage() {
   }
 
   return (
-    <PageWrap>
-      <PageHeader
+    <PageWrap compact>
+      <DesignTicketPageHeader
+        compact
         title="Master Config"
         subtitle="Single source of truth for fields, workflows, templates, modules, and dictionaries."
       />
 
-      <div className="grid gap-5 lg:grid-cols-[240px_1fr]">
-        <aside className="card-soft flex h-fit gap-1 overflow-x-auto p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:sticky lg:top-20 lg:block lg:space-y-1 lg:overflow-visible">
+      <div className="grid gap-3 lg:grid-cols-[200px_1fr]">
+        <aside className="card-soft flex h-fit gap-0.5 overflow-x-auto p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:sticky lg:top-16 lg:block lg:space-y-0.5 lg:overflow-visible">
           {SECTIONS.map((s) => {
             const Icon = s.icon;
             return (
@@ -114,34 +124,43 @@ function MasterPage() {
                 type="button"
                 onClick={() => setSection(s.id)}
                 className={cn(
-                  "flex min-h-10 shrink-0 items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium transition-colors lg:w-full",
+                  "flex min-h-8 shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-left text-xs font-medium transition-colors lg:w-full",
                   section === s.id
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 )}
               >
-                <Icon className="h-4 w-4 shrink-0" />
+                <Icon className="h-3.5 w-3.5 shrink-0" />
                 <span className="whitespace-nowrap">{s.label}</span>
               </button>
             );
           })}
         </aside>
 
-        <div className="min-w-0">
-          {section === "overview" && <OverviewPanel onNavigate={setSection} />}
-          {section === "platform" && <PlatformPanel />}
-          {section === "company-fields" && <FieldsPanel entity="company" />}
-          {section === "project-fields" && <FieldsPanel entity="project" />}
-          {section === "picklists" && <PicklistsPanel />}
-          {section === "inventory" && <InventoryPanel />}
-          {section === "workflow" && <WorkflowPanel />}
-          {section === "checklist" && <ChecklistPanel />}
-          {section === "templates" && <TemplatesPanel />}
-          {section === "modules" && <ModulesPanel />}
-          {section === "integrations" && <IntegrationsPanel />}
-          {section === "data-control" && <DataControlPanel />}
-          {section === "danger" && <DangerPanel />}
-        </div>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={section}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.22, ease: TICKET_EASE }}
+            className="min-w-0"
+          >
+            {section === "overview" && <OverviewPanel onNavigate={setSection} />}
+            {section === "platform" && <PlatformPanel />}
+            {section === "company-fields" && <FieldsPanel entity="company" />}
+            {section === "project-fields" && <FieldsPanel entity="project" />}
+            {section === "picklists" && <PicklistsPanel />}
+            {section === "inventory" && <InventoryPanel />}
+            {section === "workflow" && <WorkflowPanel />}
+            {section === "checklist" && <ChecklistPanel />}
+            {section === "templates" && <TemplatesPanel />}
+            {section === "modules" && <ModulesPanel />}
+            {section === "integrations" && <IntegrationsPanel />}
+            {section === "data-control" && <DataControlPanel />}
+            {section === "danger" && <DangerPanel />}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </PageWrap>
   );
@@ -174,27 +193,27 @@ function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) 
   ];
 
   return (
-    <div className="space-y-4">
-      <div className="card-soft p-5">
-        <h3 className="font-semibold">{platform.productName}</h3>
-        <p className="text-sm text-muted-foreground">{platform.productTagline}</p>
-        <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+    <div className="space-y-2.5">
+      <div className="card-soft p-3">
+        <h3 className="text-sm font-semibold">{platform.productName}</h3>
+        <p className="text-xs text-muted-foreground">{platform.productTagline}</p>
+        <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] text-muted-foreground">
           <Pill tone="accent">{platform.defaultTimezone}</Pill>
           <Pill>{platform.defaultCurrency}</Pill>
           <Pill>{platform.supportEmail}</Pill>
         </div>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((c) => (
           <button
             key={c.label}
             type="button"
             onClick={() => onNavigate(c.to)}
-            className="card-soft p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
+            className="card-soft p-2.5 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
           >
-            <div className="text-xs text-muted-foreground">{c.label}</div>
-            <div className="mt-1 text-2xl font-semibold">{c.value}</div>
-            <div className="text-[11px] text-muted-foreground">
+            <div className="text-[10px] text-muted-foreground">{c.label}</div>
+            <div className="mt-0.5 text-lg font-semibold tabular-nums">{c.value}</div>
+            <div className="text-[10px] text-muted-foreground">
               {typeof c.total === "number"
                 ? `of ${c.total} ${c.suffix || "defined"} · click to manage`
                 : `${c.total} · click to manage`}
@@ -202,7 +221,7 @@ function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) 
           </button>
         ))}
       </div>
-      <div className="card-soft border-dashed p-4 text-sm text-muted-foreground">
+      <div className="card-soft border-dashed p-3 text-xs text-muted-foreground">
         Changes here drive new Post Sales projects, form catalogs, and template pickers.
         Existing operational records are not rewritten until you recreate them. Use Data Control
         to edit or delete live company and project records.
@@ -217,12 +236,12 @@ function PlatformPanel() {
   const [form, setForm] = useState(platform);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2.5">
       <SectionHead
         title="Platform Settings"
         description="Global product identity and governance defaults."
       />
-      <div className="card-soft grid gap-3 p-5 md:grid-cols-2">
+      <div className="card-soft grid gap-2.5 p-3 md:grid-cols-2">
         {(
           [
             ["productName", "Product Name"],
@@ -237,11 +256,11 @@ function PlatformPanel() {
             <input
               value={form[key]}
               onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-              className="mt-1 h-9 w-full rounded-md border px-3 text-sm"
+              className="mt-1 h-8 w-full rounded-md border px-2.5 text-xs"
             />
           </label>
         ))}
-        <label className="flex items-center gap-2 text-sm md:col-span-2">
+        <label className="flex items-center gap-2 text-xs md:col-span-2">
           <input
             type="checkbox"
             checked={form.allowViewerApprovals}
@@ -249,7 +268,7 @@ function PlatformPanel() {
           />
           Allow Viewer role to approve Post Sales steps
         </label>
-        <label className="flex items-center gap-2 text-sm md:col-span-2">
+        <label className="flex items-center gap-2 text-xs md:col-span-2">
           <input
             type="checkbox"
             checked={form.requireRejectionRemarks}
@@ -257,7 +276,7 @@ function PlatformPanel() {
           />
           Require rejection remarks
         </label>
-        <label className="flex items-center gap-2 text-sm md:col-span-2">
+        <label className="flex items-center gap-2 text-xs md:col-span-2">
           <input
             type="checkbox"
             checked={form.autoLogActivity}
@@ -267,6 +286,8 @@ function PlatformPanel() {
         </label>
       </div>
       <Button
+        size="sm"
+        className="h-7 px-2.5 text-xs"
         onClick={() => {
           updatePlatform(form);
           toast.success("Platform settings saved");
@@ -377,42 +398,42 @@ function FieldsPanel({ entity }: { entity: "company" | "project" }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2.5">
       <SectionHead
         title={entity === "company" ? "Company Field Catalog" : "Project Field Catalog"}
         description="Define which attributes appear in create/edit forms and detail views."
-        action={<Button size="sm" className="gap-1" onClick={openCreate}><Plus className="h-3.5 w-3.5" /> Add Field</Button>}
+        action={<Button size="sm" className="h-7 gap-1 px-2.5 text-xs" onClick={openCreate}><Plus className="h-3.5 w-3.5" /> Add Field</Button>}
       />
       <div className="card-soft overflow-hidden">
         <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] text-sm">
+        <table className="w-full min-w-[640px] text-xs">
           <thead className="bg-muted/50 text-xs text-muted-foreground">
             <tr>
-              <th className="px-3 py-2 text-left">Order</th>
-              <th className="px-3 py-2 text-left">Label / Key</th>
-              <th className="px-3 py-2 text-left">Group</th>
-              <th className="px-3 py-2 text-left">Type</th>
-              <th className="px-3 py-2 text-left">Flags</th>
-              <th className="px-3 py-2 text-right">Actions</th>
+              <th className="px-2.5 py-1.5 text-left">Order</th>
+              <th className="px-2.5 py-1.5 text-left">Label / Key</th>
+              <th className="px-2.5 py-1.5 text-left">Group</th>
+              <th className="px-2.5 py-1.5 text-left">Type</th>
+              <th className="px-2.5 py-1.5 text-left">Flags</th>
+              <th className="px-2.5 py-1.5 text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
             {fields.map((f) => (
               <tr key={f.id} className="border-t">
-                <td className="px-3 py-2 text-muted-foreground">{f.order}</td>
-                <td className="px-3 py-2">
+                <td className="px-2.5 py-1.5 text-muted-foreground">{f.order}</td>
+                <td className="px-2.5 py-1.5">
                   <div className="font-medium">{f.label}</div>
-                  <div className="font-mono text-[11px] text-muted-foreground">{f.key}</div>
+                  <div className="font-mono text-[10px] text-muted-foreground">{f.key}</div>
                 </td>
-                <td className="px-3 py-2">{f.group}</td>
-                <td className="px-3 py-2"><Pill>{f.type}</Pill></td>
-                <td className="px-3 py-2">
+                <td className="px-2.5 py-1.5">{f.group}</td>
+                <td className="px-2.5 py-1.5"><Pill>{f.type}</Pill></td>
+                <td className="px-2.5 py-1.5">
                   <div className="flex flex-wrap gap-1">
                     {f.required && <Pill tone="warning">Required</Pill>}
                     <Pill tone={f.enabled ? "success" : "muted"}>{f.enabled ? "Enabled" : "Off"}</Pill>
                   </div>
                 </td>
-                <td className="px-3 py-2">
+                <td className="px-2.5 py-1.5">
                   <div className="flex items-center justify-end gap-0.5">
                   <MasterToggle
                     enabled={f.enabled}
@@ -440,21 +461,21 @@ function FieldsPanel({ entity }: { entity: "company" | "project" }) {
         submitLabel={editing ? "Update" : "Create"}
       >
         <div className="grid gap-3">
-          <label className="text-xs font-medium">Label<input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" /></label>
-          <label className="text-xs font-medium">Key<input value={form.key} onChange={(e) => setForm((f) => ({ ...f, key: e.target.value }))} className="mt-1 h-9 w-full rounded-md border px-3 font-mono text-sm" /></label>
-          <label className="text-xs font-medium">Group<input value={form.group} onChange={(e) => setForm((f) => ({ ...f, group: e.target.value }))} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" /></label>
+          <label className="text-xs font-medium">Label<input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} className="mt-1 h-8 w-full rounded-md border px-2.5 text-xs" /></label>
+          <label className="text-xs font-medium">Key<input value={form.key} onChange={(e) => setForm((f) => ({ ...f, key: e.target.value }))} className="mt-1 h-8 w-full rounded-md border px-2.5 font-mono text-xs" /></label>
+          <label className="text-xs font-medium">Group<input value={form.group} onChange={(e) => setForm((f) => ({ ...f, group: e.target.value }))} className="mt-1 h-8 w-full rounded-md border px-2.5 text-xs" /></label>
           <label className="text-xs font-medium">Type
-            <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as FieldValueType }))} className="mt-1 h-9 w-full rounded-md border px-3 text-sm">
+            <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as FieldValueType }))} className="mt-1 h-8 w-full rounded-md border px-2.5 text-xs">
               {FIELD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </label>
           <label className="text-xs font-medium">Options (comma-separated, for select)
-            <input value={form.options} onChange={(e) => setForm((f) => ({ ...f, options: e.target.value }))} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" />
+            <input value={form.options} onChange={(e) => setForm((f) => ({ ...f, options: e.target.value }))} className="mt-1 h-8 w-full rounded-md border px-2.5 text-xs" />
           </label>
-          <label className="text-xs font-medium">Placeholder<input value={form.placeholder} onChange={(e) => setForm((f) => ({ ...f, placeholder: e.target.value }))} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" /></label>
-          <label className="text-xs font-medium">Description<textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="mt-1 min-h-[64px] w-full rounded-md border px-3 py-2 text-sm" /></label>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.required} onChange={(e) => setForm((f) => ({ ...f, required: e.target.checked }))} /> Required</label>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.enabled} onChange={(e) => setForm((f) => ({ ...f, enabled: e.target.checked }))} /> Enabled</label>
+          <label className="text-xs font-medium">Placeholder<input value={form.placeholder} onChange={(e) => setForm((f) => ({ ...f, placeholder: e.target.value }))} className="mt-1 h-8 w-full rounded-md border px-2.5 text-xs" /></label>
+          <label className="text-xs font-medium">Description<textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="mt-1 min-h-[56px] w-full rounded-md border px-2.5 py-1.5 text-xs" /></label>
+          <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.required} onChange={(e) => setForm((f) => ({ ...f, required: e.target.checked }))} /> Required</label>
+          <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.enabled} onChange={(e) => setForm((f) => ({ ...f, enabled: e.target.checked }))} /> Enabled</label>
         </div>
       </EntityFormModal>
 
@@ -525,19 +546,19 @@ function PicklistsPanel() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2.5">
       <SectionHead
         title="Global Picklists"
         description="Shared value dictionaries for plans, health, ticket types, training types, and more."
-        action={<Button size="sm" className="gap-1" onClick={openCreate}><Plus className="h-3.5 w-3.5" /> Add Picklist</Button>}
+        action={<Button size="sm" className="h-7 gap-1 px-2.5 text-xs" onClick={openCreate}><Plus className="h-3.5 w-3.5" /> Add Picklist</Button>}
       />
       <div className="grid gap-3 md:grid-cols-2">
         {picklists.map((p) => (
-          <div key={p.id} className="card-soft p-4">
+          <div key={p.id} className="card-soft p-3">
             <div className="mb-2 flex items-start justify-between gap-2">
               <div>
                 <div className="font-semibold">{p.label}</div>
-                <div className="font-mono text-[11px] text-muted-foreground">{p.key}</div>
+                <div className="font-mono text-[10px] text-muted-foreground">{p.key}</div>
               </div>
               <div className="flex items-center gap-0.5">
                 <MasterIconButton label="Edit picklist" onClick={() => openEdit(p)}><Pencil /></MasterIconButton>
@@ -554,11 +575,11 @@ function PicklistsPanel() {
 
       <EntityFormModal open={modalOpen} onOpenChange={setModalOpen} title={editing ? "Edit Picklist" : "Add Picklist"} onSubmit={save}>
         <div className="grid gap-3">
-          <label className="text-xs font-medium">Label<input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" /></label>
-          <label className="text-xs font-medium">Key<input value={form.key} onChange={(e) => setForm((f) => ({ ...f, key: e.target.value }))} className="mt-1 h-9 w-full rounded-md border px-3 font-mono text-sm" /></label>
-          <label className="text-xs font-medium">Description<input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" /></label>
+          <label className="text-xs font-medium">Label<input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} className="mt-1 h-8 w-full rounded-md border px-2.5 text-xs" /></label>
+          <label className="text-xs font-medium">Key<input value={form.key} onChange={(e) => setForm((f) => ({ ...f, key: e.target.value }))} className="mt-1 h-8 w-full rounded-md border px-2.5 font-mono text-xs" /></label>
+          <label className="text-xs font-medium">Description<input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="mt-1 h-8 w-full rounded-md border px-2.5 text-xs" /></label>
           <label className="text-xs font-medium">Values (one per line)
-            <textarea value={form.values} onChange={(e) => setForm((f) => ({ ...f, values: e.target.value }))} className="mt-1 min-h-[140px] w-full rounded-md border px-3 py-2 font-mono text-sm" />
+            <textarea value={form.values} onChange={(e) => setForm((f) => ({ ...f, values: e.target.value }))} className="mt-1 min-h-[120px] w-full rounded-md border px-2.5 py-1.5 font-mono text-xs" />
           </label>
         </div>
       </EntityFormModal>
@@ -740,24 +761,24 @@ function InventoryPanel() {
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2.5">
       <SectionHead
         title="Inventory Catalog"
         description="Add any item and manually design its end-to-end workflow. Full create, edit, reorder, and delete access."
         action={
-          <Button size="sm" className="gap-1" onClick={openCreateItem}>
+          <Button size="sm" className="h-7 gap-1 px-2.5 text-xs" onClick={openCreateItem}>
             <Plus className="h-3.5 w-3.5" /> Add Item
           </Button>
         }
       />
 
-      <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
+      <div className="grid gap-2.5 lg:grid-cols-[260px_1fr]">
         <div className="card-soft space-y-2 p-3">
           <div className="px-1 pb-1 text-xs font-medium text-muted-foreground">
             {sorted.length} item{sorted.length === 1 ? "" : "s"}
           </div>
           {sorted.length === 0 && (
-            <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+            <div className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
               No inventory items yet. Click Add Item to create one.
             </div>
           )}
@@ -775,7 +796,7 @@ function InventoryPanel() {
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold">{item.name}</div>
+                    <div className="truncate text-xs font-semibold">{item.name}</div>
                     <div className="mt-0.5 flex flex-wrap gap-1">
                       <Pill tone="accent">{item.category}</Pill>
                       {item.sku && <span className="font-mono text-[10px] text-muted-foreground">{item.sku}</span>}
@@ -791,18 +812,18 @@ function InventoryPanel() {
           })}
         </div>
 
-        <div className="min-w-0 space-y-4">
+        <div className="min-w-0 space-y-2.5">
           {!selected ? (
-            <div className="card-soft p-8 text-center text-sm text-muted-foreground">
+            <div className="card-soft p-5 text-center text-xs text-muted-foreground">
               Select or add an inventory item to configure its workflow.
             </div>
           ) : (
             <>
-              <div className="card-soft p-5">
+              <div className="card-soft p-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h4 className="text-lg font-semibold">{selected.name}</h4>
-                    <p className="mt-1 text-sm text-muted-foreground">
+                    <p className="mt-0.5 text-xs text-muted-foreground">
                       {selected.description || "No description yet."}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs">
@@ -829,7 +850,7 @@ function InventoryPanel() {
                 </div>
               </div>
 
-              <div className="card-soft p-5">
+              <div className="card-soft p-3">
                 <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
                   <div>
                     <h4 className="font-semibold">Item Workflow</h4>
@@ -859,26 +880,26 @@ function InventoryPanel() {
                     >
                       Clear
                     </Button>
-                    <Button size="sm" className="gap-1" onClick={openCreateStep}>
+                    <Button size="sm" className="h-7 gap-1 px-2.5 text-xs" onClick={openCreateStep}>
                       <Plus className="h-3.5 w-3.5" /> Add Step
                     </Button>
                   </div>
                 </div>
 
                 {workflowSorted.length === 0 ? (
-                  <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  <div className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
                     No steps yet. Add steps manually or apply the default Post Sales workflow.
                   </div>
                 ) : (
                   <div className="space-y-2">
                     {workflowSorted.map((step, idx) => (
                       <div key={step.id} className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/20 p-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
                           {idx + 1}
                         </div>
                         <div className="min-w-[160px] flex-1">
                           <div className="font-medium">{step.label}</div>
-                          <div className="font-mono text-[11px] text-muted-foreground">{step.key}</div>
+                          <div className="font-mono text-[10px] text-muted-foreground">{step.key}</div>
                           {step.description && (
                             <p className="mt-0.5 text-xs text-muted-foreground">{step.description}</p>
                           )}
@@ -940,7 +961,7 @@ function InventoryPanel() {
             <input
               value={itemForm.name}
               onChange={(e) => setItemForm((f) => ({ ...f, name: e.target.value }))}
-              className="mt-1 h-9 w-full rounded-md border px-3 text-sm"
+              className="mt-1 h-8 w-full rounded-md border px-2.5 text-xs"
               placeholder="e.g. Receipt Format"
             />
           </label>
@@ -950,7 +971,7 @@ function InventoryPanel() {
               <input
                 value={itemForm.sku}
                 onChange={(e) => setItemForm((f) => ({ ...f, sku: e.target.value }))}
-                className="mt-1 h-9 w-full rounded-md border px-3 font-mono text-sm"
+                className="mt-1 h-8 w-full rounded-md border px-2.5 font-mono text-xs"
                 placeholder="INV-…"
               />
             </label>
@@ -959,7 +980,7 @@ function InventoryPanel() {
               <input
                 value={itemForm.unit}
                 onChange={(e) => setItemForm((f) => ({ ...f, unit: e.target.value }))}
-                className="mt-1 h-9 w-full rounded-md border px-3 text-sm"
+                className="mt-1 h-8 w-full rounded-md border px-2.5 text-xs"
                 placeholder="template / bag / app"
               />
             </label>
@@ -971,7 +992,7 @@ function InventoryPanel() {
               onChange={(e) =>
                 setItemForm((f) => ({ ...f, category: e.target.value as MasterInventoryCategory }))
               }
-              className="mt-1 h-9 w-full rounded-md border px-3 text-sm"
+              className="mt-1 h-8 w-full rounded-md border px-2.5 text-xs"
             >
               {MASTER_INVENTORY_CATEGORIES.map((c) => (
                 <option key={c} value={c}>{c}</option>
@@ -983,10 +1004,10 @@ function InventoryPanel() {
             <textarea
               value={itemForm.description}
               onChange={(e) => setItemForm((f) => ({ ...f, description: e.target.value }))}
-              className="mt-1 min-h-[72px] w-full rounded-md border px-3 py-2 text-sm"
+              className="mt-1 min-h-[60px] w-full rounded-md border px-2.5 py-1.5 text-xs"
             />
           </label>
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 text-xs">
             <input
               type="checkbox"
               checked={itemForm.enabled}
@@ -1009,7 +1030,7 @@ function InventoryPanel() {
             <input
               value={stepForm.label}
               onChange={(e) => setStepForm((f) => ({ ...f, label: e.target.value }))}
-              className="mt-1 h-9 w-full rounded-md border px-3 text-sm"
+              className="mt-1 h-8 w-full rounded-md border px-2.5 text-xs"
             />
           </label>
           <label className="text-xs font-medium">
@@ -1017,7 +1038,7 @@ function InventoryPanel() {
             <input
               value={stepForm.key}
               onChange={(e) => setStepForm((f) => ({ ...f, key: e.target.value }))}
-              className="mt-1 h-9 w-full rounded-md border px-3 font-mono text-sm"
+              className="mt-1 h-8 w-full rounded-md border px-2.5 font-mono text-xs"
               placeholder="auto from label if empty"
             />
           </label>
@@ -1026,10 +1047,10 @@ function InventoryPanel() {
             <textarea
               value={stepForm.description}
               onChange={(e) => setStepForm((f) => ({ ...f, description: e.target.value }))}
-              className="mt-1 min-h-[64px] w-full rounded-md border px-3 py-2 text-sm"
+              className="mt-1 min-h-[56px] w-full rounded-md border px-2.5 py-1.5 text-xs"
             />
           </label>
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 text-xs">
             <input
               type="checkbox"
               checked={stepForm.requiresApproval}
@@ -1037,7 +1058,7 @@ function InventoryPanel() {
             />
             Requires approval
           </label>
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 text-xs">
             <input
               type="checkbox"
               checked={stepForm.requiresUpload}
@@ -1045,7 +1066,7 @@ function InventoryPanel() {
             />
             Requires upload
           </label>
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 text-xs">
             <input
               type="checkbox"
               checked={stepForm.enabled}
@@ -1160,21 +1181,21 @@ function WorkflowPanel() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2.5">
       <SectionHead
         title="Post Sales Workflow Steps"
         description="Canonical pipeline for every new Post Sales project (template → upload → approval)."
-        action={<Button size="sm" className="gap-1" onClick={openCreate}><Plus className="h-3.5 w-3.5" /> Add Step</Button>}
+        action={<Button size="sm" className="h-7 gap-1 px-2.5 text-xs" onClick={openCreate}><Plus className="h-3.5 w-3.5" /> Add Step</Button>}
       />
       <div className="space-y-2">
         {sorted.map((s, idx) => (
-          <div key={s.id} className="card-soft flex flex-wrap items-center gap-3 p-4">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
+          <div key={s.id} className="card-soft flex flex-wrap items-center gap-2 p-2.5">
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
               {idx + 1}
             </div>
             <div className="min-w-[180px] flex-1">
               <div className="font-medium">{s.label}</div>
-              <div className="font-mono text-[11px] text-muted-foreground">{s.key}</div>
+              <div className="font-mono text-[10px] text-muted-foreground">{s.key}</div>
               {s.description && <p className="mt-0.5 text-xs text-muted-foreground">{s.description}</p>}
             </div>
             <div className="flex flex-wrap gap-1">
@@ -1196,12 +1217,12 @@ function WorkflowPanel() {
 
       <EntityFormModal open={modalOpen} onOpenChange={setModalOpen} title={editing ? "Edit Step" : "Add Step"} onSubmit={save}>
         <div className="grid gap-3">
-          <label className="text-xs font-medium">Label<input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" /></label>
-          <label className="text-xs font-medium">Key<input value={form.key} onChange={(e) => setForm((f) => ({ ...f, key: e.target.value }))} className="mt-1 h-9 w-full rounded-md border px-3 font-mono text-sm" /></label>
-          <label className="text-xs font-medium">Description<textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="mt-1 min-h-[64px] w-full rounded-md border px-3 py-2 text-sm" /></label>
-          <label className="text-xs font-medium">Template file name<input value={form.templateName} onChange={(e) => setForm((f) => ({ ...f, templateName: e.target.value }))} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" placeholder="Unit Details Template.xlsx" /></label>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.requiresTemplate} onChange={(e) => setForm((f) => ({ ...f, requiresTemplate: e.target.checked }))} /> Requires template</label>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.enabled} onChange={(e) => setForm((f) => ({ ...f, enabled: e.target.checked }))} /> Enabled</label>
+          <label className="text-xs font-medium">Label<input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} className="mt-1 h-8 w-full rounded-md border px-2.5 text-xs" /></label>
+          <label className="text-xs font-medium">Key<input value={form.key} onChange={(e) => setForm((f) => ({ ...f, key: e.target.value }))} className="mt-1 h-8 w-full rounded-md border px-2.5 font-mono text-xs" /></label>
+          <label className="text-xs font-medium">Description<textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="mt-1 min-h-[56px] w-full rounded-md border px-2.5 py-1.5 text-xs" /></label>
+          <label className="text-xs font-medium">Template file name<input value={form.templateName} onChange={(e) => setForm((f) => ({ ...f, templateName: e.target.value }))} className="mt-1 h-8 w-full rounded-md border px-2.5 text-xs" placeholder="Unit Details Template.xlsx" /></label>
+          <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.requiresTemplate} onChange={(e) => setForm((f) => ({ ...f, requiresTemplate: e.target.checked }))} /> Requires template</label>
+          <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.enabled} onChange={(e) => setForm((f) => ({ ...f, enabled: e.target.checked }))} /> Enabled</label>
         </div>
       </EntityFormModal>
 
@@ -1238,18 +1259,18 @@ function ChecklistPanel() {
   const [form, setForm] = useState({ sectionKey: "project", sectionLabel: "Project Information", label: "" });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2.5">
       <SectionHead
         title="Onboarding Checklist Catalog"
         description="Master checklist items copied into each onboarding project."
-        action={<Button size="sm" className="gap-1" onClick={() => setModalOpen(true)}><Plus className="h-3.5 w-3.5" /> Add Item</Button>}
+        action={<Button size="sm" className="h-7 gap-1 px-2.5 text-xs" onClick={() => setModalOpen(true)}><Plus className="h-3.5 w-3.5" /> Add Item</Button>}
       />
       {sections.map(([key, list]) => (
-        <div key={key} className="card-soft p-4">
-          <h4 className="mb-3 text-sm font-semibold">{list[0]?.sectionLabel ?? key}</h4>
+        <div key={key} className="card-soft p-3">
+          <h4 className="mb-2 text-xs font-semibold">{list[0]?.sectionLabel ?? key}</h4>
           <ul className="space-y-2">
             {list.map((item) => (
-              <li key={item.id} className="flex items-center gap-2 rounded-md border bg-muted/20 px-3 py-2 text-sm">
+              <li key={item.id} className="flex items-center gap-2 rounded-md border bg-muted/20 px-2.5 py-1.5 text-xs">
                 <span className="flex-1">{item.label}</span>
                 <Pill tone={item.enabled ? "success" : "muted"}>{item.enabled ? "On" : "Off"}</Pill>
                 <MasterToggle enabled={item.enabled} onClick={() => updateChecklistItem(item.id, { enabled: !item.enabled })} />
@@ -1274,9 +1295,9 @@ function ChecklistPanel() {
         toast.success("Checklist item added");
       }}>
         <div className="grid gap-3">
-          <label className="text-xs font-medium">Section key<input value={form.sectionKey} onChange={(e) => setForm((f) => ({ ...f, sectionKey: e.target.value }))} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" /></label>
-          <label className="text-xs font-medium">Section label<input value={form.sectionLabel} onChange={(e) => setForm((f) => ({ ...f, sectionLabel: e.target.value }))} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" /></label>
-          <label className="text-xs font-medium">Item label<input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" /></label>
+          <label className="text-xs font-medium">Section key<input value={form.sectionKey} onChange={(e) => setForm((f) => ({ ...f, sectionKey: e.target.value }))} className="mt-1 h-8 w-full rounded-md border px-2.5 text-xs" /></label>
+          <label className="text-xs font-medium">Section label<input value={form.sectionLabel} onChange={(e) => setForm((f) => ({ ...f, sectionLabel: e.target.value }))} className="mt-1 h-8 w-full rounded-md border px-2.5 text-xs" /></label>
+          <label className="text-xs font-medium">Item label<input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} className="mt-1 h-8 w-full rounded-md border px-2.5 text-xs" /></label>
         </div>
       </EntityFormModal>
     </div>
@@ -1331,32 +1352,32 @@ function TemplatesPanel() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2.5">
       <SectionHead
         title="Document Template Catalog"
         description="Canonical document names/categories offered during document setup."
-        action={<Button size="sm" className="gap-1" onClick={openCreate}><Plus className="h-3.5 w-3.5" /> Add Template</Button>}
+        action={<Button size="sm" className="h-7 gap-1 px-2.5 text-xs" onClick={openCreate}><Plus className="h-3.5 w-3.5" /> Add Template</Button>}
       />
       <div className="card-soft overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="w-full text-xs">
           <thead className="bg-muted/50 text-xs text-muted-foreground">
             <tr>
-              <th className="px-3 py-2 text-left">Name</th>
-              <th className="px-3 py-2 text-left">Category</th>
-              <th className="px-3 py-2 text-left">Status</th>
-              <th className="px-3 py-2 text-right">Actions</th>
+              <th className="px-2.5 py-1.5 text-left">Name</th>
+              <th className="px-2.5 py-1.5 text-left">Category</th>
+              <th className="px-2.5 py-1.5 text-left">Status</th>
+              <th className="px-2.5 py-1.5 text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
             {sorted.map((t) => (
               <tr key={t.id} className="border-t">
-                <td className="px-3 py-2">
+                <td className="px-2.5 py-1.5">
                   <div className="font-medium">{t.name}</div>
-                  {t.description && <div className="text-[11px] text-muted-foreground">{t.description}</div>}
+                  {t.description && <div className="text-[10px] text-muted-foreground">{t.description}</div>}
                 </td>
-                <td className="px-3 py-2"><Pill tone="accent">{t.category}</Pill></td>
-                <td className="px-3 py-2"><Pill tone={t.enabled ? "success" : "muted"}>{t.enabled ? "Enabled" : "Off"}</Pill></td>
-                <td className="px-3 py-2">
+                <td className="px-2.5 py-1.5"><Pill tone="accent">{t.category}</Pill></td>
+                <td className="px-2.5 py-1.5"><Pill tone={t.enabled ? "success" : "muted"}>{t.enabled ? "Enabled" : "Off"}</Pill></td>
+                <td className="px-2.5 py-1.5">
                   <div className="flex items-center justify-end gap-0.5">
                   <MasterToggle enabled={t.enabled} onClick={() => updateTemplate(t.id, { enabled: !t.enabled })} />
                   <MasterIconButton label="Edit template" onClick={() => openEdit(t)}><Pencil /></MasterIconButton>
@@ -1371,10 +1392,10 @@ function TemplatesPanel() {
 
       <EntityFormModal open={modalOpen} onOpenChange={setModalOpen} title={editing ? "Edit Template" : "Add Template"} onSubmit={save}>
         <div className="grid gap-3">
-          <label className="text-xs font-medium">Name<input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" /></label>
-          <label className="text-xs font-medium">Category<input value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" /></label>
-          <label className="text-xs font-medium">Description<textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="mt-1 min-h-[64px] w-full rounded-md border px-3 py-2 text-sm" /></label>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.enabled} onChange={(e) => setForm((f) => ({ ...f, enabled: e.target.checked }))} /> Enabled</label>
+          <label className="text-xs font-medium">Name<input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className="mt-1 h-8 w-full rounded-md border px-2.5 text-xs" /></label>
+          <label className="text-xs font-medium">Category<input value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} className="mt-1 h-8 w-full rounded-md border px-2.5 text-xs" /></label>
+          <label className="text-xs font-medium">Description<textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="mt-1 min-h-[56px] w-full rounded-md border px-2.5 py-1.5 text-xs" /></label>
+          <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.enabled} onChange={(e) => setForm((f) => ({ ...f, enabled: e.target.checked }))} /> Enabled</label>
         </div>
       </EntityFormModal>
     </div>
@@ -1440,23 +1461,23 @@ function ModulesPanel() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2.5">
       <SectionHead
         title="Module Catalog"
         description="Full control over product modules offered when opting a company in."
         action={
-          <Button size="sm" className="gap-1" onClick={openCreate}>
+          <Button size="sm" className="h-7 gap-1 px-2.5 text-xs" onClick={openCreate}>
             <Plus className="h-3.5 w-3.5" /> Add Module
           </Button>
         }
       />
       <div className="grid gap-3 md:grid-cols-2">
         {sorted.map((m) => (
-          <div key={m.id} className="card-soft p-4">
+          <div key={m.id} className="card-soft p-3">
             <div className="mb-2 flex items-start justify-between gap-2">
               <div>
                 <div className="font-semibold">{m.label}</div>
-                <div className="font-mono text-[11px] text-muted-foreground">{m.key}</div>
+                <div className="font-mono text-[10px] text-muted-foreground">{m.key}</div>
               </div>
               <div className="flex items-center gap-0.5">
                 <MasterToggle enabled={m.enabled} onClick={() => updateModule(m.id, { enabled: !m.enabled })} />
@@ -1468,7 +1489,7 @@ function ModulesPanel() {
                 </MasterIconButton>
               </div>
             </div>
-            <p className="text-sm text-muted-foreground">{m.description}</p>
+            <p className="text-xs text-muted-foreground">{m.description}</p>
             <div className="mt-2">
               <Pill tone={m.enabled ? "success" : "muted"}>{m.enabled ? "Available" : "Hidden"}</Pill>
             </div>
@@ -1488,7 +1509,7 @@ function ModulesPanel() {
             <input
               value={form.label}
               onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
-              className="mt-1 h-9 w-full rounded-md border px-3 text-sm"
+              className="mt-1 h-8 w-full rounded-md border px-2.5 text-xs"
             />
           </label>
           <label className="text-xs font-medium">
@@ -1496,7 +1517,7 @@ function ModulesPanel() {
             <input
               value={form.key}
               onChange={(e) => setForm((f) => ({ ...f, key: e.target.value }))}
-              className="mt-1 h-9 w-full rounded-md border px-3 font-mono text-sm"
+              className="mt-1 h-8 w-full rounded-md border px-2.5 font-mono text-xs"
               placeholder="custom-module"
             />
           </label>
@@ -1505,7 +1526,7 @@ function ModulesPanel() {
             <textarea
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              className="mt-1 min-h-[64px] w-full rounded-md border px-3 py-2 text-sm"
+              className="mt-1 min-h-[56px] w-full rounded-md border px-2.5 py-1.5 text-xs"
             />
           </label>
           <label className="text-xs font-medium">
@@ -1513,11 +1534,11 @@ function ModulesPanel() {
             <input
               value={form.icon}
               onChange={(e) => setForm((f) => ({ ...f, icon: e.target.value }))}
-              className="mt-1 h-9 w-full rounded-md border px-3 text-sm"
+              className="mt-1 h-8 w-full rounded-md border px-2.5 text-xs"
               placeholder="Boxes"
             />
           </label>
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 text-xs">
             <input
               type="checkbox"
               checked={form.enabled}
@@ -1562,12 +1583,12 @@ function IntegrationsPanel() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-4">
+      <div className="space-y-2.5">
         <SectionHead
           title="Integrations"
           description="Enable/disable connectors shown in the integrations workspace."
           action={
-            <Button size="sm" className="gap-1" onClick={() => {
+            <Button size="sm" className="h-7 gap-1 px-2.5 text-xs" onClick={() => {
               setIntegrationForm({ name: "", description: "", enabled: true });
               setIntegrationModal(true);
             }}>
@@ -1577,7 +1598,7 @@ function IntegrationsPanel() {
         />
         <div className="grid gap-3 md:grid-cols-2">
           {integrations.map((i) => (
-            <div key={i.id} className="card-soft flex items-start gap-3 p-4">
+            <div key={i.id} className="card-soft flex items-start gap-2.5 p-2.5">
               <div className="flex-1">
                 <div className="font-medium">{i.name}</div>
                 <p className="text-xs text-muted-foreground">{i.description}</p>
@@ -1597,20 +1618,20 @@ function IntegrationsPanel() {
         </div>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-2.5">
         <SectionHead
           title="Notification Triggers"
           description="Event → channel mappings used by automations."
-          action={<Button size="sm" className="gap-1" onClick={() => setModalOpen(true)}><Plus className="h-3.5 w-3.5" /> Add Trigger</Button>}
+          action={<Button size="sm" className="h-7 gap-1 px-2.5 text-xs" onClick={() => setModalOpen(true)}><Plus className="h-3.5 w-3.5" /> Add Trigger</Button>}
         />
         <div className="card-soft overflow-hidden">
-          <table className="w-full text-sm">
+          <table className="w-full text-xs">
             <thead className="bg-muted/50 text-xs text-muted-foreground">
               <tr>
-                <th className="px-3 py-2 text-left">Name</th>
-                <th className="px-3 py-2 text-left">Event</th>
-                <th className="px-3 py-2 text-left">Channel</th>
-                <th className="px-3 py-2 text-right">Actions</th>
+                <th className="px-2.5 py-1.5 text-left">Name</th>
+                <th className="px-2.5 py-1.5 text-left">Event</th>
+                <th className="px-2.5 py-1.5 text-left">Channel</th>
+                <th className="px-2.5 py-1.5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -1618,8 +1639,8 @@ function IntegrationsPanel() {
                 <tr key={t.id} className="border-t">
                   <td className="px-3 py-2 font-medium">{t.name}</td>
                   <td className="px-3 py-2 font-mono text-xs">{t.event}</td>
-                  <td className="px-3 py-2"><Pill tone="accent">{t.channel}</Pill></td>
-                  <td className="px-3 py-2">
+                  <td className="px-2.5 py-1.5"><Pill tone="accent">{t.channel}</Pill></td>
+                  <td className="px-2.5 py-1.5">
                     <div className="flex items-center justify-end gap-0.5">
                     <MasterToggle enabled={t.enabled} onClick={() => updateTrigger(t.id, { enabled: !t.enabled })} />
                     <MasterIconButton label="Delete trigger" destructive onClick={() => { deleteTrigger(t.id); toast.success("Deleted"); }}><Trash2 /></MasterIconButton>
@@ -1646,10 +1667,10 @@ function IntegrationsPanel() {
         toast.success("Trigger added");
       }}>
         <div className="grid gap-3">
-          <label className="text-xs font-medium">Name<input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" /></label>
-          <label className="text-xs font-medium">Event key<input value={form.event} onChange={(e) => setForm((f) => ({ ...f, event: e.target.value }))} className="mt-1 h-9 w-full rounded-md border px-3 font-mono text-sm" placeholder="payment.received" /></label>
+          <label className="text-xs font-medium">Name<input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className="mt-1 h-8 w-full rounded-md border px-2.5 text-xs" /></label>
+          <label className="text-xs font-medium">Event key<input value={form.event} onChange={(e) => setForm((f) => ({ ...f, event: e.target.value }))} className="mt-1 h-8 w-full rounded-md border px-2.5 font-mono text-xs" placeholder="payment.received" /></label>
           <label className="text-xs font-medium">Channel
-            <select value={form.channel} onChange={(e) => setForm((f) => ({ ...f, channel: e.target.value }))} className="mt-1 h-9 w-full rounded-md border px-3 text-sm">
+            <select value={form.channel} onChange={(e) => setForm((f) => ({ ...f, channel: e.target.value }))} className="mt-1 h-8 w-full rounded-md border px-2.5 text-xs">
               {["WhatsApp", "SMS", "Email"].map((c) => <option key={c}>{c}</option>)}
             </select>
           </label>
@@ -1678,7 +1699,7 @@ function IntegrationsPanel() {
             <input
               value={integrationForm.name}
               onChange={(e) => setIntegrationForm((f) => ({ ...f, name: e.target.value }))}
-              className="mt-1 h-9 w-full rounded-md border px-3 text-sm"
+              className="mt-1 h-8 w-full rounded-md border px-2.5 text-xs"
             />
           </label>
           <label className="text-xs font-medium">
@@ -1686,10 +1707,10 @@ function IntegrationsPanel() {
             <textarea
               value={integrationForm.description}
               onChange={(e) => setIntegrationForm((f) => ({ ...f, description: e.target.value }))}
-              className="mt-1 min-h-[64px] w-full rounded-md border px-3 py-2 text-sm"
+              className="mt-1 min-h-[56px] w-full rounded-md border px-2.5 py-1.5 text-xs"
             />
           </label>
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 text-xs">
             <input
               type="checkbox"
               checked={integrationForm.enabled}
@@ -1735,7 +1756,7 @@ function DangerPanel() {
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2.5">
       <SectionHead
         title="Reset & Safety"
         description="Restore seeded defaults for a section, or wipe the entire master catalog."
@@ -1745,23 +1766,23 @@ function DangerPanel() {
           <button
             key={s.id}
             type="button"
-            className="card-soft flex items-center justify-between gap-3 p-4 text-left hover:bg-muted/40"
+            className="card-soft flex items-center justify-between gap-2 p-2.5 text-left hover:bg-muted/40"
             onClick={() => {
               resetSection(s.id);
               toast.success(`Reset ${s.label}`);
             }}
           >
-            <span className="text-sm font-medium">{s.label}</span>
+            <span className="text-xs font-medium">{s.label}</span>
             <RotateCcw className="h-4 w-4 text-muted-foreground" />
           </button>
         ))}
       </div>
-      <div className="card-soft border-destructive/30 bg-destructive/5 p-5">
-        <h4 className="font-semibold text-destructive">Reset all master configuration</h4>
-        <p className="mt-1 text-sm text-muted-foreground">
+      <div className="card-soft border-destructive/30 bg-destructive/5 p-3">
+        <h4 className="text-sm font-semibold text-destructive">Reset all master configuration</h4>
+        <p className="mt-0.5 text-xs text-muted-foreground">
           Restores every catalog to factory seed. Operational company/project data is not deleted.
         </p>
-        <Button variant="destructive" className="mt-3 gap-1.5" onClick={() => setConfirmAll(true)}>
+        <Button variant="destructive" className="mt-2 h-7 gap-1 px-2.5 text-xs" onClick={() => setConfirmAll(true)}>
           <RotateCcw className="h-4 w-4" /> Reset Everything
         </Button>
       </div>
@@ -1791,10 +1812,10 @@ function SectionHead({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="flex flex-wrap items-end justify-between gap-2">
       <div>
-        <h3 className="font-semibold">{title}</h3>
-        <p className="text-xs text-muted-foreground">{description}</p>
+        <h3 className="text-xs font-semibold text-muted-foreground">{title}</h3>
+        <p className="text-[10px] text-muted-foreground">{description}</p>
       </div>
       {action}
     </div>
@@ -1809,7 +1830,7 @@ function MasterToggle({
   onClick: () => void;
 }) {
   return (
-    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center">
+    <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center">
       <Switch
         size="sm"
         checked={enabled}
@@ -1841,7 +1862,7 @@ function MasterIconButton({
       aria-label={label}
       onClick={onClick}
       className={cn(
-        "h-9 w-9 shrink-0 [&_svg]:!size-4",
+        "h-7 w-7 shrink-0 [&_svg]:!size-3.5",
         destructive && "text-destructive hover:text-destructive",
       )}
     >

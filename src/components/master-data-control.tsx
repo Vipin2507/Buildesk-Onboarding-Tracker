@@ -67,7 +67,7 @@ const companyAdminSchema = z.object({
 type CompanyAdminForm = z.infer<typeof companyAdminSchema>;
 
 const inputClass =
-  "mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40";
+  "mt-1 h-8 w-full rounded-md border bg-background px-2.5 text-xs outline-none focus:ring-2 focus:ring-primary/40";
 
 export function DataControlPanel() {
   const companies = useCompanyStore((s) => s.companies);
@@ -213,11 +213,11 @@ export function DataControlPanel() {
         : `Remove ${pendingIds.length} projects and their onboarding data?`;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="space-y-2.5">
+      <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h3 className="flex items-center gap-2 font-semibold">
-            <Table2 className="h-4 w-4 text-primary" />
+          <h3 className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+            <Table2 className="h-3.5 w-3.5 text-primary" />
             Data Control
           </h3>
           <p className="text-xs text-muted-foreground">
@@ -247,18 +247,18 @@ export function DataControlPanel() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={tab === "companies" ? "Search companies…" : "Search projects…"}
-            className="h-9 w-full rounded-md border bg-background pl-8 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+            className="h-8 w-full rounded-md border bg-background pl-8 pr-2.5 text-xs outline-none focus:ring-2 focus:ring-primary/40"
           />
         </div>
       </div>
 
       {selected.size > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2">
-          <span className="text-sm font-medium">
+          <span className="text-xs font-medium">
             {selected.size} selected
             {tab === "companies" ? ` · ${linkedProjectCount([...selected])} linked projects` : ""}
           </span>
-          <Button type="button" size="sm" variant="destructive" className="gap-1.5" onClick={openDeleteBulk}>
+          <Button type="button" size="sm" variant="destructive" className="h-7 gap-1 px-2.5 text-xs" onClick={openDeleteBulk}>
             <Trash2 className="h-3.5 w-3.5" /> Delete selected
           </Button>
         </div>
@@ -267,25 +267,25 @@ export function DataControlPanel() {
       <div className="card-soft overflow-hidden">
         <div className="max-h-[min(70vh,720px)] overflow-auto">
           {tab === "companies" ? (
-            <table className="w-full min-w-[720px] text-left text-sm">
+            <table className="w-full min-w-[720px] text-left text-xs">
               <thead className="sticky top-0 z-10 border-b bg-muted/90 backdrop-blur">
-                <tr className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  <th className="w-10 px-3 py-2.5">
+                <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <th className="w-8 px-2.5 py-1.5">
                     <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Select all" />
                   </th>
-                  <th className="px-3 py-2.5 font-medium">Company</th>
-                  <th className="px-3 py-2.5 font-medium">Contact</th>
-                  <th className="px-3 py-2.5 font-medium">Plan</th>
-                  <th className="px-3 py-2.5 font-medium">Start</th>
-                  <th className="px-3 py-2.5 font-medium">Status</th>
-                  <th className="px-3 py-2.5 font-medium">Projects</th>
-                  <th className="px-3 py-2.5 font-medium text-right">Actions</th>
+                  <th className="px-2.5 py-1.5 font-medium">Company</th>
+                  <th className="px-2.5 py-1.5 font-medium">Contact</th>
+                  <th className="px-2.5 py-1.5 font-medium">Plan</th>
+                  <th className="px-2.5 py-1.5 font-medium">Start</th>
+                  <th className="px-2.5 py-1.5 font-medium">Status</th>
+                  <th className="px-2.5 py-1.5 font-medium">Projects</th>
+                  <th className="px-2.5 py-1.5 font-medium text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredCompanies.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">
+                    <td colSpan={8} className="px-2.5 py-6 text-center text-xs text-muted-foreground">
                       No companies match.
                     </td>
                   </tr>
@@ -294,7 +294,7 @@ export function DataControlPanel() {
                     const projectCount = getByCompany(c.id).length;
                     return (
                       <tr key={c.id} className="border-b border-border/60 last:border-0 hover:bg-muted/30">
-                        <td className="px-3 py-2.5">
+                        <td className="px-2.5 py-1.5">
                           <input
                             type="checkbox"
                             checked={selected.has(c.id)}
@@ -302,29 +302,29 @@ export function DataControlPanel() {
                             aria-label={`Select ${c.name}`}
                           />
                         </td>
-                        <td className="px-3 py-2.5">
+                        <td className="px-2.5 py-1.5">
                           <div className="font-medium">{c.name}</div>
                           <div className="text-xs text-muted-foreground">{c.city}</div>
                         </td>
-                        <td className="px-3 py-2.5">
+                        <td className="px-2.5 py-1.5">
                           <div>{c.contact}</div>
                           <div className="text-xs text-muted-foreground">{c.email}</div>
                         </td>
-                        <td className="px-3 py-2.5 text-muted-foreground">{c.plan}</td>
-                        <td className="px-3 py-2.5 text-muted-foreground">
+                        <td className="px-2.5 py-1.5 text-muted-foreground">{c.plan}</td>
+                        <td className="px-2.5 py-1.5 text-muted-foreground">
                           {formatDate(c.startDate || c.agreementDate)}
                         </td>
-                        <td className="px-3 py-2.5">
+                        <td className="px-2.5 py-1.5">
                           <StatusPill status={c.status} />
                         </td>
-                        <td className="px-3 py-2.5 text-muted-foreground">{projectCount}</td>
-                        <td className="px-3 py-2.5">
+                        <td className="px-2.5 py-1.5 text-muted-foreground">{projectCount}</td>
+                        <td className="px-2.5 py-1.5">
                           <div className="flex justify-end gap-1">
                             <Button
                               type="button"
                               size="icon"
                               variant="ghost"
-                              className="h-8 w-8"
+                              className="h-7 w-7"
                               onClick={() => setEditingCompany(c)}
                             >
                               <Pencil className="h-3.5 w-3.5" />
@@ -347,25 +347,25 @@ export function DataControlPanel() {
               </tbody>
             </table>
           ) : (
-            <table className="w-full min-w-[720px] text-left text-sm">
+            <table className="w-full min-w-[720px] text-left text-xs">
               <thead className="sticky top-0 z-10 border-b bg-muted/90 backdrop-blur">
-                <tr className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  <th className="w-10 px-3 py-2.5">
+                <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <th className="w-8 px-2.5 py-1.5">
                     <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Select all" />
                   </th>
-                  <th className="px-3 py-2.5 font-medium">Project</th>
-                  <th className="px-3 py-2.5 font-medium">Company</th>
-                  <th className="px-3 py-2.5 font-medium">Type</th>
-                  <th className="px-3 py-2.5 font-medium">Start</th>
-                  <th className="px-3 py-2.5 font-medium">Status</th>
-                  <th className="px-3 py-2.5 font-medium">Units</th>
-                  <th className="px-3 py-2.5 font-medium text-right">Actions</th>
+                  <th className="px-2.5 py-1.5 font-medium">Project</th>
+                  <th className="px-2.5 py-1.5 font-medium">Company</th>
+                  <th className="px-2.5 py-1.5 font-medium">Type</th>
+                  <th className="px-2.5 py-1.5 font-medium">Start</th>
+                  <th className="px-2.5 py-1.5 font-medium">Status</th>
+                  <th className="px-2.5 py-1.5 font-medium">Units</th>
+                  <th className="px-2.5 py-1.5 font-medium text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredProjects.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">
+                    <td colSpan={8} className="px-2.5 py-6 text-center text-xs text-muted-foreground">
                       No projects match.
                     </td>
                   </tr>
@@ -374,7 +374,7 @@ export function DataControlPanel() {
                     const companyName = companies.find((c) => c.id === p.companyId)?.name ?? "—";
                     return (
                       <tr key={p.id} className="border-b border-border/60 last:border-0 hover:bg-muted/30">
-                        <td className="px-3 py-2.5">
+                        <td className="px-2.5 py-1.5">
                           <input
                             type="checkbox"
                             checked={selected.has(p.id)}
@@ -382,24 +382,24 @@ export function DataControlPanel() {
                             aria-label={`Select ${p.name}`}
                           />
                         </td>
-                        <td className="px-3 py-2.5">
+                        <td className="px-2.5 py-1.5">
                           <div className="font-medium">{p.name}</div>
                           <div className="text-xs text-muted-foreground">{p.city}</div>
                         </td>
-                        <td className="px-3 py-2.5">{companyName}</td>
-                        <td className="px-3 py-2.5 text-muted-foreground">{p.type}</td>
-                        <td className="px-3 py-2.5 text-muted-foreground">{formatDate(p.startDate)}</td>
-                        <td className="px-3 py-2.5">
+                        <td className="px-2.5 py-1.5">{companyName}</td>
+                        <td className="px-2.5 py-1.5 text-muted-foreground">{p.type}</td>
+                        <td className="px-2.5 py-1.5 text-muted-foreground">{formatDate(p.startDate)}</td>
+                        <td className="px-2.5 py-1.5">
                           <StatusPill status={p.status} />
                         </td>
-                        <td className="px-3 py-2.5 text-muted-foreground">{p.units}</td>
-                        <td className="px-3 py-2.5">
+                        <td className="px-2.5 py-1.5 text-muted-foreground">{p.units}</td>
+                        <td className="px-2.5 py-1.5">
                           <div className="flex justify-end gap-1">
                             <Button
                               type="button"
                               size="icon"
                               variant="ghost"
-                              className="h-8 w-8"
+                              className="h-7 w-7"
                               onClick={() => {
                                 setEditingProject(p);
                                 setProjectModalOpen(true);
@@ -553,7 +553,7 @@ function CompanyAdminEditModal({
         <AlertDialogHeader className="border-b px-6 py-4 text-left">
           <AlertDialogTitle>Edit company — {company?.name}</AlertDialogTitle>
         </AlertDialogHeader>
-        <div className="max-h-[min(70vh,640px)] space-y-4 overflow-y-auto px-6 py-4">
+        <div className="max-h-[min(70vh,640px)] space-y-2.5 overflow-y-auto px-4 py-3">
           <Section title="Profile">
             <Field label="Name">
               <input {...form.register("name")} className={inputClass} />
@@ -688,7 +688,7 @@ function CompanyAdminEditModal({
                 return (
                   <label
                     key={m.key}
-                    className="flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2 text-sm hover:bg-muted/40"
+                    className="flex cursor-pointer items-start gap-2 rounded-md border px-2.5 py-1.5 text-xs hover:bg-muted/40"
                   >
                     <input
                       type="checkbox"
