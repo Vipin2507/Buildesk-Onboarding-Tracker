@@ -30,7 +30,12 @@ import {
 } from "recharts";
 import { z } from "zod";
 
-import { PageHeader, PageWrap } from "@/components/page-header";
+import { PageWrap } from "@/components/page-header";
+import {
+  DesignTicketPageHeader,
+  DesignTicketSection,
+  TICKET_EASE,
+} from "@/components/design-ticket/design-ticket-shared";
 import { ReportTable } from "@/components/report-table";
 import { Button } from "@/components/ui/button";
 import {
@@ -168,18 +173,23 @@ function Reports() {
   }
 
   return (
-    <PageWrap>
-      <PageHeader
-        title="Reports"
-        subtitle="Live operational insights from your Buildesk data."
+    <PageWrap compact>
+      <DesignTicketPageHeader
+        compact
+        title={active ? active.title : "Reports"}
+        subtitle={
+          active
+            ? `${active.description} · as of ${new Date().toLocaleString()}`
+            : "Live operational insights from your Buildesk data."
+        }
         actions={
           active ? (
-            <div className="flex gap-2">
-              <Button variant="outline" className="gap-1.5" onClick={clearReport}>
-                <ArrowLeft className="h-4 w-4" /> All reports
+            <div className="flex flex-wrap gap-1.5">
+              <Button variant="outline" size="sm" className="h-7 gap-1 px-2.5 text-xs" onClick={clearReport}>
+                <ArrowLeft className="h-3.5 w-3.5" /> All reports
               </Button>
-              <Button className="gap-1.5 bg-primary hover:bg-primary/90" onClick={exportActive}>
-                <Download className="h-4 w-4" /> Export CSV
+              <Button size="sm" className="h-7 gap-1 px-2.5 text-xs bg-primary hover:bg-primary/90" onClick={exportActive}>
+                <Download className="h-3.5 w-3.5" /> Export CSV
               </Button>
             </div>
           ) : undefined
@@ -190,59 +200,53 @@ function Reports() {
         {!active ? (
           <motion.div
             key="grid"
-            initial={{ opacity: 0, y: 8 }}
+            initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-            className="grid gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3"
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.25, ease: TICKET_EASE }}
+            className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3"
           >
-            {REPORT_META.map((r) => {
+            {REPORT_META.map((r, i) => {
               const Icon = ICONS[r.id];
               return (
-                <button
+                <motion.button
                   key={r.id}
                   type="button"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: Math.min(i * 0.02, 0.2), ease: TICKET_EASE }}
                   onClick={() => openReport(r.id)}
-                  className="card-soft group flex min-h-[4.5rem] items-start gap-3 p-4 text-left transition-all active:scale-[0.99] hover:-translate-y-0.5 hover:shadow-[var(--shadow-elevated)] sm:gap-4 sm:p-5"
+                  className="card-soft group flex min-h-[3.5rem] items-start gap-2.5 p-3 text-left transition-all active:scale-[0.99] hover:-translate-y-0.5 hover:shadow-[var(--shadow-elevated)]"
                 >
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary transition-colors group-hover:bg-primary group-hover:text-white">
-                    <Icon className="h-5 w-5" />
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary transition-colors group-hover:bg-primary group-hover:text-white">
+                    <Icon className="h-4 w-4" />
                   </div>
-                  <div>
-                    <div className="font-semibold">{r.name}</div>
-                    <div className="text-sm text-muted-foreground">{r.desc}</div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold leading-tight">{r.name}</div>
+                    <div className="mt-0.5 text-[10px] text-muted-foreground">{r.desc}</div>
                   </div>
-                </button>
+                </motion.button>
               );
             })}
           </motion.div>
         ) : (
           <motion.div
             key={active.id}
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-            className="space-y-5"
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.28, ease: TICKET_EASE }}
+            className="space-y-3"
           >
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <h2 className="text-xl font-semibold tracking-tight">{active.title}</h2>
-                <p className="text-sm text-muted-foreground">
-                  {active.description} · as of {new Date().toLocaleString()}
-                </p>
-              </div>
-            </div>
-
-            <div className="grid gap-3 grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-1.5 grid-cols-2 xl:grid-cols-4">
               {active.kpis.map((k) => (
-                <div key={k.label} className="card-soft p-3 sm:p-4">
-                  <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground sm:text-[11px]">
+                <div key={k.label} className="card-soft p-2.5">
+                  <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                     {k.label}
                   </div>
                   <div
                     className={cn(
-                      "mt-1 text-xl font-semibold tabular-nums sm:text-2xl",
+                      "mt-0.5 text-lg font-semibold tabular-nums sm:text-xl",
                       k.tone === "success" && "text-success",
                       k.tone === "warning" && "text-warning-foreground",
                       k.tone === "danger" && "text-destructive",
@@ -254,53 +258,54 @@ function Reports() {
               ))}
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-5">
-              <div className="card-soft order-1 p-4 lg:col-span-2">
-                <div className="mb-3 text-sm font-medium">{active.chartLabel ?? "Distribution"}</div>
-                <div className="h-56 sm:h-64">
-                  {active.chart.length === 0 ? (
-                    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                      No chart data
-                    </div>
-                  ) : active.id === "collection" || active.id === "executive" || active.id === "integrations" ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RePieChart>
-                        <Pie
-                          data={active.chart}
-                          dataKey="value"
-                          nameKey="name"
-                          innerRadius={55}
-                          outerRadius={85}
-                          paddingAngle={2}
-                        >
-                          {active.chart.map((entry, i) => (
-                            <Cell key={entry.name} fill={entry.fill ?? CHART_COLORS[i % CHART_COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </RePieChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={active.chart} margin={{ top: 8, right: 8, left: 0, bottom: 24 }}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                        <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-20} textAnchor="end" height={50} />
-                        <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                        <Tooltip />
-                        <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-                          {active.chart.map((entry, i) => (
-                            <Cell key={entry.name} fill={entry.fill ?? CHART_COLORS[i % CHART_COLORS.length]} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  )}
+            <div className="grid gap-2.5 lg:grid-cols-5">
+              <DesignTicketSection title={active.chartLabel ?? "Distribution"} delay={0.02} compact className="lg:col-span-2">
+                <div className="card-soft p-3">
+                  <div className="h-48 sm:h-56">
+                    {active.chart.length === 0 ? (
+                      <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                        No chart data
+                      </div>
+                    ) : active.id === "collection" || active.id === "executive" || active.id === "integrations" ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RePieChart>
+                          <Pie
+                            data={active.chart}
+                            dataKey="value"
+                            nameKey="name"
+                            innerRadius={48}
+                            outerRadius={72}
+                            paddingAngle={2}
+                          >
+                            {active.chart.map((entry, i) => (
+                              <Cell key={entry.name} fill={entry.fill ?? CHART_COLORS[i % CHART_COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </RePieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={active.chart} margin={{ top: 6, right: 6, left: 0, bottom: 20 }}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                          <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-20} textAnchor="end" height={44} />
+                          <YAxis tick={{ fontSize: 10 }} allowDecimals={false} width={28} />
+                          <Tooltip />
+                          <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                            {active.chart.map((entry, i) => (
+                              <Cell key={entry.name} fill={entry.fill ?? CHART_COLORS[i % CHART_COLORS.length]} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
                 </div>
-              </div>
+              </DesignTicketSection>
 
-              <div className="order-2 lg:col-span-3">
+              <DesignTicketSection title="Details" delay={0.04} compact className="lg:col-span-3">
                 <ReportTable columns={active.columns} rows={active.rows} />
-              </div>
+              </DesignTicketSection>
             </div>
           </motion.div>
         )}
