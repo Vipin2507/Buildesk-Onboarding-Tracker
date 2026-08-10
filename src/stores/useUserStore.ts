@@ -32,6 +32,7 @@ export const useUserStore = createStore<UserState>((set, get) => ({
           email: user.email,
           role: user.role,
           active: user.active,
+          productScope: user.productScope === "crm" ? "crm" : "erp",
           phone: user.phone,
           jobTitle: user.jobTitle,
           department: user.department,

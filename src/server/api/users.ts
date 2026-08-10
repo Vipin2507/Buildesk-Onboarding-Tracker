@@ -23,6 +23,8 @@ export const listUsers = createServerFn({ method: "GET" }).handler(async () => {
     .map(toPublicUser);
 });
 
+const productScopeSchema = z.enum(["erp", "crm"]);
+
 export const createUser = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z
@@ -31,6 +33,7 @@ export const createUser = createServerFn({ method: "POST" })
         email: z.string().email(),
         role: z.string().min(1),
         active: z.boolean().optional(),
+        productScope: productScopeSchema.optional(),
         phone: z.string().optional(),
         jobTitle: z.string().optional(),
         department: z.string().optional(),
@@ -55,6 +58,7 @@ export const createUser = createServerFn({ method: "POST" })
         email,
         passwordHash,
         role: data.role,
+        productScope: data.productScope ?? "erp",
         active: data.active ?? true,
         phone: data.phone,
         jobTitle: data.jobTitle,
@@ -79,6 +83,7 @@ export const updateUser = createServerFn({ method: "POST" })
           email: z.string().email().optional(),
           role: z.string().min(1).optional(),
           active: z.boolean().optional(),
+          productScope: productScopeSchema.optional(),
           phone: z.string().optional().nullable(),
           jobTitle: z.string().optional().nullable(),
           department: z.string().optional().nullable(),
