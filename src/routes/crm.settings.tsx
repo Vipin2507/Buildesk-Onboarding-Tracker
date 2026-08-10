@@ -734,7 +734,7 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
   }
 
   return (
-    <div>
+          <div>
       <div className="mb-2.5 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <SectionTitle
           title="CRM Users"

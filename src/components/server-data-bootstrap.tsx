@@ -30,6 +30,7 @@ import {
   listModuleSubscriptionEvents,
   listCrmEvents,
   ensureCompanyPortals,
+  listCrmAccounts,
   listDesignTickets,
   listChatSessions,
 } from "@/lib/api";
@@ -58,6 +59,7 @@ import {
   useTaskStore,
   useClientVisitStore,
   useCrmEventStore,
+  useCrmAccountStore,
 } from "@/stores";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
 import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
@@ -119,6 +121,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           subscriptionEvents,
           crmEvents,
           portalAccess,
+          crmAccounts,
           designTickets,
           chatSessions,
         ] = await Promise.all([
@@ -154,6 +157,10 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           listModuleSubscriptionEvents({ data: {} }).catch(() => []),
           listCrmEvents({ data: { limit: 200 } }).catch(() => []),
           ensureCompanyPortals().catch(() => []),
+          listCrmAccounts().catch((err) => {
+            console.warn("[bootstrap] listCrmAccounts failed", err);
+            return null;
+          }),
           listDesignTickets({ data: {} }).catch((err) => {
             console.warn("[bootstrap] listDesignTickets failed", err);
             return null;
@@ -213,6 +220,9 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           events: crmEvents,
         });
         useCompanyPortalStore.getState().hydrateAccess(portalAccess);
+        if (crmAccounts) {
+          useCrmAccountStore.getState().hydrateAccounts(crmAccounts);
+        }
         if (designTickets) {
           useDesignTicketStore.getState().hydrateTickets(designTickets);
         }

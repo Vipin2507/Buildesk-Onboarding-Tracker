@@ -40,8 +40,8 @@ export const crmAccountSchema = z.object({
   supportManager1: z.string().min(2, "Support manager 1 is required"),
   supportManager2: z.string().optional(),
   usersPurchased: z.coerce.number().int().min(1, "Users purchased is required"),
-  dealSize: z.coerce.number().min(1, "Total deal value is required"),
-  pendingAmount: z.coerce.number().min(0, "Pending amount is required"),
+  dealSize: z.coerce.number().min(0),
+  pendingAmount: z.coerce.number().min(0),
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
 });
@@ -444,7 +444,7 @@ export function CrmAccountFormFields({ form }: { form: UseFormReturn<CrmAccountF
             <FieldError message={errors.usersPurchased?.message} />
           </div>
           <div>
-            <Label required>Total deal value (₹)</Label>
+            <Label>Total deal value (₹)</Label>
             <input
               type="number"
               min={0}
@@ -455,7 +455,7 @@ export function CrmAccountFormFields({ form }: { form: UseFormReturn<CrmAccountF
             <FieldError message={errors.dealSize?.message} />
           </div>
           <div>
-            <Label required>Pending amount (₹)</Label>
+            <Label>Pending amount (₹)</Label>
             <input
               type="number"
               min={0}

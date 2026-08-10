@@ -24,7 +24,7 @@ export function isCrmAccountCompanyStub(billingInfo: string | null | undefined) 
 /**
  * Base URL for shareable client portal links.
  * Prefer VITE_PORTAL_BASE_URL (set in .env / .env.production for your VPS or domain).
- * Falls back to the browser origin when opening the app (e.g. http://200.97.166.244).
+ * Falls back to the browser origin when opening the app (e.g. http://69.62.84.237).
  */
 export function getPortalBaseUrl(): string {
   const configured = import.meta.env.VITE_PORTAL_BASE_URL as string | undefined;

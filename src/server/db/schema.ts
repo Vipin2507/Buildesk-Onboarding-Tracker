@@ -111,6 +111,50 @@ export const companyModules = sqliteTable(
   ],
 );
 
+/** CRM customer accounts (separate from ERP companies). */
+export const crmAccounts = sqliteTable(
+  "crm_accounts",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    userId: text("user_id"),
+    companyType: text("company_type").notNull(),
+    contact: text("contact").notNull(),
+    phone: text("phone").notNull(),
+    email: text("email").notNull(),
+    city: text("city").notNull(),
+    state: text("state"),
+    country: text("country"),
+    region: text("region"),
+    ownerName: text("owner_name"),
+    ownerPhone: text("owner_phone"),
+    ownerEmail: text("owner_email"),
+    pocName: text("poc_name"),
+    pocMobile: text("poc_mobile"),
+    pocEmail: text("poc_email"),
+    salesManagerName: text("sales_manager_name"),
+    accountManagerName: text("account_manager_name"),
+    supportManager1: text("support_manager_1"),
+    supportManager2: text("support_manager_2"),
+    startDate: text("start_date"),
+    endDate: text("end_date"),
+    annualLicense: integer("annual_license", { mode: "boolean" }),
+    dealSize: real("deal_size"),
+    usersPurchased: integer("users_purchased"),
+    totalCost: real("total_cost"),
+    paymentReceived: real("payment_received"),
+    pendingAmount: real("pending_amount"),
+    healthScore: integer("health_score"),
+    status: text("status").notNull().default("onboarding"),
+    ...timestamps,
+  },
+  (t) => [
+    index("crm_accounts_name_idx").on(t.name),
+    index("crm_accounts_user_id_idx").on(t.userId),
+    index("crm_accounts_status_idx").on(t.status),
+  ],
+);
+
 /* ---------- CRM: subscriptions, tasks, visits, events ---------- */
 
 export const moduleSubscriptions = sqliteTable(

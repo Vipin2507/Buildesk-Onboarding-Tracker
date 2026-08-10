@@ -44,7 +44,7 @@ jobs:
           command_timeout: 15m
           script: |
             set -euo pipefail
-            APP_DIR="${APP_DIR:-/var/www/buildesk}"
+            APP_DIR="${APP_DIR:-/home/buildesk-track/htdocs/track.cravingcodetech.in}"
             cd "$APP_DIR"
 
             echo "==> Fetching latest main"

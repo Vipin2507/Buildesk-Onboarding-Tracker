@@ -131,6 +131,13 @@ export {
 } from "@/server/api/crm";
 
 export {
+  listCrmAccounts,
+  upsertCrmAccount,
+  upsertCrmAccountsBatch,
+  deleteCrmAccount,
+} from "@/server/api/crm-accounts";
+
+export {
   getPortalBySlug,
   listCompanyPortalAccess,
   ensureCompanyPortals,

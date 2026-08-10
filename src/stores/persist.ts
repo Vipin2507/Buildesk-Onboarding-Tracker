@@ -20,7 +20,6 @@ const PERSIST_ALLOWLIST = new Set([
   `${BUILDESK_PREFIX}automation-v3`,
   `${BUILDESK_PREFIX}chat-v1`,
   `${BUILDESK_PREFIX}crm-onboarding-v1`,
-  `${BUILDESK_PREFIX}crm-accounts-v1`,
   `${BUILDESK_PREFIX}crm-master-config-v1`,
   `${BUILDESK_PREFIX}crm-app-settings-v1`,
 ]);
@@ -45,6 +44,8 @@ const LEGACY_CACHE_KEYS = [
   "labor",
   "labor-v2",
   "tickets",
+  "chat-v1",
+  "crm-accounts-v1",
   "design-tickets-v1",
   "tickets-v3",
   "training",

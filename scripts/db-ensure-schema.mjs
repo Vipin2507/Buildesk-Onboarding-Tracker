@@ -771,6 +771,51 @@ function ensureCrmTables() {
 
 ensureCrmTables();
 
+/** CRM customer accounts (product CRM) — no FK to ERP companies. */
+if (!tableExists("crm_accounts")) {
+  sqlite.exec(`
+    CREATE TABLE crm_accounts (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL,
+      user_id TEXT,
+      company_type TEXT NOT NULL,
+      contact TEXT NOT NULL,
+      phone TEXT NOT NULL,
+      email TEXT NOT NULL,
+      city TEXT NOT NULL,
+      state TEXT,
+      country TEXT,
+      region TEXT,
+      owner_name TEXT,
+      owner_phone TEXT,
+      owner_email TEXT,
+      poc_name TEXT,
+      poc_mobile TEXT,
+      poc_email TEXT,
+      sales_manager_name TEXT,
+      account_manager_name TEXT,
+      support_manager_1 TEXT,
+      support_manager_2 TEXT,
+      start_date TEXT,
+      end_date TEXT,
+      annual_license INTEGER,
+      deal_size REAL,
+      users_purchased INTEGER,
+      total_cost REAL,
+      payment_received REAL,
+      pending_amount REAL,
+      health_score INTEGER,
+      status TEXT NOT NULL DEFAULT 'onboarding',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS crm_accounts_name_idx ON crm_accounts(name);
+    CREATE INDEX IF NOT EXISTS crm_accounts_user_id_idx ON crm_accounts(user_id);
+    CREATE INDEX IF NOT EXISTS crm_accounts_status_idx ON crm_accounts(status);
+  `);
+  console.log("+ CREATE TABLE crm_accounts");
+}
+
 /** Backfill module_subscriptions from opted-in company_modules (idempotent). */
 if (tableExists("module_subscriptions") && tableExists("company_modules")) {
   sqlite.exec(`

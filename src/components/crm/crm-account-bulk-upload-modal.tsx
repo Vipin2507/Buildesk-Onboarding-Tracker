@@ -36,7 +36,7 @@ export function CrmAccountBulkUploadModal({
   onOpenChange: (open: boolean) => void;
 }) {
   const accounts = useCrmAccountStore((s) => s.accounts);
-  const upsertAccount = useCrmAccountStore((s) => s.upsertAccount);
+  const upsertAccountsBatch = useCrmAccountStore((s) => s.upsertAccountsBatch);
   const ensure = useCrmOnboardingStore((s) => s.ensureForCompany);
   const users = useUserStore((s) => s.users);
 
@@ -138,12 +138,13 @@ export function CrmAccountBulkUploadModal({
 
     try {
       const current = useCrmAccountStore.getState().accounts;
-      for (const row of ready) {
-        // Unmatched managers without a manual pick stay blank (never random).
+      const payloads = ready.map((row) => {
         const existing = row.existingId
           ? current.find((a) => a.id === row.existingId)
           : undefined;
-        const payload = mergeCrmAccountImportRow(
+        if (existing) updated += 1;
+        else created += 1;
+        return mergeCrmAccountImportRow(
           {
             ...row,
             salesManagerName: row.salesManagerNeedsPick ? "" : row.salesManagerName,
@@ -151,11 +152,13 @@ export function CrmAccountBulkUploadModal({
           },
           existing,
         );
-        const saved = upsertAccount(payload);
-        ensure(saved.id, saved.companyType);
-        if (existing) updated += 1;
-        else created += 1;
+      });
+
+      const saved = upsertAccountsBatch(payloads);
+      for (const account of saved) {
+        ensure(account.id, account.companyType);
       }
+
       const leftBlank = unresolvedPicks ?? 0;
       toast.success(
         `Imported ${created + updated} account${created + updated === 1 ? "" : "s"} (${created} new, ${updated} updated)` +
