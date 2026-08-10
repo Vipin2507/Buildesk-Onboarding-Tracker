@@ -43,7 +43,7 @@ export function CrmDashboardDrillDownSheet({ open, filter, data, onClose }: Prop
         a.name.toLowerCase().includes(q) ||
         a.city.toLowerCase().includes(q) ||
         a.companyType.toLowerCase().includes(q) ||
-        (a.accountManagerName ?? "").toLowerCase().includes(q),
+        (a.salesManagerName ?? "").toLowerCase().includes(q),
     );
   }, [data, query]);
 
@@ -106,7 +106,7 @@ export function CrmDashboardDrillDownSheet({ open, filter, data, onClose }: Prop
                 <div className="mt-1.5 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
                   <span>Health {a.resolvedHealth}</span>
                   {a.openTickets > 0 ? <span>· {a.openTickets} tickets</span> : null}
-                  {a.accountManagerName ? <span>· {a.accountManagerName}</span> : null}
+                  {a.salesManagerName ? <span>· {a.salesManagerName}</span> : null}
                 </div>
               </Link>
             ))

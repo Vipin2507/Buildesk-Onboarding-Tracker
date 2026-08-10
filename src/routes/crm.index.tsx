@@ -416,7 +416,7 @@ function CrmDashboardPage() {
                         <th className="px-2 py-1.5 text-left font-medium">Status</th>
                         <th className="px-2 py-1.5 text-left font-medium">Progress</th>
                         <th className="px-2 py-1.5 text-left font-medium">Stage</th>
-                        <th className="px-2 py-1.5 text-left font-medium">Manager</th>
+                        <th className="px-2 py-1.5 text-left font-medium">Sales Manager</th>
                         <th className="px-2 py-1.5" />
                       </tr>
                     </thead>
@@ -447,7 +447,7 @@ function CrmDashboardPage() {
                             {a.stageLabel}
                           </td>
                           <td className="max-w-[80px] truncate px-2 py-1.5 text-muted-foreground">
-                            {a.accountManagerName || "—"}
+                            {a.salesManagerName || "—"}
                           </td>
                           <td className="px-2 py-1.5 text-right">
                             <Button size="sm" variant="ghost" className="h-7 gap-0.5 px-1.5 text-primary" asChild>

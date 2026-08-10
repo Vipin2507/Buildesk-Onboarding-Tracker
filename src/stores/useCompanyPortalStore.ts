@@ -60,14 +60,13 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
     generateAccessForCompany: (company) => {
       const existing = get().getByCompanyId(company.id);
       if (existing) {
-        let record = existing;
         if (existing.companyName !== company.name) {
           get().updateContact(company.id, { companyName: company.name });
-          record = get().getByCompanyId(company.id)!;
+          return get().getByCompanyId(company.id)!;
         }
-        // Re-upsert so CRM portals that failed an earlier FK sync land in SQLite.
-        syncPortal(record);
-        return record;
+        // Do not re-POST existing portals on every page load — that floods the
+        // reverse proxy and surfaces as net::ERR_FAILED / Failed to fetch.
+        return existing;
       }
 
       const now = nowIso();

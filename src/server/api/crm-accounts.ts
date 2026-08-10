@@ -5,6 +5,8 @@ import { z } from "zod";
 import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
+import { canViewCrmAccount, crmSalesManagerNamesMatch } from "@/lib/crm-account-access";
+import { isAdminRoleKey } from "@/lib/permissions";
 import type { CrmAccount } from "@/types/crm-account";
 import type { CompanyType } from "@/types/company";
 
@@ -127,24 +129,44 @@ function toRowValues(
 }
 
 export const listCrmAccounts = createServerFn({ method: "GET" }).handler(async () => {
-  requireUser();
+  const user = requireUser();
   const db = getDb();
-  return db
+  const rows = db
     .select()
     .from(t.crmAccounts)
     .orderBy(asc(t.crmAccounts.name))
     .all()
     .map(mapRow);
+
+  if (isAdminRoleKey(user.role)) return rows;
+  return rows.filter((a) => canViewCrmAccount(a, user));
 });
+
+function assertCanMutateAccount(
+  user: { name: string; role: string },
+  existing: { salesManagerName: string | null } | undefined,
+  nextSalesManagerName: string | null | undefined,
+) {
+  if (isAdminRoleKey(user.role)) return;
+  // Managers may only create/update accounts assigned to themselves.
+  if (existing && !crmSalesManagerNamesMatch(existing.salesManagerName ?? undefined, user.name)) {
+    throw new ApiError(403, "You can only manage accounts assigned to you");
+  }
+  if (!crmSalesManagerNamesMatch(nextSalesManagerName ?? undefined, user.name)) {
+    throw new ApiError(403, "Sales manager must be you for accounts you manage");
+  }
+}
 
 export const upsertCrmAccount = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => accountInput.parse(data))
   .handler(async ({ data }) => {
-    requireUser();
+    const user = requireUser();
     const db = getDb();
     const now = nowIso();
     const id = data.id ?? newId();
     const existing = db.select().from(t.crmAccounts).where(eq(t.crmAccounts.id, id)).get();
+
+    assertCanMutateAccount(user, existing, data.salesManagerName);
 
     if (existing) {
       const updatedAt = data.updatedAt ?? now;
@@ -173,7 +195,7 @@ export const upsertCrmAccount = createServerFn({ method: "POST" })
 export const upsertCrmAccountsBatch = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ accounts: z.array(accountInput) }).parse(data))
   .handler(async ({ data }) => {
-    requireUser();
+    const user = requireUser();
     const db = getDb();
     const now = nowIso();
     const saved: CrmAccount[] = [];
@@ -181,6 +203,7 @@ export const upsertCrmAccountsBatch = createServerFn({ method: "POST" })
     for (const item of data.accounts) {
       const id = item.id ?? newId();
       const existing = db.select().from(t.crmAccounts).where(eq(t.crmAccounts.id, id)).get();
+      assertCanMutateAccount(user, existing, item.salesManagerName);
       if (existing) {
         const updatedAt = item.updatedAt ?? now;
         db.update(t.crmAccounts)
@@ -209,10 +232,13 @@ export const upsertCrmAccountsBatch = createServerFn({ method: "POST" })
 export const deleteCrmAccount = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ id: z.string() }).parse(data))
   .handler(async ({ data }) => {
-    requireUser();
+    const user = requireUser();
     const db = getDb();
     const existing = db.select().from(t.crmAccounts).where(eq(t.crmAccounts.id, data.id)).get();
     if (!existing) throw new ApiError(404, "CRM account not found");
+    if (!isAdminRoleKey(user.role) && !crmSalesManagerNamesMatch(existing.salesManagerName ?? undefined, user.name)) {
+      throw new ApiError(403, "You can only delete accounts assigned to you");
+    }
     db.delete(t.crmAccounts).where(eq(t.crmAccounts.id, data.id)).run();
     return mapRow(existing);
   });

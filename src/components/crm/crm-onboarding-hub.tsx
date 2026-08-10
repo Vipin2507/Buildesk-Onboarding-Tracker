@@ -387,7 +387,7 @@ function DashboardTab({
             Stage: {CRM_STAGE_LABELS[record.tracker.stage] ?? record.tracker.stage}
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
-            Manager: {account.accountManagerName || account.supportManager1 || "—"}
+            Sales Manager: {account.salesManagerName || "—"}
           </div>
           <Pill className="mt-2" tone={isLive ? "success" : "warning"}>
             {isLive ? "Go-Live complete" : "Pre go-live"}

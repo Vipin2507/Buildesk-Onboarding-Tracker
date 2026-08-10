@@ -172,7 +172,7 @@ function CrmAccountsPage() {
 
   const managers = useMemo(() => {
     const set = new Set(
-      rows.map((r) => r.accountManagerName).filter((n): n is string => Boolean(n?.trim())),
+      rows.map((r) => r.salesManagerName).filter((n): n is string => Boolean(n?.trim())),
     );
     return [...set].sort((a, b) => a.localeCompare(b));
   }, [rows]);
@@ -215,11 +215,11 @@ function CrmAccountsPage() {
       if (typeFilter !== "all" && r.companyType !== typeFilter) return false;
       if (cityFilter !== "all" && r.city !== cityFilter) return false;
       if (regionFilter !== "all" && r.region !== regionFilter) return false;
-      if (managerFilter === "unassigned" && r.accountManagerName?.trim()) return false;
+      if (managerFilter === "unassigned" && r.salesManagerName?.trim()) return false;
       if (
         managerFilter !== "all" &&
         managerFilter !== "unassigned" &&
-        r.accountManagerName !== managerFilter
+        r.salesManagerName !== managerFilter
       ) {
         return false;
       }
@@ -426,7 +426,7 @@ function CrmAccountsPage() {
     setGoingLive(null);
   }
 
-  const unassignedManagerCount = rows.filter((r) => !r.accountManagerName?.trim()).length;
+  const unassignedManagerCount = rows.filter((r) => !r.salesManagerName?.trim()).length;
 
   return (
     <PageWrap compact>
@@ -525,7 +525,7 @@ function CrmAccountsPage() {
             ]}
           />
         </DesignTicketFilterField>
-        <DesignTicketFilterField label="Manager" compact>
+        <DesignTicketFilterField label="Sales Manager" compact>
           <DesignTicketSelect
             compact
             value={managerFilter}
@@ -625,7 +625,7 @@ function CrmAccountsPage() {
                   "contact",
                   "email",
                   "companyType",
-                  "accountManagerName",
+                  "salesManagerName",
                   "stageLabel",
                 ]}
                 pageSize={15}
@@ -676,10 +676,11 @@ function CrmAccountsPage() {
                     ),
                   },
                   {
-                    key: "accountManagerName",
-                    header: "Manager",
+                    key: "salesManagerName",
+                    header: "Sales Manager",
+                    sortable: true,
                     render: (r) => (
-                      <span className="text-xs">{r.accountManagerName || "—"}</span>
+                      <span className="text-xs">{r.salesManagerName || "—"}</span>
                     ),
                   },
                   {

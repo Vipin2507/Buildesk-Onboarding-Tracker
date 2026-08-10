@@ -5,7 +5,10 @@ function isIgnorableSyncError(message: string) {
     /not found/i.test(message) ||
     /FOREIGN KEY constraint failed/i.test(message) ||
     /skipped/i.test(message) ||
-    /company missing/i.test(message)
+    /company missing/i.test(message) ||
+    /failed to fetch/i.test(message) ||
+    /networkerror/i.test(message) ||
+    /load failed/i.test(message)
   );
 }
 

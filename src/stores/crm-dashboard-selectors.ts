@@ -12,8 +12,14 @@ import {
   summarizeChecklistPhases,
   type ChecklistPhaseBucket,
 } from "@/lib/checklist";
+import { filterCrmAccountsForUser } from "@/lib/crm-account-access";
 import { isTicketOpen } from "@/lib/tickets";
-import { useCrmAccountStore, useCrmOnboardingStore, useTicketStore } from "@/stores";
+import {
+  useAuthStore,
+  useCrmAccountStore,
+  useCrmOnboardingStore,
+  useTicketStore,
+} from "@/stores";
 import type { CrmAccount } from "@/types/crm-account";
 import type { CrmImplementationStage, CrmOnboardingRecord } from "@/types/crm-onboarding";
 
@@ -75,11 +81,14 @@ function recordFor(account: CrmAccount, records: CrmOnboardingRecord[]): CrmOnbo
 }
 
 export function useCrmDashboardOverview() {
-  const accounts = useCrmAccountStore((s) => s.accounts);
+  const allAccounts = useCrmAccountStore((s) => s.accounts);
+  const currentUser = useAuthStore((s) => s.user);
   const records = useCrmOnboardingStore((s) => s.records);
   const tickets = useTicketStore((s) => s.tickets);
 
   return useMemo(() => {
+    // Admins see all; managers only accounts where they are the sales manager.
+    const accounts = filterCrmAccountsForUser(allAccounts, currentUser);
     const accountIds = new Set(accounts.map((a) => a.id));
     const today = todayYmd();
 
@@ -303,7 +312,7 @@ export function useCrmDashboardOverview() {
       recentActivity,
       resolveDrillDown,
     };
-  }, [accounts, records, tickets]);
+  }, [allAccounts, currentUser, records, tickets]);
 }
 
 function buildRecentActivity(accounts: CrmAccount[], records: CrmOnboardingRecord[]) {
