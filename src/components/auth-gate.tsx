@@ -11,6 +11,14 @@ function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.includes(pathname) || pathname.startsWith("/portal/");
 }
 
+function RedirectingScreen({ message }: { message: string }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
+      {message}
+    </div>
+  );
+}
+
 export function AuthGate({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -59,20 +67,25 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }, [user, hydrated, isPublic, isCrmPath, navigate]);
 
   if (!hydrated) {
-    return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
-        Loading session…
-      </div>
-    );
+    return <RedirectingScreen message="Loading session…" />;
   }
 
-  if (!user && !isPublic) return null;
-  if (user && isPublic) return null;
+  // Avoid a blank white screen while the router catches up after sign-out / product redirects.
+  if (!user && !isPublic) {
+    return <RedirectingScreen message="Redirecting to sign in…" />;
+  }
+  if (user && isPublic) {
+    return <RedirectingScreen message="Signing you in…" />;
+  }
 
   if (user) {
     const crmUser = isCrmUser(user);
-    if (crmUser && !isCrmPath) return null;
-    if (!crmUser && isCrmPath) return null;
+    if (crmUser && !isCrmPath) {
+      return <RedirectingScreen message="Opening CRM…" />;
+    }
+    if (!crmUser && isCrmPath) {
+      return <RedirectingScreen message="Opening ERP…" />;
+    }
   }
 
   return <>{children}</>;

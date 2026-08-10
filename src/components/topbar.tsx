@@ -60,10 +60,19 @@ export function TopBar() {
   }, []);
 
   async function handleLogout() {
-    await authLogout();
+    try {
+      await authLogout();
+    } catch {
+      // Session may already be invalid — still clear local auth.
+    }
     setUser(null);
     toast.success("Signed out");
-    void navigate({ to: "/login", search: { mode: "login" } });
+    // Await navigation so we don't leave a protected route with a cleared session.
+    try {
+      await navigate({ to: "/login", search: { mode: "login" }, replace: true });
+    } catch {
+      // AuthGate will also redirect if this fails.
+    }
   }
 
   return (
