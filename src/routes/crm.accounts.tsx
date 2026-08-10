@@ -11,10 +11,12 @@ import {
   Rocket,
   Trash2,
   TrendingUp,
+  Upload,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
+import { CrmAccountBulkUploadModal } from "@/components/crm/crm-account-bulk-upload-modal";
 import {
   CrmAccountFormFields,
   crmAccountSchema,
@@ -140,6 +142,7 @@ function CrmAccountsPage() {
   const [dateTo, setDateTo] = useState("");
 
   const [modalOpen, setModalOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [editing, setEditing] = useState<CrmAccount | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState<CrmAccountRow | null>(null);
@@ -432,10 +435,21 @@ function CrmAccountsPage() {
         title="CRM Accounts"
         subtitle="Customer accounts for CRM onboarding — progress, health, and go-live."
         actions={
-          <Button size="sm" className="h-8 gap-1 bg-primary text-xs" onClick={openCreate}>
-            <Plus className="h-3.5 w-3.5" />
-            Add account
-          </Button>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1 text-xs"
+              onClick={() => setBulkOpen(true)}
+            >
+              <Upload className="h-3.5 w-3.5" />
+              Bulk upload
+            </Button>
+            <Button size="sm" className="h-8 gap-1 bg-primary text-xs" onClick={openCreate}>
+              <Plus className="h-3.5 w-3.5" />
+              Add account
+            </Button>
+          </div>
         }
       />
 
@@ -799,6 +813,8 @@ function CrmAccountsPage() {
       >
         <CrmAccountFormFields form={form} />
       </EntityFormModal>
+
+      <CrmAccountBulkUploadModal open={bulkOpen} onOpenChange={setBulkOpen} />
 
       <ConfirmDeleteDialog
         open={deleteOpen}
