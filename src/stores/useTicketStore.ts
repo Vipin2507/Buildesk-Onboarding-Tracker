@@ -1,5 +1,6 @@
 import type { Ticket, TicketActivity, TicketStatus } from "@/types";
 import { nowIso } from "@/types";
+import { isCrmTicket } from "@/lib/crm-tickets";
 import { logActivity } from "./useActivityStore";
 import { notifyInApp } from "./useNotificationStore";
 import { createStore, touch } from "./persist";
@@ -14,6 +15,10 @@ import {
   dispatchAutomationTrigger,
   isClosedTicketStatus,
 } from "@/services/automation";
+
+function ticketNotifyHref(ticket: Pick<Ticket, "id" | "projectId" | "companyId">) {
+  return isCrmTicket(ticket as Ticket) ? `/crm/support/${ticket.id}` : `/support/${ticket.id}`;
+}
 
 type TicketState = {
   tickets: Ticket[];
@@ -78,9 +83,10 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
       title: `New ticket ${ticket.id}`,
       body: ticket.title,
       kind: ticket.priority === "Critical" ? "danger" : "info",
-      href: `/support/${ticket.id}`,
+      href: ticketNotifyHref(ticket),
       companyId: ticket.companyId,
       ticketId: ticket.id,
+      gate: isCrmTicket(ticket) ? "none" : "ticket",
     });
     serverSync("createTicket", () =>
       apiCreate({
@@ -132,9 +138,10 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
         title: `${id} → ${data.status}`,
         body: ticket?.title ?? prev.title,
         kind: "info",
-        href: `/support/${id}`,
+        href: ticketNotifyHref(ticket ?? prev),
         companyId: ticket?.companyId ?? prev.companyId,
         ticketId: id,
+        gate: isCrmTicket(ticket ?? prev) ? "none" : "ticket",
       });
     }
     if (prev && data.developerId && data.developerId !== prev.developerId) {
@@ -142,9 +149,10 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
         title: `${id} reassigned`,
         body: ticket?.title ?? prev.title,
         kind: "info",
-        href: `/support/${id}`,
+        href: ticketNotifyHref(ticket ?? prev),
         companyId: ticket?.companyId ?? prev.companyId,
         ticketId: id,
+        gate: isCrmTicket(ticket ?? prev) ? "none" : "ticket",
       });
     }
     serverSync("updateTicket", () =>
@@ -198,9 +206,10 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
       title: `${id} → ${status}`,
       body: prev?.title ?? "Ticket status updated",
       kind: "info",
-      href: `/support/${id}`,
+      href: prev ? ticketNotifyHref(prev) : `/support/${id}`,
       companyId: prev?.companyId,
       ticketId: id,
+      gate: prev && isCrmTicket(prev) ? "none" : "ticket",
     });
     serverSync("moveTicket", () => apiUpdate({ data: { id, patch: { status } } }));
     const updated = get().getById(id);

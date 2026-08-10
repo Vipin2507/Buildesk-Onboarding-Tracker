@@ -16,8 +16,10 @@ import { nowIso } from "@/types";
 import { serverSync } from "@/lib/sync";
 import { useTicketStore } from "./useTicketStore";
 import { useCompanyStore } from "./useCompanyStore";
+import { useCrmAccountStore } from "./useCrmAccountStore";
 import { useProjectStore } from "./useProjectStore";
 import { createStore, touch } from "./persist";
+import { CRM_TICKET_PROJECT_ID } from "@/lib/crm-tickets";
 
 type ChatState = {
   sessions: ChatSession[];
@@ -374,17 +376,23 @@ export const useChatStore = createStore<ChatState>((set, get) => ({
 
     const transcript = session.messages.map((m) => `[${m.senderName}] ${m.text}`).join("\n");
 
+    const isCrmAccount = Boolean(
+      useCrmAccountStore.getState().getById(session.companyId),
+    );
     const projects = useProjectStore
       .getState()
       .projects.filter((p) => p.companyId === session.companyId);
-    const projectId = projects[0]?.id ?? "";
-    const developerId =
-      useCompanyStore.getState().companies.find((c) => c.id === session.companyId)
-        ?.onboardingManagerId ?? "";
+    const projectId = isCrmAccount ? CRM_TICKET_PROJECT_ID : projects[0]?.id ?? "";
+    const developerId = isCrmAccount
+      ? ""
+      : useCompanyStore.getState().companies.find((c) => c.id === session.companyId)
+          ?.onboardingManagerId ?? "";
 
     const ticket = useTicketStore.getState().addTicket({
       type: "Other",
-      title: `Chat: ${session.visitorName}`,
+      title: isCrmAccount
+        ? `[CRM] Chat: ${session.visitorName}`
+        : `Chat: ${session.visitorName}`,
       priority: "Medium",
       status: "Open",
       raisedOn: new Date().toISOString().slice(0, 10),

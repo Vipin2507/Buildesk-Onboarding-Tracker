@@ -95,6 +95,11 @@ export function MobileNavSheet({
                         {chatBadge}
                       </span>
                     ) : null}
+                    {crm && item.to === "/crm/live-chat" && chatBadge > 0 ? (
+                      <span className="ml-auto rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground">
+                        {chatBadge}
+                      </span>
+                    ) : null}
                   </Link>
                 </motion.div>
               </div>

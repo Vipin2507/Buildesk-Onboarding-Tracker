@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -1091,15 +1092,19 @@ function TicketsTab({ companyId }: { companyId: string }) {
             companyTickets.slice(0, 40).map((t) => (
               <div key={t.id} className="card-soft space-y-2 p-2.5">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="text-xs font-medium">{t.title}</div>
+                  <Link
+                    to="/crm/support/$ticketId"
+                    params={{ ticketId: t.id }}
+                    className="min-w-0 hover:opacity-90"
+                  >
+                    <div className="text-xs font-medium text-primary">{t.title}</div>
                     <div className="mt-0.5 line-clamp-2 text-[10px] text-muted-foreground">
                       {t.description}
                     </div>
                     <div className="mt-1 text-[10px] text-muted-foreground">
                       {t.id.slice(0, 8)} · Raised {formatDate(t.raisedOn)} · {t.type}
                     </div>
-                  </div>
+                  </Link>
                   <div className="flex flex-wrap gap-1">
                     <Pill tone="accent">{t.priority}</Pill>
                     <Pill tone={isTicketOpen(t) ? "warning" : "success"}>{t.status}</Pill>

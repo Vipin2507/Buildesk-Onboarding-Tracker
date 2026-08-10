@@ -40,8 +40,11 @@ import { Route as TicketsTicketIdRouteImport } from './routes/tickets.$ticketId'
 import { Route as SupportTicketIdRouteImport } from './routes/support.$ticketId'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects.$projectId'
 import { Route as PortalSlugRouteImport } from './routes/portal.$slug'
+import { Route as CrmTicketsRouteImport } from './routes/crm.tickets'
+import { Route as CrmSupportRouteImport } from './routes/crm.support'
 import { Route as CrmSettingsRouteImport } from './routes/crm.settings'
 import { Route as CrmMasterRouteImport } from './routes/crm.master'
+import { Route as CrmLiveChatRouteImport } from './routes/crm.live-chat'
 import { Route as CrmAccountsRouteImport } from './routes/crm.accounts'
 import { Route as CompaniesCompanyIdRouteImport } from './routes/companies.$companyId'
 import { Route as PortalSlugIndexRouteImport } from './routes/portal.$slug.index'
@@ -50,6 +53,8 @@ import { Route as PortalSlugSolvedRouteImport } from './routes/portal.$slug.solv
 import { Route as PortalSlugProfileRouteImport } from './routes/portal.$slug.profile'
 import { Route as PortalSlugDashboardRouteImport } from './routes/portal.$slug.dashboard'
 import { Route as PortalSlugCreateTicketRouteImport } from './routes/portal.$slug.create-ticket'
+import { Route as CrmTicketsTicketIdRouteImport } from './routes/crm.tickets.$ticketId'
+import { Route as CrmSupportTicketIdRouteImport } from './routes/crm.support.$ticketId'
 import { Route as CrmAccountsAccountIdRouteImport } from './routes/crm.accounts.$accountId'
 import { Route as PortalSlugTicketsTicketIdRouteImport } from './routes/portal.$slug.tickets.$ticketId'
 import { Route as CompaniesCompanyIdModulesModuleKeyRouteImport } from './routes/companies.$companyId.modules.$moduleKey'
@@ -210,6 +215,16 @@ const PortalSlugRoute = PortalSlugRouteImport.update({
   path: '/portal/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CrmTicketsRoute = CrmTicketsRouteImport.update({
+  id: '/tickets',
+  path: '/tickets',
+  getParentRoute: () => CrmRoute,
+} as any)
+const CrmSupportRoute = CrmSupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => CrmRoute,
+} as any)
 const CrmSettingsRoute = CrmSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -218,6 +233,11 @@ const CrmSettingsRoute = CrmSettingsRouteImport.update({
 const CrmMasterRoute = CrmMasterRouteImport.update({
   id: '/master',
   path: '/master',
+  getParentRoute: () => CrmRoute,
+} as any)
+const CrmLiveChatRoute = CrmLiveChatRouteImport.update({
+  id: '/live-chat',
+  path: '/live-chat',
   getParentRoute: () => CrmRoute,
 } as any)
 const CrmAccountsRoute = CrmAccountsRouteImport.update({
@@ -259,6 +279,16 @@ const PortalSlugCreateTicketRoute = PortalSlugCreateTicketRouteImport.update({
   id: '/create-ticket',
   path: '/create-ticket',
   getParentRoute: () => PortalSlugRoute,
+} as any)
+const CrmTicketsTicketIdRoute = CrmTicketsTicketIdRouteImport.update({
+  id: '/$ticketId',
+  path: '/$ticketId',
+  getParentRoute: () => CrmTicketsRoute,
+} as any)
+const CrmSupportTicketIdRoute = CrmSupportTicketIdRouteImport.update({
+  id: '/$ticketId',
+  path: '/$ticketId',
+  getParentRoute: () => CrmSupportRoute,
 } as any)
 const CrmAccountsAccountIdRoute = CrmAccountsAccountIdRouteImport.update({
   id: '/$accountId',
@@ -312,8 +342,11 @@ export interface FileRoutesByFullPath {
   '/vendors': typeof VendorsRoute
   '/companies/$companyId': typeof CompaniesCompanyIdRouteWithChildren
   '/crm/accounts': typeof CrmAccountsRouteWithChildren
+  '/crm/live-chat': typeof CrmLiveChatRoute
   '/crm/master': typeof CrmMasterRoute
   '/crm/settings': typeof CrmSettingsRoute
+  '/crm/support': typeof CrmSupportRouteWithChildren
+  '/crm/tickets': typeof CrmTicketsRouteWithChildren
   '/portal/$slug': typeof PortalSlugRouteWithChildren
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/support/$ticketId': typeof SupportTicketIdRoute
@@ -321,6 +354,8 @@ export interface FileRoutesByFullPath {
   '/tickets/links': typeof TicketsLinksRoute
   '/crm/': typeof CrmIndexRoute
   '/crm/accounts/$accountId': typeof CrmAccountsAccountIdRoute
+  '/crm/support/$ticketId': typeof CrmSupportTicketIdRoute
+  '/crm/tickets/$ticketId': typeof CrmTicketsTicketIdRoute
   '/portal/$slug/create-ticket': typeof PortalSlugCreateTicketRoute
   '/portal/$slug/dashboard': typeof PortalSlugDashboardRoute
   '/portal/$slug/profile': typeof PortalSlugProfileRoute
@@ -358,14 +393,19 @@ export interface FileRoutesByTo {
   '/vendors': typeof VendorsRoute
   '/companies/$companyId': typeof CompaniesCompanyIdRouteWithChildren
   '/crm/accounts': typeof CrmAccountsRouteWithChildren
+  '/crm/live-chat': typeof CrmLiveChatRoute
   '/crm/master': typeof CrmMasterRoute
   '/crm/settings': typeof CrmSettingsRoute
+  '/crm/support': typeof CrmSupportRouteWithChildren
+  '/crm/tickets': typeof CrmTicketsRouteWithChildren
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/support/$ticketId': typeof SupportTicketIdRoute
   '/tickets/$ticketId': typeof TicketsTicketIdRoute
   '/tickets/links': typeof TicketsLinksRoute
   '/crm': typeof CrmIndexRoute
   '/crm/accounts/$accountId': typeof CrmAccountsAccountIdRoute
+  '/crm/support/$ticketId': typeof CrmSupportTicketIdRoute
+  '/crm/tickets/$ticketId': typeof CrmTicketsTicketIdRoute
   '/portal/$slug/create-ticket': typeof PortalSlugCreateTicketRoute
   '/portal/$slug/dashboard': typeof PortalSlugDashboardRoute
   '/portal/$slug/profile': typeof PortalSlugProfileRoute
@@ -405,8 +445,11 @@ export interface FileRoutesById {
   '/vendors': typeof VendorsRoute
   '/companies/$companyId': typeof CompaniesCompanyIdRouteWithChildren
   '/crm/accounts': typeof CrmAccountsRouteWithChildren
+  '/crm/live-chat': typeof CrmLiveChatRoute
   '/crm/master': typeof CrmMasterRoute
   '/crm/settings': typeof CrmSettingsRoute
+  '/crm/support': typeof CrmSupportRouteWithChildren
+  '/crm/tickets': typeof CrmTicketsRouteWithChildren
   '/portal/$slug': typeof PortalSlugRouteWithChildren
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/support/$ticketId': typeof SupportTicketIdRoute
@@ -414,6 +457,8 @@ export interface FileRoutesById {
   '/tickets/links': typeof TicketsLinksRoute
   '/crm/': typeof CrmIndexRoute
   '/crm/accounts/$accountId': typeof CrmAccountsAccountIdRoute
+  '/crm/support/$ticketId': typeof CrmSupportTicketIdRoute
+  '/crm/tickets/$ticketId': typeof CrmTicketsTicketIdRoute
   '/portal/$slug/create-ticket': typeof PortalSlugCreateTicketRoute
   '/portal/$slug/dashboard': typeof PortalSlugDashboardRoute
   '/portal/$slug/profile': typeof PortalSlugProfileRoute
@@ -454,8 +499,11 @@ export interface FileRouteTypes {
     | '/vendors'
     | '/companies/$companyId'
     | '/crm/accounts'
+    | '/crm/live-chat'
     | '/crm/master'
     | '/crm/settings'
+    | '/crm/support'
+    | '/crm/tickets'
     | '/portal/$slug'
     | '/projects/$projectId'
     | '/support/$ticketId'
@@ -463,6 +511,8 @@ export interface FileRouteTypes {
     | '/tickets/links'
     | '/crm/'
     | '/crm/accounts/$accountId'
+    | '/crm/support/$ticketId'
+    | '/crm/tickets/$ticketId'
     | '/portal/$slug/create-ticket'
     | '/portal/$slug/dashboard'
     | '/portal/$slug/profile'
@@ -500,14 +550,19 @@ export interface FileRouteTypes {
     | '/vendors'
     | '/companies/$companyId'
     | '/crm/accounts'
+    | '/crm/live-chat'
     | '/crm/master'
     | '/crm/settings'
+    | '/crm/support'
+    | '/crm/tickets'
     | '/projects/$projectId'
     | '/support/$ticketId'
     | '/tickets/$ticketId'
     | '/tickets/links'
     | '/crm'
     | '/crm/accounts/$accountId'
+    | '/crm/support/$ticketId'
+    | '/crm/tickets/$ticketId'
     | '/portal/$slug/create-ticket'
     | '/portal/$slug/dashboard'
     | '/portal/$slug/profile'
@@ -546,8 +601,11 @@ export interface FileRouteTypes {
     | '/vendors'
     | '/companies/$companyId'
     | '/crm/accounts'
+    | '/crm/live-chat'
     | '/crm/master'
     | '/crm/settings'
+    | '/crm/support'
+    | '/crm/tickets'
     | '/portal/$slug'
     | '/projects/$projectId'
     | '/support/$ticketId'
@@ -555,6 +613,8 @@ export interface FileRouteTypes {
     | '/tickets/links'
     | '/crm/'
     | '/crm/accounts/$accountId'
+    | '/crm/support/$ticketId'
+    | '/crm/tickets/$ticketId'
     | '/portal/$slug/create-ticket'
     | '/portal/$slug/dashboard'
     | '/portal/$slug/profile'
@@ -814,6 +874,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortalSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/crm/tickets': {
+      id: '/crm/tickets'
+      path: '/tickets'
+      fullPath: '/crm/tickets'
+      preLoaderRoute: typeof CrmTicketsRouteImport
+      parentRoute: typeof CrmRoute
+    }
+    '/crm/support': {
+      id: '/crm/support'
+      path: '/support'
+      fullPath: '/crm/support'
+      preLoaderRoute: typeof CrmSupportRouteImport
+      parentRoute: typeof CrmRoute
+    }
     '/crm/settings': {
       id: '/crm/settings'
       path: '/settings'
@@ -826,6 +900,13 @@ declare module '@tanstack/react-router' {
       path: '/master'
       fullPath: '/crm/master'
       preLoaderRoute: typeof CrmMasterRouteImport
+      parentRoute: typeof CrmRoute
+    }
+    '/crm/live-chat': {
+      id: '/crm/live-chat'
+      path: '/live-chat'
+      fullPath: '/crm/live-chat'
+      preLoaderRoute: typeof CrmLiveChatRouteImport
       parentRoute: typeof CrmRoute
     }
     '/crm/accounts': {
@@ -883,6 +964,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/portal/$slug/create-ticket'
       preLoaderRoute: typeof PortalSlugCreateTicketRouteImport
       parentRoute: typeof PortalSlugRoute
+    }
+    '/crm/tickets/$ticketId': {
+      id: '/crm/tickets/$ticketId'
+      path: '/$ticketId'
+      fullPath: '/crm/tickets/$ticketId'
+      preLoaderRoute: typeof CrmTicketsTicketIdRouteImport
+      parentRoute: typeof CrmTicketsRoute
+    }
+    '/crm/support/$ticketId': {
+      id: '/crm/support/$ticketId'
+      path: '/$ticketId'
+      fullPath: '/crm/support/$ticketId'
+      preLoaderRoute: typeof CrmSupportTicketIdRouteImport
+      parentRoute: typeof CrmSupportRoute
     }
     '/crm/accounts/$accountId': {
       id: '/crm/accounts/$accountId'
@@ -954,17 +1049,47 @@ const CrmAccountsRouteWithChildren = CrmAccountsRoute._addFileChildren(
   CrmAccountsRouteChildren,
 )
 
+interface CrmSupportRouteChildren {
+  CrmSupportTicketIdRoute: typeof CrmSupportTicketIdRoute
+}
+
+const CrmSupportRouteChildren: CrmSupportRouteChildren = {
+  CrmSupportTicketIdRoute: CrmSupportTicketIdRoute,
+}
+
+const CrmSupportRouteWithChildren = CrmSupportRoute._addFileChildren(
+  CrmSupportRouteChildren,
+)
+
+interface CrmTicketsRouteChildren {
+  CrmTicketsTicketIdRoute: typeof CrmTicketsTicketIdRoute
+}
+
+const CrmTicketsRouteChildren: CrmTicketsRouteChildren = {
+  CrmTicketsTicketIdRoute: CrmTicketsTicketIdRoute,
+}
+
+const CrmTicketsRouteWithChildren = CrmTicketsRoute._addFileChildren(
+  CrmTicketsRouteChildren,
+)
+
 interface CrmRouteChildren {
   CrmAccountsRoute: typeof CrmAccountsRouteWithChildren
+  CrmLiveChatRoute: typeof CrmLiveChatRoute
   CrmMasterRoute: typeof CrmMasterRoute
   CrmSettingsRoute: typeof CrmSettingsRoute
+  CrmSupportRoute: typeof CrmSupportRouteWithChildren
+  CrmTicketsRoute: typeof CrmTicketsRouteWithChildren
   CrmIndexRoute: typeof CrmIndexRoute
 }
 
 const CrmRouteChildren: CrmRouteChildren = {
   CrmAccountsRoute: CrmAccountsRouteWithChildren,
+  CrmLiveChatRoute: CrmLiveChatRoute,
   CrmMasterRoute: CrmMasterRoute,
   CrmSettingsRoute: CrmSettingsRoute,
+  CrmSupportRoute: CrmSupportRouteWithChildren,
+  CrmTicketsRoute: CrmTicketsRouteWithChildren,
   CrmIndexRoute: CrmIndexRoute,
 }
 

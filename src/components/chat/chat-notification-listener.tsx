@@ -2,11 +2,14 @@ import { useEffect, useRef } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 
+import { isCrmUser } from "@/lib/product-scope";
+import { useAuthStore } from "@/stores";
 import { useChatStore } from "@/stores/useChatStore";
 
 /** Shows pop-up alerts when chats need agent attention. */
 export function ChatNotificationListener() {
   const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
   const sessions = useChatStore((s) => s.sessions);
   const activeInternalSessionId = useChatStore((s) => s.activeInternalSessionId);
   const seenRef = useRef<Set<string>>(new Set());
@@ -37,12 +40,14 @@ export function ChatNotificationListener() {
           label: "Reply",
           onClick: () => {
             useChatStore.getState().setActiveInternalSession(session.id);
-            void navigate({ to: "/live-chat" });
+            void navigate({
+              to: isCrmUser(user) ? "/crm/live-chat" : "/live-chat",
+            });
           },
         },
       });
     }
-  }, [sessions, activeInternalSessionId, navigate]);
+  }, [sessions, activeInternalSessionId, navigate, user]);
 
   return null;
 }
