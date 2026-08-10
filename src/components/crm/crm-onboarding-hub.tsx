@@ -30,6 +30,7 @@ import {
   normalizeCrmAccountForm,
   type CrmAccountFormValues,
 } from "@/components/crm/crm-account-form";
+import { CrmAccountPortalPanel } from "@/components/crm/crm-account-portal-panel";
 import { CrmGoLiveChecklist } from "@/components/crm/crm-go-live-checklist";
 import { CrmMasterChecklistDetail } from "@/components/crm/crm-master-checklist-detail";
 import { CrmMigrationChecklistDetail } from "@/components/crm/crm-migration-checklist-detail";
@@ -982,7 +983,9 @@ function TicketsTab({ companyId }: { companyId: string }) {
 
   return (
     <div className="space-y-2.5">
-      <DesignTicketSection compact title="Create ticket">
+      <CrmAccountPortalPanel accountId={companyId} />
+
+      <DesignTicketSection compact title="Create internal ticket">
         <div className="grid gap-2 sm:grid-cols-2">
           <label className="text-[10px] text-muted-foreground sm:col-span-2">
             Title
@@ -1076,10 +1079,13 @@ function TicketsTab({ companyId }: { companyId: string }) {
 
       <DesignTicketSection
         compact
-        title="CRM implementation tickets"
+        title="Internal CRM tickets"
         action={
           <span className="text-[10px] tabular-nums text-muted-foreground">
-            {companyTickets.length} total
+            {companyTickets.length} total ·{" "}
+            <Link to="/crm/support" className="text-primary hover:underline">
+              Support Desk
+            </Link>
           </span>
         }
       >
