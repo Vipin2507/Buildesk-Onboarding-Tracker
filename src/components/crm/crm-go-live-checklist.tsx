@@ -81,7 +81,7 @@ export function CrmGoLiveChecklist({ companyId, accountName, isLive, who }: Prop
       toast.error("Complete all go-live checklist items first");
       return;
     }
-    markLive(companyId);
+    markLive(companyId, who);
     updateTracker(companyId, { stage: "go_live" }, who);
     toast.success(`${accountName} marked Live`);
     setConfirmApprove(false);
@@ -89,7 +89,7 @@ export function CrmGoLiveChecklist({ companyId, accountName, isLive, who }: Prop
 
   function forceCompleteAccount() {
     completeAllGoLiveItems(companyId);
-    markLive(companyId);
+    markLive(companyId, who);
     updateTracker(companyId, { stage: "customer_success", priority: "medium" }, who);
     toast.success(`${accountName} completed & marked Live`);
     setConfirmForce(false);

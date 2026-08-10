@@ -264,7 +264,7 @@ export function CrmOnboardingHub({
         confirmTone="default"
         onConfirm={() => {
           completeAllGoLiveItems(accountId);
-          markLive(accountId);
+          markLive(accountId, currentUser?.name);
           updateTracker(accountId, { stage: "customer_success", priority: "medium" }, currentUser?.name);
           toast.success(`${accountName} completed & marked Live`);
           setConfirmForceLive(false);

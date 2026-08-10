@@ -99,7 +99,7 @@ const SECTIONS: {
   {
     id: "notifications",
     title: "Email & Alerts",
-    desc: "SMTP and CRM onboarding notification preferences.",
+    desc: "In-app CRM alerts plus SMTP settings for later email.",
     icon: Bell,
     adminOnly: true,
   },
@@ -444,34 +444,31 @@ function NotificationsSection() {
       smtpFromEmail: form.smtpFromEmail.trim(),
       smtpPort: Number(form.smtpPort) || 587,
       digestHour: Math.min(23, Math.max(0, Number(form.digestHour) || 0)),
+      // Pending digest is not wired yet — keep stored value but do not imply it is active.
+      notifyOnPendingActivities: form.notifyOnPendingActivities,
     });
-    toast.success("Email & alert settings saved");
+    toast.success("Notification settings saved");
   }
 
   const eventToggles: {
-    key: keyof CrmNotificationSettings;
+    key: "notifyOnStageChange" | "notifyOnTraining" | "notifyOnGoLive";
     label: string;
     desc: string;
   }[] = [
     {
       key: "notifyOnStageChange",
       label: "Stage changes",
-      desc: "When an account moves to a new implementation stage",
+      desc: "In-app bell when an account moves to a new implementation stage",
     },
     {
       key: "notifyOnTraining",
       label: "Training",
-      desc: "Upcoming and completed training sessions",
+      desc: "In-app bell when a training session is logged",
     },
     {
       key: "notifyOnGoLive",
       label: "Go-live",
-      desc: "When an account is marked live",
-    },
-    {
-      key: "notifyOnPendingActivities",
-      label: "Pending activities",
-      desc: "Digest of open checklist and tracker items",
+      desc: "In-app bell when an account is marked live",
     },
   ];
 
@@ -479,8 +476,41 @@ function NotificationsSection() {
     <div className="space-y-3">
       <div className="card-soft p-3">
         <SectionTitle
+          title="In-app event alerts"
+          subtitle="These toggles control the CRM notification bell. Clicking an alert opens the account."
+        />
+        <div className="space-y-2">
+          {eventToggles.map((item) => (
+            <div
+              key={item.key}
+              className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+            >
+              <div className="min-w-0">
+                <div className="text-xs font-medium">{item.label}</div>
+                <div className="text-[10px] text-muted-foreground">{item.desc}</div>
+              </div>
+              <Switch
+                checked={Boolean(form[item.key])}
+                onCheckedChange={(v) => setForm({ ...form, [item.key]: v === true })}
+              />
+            </div>
+          ))}
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-dashed px-3 py-2 opacity-70">
+            <div className="min-w-0">
+              <div className="text-xs font-medium">Pending activities digest</div>
+              <div className="text-[10px] text-muted-foreground">
+                Coming soon — needs a scheduled digest job. Setting is saved but not sent yet.
+              </div>
+            </div>
+            <Switch checked={false} disabled />
+          </div>
+        </div>
+      </div>
+
+      <div className="card-soft p-3">
+        <SectionTitle
           title="SMTP Configuration"
-          subtitle="Outbound mail for CRM digests and alerts (stored for this CRM workspace)."
+          subtitle="Stored for a future email send path. Email is not sent yet."
         />
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="SMTP host">
@@ -524,7 +554,10 @@ function NotificationsSection() {
       </div>
 
       <div className="card-soft p-3">
-        <SectionTitle title="Digest" subtitle="Summary email cadence for pending CRM work." />
+        <SectionTitle
+          title="Digest"
+          subtitle="Email digest cadence — stored only until email sending is wired."
+        />
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Cadence">
             <select
@@ -556,28 +589,10 @@ function NotificationsSection() {
       </div>
 
       <div className="card-soft p-3">
-        <SectionTitle title="Event alerts" subtitle="Choose which CRM events should notify the team." />
-        <div className="space-y-2">
-          {eventToggles.map((item) => (
-            <div
-              key={item.key}
-              className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
-            >
-              <div className="min-w-0">
-                <div className="text-xs font-medium">{item.label}</div>
-                <div className="text-[10px] text-muted-foreground">{item.desc}</div>
-              </div>
-              <Switch
-                checked={Boolean(form[item.key])}
-                onCheckedChange={(v) => setForm({ ...form, [item.key]: v === true })}
-              />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="card-soft p-3">
-        <SectionTitle title="Quiet hours" subtitle="Pause non-critical alerts overnight." />
+        <SectionTitle
+          title="Quiet hours"
+          subtitle="Stored for later — not enforced on in-app alerts yet."
+        />
         <div className="mb-3 flex items-center justify-between gap-3">
           <span className="text-xs font-medium">Enable quiet hours</span>
           <Switch
@@ -608,7 +623,7 @@ function NotificationsSection() {
       </div>
 
       <div className="flex justify-end">
-        <Button onClick={save}>Save Email & Alerts</Button>
+        <Button onClick={save}>Save Notification Settings</Button>
       </div>
     </div>
   );

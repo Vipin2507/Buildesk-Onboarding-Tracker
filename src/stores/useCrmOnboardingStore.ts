@@ -39,6 +39,11 @@ import type {
   CrmMasterTeam,
 } from "@/types/crm-master";
 import {
+  notifyCrmStageChange,
+  notifyCrmTrainingLogged,
+} from "@/lib/crm-notify";
+import { useCrmAccountStore } from "./useCrmAccountStore";
+import {
   applyChecklistPhaseDate,
   applyChecklistPhaseToggle,
 } from "@/lib/checklist";
@@ -585,6 +590,9 @@ export const useCrmOnboardingStore = createPersistedStore<CrmOnboardingState>(
   logTrainingSession: (companyId, sessionId, entry) => {
     get().ensureForCompany(companyId);
     const trainingDate = entry?.trainingDate || nowIso().slice(0, 10);
+    const before = get().getByCompanyId(companyId);
+    const sessionLabel =
+      before?.trainingSessions.find((s) => s.id === sessionId)?.label ?? "Training session";
     set((s) => ({
       records: updateRecord(s.records, companyId, (r) => ({
         ...r,
@@ -617,6 +625,8 @@ export const useCrmOnboardingStore = createPersistedStore<CrmOnboardingState>(
         }),
       })),
     }));
+    const accountName = useCrmAccountStore.getState().getById(companyId)?.name ?? "CRM account";
+    notifyCrmTrainingLogged(companyId, accountName, sessionLabel);
   },
 
   adjustTrainingSessionCount: (companyId, sessionId, delta) => {
@@ -833,6 +843,9 @@ export const useCrmOnboardingStore = createPersistedStore<CrmOnboardingState>(
 
   updateTracker: (companyId, patch, who) => {
     get().ensureForCompany(companyId);
+    const prev = get().getByCompanyId(companyId)?.tracker;
+    const stageChanged =
+      patch.stage != null && prev != null && patch.stage !== prev.stage;
     set((s) => ({
       records: updateRecord(s.records, companyId, (r) => ({
         ...r,
@@ -843,6 +856,10 @@ export const useCrmOnboardingStore = createPersistedStore<CrmOnboardingState>(
         },
       })),
     }));
+    if (stageChanged && patch.stage) {
+      const accountName = useCrmAccountStore.getState().getById(companyId)?.name ?? "CRM account";
+      notifyCrmStageChange(companyId, accountName, patch.stage, who);
+    }
   },
 
   logComm: (companyId, action, channel, summary, status = "logged") => {

@@ -412,7 +412,7 @@ function CrmAccountsPage() {
   function confirmGoLive() {
     if (!goingLive) return;
     completeAllGoLiveItems(goingLive.id);
-    markLive(goingLive.id);
+    markLive(goingLive.id, currentUser?.name);
     updateTracker(
       goingLive.id,
       { stage: "customer_success", priority: "medium" },

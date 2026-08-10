@@ -1,5 +1,6 @@
 import type { CrmAccount } from "@/types/crm-account";
 import { newId, nowIso } from "@/types/common";
+import { notifyCrmGoLive } from "@/lib/crm-notify";
 import { createPersistedStore, touch } from "./persist";
 import { seedCrmAccounts } from "@/data/crm-accounts";
 
@@ -8,7 +9,7 @@ type CrmAccountState = {
   getById: (id: string) => CrmAccount | undefined;
   upsertAccount: (data: Omit<CrmAccount, "id" | "createdAt" | "updatedAt"> & { id?: string }) => CrmAccount;
   updateAccount: (id: string, patch: Partial<CrmAccount>) => void;
-  markLive: (id: string) => void;
+  markLive: (id: string, who?: string) => void;
   deleteAccount: (id: string) => CrmAccount | undefined;
 };
 
@@ -45,8 +46,14 @@ export const useCrmAccountStore = createPersistedStore<CrmAccountState>(
       }));
     },
 
-    markLive: (id) => {
+    markLive: (id, who) => {
+      const existing = get().getById(id);
+      if (!existing) return;
+      const alreadyLive = existing.status === "live";
       get().updateAccount(id, { status: "live" });
+      if (!alreadyLive) {
+        notifyCrmGoLive(id, existing.name, who);
+      }
     },
 
     deleteAccount: (id) => {

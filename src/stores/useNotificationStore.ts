@@ -7,7 +7,16 @@ import {
   markAllNotificationsRead as apiMarkAll,
 } from "@/lib/api";
 import { serverSync } from "@/lib/sync";
+import { useCrmSettingsStore } from "./useCrmSettingsStore";
 import { useSettingsStore } from "./useSettingsStore";
+
+export type NotifyGate =
+  | "ticket"
+  | "golive"
+  | "crmStage"
+  | "crmTraining"
+  | "crmGoLive"
+  | "none";
 
 type NotifyInput = {
   title: string;
@@ -18,7 +27,7 @@ type NotifyInput = {
   ticketId?: string;
   userId?: string;
   /** Which settings toggle gates this notification. Default: ticket. */
-  gate?: "ticket" | "golive" | "none";
+  gate?: NotifyGate;
 };
 
 type NotificationState = {
@@ -30,9 +39,15 @@ type NotificationState = {
   unreadCount: () => number;
 };
 
-function isGateOpen(gate: NotifyInput["gate"] = "ticket") {
-  const n = useSettingsStore.getState().notifications;
+function isGateOpen(gate: NotifyGate = "ticket") {
   if (gate === "none") return true;
+
+  const crm = useCrmSettingsStore.getState().notifications;
+  if (gate === "crmStage") return crm.notifyOnStageChange;
+  if (gate === "crmTraining") return crm.notifyOnTraining;
+  if (gate === "crmGoLive") return crm.notifyOnGoLive;
+
+  const n = useSettingsStore.getState().notifications;
   if (gate === "golive") return n.notifyOnGoLive;
   return n.notifyOnTicketUpdates;
 }

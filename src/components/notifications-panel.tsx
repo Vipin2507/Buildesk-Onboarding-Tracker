@@ -1,11 +1,14 @@
+import { useMemo } from "react";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { Bell, CheckCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { isCrmUser } from "@/lib/product-scope";
 import { cn } from "@/lib/utils";
 import { useCurrentUser, useNotificationStore } from "@/stores";
+import type { AppNotification } from "@/types";
 import { formatRelativeTime } from "@/types/common";
 
 const kindDot: Record<string, string> = {
@@ -15,13 +18,23 @@ const kindDot: Record<string, string> = {
   danger: "bg-rose-500",
 };
 
+function isCrmScopedNotification(n: AppNotification) {
+  return Boolean(n.href?.startsWith("/crm"));
+}
+
 export function NotificationsBell() {
   const navigate = useNavigate();
   const router = useRouter();
   const currentUser = useCurrentUser();
-  const notifications = useNotificationStore((s) => s.notifications);
+  const allNotifications = useNotificationStore((s) => s.notifications);
   const markRead = useNotificationStore((s) => s.markRead);
   const markAllRead = useNotificationStore((s) => s.markAllRead);
+  const crm = isCrmUser(currentUser);
+
+  const notifications = useMemo(
+    () => (crm ? allNotifications.filter(isCrmScopedNotification) : allNotifications),
+    [allNotifications, crm],
+  );
   const unread = notifications.filter((n) => !n.readAt).length;
   const inAppEnabled = currentUser?.notifyInApp !== false;
 
@@ -54,7 +67,15 @@ export function NotificationsBell() {
               variant="ghost"
               size="sm"
               className="h-8 gap-1.5 px-2 text-xs text-muted-foreground"
-              onClick={() => markAllRead()}
+              onClick={() => {
+                if (crm) {
+                  for (const n of notifications) {
+                    if (!n.readAt) markRead(n.id);
+                  }
+                } else {
+                  markAllRead();
+                }
+              }}
             >
               <CheckCheck className="h-3.5 w-3.5" />
               Mark all read
