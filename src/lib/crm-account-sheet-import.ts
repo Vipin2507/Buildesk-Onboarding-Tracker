@@ -159,8 +159,9 @@ export function normalizeManagerName(name: string) {
 
 /**
  * Match sheet manager text to a CRM user.
- * Handles case differences and first-name-only cells when the match is unique.
- * Ambiguous matches (e.g. two users named Priya) return undefined for manual pick.
+ * Handles case differences and partial names (first / middle / last) when unique.
+ * Example: sheet "asif" → "Md Asif Ansari" if no other user contains "asif".
+ * Ambiguous matches return undefined for manual pick.
  */
 export function matchCrmManager(
   raw: string,
@@ -179,19 +180,44 @@ export function matchCrmManager(
   if (exactCompact.length === 1) return exactCompact[0];
 
   const needleTokens = needle.split(" ").filter(Boolean);
-  const first = needleTokens[0]!;
 
-  // Excel often has only the first name (any casing).
-  const byFirstName = managers.filter((m) => {
-    const tokens = normalizeManagerName(m.name).split(" ").filter(Boolean);
-    return tokens[0] === first;
-  });
+  // Single token from the sheet (first, middle, or last name) — unique only.
   if (needleTokens.length === 1) {
-    if (byFirstName.length === 1) return byFirstName[0];
+    const token = needleTokens[0]!;
+    const byAnyNamePart = managers.filter((m) => {
+      const parts = normalizeManagerName(m.name).split(" ").filter(Boolean);
+      return parts.some((p) => p === token);
+    });
+    if (byAnyNamePart.length === 1) return byAnyNamePart[0];
+
+    // Prefix on a single name part: "asi" → Asif when unique
+    const byPartPrefix = managers.filter((m) => {
+      const parts = normalizeManagerName(m.name).split(" ").filter(Boolean);
+      return parts.some((p) => p.startsWith(token) && token.length >= 3);
+    });
+    if (byPartPrefix.length === 1) return byPartPrefix[0];
+
     return undefined;
   }
 
-  // Partial full name: "priya sh" / "Priya Sharma" vs "Priya Sharma"
+  // Multi-token: all sheet tokens must appear as name parts (any order).
+  // "asif ansari" / "md asif" → "Md Asif Ansari"
+  const byAllTokens = managers.filter((m) => {
+    const parts = new Set(normalizeManagerName(m.name).split(" ").filter(Boolean));
+    return needleTokens.every((t) => {
+      if (parts.has(t)) return true;
+      // Allow short prefixes on a part when token length >= 3
+      if (t.length >= 3) {
+        for (const p of parts) {
+          if (p.startsWith(t)) return true;
+        }
+      }
+      return false;
+    });
+  });
+  if (byAllTokens.length === 1) return byAllTokens[0];
+
+  // Ordered prefix: "priya sh" → "Priya Sharma"
   const byTokenPrefix = managers.filter((m) => {
     const tokens = normalizeManagerName(m.name).split(" ").filter(Boolean);
     if (needleTokens.length > tokens.length) return false;

@@ -178,8 +178,8 @@ export function CrmAccountBulkUploadModal({
           <AlertDialogTitle>Bulk upload accounts</AlertDialogTitle>
           <AlertDialogDescription>
             Upload an Excel sheet with the template headers. Empty cells are skipped. Manager
-            names match CRM users case-insensitively (first name alone is fine when unique).
-            Ambiguous or unknown names can be picked manually — nothing is assigned at random.
+            names match CRM users case-insensitively — first, middle, or last name alone is fine
+            when unique (e.g. “asif” → Md Asif Ansari). Ambiguous names can be picked manually.
           </AlertDialogDescription>
         </AlertDialogHeader>
 
