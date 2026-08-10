@@ -19,7 +19,7 @@ import { useCompanyStore } from "./useCompanyStore";
 import { useCrmAccountStore } from "./useCrmAccountStore";
 import { useProjectStore } from "./useProjectStore";
 import { createStore, touch } from "./persist";
-import { CRM_TICKET_PROJECT_ID } from "@/lib/crm-tickets";
+import { CRM_TICKET_PROJECT_ID, isCrmChatSession } from "@/lib/crm-tickets";
 
 type ChatState = {
   sessions: ChatSession[];
@@ -49,7 +49,7 @@ type ChatState = {
   convertToTicket: (sessionId: string) => string | null;
   closeSession: (sessionId: string) => void;
   markSessionRead: (sessionId: string, reader: "agent" | "customer") => void;
-  getLiveChatBadgeCount: () => number;
+  getLiveChatBadgeCount: (scope?: "all" | "crm" | "erp") => number;
   getUnreadForAgent: () => number;
 };
 
@@ -453,14 +453,19 @@ export const useChatStore = createStore<ChatState>((set, get) => ({
     pushToServer(get, sessionId);
   },
 
-  getLiveChatBadgeCount: () => {
+  getLiveChatBadgeCount: (scope: "all" | "crm" | "erp" = "all") => {
     const { sessions } = get();
     return sessions.filter((s) => {
       if (s.status === "closed") return false;
+      if (scope !== "all") {
+        const crm = isCrmChatSession(s);
+        if (scope === "crm" && !crm) return false;
+        if (scope === "erp" && crm) return false;
+      }
       if (s.status === "waiting-for-agent") return true;
       return s.messages.some((m) => m.senderType === "customer" && !m.isRead);
     }).length;
   },
 
-  getUnreadForAgent: () => get().getLiveChatBadgeCount(),
+  getUnreadForAgent: () => get().getLiveChatBadgeCount("all"),
 }));

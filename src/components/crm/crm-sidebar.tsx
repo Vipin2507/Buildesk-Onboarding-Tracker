@@ -7,6 +7,7 @@ import { CRM_NAV } from "@/lib/crm-nav";
 import { isNavActive } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores";
+import { useChatStore } from "@/stores/useChatStore";
 
 const STORAGE_KEY = "buildesk-crm-sidebar-collapsed";
 
@@ -14,6 +15,7 @@ export function CrmSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const user = useAuthStore((s) => s.user);
   const isAdmin = user?.role === "Admin";
+  const chatBadge = useChatStore((s) => s.getLiveChatBadgeCount("crm"));
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -104,6 +106,16 @@ export function CrmSidebar() {
                 >
                   {item.label}
                 </span>
+                {item.to === "/crm/live-chat" && chatBadge > 0 ? (
+                  <span
+                    className={cn(
+                      "relative z-10 ml-auto rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground",
+                      collapsed && "absolute right-0.5 top-0.5 ml-0 px-1",
+                    )}
+                  >
+                    {chatBadge > 9 ? "9+" : chatBadge}
+                  </span>
+                ) : null}
               </Link>
             );
           })}

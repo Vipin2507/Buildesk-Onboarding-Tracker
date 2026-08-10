@@ -9,6 +9,7 @@ import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { usePermissions } from "@/hooks/use-permissions";
+import { isCrmChatSession } from "@/lib/crm-tickets";
 import { useChatStore, useCompanyStore, useCurrentUser } from "@/stores";
 import type { ChatSession, ChatSessionStatus } from "@/types/chat";
 import { cn, formatDate } from "@/lib/utils";
@@ -51,13 +52,18 @@ function LiveChatPage() {
   const [draft, setDraft] = useState("");
   const [tab, setTab] = useState<SessionTab>("active");
 
+  const erpSessions = useMemo(
+    () => sessions.filter((s) => !isCrmChatSession(s)),
+    [sessions, companies],
+  );
+
   const activeSessions = useMemo(
-    () => sessions.filter((s) => s.status !== "closed"),
-    [sessions],
+    () => erpSessions.filter((s) => s.status !== "closed"),
+    [erpSessions],
   );
   const historySessions = useMemo(
-    () => sessions.filter((s) => s.status === "closed"),
-    [sessions],
+    () => erpSessions.filter((s) => s.status === "closed"),
+    [erpSessions],
   );
 
   const sorted = useMemo(
@@ -68,18 +74,18 @@ function LiveChatPage() {
     [tab, activeSessions, historySessions],
   );
 
-  const active = sessions.find((s) => s.id === activeId) ?? sorted[0];
+  const active = erpSessions.find((s) => s.id === activeId) ?? sorted[0];
   const isReadOnly = active?.status === "closed";
   const activeUnreadCustomer =
     active?.messages.filter((m) => m.senderType === "customer" && !m.isRead).length ?? 0;
 
   useEffect(() => {
     if (!sorted.length) return;
-    const current = sessions.find((s) => s.id === activeId);
+    const current = erpSessions.find((s) => s.id === activeId);
     const inTab =
       current && (tab === "active" ? current.status !== "closed" : current.status === "closed");
     if (!inTab) setActive(sorted[0].id);
-  }, [tab, sorted, activeId, sessions, setActive]);
+  }, [tab, sorted, activeId, erpSessions, setActive]);
 
   useEffect(() => {
     if (active?.id && !isReadOnly && activeUnreadCustomer > 0) {

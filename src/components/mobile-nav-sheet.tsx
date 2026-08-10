@@ -32,7 +32,7 @@ export function MobileNavSheet({
   const navItems = crm
     ? CRM_NAV.filter((item) => !item.adminOnly || isAdmin)
     : filterNavItems(APP_NAV, { isAdmin, can });
-  const chatBadge = useChatStore((s) => s.getLiveChatBadgeCount());
+  const chatBadge = useChatStore((s) => s.getLiveChatBadgeCount(crm ? "crm" : "erp"));
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

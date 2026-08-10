@@ -14,7 +14,7 @@ export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { isAdmin, can } = usePermissions();
   const navItems = filterNavItems(APP_NAV, { isAdmin, can });
-  const chatBadge = useChatStore((s) => s.getLiveChatBadgeCount());
+  const chatBadge = useChatStore((s) => s.getLiveChatBadgeCount("erp"));
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {

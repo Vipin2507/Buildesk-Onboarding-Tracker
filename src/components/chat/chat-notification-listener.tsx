@@ -2,11 +2,12 @@ import { useEffect, useRef } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 
+import { isCrmChatSession } from "@/lib/crm-tickets";
 import { isCrmUser } from "@/lib/product-scope";
 import { useAuthStore } from "@/stores";
 import { useChatStore } from "@/stores/useChatStore";
 
-/** Shows pop-up alerts when chats need agent attention. */
+/** Shows pop-up alerts when chats need agent attention — scoped ERP vs CRM. */
 export function ChatNotificationListener() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
@@ -15,6 +16,11 @@ export function ChatNotificationListener() {
   const seenRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    if (!user) return;
+
+    const crmUser = isCrmUser(user);
+    const isAdmin = user.role === "Admin";
+
     for (const session of sessions) {
       if (session.status === "closed") continue;
 
@@ -31,7 +37,17 @@ export function ChatNotificationListener() {
 
       if (!needsAgent) continue;
 
+      const crmSession = isCrmChatSession(session);
+      // CRM users only get CRM/unlinked chats; ERP users only get ERP chats.
+      // Admins still get both, routed to the correct product inbox.
+      if (!isAdmin) {
+        if (crmUser && !crmSession) continue;
+        if (!crmUser && crmSession) continue;
+      }
+
       seenRef.current.add(notifyKey);
+
+      const inbox = crmSession ? "/crm/live-chat" : "/live-chat";
 
       toast(`Live chat · ${session.visitorName}`, {
         description: last.text.slice(0, 120),
@@ -40,9 +56,7 @@ export function ChatNotificationListener() {
           label: "Reply",
           onClick: () => {
             useChatStore.getState().setActiveInternalSession(session.id);
-            void navigate({
-              to: isCrmUser(user) ? "/crm/live-chat" : "/live-chat",
-            });
+            void navigate({ to: inbox });
           },
         },
       });

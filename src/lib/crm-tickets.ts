@@ -29,7 +29,17 @@ export function crmAccountName(companyId: string) {
 
 export function isCrmChatCompany(companyId: string | undefined | null) {
   if (!companyId) return true; // unlinked — show in CRM inbox so agents can pick up
-  return crmAccountIds().has(companyId);
+  if (crmAccountIds().has(companyId)) return true;
+
+  const erpCompanyIds = new Set(useCompanyStore.getState().companies.map((c) => c.id));
+  if (erpCompanyIds.has(companyId)) return false;
+
+  // CRM account portal stubs are not in the ERP company list.
+  return Boolean(useCompanyPortalStore.getState().getByCompanyId(companyId));
+}
+
+export function isCrmChatSession(session: { companyId?: string | null }) {
+  return isCrmChatCompany(session.companyId);
 }
 
 /**
