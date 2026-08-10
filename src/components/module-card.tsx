@@ -5,6 +5,7 @@ import {
   Smartphone,
   Building2,
   Boxes,
+  Users,
 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -29,6 +30,7 @@ const ICONS = {
   smartphone: Smartphone,
   building: Building2,
   boxes: Boxes,
+  users: Users,
 } as const;
 
 export function ModuleCard({

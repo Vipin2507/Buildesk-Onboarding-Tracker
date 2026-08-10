@@ -7,6 +7,29 @@ import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 
 export function mapCompany(row: typeof t.companies.$inferSelect, modules: CompanyModule[]): Company {
+  let additionalSupportContactIds: string[] | undefined;
+  let paymentHistory: Company["paymentHistory"];
+  try {
+    if (row.additionalSupportContactIdsJson) {
+      additionalSupportContactIds = JSON.parse(row.additionalSupportContactIdsJson) as string[];
+    }
+  } catch {
+    additionalSupportContactIds = undefined;
+  }
+  try {
+    if (row.paymentHistoryJson) {
+      paymentHistory = JSON.parse(row.paymentHistoryJson) as Company["paymentHistory"];
+    }
+  } catch {
+    paymentHistory = undefined;
+  }
+
+  const num = (v: string | null | undefined) => {
+    if (v == null || v === "") return undefined;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  };
+
   return {
     id: row.id,
     name: row.name,
@@ -35,6 +58,19 @@ export function mapCompany(row: typeof t.companies.$inferSelect, modules: Compan
     plan: migrateLegacyPlan(row.plan),
     health: row.health as Company["health"],
     renewedAt: row.renewedAt ?? undefined,
+    companyType: (row.companyType as Company["companyType"]) ?? undefined,
+    state: row.state ?? undefined,
+    supportManager1Id: row.supportManager1Id ?? undefined,
+    supportManager2Id: row.supportManager2Id ?? undefined,
+    additionalSupportContactIds,
+    annualLicense: row.annualLicense ?? undefined,
+    dealSize: num(row.dealSize),
+    usersPurchased: row.usersPurchased ?? undefined,
+    totalCost: num(row.totalCost),
+    paymentReceived: num(row.paymentReceived),
+    pendingAmount: num(row.pendingAmount),
+    endDate: row.endDate ?? undefined,
+    paymentHistory,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

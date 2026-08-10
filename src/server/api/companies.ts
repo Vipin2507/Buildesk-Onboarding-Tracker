@@ -148,6 +148,33 @@ const companyInput = z.object({
   planExpiry: z.string(),
   plan: z.enum(["Annual", "Half-Yearly", "AMC"]),
   health: z.enum(["Healthy", "Moderate", "Critical"]),
+  companyType: z
+    .enum(["Real Estate Developer", "Channel Partner", "Broker", "Mandate", "CT", "Agent"])
+    .optional()
+    .nullable(),
+  state: z.string().optional().nullable(),
+  supportManager1Id: z.string().optional().nullable(),
+  supportManager2Id: z.string().optional().nullable(),
+  additionalSupportContactIds: z.array(z.string()).optional().nullable(),
+  annualLicense: z.boolean().optional().nullable(),
+  dealSize: z.number().optional().nullable(),
+  usersPurchased: z.number().optional().nullable(),
+  totalCost: z.number().optional().nullable(),
+  paymentReceived: z.number().optional().nullable(),
+  pendingAmount: z.number().optional().nullable(),
+  endDate: z.string().optional().nullable(),
+  paymentHistory: z
+    .array(
+      z.object({
+        id: z.string(),
+        date: z.string(),
+        amount: z.number(),
+        note: z.string().optional(),
+        method: z.string().optional(),
+      }),
+    )
+    .optional()
+    .nullable(),
   moduleKeys: z.array(z.string()).optional(),
   modules: z
     .array(
@@ -205,6 +232,21 @@ export const createCompany = createServerFn({ method: "POST" })
         planExpiry: data.planExpiry,
         plan: data.plan,
         health: data.health,
+        companyType: data.companyType || null,
+        state: data.state || null,
+        supportManager1Id: data.supportManager1Id || null,
+        supportManager2Id: data.supportManager2Id || null,
+        additionalSupportContactIdsJson: data.additionalSupportContactIds
+          ? JSON.stringify(data.additionalSupportContactIds)
+          : null,
+        annualLicense: data.annualLicense ?? null,
+        dealSize: data.dealSize != null ? String(data.dealSize) : null,
+        usersPurchased: data.usersPurchased ?? null,
+        totalCost: data.totalCost != null ? String(data.totalCost) : null,
+        paymentReceived: data.paymentReceived != null ? String(data.paymentReceived) : null,
+        pendingAmount: data.pendingAmount != null ? String(data.pendingAmount) : null,
+        endDate: data.endDate || null,
+        paymentHistoryJson: data.paymentHistory ? JSON.stringify(data.paymentHistory) : null,
         createdAt: now,
         updatedAt: now,
       })
@@ -261,8 +303,40 @@ export const updateCompany = createServerFn({ method: "POST" })
       requirePermission("assignSalesAgent");
       requireActiveUserId(salesAgentId, "Sales agent");
     }
-    const set: Record<string, unknown> = { ...rest, updatedAt: nowIso() };
+    const {
+      additionalSupportContactIds,
+      paymentHistory,
+      dealSize,
+      totalCost,
+      paymentReceived,
+      pendingAmount,
+      ...scalarRest
+    } = rest as typeof rest & {
+      additionalSupportContactIds?: string[] | null;
+      paymentHistory?: unknown;
+      dealSize?: number | null;
+      totalCost?: number | null;
+      paymentReceived?: number | null;
+      pendingAmount?: number | null;
+    };
+    const set: Record<string, unknown> = { ...scalarRest, updatedAt: nowIso() };
     if (salesAgentId !== undefined) set.salesAgentId = salesAgentId || null;
+    if (additionalSupportContactIds !== undefined) {
+      set.additionalSupportContactIdsJson = additionalSupportContactIds
+        ? JSON.stringify(additionalSupportContactIds)
+        : null;
+    }
+    if (paymentHistory !== undefined) {
+      set.paymentHistoryJson = paymentHistory ? JSON.stringify(paymentHistory) : null;
+    }
+    if (dealSize !== undefined) set.dealSize = dealSize != null ? String(dealSize) : null;
+    if (totalCost !== undefined) set.totalCost = totalCost != null ? String(totalCost) : null;
+    if (paymentReceived !== undefined) {
+      set.paymentReceived = paymentReceived != null ? String(paymentReceived) : null;
+    }
+    if (pendingAmount !== undefined) {
+      set.pendingAmount = pendingAmount != null ? String(pendingAmount) : null;
+    }
     db.update(t.companies)
       .set(set)
       .where(eq(t.companies.id, data.id))

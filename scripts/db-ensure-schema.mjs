@@ -273,6 +273,20 @@ const EXTRA_COLUMNS = [
     name: "sales_agent_id",
     ddl: "TEXT",
   },
+  { table: "companies", name: "company_type", ddl: "TEXT" },
+  { table: "companies", name: "state", ddl: "TEXT" },
+  { table: "companies", name: "support_manager_1_id", ddl: "TEXT" },
+  { table: "companies", name: "support_manager_2_id", ddl: "TEXT" },
+  { table: "companies", name: "additional_support_contact_ids_json", ddl: "TEXT" },
+  { table: "companies", name: "annual_license", ddl: "INTEGER" },
+  { table: "companies", name: "deal_size", ddl: "TEXT" },
+  { table: "companies", name: "users_purchased", ddl: "INTEGER" },
+  { table: "companies", name: "total_cost", ddl: "TEXT" },
+  { table: "companies", name: "payment_received", ddl: "TEXT" },
+  { table: "companies", name: "pending_amount", ddl: "TEXT" },
+  { table: "companies", name: "end_date", ddl: "TEXT" },
+  { table: "companies", name: "payment_history_json", ddl: "TEXT" },
+  { table: "users", name: "product_scope", ddl: "TEXT NOT NULL DEFAULT 'erp'" },
 ];
 
 for (const col of EXTRA_COLUMNS) {

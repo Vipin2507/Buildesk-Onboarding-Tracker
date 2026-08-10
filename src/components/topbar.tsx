@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useGlobalSearch, useAuthStore, useCurrentUser } from "@/stores";
 import { authLogout } from "@/lib/api";
+import { isCrmUser } from "@/lib/product-scope";
 
 export function TopBar() {
   const [query, setQuery] = useState("");
@@ -39,6 +40,7 @@ export function TopBar() {
   const navigate = useNavigate();
   const setUser = useAuthStore((s) => s.setUser);
   const currentUser = useCurrentUser();
+  const crm = isCrmUser(currentUser);
   const ref = useRef<HTMLDivElement>(null);
 
   const hasResults =
@@ -223,12 +225,18 @@ export function TopBar() {
                 Edit Profile
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => void navigate({ to: "/settings", search: { section: undefined, invite: false } })}
+                onClick={() =>
+                  void navigate(
+                    crm
+                      ? { to: "/crm/settings" }
+                      : { to: "/settings", search: { section: undefined, invite: false } },
+                  )
+                }
               >
                 <Settings className="mr-2 h-4 w-4" />
                 Settings
               </DropdownMenuItem>
-              {currentUser?.role === "Admin" && (
+              {currentUser?.role === "Admin" && !crm && (
                 <DropdownMenuItem
                   onClick={() =>
                     void navigate({

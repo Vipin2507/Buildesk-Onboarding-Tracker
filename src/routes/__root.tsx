@@ -12,6 +12,7 @@ import { type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { AppSidebar } from "@/components/app-sidebar";
+import { CrmSidebar } from "@/components/crm/crm-sidebar";
 import { TopBar } from "@/components/topbar";
 import { Toaster } from "@/components/ui/sonner";
 import { StoreHydrationGate } from "@/components/store-hydration-gate";
@@ -139,6 +140,7 @@ function RootComponent() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isAuthPage = pathname === "/login";
   const isPortal = pathname.startsWith("/portal");
+  const isCrmApp = pathname === "/crm" || pathname.startsWith("/crm/");
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -160,7 +162,7 @@ function RootComponent() {
                   <ChatBootstrap />
                   <ChatNotificationListener />
                   <div className="flex min-h-screen w-full bg-background text-foreground">
-                    <AppSidebar />
+                    {isCrmApp ? <CrmSidebar /> : <AppSidebar />}
                     <div className="flex min-w-0 flex-1 flex-col">
                       <TopBar />
                       <main className="min-w-0 flex-1 pb-[env(safe-area-inset-bottom)]">

@@ -2,6 +2,7 @@ import { useEffect, type ReactNode } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 
 import { authMe } from "@/lib/api";
+import { homePathForUser, isCrmUser } from "@/lib/product-scope";
 import { useAuthStore } from "@/stores";
 
 const PUBLIC_PATHS = ["/login"];
@@ -18,6 +19,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const setUser = useAuthStore((s) => s.setUser);
   const setHydrated = useAuthStore((s) => s.setHydrated);
   const isPublic = isPublicPath(pathname);
+  const isCrmPath = pathname === "/crm" || pathname.startsWith("/crm/");
 
   useEffect(() => {
     let cancelled = false;
@@ -40,10 +42,21 @@ export function AuthGate({ children }: { children: ReactNode }) {
     if (!hydrated) return;
     if (!user && !isPublic) {
       void navigate({ to: "/login", search: { mode: "login" }, replace: true });
-    } else if (user && isPublic) {
+      return;
+    }
+    if (user && isPublic) {
+      void navigate({ to: homePathForUser(user), replace: true });
+      return;
+    }
+    if (!user) return;
+
+    const crmUser = isCrmUser(user);
+    if (crmUser && !isCrmPath) {
+      void navigate({ to: "/crm", replace: true });
+    } else if (!crmUser && isCrmPath) {
       void navigate({ to: "/", replace: true });
     }
-  }, [user, hydrated, isPublic, navigate]);
+  }, [user, hydrated, isPublic, isCrmPath, navigate]);
 
   if (!hydrated) {
     return (
@@ -55,6 +68,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   if (!user && !isPublic) return null;
   if (user && isPublic) return null;
+
+  if (user) {
+    const crmUser = isCrmUser(user);
+    if (crmUser && !isCrmPath) return null;
+    if (!crmUser && isCrmPath) return null;
+  }
 
   return <>{children}</>;
 }

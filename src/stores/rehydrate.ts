@@ -4,6 +4,7 @@ import { useSettingsStore } from "./useSettingsStore";
 import { useCompanyPortalStore } from "./useCompanyPortalStore";
 import { useAutomationStore } from "./useAutomationStore";
 import { useChatStore } from "./useChatStore";
+import { useCrmOnboardingStore } from "./useCrmOnboardingStore";
 
 /** Config stores persist to disk; entity data (incl. design tickets) loads from SQLite. */
 const persistedStores = [
@@ -12,6 +13,7 @@ const persistedStores = [
   useCompanyPortalStore,
   useAutomationStore,
   useChatStore,
+  useCrmOnboardingStore,
 ] as const;
 
 export async function rehydrateAllStores() {

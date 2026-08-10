@@ -2,22 +2,23 @@ import type { Timestamps } from "./common";
 
 export type ChecklistPhase = "collected" | "uploaded" | "live";
 
-export type OnboardingChecklistItem = Timestamps & {
+/** Minimal shape for sequential Collected → Uploaded → Live toggles. */
+export type ChecklistPhaseState = {
+  collected: boolean;
+  uploaded: boolean;
+  live: boolean;
+  collectedAt?: string;
+  uploadedAt?: string;
+  liveAt?: string;
+  notApplicable: boolean;
+};
+
+export type OnboardingChecklistItem = Timestamps &
+  ChecklistPhaseState & {
   id: string;
   projectId: string;
   section: string;
   label: string;
-  collected: boolean;
-  uploaded: boolean;
-  live: boolean;
-  /** ISO timestamp when Collected was marked (cleared when unchecked). */
-  collectedAt?: string;
-  /** ISO timestamp when Uploaded was marked. */
-  uploadedAt?: string;
-  /** ISO timestamp when Live was marked. */
-  liveAt?: string;
-  /** When true, item is skipped for this project and counts as complete. */
-  notApplicable: boolean;
   remarks: string;
   /** Explicit owner; dashboard falls back to the company's onboarding manager. */
   assigneeUserId?: string;

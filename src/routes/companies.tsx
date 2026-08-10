@@ -50,7 +50,7 @@ import {
 import { isCompanyModulesAllLive } from "@/lib/module-progress";
 import { assignableManagerUsers, resolveAssigneeLabel } from "@/lib/managers";
 import type { Company, ModuleKey, User } from "@/types";
-import { COMPANY_REGIONS } from "@/types";
+import { COMPANY_REGIONS, COMPANY_TYPES } from "@/types";
 import { cn, formatDate } from "@/lib/utils";
 
 const FIELD_LABELS: Record<string, string> = {
@@ -87,6 +87,17 @@ function defaultCompanyFormValues(users: User[]): CompanyForm {
     startDate: today,
     goLiveTarget: new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10),
     planExpiry: new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10),
+    companyType: "Real Estate Developer",
+    state: "",
+    supportManager1Id: "",
+    supportManager2Id: "",
+    annualLicense: true,
+    dealSize: undefined,
+    usersPurchased: undefined,
+    totalCost: undefined,
+    paymentReceived: undefined,
+    pendingAmount: undefined,
+    endDate: "",
   };
 }
 
@@ -143,6 +154,19 @@ const companySchema = z.object({
   startDate: z.string().min(1, "Start date is required"),
   goLiveTarget: z.string(),
   planExpiry: z.string(),
+  companyType: z
+    .enum(["Real Estate Developer", "Channel Partner", "Broker", "Mandate", "CT", "Agent"])
+    .optional(),
+  state: z.string().optional(),
+  supportManager1Id: z.string().optional(),
+  supportManager2Id: z.string().optional(),
+  annualLicense: z.boolean().optional(),
+  dealSize: z.coerce.number().optional(),
+  usersPurchased: z.coerce.number().optional(),
+  totalCost: z.coerce.number().optional(),
+  paymentReceived: z.coerce.number().optional(),
+  pendingAmount: z.coerce.number().optional(),
+  endDate: z.string().optional(),
 });
 
 type CompanyForm = z.infer<typeof companySchema>;
@@ -537,6 +561,17 @@ function CompaniesListPage() {
       startDate: c.startDate || c.agreementDate,
       goLiveTarget: c.goLiveTarget,
       planExpiry: c.planExpiry,
+      companyType: c.companyType ?? "Real Estate Developer",
+      state: c.state ?? "",
+      supportManager1Id: c.supportManager1Id ?? "",
+      supportManager2Id: c.supportManager2Id ?? "",
+      annualLicense: c.annualLicense ?? true,
+      dealSize: c.dealSize,
+      usersPurchased: c.usersPurchased,
+      totalCost: c.totalCost,
+      paymentReceived: c.paymentReceived,
+      pendingAmount: c.pendingAmount,
+      endDate: c.endDate ?? "",
     });
     setModalOpen(true);
   }
@@ -927,11 +962,25 @@ function CompaniesListPage() {
                 <input {...form.register("city")} className={inputClass(!!form.formState.errors.city)} />
               </div>
               <div>
+                <label className="text-xs font-medium">State</label>
+                <input {...form.register("state")} className={inputClass()} />
+              </div>
+              <div>
                 <label className="text-xs font-medium">Region</label>
                 <select {...form.register("region")} className={inputClass()}>
                   {COMPANY_REGIONS.map((r) => (
                     <option key={r} value={r}>
                       {r}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium">Company Type</label>
+                <select {...form.register("companyType")} className={inputClass()}>
+                  {COMPANY_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
                     </option>
                   ))}
                 </select>
@@ -1041,10 +1090,80 @@ function CompaniesListPage() {
               ))}
             </select>
           </div>
+          <label className="flex items-center gap-2 text-xs">
+            <input type="checkbox" {...form.register("annualLicense")} />
+            Annual License
+          </label>
+
+          <div className="space-y-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Commercial & Support
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="text-xs font-medium">Account Manager (CSM)</label>
+                <select {...form.register("csmId")} className={inputClass()}>
+                  <option value="">Unassigned</option>
+                  {assignableUsers.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium">Support Manager 1</label>
+                <select {...form.register("supportManager1Id")} className={inputClass()}>
+                  <option value="">Unassigned</option>
+                  {assignableUsers.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium">Support Manager 2</label>
+                <select {...form.register("supportManager2Id")} className={inputClass()}>
+                  <option value="">Unassigned</option>
+                  {assignableUsers.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium">Deal Size</label>
+                <input type="number" step="any" {...form.register("dealSize")} className={inputClass()} />
+              </div>
+              <div>
+                <label className="text-xs font-medium">Users Purchased</label>
+                <input type="number" {...form.register("usersPurchased")} className={inputClass()} />
+              </div>
+              <div>
+                <label className="text-xs font-medium">Total Cost</label>
+                <input type="number" step="any" {...form.register("totalCost")} className={inputClass()} />
+              </div>
+              <div>
+                <label className="text-xs font-medium">Payment Received</label>
+                <input type="number" step="any" {...form.register("paymentReceived")} className={inputClass()} />
+              </div>
+              <div>
+                <label className="text-xs font-medium">Pending Amount</label>
+                <input type="number" step="any" {...form.register("pendingAmount")} className={inputClass()} />
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="text-xs font-medium">Start Date</label>
               <input type="date" {...form.register("startDate")} className={inputClass(!!form.formState.errors.startDate)} />
+            </div>
+            <div>
+              <label className="text-xs font-medium">End Date</label>
+              <input type="date" {...form.register("endDate")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" />
             </div>
             <div>
               <label className="text-xs font-medium">Agreement Date</label>

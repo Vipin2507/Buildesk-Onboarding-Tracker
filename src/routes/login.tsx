@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ThemeToggleCompact } from "@/components/theme-toggle";
 import { authLogin } from "@/lib/api";
+import { homePathForUser } from "@/lib/product-scope";
 import { useAuthStore } from "@/stores";
 
 const loginSchema = z.object({
@@ -43,7 +44,7 @@ function LoginPage() {
         if (result.success) {
           setUser(result.data.user);
           toast.success("Welcome back!");
-          void navigate({ to: "/" });
+          void navigate({ to: homePathForUser(result.data.user) });
         } else {
           toast.error(result.error);
         }
@@ -66,13 +67,13 @@ function LoginPage() {
             <Building2 className="h-6 w-6" />
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">Buildesk</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Onboarding & Post-Sales Tracker</p>
+          <p className="mt-1 text-sm text-muted-foreground">ERP Tracker & CRM Onboarding</p>
         </div>
 
         <div className="card-soft overflow-hidden p-6">
           <h2 className="mb-1 text-lg font-semibold">Sign in</h2>
           <p className="mb-6 text-sm text-muted-foreground">
-            Accounts are created by an Admin from Settings → User Management.
+            ERP: aditya@buildesk.com · CRM: ananya@crm.buildesk.com · password buildesk123
           </p>
 
           <form

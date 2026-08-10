@@ -60,6 +60,7 @@ export function EntityFormModal({
   children,
   onSubmit,
   submitLabel = "Save",
+  contentClassName,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -67,10 +68,14 @@ export function EntityFormModal({
   children: ReactNode;
   onSubmit: () => void;
   submitLabel?: string;
+  /** Optional extra classes for dialog content (e.g. wider modals). */
+  contentClassName?: string;
 }) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
+      <AlertDialogContent
+        className={["max-h-[90vh] max-w-lg overflow-y-auto", contentClassName].filter(Boolean).join(" ")}
+      >
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
         </AlertDialogHeader>

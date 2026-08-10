@@ -65,6 +65,9 @@ type DatePickerFieldProps = {
   yearsForward?: number;
   /** Use when nesting inside Dialog/AlertDialog so the calendar stays interactive. */
   modal?: boolean;
+  /** Dense variant for table cells and inline rows. */
+  compact?: boolean;
+  disabled?: boolean;
 };
 
 export function DatePickerField({
@@ -78,6 +81,8 @@ export function DatePickerField({
   yearsBack = 25,
   yearsForward = 5,
   modal = false,
+  compact = false,
+  disabled = false,
 }: DatePickerFieldProps) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(() => displayValue(value));
@@ -145,6 +150,7 @@ export function DatePickerField({
           inputMode="text"
           autoComplete="off"
           spellCheck={false}
+          disabled={disabled}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => commitTyped(draft)}
           onKeyDown={(e) => {
@@ -159,14 +165,18 @@ export function DatePickerField({
             }
           }}
           className={cn(
-            "h-10 rounded-lg border-input bg-card pr-9 shadow-none dark:bg-muted/40",
+            "rounded-lg border-input bg-card shadow-none dark:bg-muted/40",
             "focus-visible:border-primary/45 focus-visible:ring-2 focus-visible:ring-primary/20",
+            compact ? "h-8 pr-8 text-xs" : "h-10 pr-9",
           )}
         />
-        {value || draft ? (
+        {(value || draft) && !disabled ? (
           <button
             type="button"
-            className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+            className={cn(
+              "absolute top-1/2 flex -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground",
+              compact ? "right-1.5 h-5 w-5" : "right-2 h-6 w-6",
+            )}
             aria-label="Clear date"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => {
@@ -174,7 +184,7 @@ export function DatePickerField({
               setDraft("");
             }}
           >
-            <X className="h-3.5 w-3.5" />
+            <X className={compact ? "h-3 w-3" : "h-3.5 w-3.5"} />
           </button>
         ) : null}
       </div>
@@ -185,10 +195,14 @@ export function DatePickerField({
             type="button"
             variant="outline"
             size="icon"
-            className="h-10 w-10 shrink-0 rounded-lg border-input bg-card shadow-none hover:bg-muted dark:bg-muted/40 dark:hover:bg-muted/55"
+            disabled={disabled}
+            className={cn(
+              "shrink-0 rounded-lg border-input bg-card shadow-none hover:bg-muted dark:bg-muted/40 dark:hover:bg-muted/55",
+              compact ? "h-8 w-8" : "h-10 w-10",
+            )}
             aria-label="Open calendar"
           >
-            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+            <CalendarIcon className={compact ? "h-3.5 w-3.5 text-muted-foreground" : "h-4 w-4 text-muted-foreground"} />
           </Button>
         </PopoverTrigger>
         <PopoverContent

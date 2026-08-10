@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Building } from "lucide-react";
+import { Building, Contact } from "lucide-react";
 import { motion } from "framer-motion";
 
 import {
@@ -9,7 +9,10 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { APP_NAV, filterNavItems, isNavActive } from "@/lib/nav";
+import { CRM_NAV } from "@/lib/crm-nav";
+import { isCrmUser } from "@/lib/product-scope";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useAuthStore } from "@/stores";
 import { useChatStore } from "@/stores/useChatStore";
 import { cn } from "@/lib/utils";
 
@@ -23,8 +26,12 @@ export function MobileNavSheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const user = useAuthStore((s) => s.user);
+  const crm = isCrmUser(user);
   const { isAdmin, can } = usePermissions();
-  const navItems = filterNavItems(APP_NAV, { isAdmin, can });
+  const navItems = crm
+    ? CRM_NAV.filter((item) => !item.adminOnly || isAdmin)
+    : filterNavItems(APP_NAV, { isAdmin, can });
   const chatBadge = useChatStore((s) => s.getLiveChatBadgeCount());
 
   return (
@@ -36,13 +43,15 @@ export function MobileNavSheet({
         <SheetHeader className="border-b border-sidebar-border px-4 py-4 text-left">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-              <Building className="h-4 w-4" />
+              {crm ? <Contact className="h-4 w-4" /> : <Building className="h-4 w-4" />}
             </div>
             <div>
               <SheetTitle className="text-base font-semibold tracking-tight text-white">
-                Buildesk
+                {crm ? "Buildesk CRM" : "Buildesk"}
               </SheetTitle>
-              <p className="text-[11px] text-sidebar-foreground/70">Onboarding & Post-Sales</p>
+              <p className="text-[11px] text-sidebar-foreground/70">
+                {crm ? "Onboarding & Go-Live" : "Onboarding & Post-Sales"}
+              </p>
             </div>
           </div>
         </SheetHeader>
@@ -51,7 +60,7 @@ export function MobileNavSheet({
           {navItems.map((item, i) => {
             const active = isNavActive(pathname, item);
             const Icon = item.icon;
-            const showAdminDivider = item.to === "/master";
+            const showAdminDivider = !crm && item.to === "/master";
             return (
               <div key={item.to}>
                 {showAdminDivider && (
@@ -81,9 +90,9 @@ export function MobileNavSheet({
                     )}
                     <Icon className="h-4 w-4 shrink-0" />
                     <span className="truncate">{item.label}</span>
-                    {item.to === "/live-chat" && chatBadge > 0 ? (
-                      <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground">
-                        {chatBadge > 9 ? "9+" : chatBadge}
+                    {!crm && item.to === "/live-chat" && chatBadge > 0 ? (
+                      <span className="ml-auto rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground">
+                        {chatBadge}
                       </span>
                     ) : null}
                   </Link>
@@ -92,10 +101,6 @@ export function MobileNavSheet({
             );
           })}
         </nav>
-
-        <div className="border-t border-sidebar-border px-4 py-3 text-[10px] text-sidebar-foreground/60">
-          v1.0 · Buildesk Internal
-        </div>
       </SheetContent>
     </Sheet>
   );

@@ -1,4 +1,4 @@
-import type { OnboardingChecklistItem } from "@/types";
+import type { ChecklistPhaseState, OnboardingChecklistItem } from "@/types";
 import { nowIso } from "@/types";
 
 export type ChecklistPhase = "collected" | "uploaded" | "live";
@@ -12,26 +12,26 @@ const PHASE_AT: Record<ChecklistPhase, "collectedAt" | "uploadedAt" | "liveAt"> 
 };
 
 /** Item is done for go-live gates (fully checked through or marked N/A). */
-export function isChecklistItemComplete(item: OnboardingChecklistItem) {
+export function isChecklistItemComplete(item: ChecklistPhaseState) {
   if (item.notApplicable) return true;
   return item.collected && item.uploaded && item.live;
 }
 
 /** Fully done among applicable work only — N/A does not count as done. */
-export function isChecklistItemFullyDone(item: OnboardingChecklistItem) {
+export function isChecklistItemFullyDone(item: ChecklistPhaseState) {
   if (item.notApplicable) return false;
   return item.collected && item.uploaded && item.live;
 }
 
 /** Applicable item counts for UI fractions (e.g. 0/3 when one of four is N/A). */
-export function countApplicableChecklist(items: OnboardingChecklistItem[]) {
+export function countApplicableChecklist(items: ChecklistPhaseState[]) {
   const applicable = items.filter((i) => !i.notApplicable);
   const done = applicable.filter((i) => i.collected && i.uploaded && i.live).length;
   return { done, total: applicable.length, na: items.length - applicable.length };
 }
 
 /** Progress % excluding N/A items from the denominator; all-N/A → 100. */
-export function calcChecklistProgress(items: OnboardingChecklistItem[]) {
+export function calcChecklistProgress(items: ChecklistPhaseState[]) {
   const applicable = items.filter((i) => !i.notApplicable);
   if (items.length === 0) return 0;
   if (applicable.length === 0) return 100;
@@ -44,7 +44,7 @@ export function calcChecklistProgress(items: OnboardingChecklistItem[]) {
 }
 
 /** Whether a phase button may be toggled given sequential collected → uploaded → live. */
-export function canToggleChecklistPhase(item: OnboardingChecklistItem, phase: ChecklistPhase) {
+export function canToggleChecklistPhase(item: ChecklistPhaseState, phase: ChecklistPhase) {
   if (item.notApplicable) return false;
   const on = item[phase];
   if (on) {
@@ -61,11 +61,11 @@ export function canToggleChecklistPhase(item: OnboardingChecklistItem, phase: Ch
  * Turning on requires prior phases; turning off clears this and later phases.
  * Optional `at` (YYYY-MM-DD or ISO) stamps the phase date when turning on.
  */
-export function applyChecklistPhaseToggle(
-  item: OnboardingChecklistItem,
+export function applyChecklistPhaseToggle<T extends ChecklistPhaseState>(
+  item: T,
   phase: ChecklistPhase,
   at?: string,
-): OnboardingChecklistItem | null {
+): T | null {
   if (item.notApplicable) return null;
   if (!canToggleChecklistPhase(item, phase)) return null;
 
@@ -98,11 +98,11 @@ export function normalizePhaseAt(at?: string, fallback = nowIso()) {
 }
 
 /** Update only the timestamp for an already-completed phase. */
-export function applyChecklistPhaseDate(
-  item: OnboardingChecklistItem,
+export function applyChecklistPhaseDate<T extends ChecklistPhaseState>(
+  item: T,
   phase: ChecklistPhase,
   at: string,
-): OnboardingChecklistItem | null {
+): T | null {
   if (item.notApplicable || !item[phase]) return null;
   return {
     ...item,
@@ -123,7 +123,7 @@ export type ChecklistPhaseBucket =
   | "complete";
 
 /** Current blocking phase for an applicable checklist item. */
-export function getChecklistPhaseBucket(item: OnboardingChecklistItem): ChecklistPhaseBucket | null {
+export function getChecklistPhaseBucket(item: ChecklistPhaseState): ChecklistPhaseBucket | null {
   if (item.notApplicable) return null;
   if (item.collected && item.uploaded && item.live) return "complete";
   if (item.uploaded) return "awaiting_live";
@@ -132,13 +132,13 @@ export function getChecklistPhaseBucket(item: OnboardingChecklistItem): Checklis
 }
 
 export function matchesChecklistPhaseBucket(
-  item: OnboardingChecklistItem,
+  item: ChecklistPhaseState,
   bucket: ChecklistPhaseBucket,
 ) {
   return getChecklistPhaseBucket(item) === bucket;
 }
 
-export function summarizeChecklistPhases(items: OnboardingChecklistItem[]) {
+export function summarizeChecklistPhases(items: ChecklistPhaseState[]) {
   const applicable = items.filter((i) => !i.notApplicable);
   const awaitingCollection = applicable.filter((i) => !i.collected).length;
   const awaitingUpload = applicable.filter((i) => i.collected && !i.uploaded).length;

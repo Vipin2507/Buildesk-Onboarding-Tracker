@@ -84,6 +84,7 @@ async function main() {
         email: user.email,
         passwordHash,
         role: user.role,
+        productScope: user.productScope ?? "erp",
         active: user.active,
         avatarUrl: user.avatarUrl,
         phone: user.phone,

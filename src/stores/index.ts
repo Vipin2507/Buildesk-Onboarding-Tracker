@@ -27,6 +27,9 @@ export { useNotificationStore, notifyInApp } from "./useNotificationStore";
 export { useProjectProgressStore } from "./useProjectProgressStore";
 export { useTaskStore } from "./useTaskStore";
 export { useClientVisitStore } from "./useClientVisitStore";
+export { useCrmOnboardingStore } from "./useCrmOnboardingStore";
+export { useCrmAccountStore } from "./useCrmAccountStore";
+export { useCrmMasterStore, getCrmPicklistValues } from "./useCrmMasterStore";
 export { useCrmEventStore } from "./useCrmEventStore";
 export { useDesignTicketStore } from "./useDesignTicketStore";
 export { useCompanyPortalStore } from "./useCompanyPortalStore";
@@ -65,3 +68,13 @@ export type {
   ChecklistDrillDownRow,
   CompanyStatusFilter,
 } from "./dashboard-selectors";
+export {
+  useCrmDashboardOverview,
+  crmDrillDownFilterKey,
+} from "./crm-dashboard-selectors";
+export type {
+  CrmDashboardDrillDownFilter,
+  CrmAccountRow,
+  CrmHealthBucket,
+  CrmAccountStatusFilter,
+} from "./crm-dashboard-selectors";

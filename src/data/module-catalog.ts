@@ -5,7 +5,7 @@ export type ModuleCatalogEntry = {
   key: ModuleKey;
   label: string;
   description: string;
-  icon: "layers" | "truck" | "hardhat" | "smartphone" | "building" | "boxes";
+  icon: "layers" | "truck" | "hardhat" | "smartphone" | "building" | "boxes" | "users";
 };
 
 export const MODULE_CATALOG: ModuleCatalogEntry[] = [
