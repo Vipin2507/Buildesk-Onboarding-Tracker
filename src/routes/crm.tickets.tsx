@@ -7,6 +7,12 @@ import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import { CrmTicketsNav } from "@/components/crm/crm-tickets-nav";
 import {
+  DesignTicketPriorityChip,
+  DesignTicketStatusPill,
+  DESIGN_TICKET_PRIORITIES,
+  DESIGN_TICKET_STATUSES,
+} from "@/components/design-ticket/design-ticket-chips";
+import {
   DesignTicketFilterField,
   DesignTicketSelect,
 } from "@/components/design-ticket/design-ticket-fields";
@@ -17,15 +23,17 @@ import {
   DesignTicketSection,
 } from "@/components/design-ticket/design-ticket-shared";
 import { PageWrap } from "@/components/page-header";
-import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
-import { TICKET_KANBAN_COLUMNS } from "@/data/constants";
-import { filterCrmTickets } from "@/lib/crm-tickets";
-import { isTicketOpen } from "@/lib/tickets";
-import { SUPPORT_PRIORITIES } from "@/lib/support-tracking";
+import { filterCrmDesignTickets } from "@/lib/crm-tickets";
 import { formatDate } from "@/lib/utils";
-import { useCrmAccountStore, useTicketStore } from "@/stores";
-import type { TicketPriority, TicketStatus } from "@/types";
+import { isDesignTicketActive } from "@/stores/design-ticket-selectors";
+import { useCrmAccountStore, useCurrentUser } from "@/stores";
+import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
+import type { DesignTicketPriority, DesignTicketStatus } from "@/types/design-ticket";
+import {
+  DESIGN_TICKET_PRIORITY_LABEL,
+  DESIGN_TICKET_STATUS_LABEL,
+} from "@/types/design-ticket";
 
 export const Route = createFileRoute("/crm/tickets")({
   component: CrmTicketsLayout,
@@ -39,10 +47,12 @@ function CrmTicketsLayout() {
 
 function CrmTicketTrackingPage() {
   const navigate = useNavigate();
-  const tickets = useTicketStore((s) => s.tickets);
-  const updateTicket = useTicketStore((s) => s.updateTicket);
+  const currentUser = useCurrentUser();
+  const tickets = useDesignTicketStore((s) => s.tickets);
+  const updateStatus = useDesignTicketStore((s) => s.updateStatus);
+  const updatePriority = useDesignTicketStore((s) => s.updatePriority);
   const accounts = useCrmAccountStore((s) => s.accounts);
-  const crmTickets = useMemo(() => filterCrmTickets(tickets), [tickets]);
+  const crmTickets = useMemo(() => filterCrmDesignTickets(tickets), [tickets, accounts]);
 
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
@@ -62,23 +72,28 @@ function CrmTicketTrackingPage() {
       if (accountFilter !== "all" && t.companyId !== accountFilter) return false;
       if (!q) return true;
       return (
-        t.title.toLowerCase().includes(q) ||
+        t.subject.toLowerCase().includes(q) ||
+        t.ticketNumber.toLowerCase().includes(q) ||
         t.id.toLowerCase().includes(q) ||
         accountName(t.companyId).toLowerCase().includes(q)
       );
     });
   }, [crmTickets, statusFilter, priorityFilter, accountFilter, query, accountName]);
 
-  const openCount = crmTickets.filter((t) => isTicketOpen(t)).length;
-  const pendingCount = crmTickets.filter((t) => t.status === "Pending").length;
-  const criticalCount = crmTickets.filter((t) => t.priority === "Critical" && isTicketOpen(t)).length;
+  const openCount = crmTickets.filter((t) => isDesignTicketActive(t.status)).length;
+  const inProgressCount = crmTickets.filter((t) => t.status === "in-progress").length;
+  const highCount = crmTickets.filter(
+    (t) => t.priority === "high" && isDesignTicketActive(t.status),
+  ).length;
+
+  const actorName = currentUser?.name ?? "Team";
 
   return (
     <PageWrap compact>
       <DesignTicketPageHeader
         compact
         title="Ticket Tracking"
-        subtitle="Filter and track CRM support tickets across accounts"
+        subtitle="Client portal tickets across CRM accounts"
         actions={
           <Button type="button" size="sm" variant="outline" className="h-8 gap-1.5 text-xs" asChild>
             <Link to="/crm/tickets/links">
@@ -94,9 +109,9 @@ function CrmTicketTrackingPage() {
       <DesignTicketKpiGrid
         size="compact"
         items={[
-          { id: "open", label: "Open", value: openCount },
-          { id: "pending", label: "Pending", value: pendingCount },
-          { id: "critical", label: "Critical open", value: criticalCount },
+          { id: "open", label: "Open / active", value: openCount },
+          { id: "progress", label: "In progress", value: inProgressCount },
+          { id: "high", label: "High priority", value: highCount },
           { id: "total", label: "Total", value: crmTickets.length },
         ]}
       />
@@ -105,7 +120,7 @@ function CrmTicketTrackingPage() {
         <DesignTicketFilterField label="Search">
           <input
             className="h-8 w-full rounded-md border bg-background px-2 text-xs"
-            placeholder="Title, id, account…"
+            placeholder="Subject, id, account…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -116,7 +131,10 @@ function CrmTicketTrackingPage() {
             onChange={setStatusFilter}
             options={[
               { value: "all", label: "All statuses" },
-              ...TICKET_KANBAN_COLUMNS.map((s) => ({ value: s, label: s })),
+              ...DESIGN_TICKET_STATUSES.map((s) => ({
+                value: s,
+                label: DESIGN_TICKET_STATUS_LABEL[s],
+              })),
             ]}
           />
         </DesignTicketFilterField>
@@ -126,7 +144,10 @@ function CrmTicketTrackingPage() {
             onChange={setPriorityFilter}
             options={[
               { value: "all", label: "All priorities" },
-              ...SUPPORT_PRIORITIES.map((p) => ({ value: p, label: p })),
+              ...DESIGN_TICKET_PRIORITIES.map((p) => ({
+                value: p,
+                label: DESIGN_TICKET_PRIORITY_LABEL[p],
+              })),
             ]}
           />
         </DesignTicketFilterField>
@@ -145,14 +166,14 @@ function CrmTicketTrackingPage() {
       {filtered.length === 0 ? (
         <EmptyState
           title="No matching tickets"
-          description="Adjust filters or create a ticket from Support Desk. Share portal links from Portal Links."
+          description="Portal tickets created by clients appear here. Share links from Portal Links."
           actionLabel="Portal Links"
           href="/crm/tickets/links"
         />
       ) : (
         <DesignTicketSection
           compact
-          title="Tracked tickets"
+          title="Portal tickets"
           action={
             <span className="text-[10px] tabular-nums text-muted-foreground">
               {filtered.length} shown ·{" "}
@@ -171,19 +192,28 @@ function CrmTicketTrackingPage() {
             }
             columns={[
               {
-                key: "title",
+                key: "subject",
                 header: "Ticket",
                 render: (t) => (
                   <div>
-                    <div className="font-medium">{t.title}</div>
-                    <div className="text-[10px] text-muted-foreground">{t.id}</div>
+                    <div className="font-medium">{t.subject}</div>
+                    <div className="text-[10px] text-muted-foreground">{t.ticketNumber}</div>
                   </div>
                 ),
               },
               {
                 key: "account",
                 header: "Account",
-                render: (t) => accountName(t.companyId),
+                render: (t) => (
+                  <Link
+                    to="/crm/accounts/$accountId"
+                    params={{ accountId: t.companyId }}
+                    className="text-primary hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {accountName(t.companyId)}
+                  </Link>
+                ),
               },
               {
                 key: "status",
@@ -194,13 +224,15 @@ function CrmTicketTrackingPage() {
                     value={t.status}
                     onClick={(e) => e.stopPropagation()}
                     onChange={(e) => {
-                      updateTicket(t.id, { status: e.target.value as TicketStatus });
-                      toast.success(`Status → ${e.target.value}`);
+                      updateStatus(t.id, e.target.value as DesignTicketStatus, actorName);
+                      toast.success(
+                        `Status → ${DESIGN_TICKET_STATUS_LABEL[e.target.value as DesignTicketStatus]}`,
+                      );
                     }}
                   >
-                    {TICKET_KANBAN_COLUMNS.map((s) => (
+                    {DESIGN_TICKET_STATUSES.map((s) => (
                       <option key={s} value={s}>
-                        {s}
+                        {DESIGN_TICKET_STATUS_LABEL[s]}
                       </option>
                     ))}
                   </select>
@@ -215,26 +247,41 @@ function CrmTicketTrackingPage() {
                     value={t.priority}
                     onClick={(e) => e.stopPropagation()}
                     onChange={(e) =>
-                      updateTicket(t.id, { priority: e.target.value as TicketPriority })
+                      updatePriority(t.id, e.target.value as DesignTicketPriority, actorName)
                     }
                   >
-                    {SUPPORT_PRIORITIES.map((p) => (
+                    {DESIGN_TICKET_PRIORITIES.map((p) => (
                       <option key={p} value={p}>
-                        {p}
+                        {DESIGN_TICKET_PRIORITY_LABEL[p]}
                       </option>
                     ))}
                   </select>
                 ),
               },
               {
-                key: "type",
-                header: "Type",
-                render: (t) => <Pill tone="muted">{t.type}</Pill>,
+                key: "createdBy",
+                header: "Raised by",
+                render: (t) => (
+                  <span className="text-xs text-muted-foreground">
+                    {t.createdBy.name}
+                    {t.createdBy.type === "client" ? " · Client" : ""}
+                  </span>
+                ),
               },
               {
-                key: "raised",
+                key: "chips",
+                header: "",
+                render: (t) => (
+                  <div className="flex items-center gap-1">
+                    <DesignTicketStatusPill status={t.status} />
+                    <DesignTicketPriorityChip priority={t.priority} />
+                  </div>
+                ),
+              },
+              {
+                key: "createdAt",
                 header: "Raised",
-                render: (t) => formatDate(t.raisedOn),
+                render: (t) => formatDate(t.createdAt),
               },
             ]}
           />

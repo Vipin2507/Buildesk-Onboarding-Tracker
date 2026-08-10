@@ -63,6 +63,7 @@ import {
   ticketKpiFilterLabel,
   type TicketKpiFilter,
 } from "@/lib/ticket-tracking";
+import { filterErpDesignTickets } from "@/lib/crm-tickets";
 import { formatDate } from "@/lib/utils";
 import {
   useCompanyPortalStore,
@@ -101,7 +102,14 @@ function TicketsDashboard() {
   const tableRef = useRef<HTMLDivElement>(null);
 
   const currentUser = useCurrentUser();
-  const tickets = useDesignTicketStore((s) => s.tickets);
+  const allTickets = useDesignTicketStore((s) => s.tickets);
+  const companies = useCompanyStore((s) => s.companies);
+  const portalAccess = useCompanyPortalStore((s) => s.access);
+  // Keep CRM account portal tickets on /crm/tickets — not ERP Ticket Tracking.
+  const tickets = useMemo(
+    () => filterErpDesignTickets(allTickets),
+    [allTickets, companies, portalAccess],
+  );
   const deleteTicket = useDesignTicketStore((s) => s.deleteTicket);
   const updateStatus = useDesignTicketStore((s) => s.updateStatus);
   const updatePriority = useDesignTicketStore((s) => s.updatePriority);
@@ -111,11 +119,9 @@ function TicketsDashboard() {
   const bulkUpdateStatus = useDesignTicketStore((s) => s.bulkUpdateStatus);
   const bulkUpdatePriority = useDesignTicketStore((s) => s.bulkUpdatePriority);
   const highlights = useDesignTicketHighlights();
-  const companies = useCompanyStore((s) => s.companies);
   const projects = useProjectStore((s) => s.projects);
   const employees = useEmployeeStore((s) => s.employees);
   const users = useUserStore((s) => s.users);
-  const portalAccess = useCompanyPortalStore((s) => s.access);
 
   const [companyFilter, setCompanyFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<"all" | DesignTicketStatus>("all");
