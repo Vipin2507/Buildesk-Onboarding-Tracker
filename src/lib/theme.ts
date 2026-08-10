@@ -63,4 +63,4 @@ export function setTheme(mode: ThemeMode, _origin?: { x: number; y: number }) {
 }
 
 /** Inline script for shell <head> — prevents light flash before React hydrates. */
-export const THEME_BOOT_SCRIPT = `(function(){try{var k=${JSON.stringify(THEME_STORAGE_KEY)};var t=localStorage.getItem(k);var d=window.matchMedia("(prefers-color-scheme: dark)").matches;var dark=t==="dark"||((t==null||t==="system")&&d);var r=document.documentElement;r.classList.toggle("dark",dark);r.style.colorScheme=dark?"dark":"light";r.dataset.theme=dark?"dark":"light";}catch(e){}})();`;
+export const THEME_BOOT_SCRIPT = `(function(){try{var k=${JSON.stringify(THEME_STORAGE_KEY)};var t=localStorage.getItem(k);var d=window.matchMedia("(prefers-color-scheme: dark)").matches;var portal=(location.pathname||"").indexOf("/portal/")===0;var dark=t==="dark"||(!portal&&(t==null||t==="system")&&d);var r=document.documentElement;r.classList.toggle("dark",dark);r.style.colorScheme=dark?"dark":"light";r.dataset.theme=dark?"dark":"light";}catch(e){}})();`;

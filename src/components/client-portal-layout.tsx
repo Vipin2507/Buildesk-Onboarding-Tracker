@@ -10,9 +10,11 @@ import {
   Building2,
   Menu,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { TICKET_EASE } from "@/components/design-ticket/design-ticket-shared";
+import { useTheme } from "@/components/theme-provider";
+import { ThemeToggleCompact } from "@/components/theme-toggle";
 import {
   Sheet,
   SheetContent,
@@ -20,6 +22,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import type { CompanyPortalAccess } from "@/types/design-ticket";
+import { getStoredTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { PortalDesignTicketBootstrap } from "@/components/portal-design-ticket-bootstrap";
 import { PortalChatBootstrap } from "@/components/chat/portal-chat-bootstrap";
@@ -119,8 +122,16 @@ function PortalNavLink({
 
 export function ClientPortalLayout({ access }: { access: CompanyPortalAccess }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { setMode } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const base = `/portal/${access.slug}`;
+
+  // Client portal prefers light unless the visitor already picked light/dark.
+  useEffect(() => {
+    if (getStoredTheme() === "system") {
+      setMode("light");
+    }
+  }, [setMode]);
 
   function isActive(segment: string) {
     if (segment === "dashboard") {
@@ -176,11 +187,14 @@ export function ClientPortalLayout({ access }: { access: CompanyPortalAccess }) 
               Client ticket portal
             </div>
           </div>
-          <div className="hidden items-center gap-2 text-sm sm:flex">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            <span>
-              Welcome, <span className="font-medium">{access.contactName}</span>
-            </span>
+          <div className="flex shrink-0 items-center gap-2">
+            <div className="hidden items-center gap-2 text-sm sm:flex">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <span>
+                Welcome, <span className="font-medium">{access.contactName}</span>
+              </span>
+            </div>
+            <ThemeToggleCompact className="h-9 w-9 rounded-lg" />
           </div>
         </header>
 
@@ -231,6 +245,12 @@ export function ClientPortalLayout({ access }: { access: CompanyPortalAccess }) 
               />
             ))}
           </nav>
+          <div className="border-t p-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-muted-foreground">Appearance</span>
+              <ThemeToggleCompact className="h-9 w-9 rounded-lg" />
+            </div>
+          </div>
         </SheetContent>
       </Sheet>
     </div>
