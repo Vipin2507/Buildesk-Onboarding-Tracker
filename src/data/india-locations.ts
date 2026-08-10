@@ -67,8 +67,30 @@ export const ACCOUNT_COUNTRIES = ["India"] as const;
 export function findLocationByCity(city: string): IndiaLocation | undefined {
   const needle = city.trim().toLowerCase();
   if (!needle) return undefined;
-  return INDIA_LOCATIONS.find((l) => l.city.toLowerCase() === needle);
+
+  const exact = INDIA_LOCATIONS.find((l) => l.city.toLowerCase() === needle);
+  if (exact) return exact;
+
+  // Common aliases / partial matches (e.g. "Bangalore" → Bengaluru, "Gurgaon" → Gurugram)
+  const aliases: Record<string, string> = {
+    bangalore: "bengaluru",
+    gurgaon: "gurugram",
+    bombay: "mumbai",
+    calcutta: "kolkata",
+    madras: "chennai",
+    trivandrum: "kochi",
+    vizag: "visakhapatnam",
+  };
+  const aliased = aliases[needle];
+  if (aliased) {
+    return INDIA_LOCATIONS.find((l) => l.city.toLowerCase() === aliased);
+  }
+
+  return INDIA_LOCATIONS.find(
+    (l) => l.city.toLowerCase().includes(needle) || needle.includes(l.city.toLowerCase()),
+  );
 }
+
 
 export function countryForState(state: string): string {
   return state.trim() ? "India" : "";

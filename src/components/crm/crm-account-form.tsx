@@ -5,10 +5,8 @@ import { z } from "zod";
 import { DatePickerField } from "@/components/date-picker-field";
 import {
   ACCOUNT_COUNTRIES,
-  citiesForState,
   countryForState,
   findLocationByCity,
-  INDIA_CITIES,
   INDIA_STATES,
   regionForState,
 } from "@/data/india-locations";
@@ -202,7 +200,7 @@ export function CrmAccountFormFields({ form }: { form: UseFormReturn<CrmAccountF
 
   const managers = useMemo(() => {
     const base = users
-      .filter((u) => u.active && (u.productScope === "crm" || u.role === "Admin"))
+      .filter((u) => u.active && u.productScope === "crm")
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name));
     const names = new Set(base.map((u) => u.name));
@@ -212,18 +210,12 @@ export function CrmAccountFormFields({ form }: { form: UseFormReturn<CrmAccountF
     return [...extras.map((name) => ({ id: `legacy-${name}`, name })), ...base];
   }, [users, salesManagerName, supportManager1, supportManager2]);
 
-  const cityOptions = useMemo(() => {
-    const base = state ? citiesForState(state) : INDIA_CITIES;
-    if (city && !base.includes(city)) return [city, ...base];
-    return base;
-  }, [state, city]);
-
   const stateOptions = useMemo(() => {
     if (state && !INDIA_STATES.includes(state)) return [state, ...INDIA_STATES];
     return INDIA_STATES;
   }, [state]);
 
-  // City drives state / country / region.
+  // Typed city → auto-fill state / country / region when recognized.
   useEffect(() => {
     const loc = findLocationByCity(city);
     if (!loc) return;
@@ -233,7 +225,7 @@ export function CrmAccountFormFields({ form }: { form: UseFormReturn<CrmAccountF
     if (form.getValues("region") !== loc.region) form.setValue("region", loc.region, opts);
   }, [city, form]);
 
-  // State drives country / region when city is empty or mismatched.
+  // State drives country / region when city is empty or not recognized.
   useEffect(() => {
     if (!state) return;
     const loc = findLocationByCity(city);
@@ -280,42 +272,21 @@ export function CrmAccountFormFields({ form }: { form: UseFormReturn<CrmAccountF
         </div>
       </Section>
 
-      <Section title="Location" description="City fills state, country, and region automatically.">
+      <Section title="Location" description="Type a city to auto-fill state, country, and region.">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <Label required>City</Label>
-            <select
+            <input
               {...form.register("city")}
+              placeholder="e.g. Mumbai, Gurugram, Bengaluru"
+              autoComplete="address-level2"
               className={fieldClass(!!errors.city)}
-              value={city}
-              onChange={(e) => {
-                form.setValue("city", e.target.value, { shouldValidate: true, shouldDirty: true });
-              }}
-            >
-              <option value="">Select city</option>
-              {cityOptions.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+            />
             <FieldError message={errors.city?.message} />
           </div>
           <div>
             <Label required>State</Label>
-            <select
-              {...form.register("state")}
-              className={fieldClass(!!errors.state)}
-              value={state}
-              onChange={(e) => {
-                const next = e.target.value;
-                form.setValue("state", next, { shouldValidate: true, shouldDirty: true });
-                const allowed = citiesForState(next);
-                if (city && !allowed.includes(city)) {
-                  form.setValue("city", "", { shouldValidate: true, shouldDirty: true });
-                }
-              }}
-            >
+            <select {...form.register("state")} className={fieldClass(!!errors.state)}>
               <option value="">Select state</option>
               {stateOptions.map((s) => (
                 <option key={s} value={s}>
