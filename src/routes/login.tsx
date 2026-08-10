@@ -73,7 +73,7 @@ function LoginPage() {
         <div className="card-soft overflow-hidden p-6">
           <h2 className="mb-1 text-lg font-semibold">Sign in</h2>
           <p className="mb-6 text-sm text-muted-foreground">
-            ERP: aditya@buildesk.com · CRM: ananya@crm.buildesk.com · password buildesk123
+            Enter your work email and password to continue.
           </p>
 
           <form

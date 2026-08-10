@@ -228,7 +228,7 @@ export function TopBar() {
                 onClick={() =>
                   void navigate(
                     crm
-                      ? { to: "/crm/settings" }
+                      ? { to: "/crm/settings", search: { section: undefined, invite: false } }
                       : { to: "/settings", search: { section: undefined, invite: false } },
                   )
                 }
@@ -247,6 +247,19 @@ export function TopBar() {
                 >
                   <User className="mr-2 h-4 w-4" />
                   Invite user
+                </DropdownMenuItem>
+              )}
+              {currentUser?.role === "Admin" && crm && (
+                <DropdownMenuItem
+                  onClick={() =>
+                    void navigate({
+                      to: "/crm/settings",
+                      search: { section: "users", invite: true },
+                    })
+                  }
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  Invite CRM user
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />

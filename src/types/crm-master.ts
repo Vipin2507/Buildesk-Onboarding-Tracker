@@ -6,8 +6,12 @@ export type CrmMasterPlatformSettings = {
   productName: string;
   productTagline: string;
   supportEmail: string;
+  supportPhone: string;
   defaultTimezone: string;
   defaultCurrency: string;
+  locale: string;
+  brandPrimary: string;
+  registeredAddress: string;
 };
 
 export type CrmMasterFieldDef = Timestamps & {

@@ -40,7 +40,6 @@ import {
   type NotificationSettings,
   type OrgSettings,
   type PaymentPlanPreset,
-  type ProductScope,
   type User,
 } from "@/types";
 
@@ -980,10 +979,7 @@ function PaymentsSection() {
   );
 }
 
-type UserForm = Pick<
-  User,
-  "name" | "email" | "role" | "active" | "phone" | "jobTitle" | "department"
-> & { productScope: ProductScope };
+type UserForm = Pick<User, "name" | "email" | "role" | "active" | "phone" | "jobTitle" | "department">;
 
 function emptyUserForm(roleKey: string): UserForm {
   return {
@@ -991,7 +987,6 @@ function emptyUserForm(roleKey: string): UserForm {
     email: "",
     role: roleKey,
     active: true,
-    productScope: "erp",
     phone: "",
     jobTitle: "",
     department: "",
@@ -1004,19 +999,15 @@ function userToForm(u: User): UserForm {
     email: u.email,
     role: u.role,
     active: u.active,
-    productScope: u.productScope === "crm" ? "crm" : "erp",
     phone: u.phone ?? "",
     jobTitle: u.jobTitle ?? "",
     department: u.department ?? "",
   };
 }
 
-function productLabel(scope: ProductScope | undefined) {
-  return scope === "crm" ? "CRM" : "ERP";
-}
-
 function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boolean }) {
-  const users = useUserStore((s) => s.users);
+  const allUsers = useUserStore((s) => s.users);
+  const users = allUsers.filter((u) => u.productScope !== "crm");
   const deleteUser = useUserStore((s) => s.deleteUser);
   const roles = useSettingsStore((s) => s.roles);
   const currentUser = useAuthStore((s) => s.user);
@@ -1098,16 +1089,6 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
               </div>
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
                 <span>{roles.find((r) => r.key === u.role)?.name ?? u.role}</span>
-                <span
-                  className={cn(
-                    "inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium uppercase",
-                    u.productScope === "crm"
-                      ? "border border-primary/30 bg-primary/15 text-primary"
-                      : "border border-border bg-muted text-muted-foreground",
-                  )}
-                >
-                  {productLabel(u.productScope)}
-                </span>
                 {u.department ? <span className="text-muted-foreground">· {u.department}</span> : null}
                 <span
                   className={cn(
@@ -1158,7 +1139,6 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
             <tr>
               <th className="px-3 py-1.5 text-left">User</th>
               <th className="px-3 py-1.5 text-left">Role</th>
-              <th className="px-3 py-1.5 text-left">Product</th>
               <th className="px-3 py-1.5 text-left">Department</th>
               <th className="px-3 py-1.5 text-left">Status</th>
               <th />
@@ -1189,18 +1169,6 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
                 </td>
                 <td className="px-3 py-2">
                   {roles.find((r) => r.key === u.role)?.name ?? u.role}
-                </td>
-                <td className="px-3 py-2">
-                  <span
-                    className={cn(
-                      "inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase",
-                      u.productScope === "crm"
-                        ? "border-primary/30 bg-primary/15 text-primary"
-                        : "border-border bg-muted text-muted-foreground",
-                    )}
-                  >
-                    {productLabel(u.productScope)}
-                  </span>
                 </td>
                 <td className="px-3 py-2 text-muted-foreground">{u.department ?? "—"}</td>
                 <td className="px-3 py-2">
@@ -1287,7 +1255,7 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
             email: form.email.trim().toLowerCase(),
             role: form.role,
             active: form.active,
-            productScope: form.productScope,
+            productScope: "erp" as const,
             phone: form.phone?.trim() || undefined,
             jobTitle: form.jobTitle?.trim() || undefined,
             department: form.department?.trim() || undefined,
@@ -1316,11 +1284,7 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
           void apiCreateUser({ data: { ...payload, password: "buildesk123" } })
             .then((user) => {
               useUserStore.setState((s) => ({ users: [...s.users, user] }));
-              toast.success(
-                user.productScope === "crm"
-                  ? "CRM user invited · temporary password: buildesk123"
-                  : "User invited · temporary password: buildesk123",
-              );
+              toast.success("User invited · temporary password: buildesk123");
               setModalOpen(false);
             })
             .catch((e) => toast.error(e instanceof Error ? e.message : "Invite failed"));
@@ -1360,40 +1324,17 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
             value={form.department ?? ""}
             onChange={(e) => setForm({ ...form, department: e.target.value })}
           />
-          <div className="grid grid-cols-2 gap-2">
-            <label className="text-[10px] text-muted-foreground">
-              Role
-              <select
-                className={cn(FIELD, "mt-1")}
-                value={form.role}
-                onChange={(e) => setForm({ ...form, role: e.target.value })}
-              >
-                {roles.map((r) => (
-                  <option key={r.id} value={r.key}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="text-[10px] text-muted-foreground">
-              Product
-              <select
-                className={cn(FIELD, "mt-1")}
-                value={form.productScope}
-                onChange={(e) =>
-                  setForm({ ...form, productScope: e.target.value as ProductScope })
-                }
-              >
-                <option value="erp">ERP (Buildesk tracker)</option>
-                <option value="crm">CRM (onboarding)</option>
-              </select>
-            </label>
-          </div>
-          <p className="text-[11px] text-muted-foreground">
-            {form.productScope === "crm"
-              ? "CRM users land on /crm after login and cannot open ERP pages."
-              : "ERP users land on the tracker home and cannot open CRM pages."}
-          </p>
+          <select
+            className={FIELD}
+            value={form.role}
+            onChange={(e) => setForm({ ...form, role: e.target.value })}
+          >
+            {roles.map((r) => (
+              <option key={r.id} value={r.key}>
+                {r.name}
+              </option>
+            ))}
+          </select>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />
             Active account

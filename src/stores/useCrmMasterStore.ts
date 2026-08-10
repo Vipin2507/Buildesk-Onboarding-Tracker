@@ -50,13 +50,24 @@ function seedState() {
   };
 }
 
+function normalizePlatform(platform: CrmMasterPlatformSettings): CrmMasterPlatformSettings {
+  return {
+    ...CRM_SEED_PLATFORM,
+    ...platform,
+    supportPhone: platform.supportPhone ?? CRM_SEED_PLATFORM.supportPhone,
+    locale: platform.locale ?? CRM_SEED_PLATFORM.locale,
+    brandPrimary: platform.brandPrimary ?? CRM_SEED_PLATFORM.brandPrimary,
+    registeredAddress: platform.registeredAddress ?? CRM_SEED_PLATFORM.registeredAddress,
+  };
+}
+
 export const useCrmMasterStore = createPersistedStore<CrmMasterState>(
   "crm-master-config-v1",
   (set) => ({
     ...seedState(),
 
     updatePlatform: (data) => {
-      set((s) => ({ platform: { ...s.platform, ...data } }));
+      set((s) => ({ platform: normalizePlatform({ ...s.platform, ...data }) }));
     },
 
     addAccountField: (data) => {

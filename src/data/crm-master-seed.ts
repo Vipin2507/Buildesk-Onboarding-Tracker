@@ -16,10 +16,14 @@ function stampField(
 
 export const CRM_SEED_PLATFORM: CrmMasterPlatformSettings = {
   productName: "Buildesk CRM",
-  productTagline: "CRM onboarding masters, dictionaries, and account data",
+  productTagline: "CRM onboarding, masters, and go-live tracking",
   supportEmail: "crm-support@buildesk.com",
+  supportPhone: "+91 80 4123 4567",
   defaultTimezone: "Asia/Kolkata",
   defaultCurrency: "INR",
+  locale: "en-IN",
+  brandPrimary: "#009BFF",
+  registeredAddress: "5th Floor, WeWork Galaxy, Bengaluru, KA 560001",
 };
 
 export const CRM_SEED_ACCOUNT_FIELDS: CrmMasterFieldDef[] = [
