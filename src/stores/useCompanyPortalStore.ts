@@ -39,7 +39,12 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
     access: [],
 
     hydrateAccess: (records) => {
-      set({ access: records });
+      set((s) => {
+        const serverIds = new Set(records.map((r) => r.companyId));
+        // Keep local-only rows (e.g. CRM portals mid-sync) until the server has them.
+        const localOnly = s.access.filter((a) => !serverIds.has(a.companyId));
+        return { access: [...records, ...localOnly] };
+      });
     },
 
     mergeAccess: (record) => {
@@ -55,10 +60,14 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
     generateAccessForCompany: (company) => {
       const existing = get().getByCompanyId(company.id);
       if (existing) {
+        let record = existing;
         if (existing.companyName !== company.name) {
           get().updateContact(company.id, { companyName: company.name });
+          record = get().getByCompanyId(company.id)!;
         }
-        return get().getByCompanyId(company.id)!;
+        // Re-upsert so CRM portals that failed an earlier FK sync land in SQLite.
+        syncPortal(record);
+        return record;
       }
 
       const now = nowIso();

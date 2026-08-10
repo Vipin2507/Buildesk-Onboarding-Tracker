@@ -2,6 +2,7 @@ import { asc, desc, eq } from "drizzle-orm";
 
 import type { Company, CompanyModule, ModuleKey, PostSalesProject, PostSalesStep, Project } from "@/types";
 import { migrateLegacyPlan } from "@/types/company";
+import { isCrmAccountCompanyStub } from "@/lib/design-ticket-portal";
 import { normalizeCompanyModules } from "@/data/module-catalog";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
@@ -127,6 +128,7 @@ export function loadCompanies(): Company[] {
     .from(t.companies)
     .orderBy(asc(t.companies.name))
     .all()
+    .filter((row) => !isCrmAccountCompanyStub(row.billingInfo))
     .map((row) => mapCompany(row, normalizeCompanyModules(loadCompanyModules(row.id))));
 }
 

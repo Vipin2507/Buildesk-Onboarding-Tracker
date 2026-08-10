@@ -12,6 +12,16 @@ export function portalTicketPath(slug: string, ticketId: string) {
 }
 
 /**
+ * Marker stored on companies.billingInfo for CRM-account portal stubs.
+ * Stubs satisfy FKs for portal / design tickets without appearing in ERP company lists.
+ */
+export const CRM_ACCOUNT_COMPANY_MARKER = "__crm_account__";
+
+export function isCrmAccountCompanyStub(billingInfo: string | null | undefined) {
+  return billingInfo === CRM_ACCOUNT_COMPANY_MARKER;
+}
+
+/**
  * Base URL for shareable client portal links.
  * Prefer VITE_PORTAL_BASE_URL (set in .env / .env.production for your VPS or domain).
  * Falls back to the browser origin when opening the app (e.g. http://200.97.166.244).

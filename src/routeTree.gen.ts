@@ -53,6 +53,7 @@ import { Route as PortalSlugSolvedRouteImport } from './routes/portal.$slug.solv
 import { Route as PortalSlugProfileRouteImport } from './routes/portal.$slug.profile'
 import { Route as PortalSlugDashboardRouteImport } from './routes/portal.$slug.dashboard'
 import { Route as PortalSlugCreateTicketRouteImport } from './routes/portal.$slug.create-ticket'
+import { Route as CrmTicketsLinksRouteImport } from './routes/crm.tickets.links'
 import { Route as CrmTicketsTicketIdRouteImport } from './routes/crm.tickets.$ticketId'
 import { Route as CrmSupportTicketIdRouteImport } from './routes/crm.support.$ticketId'
 import { Route as CrmAccountsAccountIdRouteImport } from './routes/crm.accounts.$accountId'
@@ -280,6 +281,11 @@ const PortalSlugCreateTicketRoute = PortalSlugCreateTicketRouteImport.update({
   path: '/create-ticket',
   getParentRoute: () => PortalSlugRoute,
 } as any)
+const CrmTicketsLinksRoute = CrmTicketsLinksRouteImport.update({
+  id: '/links',
+  path: '/links',
+  getParentRoute: () => CrmTicketsRoute,
+} as any)
 const CrmTicketsTicketIdRoute = CrmTicketsTicketIdRouteImport.update({
   id: '/$ticketId',
   path: '/$ticketId',
@@ -355,6 +361,7 @@ export interface FileRoutesByFullPath {
   '/crm/': typeof CrmIndexRoute
   '/crm/accounts/$accountId': typeof CrmAccountsAccountIdRoute
   '/crm/support/$ticketId': typeof CrmSupportTicketIdRoute
+  '/crm/tickets/links': typeof CrmTicketsLinksRoute
   '/crm/tickets/$ticketId': typeof CrmTicketsTicketIdRoute
   '/portal/$slug/create-ticket': typeof PortalSlugCreateTicketRoute
   '/portal/$slug/dashboard': typeof PortalSlugDashboardRoute
@@ -405,6 +412,7 @@ export interface FileRoutesByTo {
   '/crm': typeof CrmIndexRoute
   '/crm/accounts/$accountId': typeof CrmAccountsAccountIdRoute
   '/crm/support/$ticketId': typeof CrmSupportTicketIdRoute
+  '/crm/tickets/links': typeof CrmTicketsLinksRoute
   '/crm/tickets/$ticketId': typeof CrmTicketsTicketIdRoute
   '/portal/$slug/create-ticket': typeof PortalSlugCreateTicketRoute
   '/portal/$slug/dashboard': typeof PortalSlugDashboardRoute
@@ -458,6 +466,7 @@ export interface FileRoutesById {
   '/crm/': typeof CrmIndexRoute
   '/crm/accounts/$accountId': typeof CrmAccountsAccountIdRoute
   '/crm/support/$ticketId': typeof CrmSupportTicketIdRoute
+  '/crm/tickets/links': typeof CrmTicketsLinksRoute
   '/crm/tickets/$ticketId': typeof CrmTicketsTicketIdRoute
   '/portal/$slug/create-ticket': typeof PortalSlugCreateTicketRoute
   '/portal/$slug/dashboard': typeof PortalSlugDashboardRoute
@@ -512,6 +521,7 @@ export interface FileRouteTypes {
     | '/crm/'
     | '/crm/accounts/$accountId'
     | '/crm/support/$ticketId'
+    | '/crm/tickets/links'
     | '/crm/tickets/$ticketId'
     | '/portal/$slug/create-ticket'
     | '/portal/$slug/dashboard'
@@ -562,6 +572,7 @@ export interface FileRouteTypes {
     | '/crm'
     | '/crm/accounts/$accountId'
     | '/crm/support/$ticketId'
+    | '/crm/tickets/links'
     | '/crm/tickets/$ticketId'
     | '/portal/$slug/create-ticket'
     | '/portal/$slug/dashboard'
@@ -614,6 +625,7 @@ export interface FileRouteTypes {
     | '/crm/'
     | '/crm/accounts/$accountId'
     | '/crm/support/$ticketId'
+    | '/crm/tickets/links'
     | '/crm/tickets/$ticketId'
     | '/portal/$slug/create-ticket'
     | '/portal/$slug/dashboard'
@@ -965,6 +977,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortalSlugCreateTicketRouteImport
       parentRoute: typeof PortalSlugRoute
     }
+    '/crm/tickets/links': {
+      id: '/crm/tickets/links'
+      path: '/links'
+      fullPath: '/crm/tickets/links'
+      preLoaderRoute: typeof CrmTicketsLinksRouteImport
+      parentRoute: typeof CrmTicketsRoute
+    }
     '/crm/tickets/$ticketId': {
       id: '/crm/tickets/$ticketId'
       path: '/$ticketId'
@@ -1062,10 +1081,12 @@ const CrmSupportRouteWithChildren = CrmSupportRoute._addFileChildren(
 )
 
 interface CrmTicketsRouteChildren {
+  CrmTicketsLinksRoute: typeof CrmTicketsLinksRoute
   CrmTicketsTicketIdRoute: typeof CrmTicketsTicketIdRoute
 }
 
 const CrmTicketsRouteChildren: CrmTicketsRouteChildren = {
+  CrmTicketsLinksRoute: CrmTicketsLinksRoute,
   CrmTicketsTicketIdRoute: CrmTicketsTicketIdRoute,
 }
 

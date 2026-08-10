@@ -2,7 +2,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { generatePortalSlug } from "@/lib/design-ticket-portal";
+import {
+  CRM_ACCOUNT_COMPANY_MARKER,
+  generatePortalSlug,
+} from "@/lib/design-ticket-portal";
 import { ApiError, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
@@ -19,6 +22,54 @@ function mapPortalRow(row: typeof t.companyPortalAccess.$inferSelect): CompanyPo
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
+}
+
+/**
+ * Portal access FKs to companies.id. CRM accounts live client-side, so ensure a
+ * minimal company stub exists before writing portal rows (and design tickets).
+ */
+function ensureCompanyRowForPortal(access: CompanyPortalAccess) {
+  const db = getDb();
+  const existing = db
+    .select({ id: t.companies.id })
+    .from(t.companies)
+    .where(eq(t.companies.id, access.companyId))
+    .get();
+  if (existing) return;
+
+  const now = nowIso();
+  const day = now.slice(0, 10);
+  const email =
+    access.contactEmail?.includes("@") ? access.contactEmail : "portal@buildesk.local";
+
+  db.insert(t.companies)
+    .values({
+      id: access.companyId,
+      name: access.companyName || "CRM Account",
+      contact: access.contactName || access.companyName || "Client",
+      designation: "CRM Account",
+      phone: "—",
+      email,
+      city: "—",
+      region: "Rest of India",
+      ownerName: "",
+      ownerMobile: "",
+      pocName: access.contactName || "",
+      pocMobile: "",
+      billingInfo: CRM_ACCOUNT_COMPANY_MARKER,
+      onboardingManagerId: "crm-portal",
+      csmId: "crm-portal",
+      status: "in_progress",
+      agreementDate: day,
+      startDate: day,
+      goLiveTarget: day,
+      planExpiry: day,
+      plan: "Annual",
+      health: "Healthy",
+      createdAt: now,
+      updatedAt: now,
+    })
+    .run();
 }
 
 /** Public — used by client portal routes (no login). */
@@ -105,6 +156,7 @@ export const upsertCompanyPortalAccess = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => portalAccessSchema.parse(data))
   .handler(async ({ data }) => {
     requireUser();
+    ensureCompanyRowForPortal(data);
     const db = getDb();
     const existing = db
       .select()

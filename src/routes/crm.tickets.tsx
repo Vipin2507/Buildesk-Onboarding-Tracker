@@ -1,9 +1,11 @@
 import { createFileRoute, Link, Outlet, useChildMatches, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { Link2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
+import { CrmTicketsNav } from "@/components/crm/crm-tickets-nav";
 import {
   DesignTicketFilterField,
   DesignTicketSelect,
@@ -16,6 +18,7 @@ import {
 } from "@/components/design-ticket/design-ticket-shared";
 import { PageWrap } from "@/components/page-header";
 import { Pill } from "@/components/status-pill";
+import { Button } from "@/components/ui/button";
 import { TICKET_KANBAN_COLUMNS } from "@/data/constants";
 import { filterCrmTickets } from "@/lib/crm-tickets";
 import { isTicketOpen } from "@/lib/tickets";
@@ -30,8 +33,7 @@ export const Route = createFileRoute("/crm/tickets")({
 
 function CrmTicketsLayout() {
   const childMatches = useChildMatches();
-  const isDetail = childMatches.some((m) => m.routeId.includes("$ticketId"));
-  if (isDetail) return <Outlet />;
+  if (childMatches.length > 0) return <Outlet />;
   return <CrmTicketTrackingPage />;
 }
 
@@ -77,7 +79,17 @@ function CrmTicketTrackingPage() {
         compact
         title="Ticket Tracking"
         subtitle="Filter and track CRM support tickets across accounts"
+        actions={
+          <Button type="button" size="sm" variant="outline" className="h-8 gap-1.5 text-xs" asChild>
+            <Link to="/crm/tickets/links">
+              <Link2 className="h-3.5 w-3.5" />
+              Portal Links
+            </Link>
+          </Button>
+        }
       />
+
+      <CrmTicketsNav compact />
 
       <DesignTicketKpiGrid
         size="compact"
@@ -133,9 +145,9 @@ function CrmTicketTrackingPage() {
       {filtered.length === 0 ? (
         <EmptyState
           title="No matching tickets"
-          description="Adjust filters or create a ticket from Support Desk."
-          actionLabel="Open Support Desk"
-          href="/crm/support"
+          description="Adjust filters or create a ticket from Support Desk. Share portal links from Portal Links."
+          actionLabel="Portal Links"
+          href="/crm/tickets/links"
         />
       ) : (
         <DesignTicketSection
@@ -143,7 +155,10 @@ function CrmTicketTrackingPage() {
           title="Tracked tickets"
           action={
             <span className="text-[10px] tabular-nums text-muted-foreground">
-              {filtered.length} shown
+              {filtered.length} shown ·{" "}
+              <Link to="/crm/tickets/links" className="text-primary hover:underline">
+                manage links
+              </Link>
             </span>
           }
         >

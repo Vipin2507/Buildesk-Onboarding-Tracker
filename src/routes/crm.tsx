@@ -1,5 +1,16 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 
+import { CrmPortalBootstrap } from "@/components/crm/crm-portal-bootstrap";
+
 export const Route = createFileRoute("/crm")({
-  component: () => <Outlet />,
+  component: CrmShell,
 });
+
+function CrmShell() {
+  return (
+    <>
+      <CrmPortalBootstrap />
+      <Outlet />
+    </>
+  );
+}
