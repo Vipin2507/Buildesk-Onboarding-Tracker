@@ -132,10 +132,10 @@ function CrmDashboardPage() {
       filter: { type: "accounts" as const, status: "active" as const },
     },
     {
-      name: "Churned",
-      value: kpis.churned,
+      name: "Closed",
+      value: kpis.closed,
       color: "var(--color-destructive)",
-      filter: { type: "accounts" as const, status: "churned" as const },
+      filter: { type: "accounts" as const, status: "closed" as const },
     },
   ].filter((d) => d.value > 0 || kpis.totalAccounts === 0);
 
@@ -143,7 +143,7 @@ function CrmDashboardPage() {
   const healthPct = healthTotal ? Math.round((health.Healthy / healthTotal) * 100) : 0;
 
   const recent = rows
-    .filter((r) => r.status !== "live" && r.status !== "churned")
+    .filter((r) => r.status !== "live" && r.status !== "closed")
     .sort((a, b) => b.progress - a.progress)
     .slice(0, 5);
 

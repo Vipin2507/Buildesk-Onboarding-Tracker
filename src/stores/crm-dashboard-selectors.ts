@@ -95,7 +95,7 @@ export function useCrmDashboardOverview() {
         record.tracker.expectedCompletionDate &&
           record.tracker.expectedCompletionDate < today &&
           account.status !== "live" &&
-          account.status !== "churned",
+          account.status !== "closed" && (account.status as string) !== "churned",
       );
 
       return {
@@ -132,7 +132,9 @@ export function useCrmDashboardOverview() {
     const live = rows.filter((r) => r.status === "live").length;
     const onboarding = rows.filter((r) => r.status === "onboarding").length;
     const active = rows.filter((r) => r.status === "active").length;
-    const churned = rows.filter((r) => r.status === "churned").length;
+    const closed = rows.filter(
+      (r) => r.status === "closed" || (r.status as string) === "churned",
+    ).length;
     const avgCompletion =
       rows.length === 0 ? 0 : Math.round(rows.reduce((s, r) => s + r.progress, 0) / rows.length);
 
@@ -281,7 +283,7 @@ export function useCrmDashboardOverview() {
         onboarding,
         live,
         active,
-        churned,
+        closed,
         avgCompletion,
       },
       pending: {

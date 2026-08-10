@@ -64,3 +64,16 @@ export const useCrmAccountStore = createPersistedStore<CrmAccountState>(
     },
   }),
 );
+
+/** Migrate legacy `churned` status to `closed` after localStorage hydrate. */
+if (typeof window !== "undefined") {
+  useCrmAccountStore.persist.onFinishHydration(() => {
+    const { accounts } = useCrmAccountStore.getState();
+    if (!accounts.some((a) => (a.status as string) === "churned")) return;
+    useCrmAccountStore.setState({
+      accounts: accounts.map((a) =>
+        (a.status as string) === "churned" ? { ...a, status: "closed" as const } : a,
+      ),
+    });
+  });
+}

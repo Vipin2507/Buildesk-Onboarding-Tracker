@@ -144,7 +144,7 @@ export function CrmMasterDataControl() {
                             ? "success"
                             : a.status === "onboarding"
                               ? "warning"
-                              : a.status === "churned"
+                              : a.status === "closed" || (a.status as string) === "churned"
                                 ? "danger"
                                 : "info"
                         }

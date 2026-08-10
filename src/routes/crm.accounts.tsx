@@ -68,13 +68,13 @@ const STATUS_CHIPS = [
   { id: "onboarding", label: "Onboarding", status: "onboarding" as const },
   { id: "live", label: "Live", status: "live" as const },
   { id: "active", label: "Active", status: "active" as const },
-  { id: "churned", label: "Churned", status: "churned" as const },
+  { id: "closed", label: "Closed", status: "closed" as const },
 ] as const;
 
 function statusTone(status: CrmAccount["status"]) {
   if (status === "live") return "success" as const;
   if (status === "onboarding") return "warning" as const;
-  if (status === "churned") return "danger" as const;
+  if (status === "closed") return "danger" as const;
   return "info" as const;
 }
 
@@ -738,7 +738,7 @@ function CrmAccountsPage() {
                 ]}
                 actions={(r) => (
                   <div className="flex justify-end gap-0.5">
-                    {r.status !== "live" && r.status !== "churned" ? (
+                    {r.status !== "live" && r.status !== "closed" ? (
                       <Button
                         size="icon"
                         variant="ghost"

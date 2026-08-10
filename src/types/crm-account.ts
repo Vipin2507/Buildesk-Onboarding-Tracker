@@ -35,5 +35,5 @@ export type CrmAccount = Timestamps & {
   paymentReceived?: number;
   pendingAmount?: number;
   healthScore?: number;
-  status: "active" | "onboarding" | "live" | "churned";
+  status: "active" | "onboarding" | "live" | "closed";
 };
