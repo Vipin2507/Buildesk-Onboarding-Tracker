@@ -5,8 +5,11 @@ import { useCompanyPortalStore } from "./useCompanyPortalStore";
 import { useAutomationStore } from "./useAutomationStore";
 import { useChatStore } from "./useChatStore";
 import { useCrmOnboardingStore } from "./useCrmOnboardingStore";
+import { useCrmAccountStore } from "./useCrmAccountStore";
+import { useCrmMasterStore } from "./useCrmMasterStore";
+import { useCrmSettingsStore } from "./useCrmSettingsStore";
 
-/** Config stores persist to disk; entity data (incl. design tickets) loads from SQLite. */
+/** Config / CRM client stores persist to disk; ERP entity data loads from SQLite. */
 const persistedStores = [
   useMasterStore,
   useSettingsStore,
@@ -14,6 +17,9 @@ const persistedStores = [
   useAutomationStore,
   useChatStore,
   useCrmOnboardingStore,
+  useCrmAccountStore,
+  useCrmMasterStore,
+  useCrmSettingsStore,
 ] as const;
 
 export async function rehydrateAllStores() {
