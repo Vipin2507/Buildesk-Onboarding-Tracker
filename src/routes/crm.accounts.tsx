@@ -795,7 +795,7 @@ function CrmAccountsPage() {
         title={editing ? "Edit CRM account" : "Add CRM account"}
         submitLabel={editing ? "Save changes" : "Create account"}
         onSubmit={onSubmit}
-        contentClassName="max-w-2xl"
+        contentClassName="max-w-3xl"
       >
         <CrmAccountFormFields form={form} />
       </EntityFormModal>

@@ -200,7 +200,7 @@ export function CrmMasterDataControl() {
         title="Edit CRM account"
         submitLabel="Save changes"
         onSubmit={onSubmit}
-        contentClassName="max-w-2xl"
+        contentClassName="max-w-3xl"
       >
         <CrmAccountFormFields form={form} />
       </EntityFormModal>

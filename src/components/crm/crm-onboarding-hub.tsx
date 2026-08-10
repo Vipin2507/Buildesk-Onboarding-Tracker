@@ -422,7 +422,7 @@ function DashboardTab({
         title="Edit account details"
         submitLabel="Save changes"
         onSubmit={saveAccount}
-        contentClassName="max-w-2xl"
+        contentClassName="max-w-3xl"
       >
         <CrmAccountFormFields form={form} />
       </EntityFormModal>

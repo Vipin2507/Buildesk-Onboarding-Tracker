@@ -1,13 +1,25 @@
+import { useEffect, useMemo } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { z } from "zod";
 
 import { DatePickerField } from "@/components/date-picker-field";
+import {
+  ACCOUNT_COUNTRIES,
+  citiesForState,
+  countryForState,
+  findLocationByCity,
+  INDIA_CITIES,
+  INDIA_STATES,
+  regionForState,
+} from "@/data/india-locations";
 import { cn } from "@/lib/utils";
-import { COMPANY_REGIONS, COMPANY_TYPES, type CompanyRegion, type CompanyType } from "@/types/company";
+import { useUserStore } from "@/stores";
+import { COMPANY_TYPES, type CompanyRegion, type CompanyType } from "@/types/company";
 import type { CrmAccount } from "@/types/crm-account";
 
 export const crmAccountSchema = z.object({
   name: z.string().min(2, "Account name is required"),
+  userId: z.string().min(1, "User ID is required"),
   companyType: z.enum([
     "Real Estate Developer",
     "Channel Partner",
@@ -16,27 +28,24 @@ export const crmAccountSchema = z.object({
     "CT",
     "Agent",
   ] as [CompanyType, ...CompanyType[]]),
-  contact: z.string().min(2, "Contact person is required"),
-  phone: z.string().min(10, "Enter a valid phone"),
-  email: z.string().email("Enter a valid email"),
   city: z.string().min(2, "City is required"),
   state: z.string().min(2, "State is required"),
+  country: z.string().min(2, "Country is required"),
   region: z.enum(["NCR", "South", "West", "Rest of India"] as [CompanyRegion, ...CompanyRegion[]]),
-  ownerName: z.string().optional(),
+  ownerName: z.string().min(2, "Owner name is required"),
+  ownerPhone: z.string().min(10, "Enter a valid owner number"),
+  ownerEmail: z.string().email("Enter a valid owner email"),
   pocName: z.string().min(2, "POC name is required"),
-  pocMobile: z.string().min(10, "POC mobile is required"),
+  pocMobile: z.string().min(10, "POC number is required"),
+  pocEmail: z.string().email("Enter a valid POC email"),
   salesManagerName: z.string().min(2, "Sales manager is required"),
-  accountManagerName: z.string().min(2, "Account manager is required"),
-  supportManager1: z.string().min(2, "Support manager is required"),
+  supportManager1: z.string().min(2, "Support manager 1 is required"),
   supportManager2: z.string().optional(),
+  usersPurchased: z.coerce.number().int().min(1, "Users purchased is required"),
+  dealSize: z.coerce.number().min(1, "Total deal value is required"),
+  pendingAmount: z.coerce.number().min(0, "Pending amount is required"),
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
-  annualLicense: z.boolean(),
-  dealSize: z.coerce.number().min(1, "Deal size is required"),
-  usersPurchased: z.coerce.number().int().min(1, "Number of users is required"),
-  totalCost: z.coerce.number().min(0, "Total cost is required"),
-  paymentReceived: z.coerce.number().min(0, "Payment received is required"),
-  pendingAmount: z.coerce.number().min(0, "Pending amount is required"),
 });
 
 export type CrmAccountFormValues = z.infer<typeof crmAccountSchema>;
@@ -46,102 +55,220 @@ export function emptyCrmAccountForm(): CrmAccountFormValues {
   const end = new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10);
   return {
     name: "",
+    userId: "",
     companyType: "Real Estate Developer",
-    contact: "",
-    phone: "",
-    email: "",
     city: "",
     state: "",
+    country: "India",
     region: "Rest of India",
     ownerName: "",
+    ownerPhone: "",
+    ownerEmail: "",
     pocName: "",
     pocMobile: "",
+    pocEmail: "",
     salesManagerName: "",
-    accountManagerName: "",
     supportManager1: "",
     supportManager2: "",
+    usersPurchased: 1,
+    dealSize: 0,
+    pendingAmount: 0,
     startDate: today,
     endDate: end,
-    annualLicense: true,
-    dealSize: 0,
-    usersPurchased: 1,
-    totalCost: 0,
-    paymentReceived: 0,
-    pendingAmount: 0,
   };
 }
 
 export function crmAccountToFormValues(account: CrmAccount): CrmAccountFormValues {
+  const ownerName = account.ownerName ?? account.contact;
+  const ownerPhone = account.ownerPhone ?? account.phone;
+  const ownerEmail = account.ownerEmail ?? account.email;
   return {
     name: account.name,
+    userId: account.userId ?? "",
     companyType: account.companyType,
-    contact: account.contact,
-    phone: account.phone,
-    email: account.email,
     city: account.city,
     state: account.state ?? "",
+    country: account.country ?? "India",
     region: (account.region as CompanyRegion) || "Rest of India",
-    ownerName: account.ownerName ?? "",
+    ownerName,
+    ownerPhone,
+    ownerEmail,
     pocName: account.pocName ?? account.contact,
     pocMobile: account.pocMobile ?? account.phone,
+    pocEmail: account.pocEmail ?? account.email,
     salesManagerName: account.salesManagerName ?? "",
-    accountManagerName: account.accountManagerName ?? "",
     supportManager1: account.supportManager1 ?? "",
     supportManager2: account.supportManager2 ?? "",
+    usersPurchased: account.usersPurchased ?? 1,
+    dealSize: account.dealSize ?? account.totalCost ?? 0,
+    pendingAmount: account.pendingAmount ?? 0,
     startDate: account.startDate ?? "",
     endDate: account.endDate ?? "",
-    annualLicense: account.annualLicense ?? true,
-    dealSize: account.dealSize ?? 0,
-    usersPurchased: account.usersPurchased ?? 1,
-    totalCost: account.totalCost ?? 0,
-    paymentReceived: account.paymentReceived ?? 0,
-    pendingAmount: account.pendingAmount ?? 0,
   };
 }
 
+/** Maps form values onto CrmAccount fields (keeps legacy contact/phone/email in sync). */
 export function normalizeCrmAccountForm(data: CrmAccountFormValues) {
+  const ownerName = data.ownerName.trim();
+  const ownerPhone = data.ownerPhone.trim();
+  const ownerEmail = data.ownerEmail.trim();
+  const dealSize = Number(data.dealSize) || 0;
+  const pendingAmount = Number(data.pendingAmount) || 0;
   return {
-    ...data,
-    ownerName: (data.ownerName ?? "").trim() || data.contact.trim(),
-    pocName: data.pocName.trim() || data.contact.trim(),
-    pocMobile: data.pocMobile.trim() || data.phone.trim(),
+    name: data.name.trim(),
+    userId: data.userId.trim(),
+    companyType: data.companyType,
+    city: data.city.trim(),
+    state: data.state.trim(),
+    country: data.country.trim(),
+    region: data.region,
+    ownerName,
+    ownerPhone,
+    ownerEmail,
+    contact: ownerName,
+    phone: ownerPhone,
+    email: ownerEmail,
+    pocName: data.pocName.trim(),
+    pocMobile: data.pocMobile.trim(),
+    pocEmail: data.pocEmail.trim(),
+    salesManagerName: data.salesManagerName.trim(),
+    supportManager1: data.supportManager1.trim(),
     supportManager2: (data.supportManager2 ?? "").trim() || undefined,
+    usersPurchased: Number(data.usersPurchased) || 1,
+    dealSize,
+    totalCost: dealSize,
+    pendingAmount,
+    paymentReceived: Math.max(0, dealSize - pendingAmount),
+    annualLicense: true,
+    startDate: data.startDate,
+    endDate: data.endDate,
   };
 }
 
-function fieldClass(hasError?: boolean) {
+function fieldClass(hasError?: boolean, readOnly?: boolean) {
   return cn(
-    "mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40",
-    hasError && "border-destructive focus:ring-destructive/30",
+    "mt-1.5 h-9 w-full rounded-lg border border-border/80 bg-background px-3 text-sm outline-none transition-[box-shadow,border-color] duration-200",
+    "focus:border-primary/45 focus:ring-2 focus:ring-primary/20",
+    hasError && "border-destructive focus:border-destructive focus:ring-destructive/25",
+    readOnly && "cursor-default bg-muted/40 text-muted-foreground",
   );
 }
 
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
-  return <p className="mt-1 text-xs text-destructive">{message}</p>;
+  return <p className="mt-1 text-[11px] text-destructive">{message}</p>;
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
+function Section({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{children}</div>
+    <section className="rounded-xl border border-border/70 bg-card/40 p-3.5 sm:p-4">
+      <div className="mb-3">
+        <h3 className="text-xs font-semibold tracking-wide text-foreground">{title}</h3>
+        {description ? (
+          <p className="mt-0.5 text-[11px] text-muted-foreground">{description}</p>
+        ) : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
+  return (
+    <label className="text-[11px] font-medium text-muted-foreground">
+      {children}
+      {required ? <span className="text-destructive"> *</span> : null}
+    </label>
   );
 }
 
 export function CrmAccountFormFields({ form }: { form: UseFormReturn<CrmAccountFormValues> }) {
   const errors = form.formState.errors;
+  const users = useUserStore((s) => s.users);
+  const city = form.watch("city");
+  const state = form.watch("state");
+
+  const salesManagerName = form.watch("salesManagerName");
+  const supportManager1 = form.watch("supportManager1");
+  const supportManager2 = form.watch("supportManager2");
+
+  const managers = useMemo(() => {
+    const base = users
+      .filter((u) => u.active && (u.productScope === "crm" || u.role === "Admin"))
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const names = new Set(base.map((u) => u.name));
+    const extras = [salesManagerName, supportManager1, supportManager2]
+      .map((n) => (n ?? "").trim())
+      .filter((n) => n.length > 0 && !names.has(n));
+    return [...extras.map((name) => ({ id: `legacy-${name}`, name })), ...base];
+  }, [users, salesManagerName, supportManager1, supportManager2]);
+
+  const cityOptions = useMemo(() => {
+    const base = state ? citiesForState(state) : INDIA_CITIES;
+    if (city && !base.includes(city)) return [city, ...base];
+    return base;
+  }, [state, city]);
+
+  const stateOptions = useMemo(() => {
+    if (state && !INDIA_STATES.includes(state)) return [state, ...INDIA_STATES];
+    return INDIA_STATES;
+  }, [state]);
+
+  // City drives state / country / region.
+  useEffect(() => {
+    const loc = findLocationByCity(city);
+    if (!loc) return;
+    const opts = { shouldValidate: true, shouldDirty: true } as const;
+    if (form.getValues("state") !== loc.state) form.setValue("state", loc.state, opts);
+    if (form.getValues("country") !== loc.country) form.setValue("country", loc.country, opts);
+    if (form.getValues("region") !== loc.region) form.setValue("region", loc.region, opts);
+  }, [city, form]);
+
+  // State drives country / region when city is empty or mismatched.
+  useEffect(() => {
+    if (!state) return;
+    const loc = findLocationByCity(city);
+    if (loc && loc.state === state) return;
+    const opts = { shouldValidate: true, shouldDirty: true } as const;
+    const country = countryForState(state);
+    const region = regionForState(state);
+    if (country && form.getValues("country") !== country) form.setValue("country", country, opts);
+    if (form.getValues("region") !== region) form.setValue("region", region, opts);
+  }, [state, city, form]);
 
   return (
-    <div className="grid gap-4">
-      <div className="space-y-3">
-        <SectionTitle>Account</SectionTitle>
-        <div>
-          <label className="text-xs font-medium">Account name</label>
-          <input {...form.register("name")} className={fieldClass(!!errors.name)} />
-          <FieldError message={errors.name?.message} />
-        </div>
+    <div className="grid gap-3.5">
+      <Section title="Account" description="Basic identity for this CRM customer.">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <Label required>Account name</Label>
+            <input
+              {...form.register("name")}
+              placeholder="e.g. Skyline Developers"
+              className={fieldClass(!!errors.name)}
+            />
+            <FieldError message={errors.name?.message} />
+          </div>
           <div>
-            <label className="text-xs font-medium">Company type</label>
+            <Label required>User ID</Label>
+            <input
+              {...form.register("userId")}
+              placeholder="Client / portal user id"
+              className={fieldClass(!!errors.userId)}
+            />
+            <FieldError message={errors.userId?.message} />
+          </div>
+          <div>
+            <Label required>Company type</Label>
             <select {...form.register("companyType")} className={fieldClass()}>
               {COMPANY_TYPES.map((t) => (
                 <option key={t} value={t}>
@@ -150,111 +277,192 @@ export function CrmAccountFormFields({ form }: { form: UseFormReturn<CrmAccountF
               ))}
             </select>
           </div>
+        </div>
+      </Section>
+
+      <Section title="Location" description="City fills state, country, and region automatically.">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label className="text-xs font-medium">Region</label>
-            <select {...form.register("region")} className={fieldClass()}>
-              {COMPANY_REGIONS.map((r) => (
-                <option key={r} value={r}>
-                  {r}
+            <Label required>City</Label>
+            <select
+              {...form.register("city")}
+              className={fieldClass(!!errors.city)}
+              value={city}
+              onChange={(e) => {
+                form.setValue("city", e.target.value, { shouldValidate: true, shouldDirty: true });
+              }}
+            >
+              <option value="">Select city</option>
+              {cityOptions.map((c) => (
+                <option key={c} value={c}>
+                  {c}
                 </option>
               ))}
             </select>
-          </div>
-          <div>
-            <label className="text-xs font-medium">City</label>
-            <input {...form.register("city")} className={fieldClass(!!errors.city)} />
             <FieldError message={errors.city?.message} />
           </div>
           <div>
-            <label className="text-xs font-medium">State</label>
-            <input {...form.register("state")} className={fieldClass(!!errors.state)} />
+            <Label required>State</Label>
+            <select
+              {...form.register("state")}
+              className={fieldClass(!!errors.state)}
+              value={state}
+              onChange={(e) => {
+                const next = e.target.value;
+                form.setValue("state", next, { shouldValidate: true, shouldDirty: true });
+                const allowed = citiesForState(next);
+                if (city && !allowed.includes(city)) {
+                  form.setValue("city", "", { shouldValidate: true, shouldDirty: true });
+                }
+              }}
+            >
+              <option value="">Select state</option>
+              {stateOptions.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
             <FieldError message={errors.state?.message} />
           </div>
+          <div>
+            <Label required>Country</Label>
+            <select {...form.register("country")} className={fieldClass(!!errors.country)}>
+              {ACCOUNT_COUNTRIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+            <FieldError message={errors.country?.message} />
+          </div>
+          <div>
+            <Label required>Region</Label>
+            <input
+              readOnly
+              {...form.register("region")}
+              className={fieldClass(!!errors.region, true)}
+              tabIndex={-1}
+            />
+            <FieldError message={errors.region?.message} />
+          </div>
         </div>
-      </div>
+      </Section>
 
-      <div className="space-y-3">
-        <SectionTitle>Primary contact</SectionTitle>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div>
-            <label className="text-xs font-medium">Contact person</label>
-            <input {...form.register("contact")} className={fieldClass(!!errors.contact)} />
-            <FieldError message={errors.contact?.message} />
-          </div>
-          <div>
-            <label className="text-xs font-medium">Phone</label>
-            <input type="tel" {...form.register("phone")} className={fieldClass(!!errors.phone)} />
-            <FieldError message={errors.phone?.message} />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="text-xs font-medium">Email</label>
-            <input type="email" {...form.register("email")} className={fieldClass(!!errors.email)} />
-            <FieldError message={errors.email?.message} />
-          </div>
-          <div>
-            <label className="text-xs font-medium">Owner name</label>
+      <Section title="Owner" description="Primary account owner details.">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="sm:col-span-3 md:col-span-1">
+            <Label required>Owner name</Label>
             <input
               {...form.register("ownerName")}
-              placeholder="Defaults to contact"
-              className={fieldClass()}
+              className={fieldClass(!!errors.ownerName)}
             />
+            <FieldError message={errors.ownerName?.message} />
           </div>
           <div>
-            <label className="text-xs font-medium">POC name</label>
+            <Label required>Owner number</Label>
+            <input
+              type="tel"
+              {...form.register("ownerPhone")}
+              className={fieldClass(!!errors.ownerPhone)}
+            />
+            <FieldError message={errors.ownerPhone?.message} />
+          </div>
+          <div>
+            <Label required>Owner email</Label>
+            <input
+              type="email"
+              {...form.register("ownerEmail")}
+              className={fieldClass(!!errors.ownerEmail)}
+            />
+            <FieldError message={errors.ownerEmail?.message} />
+          </div>
+        </div>
+      </Section>
+
+      <Section title="Point of contact" description="Day-to-day POC for onboarding and support.">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div>
+            <Label required>POC name</Label>
             <input {...form.register("pocName")} className={fieldClass(!!errors.pocName)} />
             <FieldError message={errors.pocName?.message} />
           </div>
           <div>
-            <label className="text-xs font-medium">POC mobile</label>
-            <input type="tel" {...form.register("pocMobile")} className={fieldClass(!!errors.pocMobile)} />
+            <Label required>POC number</Label>
+            <input
+              type="tel"
+              {...form.register("pocMobile")}
+              className={fieldClass(!!errors.pocMobile)}
+            />
             <FieldError message={errors.pocMobile?.message} />
           </div>
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        <SectionTitle>Team</SectionTitle>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label className="text-xs font-medium">Sales manager</label>
+            <Label required>POC email</Label>
             <input
+              type="email"
+              {...form.register("pocEmail")}
+              className={fieldClass(!!errors.pocEmail)}
+            />
+            <FieldError message={errors.pocEmail?.message} />
+          </div>
+        </div>
+      </Section>
+
+      <Section title="Internal team" description="Assign CRM managers for this account.">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div>
+            <Label required>Sales manager</Label>
+            <select
               {...form.register("salesManagerName")}
               className={fieldClass(!!errors.salesManagerName)}
-            />
+            >
+              <option value="">Select manager</option>
+              {managers.map((u) => (
+                <option key={u.id} value={u.name}>
+                  {u.name}
+                </option>
+              ))}
+            </select>
             <FieldError message={errors.salesManagerName?.message} />
           </div>
           <div>
-            <label className="text-xs font-medium">Account manager</label>
-            <input
-              {...form.register("accountManagerName")}
-              className={fieldClass(!!errors.accountManagerName)}
-            />
-            <FieldError message={errors.accountManagerName?.message} />
-          </div>
-          <div>
-            <label className="text-xs font-medium">Support manager 1</label>
-            <input
+            <Label required>Support manager 1</Label>
+            <select
               {...form.register("supportManager1")}
               className={fieldClass(!!errors.supportManager1)}
-            />
+            >
+              <option value="">Select manager</option>
+              {managers.map((u) => (
+                <option key={u.id} value={u.name}>
+                  {u.name}
+                </option>
+              ))}
+            </select>
             <FieldError message={errors.supportManager1?.message} />
           </div>
           <div>
-            <label className="text-xs font-medium">Support manager 2</label>
-            <input {...form.register("supportManager2")} className={fieldClass()} />
+            <Label>Support manager 2</Label>
+            <select {...form.register("supportManager2")} className={fieldClass()}>
+              <option value="">Optional</option>
+              {managers.map((u) => (
+                <option key={u.id} value={u.name}>
+                  {u.name}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
-      </div>
+        {managers.length === 0 ? (
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            No CRM users found. Add CRM users in Settings to populate these dropdowns.
+          </p>
+        ) : null}
+      </Section>
 
-      <div className="space-y-3">
-        <SectionTitle>Commercial & license</SectionTitle>
-        <label className="flex items-center gap-2 text-xs">
-          <input type="checkbox" {...form.register("annualLicense")} />
-          Annual license
-        </label>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <Section title="Commercial" description="License seats, deal value, and contract dates.">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <div>
-            <label className="text-xs font-medium">Users purchased</label>
+            <Label required>Users purchased</Label>
             <input
               type="number"
               min={1}
@@ -265,7 +473,7 @@ export function CrmAccountFormFields({ form }: { form: UseFormReturn<CrmAccountF
             <FieldError message={errors.usersPurchased?.message} />
           </div>
           <div>
-            <label className="text-xs font-medium">Deal size (₹)</label>
+            <Label required>Total deal value (₹)</Label>
             <input
               type="number"
               min={0}
@@ -276,29 +484,7 @@ export function CrmAccountFormFields({ form }: { form: UseFormReturn<CrmAccountF
             <FieldError message={errors.dealSize?.message} />
           </div>
           <div>
-            <label className="text-xs font-medium">Total cost (₹)</label>
-            <input
-              type="number"
-              min={0}
-              step="any"
-              {...form.register("totalCost")}
-              className={fieldClass(!!errors.totalCost)}
-            />
-            <FieldError message={errors.totalCost?.message} />
-          </div>
-          <div>
-            <label className="text-xs font-medium">Payment received (₹)</label>
-            <input
-              type="number"
-              min={0}
-              step="any"
-              {...form.register("paymentReceived")}
-              className={fieldClass(!!errors.paymentReceived)}
-            />
-            <FieldError message={errors.paymentReceived?.message} />
-          </div>
-          <div>
-            <label className="text-xs font-medium">Pending amount (₹)</label>
+            <Label required>Pending amount (₹)</Label>
             <input
               type="number"
               min={0}
@@ -309,10 +495,10 @@ export function CrmAccountFormFields({ form }: { form: UseFormReturn<CrmAccountF
             <FieldError message={errors.pendingAmount?.message} />
           </div>
           <div>
-            <label className="text-xs font-medium">Start date</label>
+            <Label required>Start date</Label>
             <DatePickerField
               modal
-              className="mt-1"
+              className="mt-1.5"
               value={form.watch("startDate") ?? ""}
               onChange={(v) =>
                 form.setValue("startDate", v, { shouldValidate: true, shouldDirty: true })
@@ -321,10 +507,10 @@ export function CrmAccountFormFields({ form }: { form: UseFormReturn<CrmAccountF
             <FieldError message={errors.startDate?.message} />
           </div>
           <div>
-            <label className="text-xs font-medium">End date</label>
+            <Label required>End date</Label>
             <DatePickerField
               modal
-              className="mt-1"
+              className="mt-1.5"
               value={form.watch("endDate") ?? ""}
               onChange={(v) =>
                 form.setValue("endDate", v, { shouldValidate: true, shouldDirty: true })
@@ -333,7 +519,7 @@ export function CrmAccountFormFields({ form }: { form: UseFormReturn<CrmAccountF
             <FieldError message={errors.endDate?.message} />
           </div>
         </div>
-      </div>
+      </Section>
     </div>
   );
 }
