@@ -1,4 +1,4 @@
-import { createPersistedStore, touch } from "./persist";
+import { createStore, touch } from "./persist";
 import { newId, nowIso } from "@/types/common";
 import type { CompanyType } from "@/types/company";
 import type {
@@ -42,6 +42,11 @@ import {
   notifyCrmStageChange,
   notifyCrmTrainingLogged,
 } from "@/lib/crm-notify";
+import {
+  deleteCrmOnboardingRecord as apiDeleteCrmOnboardingRecord,
+  upsertCrmOnboardingRecord as apiUpsertCrmOnboardingRecord,
+} from "@/lib/api";
+import { serverSync, serverSyncDebounced } from "@/lib/sync";
 import { useCrmAccountStore } from "./useCrmAccountStore";
 import {
   applyChecklistPhaseDate,
@@ -50,6 +55,7 @@ import {
 
 type CrmOnboardingState = {
   records: CrmOnboardingRecord[];
+  hydrateRecords: (records: CrmOnboardingRecord[]) => void;
   ensureForCompany: (companyId: string, companyType?: CompanyType) => CrmOnboardingRecord;
   getByCompanyId: (companyId: string) => CrmOnboardingRecord | undefined;
   setProductModuleEnabled: (companyId: string, key: CrmProductModuleKey, enabled: boolean) => void;
@@ -252,10 +258,60 @@ function needsGoLiveUpgrade(items: CrmGoLiveChecklistItem[]) {
   return items.some((i) => i.category === undefined);
 }
 
-export const useCrmOnboardingStore = createPersistedStore<CrmOnboardingState>(
-  "crm-onboarding-v1",
-  (set, get) => ({
+let hydratingCrmOnboarding = false;
+
+export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, get) => {
+  const set: typeof rawSet = (partial, ...rest) => {
+    const prev = get().records;
+    const prevUpdated = new Map(prev.map((r) => [r.companyId, r.updatedAt]));
+    const prevIds = new Set(prev.map((r) => r.companyId));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (rawSet as any)(partial, ...rest);
+    if (hydratingCrmOnboarding) return;
+
+    const next = get().records;
+    const nextIds = new Set(next.map((r) => r.companyId));
+
+    for (const record of next) {
+      if (prevUpdated.get(record.companyId) !== record.updatedAt) {
+        const companyId = record.companyId;
+        serverSyncDebounced(`crm-onboarding:${companyId}`, 400, async () => {
+          const latest = get().getByCompanyId(companyId);
+          if (!latest) return;
+          await apiUpsertCrmOnboardingRecord({ data: latest });
+        });
+      }
+    }
+
+    for (const companyId of prevIds) {
+      if (!nextIds.has(companyId)) {
+        serverSync("crm onboarding delete", () =>
+          apiDeleteCrmOnboardingRecord({ data: { companyId } }),
+        );
+      }
+    }
+  };
+
+  return {
   records: [],
+
+  hydrateRecords: (records) => {
+    hydratingCrmOnboarding = true;
+    try {
+      rawSet({
+        records: records.map((r) => ({
+          ...r,
+          masterProjects: r.masterProjects ?? [],
+          masterSources: r.masterSources ?? [],
+          masterStatuses: r.masterStatuses ?? [],
+          masterFollowUps: r.masterFollowUps ?? [],
+          masterTeams: r.masterTeams ?? [],
+        })),
+      });
+    } finally {
+      hydratingCrmOnboarding = false;
+    }
+  },
 
   getByCompanyId: (companyId) => get().records.find((r) => r.companyId === companyId),
 
@@ -1027,7 +1083,7 @@ export const useCrmOnboardingStore = createPersistedStore<CrmOnboardingState>(
       })),
     }));
   },
-}),
-);
+  };
+});
 
 export type { CrmImplementationStage, CrmTrackerPriority };

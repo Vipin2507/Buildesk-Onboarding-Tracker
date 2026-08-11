@@ -138,6 +138,12 @@ export {
 } from "@/server/api/crm-accounts";
 
 export {
+  listCrmOnboardingRecords,
+  upsertCrmOnboardingRecord,
+  deleteCrmOnboardingRecord,
+} from "@/server/api/crm-onboarding";
+
+export {
   getPortalBySlug,
   listCompanyPortalAccess,
   ensureCompanyPortals,

@@ -31,6 +31,8 @@ import {
   listCrmEvents,
   ensureCompanyPortals,
   listCrmAccounts,
+  listCrmOnboardingRecords,
+  upsertCrmOnboardingRecord,
   listDesignTickets,
   listChatSessions,
 } from "@/lib/api";
@@ -60,11 +62,29 @@ import {
   useClientVisitStore,
   useCrmEventStore,
   useCrmAccountStore,
+  useCrmOnboardingStore,
 } from "@/stores";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
 import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
 import { useChatStore } from "@/stores/useChatStore";
 import { hydrateAutomationFromServer, useAutomationStore } from "@/stores/useAutomationStore";
+import type { CrmOnboardingRecord } from "@/types/crm-onboarding";
+
+function readLegacyCrmOnboarding(): CrmOnboardingRecord[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem("buildesk-crm-onboarding-v1");
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as {
+      state?: { records?: CrmOnboardingRecord[] };
+      records?: CrmOnboardingRecord[];
+    };
+    const records = parsed.state?.records ?? parsed.records;
+    return Array.isArray(records) ? records : [];
+  } catch {
+    return [];
+  }
+}
 
 /**
  * After session hydrate, pull authoritative data from SQLite into Zustand caches
@@ -122,6 +142,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           crmEvents,
           portalAccess,
           crmAccounts,
+          crmOnboarding,
           designTickets,
           chatSessions,
         ] = await Promise.all([
@@ -132,7 +153,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
             .then((u) => ({ ok: true as const, users: u }))
             .catch(() => ({ ok: false as const, users: [] as Awaited<ReturnType<typeof listUsers>> })),
           listTickets(),
-          listTicketActivities({ data: {} }).catch(() => []),
+          listTicketActivities({ data: { } }).catch(() => []),
           listTraining(),
           listActivity({ data: { limit: 100 } }),
           listNotifications({ data: { limit: 80 } }).catch(() => []),
@@ -159,6 +180,10 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           ensureCompanyPortals().catch(() => []),
           listCrmAccounts().catch((err) => {
             console.warn("[bootstrap] listCrmAccounts failed", err);
+            return null;
+          }),
+          listCrmOnboardingRecords().catch((err) => {
+            console.warn("[bootstrap] listCrmOnboardingRecords failed", err);
             return null;
           }),
           listDesignTickets({ data: {} }).catch((err) => {
@@ -222,6 +247,34 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
         useCompanyPortalStore.getState().hydrateAccess(portalAccess);
         if (crmAccounts) {
           useCrmAccountStore.getState().hydrateAccounts(crmAccounts);
+        }
+        if (crmOnboarding) {
+          if (crmOnboarding.length === 0) {
+            // One-time: lift browser-local onboarding into SQLite so progress isn't lost.
+            const local = readLegacyCrmOnboarding();
+            if (local.length > 0) {
+              useCrmOnboardingStore.getState().hydrateRecords(local);
+              for (const record of local) {
+                void upsertCrmOnboardingRecord({ data: record }).catch((err) => {
+                  console.warn("[bootstrap] migrate crm onboarding failed", record.companyId, err);
+                });
+              }
+              try {
+                localStorage.removeItem("buildesk-crm-onboarding-v1");
+              } catch {
+                /* ignore */
+              }
+            } else {
+              useCrmOnboardingStore.getState().hydrateRecords([]);
+            }
+          } else {
+            useCrmOnboardingStore.getState().hydrateRecords(crmOnboarding);
+            try {
+              localStorage.removeItem("buildesk-crm-onboarding-v1");
+            } catch {
+              /* ignore */
+            }
+          }
         }
         if (designTickets) {
           useDesignTicketStore.getState().hydrateTickets(designTickets);

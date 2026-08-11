@@ -816,6 +816,20 @@ if (!tableExists("crm_accounts")) {
   console.log("+ CREATE TABLE crm_accounts");
 }
 
+if (!tableExists("crm_onboarding_records")) {
+  sqlite.exec(`
+    CREATE TABLE crm_onboarding_records (
+      company_id TEXT PRIMARY KEY NOT NULL,
+      payload_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (company_id) REFERENCES crm_accounts(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS crm_onboarding_updated_idx ON crm_onboarding_records(updated_at);
+  `);
+  console.log("+ CREATE TABLE crm_onboarding_records");
+}
+
 /** Backfill module_subscriptions from opted-in company_modules (idempotent). */
 if (tableExists("module_subscriptions") && tableExists("company_modules")) {
   sqlite.exec(`

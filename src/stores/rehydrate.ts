@@ -4,18 +4,16 @@ import { useSettingsStore } from "./useSettingsStore";
 import { useCompanyPortalStore } from "./useCompanyPortalStore";
 import { useAutomationStore } from "./useAutomationStore";
 import { useChatStore } from "./useChatStore";
-import { useCrmOnboardingStore } from "./useCrmOnboardingStore";
 import { useCrmMasterStore } from "./useCrmMasterStore";
 import { useCrmSettingsStore } from "./useCrmSettingsStore";
 
-/** Config stores persist to disk; CRM accounts / ERP entities load from SQLite. */
+/** Config stores persist to disk; CRM accounts / onboarding / ERP entities load from SQLite. */
 const persistedStores = [
   useMasterStore,
   useSettingsStore,
   useCompanyPortalStore,
   useAutomationStore,
   useChatStore,
-  useCrmOnboardingStore,
   useCrmMasterStore,
   useCrmSettingsStore,
 ] as const;

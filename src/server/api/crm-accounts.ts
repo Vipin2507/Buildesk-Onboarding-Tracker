@@ -239,6 +239,7 @@ export const deleteCrmAccount = createServerFn({ method: "POST" })
     if (!isAdminRoleKey(user.role) && !crmSalesManagerNamesMatch(existing.salesManagerName ?? undefined, user.name)) {
       throw new ApiError(403, "You can only delete accounts assigned to you");
     }
+    db.delete(t.crmOnboardingRecords).where(eq(t.crmOnboardingRecords.companyId, data.id)).run();
     db.delete(t.crmAccounts).where(eq(t.crmAccounts.id, data.id)).run();
     return mapRow(existing);
   });

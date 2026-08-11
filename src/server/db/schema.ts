@@ -155,6 +155,19 @@ export const crmAccounts = sqliteTable(
   ],
 );
 
+/** Full CRM account onboarding document (checklists, tracker, modules, …). */
+export const crmOnboardingRecords = sqliteTable(
+  "crm_onboarding_records",
+  {
+    companyId: text("company_id")
+      .primaryKey()
+      .references(() => crmAccounts.id, { onDelete: "cascade" }),
+    payloadJson: text("payload_json").notNull(),
+    ...timestamps,
+  },
+  (t) => [index("crm_onboarding_updated_idx").on(t.updatedAt)],
+);
+
 /* ---------- CRM: subscriptions, tasks, visits, events ---------- */
 
 export const moduleSubscriptions = sqliteTable(
