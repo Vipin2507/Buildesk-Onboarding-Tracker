@@ -8,7 +8,9 @@ function isIgnorableSyncError(message: string) {
     /company missing/i.test(message) ||
     /failed to fetch/i.test(message) ||
     /networkerror/i.test(message) ||
-    /load failed/i.test(message)
+    /load failed/i.test(message) ||
+    /do not have permission/i.test(message) ||
+    /sign in required/i.test(message)
   );
 }
 

@@ -1,7 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 
+import { crmSalesManagerNamesMatch } from "@/lib/crm-account-access";
 import { isAdminRoleKey } from "@/lib/permissions";
 import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
@@ -24,7 +25,6 @@ function mapNotification(row: typeof t.notifications.$inferSelect): AppNotificat
   };
 }
 
-/** Active Admin user ids — bell notifications are admin-only. */
 export function listActiveAdminUserIds(db: ReturnType<typeof getDb> = getDb()): string[] {
   return db
     .select({ id: t.users.id, role: t.users.role, active: t.users.active })
@@ -32,6 +32,74 @@ export function listActiveAdminUserIds(db: ReturnType<typeof getDb> = getDb()): 
     .all()
     .filter((u) => u.active && isAdminRoleKey(u.role))
     .map((u) => u.id);
+}
+
+/**
+ * Recipients for a notification:
+ * - all active Admins (always)
+ * - explicit extra user ids (assignees, etc.)
+ * - CRM account sales / support managers (name match)
+ * - ERP company onboarding / CSM / support managers
+ * - optional actor (so they see their own activity)
+ */
+export function resolveNotificationRecipientIds(
+  db: ReturnType<typeof getDb>,
+  opts: {
+    companyId?: string;
+    extraUserIds?: Array<string | undefined | null>;
+    includeActorId?: string;
+  },
+): string[] {
+  const ids = new Set<string>(listActiveAdminUserIds(db));
+
+  for (const id of opts.extraUserIds ?? []) {
+    if (id?.trim()) ids.add(id.trim());
+  }
+  if (opts.includeActorId?.trim()) ids.add(opts.includeActorId.trim());
+
+  if (opts.companyId) {
+    const users = db
+      .select({ id: t.users.id, name: t.users.name, active: t.users.active })
+      .from(t.users)
+      .all()
+      .filter((u) => u.active);
+
+    const account = db
+      .select()
+      .from(t.crmAccounts)
+      .where(eq(t.crmAccounts.id, opts.companyId))
+      .get();
+    if (account) {
+      for (const label of [
+        account.salesManagerName,
+        account.supportManager1,
+        account.supportManager2,
+      ]) {
+        if (!label?.trim()) continue;
+        for (const u of users) {
+          if (crmSalesManagerNamesMatch(label, u.name)) ids.add(u.id);
+        }
+      }
+    }
+
+    const company = db
+      .select()
+      .from(t.companies)
+      .where(eq(t.companies.id, opts.companyId))
+      .get();
+    if (company) {
+      for (const id of [
+        company.onboardingManagerId,
+        company.csmId,
+        company.supportManager1Id,
+        company.supportManager2Id,
+      ]) {
+        if (id?.trim()) ids.add(id.trim());
+      }
+    }
+  }
+
+  return [...ids];
 }
 
 type NotificationInsert = {
@@ -44,26 +112,24 @@ type NotificationInsert = {
   ticketId?: string;
 };
 
-/**
- * Insert one row per active Admin (user-scoped). Never creates broadcast NULL userId rows.
- * Returns the row for `preferUserId` when that admin exists, else the first created row.
- */
-export function insertNotificationsForAdmins(
+function eventKey(n: Pick<AppNotification, "title" | "body" | "companyId" | "ticketId" | "createdAt">) {
+  return `${n.title}\0${n.body}\0${n.companyId ?? ""}\0${n.ticketId ?? ""}\0${n.createdAt}`;
+}
+
+function insertForUserIds(
   db: ReturnType<typeof getDb>,
   data: NotificationInsert,
+  userIds: string[],
   preferUserId?: string,
 ): AppNotification[] {
-  const adminIds = listActiveAdminUserIds(db);
-  if (adminIds.length === 0) return [];
-
   const now = nowIso();
-  const created: AppNotification[] = [];
-  for (let i = 0; i < adminIds.length; i++) {
-    const id = i === 0 && data.id ? data.id : newId();
+
+  if (userIds.length === 0) {
+    const id = data.id ?? newId();
     db.insert(t.notifications)
       .values({
         id,
-        userId: adminIds[i],
+        userId: null,
         title: data.title,
         body: data.body ?? "",
         kind: data.kind ?? "info",
@@ -75,17 +141,71 @@ export function insertNotificationsForAdmins(
         updatedAt: now,
       })
       .run();
-    const row = db.select().from(t.notifications).where(eq(t.notifications.id, id)).get()!;
-    created.push(mapNotification(row));
+    return [mapNotification(db.select().from(t.notifications).where(eq(t.notifications.id, id)).get()!)];
+  }
+
+  const created: AppNotification[] = [];
+  for (let i = 0; i < userIds.length; i++) {
+    const id = i === 0 && data.id ? data.id : newId();
+    db.insert(t.notifications)
+      .values({
+        id,
+        userId: userIds[i],
+        title: data.title,
+        body: data.body ?? "",
+        kind: data.kind ?? "info",
+        href: data.href ?? null,
+        readAt: null,
+        companyId: data.companyId ?? null,
+        ticketId: data.ticketId ?? null,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+    created.push(
+      mapNotification(db.select().from(t.notifications).where(eq(t.notifications.id, id)).get()!),
+    );
   }
 
   if (preferUserId) {
     const preferred = created.find((n) => n.userId === preferUserId);
-    if (preferred) {
-      return [preferred, ...created.filter((n) => n.id !== preferred.id)];
-    }
+    if (preferred) return [preferred, ...created.filter((n) => n.id !== preferred.id)];
   }
   return created;
+}
+
+/** @deprecated name kept for design-ticket callers — fans out to admins + account stakeholders. */
+export function insertNotificationsForAdmins(
+  db: ReturnType<typeof getDb>,
+  data: NotificationInsert,
+  preferUserId?: string,
+): AppNotification[] {
+  const recipientIds = resolveNotificationRecipientIds(db, {
+    companyId: data.companyId,
+    includeActorId: preferUserId,
+  });
+  return insertForUserIds(db, data, recipientIds, preferUserId);
+}
+
+function dedupeAdminFeed(rows: AppNotification[], viewerId: string, limit: number) {
+  const groups = new Map<string, AppNotification[]>();
+  for (const n of rows) {
+    const key = eventKey(n);
+    const list = groups.get(key);
+    if (list) list.push(n);
+    else groups.set(key, [n]);
+  }
+
+  const feed: AppNotification[] = [];
+  for (const group of groups.values()) {
+    const preferred =
+      group.find((n) => n.userId === viewerId) ??
+      group.find((n) => !n.userId) ??
+      group[0];
+    feed.push(preferred);
+  }
+
+  return feed.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, limit);
 }
 
 export const listNotifications = createServerFn({ method: "GET" })
@@ -94,18 +214,30 @@ export const listNotifications = createServerFn({ method: "GET" })
   )
   .handler(async ({ data }) => {
     const user = requireUser();
-    // Bell feed is admin-only and strictly user-scoped (no shared NULL rows).
-    if (!isAdminRoleKey(user.role)) return [];
-
     const limit = data?.limit ?? 80;
-    const rows = getDb()
+    const db = getDb();
+
+    // Admins: full feed (deduped across fan-out + legacy broadcasts).
+    if (isAdminRoleKey(user.role)) {
+      const rows = db
+        .select()
+        .from(t.notifications)
+        .orderBy(desc(t.notifications.createdAt))
+        .limit(Math.min(limit * 8, 500))
+        .all()
+        .map(mapNotification);
+      return dedupeAdminFeed(rows, user.id, limit);
+    }
+
+    // Everyone else: only their own user-scoped notifications.
+    return db
       .select()
       .from(t.notifications)
       .where(eq(t.notifications.userId, user.id))
       .orderBy(desc(t.notifications.createdAt))
       .limit(limit)
-      .all();
-    return rows.map(mapNotification);
+      .all()
+      .map(mapNotification);
   });
 
 export const createNotification = createServerFn({ method: "POST" })
@@ -114,6 +246,7 @@ export const createNotification = createServerFn({ method: "POST" })
       .object({
         id: z.string().optional(),
         userId: z.string().optional(),
+        recipientUserIds: z.array(z.string()).optional(),
         title: z.string().min(1),
         body: z.string().optional(),
         kind: z.enum(["success", "info", "warning", "danger"]).optional(),
@@ -126,10 +259,12 @@ export const createNotification = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const actor = requireUser();
     const db = getDb();
-
-    // Always fan-out to admins. Optional userId is ignored for targeting —
-    // notifications are admin-only by product rule.
-    const created = insertNotificationsForAdmins(
+    const recipientIds = resolveNotificationRecipientIds(db, {
+      companyId: data.companyId,
+      extraUserIds: [...(data.recipientUserIds ?? []), data.userId],
+      includeActorId: actor.id,
+    });
+    const created = insertForUserIds(
       db,
       {
         id: data.id,
@@ -140,27 +275,47 @@ export const createNotification = createServerFn({ method: "POST" })
         companyId: data.companyId,
         ticketId: data.ticketId,
       },
+      recipientIds,
       actor.id,
     );
-
-    if (created.length === 0) {
-      throw new ApiError(400, "No admin recipients for notification");
-    }
-    return created[0];
+    return created[0]!;
   });
 
 export const markNotificationRead = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ id: z.string() }).parse(data))
   .handler(async ({ data }) => {
     const user = requireUser();
-    if (!isAdminRoleKey(user.role)) {
-      throw new ApiError(403, "Notifications are admin-only");
-    }
     const db = getDb();
     const row = db.select().from(t.notifications).where(eq(t.notifications.id, data.id)).get();
-    if (!row || row.userId !== user.id) {
+    if (!row) throw new ApiError(404, "Notification not found");
+
+    const isAdmin = isAdminRoleKey(user.role);
+    if (!isAdmin && row.userId !== user.id) {
       throw new ApiError(404, "Notification not found");
     }
+
+    if (isAdmin && row.userId && row.userId !== user.id) {
+      const twin = db
+        .select()
+        .from(t.notifications)
+        .where(
+          and(
+            eq(t.notifications.userId, user.id),
+            eq(t.notifications.title, row.title),
+            eq(t.notifications.body, row.body),
+            eq(t.notifications.createdAt, row.createdAt),
+          ),
+        )
+        .get();
+      const targetId = twin?.id ?? row.id;
+      const now = nowIso();
+      db.update(t.notifications)
+        .set({ readAt: now, updatedAt: now })
+        .where(eq(t.notifications.id, targetId))
+        .run();
+      return { ok: true as const, readAt: now };
+    }
+
     const now = nowIso();
     db.update(t.notifications)
       .set({ readAt: now, updatedAt: now })
@@ -171,15 +326,19 @@ export const markNotificationRead = createServerFn({ method: "POST" })
 
 export const markAllNotificationsRead = createServerFn({ method: "POST" }).handler(async () => {
   const user = requireUser();
-  if (!isAdminRoleKey(user.role)) {
-    throw new ApiError(403, "Notifications are admin-only");
-  }
   const now = nowIso();
   const db = getDb();
   const rows = db
     .select()
     .from(t.notifications)
-    .where(and(eq(t.notifications.userId, user.id), isNull(t.notifications.readAt)))
+    .where(
+      and(
+        isNull(t.notifications.readAt),
+        isAdminRoleKey(user.role)
+          ? or(eq(t.notifications.userId, user.id), isNull(t.notifications.userId))
+          : eq(t.notifications.userId, user.id),
+      ),
+    )
     .all();
   for (const row of rows) {
     db.update(t.notifications)

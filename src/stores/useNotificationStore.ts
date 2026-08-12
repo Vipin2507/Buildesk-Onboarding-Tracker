@@ -28,6 +28,8 @@ type NotifyInput = {
   companyId?: string;
   ticketId?: string;
   userId?: string;
+  /** Extra recipients (assignees, etc.). Admins + account managers are added server-side. */
+  recipientUserIds?: string[];
   /** Which settings toggle gates this notification. Default: ticket. */
   gate?: NotifyGate;
 };
@@ -75,14 +77,14 @@ export const useNotificationStore = createStore<NotificationState>((set, get) =>
       href: input.href,
       companyId: input.companyId,
       ticketId: input.ticketId,
-      // Server fans out to all admins; local preview only for the acting admin.
       userId: currentUser?.id,
       createdAt: now,
       updatedAt: now,
     };
 
-    // Only admins keep an optimistic copy in the bell store.
-    if (currentUser && isAdminRoleKey(currentUser.role)) {
+    // Actor always sees their own activity immediately; server also fans out to
+    // admins, assignees, and account managers.
+    if (currentUser) {
       set((s) => ({ notifications: [notification, ...s.notifications] }));
     }
 
@@ -96,10 +98,27 @@ export const useNotificationStore = createStore<NotificationState>((set, get) =>
           href: notification.href,
           companyId: notification.companyId,
           ticketId: notification.ticketId,
+          recipientUserIds: input.recipientUserIds,
+          userId: input.userId,
         },
+      }).then((created) => {
+        if (!created || !useAuthStore.getState().user) return created;
+        useNotificationStore.setState((s) => {
+          const withoutOptimistic = s.notifications.filter((n) => n.id !== notification.id);
+          // Only keep the server row if it belongs to the current user (or admin dedupe pick).
+          const me = useAuthStore.getState().user?.id;
+          if (created.userId && me && created.userId !== me && !isAdminRoleKey(useAuthStore.getState().user?.role)) {
+            return { notifications: withoutOptimistic };
+          }
+          if (withoutOptimistic.some((n) => n.id === created.id)) {
+            return { notifications: withoutOptimistic };
+          }
+          return { notifications: [created, ...withoutOptimistic] };
+        });
+        return created;
       }),
     );
-    return isAdminRoleKey(currentUser?.role) ? notification : null;
+    return notification;
   },
 
   markRead: (id) => {

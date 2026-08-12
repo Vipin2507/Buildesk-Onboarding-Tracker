@@ -1,4 +1,5 @@
 import { setAppConfig } from "@/lib/api";
+import { isAdminRoleKey } from "@/lib/permissions";
 import { flushServerSyncDebounced, serverSyncDebounced } from "@/lib/sync";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useAutomationStore } from "@/stores/useAutomationStore";
@@ -6,6 +7,11 @@ import { useCrmAutomationStore } from "@/stores/useCrmAutomationStore";
 import { useMasterStore } from "@/stores/useMasterStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import type { AutomationLog } from "@/types/automation";
+
+function canPersistAppConfig() {
+  const user = useAuthStore.getState().user;
+  return Boolean(user && isAdminRoleKey(user.role));
+}
 
 function masterSnapshot() {
   const s = useMasterStore.getState();
@@ -88,14 +94,14 @@ function crmAutomationSnapshot() {
 let wired = false;
 
 function persistAutomationConfig() {
-  if (!useAuthStore.getState().user) return;
+  if (!canPersistAppConfig()) return;
   serverSyncDebounced("automation-config", 400, () =>
     setAppConfig({ data: { key: "automation", value: automationSnapshot() } }),
   );
 }
 
 function persistCrmAutomationConfig() {
-  if (!useAuthStore.getState().user) return;
+  if (!canPersistAppConfig()) return;
   serverSyncDebounced("crm-automation-config", 400, () =>
     setAppConfig({ data: { key: "crm-automation", value: crmAutomationSnapshot() } }),
   );
@@ -103,6 +109,7 @@ function persistCrmAutomationConfig() {
 
 /** Force pending automation config (including logs) to SQLite now. */
 export function flushAutomationConfigPersistence() {
+  if (!canPersistAppConfig()) return;
   persistAutomationConfig();
   persistCrmAutomationConfig();
   flushServerSyncDebounced("automation-config");
@@ -115,14 +122,14 @@ export function wireConfigPersistence() {
   wired = true;
 
   useMasterStore.subscribe(() => {
-    if (!useAuthStore.getState().user) return;
+    if (!canPersistAppConfig()) return;
     serverSyncDebounced("master-config", 1000, () =>
       setAppConfig({ data: { key: "master", value: masterSnapshot() } }),
     );
   });
 
   useSettingsStore.subscribe(() => {
-    if (!useAuthStore.getState().user) return;
+    if (!canPersistAppConfig()) return;
     serverSyncDebounced("settings-config", 1000, () =>
       setAppConfig({ data: { key: "settings", value: settingsSnapshot() } }),
     );

@@ -5,7 +5,6 @@ import { Bell, CheckCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { isAdminRoleKey } from "@/lib/permissions";
 import { isCrmUser } from "@/lib/product-scope";
 import { cn } from "@/lib/utils";
 import { useCurrentUser, useNotificationStore } from "@/stores";
@@ -31,15 +30,11 @@ export function NotificationsBell() {
   const markRead = useNotificationStore((s) => s.markRead);
   const markAllRead = useNotificationStore((s) => s.markAllRead);
   const crm = isCrmUser(currentUser);
-  const isAdmin = isAdminRoleKey(currentUser?.role);
 
   const notifications = useMemo(() => {
-    if (!isAdmin) return [];
-    const mine = allNotifications.filter(
-      (n) => !n.userId || n.userId === currentUser?.id,
-    );
-    return crm ? mine.filter(isCrmScopedNotification) : mine;
-  }, [allNotifications, crm, currentUser?.id, isAdmin]);
+    // Server already scopes: admins get the full deduped feed; others get only theirs.
+    return crm ? allNotifications.filter(isCrmScopedNotification) : allNotifications;
+  }, [allNotifications, crm]);
   const unread = notifications.filter((n) => !n.readAt).length;
   const inAppEnabled = currentUser?.notifyInApp !== false;
 
@@ -53,7 +48,7 @@ export function NotificationsBell() {
           aria-label={unread > 0 ? `${unread} unread notifications` : "Notifications"}
         >
           <Bell className="h-4 w-4" />
-          {isAdmin && inAppEnabled && unread > 0 ? (
+          {inAppEnabled && unread > 0 ? (
             <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
               {unread > 99 ? "99+" : unread}
             </span>
@@ -66,7 +61,7 @@ export function NotificationsBell() {
       >
         <div className="flex items-center justify-between gap-2 border-b border-border/80 px-3 py-2.5">
           <div className="text-sm font-semibold">Notifications</div>
-          {isAdmin && inAppEnabled && unread > 0 ? (
+          {inAppEnabled && unread > 0 ? (
             <Button
               type="button"
               variant="ghost"
@@ -88,11 +83,7 @@ export function NotificationsBell() {
           ) : null}
         </div>
 
-        {!isAdmin ? (
-          <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-            Notifications are available to admins only.
-          </div>
-        ) : !inAppEnabled ? (
+        {!inAppEnabled ? (
           <div className="px-4 py-8 text-center text-sm text-muted-foreground">
             In-app notifications are turned off in your profile.
           </div>

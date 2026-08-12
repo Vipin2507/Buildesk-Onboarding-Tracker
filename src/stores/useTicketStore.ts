@@ -21,6 +21,12 @@ function ticketNotifyHref(ticket: Pick<Ticket, "id" | "projectId" | "companyId">
   return isCrmTicket(ticket as Ticket) ? `/crm/support/${ticket.id}` : `/support/${ticket.id}`;
 }
 
+function ticketRecipientIds(ticket: Pick<Ticket, "assignedUserId" | "backendAssigneeId" | "developerId">) {
+  return [ticket.assignedUserId, ticket.backendAssigneeId, ticket.developerId].filter(
+    (id): id is string => Boolean(id?.trim()),
+  );
+}
+
 function dispatchTicketAutomation(
   trigger: Parameters<typeof dispatchAutomationTrigger>[0],
   ticket: Ticket,
@@ -99,6 +105,7 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
       href: ticketNotifyHref(ticket),
       companyId: ticket.companyId,
       ticketId: ticket.id,
+      recipientUserIds: ticketRecipientIds(ticket),
       gate: isCrmTicket(ticket) ? "none" : "ticket",
     });
     serverSync("createTicket", () =>
@@ -147,25 +154,29 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
     const ticket = get().getById(id);
     if (ticket) logActivity({ who: "You", what: `Updated ticket ${id}`, kind: "info" });
     if (prev && data.status && data.status !== prev.status) {
+      const t = ticket ?? prev;
       notifyInApp({
         title: `${id} → ${data.status}`,
-        body: ticket?.title ?? prev.title,
+        body: t.title,
         kind: "info",
-        href: ticketNotifyHref(ticket ?? prev),
-        companyId: ticket?.companyId ?? prev.companyId,
+        href: ticketNotifyHref(t),
+        companyId: t.companyId,
         ticketId: id,
-        gate: isCrmTicket(ticket ?? prev) ? "none" : "ticket",
+        recipientUserIds: ticketRecipientIds(t),
+        gate: isCrmTicket(t) ? "none" : "ticket",
       });
     }
     if (prev && data.developerId && data.developerId !== prev.developerId) {
+      const t = ticket ?? prev;
       notifyInApp({
         title: `${id} reassigned`,
-        body: ticket?.title ?? prev.title,
+        body: t.title,
         kind: "info",
-        href: ticketNotifyHref(ticket ?? prev),
-        companyId: ticket?.companyId ?? prev.companyId,
+        href: ticketNotifyHref(t),
+        companyId: t.companyId,
         ticketId: id,
-        gate: isCrmTicket(ticket ?? prev) ? "none" : "ticket",
+        recipientUserIds: ticketRecipientIds(t),
+        gate: isCrmTicket(t) ? "none" : "ticket",
       });
     }
     serverSync("updateTicket", () =>
@@ -222,6 +233,7 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
       href: prev ? ticketNotifyHref(prev) : `/support/${id}`,
       companyId: prev?.companyId,
       ticketId: id,
+      recipientUserIds: prev ? ticketRecipientIds(prev) : undefined,
       gate: prev && isCrmTicket(prev) ? "none" : "ticket",
     });
     serverSync("moveTicket", () => apiUpdate({ data: { id, patch: { status } } }));
