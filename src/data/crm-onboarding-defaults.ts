@@ -191,27 +191,15 @@ export const CRM_MIGRATION_CHECKLIST_LABELS: {
   { key: "lead_data", label: "Lead Data", category: "CRM data" },
   { key: "contact_data", label: "Contact Data", category: "CRM data" },
   { key: "cp_data", label: "Channel Partner Data", category: "CRM data" },
-  { key: "inventory", label: "Inventory", category: "Inventory & units" },
-  { key: "unit_data", label: "Unit Data", category: "Inventory & units" },
-  { key: "booking_data", label: "Booking Data", category: "Post-sales" },
-  { key: "customer_data", label: "Customer Data", category: "Post-sales" },
-  { key: "payment_data", label: "Payment Data", category: "Collections" },
-  { key: "demand_data", label: "Demand Data", category: "Collections" },
-  { key: "receipt_data", label: "Receipt Data", category: "Collections" },
-  { key: "documents", label: "Documents", category: "Documents" },
-  { key: "call_logs", label: "Call Logs", category: "Activity" },
-  { key: "followup_history", label: "Follow-up History", category: "Activity" },
-  { key: "site_visit_data", label: "Site Visit Data", category: "Activity" },
+  { key: "inventory", label: "Project", category: "Project and property" },
+  { key: "unit_data", label: "Property", category: "Project and property" },
 ];
 
-export const CRM_MIGRATION_CATEGORIES = [
-  "CRM data",
-  "Inventory & units",
-  "Post-sales",
-  "Collections",
-  "Documents",
-  "Activity",
-] as const;
+export const CRM_MIGRATION_CATEGORIES = ["CRM data", "Project and property"] as const;
+
+export function seedCrmMigrationFields() {
+  return CRM_MIGRATION_CHECKLIST_LABELS.map((f) => ({ ...f }));
+}
 export const CRM_REPORT_CHECKLIST_LABELS: {
   key: string;
   label: string;
@@ -415,8 +403,10 @@ export function normalizeCrmMasterChecklist(
   return items.map(normalizeCrmMasterItem);
 }
 
-function defaultMigrationChecklist(): CrmMigrationChecklistItem[] {
-  return CRM_MIGRATION_CHECKLIST_LABELS.map((m) => ({
+function defaultMigrationChecklist(
+  catalog: typeof CRM_MIGRATION_CHECKLIST_LABELS = CRM_MIGRATION_CHECKLIST_LABELS,
+): CrmMigrationChecklistItem[] {
+  return catalog.map((m) => ({
     key: m.key,
     label: m.label,
     category: m.category,
@@ -431,7 +421,7 @@ function defaultMigrationChecklist(): CrmMigrationChecklistItem[] {
   }));
 }
 
-/** Upgrade legacy pending/in_progress/completed migration rows + merge new catalog keys. */
+/** Upgrade legacy pending/in_progress/completed migration rows + merge catalog keys. */
 export function mergeCrmMigrationChecklist(
   existing: Array<
     Partial<CrmMigrationChecklistItem> & {
@@ -440,9 +430,10 @@ export function mergeCrmMigrationChecklist(
       status?: string;
     }
   >,
+  catalog: typeof CRM_MIGRATION_CHECKLIST_LABELS = CRM_MIGRATION_CHECKLIST_LABELS,
 ): CrmMigrationChecklistItem[] {
   const byKey = new Map(existing.map((item) => [item.key, item]));
-  return CRM_MIGRATION_CHECKLIST_LABELS.map((def) => {
+  return catalog.map((def) => {
     const prev = byKey.get(def.key);
     if (!prev) {
       return {
@@ -722,6 +713,7 @@ export function mergeCrmTrainingSessions(
 export function createCrmOnboardingRecord(
   companyId: string,
   companyType?: CompanyType,
+  migrationCatalog: typeof CRM_MIGRATION_CHECKLIST_LABELS = CRM_MIGRATION_CHECKLIST_LABELS,
 ): CrmOnboardingRecord {
   const now = nowIso();
   return {
@@ -731,7 +723,7 @@ export function createCrmOnboardingRecord(
     productModules: defaultProductModules(),
     masterChecklist: defaultMasterChecklist(),
     ...defaultMasterData(),
-    migrationChecklist: defaultMigrationChecklist(),
+    migrationChecklist: defaultMigrationChecklist(migrationCatalog),
     trainingSessions: defaultTrainingSessions(companyType),
     reportChecklist: defaultReportChecklist(),
     goLiveChecklist: defaultGoLiveChecklist(),

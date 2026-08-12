@@ -3,6 +3,7 @@ import type {
   CrmMasterModuleDef,
   CrmMasterPicklist,
   CrmMasterPlatformSettings,
+  CrmMigrationFieldDef,
 } from "@/types/crm-master";
 import { newId, nowIso } from "@/types/common";
 import {
@@ -12,7 +13,10 @@ import {
   CRM_SEED_PLATFORM,
   CRM_SEED_PROJECT_FIELDS,
 } from "@/data/crm-master-seed";
-import { seedCrmModuleProviders } from "@/data/crm-onboarding-defaults";
+import {
+  seedCrmMigrationFields,
+  seedCrmModuleProviders,
+} from "@/data/crm-onboarding-defaults";
 import { createPersistedStore, touch } from "./persist";
 
 type CrmMasterState = {
@@ -23,6 +27,8 @@ type CrmMasterState = {
   modules: CrmMasterModuleDef[];
   /** Integration module key → provider display names (editable in Master). */
   moduleProviders: Record<string, string[]>;
+  /** Migration checklist fields shown on CRM accounts (editable in Master). */
+  migrationFields: CrmMigrationFieldDef[];
 
   updatePlatform: (data: Partial<CrmMasterPlatformSettings>) => void;
 
@@ -40,6 +46,7 @@ type CrmMasterState = {
 
   updateModule: (id: string, data: Partial<CrmMasterModuleDef>) => void;
   setModuleProviders: (moduleKey: string, providers: string[]) => void;
+  setMigrationFields: (fields: CrmMigrationFieldDef[]) => void;
 
   resetAll: () => void;
 };
@@ -52,6 +59,7 @@ function seedState() {
     picklists: CRM_SEED_PICKLISTS.map((p) => ({ ...p, values: [...p.values] })),
     modules: CRM_SEED_MODULES.map((m) => ({ ...m })),
     moduleProviders: seedCrmModuleProviders(),
+    migrationFields: seedCrmMigrationFields(),
   };
 }
 
@@ -78,6 +86,23 @@ function normalizeModuleProviders(
     }
   }
   return out;
+}
+
+function normalizeCrmMigrationFields(
+  existing: CrmMigrationFieldDef[] | undefined,
+): CrmMigrationFieldDef[] {
+  if (!Array.isArray(existing)) return seedCrmMigrationFields();
+  return existing
+    .map((f) => ({
+      key: String(f.key ?? "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_|_$/g, ""),
+      label: String(f.label ?? "").trim(),
+      category: String(f.category ?? "").trim() || "CRM data",
+    }))
+    .filter((f) => f.key && f.label);
 }
 
 export const useCrmMasterStore = createPersistedStore<CrmMasterState>(
@@ -146,6 +171,10 @@ export const useCrmMasterStore = createPersistedStore<CrmMasterState>(
       }));
     },
 
+    setMigrationFields: (fields) => {
+      set({ migrationFields: normalizeCrmMigrationFields(fields) });
+    },
+
     resetAll: () => {
       set(seedState());
     },
@@ -159,4 +188,9 @@ export function getCrmPicklistValues(key: string): string[] {
 /** Safe read for older persisted snapshots missing moduleProviders. */
 export function getCrmMasterModuleProviders(): Record<string, string[]> {
   return normalizeModuleProviders(useCrmMasterStore.getState().moduleProviders);
+}
+
+/** Safe read for older persisted snapshots missing migrationFields. */
+export function getCrmMasterMigrationFields(): CrmMigrationFieldDef[] {
+  return normalizeCrmMigrationFields(useCrmMasterStore.getState().migrationFields);
 }

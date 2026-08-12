@@ -21,7 +21,6 @@ import {
   CRM_DEVELOPER_TRAINING,
   CRM_BROKER_CP_TRAINING,
   CRM_GO_LIVE_CHECKLIST_LABELS,
-  CRM_MIGRATION_CHECKLIST_LABELS,
   CRM_REPORT_CHECKLIST_LABELS,
   defaultModuleWorkflow,
   defaultTrainingSessions,
@@ -33,6 +32,7 @@ import {
   mergeCrmTrainingSessions,
   normalizeCrmMasterChecklist,
 } from "@/data/crm-onboarding-defaults";
+import { resolveCrmMigrationCatalog } from "@/lib/crm-migration-catalog";
 import type {
   CrmAccountProject,
   CrmMasterDictItem,
@@ -231,11 +231,20 @@ function needsMasterMigration(items: CrmMasterChecklistItem[]) {
 }
 
 function needsDataMigrationChecklistUpgrade(items: CrmMigrationChecklistItem[]) {
+  const catalog = resolveCrmMigrationCatalog();
   if (items.some((i) => typeof i.collected !== "boolean" || typeof i.uploadAttempts !== "number")) {
     return true;
   }
-  const existingKeys = new Set(items.map((i) => i.key));
-  return CRM_MIGRATION_CHECKLIST_LABELS.some((d) => !existingKeys.has(d.key));
+  if (items.length !== catalog.length) return true;
+  const catalogKeys = new Set(catalog.map((d) => d.key));
+  if (items.some((i) => !catalogKeys.has(i.key))) return true;
+  const byKey = new Map(items.map((i) => [i.key, i]));
+  for (const def of catalog) {
+    const prev = byKey.get(def.key);
+    if (!prev) return true;
+    if (prev.label !== def.label || prev.category !== def.category) return true;
+  }
+  return false;
 }
 
 function needsTrainingUpgrade(items: CrmTrainingSession[], companyType?: CompanyType) {
@@ -332,10 +341,11 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
       }
       const current = get().getByCompanyId(companyId)!;
       if (needsDataMigrationChecklistUpgrade(current.migrationChecklist)) {
+        const catalog = resolveCrmMigrationCatalog();
         set((s) => ({
           records: updateRecord(s.records, companyId, (r) => ({
             ...r,
-            migrationChecklist: mergeCrmMigrationChecklist(r.migrationChecklist),
+            migrationChecklist: mergeCrmMigrationChecklist(r.migrationChecklist, catalog),
           })),
         }));
         changed = true;
@@ -401,7 +411,11 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
       }
       return get().getByCompanyId(companyId)!;
     }
-    const created = createCrmOnboardingRecord(companyId, companyType);
+    const created = createCrmOnboardingRecord(
+      companyId,
+      companyType,
+      resolveCrmMigrationCatalog(),
+    );
     set((s) => ({ records: [created, ...s.records] }));
     return created;
   },

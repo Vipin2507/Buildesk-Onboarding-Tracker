@@ -70,3 +70,10 @@ export type CrmMasterTeam = Timestamps & {
   role?: string;
   memberCount?: number;
 };
+
+/** Editable CRM Migration checklist catalog (Master → Migration). */
+export type CrmMigrationFieldDef = {
+  key: string;
+  label: string;
+  category: string;
+};

@@ -19,6 +19,7 @@ import {
   phaseAtToYmd,
   type ChecklistPhase,
 } from "@/lib/checklist";
+import { resolveCrmMigrationCategories } from "@/lib/crm-migration-catalog";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import { useCrmOnboardingStore, useUserStore } from "@/stores";
 import type { CrmMigrationChecklistItem } from "@/types/crm-onboarding";
@@ -54,6 +55,28 @@ export function CrmMigrationChecklistDetail({ companyId }: { companyId: string }
     [users],
   );
 
+  const categories = useMemo(() => {
+    const fromItems = [
+      ...new Set(items.map((i) => i.category ?? "CRM data")),
+    ];
+    const preferred = resolveCrmMigrationCategories();
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const cat of preferred) {
+      if (fromItems.includes(cat) && !seen.has(cat)) {
+        out.push(cat);
+        seen.add(cat);
+      }
+    }
+    for (const cat of fromItems) {
+      if (!seen.has(cat)) {
+        out.push(cat);
+        seen.add(cat);
+      }
+    }
+    return out.length ? out : [...CRM_MIGRATION_CATEGORIES];
+  }, [items]);
+
   const grouped = useMemo(() => {
     const filtered =
       categoryFilter === "all"
@@ -66,10 +89,10 @@ export function CrmMigrationChecklistDetail({ companyId }: { companyId: string }
       list.push(item);
       map.set(cat, list);
     }
-    return [...CRM_MIGRATION_CATEGORIES]
+    return categories
       .filter((c) => map.has(c))
       .map((c) => ({ category: c, items: map.get(c)! }));
-  }, [items, categoryFilter]);
+  }, [items, categoryFilter, categories]);
 
   const [phaseDialog, setPhaseDialog] = useState<{
     key: string;
@@ -152,7 +175,7 @@ export function CrmMigrationChecklistDetail({ companyId }: { companyId: string }
           >
             All ({items.length})
           </button>
-          {CRM_MIGRATION_CATEGORIES.map((cat) => {
+          {categories.map((cat) => {
             const count = items.filter((i) => (i.category ?? "CRM data") === cat).length;
             if (!count) return null;
             return (

@@ -13,6 +13,7 @@ import {
   type ChecklistPhaseBucket,
 } from "@/lib/checklist";
 import { filterCrmAccountsForUser } from "@/lib/crm-account-access";
+import { resolveCrmMigrationCatalog } from "@/lib/crm-migration-catalog";
 import { isTicketOpen } from "@/lib/tickets";
 import {
   useAuthStore,
@@ -77,7 +78,11 @@ function recordFor(account: CrmAccount, records: CrmOnboardingRecord[]): CrmOnbo
   if (found) {
     return { ...found, ...ensureMasterDataFields(found) };
   }
-  return createCrmOnboardingRecord(account.id, account.companyType);
+  return createCrmOnboardingRecord(
+    account.id,
+    account.companyType,
+    resolveCrmMigrationCatalog(),
+  );
 }
 
 export function useCrmDashboardOverview() {

@@ -13,6 +13,7 @@ import {
   Trash2,
   Layers,
   RotateCcw,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -28,8 +29,9 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { CRM_MODULE_PROVIDERS, CRM_PRODUCT_MODULES } from "@/data/crm-onboarding-defaults";
+import { getCrmMasterMigrationFields } from "@/stores/useCrmMasterStore";
 import { useAuthStore, useCrmMasterStore } from "@/stores";
-import type { CrmMasterFieldDef, CrmMasterPicklist } from "@/types/crm-master";
+import type { CrmMasterFieldDef, CrmMasterPicklist, CrmMigrationFieldDef } from "@/types/crm-master";
 import type { FieldValueType } from "@/types/master";
 import type { CrmProductModuleKey } from "@/types/crm-onboarding";
 
@@ -44,6 +46,7 @@ const SECTIONS = [
   { id: "picklists", label: "Picklists", icon: ListChecks },
   { id: "modules", label: "Modules", icon: Layers },
   { id: "providers", label: "Providers", icon: Database },
+  { id: "migration", label: "Migration", icon: Upload },
   { id: "data-control", label: "Data Control", icon: Table2 },
   { id: "danger", label: "Reset & Safety", icon: ShieldAlert },
 ] as const;
@@ -134,6 +137,7 @@ function CrmMasterPage() {
             {section === "picklists" ? <PicklistsPanel /> : null}
             {section === "modules" ? <ModulesPanel /> : null}
             {section === "providers" ? <ProvidersPanel /> : null}
+            {section === "migration" ? <MigrationPanel /> : null}
             {section === "data-control" ? <CrmMasterDataControl /> : null}
             {section === "danger" ? <DangerPanel /> : null}
           </motion.div>
@@ -149,6 +153,7 @@ function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) 
   const projectFields = useCrmMasterStore((s) => s.projectFields);
   const picklists = useCrmMasterStore((s) => s.picklists);
   const modules = useCrmMasterStore((s) => s.modules);
+  const migrationFields = useCrmMasterStore((s) => s.migrationFields);
 
   const cards = [
     {
@@ -175,6 +180,12 @@ function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) 
       value: modules.filter((m) => m.enabled).length,
       total: modules.length,
       to: "modules" as const,
+    },
+    {
+      label: "Migration",
+      value: (migrationFields?.length ?? getCrmMasterMigrationFields().length),
+      total: "checklist fields",
+      to: "migration" as const,
     },
     {
       label: "Data Control",
@@ -772,6 +783,158 @@ function ProvidersPanel() {
   );
 }
 
+function MigrationPanel() {
+  const migrationFields = useCrmMasterStore((s) => s.migrationFields);
+  const setMigrationFields = useCrmMasterStore((s) => s.setMigrationFields);
+  const fields = useMemo(
+    () => (migrationFields?.length ? migrationFields : getCrmMasterMigrationFields()),
+    [migrationFields],
+  );
+  const [draftLabel, setDraftLabel] = useState("");
+  const [draftCategory, setDraftCategory] = useState("CRM data");
+
+  function slugify(label: string) {
+    return label
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_|_$/g, "");
+  }
+
+  function updateField(index: number, patch: Partial<CrmMigrationFieldDef>) {
+    const next = fields.map((f, i) => (i === index ? { ...f, ...patch } : f));
+    setMigrationFields(next);
+  }
+
+  function removeField(index: number) {
+    setMigrationFields(fields.filter((_, i) => i !== index));
+    toast.success("Migration field removed");
+  }
+
+  function addField() {
+    const label = draftLabel.trim();
+    if (!label) {
+      toast.error("Enter a field label");
+      return;
+    }
+    const key = slugify(label);
+    if (!key) {
+      toast.error("Label must include letters or numbers");
+      return;
+    }
+    if (fields.some((f) => f.key === key)) {
+      toast.error("A field with this key already exists");
+      return;
+    }
+    setMigrationFields([
+      ...fields,
+      { key, label, category: draftCategory.trim() || "CRM data" },
+    ]);
+    setDraftLabel("");
+    toast.success(`Added ${label}`);
+  }
+
+  const categories = useMemo(() => {
+    const preferred = ["CRM data", "Project and property"];
+    const seen = new Set(preferred);
+    const extra = fields.map((f) => f.category).filter((c) => c && !seen.has(c));
+    return [...preferred, ...Array.from(new Set(extra))];
+  }, [fields]);
+
+  return (
+    <div className="space-y-2.5">
+      <div>
+        <h3 className="text-sm font-semibold">Migration checklist fields</h3>
+        <p className="text-[10px] text-muted-foreground">
+          Controls which datasets appear on account Data Migration. Default is CRM data plus Project
+          and property. Changes sync to accounts the next time their onboarding record is opened.
+        </p>
+      </div>
+
+      <div className="card-soft space-y-2 p-2.5">
+        <div className="grid gap-1.5 sm:grid-cols-[1fr_1fr_auto]">
+          <input
+            className="h-7 rounded-md border bg-background px-2 text-xs"
+            placeholder="New field label"
+            value={draftLabel}
+            onChange={(e) => setDraftLabel(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addField();
+              }
+            }}
+          />
+          <input
+            className="h-7 rounded-md border bg-background px-2 text-xs"
+            list="crm-migration-categories"
+            placeholder="Category"
+            value={draftCategory}
+            onChange={(e) => setDraftCategory(e.target.value)}
+          />
+          <datalist id="crm-migration-categories">
+            {categories.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-7 gap-1 text-xs"
+            onClick={addField}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add
+          </Button>
+        </div>
+
+        <div className="space-y-1">
+          {fields.map((field, index) => (
+            <div
+              key={field.key}
+              className="flex flex-col gap-1.5 rounded-md border bg-background/60 p-2 sm:flex-row sm:items-center"
+            >
+              <input
+                className="h-7 flex-1 rounded-md border bg-background px-2 text-xs"
+                value={field.label}
+                onChange={(e) => updateField(index, { label: e.target.value })}
+                onBlur={(e) => {
+                  if (!e.target.value.trim()) removeField(index);
+                }}
+              />
+              <input
+                className="h-7 w-full rounded-md border bg-background px-2 text-xs sm:w-44"
+                list="crm-migration-categories"
+                value={field.category}
+                onChange={(e) => updateField(index, { category: e.target.value })}
+              />
+              <span className="truncate text-[10px] text-muted-foreground sm:w-28" title={field.key}>
+                {field.key}
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 shrink-0 p-0 text-muted-foreground hover:text-destructive"
+                onClick={() => removeField(index)}
+                aria-label={`Remove ${field.label}`}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ))}
+          {fields.length === 0 ? (
+            <p className="py-3 text-center text-[10px] text-muted-foreground">
+              No migration fields. Add at least one, or reset Master to restore defaults.
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DangerPanel() {
   const resetAll = useCrmMasterStore((s) => s.resetAll);
   const [open, setOpen] = useState(false);
@@ -781,8 +944,8 @@ function DangerPanel() {
       <div className="card-soft border-destructive/30 p-3">
         <h3 className="text-sm font-semibold text-destructive">Reset CRM Master Config</h3>
         <p className="mt-1 text-[10px] text-muted-foreground">
-          Restores seeded account fields, project fields, picklists, modules, and providers. Does not
-          delete CRM accounts or onboarding checklists.
+          Restores seeded account fields, project fields, picklists, modules, providers, and
+          migration checklist fields. Does not delete CRM accounts or onboarding checklists.
         </p>
         <Button
           size="sm"
@@ -798,7 +961,7 @@ function DangerPanel() {
         open={open}
         onOpenChange={setOpen}
         title="Reset CRM Master Config?"
-        description="All field catalogs, picklists, and module toggles will revert to seed defaults."
+        description="All field catalogs, picklists, modules, providers, and migration fields will revert to seed defaults."
         confirmLabel="Reset"
         onConfirm={() => {
           resetAll();
