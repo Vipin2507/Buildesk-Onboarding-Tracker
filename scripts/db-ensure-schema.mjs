@@ -287,6 +287,7 @@ const EXTRA_COLUMNS = [
   { table: "companies", name: "end_date", ddl: "TEXT" },
   { table: "companies", name: "payment_history_json", ddl: "TEXT" },
   { table: "users", name: "product_scope", ddl: "TEXT NOT NULL DEFAULT 'erp'" },
+  { table: "users", name: "work_email", ddl: "TEXT" },
 ];
 
 for (const col of EXTRA_COLUMNS) {

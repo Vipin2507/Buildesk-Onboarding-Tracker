@@ -4,7 +4,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Check,
-  CheckCircle2,
   ClipboardList,
   GraduationCap,
   LayoutDashboard,
@@ -67,28 +66,17 @@ import {
   isCustomCrmProvider,
   useCrmProviderOptions,
 } from "@/lib/crm-providers";
-import {
-  crmAssigneeSelectPatch,
-  crmAssigneeSelectValue,
-  resolveCrmSalesManagerDefaults,
-  withCrmSalesManagerOption,
-} from "@/lib/crm-sales-manager-defaults";
-import { resolveAssigneeLabel } from "@/lib/managers";
 import { cn, formatDate } from "@/lib/utils";
 import { isTicketOpen } from "@/lib/tickets";
 import {
   useAuthStore,
   useCrmAccountStore,
   useCrmOnboardingStore,
-  useEmployeeStore,
   useTicketStore,
-  useUserStore,
 } from "@/stores";
 import type {
   CrmCommChannel,
-  CrmImplementationStage,
   CrmProductModuleKey,
-  CrmTrackerPriority,
 } from "@/types/crm-onboarding";
 import { nowIso } from "@/types/common";
 import type { TicketPriority, TicketStatus, TicketType } from "@/types/ticket";
@@ -101,7 +89,6 @@ const TABS = [
   { id: "training", label: "Training", icon: GraduationCap },
   { id: "reports", label: "Reports", icon: TrendingUp },
   { id: "golive", label: "Go-Live", icon: Rocket },
-  { id: "tracker", label: "Tracker", icon: CheckCircle2 },
   { id: "tickets", label: "Tickets", icon: Ticket },
   { id: "comms", label: "Comms", icon: MessageSquare },
 ] as const;
@@ -213,13 +200,13 @@ export function CrmOnboardingHub({
             onClick: () => {
               if (k.id === "tickets") setTab("tickets");
               else if (k.id === "modules") setTab("modules");
-              else if (k.id === "pending") setTab("tracker");
+              else if (k.id === "pending") setTab("masters");
               else setTab("dashboard");
             },
             active:
               (k.id === "tickets" && tab === "tickets") ||
               (k.id === "modules" && tab === "modules") ||
-              (k.id === "pending" && tab === "tracker") ||
+              (k.id === "pending" && tab === "masters") ||
               (k.id === "progress" && tab === "dashboard"),
           }))}
           columns={4}
@@ -258,9 +245,6 @@ export function CrmOnboardingHub({
               isLive={isLive}
               who={currentUser?.name}
             />
-          ) : null}
-          {tab === "tracker" ? (
-            <TrackerTab companyId={accountId} pct={pct} pending={pending} who={currentUser?.name} />
           ) : null}
           {tab === "tickets" ? <TicketsTab companyId={accountId} /> : null}
           {tab === "comms" ? <CommsTab companyId={accountId} /> : null}
@@ -831,228 +815,6 @@ function GoLiveTab({
       isLive={isLive}
       who={who}
     />
-  );
-}
-
-const TRACKER_STAGE_KEYS = Object.keys(CRM_STAGE_LABELS) as CrmImplementationStage[];
-
-const TRACKER_PRIORITY_META: Record<
-  CrmTrackerPriority,
-  { label: string; tone: "muted" | "info" | "warning" | "danger" }
-> = {
-  low: { label: "Low", tone: "muted" },
-  medium: { label: "Medium", tone: "info" },
-  high: { label: "High", tone: "warning" },
-  critical: { label: "Critical", tone: "danger" },
-};
-
-function TrackerTab({
-  companyId,
-  pct,
-  pending,
-  who,
-}: {
-  companyId: string;
-  pct: number;
-  pending: number;
-  who?: string;
-}) {
-  const record = useCrmOnboardingStore((s) => s.getByCompanyId(companyId))!;
-  const account = useCrmAccountStore((s) => s.getById(companyId));
-  const updateTracker = useCrmOnboardingStore((s) => s.updateTracker);
-  const users = useUserStore((s) => s.users);
-  const employees = useEmployeeStore((s) => s.employees);
-  const t = record.tracker;
-
-  const salesManager = useMemo(
-    () => resolveCrmSalesManagerDefaults(account, users),
-    [account, users],
-  );
-
-  const assignees = useMemo(
-    () =>
-      withCrmSalesManagerOption(
-        users.filter(
-          (u) => u.active && (u.productScope === "crm" || !u.productScope || u.role === "Admin"),
-        ),
-        salesManager,
-        users,
-      ),
-    [users, salesManager],
-  );
-
-  const currentIndex = Math.max(0, TRACKER_STAGE_KEYS.indexOf(t.stage));
-  const stageCount = TRACKER_STAGE_KEYS.length;
-  const stagePct = Math.round(((currentIndex + 1) / stageCount) * 100);
-  const todayYmd = new Date().toISOString().slice(0, 10);
-  const overdue = !!t.expectedCompletionDate && t.expectedCompletionDate < todayYmd && pct < 100;
-  const priorityMeta = TRACKER_PRIORITY_META[t.priority];
-
-  return (
-    <div className="space-y-2.5">
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Overall completion" value={`${pct}%`} bar={pct} />
-        <div className="card-soft p-2.5">
-          <div className="text-[10px] text-muted-foreground">Current stage</div>
-          <div className="mt-0.5 truncate text-sm font-semibold">
-            {CRM_STAGE_LABELS[t.stage]}
-          </div>
-          <div className="mt-0.5 text-[10px] tabular-nums text-muted-foreground">
-            Step {currentIndex + 1} of {stageCount}
-          </div>
-          <ProgressBar value={stagePct} className="mt-1.5 h-1.5" />
-        </div>
-        <div className="card-soft p-2.5">
-          <div className="text-[10px] text-muted-foreground">Expected completion</div>
-          <div className="mt-0.5 text-sm font-semibold tabular-nums">
-            {t.expectedCompletionDate ? formatDate(t.expectedCompletionDate) : "—"}
-          </div>
-          <div className="mt-1">
-            <Pill tone={overdue ? "danger" : pct >= 100 ? "success" : "info"}>
-              {pct >= 100 ? "Completed" : overdue ? "Overdue" : "On track"}
-            </Pill>
-          </div>
-        </div>
-        <div className="card-soft p-2.5">
-          <div className="text-[10px] text-muted-foreground">Pending activities</div>
-          <div className="mt-0.5 text-lg font-semibold tabular-nums">{pending}</div>
-          <div className="mt-1">
-            <Pill tone={priorityMeta.tone}>{priorityMeta.label} priority</Pill>
-          </div>
-        </div>
-      </div>
-
-      <DesignTicketSection
-        compact
-        title="Implementation stage"
-        action={
-          <span className="text-[10px] tabular-nums text-muted-foreground">
-            {stagePct}% through pipeline
-          </span>
-        }
-      >
-        <p className="mb-2 text-[10px] text-muted-foreground">
-          Tap a stage to set the current position. Everything up to it is treated as done.
-        </p>
-        <ol className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
-          {TRACKER_STAGE_KEYS.map((key, idx) => {
-            const state = idx < currentIndex ? "done" : idx === currentIndex ? "current" : "upcoming";
-            return (
-              <li key={key}>
-                <button
-                  type="button"
-                  onClick={() => updateTracker(companyId, { stage: key }, who)}
-                  className={cn(
-                    "flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left text-[11px] transition-colors",
-                    state === "current" && "border-primary bg-primary/10 font-medium",
-                    state === "done" && "border-success/40 bg-success/5",
-                    state === "upcoming" && "border-input bg-background hover:border-primary",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[9px] font-semibold tabular-nums",
-                      state === "current" && "border-primary bg-primary text-white",
-                      state === "done" && "border-success bg-success text-white",
-                      state === "upcoming" && "border-muted-foreground/40 text-muted-foreground",
-                    )}
-                  >
-                    {state === "done" ? <Check className="h-3 w-3" /> : idx + 1}
-                  </span>
-                  <span className="min-w-0 truncate">{CRM_STAGE_LABELS[key]}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ol>
-      </DesignTicketSection>
-
-      <DesignTicketSection compact title="Tracker details">
-        <div className="grid gap-2 sm:grid-cols-2">
-          <label className="text-[10px] text-muted-foreground">
-            Assigned executive
-            <select
-              className={cn(selectClass, "mt-1")}
-              value={crmAssigneeSelectValue(t.assignedExecutiveId, salesManager.userId)}
-              onChange={(e) =>
-                updateTracker(
-                  companyId,
-                  {
-                    assignedExecutiveId: crmAssigneeSelectPatch(
-                      e.target.value,
-                      salesManager.userId,
-                    ),
-                  },
-                  who,
-                )
-              }
-            >
-              <option value="">Unassigned</option>
-              {assignees.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-[10px] text-muted-foreground">
-            Expected completion
-            <DatePickerField
-              compact
-              className="mt-1"
-              value={t.expectedCompletionDate ?? ""}
-              onChange={(v) => updateTracker(companyId, { expectedCompletionDate: v }, who)}
-            />
-          </label>
-          <div className="text-[10px] text-muted-foreground sm:col-span-2">
-            Priority
-            <div className="mt-1 flex flex-wrap gap-1.5">
-              {(["low", "medium", "high", "critical"] as const).map((p) => {
-                const active = t.priority === p;
-                const meta = TRACKER_PRIORITY_META[p];
-                return (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => updateTracker(companyId, { priority: p }, who)}
-                    className={cn(
-                      "rounded-full border px-2.5 py-1 text-[11px] font-medium capitalize transition-colors",
-                      active
-                        ? "border-primary bg-primary text-white"
-                        : "border-input bg-background text-muted-foreground hover:border-primary",
-                    )}
-                  >
-                    {meta.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <label className="text-[10px] text-muted-foreground sm:col-span-2">
-            Delay reason
-            <input
-              className={cn(fieldClass, "mt-1")}
-              value={t.delayReason ?? ""}
-              onChange={(e) => updateTracker(companyId, { delayReason: e.target.value }, who)}
-              placeholder="Optional — note any blocker or delay"
-            />
-          </label>
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
-          {crmAssigneeSelectValue(t.assignedExecutiveId, salesManager.userId) ? (
-            <span>
-              Assigned:{" "}
-              {resolveAssigneeLabel(
-                crmAssigneeSelectValue(t.assignedExecutiveId, salesManager.userId),
-                users,
-                employees,
-              )}
-            </span>
-          ) : null}
-          {t.lastUpdatedBy ? <span>Last updated by {t.lastUpdatedBy}</span> : null}
-        </div>
-      </DesignTicketSection>
-    </div>
   );
 }
 

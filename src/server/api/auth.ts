@@ -101,6 +101,7 @@ export const authUpdateProfile = createServerFn({ method: "POST" })
       .object({
         name: z.string().min(2).optional(),
         email: z.string().email().optional(),
+        workEmail: z.string().email().optional().nullable(),
         phone: z.string().optional().nullable(),
         jobTitle: z.string().optional().nullable(),
         department: z.string().optional().nullable(),
@@ -124,6 +125,9 @@ export const authUpdateProfile = createServerFn({ method: "POST" })
       .set({
         ...(data.name !== undefined ? { name: data.name.trim() } : {}),
         ...(data.email !== undefined ? { email: data.email.trim().toLowerCase() } : {}),
+        ...(data.workEmail !== undefined
+          ? { workEmail: data.workEmail?.trim().toLowerCase() || null }
+          : {}),
         ...(data.phone !== undefined ? { phone: data.phone || null } : {}),
         ...(data.jobTitle !== undefined ? { jobTitle: data.jobTitle || null } : {}),
         ...(data.department !== undefined ? { department: data.department || null } : {}),

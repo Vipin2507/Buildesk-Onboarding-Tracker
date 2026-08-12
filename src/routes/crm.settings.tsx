@@ -671,6 +671,7 @@ function RolesSection() {
 type UserForm = {
   name: string;
   email: string;
+  workEmail: string;
   role: string;
   active: boolean;
   phone: string;
@@ -682,6 +683,7 @@ function emptyUserForm(): UserForm {
   return {
     name: "",
     email: "",
+    workEmail: "",
     role: "Manager",
     active: true,
     phone: "",
@@ -694,6 +696,7 @@ function userToForm(u: User): UserForm {
   return {
     name: u.name,
     email: u.email,
+    workEmail: u.workEmail ?? "",
     role: u.role,
     active: u.active,
     phone: u.phone ?? "",
@@ -907,7 +910,12 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
             return;
           }
           if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-            toast.error("Enter a valid email");
+            toast.error("Enter a valid login email");
+            return;
+          }
+          const workTrim = form.workEmail.trim();
+          if (workTrim && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(workTrim)) {
+            toast.error("Enter a valid work email");
             return;
           }
           const wantsPasswordChange = Boolean(passwords.next.trim() || passwords.confirm.trim());
@@ -924,6 +932,7 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
           const payload = {
             name: form.name.trim(),
             email: form.email.trim().toLowerCase(),
+            workEmail: workTrim ? workTrim.toLowerCase() : null,
             role: form.role,
             active: form.active,
             productScope: "crm" as const,
@@ -950,7 +959,13 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
               .catch((e) => toast.error(e instanceof Error ? e.message : "Update failed"));
             return;
           }
-          void apiCreateUser({ data: { ...payload, password: "buildesk123" } })
+          void apiCreateUser({
+            data: {
+              ...payload,
+              workEmail: workTrim ? workTrim.toLowerCase() : undefined,
+              password: "buildesk123",
+            },
+          })
             .then((user) => {
               useUserStore.setState((s) => ({ users: [...s.users, user] }));
               toast.success("CRM user invited · temporary password: buildesk123");
@@ -967,11 +982,18 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
             onChange={(e) => setForm({ ...form, name: e.target.value })}
           />
           <input
-            placeholder="Email"
+            placeholder="Login email"
             type="email"
             className={FIELD}
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
+          />
+          <input
+            placeholder="Work email (automation & executive alerts)"
+            type="email"
+            className={FIELD}
+            value={form.workEmail}
+            onChange={(e) => setForm({ ...form, workEmail: e.target.value })}
           />
           <div className="grid grid-cols-2 gap-2">
             <input

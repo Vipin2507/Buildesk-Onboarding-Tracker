@@ -31,6 +31,7 @@ export const createUser = createServerFn({ method: "POST" })
       .object({
         name: z.string().min(2),
         email: z.string().email(),
+        workEmail: z.string().email().optional().nullable(),
         role: z.string().min(1),
         active: z.boolean().optional(),
         productScope: productScopeSchema.optional(),
@@ -56,6 +57,7 @@ export const createUser = createServerFn({ method: "POST" })
         id,
         name: data.name.trim(),
         email,
+        workEmail: data.workEmail?.trim().toLowerCase() || null,
         passwordHash,
         role: data.role,
         productScope: data.productScope ?? "erp",
@@ -81,6 +83,7 @@ export const updateUser = createServerFn({ method: "POST" })
         patch: z.object({
           name: z.string().optional(),
           email: z.string().email().optional(),
+          workEmail: z.string().email().optional().nullable(),
           role: z.string().min(1).optional(),
           active: z.boolean().optional(),
           productScope: productScopeSchema.optional(),
@@ -93,9 +96,16 @@ export const updateUser = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     requireUser(["Admin"]);
+    const patch = { ...data.patch };
+    if (patch.workEmail !== undefined) {
+      patch.workEmail = patch.workEmail?.trim().toLowerCase() || null;
+    }
+    if (patch.email !== undefined) {
+      patch.email = patch.email.trim().toLowerCase();
+    }
     getDb()
       .update(t.users)
-      .set({ ...data.patch, updatedAt: nowIso() })
+      .set({ ...patch, updatedAt: nowIso() })
       .where(eq(t.users.id, data.id))
       .run();
     const row = getDb().select().from(t.users).where(eq(t.users.id, data.id)).get();

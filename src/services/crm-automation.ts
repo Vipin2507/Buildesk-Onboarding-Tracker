@@ -16,6 +16,7 @@ import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
 import { useCrmAccountStore } from "@/stores/useCrmAccountStore";
 import { useBookingStore } from "@/stores/useBookingStore";
 import { useUserStore } from "@/stores/useUserStore";
+import { resolveUserWorkEmail } from "@/lib/user-email";
 import {
   renderAutomationSubject,
   renderAutomationTemplate,
@@ -574,7 +575,7 @@ export function dispatchCrmBookingAutomationTrigger(
         : "/crm/bookings";
 
     const hostName = host?.name ?? "Host";
-    const hostEmail = host?.email;
+    const hostEmail = resolveUserWorkEmail(host);
     const guestName = appointment.guestName;
     const guestEmail = appointment.guestEmail;
 

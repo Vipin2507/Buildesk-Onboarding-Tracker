@@ -5,6 +5,7 @@ import { z } from "zod";
 import { resolveBookingHostUserId, resolveHostTimezone } from "@/lib/booking-host";
 import { computeOpenSlots, localWallClockIso } from "@/lib/booking-slots";
 import { isAdminRoleKey } from "@/lib/permissions";
+import { resolveUserWorkEmail } from "@/lib/user-email";
 import { dispatchServerBookingCreatedEmail, isBookingSlotInPast } from "@/server/crm-booking-automation";
 import { insertBookingRequestNotification } from "@/server/api/notifications";
 import { ApiError, getSessionUser, newId, nowIso, requireUser } from "@/server/auth/session";
@@ -556,7 +557,7 @@ export const createPortalBooking = createServerFn({ method: "POST" })
       eventTitle: event.title,
       accountName: account?.name ?? "CRM account",
       hostName: host?.name ?? "Host",
-      hostEmail: host?.email ?? undefined,
+      hostEmail: resolveUserWorkEmail(host ?? undefined),
     });
 
     return mapped;

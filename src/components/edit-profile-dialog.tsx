@@ -41,6 +41,7 @@ export function EditProfileDialog({
   const [form, setForm] = useState({
     name: "",
     email: "",
+    workEmail: "",
     phone: "",
     jobTitle: "",
     department: "",
@@ -62,6 +63,7 @@ export function EditProfileDialog({
     setForm({
       name: user.name,
       email: user.email,
+      workEmail: user.workEmail ?? "",
       phone: user.phone ?? "",
       jobTitle: user.jobTitle ?? "",
       department: user.department ?? "",
@@ -106,7 +108,12 @@ export function EditProfileDialog({
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-      toast.error("Enter a valid email");
+      toast.error("Enter a valid login email");
+      return;
+    }
+    const workTrim = form.workEmail.trim();
+    if (workTrim && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(workTrim)) {
+      toast.error("Enter a valid work email");
       return;
     }
     try {
@@ -114,6 +121,7 @@ export function EditProfileDialog({
         data: {
           name: form.name.trim(),
           email: form.email.trim().toLowerCase(),
+          workEmail: workTrim ? workTrim.toLowerCase() : null,
           phone: form.phone.trim() || null,
           jobTitle: form.jobTitle.trim() || null,
           department: form.department.trim() || null,
@@ -247,12 +255,21 @@ export function EditProfileDialog({
                   className="field"
                 />
               </Field>
-              <Field label="Email">
+              <Field label="Login email">
                 <input
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                   className="field"
+                />
+              </Field>
+              <Field label="Work email">
+                <input
+                  type="email"
+                  value={form.workEmail}
+                  onChange={(e) => setForm((f) => ({ ...f, workEmail: e.target.value }))}
+                  className="field"
+                  placeholder="For CRM automation & executive alerts"
                 />
               </Field>
               <Field label="Phone">

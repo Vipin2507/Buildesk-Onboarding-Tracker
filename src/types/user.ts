@@ -11,7 +11,10 @@ export type ProductScope = "erp" | "crm";
 export type User = Timestamps & {
   id: string;
   name: string;
+  /** Sign-in / login email */
   email: string;
+  /** Work inbox for CRM automation & executive notifications */
+  workEmail?: string;
   role: UserRole;
   active: boolean;
   /** erp = Buildesk tracker; crm = separate CRM product */
