@@ -18,6 +18,7 @@ import {
 } from "@/components/design-ticket/design-ticket-shared";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { browserWallClockIso } from "@/lib/booking-slots";
 import { getCrmMasterBookingCallTypes } from "@/stores/useCrmMasterStore";
 import { useBookingStore } from "@/stores/useBookingStore";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
@@ -96,6 +97,16 @@ function PortalBookCall() {
       ? customDuration
       : selectedType?.durationMinutes ?? selectedMeta?.durationMinutes;
 
+  const minDate = todayYmd();
+
+  function pickDate(next: string) {
+    if (!next || next < minDate) {
+      setDate(minDate);
+      return;
+    }
+    setDate(next);
+  }
+
   useEffect(() => {
     if (!access) return;
     setGuestName(access.contactName || "");
@@ -151,10 +162,12 @@ function PortalBookCall() {
     step,
   ]);
 
-  const daySlots = useMemo(
-    () => slots.filter((s) => s.startsAt.startsWith(date)),
-    [date, slots],
-  );
+  const daySlots = useMemo(() => {
+    const now = browserWallClockIso();
+    return slots
+      .filter((s) => s.startsAt.startsWith(date))
+      .filter((s) => s.startsAt.slice(0, 19) > now);
+  }, [date, slots]);
 
   if (!access) return null;
 
@@ -167,6 +180,10 @@ function PortalBookCall() {
     }
     if (allowsCustom && !specifyTopic.trim()) {
       toast.error("Please specify what the call is about");
+      return;
+    }
+    if (selectedSlot.startsAt.slice(0, 19) <= browserWallClockIso()) {
+      toast.error("That time has passed — please pick a later slot");
       return;
     }
     setSubmitting(true);
@@ -299,7 +316,13 @@ function PortalBookCall() {
                 ) : null}
 
                 <DesignTicketFormField label="Date">
-                  <DatePickerField value={date} onChange={setDate} yearsBack={0} yearsForward={1} />
+                  <DatePickerField
+                    value={date}
+                    onChange={pickDate}
+                    min={minDate}
+                    yearsBack={0}
+                    yearsForward={1}
+                  />
                 </DesignTicketFormField>
 
                 <DesignTicketFormField label="Available times">

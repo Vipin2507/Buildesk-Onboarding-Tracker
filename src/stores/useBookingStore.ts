@@ -219,7 +219,6 @@ export const useBookingStore = createStore<BookingState>((set, get) => ({
   createPortalRequest: async (input) => {
     const created = await createPortalBooking({ data: input });
     get().mergeAppointment(created);
-    dispatchCrmBookingAutomationTrigger("booking-created", created);
     return created;
   },
 

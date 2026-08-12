@@ -3,8 +3,9 @@ import { and, eq, gte, inArray, lte } from "drizzle-orm";
 import { z } from "zod";
 
 import { resolveBookingHostUserId, resolveHostTimezone } from "@/lib/booking-host";
-import { computeOpenSlots } from "@/lib/booking-slots";
+import { computeOpenSlots, localWallClockIso } from "@/lib/booking-slots";
 import { isAdminRoleKey } from "@/lib/permissions";
+import { dispatchServerBookingCreatedEmail, isBookingSlotInPast } from "@/server/crm-booking-automation";
 import { insertBookingRequestNotification } from "@/server/api/notifications";
 import { ApiError, getSessionUser, newId, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
@@ -317,6 +318,8 @@ function loadOpenSlots(event: BookingEventType, fromYmd: string, toYmd: string) 
     return loadOpenSlots(event, fromYmd, toYmd);
   }
 
+  const timezone = windows[0]?.timezone ?? resolveHostTimezone(hostUserId);
+
   return computeOpenSlots({
     fromYmd,
     toYmd,
@@ -325,6 +328,7 @@ function loadOpenSlots(event: BookingEventType, fromYmd: string, toYmd: string) 
     bufferAfterMinutes: event.bufferAfterMinutes,
     windows: windows.map(mapAvailability),
     busy: collectBusyRanges(hostUserId, fromYmd, toYmd),
+    nowIso: localWallClockIso(timezone),
   });
 }
 
@@ -453,7 +457,14 @@ export const listPortalBookingSlots = createServerFn({ method: "GET" })
     if (data.durationMinutes) {
       event.durationMinutes = data.durationMinutes;
     }
-    return loadOpenSlots(event, data.from.slice(0, 10), data.to.slice(0, 10));
+    const hostUserId = resolveEventHost(event);
+    const hostTimezone = resolveHostTimezone(hostUserId);
+    const fromYmd = data.from.slice(0, 10);
+    const toYmd = data.to.slice(0, 10);
+    const todayYmd = localWallClockIso(hostTimezone).slice(0, 10);
+    const rangeFrom = fromYmd < todayYmd ? todayYmd : fromYmd;
+    if (rangeFrom > toYmd) return [];
+    return loadOpenSlots(event, rangeFrom, toYmd);
   });
 
 export const createPortalBooking = createServerFn({ method: "POST" })
@@ -485,8 +496,16 @@ export const createPortalBooking = createServerFn({ method: "POST" })
     const event = mapEventType(row);
     if (data.durationMinutes) event.durationMinutes = data.durationMinutes;
     const hostUserId = resolveEventHost(event);
+    const hostTimezone = resolveHostTimezone(hostUserId);
     const startsAt = data.startsAt.slice(0, 19);
     const ymd = startsAt.slice(0, 10);
+    const todayYmd = localWallClockIso(hostTimezone).slice(0, 10);
+    if (ymd < todayYmd) {
+      throw new ApiError(400, "Please choose a future date");
+    }
+    if (isBookingSlotInPast(startsAt, hostTimezone)) {
+      throw new ApiError(400, "Please choose a time in the future");
+    }
     const open = loadOpenSlots(event, ymd, ymd);
     const slot = open.find((s) => s.startsAt.slice(0, 19) === startsAt);
     if (!slot) throw new ApiError(400, "Selected slot is no longer available");
@@ -529,6 +548,15 @@ export const createPortalBooking = createServerFn({ method: "POST" })
       appointment: mapped,
       eventTitle: event.title,
       accountName: account?.name ?? "CRM account",
+    });
+
+    const host = db.select().from(t.users).where(eq(t.users.id, hostUserId)).get();
+    await dispatchServerBookingCreatedEmail(db, {
+      appointment: mapped,
+      eventTitle: event.title,
+      accountName: account?.name ?? "CRM account",
+      hostName: host?.name ?? "Host",
+      hostEmail: host?.email ?? undefined,
     });
 
     return mapped;

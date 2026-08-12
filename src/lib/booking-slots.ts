@@ -9,6 +9,37 @@ function pad(n: number) {
   return String(n).padStart(2, "0");
 }
 
+/** Wall-clock now in an IANA timezone as YYYY-MM-DDTHH:mm:ss (matches slot format). */
+export function localWallClockIso(timezone: string, date = new Date()): string {
+  try {
+    return new Intl.DateTimeFormat("sv-SE", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    })
+      .format(date)
+      .replace(" ", "T");
+  } catch {
+    return date.toISOString().slice(0, 19);
+  }
+}
+
+/** Browser-local wall clock for portal UI filtering. */
+export function browserWallClockIso(date = new Date()): string {
+  const y = date.getFullYear();
+  const m = pad(date.getMonth() + 1);
+  const d = pad(date.getDate());
+  const h = pad(date.getHours());
+  const min = pad(date.getMinutes());
+  const s = pad(date.getSeconds());
+  return `${y}-${m}-${d}T${h}:${min}:${s}`;
+}
+
 /** Build ISO-ish local datetime string YYYY-MM-DDTHH:mm:00 for a calendar day + minutes. */
 function atLocalMinutes(ymd: string, minutes: number): string {
   const h = Math.floor(minutes / 60);
@@ -49,12 +80,13 @@ export function computeOpenSlots(input: {
   bufferAfterMinutes?: number;
   windows: AvailabilityWindow[];
   busy: BusyRange[];
+  /** Wall-clock now in host timezone (YYYY-MM-DDTHH:mm:ss). Defaults to UTC slice. */
   nowIso?: string;
 }): BookingSlot[] {
   const duration = Math.max(5, input.durationMinutes);
   const bufferBefore = input.bufferBeforeMinutes ?? 0;
   const bufferAfter = input.bufferAfterMinutes ?? 0;
-  const now = input.nowIso ?? new Date().toISOString();
+  const now = input.nowIso ?? new Date().toISOString().slice(0, 19);
   const activeWindows = input.windows.filter((w) => w.isActive !== false);
   if (activeWindows.length === 0) return [];
 
@@ -73,7 +105,7 @@ export function computeOpenSlots(input: {
       for (let cursor = startMin; cursor + duration <= endMin; cursor += duration) {
         const startsAt = atLocalMinutes(ymd, cursor);
         const endsAt = atLocalMinutes(ymd, cursor + duration);
-        if (startsAt <= now.slice(0, 19)) continue;
+        if (startsAt <= now) continue;
 
         const blockStart = atLocalMinutes(ymd, Math.max(0, cursor - bufferBefore));
         const blockEnd = atLocalMinutes(ymd, cursor + duration + bufferAfter);
