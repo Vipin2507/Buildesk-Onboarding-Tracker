@@ -94,6 +94,51 @@ function matchesAccountKpi(row: CrmAccountRow, filter: AccountKpiFilter) {
   return true;
 }
 
+type AccountListFilters = {
+  statusFilter?: string;
+  typeFilter: string;
+  cityFilter: string;
+  regionFilter: string;
+  managerFilter: string;
+  healthFilter: string;
+  stageFilter: string;
+  providerFilter: string;
+  progressFilter: string;
+  dateFrom: string;
+  dateTo: string;
+};
+
+function matchesAccountListFilters(row: CrmAccountRow, f: AccountListFilters) {
+  if (f.statusFilter && f.statusFilter !== "all" && row.status !== f.statusFilter) return false;
+  if (f.typeFilter !== "all" && row.companyType !== f.typeFilter) return false;
+  if (f.cityFilter !== "all" && row.city !== f.cityFilter) return false;
+  if (f.regionFilter !== "all" && row.region !== f.regionFilter) return false;
+  if (f.managerFilter === "unassigned" && row.salesManagerName?.trim()) return false;
+  if (
+    f.managerFilter !== "all" &&
+    f.managerFilter !== "unassigned" &&
+    row.salesManagerName !== f.managerFilter
+  ) {
+    return false;
+  }
+  if (f.healthFilter !== "all" && row.healthBucket !== f.healthFilter) return false;
+  if (f.stageFilter !== "all" && row.stage !== f.stageFilter) return false;
+  if (f.providerFilter === "none" && row.providers.length > 0) return false;
+  if (
+    f.providerFilter !== "all" &&
+    f.providerFilter !== "none" &&
+    !row.providers.includes(f.providerFilter)
+  ) {
+    return false;
+  }
+  if (f.progressFilter === "0" && row.progress !== 0) return false;
+  if (f.progressFilter === "1-49" && !(row.progress >= 1 && row.progress <= 49)) return false;
+  if (f.progressFilter === "50-99" && !(row.progress >= 50 && row.progress <= 99)) return false;
+  if (f.progressFilter === "100" && row.progress !== 100) return false;
+  if (!inDateRange(row.startDate, f.dateFrom, f.dateTo)) return false;
+  return true;
+}
+
 function accountKpiFilterLabel(filter: AccountKpiFilter) {
   switch (filter) {
     case "onboarding":
@@ -189,72 +234,70 @@ function CrmAccountsPage() {
     return [...set].sort((a, b) => a.localeCompare(b));
   }, [rows]);
 
+  const listFilters = useMemo(
+    () => ({
+      typeFilter,
+      cityFilter,
+      regionFilter,
+      managerFilter,
+      healthFilter,
+      stageFilter,
+      providerFilter,
+      progressFilter,
+      dateFrom,
+      dateTo,
+    }),
+    [
+      typeFilter,
+      cityFilter,
+      regionFilter,
+      managerFilter,
+      healthFilter,
+      stageFilter,
+      providerFilter,
+      progressFilter,
+      dateFrom,
+      dateTo,
+    ],
+  );
+
+  /** Toolbar filters only — KPI cards update from this set (KPI chip applied separately). */
+  const scopedRows = useMemo(
+    () =>
+      rows.filter((r) =>
+        matchesAccountListFilters(r, { ...listFilters, statusFilter }),
+      ),
+    [rows, listFilters, statusFilter],
+  );
+
+  /** Status tabs ignore the status chip so counts stay a breakdown of other filters. */
+  const statusScopeRows = useMemo(
+    () => rows.filter((r) => matchesAccountListFilters(r, listFilters)),
+    [rows, listFilters],
+  );
+
   const statusCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: rows.length };
+    const counts: Record<string, number> = { all: statusScopeRows.length };
     for (const chip of STATUS_CHIPS) {
       if (!chip.status) continue;
-      counts[chip.id] = rows.filter((r) => r.status === chip.status).length;
+      counts[chip.id] = statusScopeRows.filter((r) => r.status === chip.status).length;
     }
     return counts;
-  }, [rows]);
+  }, [statusScopeRows]);
 
   const kpiStats = useMemo(() => {
-    const onboarding = rows.filter((r) => matchesAccountKpi(r, "onboarding")).length;
-    const live = rows.filter((r) => matchesAccountKpi(r, "live")).length;
-    const critical = rows.filter((r) => matchesAccountKpi(r, "critical")).length;
-    const avg = rows.length
-      ? Math.round(rows.reduce((sum, r) => sum + r.progress, 0) / rows.length)
+    const onboarding = scopedRows.filter((r) => matchesAccountKpi(r, "onboarding")).length;
+    const live = scopedRows.filter((r) => matchesAccountKpi(r, "live")).length;
+    const critical = scopedRows.filter((r) => matchesAccountKpi(r, "critical")).length;
+    const avg = scopedRows.length
+      ? Math.round(scopedRows.reduce((sum, r) => sum + r.progress, 0) / scopedRows.length)
       : 0;
-    return { total: rows.length, onboarding, live, critical, avg };
-  }, [rows]);
+    return { total: scopedRows.length, onboarding, live, critical, avg };
+  }, [scopedRows]);
 
   const filtered = useMemo(() => {
-    return rows.filter((r) => {
-      if (!matchesAccountKpi(r, kpiFilter)) return false;
-      if (statusFilter !== "all" && r.status !== statusFilter) return false;
-      if (typeFilter !== "all" && r.companyType !== typeFilter) return false;
-      if (cityFilter !== "all" && r.city !== cityFilter) return false;
-      if (regionFilter !== "all" && r.region !== regionFilter) return false;
-      if (managerFilter === "unassigned" && r.salesManagerName?.trim()) return false;
-      if (
-        managerFilter !== "all" &&
-        managerFilter !== "unassigned" &&
-        r.salesManagerName !== managerFilter
-      ) {
-        return false;
-      }
-      if (healthFilter !== "all" && r.healthBucket !== healthFilter) return false;
-      if (stageFilter !== "all" && r.stage !== stageFilter) return false;
-      if (providerFilter === "none" && r.providers.length > 0) return false;
-      if (
-        providerFilter !== "all" &&
-        providerFilter !== "none" &&
-        !r.providers.includes(providerFilter)
-      ) {
-        return false;
-      }
-      if (progressFilter === "0" && r.progress !== 0) return false;
-      if (progressFilter === "1-49" && !(r.progress >= 1 && r.progress <= 49)) return false;
-      if (progressFilter === "50-99" && !(r.progress >= 50 && r.progress <= 99)) return false;
-      if (progressFilter === "100" && r.progress !== 100) return false;
-      if (!inDateRange(r.startDate, dateFrom, dateTo)) return false;
-      return true;
-    });
-  }, [
-    rows,
-    kpiFilter,
-    statusFilter,
-    typeFilter,
-    cityFilter,
-    regionFilter,
-    managerFilter,
-    healthFilter,
-    stageFilter,
-    providerFilter,
-    progressFilter,
-    dateFrom,
-    dateTo,
-  ]);
+    return scopedRows.filter((r) => matchesAccountKpi(r, kpiFilter));
+  }, [scopedRows, kpiFilter]);
 
   const activeFilterCount = [
     statusFilter !== "all",
