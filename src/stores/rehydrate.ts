@@ -3,6 +3,7 @@ import { useMasterStore } from "./useMasterStore";
 import { useSettingsStore } from "./useSettingsStore";
 import { useCompanyPortalStore } from "./useCompanyPortalStore";
 import { useAutomationStore } from "./useAutomationStore";
+import { useCrmAutomationStore } from "./useCrmAutomationStore";
 import { useChatStore } from "./useChatStore";
 import { useCrmMasterStore } from "./useCrmMasterStore";
 import { useCrmSettingsStore } from "./useCrmSettingsStore";
@@ -13,6 +14,7 @@ const persistedStores = [
   useSettingsStore,
   useCompanyPortalStore,
   useAutomationStore,
+  useCrmAutomationStore,
   useChatStore,
   useCrmMasterStore,
   useCrmSettingsStore,

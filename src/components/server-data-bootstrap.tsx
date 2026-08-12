@@ -321,6 +321,14 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
         }
         if (automation && typeof automation === "object" && Object.keys(automation).length > 0) {
           hydrateAutomationFromServer(automation as Record<string, unknown>);
+          // Older DB rows lack logs — push local logs up so the next refresh keeps them.
+          if (
+            !("logs" in (automation as object)) &&
+            useAutomationStore.getState().logs.length > 0
+          ) {
+            const { flushAutomationConfigPersistence } = await import("@/lib/config-persistence");
+            flushAutomationConfigPersistence();
+          }
         } else {
           // Backfill server config so automation ON/OFF state survives deploys and device changes.
           const localAutomation = useAutomationStore.getState();
@@ -341,6 +349,13 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
 
         if (crmAutomation && typeof crmAutomation === "object" && Object.keys(crmAutomation).length > 0) {
           hydrateCrmAutomationFromServer(crmAutomation as Record<string, unknown>);
+          if (
+            !("logs" in (crmAutomation as object)) &&
+            useCrmAutomationStore.getState().logs.length > 0
+          ) {
+            const { flushAutomationConfigPersistence } = await import("@/lib/config-persistence");
+            flushAutomationConfigPersistence();
+          }
         } else {
           const localCrmAutomation = useCrmAutomationStore.getState();
           await setAppConfig({

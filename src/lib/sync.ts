@@ -82,15 +82,29 @@ export function serverSyncWithRollback(
 
 /** Debounced sync for bulk config blobs (master / settings). */
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
+const pendingFns = new Map<string, () => Promise<unknown>>();
 
 export function serverSyncDebounced(key: string, ms: number, fn: () => Promise<unknown>) {
   const prev = timers.get(key);
   if (prev) clearTimeout(prev);
+  pendingFns.set(key, fn);
   timers.set(
     key,
     setTimeout(() => {
       timers.delete(key);
-      serverSync(key, fn);
+      const run = pendingFns.get(key);
+      pendingFns.delete(key);
+      if (run) serverSync(key, run);
     }, ms),
   );
+}
+
+/** Flush a pending debounced sync immediately (e.g. before unload / after critical writes). */
+export function flushServerSyncDebounced(key: string) {
+  const prev = timers.get(key);
+  if (prev) clearTimeout(prev);
+  timers.delete(key);
+  const run = pendingFns.get(key);
+  pendingFns.delete(key);
+  if (run) serverSync(key, run);
 }

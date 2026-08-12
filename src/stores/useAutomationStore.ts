@@ -234,7 +234,11 @@ export function hydrateAutomationFromServer(snapshot: AutomationSnapshot | null 
   if (snapshot.waha) patch.waha = snapshot.waha;
   if (snapshot.healthCheck) patch.healthCheck = snapshot.healthCheck;
   if (Array.isArray(snapshot.rules)) patch.rules = snapshot.rules;
-  if (Array.isArray(snapshot.logs)) patch.logs = snapshot.logs.slice(0, 500);
+  // Only replace logs when the server payload includes the key.
+  // Missing key → keep localStorage-rehydrated logs (older DB rows).
+  if ("logs" in snapshot && Array.isArray(snapshot.logs)) {
+    patch.logs = snapshot.logs.slice(0, 500);
+  }
   if (Object.keys(patch).length === 0) return;
   useAutomationStore.setState((s) => ({
     ...s,
