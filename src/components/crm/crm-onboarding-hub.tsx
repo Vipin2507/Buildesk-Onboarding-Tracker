@@ -67,6 +67,12 @@ import {
   isCustomCrmProvider,
   useCrmProviderOptions,
 } from "@/lib/crm-providers";
+import {
+  crmAssigneeSelectPatch,
+  crmAssigneeSelectValue,
+  resolveCrmSalesManagerDefaults,
+  withCrmSalesManagerOption,
+} from "@/lib/crm-sales-manager-defaults";
 import { resolveAssigneeLabel } from "@/lib/managers";
 import { cn, formatDate } from "@/lib/utils";
 import { isTicketOpen } from "@/lib/tickets";
@@ -852,14 +858,27 @@ function TrackerTab({
   who?: string;
 }) {
   const record = useCrmOnboardingStore((s) => s.getByCompanyId(companyId))!;
+  const account = useCrmAccountStore((s) => s.getById(companyId));
   const updateTracker = useCrmOnboardingStore((s) => s.updateTracker);
   const users = useUserStore((s) => s.users);
   const employees = useEmployeeStore((s) => s.employees);
   const t = record.tracker;
 
+  const salesManager = useMemo(
+    () => resolveCrmSalesManagerDefaults(account, users),
+    [account, users],
+  );
+
   const assignees = useMemo(
-    () => users.filter((u) => u.active && (u.productScope === "crm" || !u.productScope || u.role === "Admin")),
-    [users],
+    () =>
+      withCrmSalesManagerOption(
+        users.filter(
+          (u) => u.active && (u.productScope === "crm" || !u.productScope || u.role === "Admin"),
+        ),
+        salesManager,
+        users,
+      ),
+    [users, salesManager],
   );
 
   const currentIndex = Math.max(0, TRACKER_STAGE_KEYS.indexOf(t.stage));
@@ -954,9 +973,18 @@ function TrackerTab({
             Assigned executive
             <select
               className={cn(selectClass, "mt-1")}
-              value={t.assignedExecutiveId ?? ""}
+              value={crmAssigneeSelectValue(t.assignedExecutiveId, salesManager.userId)}
               onChange={(e) =>
-                updateTracker(companyId, { assignedExecutiveId: e.target.value || undefined }, who)
+                updateTracker(
+                  companyId,
+                  {
+                    assignedExecutiveId: crmAssigneeSelectPatch(
+                      e.target.value,
+                      salesManager.userId,
+                    ),
+                  },
+                  who,
+                )
               }
             >
               <option value="">Unassigned</option>
@@ -1011,8 +1039,15 @@ function TrackerTab({
           </label>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
-          {t.assignedExecutiveId ? (
-            <span>Assigned: {resolveAssigneeLabel(t.assignedExecutiveId, users, employees)}</span>
+          {crmAssigneeSelectValue(t.assignedExecutiveId, salesManager.userId) ? (
+            <span>
+              Assigned:{" "}
+              {resolveAssigneeLabel(
+                crmAssigneeSelectValue(t.assignedExecutiveId, salesManager.userId),
+                users,
+                employees,
+              )}
+            </span>
           ) : null}
           {t.lastUpdatedBy ? <span>Last updated by {t.lastUpdatedBy}</span> : null}
         </div>

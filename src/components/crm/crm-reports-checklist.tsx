@@ -14,8 +14,13 @@ import { ProgressBar } from "@/components/progress-bar";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { CRM_REPORT_CATEGORIES } from "@/data/crm-onboarding-defaults";
+import {
+  crmTrainerInputPatch,
+  crmTrainerInputValue,
+  resolveCrmSalesManagerDefaults,
+} from "@/lib/crm-sales-manager-defaults";
 import { cn, formatDate } from "@/lib/utils";
-import { useCrmOnboardingStore } from "@/stores";
+import { useCrmAccountStore, useCrmOnboardingStore, useUserStore } from "@/stores";
 import { nowIso } from "@/types/common";
 import type { CrmReportChecklistItem } from "@/types/crm-onboarding";
 
@@ -25,6 +30,8 @@ const areaClass = cn(ticketTextareaClass, "min-h-[64px] text-xs");
 
 export function CrmReportsChecklist({ companyId }: { companyId: string }) {
   const record = useCrmOnboardingStore((s) => s.getByCompanyId(companyId))!;
+  const account = useCrmAccountStore((s) => s.getById(companyId));
+  const users = useUserStore((s) => s.users);
   const setReportItem = useCrmOnboardingStore((s) => s.setReportItem);
   const logReportExplanation = useCrmOnboardingStore((s) => s.logReportExplanation);
   const adjustReportExplanationCount = useCrmOnboardingStore((s) => s.adjustReportExplanationCount);
@@ -33,6 +40,11 @@ export function CrmReportsChecklist({ companyId }: { companyId: string }) {
   const done = items.filter((r) => r.status === "explained").length;
   const totalSessions = items.reduce((s, r) => s + (r.explanationCount ?? 0), 0);
   const pct = items.length ? Math.round((done / items.length) * 100) : 0;
+
+  const salesManager = useMemo(
+    () => resolveCrmSalesManagerDefaults(account, users),
+    [account, users],
+  );
 
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [logging, setLogging] = useState<CrmReportChecklistItem | null>(null);
@@ -62,7 +74,7 @@ export function CrmReportsChecklist({ companyId }: { companyId: string }) {
   function openLog(item: CrmReportChecklistItem) {
     setLogging(item);
     setSessionDate(nowIso().slice(0, 10));
-    setSessionTrainer(item.trainerName ?? "");
+    setSessionTrainer(crmTrainerInputValue(item.trainerName, salesManager.name));
     setSessionNote("");
   }
 
@@ -70,7 +82,10 @@ export function CrmReportsChecklist({ companyId }: { companyId: string }) {
     if (!logging) return;
     logReportExplanation(companyId, logging.key, {
       explainedAt: sessionDate,
-      trainerName: sessionTrainer,
+      trainerName:
+        crmTrainerInputPatch(sessionTrainer, salesManager.name) ||
+        salesManager.name ||
+        sessionTrainer,
       note: sessionNote,
     });
     toast.success(`Logged explanation #${(logging.explanationCount ?? 0) + 1} · ${logging.label}`);
@@ -151,7 +166,12 @@ export function CrmReportsChecklist({ companyId }: { companyId: string }) {
                       if ((r.explanationCount ?? 0) <= 0) return;
                       adjustReportExplanationCount(companyId, r.key, -1);
                     }}
-                    onTrainer={(v) => setReportItem(companyId, r.key, { trainerName: v })}
+                    onTrainer={(v) =>
+                      setReportItem(companyId, r.key, {
+                        trainerName: crmTrainerInputPatch(v, salesManager.name),
+                      })
+                    }
+                    trainerDisplay={crmTrainerInputValue(r.trainerName, salesManager.name)}
                     onNotes={(v) => setReportItem(companyId, r.key, { notes: v })}
                   />
                 ))}
@@ -217,10 +237,15 @@ export function CrmReportsChecklist({ companyId }: { companyId: string }) {
                         <td className="px-2 py-2">
                           <input
                             className="h-7 w-28 rounded border bg-background px-1.5 text-[11px]"
-                            value={r.trainerName ?? ""}
+                            value={crmTrainerInputValue(r.trainerName, salesManager.name)}
                             placeholder="Trainer"
                             onChange={(e) =>
-                              setReportItem(companyId, r.key, { trainerName: e.target.value })
+                              setReportItem(companyId, r.key, {
+                                trainerName: crmTrainerInputPatch(
+                                  e.target.value,
+                                  salesManager.name,
+                                ),
+                              })
                             }
                           />
                         </td>
@@ -365,6 +390,7 @@ function ReportCard({
   onInc,
   onDec,
   onTrainer,
+  trainerDisplay,
   onNotes,
 }: {
   item: CrmReportChecklistItem;
@@ -373,6 +399,7 @@ function ReportCard({
   onInc: () => void;
   onDec: () => void;
   onTrainer: (v: string) => void;
+  trainerDisplay: string;
   onNotes: (v: string) => void;
 }) {
   return (
@@ -406,7 +433,7 @@ function ReportCard({
       </div>
       <input
         className={selectClass}
-        value={item.trainerName ?? ""}
+        value={trainerDisplay}
         placeholder="Trainer"
         onChange={(e) => onTrainer(e.target.value)}
       />

@@ -19,7 +19,13 @@ import {
   type ChecklistPhase,
 } from "@/lib/checklist";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
-import { useCrmOnboardingStore, useUserStore } from "@/stores";
+import {
+  crmAssigneeSelectPatch,
+  crmAssigneeSelectValue,
+  resolveCrmSalesManagerDefaults,
+  withCrmSalesManagerOption,
+} from "@/lib/crm-sales-manager-defaults";
+import { useCrmAccountStore, useCrmOnboardingStore, useUserStore } from "@/stores";
 import type { CrmMasterChecklistItem } from "@/types/crm-onboarding";
 
 const fieldClass = cn(ticketFieldClass, "h-8 text-xs");
@@ -27,6 +33,7 @@ const selectClass = cn(ticketSelectClass, "h-8 text-xs");
 
 export function CrmMasterChecklistDetail({ companyId }: { companyId: string }) {
   const record = useCrmOnboardingStore((s) => s.getByCompanyId(companyId))!;
+  const account = useCrmAccountStore((s) => s.getById(companyId));
   const users = useUserStore((s) => s.users);
   const toggleMasterPhase = useCrmOnboardingStore((s) => s.toggleMasterPhase);
   const setMasterPhaseDate = useCrmOnboardingStore((s) => s.setMasterPhaseDate);
@@ -38,9 +45,21 @@ export function CrmMasterChecklistDetail({ companyId }: { companyId: string }) {
   const pct = calcChecklistProgress(items);
   const counts = countApplicableChecklist(items);
 
+  const salesManager = useMemo(
+    () => resolveCrmSalesManagerDefaults(account, users),
+    [account, users],
+  );
+
   const assignees = useMemo(
-    () => users.filter((u) => u.active && (u.productScope === "crm" || !u.productScope || u.role === "Admin")),
-    [users],
+    () =>
+      withCrmSalesManagerOption(
+        users.filter(
+          (u) => u.active && (u.productScope === "crm" || !u.productScope || u.role === "Admin"),
+        ),
+        salesManager,
+        users,
+      ),
+    [users, salesManager],
   );
 
   const [phaseDialog, setPhaseDialog] = useState<{
@@ -193,10 +212,13 @@ export function CrmMasterChecklistDetail({ companyId }: { companyId: string }) {
                     />
                     <div className="mt-2 grid grid-cols-2 gap-2">
                       <select
-                        value={item.assigneeUserId ?? ""}
+                        value={crmAssigneeSelectValue(item.assigneeUserId, salesManager.userId)}
                         onChange={(e) =>
                           updateMasterAssignment(companyId, item.key, {
-                            assigneeUserId: e.target.value || undefined,
+                            assigneeUserId: crmAssigneeSelectPatch(
+                              e.target.value,
+                              salesManager.userId,
+                            ),
                             dueDate: item.dueDate,
                           })
                         }
@@ -329,10 +351,13 @@ export function CrmMasterChecklistDetail({ companyId }: { companyId: string }) {
                     </td>
                     <td className="px-2 py-2">
                       <select
-                        value={item.assigneeUserId ?? ""}
+                        value={crmAssigneeSelectValue(item.assigneeUserId, salesManager.userId)}
                         onChange={(e) =>
                           updateMasterAssignment(companyId, item.key, {
-                            assigneeUserId: e.target.value || undefined,
+                            assigneeUserId: crmAssigneeSelectPatch(
+                              e.target.value,
+                              salesManager.userId,
+                            ),
                             dueDate: item.dueDate,
                           })
                         }

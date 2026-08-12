@@ -18,8 +18,16 @@ import {
   CRM_TRAINING_CATEGORIES_DEVELOPER,
 } from "@/data/crm-onboarding-defaults";
 import { resolveCrmTrainingCategories } from "@/lib/crm-training-catalog";
+import {
+  crmAssigneeSelectPatch,
+  crmAssigneeSelectValue,
+  crmTrainerInputPatch,
+  crmTrainerInputValue,
+  resolveCrmSalesManagerDefaults,
+  withCrmSalesManagerOption,
+} from "@/lib/crm-sales-manager-defaults";
 import { cn, formatDate } from "@/lib/utils";
-import { useCrmOnboardingStore, useUserStore } from "@/stores";
+import { useCrmAccountStore, useCrmOnboardingStore, useUserStore } from "@/stores";
 import { newId, nowIso } from "@/types/common";
 import type { CrmTrainingSession } from "@/types/crm-onboarding";
 
@@ -29,12 +37,18 @@ const areaClass = cn(ticketTextareaClass, "min-h-[64px] text-xs");
 
 export function CrmTrainingChecklist({ companyId }: { companyId: string }) {
   const record = useCrmOnboardingStore((s) => s.getByCompanyId(companyId))!;
+  const account = useCrmAccountStore((s) => s.getById(companyId));
   const users = useUserStore((s) => s.users);
   const upsert = useCrmOnboardingStore((s) => s.upsertTrainingSession);
   const logTrainingSession = useCrmOnboardingStore((s) => s.logTrainingSession);
   const adjustTrainingSessionCount = useCrmOnboardingStore((s) => s.adjustTrainingSessionCount);
   const setTrainingNotApplicable = useCrmOnboardingStore((s) => s.setTrainingNotApplicable);
   const removeTrainingSession = useCrmOnboardingStore((s) => s.removeTrainingSession);
+
+  const salesManager = useMemo(
+    () => resolveCrmSalesManagerDefaults(account, users),
+    [account, users],
+  );
 
   const sessions = record.trainingSessions;
   const track = sessions[0]?.track ?? "developer";
@@ -71,10 +85,14 @@ export function CrmTrainingChecklist({ companyId }: { companyId: string }) {
 
   const assignees = useMemo(
     () =>
-      users.filter(
-        (u) => u.active && (u.productScope === "crm" || !u.productScope || u.role === "Admin"),
+      withCrmSalesManagerOption(
+        users.filter(
+          (u) => u.active && (u.productScope === "crm" || !u.productScope || u.role === "Admin"),
+        ),
+        salesManager,
+        users,
       ),
-    [users],
+    [users, salesManager],
   );
 
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -133,7 +151,7 @@ export function CrmTrainingChecklist({ companyId }: { companyId: string }) {
   function openLog(item: CrmTrainingSession) {
     setLogging(item);
     setSessionDate(item.trainingDate || nowIso().slice(0, 10));
-    setSessionTrainer(item.trainerName || "");
+    setSessionTrainer(crmTrainerInputValue(item.trainerName, salesManager.name));
     setSessionHours(String(item.durationHours || 1));
     setSessionAttendance(item.attendance || "");
     setSessionNote("");
@@ -144,7 +162,7 @@ export function CrmTrainingChecklist({ companyId }: { companyId: string }) {
     if (!logging) return;
     logTrainingSession(companyId, logging.id, {
       trainingDate: sessionDate,
-      trainerName: sessionTrainer,
+      trainerName: crmTrainerInputPatch(sessionTrainer, salesManager.name) || salesManager.name || sessionTrainer,
       durationHours: Number(sessionHours) || 0,
       attendance: sessionAttendance,
       note: sessionNote,
@@ -330,10 +348,16 @@ export function CrmTrainingChecklist({ companyId }: { companyId: string }) {
                             <input
                               disabled={na}
                               className="h-7 w-28 rounded border bg-background px-1.5 text-[11px] disabled:opacity-50"
-                              value={s.trainerName}
+                              value={crmTrainerInputValue(s.trainerName, salesManager.name)}
                               placeholder="Trainer"
                               onChange={(e) =>
-                                upsert(companyId, { ...s, trainerName: e.target.value })
+                                upsert(companyId, {
+                                  ...s,
+                                  trainerName: crmTrainerInputPatch(
+                                    e.target.value,
+                                    salesManager.name,
+                                  ),
+                                })
                               }
                             />
                           </td>
@@ -353,11 +377,14 @@ export function CrmTrainingChecklist({ companyId }: { companyId: string }) {
                               <select
                                 disabled={na}
                                 className="h-7 w-28 rounded border bg-background px-1.5 text-[11px] disabled:opacity-50"
-                                value={s.assigneeUserId ?? ""}
+                                value={crmAssigneeSelectValue(s.assigneeUserId, salesManager.userId)}
                                 onChange={(e) =>
                                   upsert(companyId, {
                                     ...s,
-                                    assigneeUserId: e.target.value || undefined,
+                                    assigneeUserId: crmAssigneeSelectPatch(
+                                      e.target.value,
+                                      salesManager.userId,
+                                    ),
                                   })
                                 }
                               >
@@ -488,8 +515,13 @@ export function CrmTrainingChecklist({ companyId }: { companyId: string }) {
               Trainer
               <input
                 className={cn(fieldClass, "mt-1")}
-                value={editing.trainerName}
-                onChange={(e) => setEditing({ ...editing, trainerName: e.target.value })}
+                value={crmTrainerInputValue(editing.trainerName, salesManager.name)}
+                onChange={(e) =>
+                  setEditing({
+                    ...editing,
+                    trainerName: crmTrainerInputPatch(e.target.value, salesManager.name),
+                  })
+                }
               />
             </label>
             <label className="text-[10px] text-muted-foreground">

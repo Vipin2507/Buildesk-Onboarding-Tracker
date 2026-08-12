@@ -20,8 +20,14 @@ import {
   type ChecklistPhase,
 } from "@/lib/checklist";
 import { resolveCrmMigrationCategories } from "@/lib/crm-migration-catalog";
+import {
+  crmAssigneeSelectPatch,
+  crmAssigneeSelectValue,
+  resolveCrmSalesManagerDefaults,
+  withCrmSalesManagerOption,
+} from "@/lib/crm-sales-manager-defaults";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
-import { useCrmOnboardingStore, useUserStore } from "@/stores";
+import { useCrmAccountStore, useCrmOnboardingStore, useUserStore } from "@/stores";
 import type { CrmMigrationChecklistItem } from "@/types/crm-onboarding";
 
 const fieldClass = cn(ticketFieldClass, "h-8 text-xs");
@@ -31,6 +37,7 @@ const PHASE_HINT = "Collected (source) → Uploaded → Live (validated)";
 
 export function CrmMigrationChecklistDetail({ companyId }: { companyId: string }) {
   const record = useCrmOnboardingStore((s) => s.getByCompanyId(companyId))!;
+  const account = useCrmAccountStore((s) => s.getById(companyId));
   const users = useUserStore((s) => s.users);
   const toggleMigrationPhase = useCrmOnboardingStore((s) => s.toggleMigrationPhase);
   const setMigrationPhaseDate = useCrmOnboardingStore((s) => s.setMigrationPhaseDate);
@@ -45,14 +52,23 @@ export function CrmMigrationChecklistDetail({ companyId }: { companyId: string }
   const counts = countApplicableChecklist(items);
   const totalAttempts = items.reduce((s, i) => s + (i.uploadAttempts ?? 0), 0);
 
+  const salesManager = useMemo(
+    () => resolveCrmSalesManagerDefaults(account, users),
+    [account, users],
+  );
+
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
   const assignees = useMemo(
     () =>
-      users.filter(
-        (u) => u.active && (u.productScope === "crm" || !u.productScope || u.role === "Admin"),
+      withCrmSalesManagerOption(
+        users.filter(
+          (u) => u.active && (u.productScope === "crm" || !u.productScope || u.role === "Admin"),
+        ),
+        salesManager,
+        users,
       ),
-    [users],
+    [users, salesManager],
   );
 
   const categories = useMemo(() => {
@@ -367,10 +383,13 @@ export function CrmMigrationChecklistDetail({ companyId }: { companyId: string }
                           />
                           <div className="grid grid-cols-2 gap-2">
                             <select
-                              value={item.assigneeUserId ?? ""}
+                              value={crmAssigneeSelectValue(item.assigneeUserId, salesManager.userId)}
                               onChange={(e) =>
                                 updateMigrationAssignment(companyId, item.key, {
-                                  assigneeUserId: e.target.value || undefined,
+                                  assigneeUserId: crmAssigneeSelectPatch(
+                                    e.target.value,
+                                    salesManager.userId,
+                                  ),
                                   dueDate: item.dueDate,
                                 })
                               }
@@ -560,10 +579,13 @@ export function CrmMigrationChecklistDetail({ companyId }: { companyId: string }
                           <td className="px-2 py-2">
                             <select
                               disabled={na}
-                              value={item.assigneeUserId ?? ""}
+                              value={crmAssigneeSelectValue(item.assigneeUserId, salesManager.userId)}
                               onChange={(e) =>
                                 updateMigrationAssignment(companyId, item.key, {
-                                  assigneeUserId: e.target.value || undefined,
+                                  assigneeUserId: crmAssigneeSelectPatch(
+                                    e.target.value,
+                                    salesManager.userId,
+                                  ),
                                   dueDate: item.dueDate,
                                 })
                               }

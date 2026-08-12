@@ -19,6 +19,12 @@ import {
   isCrmGoLiveItemComplete,
 } from "@/data/crm-onboarding-defaults";
 import { cn, formatDate } from "@/lib/utils";
+import {
+  crmAssigneeSelectPatch,
+  crmAssigneeSelectValue,
+  resolveCrmSalesManagerDefaults,
+  withCrmSalesManagerOption,
+} from "@/lib/crm-sales-manager-defaults";
 import { useCrmAccountStore, useCrmOnboardingStore, useUserStore } from "@/stores";
 import type { CrmGoLiveChecklistItem } from "@/types/crm-onboarding";
 
@@ -35,6 +41,7 @@ type Props = {
 export function CrmGoLiveChecklist({ companyId, accountName, isLive, who }: Props) {
   const record = useCrmOnboardingStore((s) => s.getByCompanyId(companyId))!;
   const users = useUserStore((s) => s.users);
+  const account = useCrmAccountStore((s) => s.getById(companyId));
   const markLive = useCrmAccountStore((s) => s.markLive);
   const setGoLiveItem = useCrmOnboardingStore((s) => s.setGoLiveItem);
   const setGoLiveNotApplicable = useCrmOnboardingStore((s) => s.setGoLiveNotApplicable);
@@ -51,12 +58,21 @@ export function CrmGoLiveChecklist({ companyId, accountName, isLive, who }: Prop
   const [confirmApprove, setConfirmApprove] = useState(false);
   const [confirmForce, setConfirmForce] = useState(false);
 
+  const salesManager = useMemo(
+    () => resolveCrmSalesManagerDefaults(account, users),
+    [account, users],
+  );
+
   const assignees = useMemo(
     () =>
-      users.filter(
-        (u) => u.active && (u.productScope === "crm" || !u.productScope || u.role === "Admin"),
+      withCrmSalesManagerOption(
+        users.filter(
+          (u) => u.active && (u.productScope === "crm" || !u.productScope || u.role === "Admin"),
+        ),
+        salesManager,
+        users,
       ),
-    [users],
+    [users, salesManager],
   );
 
   const grouped = useMemo(() => {
@@ -256,10 +272,13 @@ export function CrmGoLiveChecklist({ companyId, accountName, isLive, who }: Prop
                       <div className="grid grid-cols-2 gap-2">
                         <select
                           className={selectClass}
-                          value={item.assigneeUserId ?? ""}
+                          value={crmAssigneeSelectValue(item.assigneeUserId, salesManager.userId)}
                           onChange={(e) =>
                             updateGoLiveMeta(companyId, item.key, {
-                              assigneeUserId: e.target.value || undefined,
+                              assigneeUserId: crmAssigneeSelectPatch(
+                                e.target.value,
+                                salesManager.userId,
+                              ),
                             })
                           }
                         >
@@ -343,10 +362,13 @@ export function CrmGoLiveChecklist({ companyId, accountName, isLive, who }: Prop
                           <td className="px-2 py-2">
                             <select
                               className="h-7 w-28 rounded border bg-background px-1.5 text-[11px]"
-                              value={item.assigneeUserId ?? ""}
+                              value={crmAssigneeSelectValue(item.assigneeUserId, salesManager.userId)}
                               onChange={(e) =>
                                 updateGoLiveMeta(companyId, item.key, {
-                                  assigneeUserId: e.target.value || undefined,
+                                  assigneeUserId: crmAssigneeSelectPatch(
+                                    e.target.value,
+                                    salesManager.userId,
+                                  ),
                                 })
                               }
                             >
