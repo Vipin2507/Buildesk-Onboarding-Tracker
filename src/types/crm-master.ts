@@ -77,3 +77,10 @@ export type CrmMigrationFieldDef = {
   label: string;
   category: string;
 };
+
+/** Editable CRM Training catalog item (Master → Training). */
+export type CrmTrainingFieldDef = {
+  key: string;
+  label: string;
+  category: string;
+};

@@ -18,8 +18,6 @@ import type {
 import type { ChecklistPhase } from "@/types/onboarding";
 import {
   createCrmOnboardingRecord,
-  CRM_DEVELOPER_TRAINING,
-  CRM_BROKER_CP_TRAINING,
   CRM_GO_LIVE_CHECKLIST_LABELS,
   CRM_REPORT_CHECKLIST_LABELS,
   defaultModuleWorkflow,
@@ -33,6 +31,7 @@ import {
   normalizeCrmMasterChecklist,
 } from "@/data/crm-onboarding-defaults";
 import { resolveCrmMigrationCatalog } from "@/lib/crm-migration-catalog";
+import { resolveCrmTrainingCatalogForCompany } from "@/lib/crm-training-catalog";
 import type {
   CrmAccountProject,
   CrmMasterDictItem,
@@ -248,11 +247,15 @@ function needsDataMigrationChecklistUpgrade(items: CrmMigrationChecklistItem[]) 
 }
 
 function needsTrainingUpgrade(items: CrmTrainingSession[], companyType?: CompanyType) {
+  const catalog = resolveCrmTrainingCatalogForCompany(companyType);
   if (items.some((i) => typeof i.sessionCount !== "number")) return true;
-  const track = isDeveloperCompanyType(companyType) ? "developer" : "broker_cp";
-  const templates = track === "developer" ? CRM_DEVELOPER_TRAINING : CRM_BROKER_CP_TRAINING;
-  const keys = new Set(items.map((i) => i.templateKey));
-  return templates.some((t) => !keys.has(t.key));
+  const byKey = new Map(items.map((i) => [i.templateKey, i]));
+  for (const def of catalog) {
+    const prev = byKey.get(def.key);
+    if (!prev) return true;
+    if (prev.label !== def.label || (prev.category ?? "") !== def.category) return true;
+  }
+  return false;
 }
 
 function needsReportMigration(items: CrmReportChecklistItem[]) {
@@ -352,12 +355,15 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
       }
       const afterMig = get().getByCompanyId(companyId)!;
       if (needsTrainingUpgrade(afterMig.trainingSessions, companyType ?? afterMig.companyTypeHint)) {
+        const typeHint = companyType ?? afterMig.companyTypeHint;
+        const catalog = resolveCrmTrainingCatalogForCompany(typeHint);
         set((s) => ({
           records: updateRecord(s.records, companyId, (r) => ({
             ...r,
             trainingSessions: mergeCrmTrainingSessions(
               r.trainingSessions,
               companyType ?? r.companyTypeHint,
+              catalog,
             ),
           })),
         }));
@@ -415,6 +421,7 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
       companyId,
       companyType,
       resolveCrmMigrationCatalog(),
+      resolveCrmTrainingCatalogForCompany(companyType),
     );
     set((s) => ({ records: [created, ...s.records] }));
     return created;
@@ -960,7 +967,10 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
       records: updateRecord(s.records, companyId, (r) => ({
         ...r,
         companyTypeHint: companyType,
-        trainingSessions: defaultTrainingSessions(companyType),
+        trainingSessions: defaultTrainingSessions(
+          companyType,
+          resolveCrmTrainingCatalogForCompany(companyType),
+        ),
       })),
     }));
   },

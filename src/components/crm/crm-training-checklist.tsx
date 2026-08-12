@@ -17,6 +17,7 @@ import {
   CRM_TRAINING_CATEGORIES_BROKER,
   CRM_TRAINING_CATEGORIES_DEVELOPER,
 } from "@/data/crm-onboarding-defaults";
+import { resolveCrmTrainingCategories } from "@/lib/crm-training-catalog";
 import { cn, formatDate } from "@/lib/utils";
 import { useCrmOnboardingStore, useUserStore } from "@/stores";
 import { newId, nowIso } from "@/types/common";
@@ -37,8 +38,31 @@ export function CrmTrainingChecklist({ companyId }: { companyId: string }) {
 
   const sessions = record.trainingSessions;
   const track = sessions[0]?.track ?? "developer";
-  const categories =
-    track === "broker_cp" ? CRM_TRAINING_CATEGORIES_BROKER : CRM_TRAINING_CATEGORIES_DEVELOPER;
+  const categories = useMemo(() => {
+    const preferred = resolveCrmTrainingCategories(track);
+    const fromItems = [...new Set(sessions.map((s) => s.category ?? "Custom"))];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const cat of preferred) {
+      if ((cat === "Custom" || fromItems.includes(cat)) && !seen.has(cat)) {
+        out.push(cat);
+        seen.add(cat);
+      }
+    }
+    for (const cat of fromItems) {
+      if (!seen.has(cat)) {
+        out.push(cat);
+        seen.add(cat);
+      }
+    }
+    return out.length
+      ? out
+      : [
+          ...(track === "broker_cp"
+            ? CRM_TRAINING_CATEGORIES_BROKER
+            : CRM_TRAINING_CATEGORIES_DEVELOPER),
+        ];
+  }, [sessions, track]);
 
   const applicable = sessions.filter((s) => !s.notApplicable);
   const done = applicable.filter((s) => s.completed || (s.sessionCount ?? 0) > 0).length;
@@ -76,10 +100,10 @@ export function CrmTrainingChecklist({ companyId }: { companyId: string }) {
       list.push(item);
       map.set(cat, list);
     }
-    const order = [...categories];
+    const order = categories;
     const known = order.filter((c) => map.has(c)).map((c) => ({ category: c, items: map.get(c)! }));
     const extras = [...map.keys()]
-      .filter((c) => !order.includes(c as (typeof order)[number]))
+      .filter((c) => !order.includes(c))
       .map((c) => ({ category: c, items: map.get(c)! }));
     return [...known, ...extras];
   }, [sessions, categoryFilter, categories]);

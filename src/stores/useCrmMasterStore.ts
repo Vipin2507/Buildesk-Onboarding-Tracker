@@ -4,6 +4,7 @@ import type {
   CrmMasterPicklist,
   CrmMasterPlatformSettings,
   CrmMigrationFieldDef,
+  CrmTrainingFieldDef,
 } from "@/types/crm-master";
 import { newId, nowIso } from "@/types/common";
 import {
@@ -16,6 +17,8 @@ import {
 import {
   seedCrmMigrationFields,
   seedCrmModuleProviders,
+  seedCrmTrainingFields,
+  type CrmTrainingTrack,
 } from "@/data/crm-onboarding-defaults";
 import { createPersistedStore, touch } from "./persist";
 
@@ -29,6 +32,10 @@ type CrmMasterState = {
   moduleProviders: Record<string, string[]>;
   /** Migration checklist fields shown on CRM accounts (editable in Master). */
   migrationFields: CrmMigrationFieldDef[];
+  /** Training catalog for developer accounts (editable in Master). */
+  trainingFieldsDeveloper: CrmTrainingFieldDef[];
+  /** Training catalog for broker / CP accounts (editable in Master). */
+  trainingFieldsBroker: CrmTrainingFieldDef[];
 
   updatePlatform: (data: Partial<CrmMasterPlatformSettings>) => void;
 
@@ -47,6 +54,7 @@ type CrmMasterState = {
   updateModule: (id: string, data: Partial<CrmMasterModuleDef>) => void;
   setModuleProviders: (moduleKey: string, providers: string[]) => void;
   setMigrationFields: (fields: CrmMigrationFieldDef[]) => void;
+  setTrainingFields: (track: CrmTrainingTrack, fields: CrmTrainingFieldDef[]) => void;
 
   resetAll: () => void;
 };
@@ -60,6 +68,8 @@ function seedState() {
     modules: CRM_SEED_MODULES.map((m) => ({ ...m })),
     moduleProviders: seedCrmModuleProviders(),
     migrationFields: seedCrmMigrationFields(),
+    trainingFieldsDeveloper: seedCrmTrainingFields("developer"),
+    trainingFieldsBroker: seedCrmTrainingFields("broker_cp"),
   };
 }
 
@@ -101,6 +111,24 @@ function normalizeCrmMigrationFields(
         .replace(/^_|_$/g, ""),
       label: String(f.label ?? "").trim(),
       category: String(f.category ?? "").trim() || "CRM data",
+    }))
+    .filter((f) => f.key && f.label);
+}
+
+function normalizeCrmTrainingFields(
+  track: CrmTrainingTrack,
+  existing: CrmTrainingFieldDef[] | undefined,
+): CrmTrainingFieldDef[] {
+  if (!Array.isArray(existing)) return seedCrmTrainingFields(track);
+  return existing
+    .map((f) => ({
+      key: String(f.key ?? "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_|_$/g, ""),
+      label: String(f.label ?? "").trim(),
+      category: String(f.category ?? "").trim() || "Custom",
     }))
     .filter((f) => f.key && f.label);
 }
@@ -175,6 +203,15 @@ export const useCrmMasterStore = createPersistedStore<CrmMasterState>(
       set({ migrationFields: normalizeCrmMigrationFields(fields) });
     },
 
+    setTrainingFields: (track, fields) => {
+      const normalized = normalizeCrmTrainingFields(track, fields);
+      if (track === "broker_cp") {
+        set({ trainingFieldsBroker: normalized });
+      } else {
+        set({ trainingFieldsDeveloper: normalized });
+      }
+    },
+
     resetAll: () => {
       set(seedState());
     },
@@ -193,4 +230,13 @@ export function getCrmMasterModuleProviders(): Record<string, string[]> {
 /** Safe read for older persisted snapshots missing migrationFields. */
 export function getCrmMasterMigrationFields(): CrmMigrationFieldDef[] {
   return normalizeCrmMigrationFields(useCrmMasterStore.getState().migrationFields);
+}
+
+/** Safe read for older persisted snapshots missing training field catalogs. */
+export function getCrmMasterTrainingFields(track: CrmTrainingTrack): CrmTrainingFieldDef[] {
+  const state = useCrmMasterStore.getState();
+  return normalizeCrmTrainingFields(
+    track,
+    track === "broker_cp" ? state.trainingFieldsBroker : state.trainingFieldsDeveloper,
+  );
 }

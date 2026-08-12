@@ -14,6 +14,7 @@ import {
 } from "@/lib/checklist";
 import { filterCrmAccountsForUser } from "@/lib/crm-account-access";
 import { resolveCrmMigrationCatalog } from "@/lib/crm-migration-catalog";
+import { resolveCrmTrainingCatalogForCompany } from "@/lib/crm-training-catalog";
 import { isTicketOpen } from "@/lib/tickets";
 import {
   useAuthStore,
@@ -82,6 +83,7 @@ function recordFor(account: CrmAccount, records: CrmOnboardingRecord[]): CrmOnbo
     account.id,
     account.companyType,
     resolveCrmMigrationCatalog(),
+    resolveCrmTrainingCatalogForCompany(account.companyType),
   );
 }
 

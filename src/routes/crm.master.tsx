@@ -5,6 +5,7 @@ import {
   Building2,
   Boxes,
   Database,
+  GraduationCap,
   ListChecks,
   Pencil,
   Plus,
@@ -29,9 +30,17 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { CRM_MODULE_PROVIDERS, CRM_PRODUCT_MODULES } from "@/data/crm-onboarding-defaults";
-import { getCrmMasterMigrationFields } from "@/stores/useCrmMasterStore";
+import {
+  getCrmMasterMigrationFields,
+  getCrmMasterTrainingFields,
+} from "@/stores/useCrmMasterStore";
 import { useAuthStore, useCrmMasterStore } from "@/stores";
-import type { CrmMasterFieldDef, CrmMasterPicklist, CrmMigrationFieldDef } from "@/types/crm-master";
+import type {
+  CrmMasterFieldDef,
+  CrmMasterPicklist,
+  CrmMigrationFieldDef,
+  CrmTrainingFieldDef,
+} from "@/types/crm-master";
 import type { FieldValueType } from "@/types/master";
 import type { CrmProductModuleKey } from "@/types/crm-onboarding";
 
@@ -47,6 +56,7 @@ const SECTIONS = [
   { id: "modules", label: "Modules", icon: Layers },
   { id: "providers", label: "Providers", icon: Database },
   { id: "migration", label: "Migration", icon: Upload },
+  { id: "training", label: "Training", icon: GraduationCap },
   { id: "data-control", label: "Data Control", icon: Table2 },
   { id: "danger", label: "Reset & Safety", icon: ShieldAlert },
 ] as const;
@@ -138,6 +148,7 @@ function CrmMasterPage() {
             {section === "modules" ? <ModulesPanel /> : null}
             {section === "providers" ? <ProvidersPanel /> : null}
             {section === "migration" ? <MigrationPanel /> : null}
+            {section === "training" ? <TrainingPanel /> : null}
             {section === "data-control" ? <CrmMasterDataControl /> : null}
             {section === "danger" ? <DangerPanel /> : null}
           </motion.div>
@@ -154,6 +165,8 @@ function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) 
   const picklists = useCrmMasterStore((s) => s.picklists);
   const modules = useCrmMasterStore((s) => s.modules);
   const migrationFields = useCrmMasterStore((s) => s.migrationFields);
+  const trainingFieldsDeveloper = useCrmMasterStore((s) => s.trainingFieldsDeveloper);
+  const trainingFieldsBroker = useCrmMasterStore((s) => s.trainingFieldsBroker);
 
   const cards = [
     {
@@ -183,9 +196,17 @@ function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) 
     },
     {
       label: "Migration",
-      value: (migrationFields?.length ?? getCrmMasterMigrationFields().length),
+      value: migrationFields?.length ?? getCrmMasterMigrationFields().length,
       total: "checklist fields",
       to: "migration" as const,
+    },
+    {
+      label: "Training",
+      value:
+        (trainingFieldsDeveloper?.length ?? getCrmMasterTrainingFields("developer").length) +
+        (trainingFieldsBroker?.length ?? getCrmMasterTrainingFields("broker_cp").length),
+      total: "catalog items",
+      to: "training" as const,
     },
     {
       label: "Data Control",
@@ -935,6 +956,199 @@ function MigrationPanel() {
   );
 }
 
+function TrainingPanel() {
+  const trainingFieldsDeveloper = useCrmMasterStore((s) => s.trainingFieldsDeveloper);
+  const trainingFieldsBroker = useCrmMasterStore((s) => s.trainingFieldsBroker);
+  const setTrainingFields = useCrmMasterStore((s) => s.setTrainingFields);
+  const [track, setTrack] = useState<"developer" | "broker_cp">("developer");
+  const [draftLabel, setDraftLabel] = useState("");
+  const [draftCategory, setDraftCategory] = useState("Admin");
+
+  const fields = useMemo(() => {
+    if (track === "broker_cp") {
+      return Array.isArray(trainingFieldsBroker)
+        ? trainingFieldsBroker
+        : getCrmMasterTrainingFields("broker_cp");
+    }
+    return Array.isArray(trainingFieldsDeveloper)
+      ? trainingFieldsDeveloper
+      : getCrmMasterTrainingFields("developer");
+  }, [track, trainingFieldsDeveloper, trainingFieldsBroker]);
+
+  function slugify(label: string) {
+    return label
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_|_$/g, "");
+  }
+
+  function updateField(index: number, patch: Partial<CrmTrainingFieldDef>) {
+    const next = fields.map((f, i) => (i === index ? { ...f, ...patch } : f));
+    setTrainingFields(track, next);
+  }
+
+  function removeField(index: number) {
+    setTrainingFields(
+      track,
+      fields.filter((_, i) => i !== index),
+    );
+    toast.success("Training field removed");
+  }
+
+  function addField() {
+    const label = draftLabel.trim();
+    if (!label) {
+      toast.error("Enter a training label");
+      return;
+    }
+    const key = slugify(label);
+    if (!key) {
+      toast.error("Label must include letters or numbers");
+      return;
+    }
+    if (fields.some((f) => f.key === key)) {
+      toast.error("A training item with this key already exists");
+      return;
+    }
+    setTrainingFields(track, [
+      ...fields,
+      { key, label, category: draftCategory.trim() || "Custom" },
+    ]);
+    setDraftLabel("");
+    toast.success(`Added ${label}`);
+  }
+
+  const categories = useMemo(() => {
+    const preferred =
+      track === "broker_cp"
+        ? ["Admin", "Sales process", "Operations", "Product", "Custom"]
+        : ["Admin", "Sales roles", "Front office", "Product modules", "Integrations", "Custom"];
+    const seen = new Set(preferred);
+    const extra = fields.map((f) => f.category).filter((c) => c && !seen.has(c));
+    return [...preferred, ...Array.from(new Set(extra))];
+  }, [fields, track]);
+
+  return (
+    <div className="space-y-2.5">
+      <div>
+        <h3 className="text-sm font-semibold">Training catalog</h3>
+        <p className="text-[10px] text-muted-foreground">
+          Controls which sessions appear on account Training. Includes Admin Training by default.
+          Changes sync when an account onboarding record is opened.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        {(
+          [
+            { id: "developer" as const, label: "Developer" },
+            { id: "broker_cp" as const, label: "Broker / CP" },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => {
+              setTrack(t.id);
+              setDraftCategory("Admin");
+            }}
+            className={cn(
+              "rounded-md border px-2.5 py-1 text-[10px] font-medium transition-colors",
+              track === t.id
+                ? "border-primary bg-primary text-primary-foreground"
+                : "hover:bg-muted",
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="card-soft space-y-2 p-2.5">
+        <div className="grid gap-1.5 sm:grid-cols-[1fr_1fr_auto]">
+          <input
+            className="h-7 rounded-md border bg-background px-2 text-xs"
+            placeholder="New training label"
+            value={draftLabel}
+            onChange={(e) => setDraftLabel(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addField();
+              }
+            }}
+          />
+          <input
+            className="h-7 rounded-md border bg-background px-2 text-xs"
+            list={`crm-training-categories-${track}`}
+            placeholder="Category"
+            value={draftCategory}
+            onChange={(e) => setDraftCategory(e.target.value)}
+          />
+          <datalist id={`crm-training-categories-${track}`}>
+            {categories.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-7 gap-1 text-xs"
+            onClick={addField}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add
+          </Button>
+        </div>
+
+        <div className="space-y-1">
+          {fields.map((field, index) => (
+            <div
+              key={field.key}
+              className="flex flex-col gap-1.5 rounded-md border bg-background/60 p-2 sm:flex-row sm:items-center"
+            >
+              <input
+                className="h-7 flex-1 rounded-md border bg-background px-2 text-xs"
+                value={field.label}
+                onChange={(e) => updateField(index, { label: e.target.value })}
+                onBlur={(e) => {
+                  if (!e.target.value.trim()) removeField(index);
+                }}
+              />
+              <input
+                className="h-7 w-full rounded-md border bg-background px-2 text-xs sm:w-44"
+                list={`crm-training-categories-${track}`}
+                value={field.category}
+                onChange={(e) => updateField(index, { category: e.target.value })}
+              />
+              <span className="truncate text-[10px] text-muted-foreground sm:w-28" title={field.key}>
+                {field.key}
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 shrink-0 p-0 text-muted-foreground hover:text-destructive"
+                onClick={() => removeField(index)}
+                aria-label={`Remove ${field.label}`}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ))}
+          {fields.length === 0 ? (
+            <p className="py-3 text-center text-[10px] text-muted-foreground">
+              No training items. Add at least one, or reset Master to restore defaults.
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DangerPanel() {
   const resetAll = useCrmMasterStore((s) => s.resetAll);
   const [open, setOpen] = useState(false);
@@ -944,8 +1158,8 @@ function DangerPanel() {
       <div className="card-soft border-destructive/30 p-3">
         <h3 className="text-sm font-semibold text-destructive">Reset CRM Master Config</h3>
         <p className="mt-1 text-[10px] text-muted-foreground">
-          Restores seeded account fields, project fields, picklists, modules, providers, and
-          migration checklist fields. Does not delete CRM accounts or onboarding checklists.
+          Restores seeded account fields, project fields, picklists, modules, providers, migration,
+          and training catalogs. Does not delete CRM accounts or onboarding checklists.
         </p>
         <Button
           size="sm"
@@ -961,7 +1175,7 @@ function DangerPanel() {
         open={open}
         onOpenChange={setOpen}
         title="Reset CRM Master Config?"
-        description="All field catalogs, picklists, modules, providers, and migration fields will revert to seed defaults."
+        description="All field catalogs, picklists, modules, providers, migration, and training fields will revert to seed defaults."
         confirmLabel="Reset"
         onConfirm={() => {
           resetAll();

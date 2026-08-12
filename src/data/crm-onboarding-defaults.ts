@@ -271,6 +271,7 @@ export const CRM_GO_LIVE_CATEGORIES = [
   "Handover",
 ] as const;
 export const CRM_DEVELOPER_TRAINING: { key: string; label: string; category: string }[] = [
+  { key: "admin", label: "Admin Training", category: "Admin" },
   { key: "sourcing_manager", label: "Sourcing Manager Training", category: "Sales roles" },
   { key: "sales_executive", label: "Sales Executive Training", category: "Sales roles" },
   { key: "sales_manager", label: "Sales Manager Training", category: "Sales roles" },
@@ -286,6 +287,7 @@ export const CRM_DEVELOPER_TRAINING: { key: string; label: string; category: str
 ];
 
 export const CRM_BROKER_CP_TRAINING: { key: string; label: string; category: string }[] = [
+  { key: "admin", label: "Admin Training", category: "Admin" },
   { key: "sales_agent", label: "Sales Agent Training", category: "Sales process" },
   { key: "followup_process", label: "Follow-up Process", category: "Sales process" },
   { key: "lead_management", label: "Lead Management", category: "Sales process" },
@@ -298,6 +300,7 @@ export const CRM_BROKER_CP_TRAINING: { key: string; label: string; category: str
 ];
 
 export const CRM_TRAINING_CATEGORIES_DEVELOPER = [
+  "Admin",
   "Sales roles",
   "Front office",
   "Product modules",
@@ -306,11 +309,19 @@ export const CRM_TRAINING_CATEGORIES_DEVELOPER = [
 ] as const;
 
 export const CRM_TRAINING_CATEGORIES_BROKER = [
+  "Admin",
   "Sales process",
   "Operations",
   "Product",
   "Custom",
 ] as const;
+
+export type CrmTrainingTrack = "developer" | "broker_cp";
+
+export function seedCrmTrainingFields(track: CrmTrainingTrack = "developer") {
+  const templates = track === "broker_cp" ? CRM_BROKER_CP_TRAINING : CRM_DEVELOPER_TRAINING;
+  return templates.map((f) => ({ ...f }));
+}
 export const CRM_COMM_ACTIONS: { key: CrmCommActionKey; label: string }[] = [
   { key: "welcome", label: "Send Welcome Message" },
   { key: "login_credentials", label: "Send Login Credentials" },
@@ -587,10 +598,14 @@ export function isDeveloperCompanyType(type?: CompanyType): boolean {
   return type === "Real Estate Developer" || type === "Mandate" || type === "CT" || !type;
 }
 
-export function defaultTrainingSessions(companyType?: CompanyType): CrmTrainingSession[] {
+export function defaultTrainingSessions(
+  companyType?: CompanyType,
+  catalog?: { key: string; label: string; category: string }[],
+): CrmTrainingSession[] {
   const now = nowIso();
   const track = isDeveloperCompanyType(companyType) ? "developer" : "broker_cp";
-  const templates = track === "developer" ? CRM_DEVELOPER_TRAINING : CRM_BROKER_CP_TRAINING;
+  const templates =
+    catalog ?? (track === "developer" ? CRM_DEVELOPER_TRAINING : CRM_BROKER_CP_TRAINING);
   return templates.map((t) => ({
     id: newId(),
     templateKey: t.key,
@@ -615,10 +630,12 @@ export function defaultTrainingSessions(companyType?: CompanyType): CrmTrainingS
 export function mergeCrmTrainingSessions(
   existing: Array<Partial<CrmTrainingSession> & { id: string; templateKey: string; label: string }>,
   companyType?: CompanyType,
+  catalog?: { key: string; label: string; category: string }[],
 ): CrmTrainingSession[] {
   const now = nowIso();
   const track = isDeveloperCompanyType(companyType) ? "developer" : "broker_cp";
-  const templates = track === "developer" ? CRM_DEVELOPER_TRAINING : CRM_BROKER_CP_TRAINING;
+  const templates =
+    catalog ?? (track === "developer" ? CRM_DEVELOPER_TRAINING : CRM_BROKER_CP_TRAINING);
   const byTemplate = new Map(existing.map((s) => [s.templateKey, s]));
   const custom = existing.filter(
     (s) =>
@@ -626,7 +643,7 @@ export function mergeCrmTrainingSessions(
       !templates.some((t) => t.key === s.templateKey),
   );
 
-  const catalog = templates.map((t) => {
+  const merged = templates.map((t) => {
     const prev = byTemplate.get(t.key);
     if (!prev) {
       return {
@@ -707,13 +724,14 @@ export function mergeCrmTrainingSessions(
     } satisfies CrmTrainingSession;
   });
 
-  return [...catalog, ...customNormalized];
+  return [...merged, ...customNormalized];
 }
 
 export function createCrmOnboardingRecord(
   companyId: string,
   companyType?: CompanyType,
   migrationCatalog: typeof CRM_MIGRATION_CHECKLIST_LABELS = CRM_MIGRATION_CHECKLIST_LABELS,
+  trainingCatalog?: { key: string; label: string; category: string }[],
 ): CrmOnboardingRecord {
   const now = nowIso();
   return {
@@ -724,7 +742,7 @@ export function createCrmOnboardingRecord(
     masterChecklist: defaultMasterChecklist(),
     ...defaultMasterData(),
     migrationChecklist: defaultMigrationChecklist(migrationCatalog),
-    trainingSessions: defaultTrainingSessions(companyType),
+    trainingSessions: defaultTrainingSessions(companyType, trainingCatalog),
     reportChecklist: defaultReportChecklist(),
     goLiveChecklist: defaultGoLiveChecklist(),
     tracker: {
