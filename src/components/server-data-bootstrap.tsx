@@ -333,6 +333,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
                 waha: localAutomation.waha,
                 healthCheck: localAutomation.healthCheck,
                 rules: localAutomation.rules,
+                logs: localAutomation.logs.slice(0, 500),
               },
             },
           }).catch(() => {});
@@ -351,6 +352,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
                 waha: localCrmAutomation.waha,
                 healthCheck: localCrmAutomation.healthCheck,
                 rules: localCrmAutomation.rules,
+                logs: localCrmAutomation.logs.slice(0, 500),
               },
             },
           }).catch(() => {});

@@ -59,6 +59,7 @@ type CrmAutomationSnapshot = {
   waha?: WahaConfig;
   healthCheck?: AutomationHealthConfig;
   rules?: AutomationRule[];
+  logs?: AutomationLog[];
 };
 
 export const useCrmAutomationStore = createPersistedStore<AutomationState>(
@@ -250,6 +251,7 @@ export function hydrateCrmAutomationFromServer(snapshot: CrmAutomationSnapshot |
   if (snapshot.waha) patch.waha = snapshot.waha;
   if (snapshot.healthCheck) patch.healthCheck = snapshot.healthCheck;
   if (Array.isArray(snapshot.rules)) patch.rules = snapshot.rules;
+  if (Array.isArray(snapshot.logs)) patch.logs = snapshot.logs.slice(0, 500);
   if (Object.keys(patch).length === 0) return;
   useCrmAutomationStore.setState((s) => ({
     ...s,

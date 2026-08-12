@@ -43,6 +43,7 @@ function automationSnapshot() {
     waha: s.waha,
     healthCheck: s.healthCheck,
     rules: s.rules,
+    logs: s.logs.slice(0, 500),
   };
 }
 
@@ -54,6 +55,7 @@ function crmAutomationSnapshot() {
     waha: s.waha,
     healthCheck: s.healthCheck,
     rules: s.rules,
+    logs: s.logs.slice(0, 500),
   };
 }
 
