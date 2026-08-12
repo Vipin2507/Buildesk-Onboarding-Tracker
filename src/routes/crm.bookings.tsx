@@ -8,7 +8,6 @@ import {
   History,
   Inbox,
   LayoutList,
-  Trash2,
   X,
   XCircle,
 } from "lucide-react";
@@ -24,6 +23,8 @@ import {
   TICKET_EASE,
 } from "@/components/design-ticket/design-ticket-shared";
 import { EmptyState } from "@/components/empty-state";
+import { WeeklyHoursEditor } from "@/components/crm/weekly-hours-editor";
+import { BookingBlocksPanel } from "@/components/crm/booking-blocks-panel";
 import { ListToolbar } from "@/components/list-toolbar";
 import { PageWrap } from "@/components/page-header";
 import { Pill } from "@/components/status-pill";
@@ -141,6 +142,8 @@ function CrmBookingsPage() {
   const [blockStart, setBlockStart] = useState("");
   const [blockEnd, setBlockEnd] = useState("");
   const [blockReason, setBlockReason] = useState("");
+  const [savingHours, setSavingHours] = useState(false);
+  const [addingBlock, setAddingBlock] = useState(false);
 
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -701,187 +704,89 @@ function CrmBookingsPage() {
           )}
 
           {tab === "availability" && (
-            <div className="card-soft space-y-3 p-3">
-              <div className="flex flex-wrap items-end gap-2">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-medium text-muted-foreground">Timezone</label>
-                  <Input
-                    className="h-8 w-[200px] text-xs"
-                    value={timezone}
-                    onChange={(e) => setTimezone(e.target.value)}
-                  />
-                </div>
-                <Button
-                  size="sm"
-                  className="h-8 text-xs"
-                  onClick={() => {
-                    void saveAvailabilityWindows({
-                      timezone,
-                      windows: draftWindows
-                        .filter((w) => w.enabled)
-                        .map((w) => ({
-                          weekday: w.weekday,
-                          startTime: w.startTime,
-                          endTime: w.endTime,
-                          isActive: true,
-                        })),
-                    })
-                      .then(() => toast.success("Availability saved"))
-                      .catch((err) =>
-                        toast.error(err instanceof Error ? err.message : "Failed to save"),
-                      );
-                  }}
-                >
-                  Save weekly hours
-                </Button>
-              </div>
-              <div className="space-y-1.5">
-                {WEEKDAYS.map((day) => {
-                  const draft = draftWindows.find((w) => w.weekday === day.id);
-                  if (!draft) return null;
-                  return (
-                    <div
-                      key={day.id}
-                      className="flex flex-wrap items-center gap-2 rounded-md border px-2 py-1.5"
-                    >
-                      <label className="flex w-14 items-center gap-1.5 text-xs font-medium">
-                        <input
-                          type="checkbox"
-                          checked={draft.enabled}
-                          onChange={(e) =>
-                            setDraftWindows((prev) =>
-                              prev.map((w) =>
-                                w.weekday === day.id ? { ...w, enabled: e.target.checked } : w,
-                              ),
-                            )
-                          }
-                        />
-                        {day.label}
-                      </label>
-                      <Input
-                        type="time"
-                        className={cn("h-8 w-[110px] text-xs", !draft.enabled && "opacity-40")}
-                        disabled={!draft.enabled}
-                        value={draft.startTime}
-                        onChange={(e) =>
-                          setDraftWindows((prev) =>
-                            prev.map((w) =>
-                              w.weekday === day.id ? { ...w, startTime: e.target.value } : w,
-                            ),
-                          )
-                        }
-                      />
-                      <span className="text-[10px] text-muted-foreground">to</span>
-                      <Input
-                        type="time"
-                        className={cn("h-8 w-[110px] text-xs", !draft.enabled && "opacity-40")}
-                        disabled={!draft.enabled}
-                        value={draft.endTime}
-                        onChange={(e) =>
-                          setDraftWindows((prev) =>
-                            prev.map((w) =>
-                              w.weekday === day.id ? { ...w, endTime: e.target.value } : w,
-                            ),
-                          )
-                        }
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <WeeklyHoursEditor
+              timezone={timezone}
+              onTimezoneChange={setTimezone}
+              rows={WEEKDAYS.map((day) => {
+                const draft = draftWindows.find((w) => w.weekday === day.id);
+                return {
+                  weekday: day.id,
+                  label: day.label,
+                  startTime: draft?.startTime ?? "10:00",
+                  endTime: draft?.endTime ?? "17:00",
+                  enabled: draft?.enabled ?? false,
+                };
+              })}
+              onRowChange={(weekday, patch) => {
+                setDraftWindows((prev) =>
+                  prev.map((w) => (w.weekday === weekday ? { ...w, ...patch } : w)),
+                );
+              }}
+              saving={savingHours}
+              onSave={() => {
+                setSavingHours(true);
+                void saveAvailabilityWindows({
+                  timezone,
+                  windows: draftWindows
+                    .filter((w) => w.enabled)
+                    .map((w) => ({
+                      weekday: w.weekday,
+                      startTime: w.startTime,
+                      endTime: w.endTime,
+                      isActive: true,
+                    })),
+                })
+                  .then(() => toast.success("Availability saved"))
+                  .catch((err) =>
+                    toast.error(err instanceof Error ? err.message : "Failed to save"),
+                  )
+                  .finally(() => setSavingHours(false));
+              }}
+            />
           )}
 
           {tab === "blocked" && (
-            <div className="space-y-3">
-              <div className="card-soft space-y-2 p-3">
-                <div className="text-xs font-semibold">Add block</div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-muted-foreground">Starts</label>
-                    <Input
-                      type="datetime-local"
-                      className="h-8 text-xs"
-                      value={blockStart}
-                      onChange={(e) => setBlockStart(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-muted-foreground">Ends</label>
-                    <Input
-                      type="datetime-local"
-                      className="h-8 text-xs"
-                      value={blockEnd}
-                      onChange={(e) => setBlockEnd(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <Input
-                  placeholder="Reason (vacation, focus…)"
-                  className="h-8 text-xs"
-                  value={blockReason}
-                  onChange={(e) => setBlockReason(e.target.value)}
-                />
-                <Button
-                  size="sm"
-                  className="h-8 text-xs"
-                  onClick={() => {
-                    if (!blockStart || !blockEnd) {
-                      toast.error("Start and end are required");
-                      return;
-                    }
-                    const startsAt = blockStart.length === 16 ? `${blockStart}:00` : blockStart;
-                    const endsAt = blockEnd.length === 16 ? `${blockEnd}:00` : blockEnd;
-                    void addBlock({ startsAt, endsAt, reason: blockReason || undefined })
-                      .then(() => {
-                        toast.success("Block added");
-                        setBlockStart("");
-                        setBlockEnd("");
-                        setBlockReason("");
-                      })
-                      .catch((err) =>
-                        toast.error(err instanceof Error ? err.message : "Failed"),
-                      );
-                  }}
-                >
-                  Add block
-                </Button>
-              </div>
-
-              {myBlocks.length === 0 ? (
-                <EmptyState title="No blocks" description="Blocked dates won't offer open slots." />
-              ) : (
-                myBlocks.map((block) => (
-                  <div
-                    key={block.id}
-                    className="card-soft flex items-center justify-between gap-2 p-3"
-                  >
-                    <div>
-                      <div className="text-xs font-medium">
-                        {formatWhen(block.startsAt, block.endsAt)}
-                      </div>
-                      {block.reason ? (
-                        <div className="text-[10px] text-muted-foreground">{block.reason}</div>
-                      ) : null}
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0"
-                      onClick={() => {
-                        void removeBlock(block.id)
-                          .then(() => toast.success("Block removed"))
-                          .catch((err) =>
-                            toast.error(err instanceof Error ? err.message : "Failed"),
-                          );
-                      }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                ))
-              )}
-            </div>
+            <BookingBlocksPanel
+              blocks={myBlocks}
+              blockStart={blockStart}
+              blockEnd={blockEnd}
+              blockReason={blockReason}
+              onBlockStartChange={setBlockStart}
+              onBlockEndChange={setBlockEnd}
+              onBlockReasonChange={setBlockReason}
+              adding={addingBlock}
+              onAdd={() => {
+                if (!blockStart || !blockEnd) {
+                  toast.error("Start and end are required");
+                  return;
+                }
+                const startsAt = blockStart.length === 16 ? `${blockStart}:00` : blockStart;
+                const endsAt = blockEnd.length === 16 ? `${blockEnd}:00` : blockEnd;
+                if (endsAt <= startsAt) {
+                  toast.error("End must be after start");
+                  return;
+                }
+                setAddingBlock(true);
+                void addBlock({ startsAt, endsAt, reason: blockReason || undefined })
+                  .then(() => {
+                    toast.success("Block added");
+                    setBlockStart("");
+                    setBlockEnd("");
+                    setBlockReason("");
+                  })
+                  .catch((err) =>
+                    toast.error(err instanceof Error ? err.message : "Failed"),
+                  )
+                  .finally(() => setAddingBlock(false));
+              }}
+              onRemove={(id) => {
+                void removeBlock(id)
+                  .then(() => toast.success("Block removed"))
+                  .catch((err) =>
+                    toast.error(err instanceof Error ? err.message : "Failed"),
+                  );
+              }}
+            />
           )}
         </motion.div>
       </AnimatePresence>
