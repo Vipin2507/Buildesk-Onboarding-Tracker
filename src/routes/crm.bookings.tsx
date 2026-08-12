@@ -416,7 +416,7 @@ function CrmBookingsPage() {
       <DesignTicketPageHeader
         compact
         title="Bookings"
-        subtitle="Review portal call requests, manage schedules, and set availability."
+        subtitle="Portal requests, schedule, and availability."
       />
 
       <DesignTicketKpiGrid
@@ -475,7 +475,7 @@ function CrmBookingsPage() {
               <ListToolbar
                 search={query}
                 onSearchChange={setQuery}
-                searchPlaceholder="Search guest, account, executive, call type…"
+                searchPlaceholder="Search bookings…"
                 resultCount={filtered.length}
                 resultLabel="bookings"
                 activeFilterCount={activeFilterCount}
@@ -546,8 +546,8 @@ function CrmBookingsPage() {
                   }
                   description={
                     tab === "pending"
-                      ? "Portal booking requests appear here and in your notification bell."
-                      : "Try clearing filters or check another tab."
+                      ? "New portal requests show here."
+                      : "Adjust filters or try another tab."
                   }
                 />
               ) : (
@@ -592,12 +592,10 @@ function CrmBookingsPage() {
                         header: "When",
                         sortable: true,
                         render: (a) => (
-                          <div className="text-xs tabular-nums">
-                            <div>{formatWhen(a.startsAt, a.endsAt)}</div>
-                            <div className="text-[10px] text-muted-foreground">
-                              {slotDurationMinutes(a.startsAt, a.endsAt)}
-                            </div>
-                          </div>
+                          <span className="text-xs tabular-nums">
+                            {formatWhen(a.startsAt, a.endsAt)} ·{" "}
+                            {slotDurationMinutes(a.startsAt, a.endsAt)}
+                          </span>
                         ),
                       },
                       {
@@ -623,30 +621,13 @@ function CrmBookingsPage() {
 
                   {filtered.map((appt) =>
                     expandedId === appt.id ? (
-                      <div key={`${appt.id}-detail`} className="card-soft space-y-2 p-3">
-                        <div className="grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
-                          <Detail label="Guest">{appt.guestName}</Detail>
-                          <Detail label="Email">{appt.guestEmail}</Detail>
-                          <Detail label="Phone">{appt.guestPhone || "—"}</Detail>
-                          <Detail label="Executive">{hostName(appt.hostUserId)}</Detail>
-                          <Detail label="Account">{accountName(appt.companyId)}</Detail>
-                          <Detail label="Call type">{eventTitle(appt.eventTypeId)}</Detail>
-                          <Detail label="Scheduled">
-                            {formatWhen(appt.startsAt, appt.endsAt)} (
-                            {slotDurationMinutes(appt.startsAt, appt.endsAt)})
-                          </Detail>
-                          <Detail label="Status">
-                            {BOOKING_STATUS_LABEL[appt.status]}
-                          </Detail>
-                        </div>
+                      <div key={`${appt.id}-detail`} className="card-soft space-y-2 p-2.5">
                         {appt.notes ? (
-                          <p className="rounded-md bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground">
-                            {appt.notes}
-                          </p>
+                          <p className="text-xs text-muted-foreground">{appt.notes}</p>
                         ) : null}
                         {appt.status === "pending" ? (
                           <Input
-                            placeholder="Optional note to guest (included in status email)"
+                            placeholder="Note to guest (optional)"
                             className="h-8 text-xs"
                             value={noteById[appt.id] ?? ""}
                             onChange={(e) =>
@@ -654,45 +635,34 @@ function CrmBookingsPage() {
                             }
                           />
                         ) : null}
-                        {expandedId === appt.id &&
-                        (appt.status === "confirmed" || appt.status === "postponed") &&
+                        {(appt.status === "confirmed" || appt.status === "postponed") &&
                         appt.startsAt >= now ? (
-                          <div className="space-y-2 rounded-md border border-dashed p-2">
-                            <div className="text-[10px] font-medium text-muted-foreground">
-                              Reschedule
-                            </div>
+                          <div className="flex flex-wrap items-center gap-2">
                             <DatePickerField
                               value={rescheduleDate}
                               onChange={(d) => void loadRescheduleSlots(appt.id, d)}
                               yearsBack={0}
                               yearsForward={1}
                             />
-                            <div className="flex flex-wrap gap-1.5">
-                              {rescheduleSlots.map((slot) => (
-                                <button
-                                  key={slot.startsAt}
-                                  type="button"
-                                  className="rounded-md border px-2 py-1 text-[10px] hover:border-primary"
-                                  onClick={() => {
-                                    void rescheduleAppointment(appt.id, slot.startsAt)
-                                      .then(() => {
-                                        toast.success("Rescheduled");
-                                        setExpandedId(null);
-                                      })
-                                      .catch((err) =>
-                                        toast.error(err instanceof Error ? err.message : "Failed"),
-                                      );
-                                  }}
-                                >
-                                  {slot.startsAt.slice(11, 16)}
-                                </button>
-                              ))}
-                              {rescheduleSlots.length === 0 ? (
-                                <span className="text-[10px] text-muted-foreground">
-                                  No open slots
-                                </span>
-                              ) : null}
-                            </div>
+                            {rescheduleSlots.map((slot) => (
+                              <button
+                                key={slot.startsAt}
+                                type="button"
+                                className="rounded border px-2 py-1 text-[10px] hover:border-primary"
+                                onClick={() => {
+                                  void rescheduleAppointment(appt.id, slot.startsAt)
+                                    .then(() => {
+                                      toast.success("Rescheduled");
+                                      setExpandedId(null);
+                                    })
+                                    .catch((err) =>
+                                      toast.error(err instanceof Error ? err.message : "Failed"),
+                                    );
+                                }}
+                              >
+                                {slot.startsAt.slice(11, 16)}
+                              </button>
+                            ))}
                           </div>
                         ) : null}
                       </div>
@@ -791,16 +761,5 @@ function CrmBookingsPage() {
         </motion.div>
       </AnimatePresence>
     </PageWrap>
-  );
-}
-
-function Detail({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-        {label}
-      </div>
-      <div className="mt-0.5 font-medium">{children}</div>
-    </div>
   );
 }
