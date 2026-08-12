@@ -21,6 +21,7 @@ import {
   DEFAULT_BOOKING_EVENT_SLUG,
   DEFAULT_BOOKING_EVENT_TITLE,
 } from "@/types/booking";
+import { seedCrmBookingCallTypes, seedCrmBookingHostHours } from "@/data/crm-booking-defaults";
 
 /* ---------- Mappers ---------- */
 
@@ -109,7 +110,11 @@ function assertCanManageAppointment(
   }
 }
 
-function seedDefaultAvailability(hostUserId: string, timezone: string) {
+function seedDefaultAvailability(
+  hostUserId: string,
+  timezone: string,
+  hostHours?: { weekday: number; startTime: string; endTime: string; enabled?: boolean }[],
+) {
   const db = getDb();
   const existing = db
     .select()
@@ -118,18 +123,27 @@ function seedDefaultAvailability(hostUserId: string, timezone: string) {
     .all();
   if (existing.length > 0) return existing.map(mapAvailability);
 
+  const windows =
+    hostHours && hostHours.length > 0
+      ? hostHours.filter((h) => h.enabled !== false)
+      : [1, 2, 3, 4, 5].map((weekday) => ({
+          weekday,
+          startTime: "10:00",
+          endTime: "17:00",
+          enabled: true,
+        }));
+
   const now = nowIso();
   const created: BookingAvailability[] = [];
-  // Mon–Fri (1–5)
-  for (const weekday of [1, 2, 3, 4, 5]) {
+  for (const win of windows) {
     const id = newId();
     db.insert(t.bookingAvailability)
       .values({
         id,
         hostUserId,
-        weekday,
-        startTime: "10:00",
-        endTime: "17:00",
+        weekday: win.weekday,
+        startTime: win.startTime,
+        endTime: win.endTime,
         timezone,
         isActive: true,
         createdAt: now,
@@ -139,9 +153,9 @@ function seedDefaultAvailability(hostUserId: string, timezone: string) {
     created.push({
       id,
       hostUserId,
-      weekday,
-      startTime: "10:00",
-      endTime: "17:00",
+      weekday: win.weekday,
+      startTime: win.startTime,
+      endTime: win.endTime,
       timezone,
       isActive: true,
       createdAt: now,
@@ -151,56 +165,93 @@ function seedDefaultAvailability(hostUserId: string, timezone: string) {
   return created;
 }
 
-function ensureDefaultEventType(companyId: string): BookingEventType {
-  const db = getDb();
-  const existing = db
-    .select()
-    .from(t.bookingEventTypes)
-    .where(
-      and(
-        eq(t.bookingEventTypes.companyId, companyId),
-        eq(t.bookingEventTypes.slug, DEFAULT_BOOKING_EVENT_SLUG),
-      ),
-    )
-    .get();
-  if (existing) return mapEventType(existing);
+type CallTypeSeed = {
+  key: string;
+  label: string;
+  durationMinutes: number;
+  isActive?: boolean;
+};
 
+/** Upsert event types from Master call-type catalog (query/training/other…). */
+function ensureEventTypesFromCatalog(
+  companyId: string,
+  callTypes?: CallTypeSeed[],
+  hostHours?: { weekday: number; startTime: string; endTime: string; enabled?: boolean }[],
+): BookingEventType[] {
+  const db = getDb();
   const hostUserId = resolveBookingHostUserId(companyId);
   const now = nowIso();
-  const id = newId();
-  db.insert(t.bookingEventTypes)
-    .values({
-      id,
-      companyId,
-      slug: DEFAULT_BOOKING_EVENT_SLUG,
-      title: DEFAULT_BOOKING_EVENT_TITLE,
-      durationMinutes: DEFAULT_BOOKING_DURATION_MINUTES,
-      hostUserId: hostUserId ?? null,
-      bufferBeforeMinutes: 0,
-      bufferAfterMinutes: 0,
-      isActive: true,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
+  const catalog =
+    callTypes && callTypes.length > 0
+      ? callTypes
+      : [
+          {
+            key: DEFAULT_BOOKING_EVENT_SLUG,
+            label: DEFAULT_BOOKING_EVENT_TITLE,
+            durationMinutes: DEFAULT_BOOKING_DURATION_MINUTES,
+            isActive: true,
+          },
+        ];
 
-  if (hostUserId) {
-    seedDefaultAvailability(hostUserId, resolveHostTimezone(hostUserId));
+  const out: BookingEventType[] = [];
+  for (const ct of catalog) {
+    const slug = ct.key.trim().toLowerCase();
+    if (!slug) continue;
+    const existing = db
+      .select()
+      .from(t.bookingEventTypes)
+      .where(
+        and(eq(t.bookingEventTypes.companyId, companyId), eq(t.bookingEventTypes.slug, slug)),
+      )
+      .get();
+    if (existing) {
+      db.update(t.bookingEventTypes)
+        .set({
+          title: ct.label.trim() || existing.title,
+          durationMinutes: Math.max(5, ct.durationMinutes || existing.durationMinutes),
+          isActive: ct.isActive !== false,
+          hostUserId: existing.hostUserId ?? hostUserId ?? null,
+          updatedAt: now,
+        })
+        .where(eq(t.bookingEventTypes.id, existing.id))
+        .run();
+      out.push(
+        mapEventType(
+          db.select().from(t.bookingEventTypes).where(eq(t.bookingEventTypes.id, existing.id)).get()!,
+        ),
+      );
+      continue;
+    }
+    const id = newId();
+    db.insert(t.bookingEventTypes)
+      .values({
+        id,
+        companyId,
+        slug,
+        title: ct.label.trim() || slug,
+        durationMinutes: Math.max(5, ct.durationMinutes || DEFAULT_BOOKING_DURATION_MINUTES),
+        hostUserId: hostUserId ?? null,
+        bufferBeforeMinutes: 0,
+        bufferAfterMinutes: 0,
+        isActive: ct.isActive !== false,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+    out.push(
+      mapEventType(db.select().from(t.bookingEventTypes).where(eq(t.bookingEventTypes.id, id)).get()!),
+    );
   }
 
-  return {
-    id,
-    companyId,
-    slug: DEFAULT_BOOKING_EVENT_SLUG,
-    title: DEFAULT_BOOKING_EVENT_TITLE,
-    durationMinutes: DEFAULT_BOOKING_DURATION_MINUTES,
-    hostUserId,
-    bufferBeforeMinutes: 0,
-    bufferAfterMinutes: 0,
-    isActive: true,
-    createdAt: now,
-    updatedAt: now,
-  };
+  if (hostUserId) {
+    seedDefaultAvailability(hostUserId, resolveHostTimezone(hostUserId), hostHours);
+  }
+  return out;
+}
+
+function ensureDefaultEventType(companyId: string): BookingEventType {
+  const types = ensureEventTypesFromCatalog(companyId);
+  return types[0]!;
 }
 
 function resolveEventHost(event: BookingEventType): string {
@@ -221,7 +272,7 @@ function collectBusyRanges(hostUserId: string, fromYmd: string, toYmd: string) {
     .where(
       and(
         eq(t.bookingAppointments.hostUserId, hostUserId),
-        inArray(t.bookingAppointments.status, ["pending", "confirmed"]),
+        inArray(t.bookingAppointments.status, ["pending", "confirmed", "postponed"]),
         lte(t.bookingAppointments.startsAt, rangeEnd),
         gte(t.bookingAppointments.endsAt, rangeStart),
       ),
@@ -279,11 +330,68 @@ function loadOpenSlots(event: BookingEventType, fromYmd: string, toYmd: string) 
 /* ---------- Portal (public) ---------- */
 
 export const listPortalBookingEventTypes = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) => z.object({ slug: z.string().min(1) }).parse(data))
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        slug: z.string().min(1),
+        callTypes: z
+          .array(
+            z.object({
+              key: z.string().min(1),
+              label: z.string().min(1),
+              durationMinutes: z.number().int().min(5),
+              isActive: z.boolean().optional(),
+            }),
+          )
+          .optional(),
+        hostHours: z
+          .array(
+            z.object({
+              weekday: z.number().int().min(0).max(6),
+              startTime: z.string().min(4),
+              endTime: z.string().min(4),
+              enabled: z.boolean().optional(),
+            }),
+          )
+          .optional(),
+      })
+      .parse(data),
+  )
   .handler(async ({ data }) => {
     const db = getDb();
     const portal = resolveActivePortal(db, data.slug);
-    ensureDefaultEventType(portal.companyId);
+    const existing = db
+      .select()
+      .from(t.bookingEventTypes)
+      .where(eq(t.bookingEventTypes.companyId, portal.companyId))
+      .all();
+
+    const sessionUser = getSessionUser();
+    if (existing.length === 0) {
+      const fallbackTypes =
+        data.callTypes && data.callTypes.length > 0
+          ? data.callTypes
+          : seedCrmBookingCallTypes().map((c) => ({
+              key: c.key,
+              label: c.label,
+              durationMinutes: c.durationMinutes,
+              isActive: c.isActive,
+            }));
+      const fallbackHours =
+        data.hostHours && data.hostHours.length > 0
+          ? data.hostHours
+          : seedCrmBookingHostHours().map((h) => ({
+              weekday: h.weekday,
+              startTime: h.startTime,
+              endTime: h.endTime,
+              enabled: h.enabled,
+            }));
+      ensureEventTypesFromCatalog(portal.companyId, fallbackTypes, fallbackHours);
+    } else if (sessionUser && data.callTypes && data.callTypes.length > 0) {
+      // Staff-driven Master sync only — avoid portal clients overwriting catalog
+      ensureEventTypesFromCatalog(portal.companyId, data.callTypes, data.hostHours);
+    }
+
     return db
       .select()
       .from(t.bookingEventTypes)
@@ -297,6 +405,26 @@ export const listPortalBookingEventTypes = createServerFn({ method: "GET" })
       .map(mapEventType);
   });
 
+export const listPortalBookings = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) =>
+    z.object({ slug: z.string().min(1), guestEmail: z.string().email().optional() }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const db = getDb();
+    const portal = resolveActivePortal(db, data.slug);
+    let rows = db
+      .select()
+      .from(t.bookingAppointments)
+      .where(eq(t.bookingAppointments.companyId, portal.companyId))
+      .all()
+      .map(mapAppointment);
+    if (data.guestEmail) {
+      const email = data.guestEmail.trim().toLowerCase();
+      rows = rows.filter((r) => r.guestEmail.toLowerCase() === email);
+    }
+    return rows.sort((a, b) => b.startsAt.localeCompare(a.startsAt));
+  });
+
 export const listPortalBookingSlots = createServerFn({ method: "GET" })
   .inputValidator((data: unknown) =>
     z
@@ -305,34 +433,7 @@ export const listPortalBookingSlots = createServerFn({ method: "GET" })
         eventTypeId: z.string().min(1),
         from: z.string().min(8),
         to: z.string().min(8),
-      })
-      .parse(data),
-  )
-  .handler(async ({ data }) => {
-    const db = getDb();
-    const portal = resolveActivePortal(db, data.slug);
-    const row = db
-      .select()
-      .from(t.bookingEventTypes)
-      .where(eq(t.bookingEventTypes.id, data.eventTypeId))
-      .get();
-    if (!row || row.companyId !== portal.companyId || !row.isActive) {
-      throw new ApiError(404, "Event type not found");
-    }
-    return loadOpenSlots(mapEventType(row), data.from.slice(0, 10), data.to.slice(0, 10));
-  });
-
-export const createPortalBooking = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) =>
-    z
-      .object({
-        slug: z.string().min(1),
-        eventTypeId: z.string().min(1),
-        startsAt: z.string().min(10),
-        guestName: z.string().min(1),
-        guestEmail: z.string().email(),
-        guestPhone: z.string().optional(),
-        notes: z.string().optional(),
+        durationMinutes: z.number().int().min(5).optional(),
       })
       .parse(data),
   )
@@ -348,6 +449,40 @@ export const createPortalBooking = createServerFn({ method: "POST" })
       throw new ApiError(404, "Event type not found");
     }
     const event = mapEventType(row);
+    if (data.durationMinutes) {
+      event.durationMinutes = data.durationMinutes;
+    }
+    return loadOpenSlots(event, data.from.slice(0, 10), data.to.slice(0, 10));
+  });
+
+export const createPortalBooking = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        slug: z.string().min(1),
+        eventTypeId: z.string().min(1),
+        startsAt: z.string().min(10),
+        guestName: z.string().min(1),
+        guestEmail: z.string().email(),
+        guestPhone: z.string().optional(),
+        notes: z.string().optional(),
+        durationMinutes: z.number().int().min(5).optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const db = getDb();
+    const portal = resolveActivePortal(db, data.slug);
+    const row = db
+      .select()
+      .from(t.bookingEventTypes)
+      .where(eq(t.bookingEventTypes.id, data.eventTypeId))
+      .get();
+    if (!row || row.companyId !== portal.companyId || !row.isActive) {
+      throw new ApiError(404, "Event type not found");
+    }
+    const event = mapEventType(row);
+    if (data.durationMinutes) event.durationMinutes = data.durationMinutes;
     const hostUserId = resolveEventHost(event);
     const startsAt = data.startsAt.slice(0, 19);
     const ymd = startsAt.slice(0, 10);
@@ -388,38 +523,92 @@ export const createPortalBooking = createServerFn({ method: "POST" })
 /* ---------- Staff: ensure / list ---------- */
 
 export const ensureBookingDefaults = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ companyId: z.string().min(1) }).parse(data))
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        companyId: z.string().min(1),
+        callTypes: z
+          .array(
+            z.object({
+              key: z.string().min(1),
+              label: z.string().min(1),
+              durationMinutes: z.number().int().min(5),
+              isActive: z.boolean().optional(),
+            }),
+          )
+          .optional(),
+        hostHours: z
+          .array(
+            z.object({
+              weekday: z.number().int().min(0).max(6),
+              startTime: z.string().min(4),
+              endTime: z.string().min(4),
+              enabled: z.boolean().optional(),
+            }),
+          )
+          .optional(),
+      })
+      .parse(data),
+  )
   .handler(async ({ data }) => {
-    // Soft-skip when session cookie is missing (bootstrap races / logged-out).
     if (!getSessionUser()) {
       return { skipped: true as const };
     }
-    const eventType = ensureDefaultEventType(data.companyId);
+    const eventTypes = ensureEventTypesFromCatalog(data.companyId, data.callTypes, data.hostHours);
+    const eventType = eventTypes[0]!;
     const hostUserId = eventType.hostUserId ?? resolveBookingHostUserId(data.companyId);
     let availability: BookingAvailability[] = [];
     if (hostUserId) {
-      availability = seedDefaultAvailability(hostUserId, resolveHostTimezone(hostUserId));
+      availability = seedDefaultAvailability(
+        hostUserId,
+        resolveHostTimezone(hostUserId),
+        data.hostHours,
+      );
     }
-    return { skipped: false as const, eventType, availability, hostUserId };
+    return { skipped: false as const, eventType, eventTypes, availability, hostUserId };
   });
 
-/** Seed defaults for many CRM accounts in one authenticated round-trip. */
 export const ensureBookingDefaultsBatch = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({ companyIds: z.array(z.string().min(1)).max(500) }).parse(data),
+    z
+      .object({
+        companyIds: z.array(z.string().min(1)).max(500),
+        callTypes: z
+          .array(
+            z.object({
+              key: z.string().min(1),
+              label: z.string().min(1),
+              durationMinutes: z.number().int().min(5),
+              isActive: z.boolean().optional(),
+            }),
+          )
+          .optional(),
+        hostHours: z
+          .array(
+            z.object({
+              weekday: z.number().int().min(0).max(6),
+              startTime: z.string().min(4),
+              endTime: z.string().min(4),
+              enabled: z.boolean().optional(),
+            }),
+          )
+          .optional(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     requireUser();
     const eventTypes: BookingEventType[] = [];
     const availabilityByHost = new Map<string, BookingAvailability[]>();
     for (const companyId of data.companyIds) {
-      const eventType = ensureDefaultEventType(companyId);
-      eventTypes.push(eventType);
-      const hostUserId = eventType.hostUserId ?? resolveBookingHostUserId(companyId);
+      const types = ensureEventTypesFromCatalog(companyId, data.callTypes, data.hostHours);
+      eventTypes.push(...types);
+      const hostUserId =
+        types[0]?.hostUserId ?? resolveBookingHostUserId(companyId);
       if (hostUserId && !availabilityByHost.has(hostUserId)) {
         availabilityByHost.set(
           hostUserId,
-          seedDefaultAvailability(hostUserId, resolveHostTimezone(hostUserId)),
+          seedDefaultAvailability(hostUserId, resolveHostTimezone(hostUserId), data.hostHours),
         );
       }
     }
@@ -764,7 +953,7 @@ export const updateBookingAppointmentStatus = createServerFn({ method: "POST" })
     z
       .object({
         id: z.string().min(1),
-        status: z.enum(["pending", "confirmed", "declined", "cancelled", "completed"]),
+        status: z.enum(["pending", "confirmed", "declined", "cancelled", "postponed", "completed"]),
         hostNote: z.string().optional(),
       })
       .parse(data),

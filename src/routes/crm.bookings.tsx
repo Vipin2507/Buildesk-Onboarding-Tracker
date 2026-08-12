@@ -78,6 +78,7 @@ function CrmBookingsPage() {
   const acceptAppointment = useBookingStore((s) => s.acceptAppointment);
   const declineAppointment = useBookingStore((s) => s.declineAppointment);
   const cancelAppointment = useBookingStore((s) => s.cancelAppointment);
+  const postponeAppointment = useBookingStore((s) => s.postponeAppointment);
   const rescheduleAppointment = useBookingStore((s) => s.rescheduleAppointment);
   const listSlotsForEvent = useBookingStore((s) => s.listSlotsForEvent);
   const saveAvailabilityWindows = useBookingStore((s) => s.saveAvailabilityWindows);
@@ -138,7 +139,10 @@ function CrmBookingsPage() {
   const upcoming = useMemo(
     () =>
       appointments
-        .filter((a) => a.status === "confirmed" && a.startsAt >= now)
+        .filter(
+          (a) =>
+            (a.status === "confirmed" || a.status === "postponed") && a.startsAt >= now,
+        )
         .sort((a, b) => a.startsAt.localeCompare(b.startsAt)),
     [appointments, now],
   );
@@ -285,6 +289,7 @@ function CrmBookingsPage() {
                       <div className="text-xs text-muted-foreground">
                         {eventTitle(appt.eventTypeId)} · {accountName(appt.companyId)} ·{" "}
                         {formatWhen(appt.startsAt)}
+                        {appt.status === "postponed" ? " · Postponed" : ""}
                       </div>
                     </div>
                     <div className="flex gap-1.5">
@@ -299,6 +304,20 @@ function CrmBookingsPage() {
                         }}
                       >
                         Reschedule
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs"
+                        onClick={() => {
+                          void postponeAppointment(appt.id, noteById[appt.id])
+                            .then(() => toast.success("Booking postponed"))
+                            .catch((err) =>
+                              toast.error(err instanceof Error ? err.message : "Failed"),
+                            );
+                        }}
+                      >
+                        Postpone
                       </Button>
                       <Button
                         size="sm"

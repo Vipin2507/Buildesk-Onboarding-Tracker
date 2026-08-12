@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Building2,
   Boxes,
+  Calendar,
   Database,
   GraduationCap,
   ListChecks,
@@ -31,11 +32,15 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { CRM_MODULE_PROVIDERS, CRM_PRODUCT_MODULES } from "@/data/crm-onboarding-defaults";
 import {
+  getCrmMasterBookingCallTypes,
+  getCrmMasterBookingHostHours,
   getCrmMasterMigrationFields,
   getCrmMasterTrainingFields,
 } from "@/stores/useCrmMasterStore";
 import { useAuthStore, useCrmMasterStore } from "@/stores";
 import type {
+  CrmBookingCallTypeDef,
+  CrmBookingHostHoursDef,
   CrmMasterFieldDef,
   CrmMasterPicklist,
   CrmMigrationFieldDef,
@@ -57,9 +62,12 @@ const SECTIONS = [
   { id: "providers", label: "Providers", icon: Database },
   { id: "migration", label: "Migration", icon: Upload },
   { id: "training", label: "Training", icon: GraduationCap },
+  { id: "bookings", label: "Bookings", icon: Calendar },
   { id: "data-control", label: "Data Control", icon: Table2 },
   { id: "danger", label: "Reset & Safety", icon: ShieldAlert },
 ] as const;
+
+const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 type SectionId = (typeof SECTIONS)[number]["id"];
 
@@ -149,6 +157,7 @@ function CrmMasterPage() {
             {section === "providers" ? <ProvidersPanel /> : null}
             {section === "migration" ? <MigrationPanel /> : null}
             {section === "training" ? <TrainingPanel /> : null}
+            {section === "bookings" ? <BookingsPanel /> : null}
             {section === "data-control" ? <CrmMasterDataControl /> : null}
             {section === "danger" ? <DangerPanel /> : null}
           </motion.div>
@@ -167,6 +176,7 @@ function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) 
   const migrationFields = useCrmMasterStore((s) => s.migrationFields);
   const trainingFieldsDeveloper = useCrmMasterStore((s) => s.trainingFieldsDeveloper);
   const trainingFieldsBroker = useCrmMasterStore((s) => s.trainingFieldsBroker);
+  const bookingCallTypes = useCrmMasterStore((s) => s.bookingCallTypes);
 
   const cards = [
     {
@@ -207,6 +217,12 @@ function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) 
         (trainingFieldsBroker?.length ?? getCrmMasterTrainingFields("broker_cp").length),
       total: "catalog items",
       to: "training" as const,
+    },
+    {
+      label: "Bookings",
+      value: (bookingCallTypes?.length ?? getCrmMasterBookingCallTypes().length),
+      total: "call types · host hours",
+      to: "bookings" as const,
     },
     {
       label: "Data Control",
@@ -1149,6 +1165,217 @@ function TrainingPanel() {
   );
 }
 
+function BookingsPanel() {
+  const bookingCallTypes = useCrmMasterStore((s) => s.bookingCallTypes);
+  const bookingHostHours = useCrmMasterStore((s) => s.bookingHostHours);
+  const setBookingCallTypes = useCrmMasterStore((s) => s.setBookingCallTypes);
+  const setBookingHostHours = useCrmMasterStore((s) => s.setBookingHostHours);
+
+  const callTypes = useMemo(
+    () =>
+      Array.isArray(bookingCallTypes) && bookingCallTypes.length > 0
+        ? bookingCallTypes
+        : getCrmMasterBookingCallTypes(),
+    [bookingCallTypes],
+  );
+  const hostHours = useMemo(
+    () =>
+      Array.isArray(bookingHostHours) && bookingHostHours.length > 0
+        ? bookingHostHours
+        : getCrmMasterBookingHostHours(),
+    [bookingHostHours],
+  );
+
+  const [draftLabel, setDraftLabel] = useState("");
+  const [draftDuration, setDraftDuration] = useState("15");
+  const [draftCustom, setDraftCustom] = useState(false);
+
+  function updateCallType(index: number, patch: Partial<CrmBookingCallTypeDef>) {
+    const next = callTypes.map((row, i) => (i === index ? { ...row, ...patch } : row));
+    setBookingCallTypes(next);
+  }
+
+  function removeCallType(index: number) {
+    setBookingCallTypes(callTypes.filter((_, i) => i !== index));
+  }
+
+  function addCallType() {
+    const label = draftLabel.trim();
+    if (!label) {
+      toast.error("Enter a call type label");
+      return;
+    }
+    const key = label
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_|_$/g, "");
+    if (!key) {
+      toast.error("Label must include letters or numbers");
+      return;
+    }
+    if (callTypes.some((c) => c.key === key)) {
+      toast.error("A call type with this key already exists");
+      return;
+    }
+    const durationMinutes = Math.max(5, Number(draftDuration) || 15);
+    setBookingCallTypes([
+      ...callTypes,
+      {
+        key,
+        label,
+        durationMinutes,
+        allowsCustomDuration: draftCustom,
+        isActive: true,
+        order: callTypes.length + 1,
+      },
+    ]);
+    setDraftLabel("");
+    setDraftDuration("15");
+    setDraftCustom(false);
+    toast.success("Call type added");
+  }
+
+  function updateHostHour(weekday: number, patch: Partial<CrmBookingHostHoursDef>) {
+    const next = hostHours.map((row) => (row.weekday === weekday ? { ...row, ...patch } : row));
+    setBookingHostHours(next);
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="card-soft space-y-3 p-3">
+        <div>
+          <h3 className="text-sm font-semibold">Call types</h3>
+          <p className="text-[10px] text-muted-foreground">
+            Durations drive open portal slots (Query 15m, Training 30m, Other custom). Changes apply
+            when booking defaults sync for an account.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          <input
+            value={draftLabel}
+            onChange={(e) => setDraftLabel(e.target.value)}
+            placeholder="New call type"
+            className="h-8 min-w-[10rem] flex-1 rounded-md border bg-background px-2 text-xs"
+          />
+          <input
+            type="number"
+            min={5}
+            step={5}
+            value={draftDuration}
+            onChange={(e) => setDraftDuration(e.target.value)}
+            className="h-8 w-20 rounded-md border bg-background px-2 text-xs"
+            aria-label="Duration minutes"
+          />
+          <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={draftCustom}
+              onChange={(e) => setDraftCustom(e.target.checked)}
+            />
+            Custom duration
+          </label>
+          <Button type="button" size="sm" className="h-8 gap-1 text-xs" onClick={addCallType}>
+            <Plus className="h-3.5 w-3.5" />
+            Add
+          </Button>
+        </div>
+
+        <div className="divide-y rounded-md border">
+          {callTypes.map((field, index) => (
+            <div key={field.key} className="flex flex-wrap items-center gap-2 px-2.5 py-2">
+              <input
+                value={field.label}
+                onChange={(e) => updateCallType(index, { label: e.target.value })}
+                className="h-7 min-w-[8rem] flex-1 rounded-md border bg-background px-2 text-xs"
+              />
+              <input
+                type="number"
+                min={5}
+                step={5}
+                value={field.durationMinutes}
+                onChange={(e) =>
+                  updateCallType(index, {
+                    durationMinutes: Math.max(5, Number(e.target.value) || 15),
+                  })
+                }
+                className="h-7 w-16 rounded-md border bg-background px-2 text-xs"
+                aria-label={`${field.label} duration`}
+              />
+              <span className="text-[10px] text-muted-foreground">min</span>
+              <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={field.allowsCustomDuration}
+                  onChange={(e) =>
+                    updateCallType(index, { allowsCustomDuration: e.target.checked })
+                  }
+                />
+                Other/specify
+              </label>
+              <Switch
+                checked={field.isActive}
+                onCheckedChange={(checked) => updateCallType(index, { isActive: checked })}
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 shrink-0 p-0 text-muted-foreground hover:text-destructive"
+                onClick={() => removeCallType(index)}
+                aria-label={`Remove ${field.label}`}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ))}
+          {callTypes.length === 0 ? (
+            <p className="py-3 text-center text-[10px] text-muted-foreground">
+              No call types. Add at least one, or reset Master to restore defaults.
+            </p>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="card-soft space-y-3 p-3">
+        <div>
+          <h3 className="text-sm font-semibold">Executive weekly hours</h3>
+          <p className="text-[10px] text-muted-foreground">
+            Default availability seeded for hosts who have no windows yet. Executives can still
+            refine hours under CRM → Bookings → Availability.
+          </p>
+        </div>
+        <div className="divide-y rounded-md border">
+          {hostHours.map((row) => (
+            <div key={row.weekday} className="flex flex-wrap items-center gap-2 px-2.5 py-2">
+              <div className="w-10 text-xs font-medium">{WEEKDAY_LABELS[row.weekday]}</div>
+              <Switch
+                checked={row.enabled}
+                onCheckedChange={(checked) => updateHostHour(row.weekday, { enabled: checked })}
+              />
+              <input
+                type="time"
+                value={row.startTime}
+                disabled={!row.enabled}
+                onChange={(e) => updateHostHour(row.weekday, { startTime: e.target.value })}
+                className="h-7 rounded-md border bg-background px-2 text-xs disabled:opacity-50"
+              />
+              <span className="text-[10px] text-muted-foreground">to</span>
+              <input
+                type="time"
+                value={row.endTime}
+                disabled={!row.enabled}
+                onChange={(e) => updateHostHour(row.weekday, { endTime: e.target.value })}
+                className="h-7 rounded-md border bg-background px-2 text-xs disabled:opacity-50"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DangerPanel() {
   const resetAll = useCrmMasterStore((s) => s.resetAll);
   const [open, setOpen] = useState(false);
@@ -1159,7 +1386,7 @@ function DangerPanel() {
         <h3 className="text-sm font-semibold text-destructive">Reset CRM Master Config</h3>
         <p className="mt-1 text-[10px] text-muted-foreground">
           Restores seeded account fields, project fields, picklists, modules, providers, migration,
-          and training catalogs. Does not delete CRM accounts or onboarding checklists.
+          training, and booking catalogs. Does not delete CRM accounts or onboarding checklists.
         </p>
         <Button
           size="sm"
@@ -1175,7 +1402,7 @@ function DangerPanel() {
         open={open}
         onOpenChange={setOpen}
         title="Reset CRM Master Config?"
-        description="All field catalogs, picklists, modules, providers, migration, and training fields will revert to seed defaults."
+        description="All field catalogs, picklists, modules, providers, migration, training, and booking fields will revert to seed defaults."
         confirmLabel="Reset"
         onConfirm={() => {
           resetAll();

@@ -18,6 +18,7 @@ import {
 } from "@/components/design-ticket/design-ticket-shared";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { getCrmMasterBookingCallTypes } from "@/stores/useCrmMasterStore";
 import { useBookingStore } from "@/stores/useBookingStore";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
 import type { BookingEventType, BookingSlot } from "@/types/booking";
@@ -25,6 +26,8 @@ import type { BookingEventType, BookingSlot } from "@/types/booking";
 export const Route = createFileRoute("/portal/$slug/book")({
   component: PortalBookCall,
 });
+
+const OTHER_DURATION_OPTIONS = [15, 30, 45, 60];
 
 function formatSlotLabel(startsAt: string) {
   const time = startsAt.slice(11, 16);
@@ -47,6 +50,22 @@ function todayYmd() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+function callTypeMeta(event: BookingEventType | null) {
+  if (!event) return null;
+  const fromMaster = getCrmMasterBookingCallTypes().find((c) => c.key === event.slug);
+  if (fromMaster) return fromMaster;
+  const allowsCustomDuration =
+    event.slug === "other" || /other/i.test(event.title);
+  return {
+    key: event.slug,
+    label: event.title,
+    durationMinutes: event.durationMinutes,
+    allowsCustomDuration,
+    isActive: true,
+    order: 0,
+  };
+}
+
 function PortalBookCall() {
   const { slug } = Route.useParams();
   const access = useCompanyPortalStore((s) => s.getBySlug(slug));
@@ -57,6 +76,7 @@ function PortalBookCall() {
   const [step, setStep] = useState<"type" | "slot" | "form" | "done">("type");
   const [eventTypes, setEventTypes] = useState<BookingEventType[]>([]);
   const [selectedType, setSelectedType] = useState<BookingEventType | null>(null);
+  const [customDuration, setCustomDuration] = useState<number | null>(null);
   const [date, setDate] = useState(todayYmd());
   const [slots, setSlots] = useState<BookingSlot[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -65,8 +85,16 @@ function PortalBookCall() {
   const [guestEmail, setGuestEmail] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
   const [notes, setNotes] = useState("");
+  const [specifyTopic, setSpecifyTopic] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [confirmationId, setConfirmationId] = useState<string | null>(null);
+
+  const selectedMeta = useMemo(() => callTypeMeta(selectedType), [selectedType]);
+  const allowsCustom = Boolean(selectedMeta?.allowsCustomDuration);
+  const effectiveDuration =
+    allowsCustom && customDuration
+      ? customDuration
+      : selectedType?.durationMinutes ?? selectedMeta?.durationMinutes;
 
   useEffect(() => {
     if (!access) return;
@@ -87,11 +115,16 @@ function PortalBookCall() {
 
   useEffect(() => {
     if (!selectedType || step !== "slot") return;
+    if (allowsCustom && !customDuration) {
+      setSlots([]);
+      setSelectedSlot(null);
+      return;
+    }
     let cancelled = false;
     setLoadingSlots(true);
     setSelectedSlot(null);
     const to = addDaysYmd(date, 0);
-    void listPortalSlots(slug, selectedType.id, date, to)
+    void listPortalSlots(slug, selectedType.id, date, to, effectiveDuration)
       .then((rows) => {
         if (!cancelled) setSlots(rows);
       })
@@ -107,7 +140,16 @@ function PortalBookCall() {
     return () => {
       cancelled = true;
     };
-  }, [date, listPortalSlots, selectedType, slug, step]);
+  }, [
+    allowsCustom,
+    customDuration,
+    date,
+    effectiveDuration,
+    listPortalSlots,
+    selectedType,
+    slug,
+    step,
+  ]);
 
   const daySlots = useMemo(
     () => slots.filter((s) => s.startsAt.startsWith(date)),
@@ -123,8 +165,16 @@ function PortalBookCall() {
       toast.error("Name and email are required");
       return;
     }
+    if (allowsCustom && !specifyTopic.trim()) {
+      toast.error("Please specify what the call is about");
+      return;
+    }
     setSubmitting(true);
     try {
+      const noteParts = [
+        allowsCustom && specifyTopic.trim() ? `Topic: ${specifyTopic.trim()}` : "",
+        notes.trim(),
+      ].filter(Boolean);
       const created = await createPortalRequest({
         slug,
         eventTypeId: selectedType.id,
@@ -132,7 +182,8 @@ function PortalBookCall() {
         guestName: guestName.trim(),
         guestEmail: guestEmail.trim(),
         guestPhone: guestPhone.trim() || undefined,
-        notes: notes.trim() || undefined,
+        notes: noteParts.length > 0 ? noteParts.join("\n") : undefined,
+        durationMinutes: allowsCustom ? effectiveDuration : undefined,
       });
       setConfirmationId(created.id);
       setStep("done");
@@ -164,23 +215,32 @@ function PortalBookCall() {
               exit={{ opacity: 0, y: -8 }}
               className="space-y-3"
             >
-              {eventTypes.map((et) => (
-                <button
-                  key={et.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedType(et);
-                    setStep("slot");
-                  }}
-                  className="card-soft flex w-full items-start gap-3 p-4 text-left transition hover:border-primary/40"
-                >
-                  <CalendarDays className="mt-0.5 h-5 w-5 text-primary" />
-                  <div>
-                    <div className="text-sm font-semibold">{et.title}</div>
-                    <div className="text-xs text-muted-foreground">{et.durationMinutes} minutes</div>
-                  </div>
-                </button>
-              ))}
+              {eventTypes.map((et) => {
+                const meta = callTypeMeta(et);
+                return (
+                  <button
+                    key={et.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedType(et);
+                      setCustomDuration(meta?.allowsCustomDuration ? null : null);
+                      setSpecifyTopic("");
+                      setStep("slot");
+                    }}
+                    className="card-soft flex w-full items-start gap-3 p-4 text-left transition hover:border-primary/40"
+                  >
+                    <CalendarDays className="mt-0.5 h-5 w-5 text-primary" />
+                    <div>
+                      <div className="text-sm font-semibold">{et.title}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {meta?.allowsCustomDuration
+                          ? "Choose length when booking"
+                          : `${et.durationMinutes} minutes`}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
               {eventTypes.length === 0 && (
                 <p className="text-sm text-muted-foreground">No meeting types available yet.</p>
               )}
@@ -213,12 +273,39 @@ function PortalBookCall() {
               </div>
 
               <DesignTicketFormCard>
+                {allowsCustom ? (
+                  <DesignTicketFormField label="Call length">
+                    <div className="flex flex-wrap gap-2">
+                      {OTHER_DURATION_OPTIONS.map((mins) => {
+                        const active = customDuration === mins;
+                        return (
+                          <button
+                            key={mins}
+                            type="button"
+                            onClick={() => setCustomDuration(mins)}
+                            className={cn(
+                              "rounded-lg border px-3 py-2 text-xs font-medium transition",
+                              active
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "bg-background hover:border-primary/50",
+                            )}
+                          >
+                            {mins} min
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </DesignTicketFormField>
+                ) : null}
+
                 <DesignTicketFormField label="Date">
                   <DatePickerField value={date} onChange={setDate} yearsBack={0} yearsForward={1} />
                 </DesignTicketFormField>
 
                 <DesignTicketFormField label="Available times">
-                  {loadingSlots ? (
+                  {allowsCustom && !customDuration ? (
+                    <p className="text-xs text-muted-foreground">Choose a call length first.</p>
+                  ) : loadingSlots ? (
                     <p className="text-xs text-muted-foreground">Loading slots…</p>
                   ) : daySlots.length === 0 ? (
                     <p className="text-xs text-muted-foreground">No open slots this day. Try another date.</p>
@@ -285,8 +372,21 @@ function PortalBookCall() {
 
               <DesignTicketFormCard>
                 <p className="text-xs text-muted-foreground">
-                  {selectedType.title} · {date} · {formatSlotLabel(selectedSlot.startsAt)}
+                  {selectedType.title}
+                  {effectiveDuration ? ` · ${effectiveDuration} min` : ""} · {date} ·{" "}
+                  {formatSlotLabel(selectedSlot.startsAt)}
                 </p>
+                {allowsCustom ? (
+                  <DesignTicketFormField label="Please specify">
+                    <input
+                      value={specifyTopic}
+                      onChange={(e) => setSpecifyTopic(e.target.value)}
+                      className={ticketFieldClass}
+                      placeholder="What should we cover on this call?"
+                      required
+                    />
+                  </DesignTicketFormField>
+                ) : null}
                 <DesignTicketFormField label="Your name">
                   <input
                     value={guestName}
@@ -338,7 +438,8 @@ function PortalBookCall() {
               <CheckCircle2 className="h-10 w-10 text-success" />
               <h2 className="text-lg font-semibold">Request received</h2>
               <p className="max-w-sm text-sm text-muted-foreground">
-                Your booking is pending confirmation. We'll email you once it's accepted.
+                Your booking is pending confirmation. Check status on your dashboard — we'll also
+                email you when it's approved, cancelled, or postponed.
               </p>
               {selectedSlot && (
                 <p className="text-xs text-muted-foreground">
@@ -354,6 +455,8 @@ function PortalBookCall() {
                   setSelectedSlot(null);
                   setConfirmationId(null);
                   setNotes("");
+                  setSpecifyTopic("");
+                  setCustomDuration(null);
                 }}
               >
                 Book another

@@ -133,6 +133,28 @@ export const DEFAULT_CRM_AUTOMATION_RULES: AutomationRule[] = [
     templateBody:
       "Hi {{customerName}}, CRM ticket {{ticketNumber}} for {{accountName}} is now closed. Status: {{status}}.",
   }),
+  rule({
+    id: "crm-rule-booking-created-email",
+    name: "Booking request — Executive email",
+    description: "Notify the host executive when a portal client requests a call",
+    trigger: "booking-created",
+    channel: "email",
+    isActive: true,
+    templateSubject: "New booking request — {{eventTypeTitle}} · {{accountName}}",
+    templateBody:
+      "Hi {{hostName}},\n\n{{guestName}} requested a {{eventTypeTitle}} for {{accountName}}.\n\nWhen: {{startsAt}} – {{endsAt}}\nGuest: {{guestName}} ({{guestEmail}})\nStatus: {{status}}\n\nReview in CRM Bookings: {{bookingUrl}}",
+  }),
+  rule({
+    id: "crm-rule-booking-status-email",
+    name: "Booking status — Customer email",
+    description: "Notify the guest when a booking is approved, cancelled, or postponed",
+    trigger: "booking-status-changed",
+    channel: "email",
+    isActive: true,
+    templateSubject: "Your call is {{status}} — {{eventTypeTitle}}",
+    templateBody:
+      "Hi {{guestName}},\n\nYour {{eventTypeTitle}} with {{hostName}} is now {{status}}.\n\nWhen: {{startsAt}} – {{endsAt}}\nAccount: {{accountName}}\n\nIf you need another time, open your portal and book again.",
+  }),
 ];
 
 export const CRM_AUTOMATION_TEMPLATE_VARS = [
@@ -145,6 +167,15 @@ export const CRM_AUTOMATION_TEMPLATE_VARS = [
   "{{ticketUrl}}",
   "{{subject}}",
   "{{title}}",
+  "{{guestName}}",
+  "{{guestEmail}}",
+  "{{hostName}}",
+  "{{eventTypeTitle}}",
+  "{{startsAt}}",
+  "{{endsAt}}",
+  "{{previousStatus}}",
+  "{{bookingId}}",
+  "{{bookingUrl}}",
 ] as const;
 
 export const CRM_AUTOMATION_SAMPLE_VARS: Record<string, string> = {
@@ -157,4 +188,13 @@ export const CRM_AUTOMATION_SAMPLE_VARS: Record<string, string> = {
   ticketUrl: "https://track.example.com/crm/support/TKT-2201",
   subject: "Onboarding checklist stuck",
   title: "Onboarding checklist stuck",
+  guestName: "Amit Verma",
+  guestEmail: "amit@horizon.example",
+  hostName: "Priya Sales",
+  eventTypeTitle: "Query",
+  startsAt: "2026-08-20 10:00",
+  endsAt: "2026-08-20 10:15",
+  previousStatus: "pending",
+  bookingId: "bk-1001",
+  bookingUrl: "https://track.example.com/crm/bookings",
 };

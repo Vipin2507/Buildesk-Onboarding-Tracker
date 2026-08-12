@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Plus } from "lucide-react";
 
@@ -16,13 +16,30 @@ import {
   PortalTicketTableCard,
 } from "@/components/design-ticket/portal-ticket-shared";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { isDesignTicketActive, isDesignTicketSolved, useDesignTicketStats } from "@/stores/design-ticket-selectors";
+import { useBookingStore } from "@/stores/useBookingStore";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
 import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
+import { BOOKING_STATUS_LABEL, type BookingAppointment } from "@/types/booking";
 
 export const Route = createFileRoute("/portal/$slug/dashboard")({
   component: PortalDashboard,
 });
+
+function formatWhen(iso: string) {
+  const date = iso.slice(0, 10);
+  const time = iso.slice(11, 16);
+  return `${date} · ${time}`;
+}
+
+function statusTone(status: string) {
+  if (status === "confirmed") return "text-success";
+  if (status === "pending") return "text-warning-foreground";
+  if (status === "postponed") return "text-info";
+  if (status === "cancelled" || status === "declined") return "text-destructive";
+  return "text-muted-foreground";
+}
 
 function PortalDashboard() {
   const { slug } = Route.useParams();
@@ -30,6 +47,15 @@ function PortalDashboard() {
   const access = useCompanyPortalStore((s) => s.getBySlug(slug));
   const tickets = useDesignTicketStore((s) => s.tickets);
   const stats = useDesignTicketStats(access?.companyId);
+  const listPortalAppointments = useBookingStore((s) => s.listPortalAppointments);
+  const [bookings, setBookings] = useState<BookingAppointment[]>([]);
+
+  useEffect(() => {
+    if (!access) return;
+    void listPortalAppointments(slug, access.contactEmail || undefined)
+      .then(setBookings)
+      .catch(() => setBookings([]));
+  }, [access, listPortalAppointments, slug]);
 
   if (!access) return null;
 
@@ -41,6 +67,7 @@ function PortalDashboard() {
   const solved = companyTickets.filter((t) => isDesignTicketSolved(t.status));
 
   const pendingCount = stats.open + stats.inProgress;
+  const recentBookings = bookings.slice(0, 8);
 
   const kpiCards = useMemo(
     () => [
@@ -122,7 +149,50 @@ function PortalDashboard() {
         <DesignTicketKpiGrid items={kpiCards} columns={4} size="compact" />
       </motion.div>
 
-      <PortalTicketTableCard title="My Current Tickets" delay={0.06}>
+      <PortalTicketTableCard
+        title="Booked calls"
+        delay={0.04}
+        action={
+          <Link
+            to="/portal/$slug/book"
+            params={{ slug }}
+            className="text-xs font-medium text-primary hover:underline"
+          >
+            Book a call
+          </Link>
+        }
+      >
+        {recentBookings.length === 0 ? (
+          <p className="p-4 text-sm text-muted-foreground">
+            No booked calls yet.{" "}
+            <Link to="/portal/$slug/book" params={{ slug }} className="text-primary hover:underline">
+              Request a call
+            </Link>{" "}
+            to see status here.
+          </p>
+        ) : (
+          <div className="divide-y">
+            {recentBookings.map((appt) => (
+              <div
+                key={appt.id}
+                className="flex flex-wrap items-center justify-between gap-2 px-4 py-3"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-medium">{formatWhen(appt.startsAt)}</div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {appt.notes?.split("\n")[0] || "Call request"}
+                  </div>
+                </div>
+                <span className={cn("text-xs font-semibold", statusTone(appt.status))}>
+                  {BOOKING_STATUS_LABEL[appt.status] ?? appt.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </PortalTicketTableCard>
+
+      <PortalTicketTableCard title="My Current Tickets" delay={0.06} className="mt-8">
         {current.length === 0 ? (
           <div className="p-4">
             <EmptyPortalCurrent slug={slug} />

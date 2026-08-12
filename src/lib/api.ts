@@ -180,6 +180,7 @@ export {
 export {
   listPortalBookingEventTypes,
   listPortalBookingSlots,
+  listPortalBookings,
   createPortalBooking,
   ensureBookingDefaults,
   ensureBookingDefaultsBatch,

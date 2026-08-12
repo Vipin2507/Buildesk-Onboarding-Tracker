@@ -1,5 +1,6 @@
 import type {
   BookingAppointment,
+  BookingAppointmentStatus,
   BookingAvailability,
   BookingBlock,
   BookingEventType,
@@ -18,12 +19,36 @@ import {
   listBookingEventTypes,
   listPortalBookingEventTypes,
   listPortalBookingSlots,
+  listPortalBookings,
   listStaffBookingSlots,
   replaceBookingAvailability,
   rescheduleBookingAppointment,
   updateBookingAppointmentStatus,
 } from "@/lib/api";
+import { dispatchCrmBookingAutomationTrigger } from "@/services/crm-automation";
+import {
+  getCrmMasterBookingCallTypes,
+  getCrmMasterBookingHostHours,
+} from "@/stores/useCrmMasterStore";
 import { createStore } from "./persist";
+
+function masterCatalogPayload() {
+  const callTypes = getCrmMasterBookingCallTypes()
+    .filter((c) => c.isActive)
+    .map((c) => ({
+      key: c.key,
+      label: c.label,
+      durationMinutes: c.durationMinutes,
+      isActive: c.isActive,
+    }));
+  const hostHours = getCrmMasterBookingHostHours().map((h) => ({
+    weekday: h.weekday,
+    startTime: h.startTime,
+    endTime: h.endTime,
+    enabled: h.enabled,
+  }));
+  return { callTypes, hostHours };
+}
 
 type BookingState = {
   eventTypes: BookingEventType[];
@@ -44,7 +69,9 @@ type BookingState = {
     eventTypeId: string,
     from: string,
     to: string,
+    durationMinutes?: number,
   ) => Promise<BookingSlot[]>;
+  listPortalAppointments: (slug: string, guestEmail?: string) => Promise<BookingAppointment[]>;
   createPortalRequest: (input: {
     slug: string;
     eventTypeId: string;
@@ -53,10 +80,12 @@ type BookingState = {
     guestEmail: string;
     guestPhone?: string;
     notes?: string;
+    durationMinutes?: number;
   }) => Promise<BookingAppointment>;
   acceptAppointment: (id: string, hostNote?: string) => Promise<BookingAppointment>;
   declineAppointment: (id: string, hostNote?: string) => Promise<BookingAppointment>;
   cancelAppointment: (id: string, hostNote?: string) => Promise<BookingAppointment>;
+  postponeAppointment: (id: string, hostNote?: string) => Promise<BookingAppointment>;
   rescheduleAppointment: (id: string, startsAt: string) => Promise<BookingAppointment>;
   listSlotsForEvent: (eventTypeId: string, from: string, to: string) => Promise<BookingSlot[]>;
   saveAvailabilityWindows: (input: {
@@ -73,6 +102,18 @@ type BookingState = {
   }) => Promise<BookingBlock>;
   removeBlock: (id: string) => Promise<void>;
 };
+
+function fireStatusChange(updated: BookingAppointment, previousStatus: BookingAppointmentStatus) {
+  if (previousStatus === updated.status) return;
+  if (
+    updated.status === "confirmed" ||
+    updated.status === "cancelled" ||
+    updated.status === "postponed" ||
+    updated.status === "declined"
+  ) {
+    dispatchCrmBookingAutomationTrigger("booking-status-changed", updated, { previousStatus });
+  }
+}
 
 export const useBookingStore = createStore<BookingState>((set, get) => ({
   eventTypes: [],
@@ -95,14 +136,16 @@ export const useBookingStore = createStore<BookingState>((set, get) => ({
     }),
 
   ensureDefaults: async (companyId) => {
-    const result = await ensureBookingDefaults({ data: { companyId } });
+    const catalog = masterCatalogPayload();
+    const result = await ensureBookingDefaults({
+      data: { companyId, ...catalog },
+    });
     if (result.skipped) return;
     set((s) => {
-      const others = s.eventTypes.filter(
-        (e) => !(e.companyId === companyId && e.slug === result.eventType.slug),
-      );
+      const byId = new Map(s.eventTypes.map((e) => [e.id, e]));
+      for (const et of result.eventTypes) byId.set(et.id, et);
       return {
-        eventTypes: [...others, result.eventType],
+        eventTypes: [...byId.values()],
         availability:
           result.availability.length > 0
             ? [
@@ -116,7 +159,10 @@ export const useBookingStore = createStore<BookingState>((set, get) => ({
 
   ensureDefaultsBatch: async (companyIds) => {
     if (companyIds.length === 0) return;
-    const result = await ensureBookingDefaultsBatch({ data: { companyIds } });
+    const catalog = masterCatalogPayload();
+    const result = await ensureBookingDefaultsBatch({
+      data: { companyIds, ...catalog },
+    });
     set((s) => {
       const byId = new Map(s.eventTypes.map((e) => [e.id, e]));
       for (const et of result.eventTypes) byId.set(et.id, et);
@@ -142,7 +188,9 @@ export const useBookingStore = createStore<BookingState>((set, get) => ({
   },
 
   listPortalEventTypes: async (slug) => {
-    const rows = await listPortalBookingEventTypes({ data: { slug } });
+    const rows = await listPortalBookingEventTypes({
+      data: { slug },
+    });
     set((s) => {
       const byId = new Map(s.eventTypes.map((e) => [e.id, e]));
       for (const row of rows) byId.set(row.id, row);
@@ -151,36 +199,67 @@ export const useBookingStore = createStore<BookingState>((set, get) => ({
     return rows;
   },
 
-  listPortalSlots: (slug, eventTypeId, from, to) =>
-    listPortalBookingSlots({ data: { slug, eventTypeId, from, to } }),
+  listPortalSlots: (slug, eventTypeId, from, to, durationMinutes) =>
+    listPortalBookingSlots({
+      data: { slug, eventTypeId, from, to, durationMinutes },
+    }),
+
+  listPortalAppointments: async (slug, guestEmail) => {
+    const rows = await listPortalBookings({
+      data: { slug, guestEmail },
+    });
+    set((s) => {
+      const byId = new Map(s.appointments.map((a) => [a.id, a]));
+      for (const row of rows) byId.set(row.id, row);
+      return { appointments: [...byId.values()] };
+    });
+    return rows;
+  },
 
   createPortalRequest: async (input) => {
     const created = await createPortalBooking({ data: input });
     get().mergeAppointment(created);
+    dispatchCrmBookingAutomationTrigger("booking-created", created);
     return created;
   },
 
   acceptAppointment: async (id, hostNote) => {
+    const prev = get().appointments.find((a) => a.id === id);
     const updated = await updateBookingAppointmentStatus({
       data: { id, status: "confirmed", hostNote },
     });
     get().mergeAppointment(updated);
+    fireStatusChange(updated, prev?.status ?? "pending");
     return updated;
   },
 
   declineAppointment: async (id, hostNote) => {
+    const prev = get().appointments.find((a) => a.id === id);
     const updated = await updateBookingAppointmentStatus({
       data: { id, status: "declined", hostNote },
     });
     get().mergeAppointment(updated);
+    fireStatusChange(updated, prev?.status ?? "pending");
     return updated;
   },
 
   cancelAppointment: async (id, hostNote) => {
+    const prev = get().appointments.find((a) => a.id === id);
     const updated = await updateBookingAppointmentStatus({
       data: { id, status: "cancelled", hostNote },
     });
     get().mergeAppointment(updated);
+    fireStatusChange(updated, prev?.status ?? "confirmed");
+    return updated;
+  },
+
+  postponeAppointment: async (id, hostNote) => {
+    const prev = get().appointments.find((a) => a.id === id);
+    const updated = await updateBookingAppointmentStatus({
+      data: { id, status: "postponed", hostNote },
+    });
+    get().mergeAppointment(updated);
+    fireStatusChange(updated, prev?.status ?? "confirmed");
     return updated;
   },
 

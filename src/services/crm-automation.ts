@@ -5,12 +5,17 @@ import type {
   AutomationHealthConfig,
   AutomationLog,
   AutomationPayload,
+  AutomationRule,
   AutomationTrigger,
 } from "@/types/automation";
-import type { Ticket } from "@/types";
+import type { Ticket, TicketStatus } from "@/types";
+import type { BookingAppointment, BookingAppointmentStatus } from "@/types/booking";
+import { BOOKING_STATUS_LABEL } from "@/types/booking";
 import { useCrmAutomationStore } from "@/stores/useCrmAutomationStore";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
 import { useCrmAccountStore } from "@/stores/useCrmAccountStore";
+import { useBookingStore } from "@/stores/useBookingStore";
+import { useUserStore } from "@/stores/useUserStore";
 import {
   renderAutomationSubject,
   renderAutomationTemplate,
@@ -22,8 +27,6 @@ import {
   N8N_EMAIL_SEGMENT,
   N8N_HEALTH_SEGMENT,
 } from "@/data/crm-automation-defaults";
-import type { AutomationRule } from "@/types/automation";
-import type { TicketStatus } from "@/types";
 
 function logId() {
   return `CAL-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -66,10 +69,10 @@ function buildN8nPayload(
     emailSubject: payload.subject,
     emailCc: mergeEmailCc(settings.emailCc, ruleMeta?.emailCc),
     delayHours: 0,
-    entityType: "crm-ticket",
+    entityType: payload.bookingId ? "crm-booking" : "crm-ticket",
     productScope: "crm",
-    entityId: payload.ticketNumber,
-    entityName: payload.subject,
+    entityId: payload.bookingId ?? payload.ticketNumber,
+    entityName: payload.eventTypeTitle ?? payload.subject,
     wahaApiUrl: waha.apiUrl,
     wahaApiKey: waha.apiKey,
     wahaSession: waha.sessionName,
@@ -83,6 +86,14 @@ function buildN8nPayload(
     status: payload.status,
     message: payload.message,
     ticketUrl: payload.ticketUrl,
+    bookingId: payload.bookingId,
+    bookingUrl: payload.bookingUrl,
+    eventTypeTitle: payload.eventTypeTitle,
+    startsAt: payload.startsAt,
+    endsAt: payload.endsAt,
+    hostName: payload.hostName,
+    guestName: payload.guestName,
+    guestEmail: payload.guestEmail,
   };
 }
 
@@ -529,4 +540,124 @@ export function notifyCrmAutomationResult(log: AutomationLog, label: string) {
       duration: 5500,
     });
   }
+}
+
+function formatBookingWhen(iso: string) {
+  const d = iso.slice(0, 10);
+  const t = iso.slice(11, 16);
+  return `${d} ${t}`;
+}
+
+/** Notify executive (host) on new booking, or guest on status change. */
+export function dispatchCrmBookingAutomationTrigger(
+  trigger: "booking-created" | "booking-status-changed",
+  appointment: BookingAppointment,
+  opts?: { previousStatus?: BookingAppointmentStatus },
+): void {
+  void (async () => {
+    const store = useCrmAutomationStore.getState();
+    if (!store.settings.automationsEnabled) return;
+    const rules = store.rules.filter((r) => r.isActive && r.trigger === trigger);
+    if (rules.length === 0) return;
+
+    const account = useCrmAccountStore.getState().getById(appointment.companyId);
+    const eventType = useBookingStore
+      .getState()
+      .eventTypes.find((e) => e.id === appointment.eventTypeId);
+    const host = useUserStore.getState().users.find((u) => u.id === appointment.hostUserId);
+    const accountName = account?.name ?? "CRM account";
+    const eventTitle = eventType?.title ?? "Call";
+    const statusLabel = BOOKING_STATUS_LABEL[appointment.status] ?? appointment.status;
+    const bookingUrl =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/crm/bookings`
+        : "/crm/bookings";
+
+    const hostName = host?.name ?? "Host";
+    const hostEmail = host?.email;
+    const guestName = appointment.guestName;
+    const guestEmail = appointment.guestEmail;
+
+    const recipientName = trigger === "booking-created" ? hostName : guestName;
+    const recipientEmail = trigger === "booking-created" ? hostEmail : guestEmail;
+    const recipientPhone =
+      trigger === "booking-created" ? host?.phone : appointment.guestPhone;
+
+    const vars: Record<string, string> = {
+      customerName: recipientName,
+      accountName,
+      companyName: accountName,
+      salesManagerName: account?.salesManagerName ?? hostName,
+      status: statusLabel,
+      previousStatus: opts?.previousStatus
+        ? BOOKING_STATUS_LABEL[opts.previousStatus] ?? opts.previousStatus
+        : "",
+      guestName,
+      guestEmail,
+      hostName,
+      hostEmail: hostEmail ?? "",
+      eventTypeTitle: eventTitle,
+      title: eventTitle,
+      subject: eventTitle,
+      startsAt: formatBookingWhen(appointment.startsAt),
+      endsAt: formatBookingWhen(appointment.endsAt),
+      bookingId: appointment.id,
+      bookingUrl,
+      ticketNumber: appointment.id,
+      ticketUrl: bookingUrl,
+    };
+
+    for (const rule of rules) {
+      const endpoint = store.endpoints.find((e) => e.channel === rule.channel);
+      if (!endpoint) continue;
+
+      const message = renderAutomationTemplate(rule.templateBody, vars);
+      const payload: AutomationPayload = {
+        channel: rule.channel,
+        trigger,
+        ticketNumber: appointment.id,
+        companyName: accountName,
+        customerName: recipientName,
+        customerEmail: recipientEmail,
+        customerPhone: recipientPhone,
+        subject: renderAutomationSubject(rule.templateSubject, vars),
+        status: statusLabel,
+        message,
+        ticketUrl: bookingUrl,
+        bookingId: appointment.id,
+        bookingUrl,
+        eventTypeTitle: eventTitle,
+        startsAt: vars.startsAt,
+        endsAt: vars.endsAt,
+        previousStatus: vars.previousStatus,
+        hostName,
+        hostEmail,
+        guestName,
+        guestEmail,
+      };
+
+      const log = await sendCrmAutomationRequest(endpoint, payload, {
+        ticketId: appointment.id,
+        companyId: appointment.companyId,
+        templateId: rule.id,
+        templateName: rule.name,
+        emailCc: rule.emailCc,
+      });
+
+      const channelLabel = rule.channel === "email" ? "Email" : "WhatsApp";
+      if (log.status === "success") {
+        toast.success(`CRM ${channelLabel} notification sent`, {
+          description: `${rule.name} · ${eventTitle}`,
+          duration: 3500,
+        });
+      } else {
+        toast.warning(`CRM ${channelLabel} notification failed`, {
+          description: log.errorMessage ?? "Check CRM Automation logs",
+          duration: 5000,
+        });
+      }
+    }
+  })().catch((err) => {
+    console.warn("[crm-automation] booking dispatch failed", err);
+  });
 }

@@ -37,7 +37,9 @@ export type AutomationTrigger =
   | "ticket-created"
   | "ticket-updated"
   | "ticket-closed"
-  | "ticket-reply-from-team";
+  | "ticket-reply-from-team"
+  | "booking-created"
+  | "booking-status-changed";
 
 export interface AutomationRule {
   id: string;
@@ -105,11 +107,22 @@ export type AutomationPayload = {
   customerEmail?: string;
   customerPhone?: string;
   subject: string;
-  status: TicketStatus;
+  status: string;
   message: string;
   ticketUrl?: string;
   /** Set when sent from Automation → Test (not a real ticket event). */
   test?: boolean;
+  /** Booking fields (optional). */
+  bookingId?: string;
+  bookingUrl?: string;
+  eventTypeTitle?: string;
+  startsAt?: string;
+  endsAt?: string;
+  previousStatus?: string;
+  hostName?: string;
+  hostEmail?: string;
+  guestName?: string;
+  guestEmail?: string;
 };
 
 export const AUTOMATION_TRIGGERS: { value: AutomationTrigger; label: string }[] = [
@@ -117,14 +130,26 @@ export const AUTOMATION_TRIGGERS: { value: AutomationTrigger; label: string }[] 
   { value: "ticket-updated", label: "Ticket updated" },
   { value: "ticket-closed", label: "Ticket closed" },
   { value: "ticket-reply-from-team", label: "Team reply on ticket" },
+  { value: "booking-created", label: "Booking request (executive)" },
+  { value: "booking-status-changed", label: "Booking status (customer)" },
 ];
 
 export const AUTOMATION_TEMPLATE_VARS = [
   "{{customerName}}",
   "{{ticketNumber}}",
   "{{companyName}}",
+  "{{accountName}}",
   "{{status}}",
   "{{ticketUrl}}",
   "{{subject}}",
   "{{title}}",
+  "{{guestName}}",
+  "{{guestEmail}}",
+  "{{hostName}}",
+  "{{eventTypeTitle}}",
+  "{{startsAt}}",
+  "{{endsAt}}",
+  "{{previousStatus}}",
+  "{{bookingId}}",
+  "{{bookingUrl}}",
 ] as const;

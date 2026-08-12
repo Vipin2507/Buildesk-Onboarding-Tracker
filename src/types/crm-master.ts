@@ -84,3 +84,23 @@ export type CrmTrainingFieldDef = {
   label: string;
   category: string;
 };
+
+/** Call / meeting types for portal booking (Master → Bookings). */
+export type CrmBookingCallTypeDef = {
+  key: string;
+  label: string;
+  /** Slot length used when generating open times. */
+  durationMinutes: number;
+  /** When true, guest may specify a custom duration (e.g. Other). */
+  allowsCustomDuration: boolean;
+  isActive: boolean;
+  order: number;
+};
+
+/** Weekly host availability windows (Master → Bookings). */
+export type CrmBookingHostHoursDef = {
+  weekday: number;
+  startTime: string;
+  endTime: string;
+  enabled: boolean;
+};

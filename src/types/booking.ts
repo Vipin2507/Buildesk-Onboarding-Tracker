@@ -5,6 +5,7 @@ export type BookingAppointmentStatus =
   | "confirmed"
   | "declined"
   | "cancelled"
+  | "postponed"
   | "completed";
 
 export type BookingCreatedVia = "portal" | "crm";
@@ -73,3 +74,12 @@ export const DEFAULT_BOOKING_TIMEZONE = "Asia/Kolkata";
 export const DEFAULT_BOOKING_DURATION_MINUTES = 30;
 export const DEFAULT_BOOKING_EVENT_SLUG = "discovery-call";
 export const DEFAULT_BOOKING_EVENT_TITLE = "Discovery / Onboarding call";
+
+export const BOOKING_STATUS_LABEL: Record<BookingAppointmentStatus, string> = {
+  pending: "Pending",
+  confirmed: "Approved",
+  declined: "Declined",
+  cancelled: "Cancelled",
+  postponed: "Postponed",
+  completed: "Completed",
+};

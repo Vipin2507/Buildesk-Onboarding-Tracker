@@ -81,13 +81,26 @@ export const useCrmAutomationStore = createPersistedStore<AutomationState>(
       const usesLegacyCrmSegment =
         s.endpoints.some((e) => e.webhookUrl.includes("buildesk-crm-")) ||
         s.healthCheck?.webhookUrl?.includes("buildesk-crm-");
+
+      const existingRules = s.rules.length > 0 ? s.rules : DEFAULT_CRM_AUTOMATION_RULES;
+      const byId = new Map(existingRules.map((r) => [r.id, r]));
+      let addedSeedRules = false;
+      for (const seed of DEFAULT_CRM_AUTOMATION_RULES) {
+        if (!byId.has(seed.id)) {
+          byId.set(seed.id, seed);
+          addedSeedRules = true;
+        }
+      }
+      const mergedRules = [...byId.values()];
+
       if (
         s.seeded &&
         s.rules.length > 0 &&
         !needsWaha &&
         !needsProvider &&
         !needsSettings &&
-        !usesLegacyCrmSegment
+        !usesLegacyCrmSegment &&
+        !addedSeedRules
       ) {
         return;
       }
@@ -101,7 +114,7 @@ export const useCrmAutomationStore = createPersistedStore<AutomationState>(
           usesLegacyCrmSegment || !s.healthCheck?.webhookUrl
             ? { ...DEFAULT_CRM_HEALTH_CONFIG }
             : s.healthCheck,
-        rules: s.rules.length > 0 ? s.rules : DEFAULT_CRM_AUTOMATION_RULES,
+        rules: mergedRules,
         seeded: true,
       });
     },
