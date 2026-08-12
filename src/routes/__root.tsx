@@ -17,6 +17,7 @@ import { TopBar } from "@/components/topbar";
 import { Toaster } from "@/components/ui/sonner";
 import { StoreHydrationGate } from "@/components/store-hydration-gate";
 import { AuthGate } from "@/components/auth-gate";
+import { NavigationLoadingOverlay } from "@/components/navigation-loading-overlay";
 import { ServerDataBootstrap } from "@/components/server-data-bootstrap";
 import { DesignTicketBootstrap } from "@/components/design-ticket-bootstrap";
 import { ChatBootstrap } from "@/components/chat/chat-bootstrap";
@@ -158,6 +159,7 @@ function RootComponent() {
                 <Outlet />
               ) : (
                 <ServerDataBootstrap>
+                  <NavigationLoadingOverlay />
                   <DesignTicketBootstrap />
                   <ChatBootstrap />
                   <ChatNotificationListener />

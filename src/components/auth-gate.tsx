@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 
+import { AppLoadingScreen } from "@/components/app-loading-screen";
 import { authMe } from "@/lib/api";
 import { homePathForUser, isCrmUser } from "@/lib/product-scope";
 import { useAuthStore } from "@/stores";
@@ -12,11 +13,7 @@ function isPublicPath(pathname: string) {
 }
 
 function RedirectingScreen({ message }: { message: string }) {
-  return (
-    <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
-      {message}
-    </div>
-  );
+  return <AppLoadingScreen message={message} />;
 }
 
 export function AuthGate({ children }: { children: ReactNode }) {

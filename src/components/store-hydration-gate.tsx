@@ -1,4 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
+
+import { AppLoadingScreen } from "@/components/app-loading-screen";
 import { rehydrateAllStores } from "@/stores/rehydrate";
 
 export function StoreHydrationGate({ children }: { children: ReactNode }) {
@@ -19,14 +21,7 @@ export function StoreHydrationGate({ children }: { children: ReactNode }) {
   }, []);
 
   if (!ready) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          <p className="text-sm text-muted-foreground">Loading Buildesk…</p>
-        </div>
-      </div>
-    );
+    return <AppLoadingScreen message="Starting Buildesk…" />;
   }
 
   return <>{children}</>;

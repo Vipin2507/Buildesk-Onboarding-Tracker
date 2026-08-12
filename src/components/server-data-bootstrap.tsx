@@ -1,5 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 
+import { AppLoadingScreen } from "@/components/app-loading-screen";
+
 import {
   getIntegrationsBundle,
   getLaborBundle,
@@ -450,9 +452,14 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
 
   if (!ready) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
-        Syncing data from server…
-      </div>
+      <AppLoadingScreen
+        messages={[
+          "Preparing your workspace…",
+          "Loading accounts & projects…",
+          "Syncing CRM & bookings…",
+          "Almost ready…",
+        ]}
+      />
     );
   }
 
