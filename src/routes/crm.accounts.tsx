@@ -621,6 +621,7 @@ function CrmAccountsPage() {
                 getRowId={(r) => r.id}
                 searchKeys={[
                   "name",
+                  "userId",
                   "city",
                   "contact",
                   "email",
@@ -657,6 +658,16 @@ function CrmAccountsPage() {
                           {r.region ? ` · ${r.region}` : ""}
                         </div>
                       </div>
+                    ),
+                  },
+                  {
+                    key: "userId",
+                    header: "User ID",
+                    sortable: true,
+                    render: (r) => (
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {r.userId?.trim() || "—"}
+                      </span>
                     ),
                   },
                   {

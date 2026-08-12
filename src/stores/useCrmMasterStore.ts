@@ -12,6 +12,7 @@ import {
   CRM_SEED_PLATFORM,
   CRM_SEED_PROJECT_FIELDS,
 } from "@/data/crm-master-seed";
+import { seedCrmModuleProviders } from "@/data/crm-onboarding-defaults";
 import { createPersistedStore, touch } from "./persist";
 
 type CrmMasterState = {
@@ -20,6 +21,8 @@ type CrmMasterState = {
   projectFields: CrmMasterFieldDef[];
   picklists: CrmMasterPicklist[];
   modules: CrmMasterModuleDef[];
+  /** Integration module key → provider display names (editable in Master). */
+  moduleProviders: Record<string, string[]>;
 
   updatePlatform: (data: Partial<CrmMasterPlatformSettings>) => void;
 
@@ -36,6 +39,7 @@ type CrmMasterState = {
   deletePicklist: (id: string) => void;
 
   updateModule: (id: string, data: Partial<CrmMasterModuleDef>) => void;
+  setModuleProviders: (moduleKey: string, providers: string[]) => void;
 
   resetAll: () => void;
 };
@@ -47,6 +51,7 @@ function seedState() {
     projectFields: CRM_SEED_PROJECT_FIELDS.map((f) => ({ ...f })),
     picklists: CRM_SEED_PICKLISTS.map((p) => ({ ...p, values: [...p.values] })),
     modules: CRM_SEED_MODULES.map((m) => ({ ...m })),
+    moduleProviders: seedCrmModuleProviders(),
   };
 }
 
@@ -59,6 +64,20 @@ function normalizePlatform(platform: CrmMasterPlatformSettings): CrmMasterPlatfo
     brandPrimary: platform.brandPrimary ?? CRM_SEED_PLATFORM.brandPrimary,
     registeredAddress: platform.registeredAddress ?? CRM_SEED_PLATFORM.registeredAddress,
   };
+}
+
+function normalizeModuleProviders(
+  existing: Record<string, string[]> | undefined,
+): Record<string, string[]> {
+  const seed = seedCrmModuleProviders();
+  if (!existing || typeof existing !== "object") return seed;
+  const out: Record<string, string[]> = { ...seed };
+  for (const [key, values] of Object.entries(existing)) {
+    if (Array.isArray(values) && values.length > 0) {
+      out[key] = values.map((v) => String(v).trim()).filter(Boolean);
+    }
+  }
+  return out;
 }
 
 export const useCrmMasterStore = createPersistedStore<CrmMasterState>(
@@ -118,6 +137,15 @@ export const useCrmMasterStore = createPersistedStore<CrmMasterState>(
       }));
     },
 
+    setModuleProviders: (moduleKey, providers) => {
+      set((s) => ({
+        moduleProviders: {
+          ...normalizeModuleProviders(s.moduleProviders),
+          [moduleKey]: providers.map((p) => p.trim()).filter(Boolean),
+        },
+      }));
+    },
+
     resetAll: () => {
       set(seedState());
     },
@@ -126,4 +154,9 @@ export const useCrmMasterStore = createPersistedStore<CrmMasterState>(
 
 export function getCrmPicklistValues(key: string): string[] {
   return useCrmMasterStore.getState().picklists.find((p) => p.key === key)?.values ?? [];
+}
+
+/** Safe read for older persisted snapshots missing moduleProviders. */
+export function getCrmMasterModuleProviders(): Record<string, string[]> {
+  return normalizeModuleProviders(useCrmMasterStore.getState().moduleProviders);
 }

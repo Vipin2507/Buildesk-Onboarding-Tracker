@@ -60,9 +60,13 @@ import {
   calcModuleWorkflowProgress,
   crmPendingActivityCount,
   moduleRequiresProvider,
-  providerOptionsFor,
 } from "@/data/crm-onboarding-defaults";
 import { calcChecklistProgress } from "@/lib/checklist";
+import {
+  CRM_PROVIDER_OTHER,
+  isCustomCrmProvider,
+  useCrmProviderOptions,
+} from "@/lib/crm-providers";
 import { resolveAssigneeLabel } from "@/lib/managers";
 import { cn, formatDate } from "@/lib/utils";
 import { isTicketOpen } from "@/lib/tickets";
@@ -440,10 +444,80 @@ function StatCard({ label, value, bar }: { label: string; value: string; bar?: n
   );
 }
 
+function ModuleProviderSelect({
+  companyId,
+  moduleKey,
+  moduleLabel,
+  provider,
+}: {
+  companyId: string;
+  moduleKey: CrmProductModuleKey;
+  moduleLabel: string;
+  provider?: string;
+}) {
+  const setModuleProvider = useCrmOnboardingStore((s) => s.setModuleProvider);
+  const options = useCrmProviderOptions(moduleKey);
+  const custom = isCustomCrmProvider(moduleKey, provider);
+  const [customDraft, setCustomDraft] = useState(custom ? (provider ?? "") : "");
+  const selectValue = custom ? CRM_PROVIDER_OTHER : (provider ?? "");
+
+  useEffect(() => {
+    setCustomDraft(isCustomCrmProvider(moduleKey, provider) ? (provider ?? "") : "");
+  }, [moduleKey, provider]);
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <select
+        className={cn(ticketSelectClass, "h-7 w-40 text-[11px]")}
+        value={selectValue}
+        onChange={(e) => {
+          const value = e.target.value;
+          if (value === CRM_PROVIDER_OTHER) {
+            setCustomDraft(custom ? (provider ?? "") : "");
+            if (!custom) setModuleProvider(companyId, moduleKey, "");
+            return;
+          }
+          setCustomDraft("");
+          setModuleProvider(companyId, moduleKey, value);
+          if (value) toast.success(`${moduleLabel} → ${value}`);
+        }}
+      >
+        <option value="">Select provider</option>
+        {options.map((p) => (
+          <option key={p} value={p}>
+            {p}
+          </option>
+        ))}
+      </select>
+      {selectValue === CRM_PROVIDER_OTHER ? (
+        <input
+          className={cn(ticketFieldClass, "h-7 w-40 text-[11px]")}
+          placeholder="Provider name…"
+          value={customDraft}
+          onChange={(e) => setCustomDraft(e.target.value)}
+          onBlur={() => {
+            const next = customDraft.trim();
+            if (!next) {
+              setModuleProvider(companyId, moduleKey, "");
+              return;
+            }
+            setModuleProvider(companyId, moduleKey, next);
+            toast.success(`${moduleLabel} → ${next}`);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              (e.target as HTMLInputElement).blur();
+            }
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 function ModulesTab({ companyId }: { companyId: string }) {
   const record = useCrmOnboardingStore((s) => s.getByCompanyId(companyId))!;
   const setEnabled = useCrmOnboardingStore((s) => s.setProductModuleEnabled);
-  const setModuleProvider = useCrmOnboardingStore((s) => s.setModuleProvider);
   const toggleStep = useCrmOnboardingStore((s) => s.toggleModuleWorkflowStep);
   const setStepDate = useCrmOnboardingStore((s) => s.setModuleWorkflowStepDate);
 
@@ -538,23 +612,12 @@ function ModulesTab({ companyId }: { companyId: string }) {
                       </div>
                       <div className="flex items-center gap-2">
                         {requiresProvider ? (
-                          <select
-                            className={cn(ticketSelectClass, "h-7 w-40 text-[11px]")}
-                            value={m.provider ?? ""}
-                            onChange={(e) => {
-                              setModuleProvider(companyId, m.key, e.target.value);
-                              if (e.target.value) {
-                                toast.success(`${m.label} → ${e.target.value}`);
-                              }
-                            }}
-                          >
-                            <option value="">Select provider</option>
-                            {providerOptionsFor(m.key).map((p) => (
-                              <option key={p} value={p}>
-                                {p}
-                              </option>
-                            ))}
-                          </select>
+                          <ModuleProviderSelect
+                            companyId={companyId}
+                            moduleKey={m.key}
+                            moduleLabel={m.label}
+                            provider={m.provider}
+                          />
                         ) : null}
                         <Switch
                           size="sm"

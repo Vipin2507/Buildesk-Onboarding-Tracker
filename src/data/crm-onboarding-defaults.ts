@@ -21,6 +21,8 @@ import type {
 import { calcChecklistProgress, isChecklistItemComplete } from "@/lib/checklist";
 
 /** Integration modules delivered via a third-party provider, with the vendor options for each. */
+export const CRM_PROVIDER_OTHER = "Other";
+
 export const CRM_MODULE_PROVIDERS: Partial<Record<CrmProductModuleKey, string[]>> = {
   "whatsapp-integration": ["Gupshup", "WATI", "Interakt", "Meta Cloud API", "Twilio", "Kaleyra"],
   "sms-integration": ["MSG91", "Twilio", "Kaleyra", "Textlocal", "Gupshup", "Airtel IQ"],
@@ -35,8 +37,18 @@ export function moduleRequiresProvider(key: CrmProductModuleKey): boolean {
   return key in CRM_MODULE_PROVIDERS;
 }
 
+/** Built-in defaults only — prefer resolveCrmProviderOptions() for UI (includes Master edits + Other). */
 export function providerOptionsFor(key: CrmProductModuleKey): string[] {
-  return CRM_MODULE_PROVIDERS[key] ?? [];
+  const base = CRM_MODULE_PROVIDERS[key] ?? [];
+  return [...base.filter((p) => p !== CRM_PROVIDER_OTHER), CRM_PROVIDER_OTHER];
+}
+
+export function seedCrmModuleProviders(): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const [key, values] of Object.entries(CRM_MODULE_PROVIDERS)) {
+    out[key] = [...(values ?? [])].filter((p) => p !== CRM_PROVIDER_OTHER);
+  }
+  return out;
 }
 
 const GENERIC_MODULE_WORKFLOW: { key: string; label: string }[] = [

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -27,9 +27,11 @@ import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { CRM_MODULE_PROVIDERS, CRM_PRODUCT_MODULES } from "@/data/crm-onboarding-defaults";
 import { useAuthStore, useCrmMasterStore } from "@/stores";
 import type { CrmMasterFieldDef, CrmMasterPicklist } from "@/types/crm-master";
 import type { FieldValueType } from "@/types/master";
+import type { CrmProductModuleKey } from "@/types/crm-onboarding";
 
 export const Route = createFileRoute("/crm/master")({
   component: CrmMasterPage,
@@ -41,6 +43,7 @@ const SECTIONS = [
   { id: "project-fields", label: "Project Fields", icon: Boxes },
   { id: "picklists", label: "Picklists", icon: ListChecks },
   { id: "modules", label: "Modules", icon: Layers },
+  { id: "providers", label: "Providers", icon: Database },
   { id: "data-control", label: "Data Control", icon: Table2 },
   { id: "danger", label: "Reset & Safety", icon: ShieldAlert },
 ] as const;
@@ -130,6 +133,7 @@ function CrmMasterPage() {
             {section === "project-fields" ? <FieldsPanel entity="project" /> : null}
             {section === "picklists" ? <PicklistsPanel /> : null}
             {section === "modules" ? <ModulesPanel /> : null}
+            {section === "providers" ? <ProvidersPanel /> : null}
             {section === "data-control" ? <CrmMasterDataControl /> : null}
             {section === "danger" ? <DangerPanel /> : null}
           </motion.div>
@@ -620,7 +624,8 @@ function ModulesPanel() {
       <div>
         <h3 className="text-sm font-semibold">CRM modules</h3>
         <p className="text-[10px] text-muted-foreground">
-          Enable or disable product modules available during account onboarding.
+          Enable or disable product modules available during account onboarding. Edit integration
+          vendor names under Providers.
         </p>
       </div>
       <div className="space-y-1.5">
@@ -645,6 +650,128 @@ function ModulesPanel() {
   );
 }
 
+function ProvidersPanel() {
+  const moduleProviders = useCrmMasterStore((s) => s.moduleProviders);
+  const setModuleProviders = useCrmMasterStore((s) => s.setModuleProviders);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+
+  const integrationModules = useMemo(
+    () =>
+      CRM_PRODUCT_MODULES.filter((m) => m.key in CRM_MODULE_PROVIDERS).map((m) => ({
+        key: m.key as CrmProductModuleKey,
+        label: m.label,
+      })),
+    [],
+  );
+
+  function providersFor(key: string) {
+    const fromStore = moduleProviders?.[key];
+    if (fromStore && fromStore.length > 0) return fromStore;
+    return CRM_MODULE_PROVIDERS[key as CrmProductModuleKey] ?? [];
+  }
+
+  function renameProvider(moduleKey: string, index: number, next: string) {
+    const list = [...providersFor(moduleKey)];
+    list[index] = next;
+    setModuleProviders(moduleKey, list);
+  }
+
+  function removeProvider(moduleKey: string, index: number) {
+    const list = providersFor(moduleKey).filter((_, i) => i !== index);
+    setModuleProviders(moduleKey, list);
+    toast.success("Provider removed");
+  }
+
+  function addProvider(moduleKey: string) {
+    const value = (drafts[moduleKey] ?? "").trim();
+    if (!value) {
+      toast.error("Enter a provider name");
+      return;
+    }
+    const list = providersFor(moduleKey);
+    if (list.some((p) => p.toLowerCase() === value.toLowerCase())) {
+      toast.error("Provider already exists");
+      return;
+    }
+    setModuleProviders(moduleKey, [...list, value]);
+    setDrafts((d) => ({ ...d, [moduleKey]: "" }));
+    toast.success(`Added ${value}`);
+  }
+
+  return (
+    <div className="space-y-2.5">
+      <div>
+        <h3 className="text-sm font-semibold">Integration providers</h3>
+        <p className="text-[10px] text-muted-foreground">
+          Rename, add, or remove vendor options shown on account Modules. Accounts can also pick{" "}
+          <span className="font-medium text-foreground">Other</span> and type a custom name.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        {integrationModules.map((mod) => {
+          const list = providersFor(mod.key);
+          return (
+            <div key={mod.key} className="card-soft space-y-2 p-2.5">
+              <div className="text-xs font-medium">{mod.label}</div>
+              <div className="space-y-1">
+                {list.map((name, index) => (
+                  <div key={`${mod.key}-${index}`} className="flex items-center gap-1.5">
+                    <input
+                      className="h-7 flex-1 rounded-md border bg-background px-2 text-xs"
+                      value={name}
+                      onChange={(e) => renameProvider(mod.key, index, e.target.value)}
+                      onBlur={(e) => {
+                        if (!e.target.value.trim()) {
+                          removeProvider(mod.key, index);
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 shrink-0 p-0 text-muted-foreground hover:text-destructive"
+                      onClick={() => removeProvider(mod.key, index)}
+                      aria-label={`Remove ${name}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <input
+                  className="h-7 flex-1 rounded-md border bg-background px-2 text-xs"
+                  placeholder="Add provider name…"
+                  value={drafts[mod.key] ?? ""}
+                  onChange={(e) => setDrafts((d) => ({ ...d, [mod.key]: e.target.value }))}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addProvider(mod.key);
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 gap-1 text-xs"
+                  onClick={() => addProvider(mod.key)}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function DangerPanel() {
   const resetAll = useCrmMasterStore((s) => s.resetAll);
   const [open, setOpen] = useState(false);
@@ -654,8 +781,8 @@ function DangerPanel() {
       <div className="card-soft border-destructive/30 p-3">
         <h3 className="text-sm font-semibold text-destructive">Reset CRM Master Config</h3>
         <p className="mt-1 text-[10px] text-muted-foreground">
-          Restores seeded account fields, project fields, picklists, and modules. Does not delete
-          CRM accounts or onboarding checklists.
+          Restores seeded account fields, project fields, picklists, modules, and providers. Does not
+          delete CRM accounts or onboarding checklists.
         </p>
         <Button
           size="sm"
