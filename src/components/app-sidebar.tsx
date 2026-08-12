@@ -46,7 +46,12 @@ export function AppSidebar() {
           collapsed ? "w-[52px]" : "w-52",
         )}
       >
-        <div className="flex h-14 items-center gap-2.5 overflow-hidden px-2.5">
+        <div
+          className={cn(
+            "flex h-14 items-center overflow-hidden",
+            collapsed ? "justify-center px-0" : "gap-2.5 px-2.5",
+          )}
+        >
           <button
             type="button"
             onClick={collapsed ? toggle : undefined}
@@ -58,18 +63,20 @@ export function AppSidebar() {
           >
             <Building className="h-4 w-4" />
           </button>
-          <div
-            className={cn(
-              "min-w-0 flex-1 overflow-hidden transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-              collapsed ? "pointer-events-none translate-x-1 opacity-0" : "translate-x-0 opacity-100",
-            )}
-          >
-            <div className="truncate text-sm font-semibold tracking-tight text-white">Buildesk</div>
-            <div className="truncate text-[10px] text-sidebar-foreground/70">Onboarding & Post-Sales</div>
-          </div>
+          {!collapsed ? (
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <div className="truncate text-sm font-semibold tracking-tight text-white">Buildesk</div>
+              <div className="truncate text-[10px] text-sidebar-foreground/70">Onboarding & Post-Sales</div>
+            </div>
+          ) : null}
         </div>
 
-        <nav className="flex-1 overflow-x-hidden overflow-y-auto px-1.5 pb-3">
+        <nav
+          className={cn(
+            "flex flex-1 flex-col overflow-x-hidden overflow-y-auto pb-3",
+            collapsed ? "items-center px-1" : "px-1.5",
+          )}
+        >
           {navItems.map((item) => {
             const active = isNavActive(pathname, item);
             const Icon = item.icon;
@@ -92,9 +99,9 @@ export function AppSidebar() {
                   to={item.to}
                   title={collapsed ? item.label : undefined}
                   className={cn(
-                    "group relative flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium",
-                    "transition-[color,padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-                    collapsed && "justify-center px-0",
+                    "group relative flex items-center gap-2.5 rounded-md text-[13px] font-medium",
+                    "transition-[color,padding,width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                    collapsed ? "h-9 w-9 justify-center p-0" : "px-2.5 py-1.5",
                     active
                       ? "text-white"
                       : "text-sidebar-foreground/80 hover:bg-sidebar-accent/70 hover:text-white",
@@ -115,18 +122,18 @@ export function AppSidebar() {
                     />
                   )}
                   <Icon className="relative z-10 h-4 w-4 shrink-0" />
-                  <span
-                    className={cn(
-                      "relative z-10 truncate transition-[opacity,max-width,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-                      collapsed
-                        ? "max-w-0 translate-x-1 opacity-0"
-                        : "max-w-[9rem] translate-x-0 opacity-100",
-                    )}
-                  >
-                    {item.label}
-                  </span>
+                  {!collapsed ? (
+                    <span className="relative z-10 truncate">{item.label}</span>
+                  ) : null}
                   {item.to === "/live-chat" && chatBadge > 0 ? (
-                    <span className="relative z-10 ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground">
+                    <span
+                      className={cn(
+                        "relative z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground",
+                        collapsed
+                          ? "absolute -right-0.5 -top-0.5 h-4 min-w-4 px-0.5"
+                          : "ml-auto px-1",
+                      )}
+                    >
                       {chatBadge > 9 ? "9+" : chatBadge}
                     </span>
                   ) : null}

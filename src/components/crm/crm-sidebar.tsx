@@ -49,7 +49,12 @@ export function CrmSidebar() {
           collapsed ? "w-[52px]" : "w-52",
         )}
       >
-        <div className="flex h-14 items-center gap-2.5 overflow-hidden px-2.5">
+        <div
+          className={cn(
+            "flex h-14 items-center overflow-hidden",
+            collapsed ? "justify-center px-0" : "gap-2.5 px-2.5",
+          )}
+        >
           <button
             type="button"
             onClick={collapsed ? toggle : undefined}
@@ -61,18 +66,20 @@ export function CrmSidebar() {
           >
             <Contact className="h-4 w-4" />
           </button>
-          <div
-            className={cn(
-              "min-w-0 flex-1 overflow-hidden transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-              collapsed ? "pointer-events-none translate-x-1 opacity-0" : "translate-x-0 opacity-100",
-            )}
-          >
-            <div className="truncate text-sm font-semibold tracking-tight text-white">Buildesk CRM</div>
-            <div className="truncate text-[10px] text-sidebar-foreground/70">Onboarding & Go-Live</div>
-          </div>
+          {!collapsed ? (
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <div className="truncate text-sm font-semibold tracking-tight text-white">Buildesk CRM</div>
+              <div className="truncate text-[10px] text-sidebar-foreground/70">Onboarding & Go-Live</div>
+            </div>
+          ) : null}
         </div>
 
-        <nav className="flex-1 overflow-x-hidden overflow-y-auto px-1.5 pb-3">
+        <nav
+          className={cn(
+            "flex flex-1 flex-col overflow-x-hidden overflow-y-auto pb-3",
+            collapsed ? "items-center px-1" : "px-1.5",
+          )}
+        >
           {navItems.map((item) => {
             const active = isNavActive(pathname, item);
             const Icon = item.icon;
@@ -82,9 +89,9 @@ export function CrmSidebar() {
                 to={item.to}
                 title={collapsed ? item.label : undefined}
                 className={cn(
-                  "group relative flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium",
-                  "transition-[color,padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-                  collapsed && "justify-center px-0",
+                  "group relative flex items-center gap-2.5 rounded-md text-[13px] font-medium",
+                  "transition-[color,padding,width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                  collapsed ? "h-9 w-9 justify-center p-0" : "px-2.5 py-1.5",
                   active
                     ? "text-white"
                     : "text-sidebar-foreground/80 hover:bg-sidebar-accent/70 hover:text-white",
@@ -98,19 +105,16 @@ export function CrmSidebar() {
                   />
                 ) : null}
                 <Icon className="relative z-10 h-4 w-4 shrink-0" />
-                <span
-                  className={cn(
-                    "relative z-10 truncate transition-[opacity,width] duration-300",
-                    collapsed ? "w-0 opacity-0" : "opacity-100",
-                  )}
-                >
-                  {item.label}
-                </span>
+                {!collapsed ? (
+                  <span className="relative z-10 truncate">{item.label}</span>
+                ) : null}
                 {item.to === "/crm/live-chat" && chatBadge > 0 ? (
                   <span
                     className={cn(
-                      "relative z-10 ml-auto rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground",
-                      collapsed && "absolute right-0.5 top-0.5 ml-0 px-1",
+                      "relative z-10 rounded-full bg-primary text-[10px] font-semibold text-primary-foreground",
+                      collapsed
+                        ? "absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center px-0.5"
+                        : "ml-auto px-1.5",
                     )}
                   >
                     {chatBadge > 9 ? "9+" : chatBadge}
@@ -124,7 +128,10 @@ export function CrmSidebar() {
         <button
           type="button"
           onClick={toggle}
-          className="m-1.5 flex h-8 items-center justify-center rounded-md text-sidebar-foreground/70 hover:bg-sidebar-accent/70 hover:text-white"
+          className={cn(
+            "flex h-8 items-center justify-center rounded-md text-sidebar-foreground/70 hover:bg-sidebar-accent/70 hover:text-white",
+            collapsed ? "mx-auto mb-1.5 w-9" : "m-1.5 w-[calc(100%-0.75rem)]",
+          )}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
