@@ -4,8 +4,11 @@ import { motion } from "framer-motion";
 import {
   ArrowRight,
   Building2,
+  Calendar,
+  CalendarClock,
   CheckCircle2,
   ClipboardList,
+  LifeBuoy,
   Plus,
   Rocket,
   TrendingUp,
@@ -23,6 +26,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { CrmDashboardActivityFeed } from "@/components/crm/crm-dashboard-activity-feed";
 import { CrmDashboardDrillDownSheet } from "@/components/crm/crm-dashboard-drill-down";
 import { CrmDashboardPendingSummary } from "@/components/crm/crm-dashboard-pending-summary";
 import { DashboardKpiCard } from "@/components/dashboard/dashboard-kpi-card";
@@ -35,7 +39,7 @@ import {
   DesignTicketPageHeader,
 } from "@/components/design-ticket/design-ticket-shared";
 import type { ChecklistPhaseBucket } from "@/lib/checklist";
-import { formatRelativeTime } from "@/types/common";
+import type { CrmImplementationStage } from "@/types/crm-onboarding";
 import {
   crmDrillDownFilterKey,
   useCrmDashboardOverview,
@@ -78,7 +82,34 @@ function CrmDashboardPage() {
     setActivePhase(undefined);
   }
 
-  const { kpis, pending, phaseStats, health, moduleAdoption, recentActivity, rows } = overview;
+  const { kpis, pending, phaseStats, health, moduleAdoption, stageMix, recentActivity, rows } =
+    overview;
+
+  const progressBuckets = useMemo(() => {
+    const low = rows.filter((r) => r.progress < 40).length;
+    const mid = rows.filter((r) => r.progress >= 40 && r.progress < 75).length;
+    const high = rows.filter((r) => r.progress >= 75).length;
+    return [
+      {
+        name: "<40%",
+        value: low,
+        color: "var(--color-destructive)",
+        filter: { type: "progress" as const, bucket: "low" as const },
+      },
+      {
+        name: "40–74%",
+        value: mid,
+        color: "var(--color-warning)",
+        filter: { type: "progress" as const, bucket: "mid" as const },
+      },
+      {
+        name: "75%+",
+        value: high,
+        color: "var(--color-success)",
+        filter: { type: "progress" as const, bucket: "high" as const },
+      },
+    ];
+  }, [rows]);
 
   const portfolioKpis = [
     {
@@ -103,14 +134,42 @@ function CrmDashboardPage() {
       filter: { type: "accounts" as const, status: "live" as const },
     },
     {
-      label: "Avg completion",
+      label: "Avg completion %",
       value: kpis.avgCompletion,
       icon: TrendingUp,
       tone: "bg-info/15 text-info",
-      filter: null as CrmDashboardDrillDownFilter | null,
-      hint: "%",
+      filter: { type: "progress" as const, bucket: "mid" as const },
     },
   ];
+
+  const opsKpis = [
+    {
+      label: "Pending bookings",
+      value: kpis.pendingBookings,
+      icon: Calendar,
+      tone: "bg-warning/15 text-warning-foreground",
+      onClick: () => navigate({ to: "/crm/bookings", search: { tab: "pending" } }),
+      activeKey: null as string | null,
+    },
+    {
+      label: "Upcoming calls",
+      value: kpis.upcomingBookings,
+      icon: CalendarClock,
+      tone: "bg-primary/10 text-primary",
+      onClick: () => navigate({ to: "/crm/bookings", search: { tab: "upcoming" } }),
+      activeKey: null as string | null,
+    },
+    {
+      label: "Portal tickets",
+      value: kpis.openSupportTickets,
+      icon: LifeBuoy,
+      tone: "bg-info/15 text-info",
+      filter: { type: "support" as const },
+      activeKey: crmDrillDownFilterKey({ type: "support" }),
+    },
+  ];
+
+  const stageChartData = stageMix.filter((s) => s.value > 0);
 
   const donutData = [
     {
@@ -181,7 +240,10 @@ function CrmDashboardPage() {
           reports={pending.reports}
           tickets={pending.tickets}
           highPriority={pending.highPriority}
+          bookings={pending.bookings}
+          support={pending.support}
           onOpen={openDrillDown}
+          onNavigate={(to, search) => void navigate({ to, search })}
           activeFilter={drillDown}
         />
 
@@ -195,17 +257,30 @@ function CrmDashboardPage() {
               icon={k.icon}
               tone={k.tone}
               delay={i * 0.03}
+              active={crmDrillDownFilterKey(drillDown) === crmDrillDownFilterKey(k.filter)}
+              onClick={() => openDrillDown(k.filter)}
+            />
+          ))}
+        </div>
+
+        <div className="grid grid-cols-3 gap-1.5">
+          {opsKpis.map((k, i) => (
+            <DashboardKpiCard
+              key={k.label}
+              compact
+              label={k.label}
+              value={k.value}
+              icon={k.icon}
+              tone={k.tone}
+              delay={0.12 + i * 0.03}
               active={
                 k.filter
-                  ? crmDrillDownFilterKey(drillDown) === crmDrillDownFilterKey(k.filter)
+                  ? crmDrillDownFilterKey(drillDown) === k.activeKey
                   : false
               }
               onClick={
-                k.filter
-                  ? () => {
-                      openDrillDown(k.filter!);
-                    }
-                  : undefined
+                k.onClick ??
+                (k.filter ? () => openDrillDown(k.filter!) : undefined)
               }
             />
           ))}
@@ -233,13 +308,13 @@ function CrmDashboardPage() {
               <h3 className="text-xs font-semibold">Account mix</h3>
               <Pill tone="info">Click</Pill>
             </div>
-            <div className="h-32">
+            <div className="h-28">
               <ResponsiveContainer>
                 <PieChart>
                   <Pie
                     data={donutData.length ? donutData : [{ name: "Empty", value: 1, color: "var(--color-muted)" }]}
-                    innerRadius={32}
-                    outerRadius={52}
+                    innerRadius={28}
+                    outerRadius={46}
                     dataKey="value"
                     paddingAngle={2}
                     stroke="none"
@@ -279,18 +354,60 @@ function CrmDashboardPage() {
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.09, ease: EASE }}
+            className="card-soft p-3 lg:col-span-3"
+          >
+            <div className="mb-1 flex items-center justify-between">
+              <h3 className="text-xs font-semibold">Implementation stage</h3>
+              <span className="text-[10px] text-muted-foreground">{rows.length} accounts</span>
+            </div>
+            <div className="h-28">
+              <ResponsiveContainer>
+                <BarChart
+                  data={stageChartData.length ? stageChartData : [{ label: "—", value: 0, stage: "discovery" }]}
+                  margin={{ top: 4, right: 4, bottom: 0, left: -22 }}
+                  layout="vertical"
+                >
+                  <CartesianGrid horizontal={false} stroke="var(--color-border)" />
+                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 9 }} stroke="var(--color-muted-foreground)" />
+                  <YAxis
+                    type="category"
+                    dataKey="label"
+                    width={72}
+                    tick={{ fontSize: 8 }}
+                    stroke="var(--color-muted-foreground)"
+                  />
+                  <Tooltip cursor={{ fill: "var(--color-muted)" }} />
+                  <Bar
+                    dataKey="value"
+                    fill="var(--color-primary)"
+                    radius={[0, 4, 4, 0]}
+                    className="cursor-pointer"
+                    onClick={(data) => {
+                      const stage = (data as { stage?: CrmImplementationStage })?.stage;
+                      if (stage) openDrillDown({ type: "stage", stage });
+                    }}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: 0.1, ease: EASE }}
-            className="card-soft p-3 lg:col-span-5"
+            className="card-soft p-3 lg:col-span-3"
           >
             <div className="mb-1 flex items-center justify-between">
               <h3 className="text-xs font-semibold">Modules opted</h3>
               <span className="text-[10px] text-muted-foreground">{kpis.totalAccounts} accounts</span>
             </div>
-            <div className="h-32">
+            <div className="h-28">
               <ResponsiveContainer>
                 <BarChart data={chartModules} margin={{ top: 4, right: 4, bottom: 0, left: -22 }}>
                   <CartesianGrid vertical={false} stroke="var(--color-border)" />
-                  <XAxis dataKey="name" tick={{ fontSize: 8 }} stroke="var(--color-muted-foreground)" interval={0} angle={-20} textAnchor="end" height={40} />
+                  <XAxis dataKey="name" tick={{ fontSize: 8 }} stroke="var(--color-muted-foreground)" interval={0} angle={-20} textAnchor="end" height={36} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 9 }} stroke="var(--color-muted-foreground)" />
                   <Tooltip
                     cursor={{ fill: "var(--color-muted)" }}
@@ -318,11 +435,11 @@ function CrmDashboardPage() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: 0.12, ease: EASE }}
-            className="card-soft p-3 lg:col-span-4"
+            className="card-soft p-3 lg:col-span-3"
           >
-            <h3 className="mb-2 text-xs font-semibold">Account health</h3>
+            <h3 className="mb-2 text-xs font-semibold">Health & completion</h3>
             <div className="flex items-center gap-3">
-              <ProgressRing value={healthPct} size={64} className="shrink-0" />
+              <ProgressRing value={healthPct} size={56} className="shrink-0" />
               <div className="min-w-0 flex-1 space-y-1 text-xs">
                 {(
                   [
@@ -344,9 +461,37 @@ function CrmDashboardPage() {
                 ))}
               </div>
             </div>
-            <p className="mt-2 text-[10px] text-muted-foreground">
-              Healthy share {healthPct}% · based on health score / progress
-            </p>
+            <div className="mt-2 space-y-1">
+              <div className="text-[10px] text-muted-foreground">Completion spread</div>
+              <div className="flex h-2 overflow-hidden rounded-full bg-muted">
+                {progressBuckets.map((b) => (
+                  <button
+                    key={b.name}
+                    type="button"
+                    title={`${b.name}: ${b.value}`}
+                    onClick={() => openDrillDown(b.filter)}
+                    className="h-full transition-opacity hover:opacity-80"
+                    style={{
+                      width: rows.length ? `${(b.value / rows.length) * 100}%` : "33%",
+                      background: b.color,
+                      minWidth: b.value > 0 ? 4 : 0,
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="flex justify-between text-[10px] text-muted-foreground">
+                {progressBuckets.map((b) => (
+                  <button
+                    key={b.name}
+                    type="button"
+                    onClick={() => openDrillDown(b.filter)}
+                    className="hover:text-foreground"
+                  >
+                    {b.name} ({b.value})
+                  </button>
+                ))}
+              </div>
+            </div>
           </motion.div>
         </div>
 
@@ -471,36 +616,14 @@ function CrmDashboardPage() {
             transition={{ duration: 0.35, delay: 0.16, ease: EASE }}
             className="card-soft p-3"
           >
-            <h3 className="mb-2 text-xs font-semibold">Recent activity</h3>
-            {recentActivity.length === 0 ? (
-              <p className="py-6 text-center text-xs text-muted-foreground">
-                Activity from communications and go-live will show here.
-              </p>
-            ) : (
-              <ol className="space-y-2">
-                {recentActivity.map((a) => (
-                  <li key={a.id} className="flex gap-2 text-xs">
-                    <span
-                      className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${
-                        a.kind === "success"
-                          ? "bg-success"
-                          : a.kind === "warning"
-                            ? "bg-warning"
-                            : a.kind === "danger"
-                              ? "bg-destructive"
-                              : "bg-primary"
-                      }`}
-                    />
-                    <div className="min-w-0">
-                      <div className="line-clamp-2 leading-snug">{a.what}</div>
-                      <div className="text-[10px] text-muted-foreground">
-                        {a.who} · {formatRelativeTime(a.createdAt)}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            )}
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-xs font-semibold">Recent activity</h3>
+              <span className="text-[10px] text-muted-foreground">Live · 15s sync</span>
+            </div>
+            <CrmDashboardActivityFeed
+              items={recentActivity}
+              onViewAll={() => navigate({ to: "/crm/accounts" })}
+            />
           </motion.div>
         </div>
       </div>

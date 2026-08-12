@@ -2,9 +2,11 @@ import { motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import {
   AlarmClock,
+  Calendar,
   ClipboardList,
   CloudUpload,
   GraduationCap,
+  LifeBuoy,
   ListChecks,
   Radio,
   Ticket,
@@ -41,7 +43,10 @@ type Props = {
   reports: number;
   tickets: number;
   highPriority: number;
+  bookings?: number;
+  support?: number;
   onOpen: (filter: CrmDashboardDrillDownFilter) => void;
+  onNavigate?: (to: string, search?: Record<string, string>) => void;
   activeFilter?: CrmDashboardDrillDownFilter | null;
 };
 
@@ -55,10 +60,31 @@ export function CrmDashboardPendingSummary({
   reports,
   tickets,
   highPriority,
+  bookings = 0,
+  support = 0,
   onOpen,
+  onNavigate,
   activeFilter,
 }: Props) {
   const chips: SummaryChip[] = [
+    {
+      id: "bookings",
+      label: "Pending bookings",
+      value: bookings,
+      icon: Calendar,
+      tone: "border-warning/30 bg-warning/10 text-warning-foreground",
+      urgent: bookings > 0,
+      filter: { type: "bookings", scope: "pending" },
+    },
+    {
+      id: "support",
+      label: "Portal tickets",
+      value: support,
+      icon: LifeBuoy,
+      tone: "border-info/30 bg-info/10 text-info",
+      urgent: support > 0,
+      filter: { type: "support" },
+    },
     {
       id: "overdue",
       label: "Overdue",
@@ -163,7 +189,13 @@ export function CrmDashboardPendingSummary({
               transition={{ delay: i * 0.02, duration: 0.25, ease: EASE }}
               whileHover={{ y: -1 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => onOpen(chip.filter)}
+              onClick={() => {
+                if (chip.id === "bookings" && onNavigate) {
+                  onNavigate("/crm/bookings", { tab: "pending" });
+                  return;
+                }
+                onOpen(chip.filter);
+              }}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-left transition-shadow",
                 chip.tone,
