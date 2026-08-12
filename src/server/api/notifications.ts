@@ -187,6 +187,41 @@ export function insertNotificationsForAdmins(
   return insertForUserIds(db, data, recipientIds, preferUserId);
 }
 
+/** In-app bell alert when a portal guest requests a call (host + admins + account managers). */
+export function insertBookingRequestNotification(
+  db: ReturnType<typeof getDb>,
+  opts: {
+    appointment: {
+      id: string;
+      companyId: string;
+      hostUserId: string;
+      guestName: string;
+      startsAt: string;
+    };
+    eventTitle: string;
+    accountName: string;
+  },
+): AppNotification[] {
+  const when = `${opts.appointment.startsAt.slice(0, 10)} · ${opts.appointment.startsAt.slice(11, 16)}`;
+  const recipientIds = resolveNotificationRecipientIds(db, {
+    companyId: opts.appointment.companyId,
+    extraUserIds: [opts.appointment.hostUserId],
+  });
+  return insertForUserIds(
+    db,
+    {
+      title: `New booking request — ${opts.appointment.guestName}`,
+      body: `${opts.eventTitle} · ${opts.accountName} · ${when}`,
+      kind: "info",
+      href: "/crm/bookings?tab=pending",
+      companyId: opts.appointment.companyId,
+      ticketId: opts.appointment.id,
+    },
+    recipientIds,
+    opts.appointment.hostUserId,
+  );
+}
+
 function dedupeAdminFeed(rows: AppNotification[], viewerId: string, limit: number) {
   const groups = new Map<string, AppNotification[]>();
   for (const n of rows) {

@@ -16,13 +16,6 @@ export function DesignTicketBootstrap() {
   const hydrateNotifications = useNotificationStore((s) => s.hydrateNotifications);
 
   useEffect(() => {
-    if (companies.length === 0) return;
-    void ensureCompanyPortals()
-      .then(hydrateAccess)
-      .catch((e) => console.warn("[portal bootstrap]", e));
-  }, [companies.length, hydrateAccess]);
-
-  useEffect(() => {
     let cancelled = false;
 
     async function sync() {
@@ -46,6 +39,13 @@ export function DesignTicketBootstrap() {
       window.clearInterval(timer);
     };
   }, [hydrateTickets, hydrateNotifications]);
+
+  useEffect(() => {
+    if (companies.length === 0) return;
+    void ensureCompanyPortals()
+      .then(hydrateAccess)
+      .catch((e) => console.warn("[portal bootstrap]", e));
+  }, [companies.length, hydrateAccess]);
 
   return null;
 }

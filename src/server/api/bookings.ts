@@ -5,6 +5,7 @@ import { z } from "zod";
 import { resolveBookingHostUserId, resolveHostTimezone } from "@/lib/booking-host";
 import { computeOpenSlots } from "@/lib/booking-slots";
 import { isAdminRoleKey } from "@/lib/permissions";
+import { insertBookingRequestNotification } from "@/server/api/notifications";
 import { ApiError, getSessionUser, newId, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
@@ -517,7 +518,20 @@ export const createPortalBooking = createServerFn({ method: "POST" })
       .from(t.bookingAppointments)
       .where(eq(t.bookingAppointments.id, id))
       .get()!;
-    return mapAppointment(created);
+    const mapped = mapAppointment(created);
+
+    const account = db
+      .select({ name: t.crmAccounts.name })
+      .from(t.crmAccounts)
+      .where(eq(t.crmAccounts.id, portal.companyId))
+      .get();
+    insertBookingRequestNotification(db, {
+      appointment: mapped,
+      eventTitle: event.title,
+      accountName: account?.name ?? "CRM account",
+    });
+
+    return mapped;
   });
 
 /* ---------- Staff: ensure / list ---------- */
