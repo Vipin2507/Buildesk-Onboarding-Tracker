@@ -5,7 +5,7 @@ import { z } from "zod";
 import { resolveBookingHostUserId, resolveHostTimezone } from "@/lib/booking-host";
 import { computeOpenSlots } from "@/lib/booking-slots";
 import { isAdminRoleKey } from "@/lib/permissions";
-import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
+import { ApiError, getSessionUser, newId, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import type {
@@ -390,14 +390,43 @@ export const createPortalBooking = createServerFn({ method: "POST" })
 export const ensureBookingDefaults = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ companyId: z.string().min(1) }).parse(data))
   .handler(async ({ data }) => {
-    requireUser();
+    // Soft-skip when session cookie is missing (bootstrap races / logged-out).
+    if (!getSessionUser()) {
+      return { skipped: true as const };
+    }
     const eventType = ensureDefaultEventType(data.companyId);
     const hostUserId = eventType.hostUserId ?? resolveBookingHostUserId(data.companyId);
     let availability: BookingAvailability[] = [];
     if (hostUserId) {
       availability = seedDefaultAvailability(hostUserId, resolveHostTimezone(hostUserId));
     }
-    return { eventType, availability, hostUserId };
+    return { skipped: false as const, eventType, availability, hostUserId };
+  });
+
+/** Seed defaults for many CRM accounts in one authenticated round-trip. */
+export const ensureBookingDefaultsBatch = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ companyIds: z.array(z.string().min(1)).max(500) }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    requireUser();
+    const eventTypes: BookingEventType[] = [];
+    const availabilityByHost = new Map<string, BookingAvailability[]>();
+    for (const companyId of data.companyIds) {
+      const eventType = ensureDefaultEventType(companyId);
+      eventTypes.push(eventType);
+      const hostUserId = eventType.hostUserId ?? resolveBookingHostUserId(companyId);
+      if (hostUserId && !availabilityByHost.has(hostUserId)) {
+        availabilityByHost.set(
+          hostUserId,
+          seedDefaultAvailability(hostUserId, resolveHostTimezone(hostUserId)),
+        );
+      }
+    }
+    return {
+      eventTypes,
+      availability: [...availabilityByHost.values()].flat(),
+    };
   });
 
 export const listBookingEventTypes = createServerFn({ method: "GET" })

@@ -27,6 +27,7 @@ import {
 } from "@/lib/design-ticket-portal";
 import { formatDate } from "@/lib/utils";
 import {
+  useAuthStore,
   useBookingStore,
   useCompanyPortalStore,
   useCrmAccountStore,
@@ -38,6 +39,7 @@ import { getBookingSummaryForCompany } from "@/lib/api";
 import type { DesignTicket } from "@/types/design-ticket";
 
 export function CrmAccountPortalPanel({ accountId }: { accountId: string }) {
+  const user = useAuthStore((s) => s.user);
   const account = useCrmAccountStore((s) => s.getById(accountId));
   const portal = useCompanyPortalStore((s) => s.getByCompanyId(accountId));
   const generateAccess = useCompanyPortalStore((s) => s.generateAccessForCompany);
@@ -60,12 +62,12 @@ export function CrmAccountPortalPanel({ accountId }: { accountId: string }) {
   }, [account, generateAccess]);
 
   useEffect(() => {
-    if (!account) return;
+    if (!account || !user) return;
     void ensureDefaults(account.id).catch(() => undefined);
     void getBookingSummaryForCompany({ data: { companyId: account.id } })
       .then((s) => setBookingSummary({ pending: s.pending, upcoming: s.upcoming }))
       .catch(() => undefined);
-  }, [account, ensureDefaults]);
+  }, [account, ensureDefaults, user]);
 
   const publicUrl = portal ? portalPublicCreateUrl(portal.slug) : "";
   const previewUrl = portal ? portalPublicDashboardUrl(portal.slug) : "";

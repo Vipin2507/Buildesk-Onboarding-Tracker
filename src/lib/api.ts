@@ -182,6 +182,7 @@ export {
   listPortalBookingSlots,
   createPortalBooking,
   ensureBookingDefaults,
+  ensureBookingDefaultsBatch,
   listBookingEventTypes,
   listBookingAppointments,
   listBookingAvailability,

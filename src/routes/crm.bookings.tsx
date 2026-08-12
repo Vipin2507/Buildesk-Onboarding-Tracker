@@ -102,11 +102,14 @@ function CrmBookingsPage() {
   const [blockReason, setBlockReason] = useState("");
 
   useEffect(() => {
+    if (!user) return;
     void refreshStaff().catch((err) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/sign in required/i.test(msg)) return;
       console.warn("[bookings]", err);
       toast.error("Failed to load bookings");
     });
-  }, [refreshStaff]);
+  }, [refreshStaff, user]);
 
   useEffect(() => {
     const hostId = user?.id;

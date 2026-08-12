@@ -11,6 +11,7 @@ import {
   deleteBookingAvailability,
   deleteBookingBlock,
   ensureBookingDefaults,
+  ensureBookingDefaultsBatch,
   listBookingAppointments,
   listBookingAvailability,
   listBookingBlocks,
@@ -35,6 +36,7 @@ type BookingState = {
   hydrateBlocks: (rows: BookingBlock[]) => void;
   mergeAppointment: (row: BookingAppointment) => void;
   ensureDefaults: (companyId: string) => Promise<void>;
+  ensureDefaultsBatch: (companyIds: string[]) => Promise<void>;
   refreshStaff: (opts?: { hostUserId?: string }) => Promise<void>;
   listPortalEventTypes: (slug: string) => Promise<BookingEventType[]>;
   listPortalSlots: (
@@ -94,6 +96,7 @@ export const useBookingStore = createStore<BookingState>((set, get) => ({
 
   ensureDefaults: async (companyId) => {
     const result = await ensureBookingDefaults({ data: { companyId } });
+    if (result.skipped) return;
     set((s) => {
       const others = s.eventTypes.filter(
         (e) => !(e.companyId === companyId && e.slug === result.eventType.slug),
@@ -107,6 +110,23 @@ export const useBookingStore = createStore<BookingState>((set, get) => ({
                 ...result.availability,
               ]
             : s.availability,
+      };
+    });
+  },
+
+  ensureDefaultsBatch: async (companyIds) => {
+    if (companyIds.length === 0) return;
+    const result = await ensureBookingDefaultsBatch({ data: { companyIds } });
+    set((s) => {
+      const byId = new Map(s.eventTypes.map((e) => [e.id, e]));
+      for (const et of result.eventTypes) byId.set(et.id, et);
+      const hostIds = new Set(result.availability.map((a) => a.hostUserId));
+      return {
+        eventTypes: [...byId.values()],
+        availability: [
+          ...s.availability.filter((a) => !hostIds.has(a.hostUserId)),
+          ...result.availability,
+        ],
       };
     });
   },
