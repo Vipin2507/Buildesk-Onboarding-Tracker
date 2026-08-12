@@ -6,7 +6,9 @@ import {
   markNotificationRead as apiMarkRead,
   markAllNotificationsRead as apiMarkAll,
 } from "@/lib/api";
+import { isAdminRoleKey } from "@/lib/permissions";
 import { serverSync } from "@/lib/sync";
+import { useAuthStore } from "./useAuthStore";
 import { useCrmSettingsStore } from "./useCrmSettingsStore";
 import { useSettingsStore } from "./useSettingsStore";
 
@@ -63,6 +65,7 @@ export const useNotificationStore = createStore<NotificationState>((set, get) =>
     if (!isGateOpen(input.gate)) {
       return null;
     }
+    const currentUser = useAuthStore.getState().user;
     const now = nowIso();
     const notification: AppNotification = {
       id: `NTF-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -72,11 +75,17 @@ export const useNotificationStore = createStore<NotificationState>((set, get) =>
       href: input.href,
       companyId: input.companyId,
       ticketId: input.ticketId,
-      userId: input.userId,
+      // Server fans out to all admins; local preview only for the acting admin.
+      userId: currentUser?.id,
       createdAt: now,
       updatedAt: now,
     };
-    set((s) => ({ notifications: [notification, ...s.notifications] }));
+
+    // Only admins keep an optimistic copy in the bell store.
+    if (currentUser && isAdminRoleKey(currentUser.role)) {
+      set((s) => ({ notifications: [notification, ...s.notifications] }));
+    }
+
     serverSync("createNotification", () =>
       apiCreate({
         data: {
@@ -87,11 +96,10 @@ export const useNotificationStore = createStore<NotificationState>((set, get) =>
           href: notification.href,
           companyId: notification.companyId,
           ticketId: notification.ticketId,
-          userId: notification.userId,
         },
       }),
     );
-    return notification;
+    return isAdminRoleKey(currentUser?.role) ? notification : null;
   },
 
   markRead: (id) => {

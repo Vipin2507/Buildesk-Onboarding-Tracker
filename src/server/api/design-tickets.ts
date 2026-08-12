@@ -5,6 +5,7 @@ import { z } from "zod";
 import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
+import { insertNotificationsForAdmins } from "@/server/api/notifications";
 import { isCrmAccountCompanyStub } from "@/lib/design-ticket-portal";
 import type {
   DesignTicket,
@@ -175,7 +176,6 @@ function insertPortalTicketNotification(
   ticket: DesignTicket,
   opts?: { title?: string; body?: string },
 ) {
-  const now = nowIso();
   const company = db
     .select({ billingInfo: t.companies.billingInfo })
     .from(t.companies)
@@ -184,21 +184,14 @@ function insertPortalTicketNotification(
   const href = isCrmAccountCompanyStub(company?.billingInfo)
     ? `/crm/accounts/${ticket.companyId}`
     : `/tickets/${ticket.id}`;
-  db.insert(t.notifications)
-    .values({
-      id: newId(),
-      userId: null,
-      title: opts?.title ?? `New client ticket ${ticket.ticketNumber}`,
-      body: opts?.body ?? ticket.subject,
-      kind: "info",
-      href,
-      readAt: null,
-      companyId: ticket.companyId,
-      ticketId: ticket.id,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
+  insertNotificationsForAdmins(db, {
+    title: opts?.title ?? `New client ticket ${ticket.ticketNumber}`,
+    body: opts?.body ?? ticket.subject,
+    kind: "info",
+    href,
+    companyId: ticket.companyId,
+    ticketId: ticket.id,
+  });
 }
 
 const createInputSchema = z.object({
