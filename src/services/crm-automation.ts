@@ -19,8 +19,8 @@ import { checkWahaSession, phoneToWahaChatId, sendWahaText } from "@/services/wa
 import { fetchN8nHealth, fetchN8nWebhook, normalizeIndiaPhone } from "@/lib/automationEndpoints";
 import {
   CRM_AUTOMATION_SAMPLE_VARS,
-  CRM_N8N_EMAIL_SEGMENT,
-  CRM_N8N_HEALTH_SEGMENT,
+  N8N_EMAIL_SEGMENT,
+  N8N_HEALTH_SEGMENT,
 } from "@/data/crm-automation-defaults";
 import type { AutomationRule } from "@/types/automation";
 import type { TicketStatus } from "@/types";
@@ -67,6 +67,7 @@ function buildN8nPayload(
     emailCc: mergeEmailCc(settings.emailCc, ruleMeta?.emailCc),
     delayHours: 0,
     entityType: "crm-ticket",
+    productScope: "crm",
     entityId: payload.ticketNumber,
     entityName: payload.subject,
     wahaApiUrl: waha.apiUrl,
@@ -162,7 +163,7 @@ export async function sendCrmAutomationRequest(
 
   try {
     const result = await fetchN8nWebhook(
-      CRM_N8N_EMAIL_SEGMENT,
+      N8N_EMAIL_SEGMENT,
       n8nBody,
       store.settings.n8nWebhookBase,
     );
@@ -306,7 +307,7 @@ export async function checkCrmAutomationHealth(): Promise<{
   try {
     const result = await fetchN8nHealth(
       settings.n8nWebhookBase,
-      CRM_N8N_HEALTH_SEGMENT,
+      N8N_HEALTH_SEGMENT,
       healthCheck.httpMethod,
     );
     emailRaw = result.text;

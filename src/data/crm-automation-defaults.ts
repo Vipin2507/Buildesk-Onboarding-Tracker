@@ -5,18 +5,27 @@ import type {
   AutomationSettings,
 } from "@/types/automation";
 import { nowIso } from "@/types";
+import {
+  DEFAULT_EMAIL_WEBHOOK,
+  DEFAULT_HEALTH_WEBHOOK,
+  DEFAULT_N8N_WEBHOOK_BASE,
+  DEFAULT_WAHA_API_KEY,
+  DEFAULT_WAHA_API_URL,
+  DEFAULT_WAHA_SESSION,
+  N8N_EMAIL_SEGMENT,
+  N8N_HEALTH_SEGMENT,
+} from "@/data/automationDefaults";
 
-/** CRM-dedicated n8n segments — separate from ERP buildesk-email / buildesk-health. */
-export const DEFAULT_CRM_N8N_WEBHOOK_BASE = "http://72.60.200.185:5678/webhook";
-export const CRM_N8N_EMAIL_SEGMENT = "buildesk-crm-email";
-export const CRM_N8N_HEALTH_SEGMENT = "buildesk-crm-health";
+/** Shared with ERP — same n8n email + health nodes. */
+export { N8N_EMAIL_SEGMENT, N8N_HEALTH_SEGMENT, DEFAULT_N8N_WEBHOOK_BASE };
 
-export const DEFAULT_CRM_EMAIL_WEBHOOK = `${DEFAULT_CRM_N8N_WEBHOOK_BASE}/${CRM_N8N_EMAIL_SEGMENT}`;
-export const DEFAULT_CRM_HEALTH_WEBHOOK = `${DEFAULT_CRM_N8N_WEBHOOK_BASE}/${CRM_N8N_HEALTH_SEGMENT}`;
+export const DEFAULT_CRM_EMAIL_WEBHOOK = DEFAULT_EMAIL_WEBHOOK;
+export const DEFAULT_CRM_HEALTH_WEBHOOK = DEFAULT_HEALTH_WEBHOOK;
 
-export const DEFAULT_CRM_WAHA_API_URL = "http://72.60.200.185:3000";
-export const DEFAULT_CRM_WAHA_API_KEY = "MySecretWAHAKey";
-export const DEFAULT_CRM_WAHA_SESSION = "crm";
+export const DEFAULT_CRM_WAHA_API_URL = DEFAULT_WAHA_API_URL;
+export const DEFAULT_CRM_WAHA_API_KEY = DEFAULT_WAHA_API_KEY;
+/** WAHA session can stay shared; CRM vs ERP is distinguished in rules/logs. */
+export const DEFAULT_CRM_WAHA_SESSION = DEFAULT_WAHA_SESSION;
 
 export const DEFAULT_CRM_WAHA_CONFIG = {
   apiUrl: DEFAULT_CRM_WAHA_API_URL,
@@ -26,21 +35,21 @@ export const DEFAULT_CRM_WAHA_CONFIG = {
 };
 
 export const DEFAULT_CRM_AUTOMATION_SETTINGS: AutomationSettings = {
-  n8nWebhookBase: DEFAULT_CRM_N8N_WEBHOOK_BASE,
+  n8nWebhookBase: DEFAULT_N8N_WEBHOOK_BASE,
   automationsEnabled: true,
 };
 
 export const DEFAULT_CRM_AUTOMATION_ENDPOINTS: AutomationEndpoint[] = [
   {
     channel: "email",
-    label: "CRM Email (n8n)",
+    label: "Email (n8n)",
     provider: "n8n-webhook",
     webhookUrl: DEFAULT_CRM_EMAIL_WEBHOOK,
     isEnabled: true,
   },
   {
     channel: "whatsapp",
-    label: "CRM WhatsApp (WAHA)",
+    label: "WhatsApp (WAHA)",
     provider: "waha",
     webhookUrl: DEFAULT_CRM_WAHA_API_URL,
     isEnabled: true,
@@ -48,7 +57,7 @@ export const DEFAULT_CRM_AUTOMATION_ENDPOINTS: AutomationEndpoint[] = [
 ];
 
 export const DEFAULT_CRM_HEALTH_CONFIG: AutomationHealthConfig = {
-  label: "CRM Health Check (n8n)",
+  label: "Health Check (n8n)",
   webhookUrl: DEFAULT_CRM_HEALTH_WEBHOOK,
   httpMethod: "POST",
 };

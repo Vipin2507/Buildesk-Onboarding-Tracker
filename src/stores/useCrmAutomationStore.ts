@@ -77,12 +77,29 @@ export const useCrmAutomationStore = createPersistedStore<AutomationState>(
       const needsWaha = !s.waha?.apiUrl;
       const needsProvider = s.endpoints.some((e) => !e.provider);
       const needsSettings = !s.settings?.n8nWebhookBase;
-      if (s.seeded && s.rules.length > 0 && !needsWaha && !needsProvider && !needsSettings) return;
+      const usesLegacyCrmSegment =
+        s.endpoints.some((e) => e.webhookUrl.includes("buildesk-crm-")) ||
+        s.healthCheck?.webhookUrl?.includes("buildesk-crm-");
+      if (
+        s.seeded &&
+        s.rules.length > 0 &&
+        !needsWaha &&
+        !needsProvider &&
+        !needsSettings &&
+        !usesLegacyCrmSegment
+      ) {
+        return;
+      }
       set({
         settings: s.settings?.n8nWebhookBase ? s.settings : { ...DEFAULT_CRM_AUTOMATION_SETTINGS },
-        endpoints: DEFAULT_CRM_AUTOMATION_ENDPOINTS.map((e) => ({ ...e })),
+        endpoints: usesLegacyCrmSegment || needsProvider || !s.seeded
+          ? DEFAULT_CRM_AUTOMATION_ENDPOINTS.map((e) => ({ ...e }))
+          : s.endpoints,
         waha: s.waha?.apiUrl ? s.waha : { ...DEFAULT_CRM_WAHA_CONFIG },
-        healthCheck: s.healthCheck?.webhookUrl ? s.healthCheck : { ...DEFAULT_CRM_HEALTH_CONFIG },
+        healthCheck:
+          usesLegacyCrmSegment || !s.healthCheck?.webhookUrl
+            ? { ...DEFAULT_CRM_HEALTH_CONFIG }
+            : s.healthCheck,
         rules: s.rules.length > 0 ? s.rules : DEFAULT_CRM_AUTOMATION_RULES,
         seeded: true,
       });

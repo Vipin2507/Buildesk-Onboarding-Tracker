@@ -64,6 +64,7 @@ function buildN8nPayload(
     emailCc: mergeEmailCc(settings.emailCc, ruleMeta?.emailCc),
     delayHours: 0,
     entityType: "ticket",
+    productScope: "erp",
     entityId: payload.ticketNumber,
     entityName: payload.subject,
     wahaApiUrl: waha.apiUrl,
