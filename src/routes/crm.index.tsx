@@ -29,6 +29,7 @@ import {
 import { CrmDashboardActivityFeed } from "@/components/crm/crm-dashboard-activity-feed";
 import { CrmDashboardDrillDownSheet } from "@/components/crm/crm-dashboard-drill-down";
 import { CrmDashboardPendingSummary } from "@/components/crm/crm-dashboard-pending-summary";
+import { CrmDashboardWorkloadCard } from "@/components/crm/crm-dashboard-workload-card";
 import { DashboardKpiCard } from "@/components/dashboard/dashboard-kpi-card";
 import { OnboardingPipelineSection } from "@/components/dashboard/onboarding-pipeline";
 import { PageWrap } from "@/components/page-header";
@@ -39,7 +40,6 @@ import {
   DesignTicketPageHeader,
 } from "@/components/design-ticket/design-ticket-shared";
 import type { ChecklistPhaseBucket } from "@/lib/checklist";
-import type { CrmImplementationStage } from "@/types/crm-onboarding";
 import {
   crmDrillDownFilterKey,
   useCrmDashboardOverview,
@@ -82,8 +82,7 @@ function CrmDashboardPage() {
     setActivePhase(undefined);
   }
 
-  const { kpis, pending, phaseStats, health, moduleAdoption, stageMix, recentActivity, rows } =
-    overview;
+  const { kpis, pending, phaseStats, health, moduleAdoption, recentActivity, rows } = overview;
 
   const progressBuckets = useMemo(() => {
     const low = rows.filter((r) => r.progress < 40).length;
@@ -168,8 +167,6 @@ function CrmDashboardPage() {
       activeKey: crmDrillDownFilterKey({ type: "support" }),
     },
   ];
-
-  const stageChartData = stageMix.filter((s) => s.value > 0);
 
   const donutData = [
     {
@@ -351,47 +348,14 @@ function CrmDashboardPage() {
             </div>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, delay: 0.09, ease: EASE }}
-            className="card-soft p-3 lg:col-span-3"
-          >
-            <div className="mb-1 flex items-center justify-between">
-              <h3 className="text-xs font-semibold">Implementation stage</h3>
-              <span className="text-[10px] text-muted-foreground">{rows.length} accounts</span>
-            </div>
-            <div className="h-28">
-              <ResponsiveContainer>
-                <BarChart
-                  data={stageChartData.length ? stageChartData : [{ label: "—", value: 0, stage: "discovery" }]}
-                  margin={{ top: 4, right: 4, bottom: 0, left: -22 }}
-                  layout="vertical"
-                >
-                  <CartesianGrid horizontal={false} stroke="var(--color-border)" />
-                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 9 }} stroke="var(--color-muted-foreground)" />
-                  <YAxis
-                    type="category"
-                    dataKey="label"
-                    width={72}
-                    tick={{ fontSize: 8 }}
-                    stroke="var(--color-muted-foreground)"
-                  />
-                  <Tooltip cursor={{ fill: "var(--color-muted)" }} />
-                  <Bar
-                    dataKey="value"
-                    fill="var(--color-primary)"
-                    radius={[0, 4, 4, 0]}
-                    className="cursor-pointer"
-                    onClick={(data) => {
-                      const stage = (data as { stage?: CrmImplementationStage })?.stage;
-                      if (stage) openDrillDown({ type: "stage", stage });
-                    }}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </motion.div>
+          <CrmDashboardWorkloadCard
+            pending={pending}
+            mastersProgressPct={phaseStats.progressPercent}
+            mastersApplicable={phaseStats.applicable}
+            onOpen={openDrillDown}
+            onNavigate={(to, search) => void navigate({ to, search })}
+            activeFilter={drillDown}
+          />
 
           <motion.div
             initial={{ opacity: 0, y: 8 }}
