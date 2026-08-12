@@ -15,9 +15,22 @@ import {
   dispatchAutomationTrigger,
   isClosedTicketStatus,
 } from "@/services/automation";
+import { dispatchCrmAutomationTrigger } from "@/services/crm-automation";
 
 function ticketNotifyHref(ticket: Pick<Ticket, "id" | "projectId" | "companyId">) {
   return isCrmTicket(ticket as Ticket) ? `/crm/support/${ticket.id}` : `/support/${ticket.id}`;
+}
+
+function dispatchTicketAutomation(
+  trigger: Parameters<typeof dispatchAutomationTrigger>[0],
+  ticket: Ticket,
+  opts?: { replyMessage?: string },
+) {
+  if (isCrmTicket(ticket)) {
+    dispatchCrmAutomationTrigger(trigger, ticket, opts);
+    return;
+  }
+  dispatchAutomationTrigger(trigger, ticket, opts);
 }
 
 type TicketState = {
@@ -123,7 +136,7 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
         return saved;
       }),
     );
-    dispatchAutomationTrigger("ticket-created", ticket);
+    dispatchTicketAutomation("ticket-created", ticket);
     return ticket;
   },
 
@@ -170,16 +183,16 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
     const updated = get().getById(id);
     if (updated) {
       if (updateRemark?.trim()) {
-        dispatchAutomationTrigger("ticket-reply-from-team", updated, {
+        dispatchTicketAutomation("ticket-reply-from-team", updated, {
           replyMessage: updateRemark.trim(),
         });
       } else if (data.status && prev && data.status !== prev.status) {
-        dispatchAutomationTrigger(
+        dispatchTicketAutomation(
           isClosedTicketStatus(data.status) ? "ticket-closed" : "ticket-updated",
           updated,
         );
       } else if (data.status && !prev) {
-        dispatchAutomationTrigger(
+        dispatchTicketAutomation(
           isClosedTicketStatus(data.status) ? "ticket-closed" : "ticket-updated",
           updated,
         );
@@ -214,7 +227,7 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
     serverSync("moveTicket", () => apiUpdate({ data: { id, patch: { status } } }));
     const updated = get().getById(id);
     if (updated) {
-      dispatchAutomationTrigger(
+      dispatchTicketAutomation(
         isClosedTicketStatus(status) ? "ticket-closed" : "ticket-updated",
         updated,
       );

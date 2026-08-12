@@ -2,6 +2,7 @@ import { setAppConfig } from "@/lib/api";
 import { serverSyncDebounced } from "@/lib/sync";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useAutomationStore } from "@/stores/useAutomationStore";
+import { useCrmAutomationStore } from "@/stores/useCrmAutomationStore";
 import { useMasterStore } from "@/stores/useMasterStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 
@@ -45,6 +46,17 @@ function automationSnapshot() {
   };
 }
 
+function crmAutomationSnapshot() {
+  const s = useCrmAutomationStore.getState();
+  return {
+    settings: s.settings,
+    endpoints: s.endpoints,
+    waha: s.waha,
+    healthCheck: s.healthCheck,
+    rules: s.rules,
+  };
+}
+
 let wired = false;
 
 /** Subscribe master/settings stores so changes persist to SQLite app_config. */
@@ -70,6 +82,13 @@ export function wireConfigPersistence() {
     if (!useAuthStore.getState().user) return;
     serverSyncDebounced("automation-config", 1000, () =>
       setAppConfig({ data: { key: "automation", value: automationSnapshot() } }),
+    );
+  });
+
+  useCrmAutomationStore.subscribe(() => {
+    if (!useAuthStore.getState().user) return;
+    serverSyncDebounced("crm-automation-config", 1000, () =>
+      setAppConfig({ data: { key: "crm-automation", value: crmAutomationSnapshot() } }),
     );
   });
 }

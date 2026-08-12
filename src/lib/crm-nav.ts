@@ -6,6 +6,7 @@ import {
   MessageSquareText,
   MessagesSquare,
   Settings,
+  Zap,
 } from "lucide-react";
 import type { NavItem } from "@/lib/nav";
 
@@ -16,6 +17,7 @@ export const CRM_NAV: NavItem[] = [
   { to: "/crm/support", label: "Support Desk", icon: LifeBuoy },
   { to: "/crm/tickets", label: "Ticket Tracking", icon: MessageSquareText },
   { to: "/crm/live-chat", label: "Live Chat", icon: MessagesSquare },
+  { to: "/crm/automation", label: "Automation", icon: Zap, adminOnly: true },
   { to: "/crm/master", label: "Master", icon: Database, adminOnly: true },
   { to: "/crm/settings", label: "Settings", icon: Settings },
 ];

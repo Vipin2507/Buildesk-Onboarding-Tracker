@@ -68,6 +68,10 @@ import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
 import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
 import { useChatStore } from "@/stores/useChatStore";
 import { hydrateAutomationFromServer, useAutomationStore } from "@/stores/useAutomationStore";
+import {
+  hydrateCrmAutomationFromServer,
+  useCrmAutomationStore,
+} from "@/stores/useCrmAutomationStore";
 import type { CrmOnboardingRecord } from "@/types/crm-onboarding";
 
 function readLegacyCrmOnboarding(): CrmOnboardingRecord[] {
@@ -128,6 +132,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           master,
           settings,
           automation,
+          crmAutomation,
           notes,
           attachments,
           checklist,
@@ -165,6 +170,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           getAppConfig({ data: { key: "master" } }).catch(() => ({})),
           getAppConfig({ data: { key: "settings" } }).catch(() => ({})),
           getAppConfig({ data: { key: "automation" } }).catch(() => ({})),
+          getAppConfig({ data: { key: "crm-automation" } }).catch(() => ({})),
           listAllNotes().catch(() => []),
           listAllAttachments().catch(() => []),
           listAllChecklist().catch(() => []),
@@ -327,6 +333,24 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
                 waha: localAutomation.waha,
                 healthCheck: localAutomation.healthCheck,
                 rules: localAutomation.rules,
+              },
+            },
+          }).catch(() => {});
+        }
+
+        if (crmAutomation && typeof crmAutomation === "object" && Object.keys(crmAutomation).length > 0) {
+          hydrateCrmAutomationFromServer(crmAutomation as Record<string, unknown>);
+        } else {
+          const localCrmAutomation = useCrmAutomationStore.getState();
+          await setAppConfig({
+            data: {
+              key: "crm-automation",
+              value: {
+                settings: localCrmAutomation.settings,
+                endpoints: localCrmAutomation.endpoints,
+                waha: localCrmAutomation.waha,
+                healthCheck: localCrmAutomation.healthCheck,
+                rules: localCrmAutomation.rules,
               },
             },
           }).catch(() => {});
