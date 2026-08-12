@@ -176,3 +176,23 @@ export {
   createPortalChatSession,
   syncPortalChatSession,
 } from "@/server/api/chat";
+
+export {
+  listPortalBookingEventTypes,
+  listPortalBookingSlots,
+  createPortalBooking,
+  ensureBookingDefaults,
+  listBookingEventTypes,
+  listBookingAppointments,
+  listBookingAvailability,
+  listBookingBlocks,
+  listStaffBookingSlots,
+  upsertBookingAvailability,
+  replaceBookingAvailability,
+  deleteBookingAvailability,
+  createBookingBlock,
+  deleteBookingBlock,
+  updateBookingAppointmentStatus,
+  rescheduleBookingAppointment,
+  getBookingSummaryForCompany,
+} from "@/server/api/bookings";

@@ -35,6 +35,10 @@ import {
   upsertCrmOnboardingRecord,
   listDesignTickets,
   listChatSessions,
+  listBookingAppointments,
+  listBookingEventTypes,
+  listBookingAvailability,
+  listBookingBlocks,
 } from "@/lib/api";
 import { wireConfigPersistence } from "@/lib/config-persistence";
 import { mapTicket, mapTicketActivity } from "@/lib/tickets";
@@ -67,6 +71,7 @@ import {
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
 import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
 import { useChatStore } from "@/stores/useChatStore";
+import { useBookingStore } from "@/stores/useBookingStore";
 import { hydrateAutomationFromServer, useAutomationStore } from "@/stores/useAutomationStore";
 import {
   hydrateCrmAutomationFromServer,
@@ -150,6 +155,10 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           crmOnboarding,
           designTickets,
           chatSessions,
+          bookingEventTypes,
+          bookingAppointments,
+          bookingAvailability,
+          bookingBlocks,
         ] = await Promise.all([
           listCompanies(),
           listProjects({ data: {} }),
@@ -198,6 +207,22 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           }),
           listChatSessions().catch((err) => {
             console.warn("[bootstrap] listChatSessions failed", err);
+            return null;
+          }),
+          listBookingEventTypes({ data: {} }).catch((err) => {
+            console.warn("[bootstrap] listBookingEventTypes failed", err);
+            return null;
+          }),
+          listBookingAppointments({ data: {} }).catch((err) => {
+            console.warn("[bootstrap] listBookingAppointments failed", err);
+            return null;
+          }),
+          listBookingAvailability({ data: {} }).catch((err) => {
+            console.warn("[bootstrap] listBookingAvailability failed", err);
+            return null;
+          }),
+          listBookingBlocks({ data: {} }).catch((err) => {
+            console.warn("[bootstrap] listBookingBlocks failed", err);
             return null;
           }),
         ]);
@@ -287,6 +312,18 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
         }
         if (chatSessions) {
           useChatStore.getState().syncSessionsFromServer(chatSessions);
+        }
+        if (bookingEventTypes) {
+          useBookingStore.getState().hydrateEventTypes(bookingEventTypes);
+        }
+        if (bookingAppointments) {
+          useBookingStore.getState().hydrateAppointments(bookingAppointments);
+        }
+        if (bookingAvailability) {
+          useBookingStore.getState().hydrateAvailability(bookingAvailability);
+        }
+        if (bookingBlocks) {
+          useBookingStore.getState().hydrateBlocks(bookingBlocks);
         }
         useVendorStore.setState({
           materials: vendors.materials,

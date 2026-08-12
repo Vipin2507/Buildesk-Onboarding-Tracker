@@ -830,6 +830,92 @@ if (!tableExists("crm_onboarding_records")) {
   console.log("+ CREATE TABLE crm_onboarding_records");
 }
 
+if (!tableExists("booking_event_types")) {
+  sqlite.exec(`
+    CREATE TABLE booking_event_types (
+      id TEXT PRIMARY KEY NOT NULL,
+      company_id TEXT NOT NULL,
+      slug TEXT NOT NULL,
+      title TEXT NOT NULL,
+      duration_minutes INTEGER NOT NULL DEFAULT 30,
+      host_user_id TEXT,
+      buffer_before_minutes INTEGER NOT NULL DEFAULT 0,
+      buffer_after_minutes INTEGER NOT NULL DEFAULT 0,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS booking_event_types_company_idx ON booking_event_types(company_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS booking_event_types_company_slug_uidx ON booking_event_types(company_id, slug);
+  `);
+  console.log("+ CREATE TABLE booking_event_types");
+}
+
+if (!tableExists("booking_availability")) {
+  sqlite.exec(`
+    CREATE TABLE booking_availability (
+      id TEXT PRIMARY KEY NOT NULL,
+      host_user_id TEXT NOT NULL,
+      weekday INTEGER NOT NULL,
+      start_time TEXT NOT NULL,
+      end_time TEXT NOT NULL,
+      timezone TEXT NOT NULL DEFAULT 'Asia/Kolkata',
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS booking_availability_host_idx ON booking_availability(host_user_id);
+    CREATE INDEX IF NOT EXISTS booking_availability_weekday_idx ON booking_availability(weekday);
+  `);
+  console.log("+ CREATE TABLE booking_availability");
+}
+
+if (!tableExists("booking_blocks")) {
+  sqlite.exec(`
+    CREATE TABLE booking_blocks (
+      id TEXT PRIMARY KEY NOT NULL,
+      host_user_id TEXT NOT NULL,
+      starts_at TEXT NOT NULL,
+      ends_at TEXT NOT NULL,
+      reason TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS booking_blocks_host_idx ON booking_blocks(host_user_id);
+    CREATE INDEX IF NOT EXISTS booking_blocks_range_idx ON booking_blocks(starts_at, ends_at);
+  `);
+  console.log("+ CREATE TABLE booking_blocks");
+}
+
+if (!tableExists("booking_appointments")) {
+  sqlite.exec(`
+    CREATE TABLE booking_appointments (
+      id TEXT PRIMARY KEY NOT NULL,
+      event_type_id TEXT NOT NULL,
+      company_id TEXT NOT NULL,
+      host_user_id TEXT NOT NULL,
+      starts_at TEXT NOT NULL,
+      ends_at TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      guest_name TEXT NOT NULL,
+      guest_email TEXT NOT NULL,
+      guest_phone TEXT,
+      notes TEXT,
+      host_note TEXT,
+      created_via TEXT NOT NULL DEFAULT 'portal',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (event_type_id) REFERENCES booking_event_types(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS booking_appointments_company_idx ON booking_appointments(company_id);
+    CREATE INDEX IF NOT EXISTS booking_appointments_host_idx ON booking_appointments(host_user_id);
+    CREATE INDEX IF NOT EXISTS booking_appointments_status_idx ON booking_appointments(status);
+    CREATE INDEX IF NOT EXISTS booking_appointments_starts_idx ON booking_appointments(starts_at);
+    CREATE INDEX IF NOT EXISTS booking_appointments_event_idx ON booking_appointments(event_type_id);
+  `);
+  console.log("+ CREATE TABLE booking_appointments");
+}
+
 /** Backfill module_subscriptions from opted-in company_modules (idempotent). */
 if (tableExists("module_subscriptions") && tableExists("company_modules")) {
   sqlite.exec(`

@@ -38,6 +38,7 @@ export { useCompanyPortalStore } from "./useCompanyPortalStore";
 export { useAutomationStore } from "./useAutomationStore";
 export { useCrmAutomationStore } from "./useCrmAutomationStore";
 export { useChatStore } from "./useChatStore";
+export { useBookingStore } from "./useBookingStore";
 export {
   useDesignTicketStats,
   useDesignTicketsForCompany,

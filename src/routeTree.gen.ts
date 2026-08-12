@@ -38,6 +38,7 @@ import { Route as CompaniesCompanyIdRouteImport } from './routes/companies.$comp
 import { Route as CrmIndexRouteImport } from './routes/crm.index'
 import { Route as CrmAccountsRouteImport } from './routes/crm.accounts'
 import { Route as CrmAutomationRouteImport } from './routes/crm.automation'
+import { Route as CrmBookingsRouteImport } from './routes/crm.bookings'
 import { Route as CrmLiveChatRouteImport } from './routes/crm.live-chat'
 import { Route as CrmMasterRouteImport } from './routes/crm.master'
 import { Route as CrmSettingsRouteImport } from './routes/crm.settings'
@@ -53,6 +54,7 @@ import { Route as CrmSupportTicketIdRouteImport } from './routes/crm.support.$ti
 import { Route as CrmTicketsTicketIdRouteImport } from './routes/crm.tickets.$ticketId'
 import { Route as CrmTicketsLinksRouteImport } from './routes/crm.tickets.links'
 import { Route as PortalSlugIndexRouteImport } from './routes/portal.$slug.index'
+import { Route as PortalSlugBookRouteImport } from './routes/portal.$slug.book'
 import { Route as PortalSlugCreateTicketRouteImport } from './routes/portal.$slug.create-ticket'
 import { Route as PortalSlugDashboardRouteImport } from './routes/portal.$slug.dashboard'
 import { Route as PortalSlugProfileRouteImport } from './routes/portal.$slug.profile'
@@ -207,6 +209,11 @@ const CrmAutomationRoute = CrmAutomationRouteImport.update({
   path: '/automation',
   getParentRoute: () => CrmRoute,
 } as any)
+const CrmBookingsRoute = CrmBookingsRouteImport.update({
+  id: '/bookings',
+  path: '/bookings',
+  getParentRoute: () => CrmRoute,
+} as any)
 const CrmLiveChatRoute = CrmLiveChatRouteImport.update({
   id: '/live-chat',
   path: '/live-chat',
@@ -282,6 +289,11 @@ const PortalSlugIndexRoute = PortalSlugIndexRouteImport.update({
   path: '/',
   getParentRoute: () => PortalSlugRoute,
 } as any)
+const PortalSlugBookRoute = PortalSlugBookRouteImport.update({
+  id: '/book',
+  path: '/book',
+  getParentRoute: () => PortalSlugRoute,
+} as any)
 const PortalSlugCreateTicketRoute = PortalSlugCreateTicketRouteImport.update({
   id: '/create-ticket',
   path: '/create-ticket',
@@ -355,6 +367,7 @@ export interface FileRoutesByFullPath {
   '/companies/$companyId': typeof CompaniesCompanyIdRouteWithChildren
   '/crm/accounts': typeof CrmAccountsRouteWithChildren
   '/crm/automation': typeof CrmAutomationRoute
+  '/crm/bookings': typeof CrmBookingsRoute
   '/crm/live-chat': typeof CrmLiveChatRoute
   '/crm/master': typeof CrmMasterRoute
   '/crm/settings': typeof CrmSettingsRoute
@@ -370,6 +383,7 @@ export interface FileRoutesByFullPath {
   '/crm/support/$ticketId': typeof CrmSupportTicketIdRoute
   '/crm/tickets/$ticketId': typeof CrmTicketsTicketIdRoute
   '/crm/tickets/links': typeof CrmTicketsLinksRoute
+  '/portal/$slug/book': typeof PortalSlugBookRoute
   '/portal/$slug/create-ticket': typeof PortalSlugCreateTicketRoute
   '/portal/$slug/dashboard': typeof PortalSlugDashboardRoute
   '/portal/$slug/profile': typeof PortalSlugProfileRoute
@@ -408,6 +422,7 @@ export interface FileRoutesByTo {
   '/companies/$companyId': typeof CompaniesCompanyIdRouteWithChildren
   '/crm/accounts': typeof CrmAccountsRouteWithChildren
   '/crm/automation': typeof CrmAutomationRoute
+  '/crm/bookings': typeof CrmBookingsRoute
   '/crm/live-chat': typeof CrmLiveChatRoute
   '/crm/master': typeof CrmMasterRoute
   '/crm/settings': typeof CrmSettingsRoute
@@ -422,6 +437,7 @@ export interface FileRoutesByTo {
   '/crm/support/$ticketId': typeof CrmSupportTicketIdRoute
   '/crm/tickets/$ticketId': typeof CrmTicketsTicketIdRoute
   '/crm/tickets/links': typeof CrmTicketsLinksRoute
+  '/portal/$slug/book': typeof PortalSlugBookRoute
   '/portal/$slug/create-ticket': typeof PortalSlugCreateTicketRoute
   '/portal/$slug/dashboard': typeof PortalSlugDashboardRoute
   '/portal/$slug/profile': typeof PortalSlugProfileRoute
@@ -462,6 +478,7 @@ export interface FileRoutesById {
   '/companies/$companyId': typeof CompaniesCompanyIdRouteWithChildren
   '/crm/accounts': typeof CrmAccountsRouteWithChildren
   '/crm/automation': typeof CrmAutomationRoute
+  '/crm/bookings': typeof CrmBookingsRoute
   '/crm/live-chat': typeof CrmLiveChatRoute
   '/crm/master': typeof CrmMasterRoute
   '/crm/settings': typeof CrmSettingsRoute
@@ -477,6 +494,7 @@ export interface FileRoutesById {
   '/crm/support/$ticketId': typeof CrmSupportTicketIdRoute
   '/crm/tickets/$ticketId': typeof CrmTicketsTicketIdRoute
   '/crm/tickets/links': typeof CrmTicketsLinksRoute
+  '/portal/$slug/book': typeof PortalSlugBookRoute
   '/portal/$slug/create-ticket': typeof PortalSlugCreateTicketRoute
   '/portal/$slug/dashboard': typeof PortalSlugDashboardRoute
   '/portal/$slug/profile': typeof PortalSlugProfileRoute
@@ -518,6 +536,7 @@ export interface FileRouteTypes {
     | '/companies/$companyId'
     | '/crm/accounts'
     | '/crm/automation'
+    | '/crm/bookings'
     | '/crm/live-chat'
     | '/crm/master'
     | '/crm/settings'
@@ -533,6 +552,7 @@ export interface FileRouteTypes {
     | '/crm/support/$ticketId'
     | '/crm/tickets/$ticketId'
     | '/crm/tickets/links'
+    | '/portal/$slug/book'
     | '/portal/$slug/create-ticket'
     | '/portal/$slug/dashboard'
     | '/portal/$slug/profile'
@@ -571,6 +591,7 @@ export interface FileRouteTypes {
     | '/companies/$companyId'
     | '/crm/accounts'
     | '/crm/automation'
+    | '/crm/bookings'
     | '/crm/live-chat'
     | '/crm/master'
     | '/crm/settings'
@@ -585,6 +606,7 @@ export interface FileRouteTypes {
     | '/crm/support/$ticketId'
     | '/crm/tickets/$ticketId'
     | '/crm/tickets/links'
+    | '/portal/$slug/book'
     | '/portal/$slug/create-ticket'
     | '/portal/$slug/dashboard'
     | '/portal/$slug/profile'
@@ -624,6 +646,7 @@ export interface FileRouteTypes {
     | '/companies/$companyId'
     | '/crm/accounts'
     | '/crm/automation'
+    | '/crm/bookings'
     | '/crm/live-chat'
     | '/crm/master'
     | '/crm/settings'
@@ -639,6 +662,7 @@ export interface FileRouteTypes {
     | '/crm/support/$ticketId'
     | '/crm/tickets/$ticketId'
     | '/crm/tickets/links'
+    | '/portal/$slug/book'
     | '/portal/$slug/create-ticket'
     | '/portal/$slug/dashboard'
     | '/portal/$slug/profile'
@@ -884,6 +908,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CrmAutomationRouteImport
       parentRoute: typeof CrmRoute
     }
+    '/crm/bookings': {
+      id: '/crm/bookings'
+      path: '/bookings'
+      fullPath: '/crm/bookings'
+      preLoaderRoute: typeof CrmBookingsRouteImport
+      parentRoute: typeof CrmRoute
+    }
     '/crm/live-chat': {
       id: '/crm/live-chat'
       path: '/live-chat'
@@ -987,6 +1018,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/portal/$slug/'
       preLoaderRoute: typeof PortalSlugIndexRouteImport
+      parentRoute: typeof PortalSlugRoute
+    }
+    '/portal/$slug/book': {
+      id: '/portal/$slug/book'
+      path: '/book'
+      fullPath: '/portal/$slug/book'
+      preLoaderRoute: typeof PortalSlugBookRouteImport
       parentRoute: typeof PortalSlugRoute
     }
     '/portal/$slug/create-ticket': {
@@ -1116,6 +1154,7 @@ const CrmTicketsRouteWithChildren = CrmTicketsRoute._addFileChildren(
 interface CrmRouteChildren {
   CrmAccountsRoute: typeof CrmAccountsRouteWithChildren
   CrmAutomationRoute: typeof CrmAutomationRoute
+  CrmBookingsRoute: typeof CrmBookingsRoute
   CrmLiveChatRoute: typeof CrmLiveChatRoute
   CrmMasterRoute: typeof CrmMasterRoute
   CrmSettingsRoute: typeof CrmSettingsRoute
@@ -1127,6 +1166,7 @@ interface CrmRouteChildren {
 const CrmRouteChildren: CrmRouteChildren = {
   CrmAccountsRoute: CrmAccountsRouteWithChildren,
   CrmAutomationRoute: CrmAutomationRoute,
+  CrmBookingsRoute: CrmBookingsRoute,
   CrmLiveChatRoute: CrmLiveChatRoute,
   CrmMasterRoute: CrmMasterRoute,
   CrmSettingsRoute: CrmSettingsRoute,
@@ -1185,6 +1225,7 @@ const PortalSlugTicketsRouteWithChildren =
   PortalSlugTicketsRoute._addFileChildren(PortalSlugTicketsRouteChildren)
 
 interface PortalSlugRouteChildren {
+  PortalSlugBookRoute: typeof PortalSlugBookRoute
   PortalSlugCreateTicketRoute: typeof PortalSlugCreateTicketRoute
   PortalSlugDashboardRoute: typeof PortalSlugDashboardRoute
   PortalSlugProfileRoute: typeof PortalSlugProfileRoute
@@ -1194,6 +1235,7 @@ interface PortalSlugRouteChildren {
 }
 
 const PortalSlugRouteChildren: PortalSlugRouteChildren = {
+  PortalSlugBookRoute: PortalSlugBookRoute,
   PortalSlugCreateTicketRoute: PortalSlugCreateTicketRoute,
   PortalSlugDashboardRoute: PortalSlugDashboardRoute,
   PortalSlugProfileRoute: PortalSlugProfileRoute,

@@ -1,16 +1,18 @@
 import { useEffect, useRef } from "react";
 
-import { useCompanyPortalStore, useCrmAccountStore } from "@/stores";
+import { useBookingStore, useCompanyPortalStore, useCrmAccountStore } from "@/stores";
 
 /**
  * Ensures CRM accounts missing portal rows get one created (once per mount wave).
- * Skips accounts that already have portal access to avoid request storms.
+ * Also seeds default booking event type + host availability when portal exists.
  */
 export function CrmPortalBootstrap() {
   const accounts = useCrmAccountStore((s) => s.accounts);
   const generateAccess = useCompanyPortalStore((s) => s.generateAccessForCompany);
   const getByCompanyId = useCompanyPortalStore((s) => s.getByCompanyId);
+  const ensureDefaults = useBookingStore((s) => s.ensureDefaults);
   const attempted = useRef(new Set<string>());
+  const bookingAttempted = useRef(new Set<string>());
 
   useEffect(() => {
     for (const account of accounts) {
@@ -28,6 +30,17 @@ export function CrmPortalBootstrap() {
       });
     }
   }, [accounts, generateAccess, getByCompanyId]);
+
+  useEffect(() => {
+    for (const account of accounts) {
+      if (bookingAttempted.current.has(account.id)) continue;
+      if (!getByCompanyId(account.id)) continue;
+      bookingAttempted.current.add(account.id);
+      void ensureDefaults(account.id).catch((e) =>
+        console.warn("[booking bootstrap]", account.id, e),
+      );
+    }
+  }, [accounts, ensureDefaults, getByCompanyId]);
 
   return null;
 }

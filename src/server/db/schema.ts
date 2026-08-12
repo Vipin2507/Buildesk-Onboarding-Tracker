@@ -803,3 +803,90 @@ export const appConfig = sqliteTable("app_config", {
     .notNull()
     .default(sql`(datetime('now'))`),
 });
+
+/** CRM portal booking — meeting types per account. */
+export const bookingEventTypes = sqliteTable(
+  "booking_event_types",
+  {
+    id: text("id").primaryKey(),
+    companyId: text("company_id").notNull(),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    durationMinutes: integer("duration_minutes").notNull().default(30),
+    hostUserId: text("host_user_id"),
+    bufferBeforeMinutes: integer("buffer_before_minutes").notNull().default(0),
+    bufferAfterMinutes: integer("buffer_after_minutes").notNull().default(0),
+    isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+    ...timestamps,
+  },
+  (t) => [
+    index("booking_event_types_company_idx").on(t.companyId),
+    uniqueIndex("booking_event_types_company_slug_uidx").on(t.companyId, t.slug),
+  ],
+);
+
+/** Weekly availability windows for a host user. */
+export const bookingAvailability = sqliteTable(
+  "booking_availability",
+  {
+    id: text("id").primaryKey(),
+    hostUserId: text("host_user_id").notNull(),
+    weekday: integer("weekday").notNull(),
+    startTime: text("start_time").notNull(),
+    endTime: text("end_time").notNull(),
+    timezone: text("timezone").notNull().default("Asia/Kolkata"),
+    isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+    ...timestamps,
+  },
+  (t) => [
+    index("booking_availability_host_idx").on(t.hostUserId),
+    index("booking_availability_weekday_idx").on(t.weekday),
+  ],
+);
+
+/** One-off blocks (vacation, focus time). */
+export const bookingBlocks = sqliteTable(
+  "booking_blocks",
+  {
+    id: text("id").primaryKey(),
+    hostUserId: text("host_user_id").notNull(),
+    startsAt: text("starts_at").notNull(),
+    endsAt: text("ends_at").notNull(),
+    reason: text("reason"),
+    ...timestamps,
+  },
+  (t) => [
+    index("booking_blocks_host_idx").on(t.hostUserId),
+    index("booking_blocks_range_idx").on(t.startsAt, t.endsAt),
+  ],
+);
+
+/** Portal / CRM booking appointments. */
+export const bookingAppointments = sqliteTable(
+  "booking_appointments",
+  {
+    id: text("id").primaryKey(),
+    eventTypeId: text("event_type_id")
+      .notNull()
+      .references(() => bookingEventTypes.id, { onDelete: "cascade" }),
+    companyId: text("company_id").notNull(),
+    hostUserId: text("host_user_id").notNull(),
+    startsAt: text("starts_at").notNull(),
+    endsAt: text("ends_at").notNull(),
+    status: text("status").notNull().default("pending"),
+    guestName: text("guest_name").notNull(),
+    guestEmail: text("guest_email").notNull(),
+    guestPhone: text("guest_phone"),
+    notes: text("notes"),
+    hostNote: text("host_note"),
+    createdVia: text("created_via").notNull().default("portal"),
+    ...timestamps,
+  },
+  (t) => [
+    index("booking_appointments_company_idx").on(t.companyId),
+    index("booking_appointments_host_idx").on(t.hostUserId),
+    index("booking_appointments_status_idx").on(t.status),
+    index("booking_appointments_starts_idx").on(t.startsAt),
+    index("booking_appointments_event_idx").on(t.eventTypeId),
+  ],
+);

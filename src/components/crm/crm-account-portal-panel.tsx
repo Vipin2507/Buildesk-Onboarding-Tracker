@@ -21,17 +21,20 @@ import { Input } from "@/components/ui/input";
 import { copyTextToClipboard, selectInputText } from "@/lib/copy-to-clipboard";
 import {
   portalCreatePath,
+  portalPublicBookUrl,
   portalPublicCreateUrl,
   portalPublicDashboardUrl,
 } from "@/lib/design-ticket-portal";
 import { formatDate } from "@/lib/utils";
 import {
+  useBookingStore,
   useCompanyPortalStore,
   useCrmAccountStore,
   useDesignTicketStats,
   useDesignTicketsForCompany,
   useDesignTicketStore,
 } from "@/stores";
+import { getBookingSummaryForCompany } from "@/lib/api";
 import type { DesignTicket } from "@/types/design-ticket";
 
 export function CrmAccountPortalPanel({ accountId }: { accountId: string }) {
@@ -39,10 +42,12 @@ export function CrmAccountPortalPanel({ accountId }: { accountId: string }) {
   const portal = useCompanyPortalStore((s) => s.getByCompanyId(accountId));
   const generateAccess = useCompanyPortalStore((s) => s.generateAccessForCompany);
   const regenerateSlug = useCompanyPortalStore((s) => s.regenerateSlug);
+  const ensureDefaults = useBookingStore((s) => s.ensureDefaults);
   const tickets = useDesignTicketsForCompany(accountId);
   const stats = useDesignTicketStats(accountId);
   const deleteTicket = useDesignTicketStore((s) => s.deleteTicket);
   const [regenOpen, setRegenOpen] = useState(false);
+  const [bookingSummary, setBookingSummary] = useState({ pending: 0, upcoming: 0 });
 
   useEffect(() => {
     if (!account) return;
@@ -54,8 +59,17 @@ export function CrmAccountPortalPanel({ accountId }: { accountId: string }) {
     });
   }, [account, generateAccess]);
 
+  useEffect(() => {
+    if (!account) return;
+    void ensureDefaults(account.id).catch(() => undefined);
+    void getBookingSummaryForCompany({ data: { companyId: account.id } })
+      .then((s) => setBookingSummary({ pending: s.pending, upcoming: s.upcoming }))
+      .catch(() => undefined);
+  }, [account, ensureDefaults]);
+
   const publicUrl = portal ? portalPublicCreateUrl(portal.slug) : "";
   const previewUrl = portal ? portalPublicDashboardUrl(portal.slug) : "";
+  const bookUrl = portal ? portalPublicBookUrl(portal.slug) : "";
 
   const enriched = useMemo(
     () => tickets.map((t) => ({ ...t })),
@@ -149,6 +163,49 @@ export function CrmAccountPortalPanel({ accountId }: { accountId: string }) {
           . Update <code className="rounded bg-muted px-1">VITE_PORTAL_BASE_URL</code> if the host
           changes.
         </p>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: TICKET_EASE, delay: 0.05 }}
+        className="card-soft space-y-2 p-3"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="text-xs font-semibold">Bookings</div>
+            <p className="text-[10px] text-muted-foreground">
+              {bookingSummary.pending} pending · {bookingSummary.upcoming} upcoming
+            </p>
+          </div>
+          <div className="flex gap-1.5">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1 text-xs"
+              onClick={async () => {
+                if (!bookUrl) return;
+                const ok = await copyTextToClipboard(bookUrl);
+                toast[ok ? "success" : "error"](
+                  ok ? "Book-a-call link copied" : "Copy failed — select the URL manually",
+                );
+              }}
+            >
+              <Copy className="h-3.5 w-3.5" />
+              Copy book link
+            </Button>
+            <Button type="button" size="sm" variant="secondary" className="h-8 gap-1 text-xs" asChild>
+              <a href={bookUrl} target="_blank" rel="noreferrer">
+                <ExternalLink className="h-3.5 w-3.5" />
+                Open
+              </a>
+            </Button>
+            <Button type="button" size="sm" variant="ghost" className="h-8 text-xs" asChild>
+              <Link to="/crm/bookings">Manage</Link>
+            </Button>
+          </div>
+        </div>
       </motion.div>
 
       <DesignTicketKpiGrid items={kpiCards} columns={4} size="compact" />

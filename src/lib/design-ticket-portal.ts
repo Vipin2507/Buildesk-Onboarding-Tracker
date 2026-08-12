@@ -46,6 +46,16 @@ export function portalPublicDashboardUrl(slug: string): string {
   return base ? `${base}${path}` : path;
 }
 
+export function portalBookPath(slug: string) {
+  return `/portal/${slug}/book`;
+}
+
+export function portalPublicBookUrl(slug: string): string {
+  const path = portalBookPath(slug);
+  const base = getPortalBaseUrl();
+  return base ? `${base}${path}` : path;
+}
+
 export function generatePortalSlug(existing: string[]) {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
   for (let attempt = 0; attempt < 20; attempt++) {

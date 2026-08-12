@@ -9,6 +9,7 @@ import {
   UserRound,
   Building2,
   Menu,
+  Calendar,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -33,6 +34,7 @@ const NAV = [
   { to: "create-ticket", label: "Create New Ticket", shortLabel: "Create", icon: PlusCircle },
   { to: "tickets", label: "My Tickets", shortLabel: "Tickets", icon: Ticket },
   { to: "solved", label: "Solved Tickets", shortLabel: "Solved", icon: CheckCircle2 },
+  { to: "book", label: "Book a call", shortLabel: "Book", icon: Calendar },
   { to: "profile", label: "Profile", shortLabel: "Profile", icon: UserRound },
 ] as const;
 
@@ -63,6 +65,8 @@ function portalRoute(segment: string, slug: string) {
       return { to: "/portal/$slug/tickets" as const, params: { slug } };
     case "solved":
       return { to: "/portal/$slug/solved" as const, params: { slug } };
+    case "book":
+      return { to: "/portal/$slug/book" as const, params: { slug } };
     case "profile":
       return { to: "/portal/$slug/profile" as const, params: { slug } };
     default:
