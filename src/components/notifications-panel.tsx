@@ -28,12 +28,13 @@ export function NotificationsBell() {
   const currentUser = useCurrentUser();
   const allNotifications = useNotificationStore((s) => s.notifications);
   const markRead = useNotificationStore((s) => s.markRead);
-  const markAllRead = useNotificationStore((s) => s.markAllRead);
   const crm = isCrmUser(currentUser);
 
   const notifications = useMemo(() => {
-    // Server already scopes: admins get the full deduped feed; others get only theirs.
-    return crm ? allNotifications.filter(isCrmScopedNotification) : allNotifications;
+    // Keep product shells isolated even while older notifications remain in local/server caches.
+    return crm
+      ? allNotifications.filter(isCrmScopedNotification)
+      : allNotifications.filter((notification) => !isCrmScopedNotification(notification));
   }, [allNotifications, crm]);
   const unread = notifications.filter((n) => !n.readAt).length;
   const inAppEnabled = currentUser?.notifyInApp !== false;
@@ -68,12 +69,8 @@ export function NotificationsBell() {
               size="sm"
               className="h-8 gap-1.5 px-2 text-xs text-muted-foreground"
               onClick={() => {
-                if (crm) {
-                  for (const n of notifications) {
-                    if (!n.readAt) markRead(n.id);
-                  }
-                } else {
-                  markAllRead();
+                for (const notification of notifications) {
+                  if (!notification.readAt) markRead(notification.id);
                 }
               }}
             >

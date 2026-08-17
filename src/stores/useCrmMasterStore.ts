@@ -20,6 +20,7 @@ import {
   seedCrmMigrationFields,
   seedCrmModuleProviders,
   seedCrmTrainingFields,
+  CRM_PRODUCT_MODULES,
   type CrmTrainingTrack,
 } from "@/data/crm-onboarding-defaults";
 import {
@@ -114,6 +115,29 @@ function normalizeModuleProviders(
   return out;
 }
 
+function normalizeMasterModules(
+  existing: CrmMasterModuleDef[] | undefined,
+): CrmMasterModuleDef[] {
+  const byKey = new Map((existing ?? []).map((m) => [m.key, m]));
+  const now = nowIso();
+  return CRM_PRODUCT_MODULES.map((def, i) => {
+    const prev = byKey.get(def.key);
+    if (prev) {
+      return { ...prev, label: def.label, order: i + 1 };
+    }
+    return {
+      id: newId(),
+      key: def.key,
+      label: def.label,
+      description: `${def.label} product module`,
+      enabled: true,
+      order: i + 1,
+      createdAt: now,
+      updatedAt: now,
+    };
+  });
+}
+
 function normalizeCrmMigrationFields(
   existing: CrmMigrationFieldDef[] | undefined,
 ): CrmMigrationFieldDef[] {
@@ -202,12 +226,15 @@ export const useCrmMasterStore = createPersistedStore<CrmMasterState>(
 
     updateModule: (id, data) => {
       set((s) => ({
-        modules: s.modules.map((m) => (m.id === id ? touch({ ...m, ...data }) : m)),
+        modules: normalizeMasterModules(s.modules).map((m) =>
+          m.id === id ? touch({ ...m, ...data }) : m,
+        ),
       }));
     },
 
     setModuleProviders: (moduleKey, providers) => {
       set((s) => ({
+        modules: normalizeMasterModules(s.modules),
         moduleProviders: {
           ...normalizeModuleProviders(s.moduleProviders),
           [moduleKey]: providers.map((p) => p.trim()).filter(Boolean),
@@ -249,6 +276,20 @@ export function getCrmPicklistValues(key: string): string[] {
 /** Safe read for older persisted snapshots missing moduleProviders. */
 export function getCrmMasterModuleProviders(): Record<string, string[]> {
   return normalizeModuleProviders(useCrmMasterStore.getState().moduleProviders);
+}
+
+/** Ensures newly catalogued CRM product modules appear in Master → Modules. */
+export function ensureCrmMasterModulesCatalog() {
+  const state = useCrmMasterStore.getState();
+  const modules = normalizeMasterModules(state.modules);
+  const moduleProviders = normalizeModuleProviders(state.moduleProviders);
+  if (
+    modules.length !== state.modules.length ||
+    modules.some((m, i) => m.key !== state.modules[i]?.key) ||
+    Object.keys(moduleProviders).length !== Object.keys(state.moduleProviders ?? {}).length
+  ) {
+    useCrmMasterStore.setState({ modules, moduleProviders });
+  }
 }
 
 /** Safe read for older persisted snapshots missing migrationFields. */

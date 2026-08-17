@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Minus, Plus, History } from "lucide-react";
+import { Ban, History, Minus, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -13,11 +13,13 @@ import { EntityFormModal } from "@/components/entity-form-modal";
 import { ProgressBar } from "@/components/progress-bar";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
+import { CrmTrainerSelect } from "@/components/crm/crm-trainer-select";
 import { CRM_REPORT_CATEGORIES } from "@/data/crm-onboarding-defaults";
 import {
   crmTrainerInputPatch,
   crmTrainerInputValue,
   resolveCrmSalesManagerDefaults,
+  withCrmSalesManagerOption,
 } from "@/lib/crm-sales-manager-defaults";
 import { cn, formatDate } from "@/lib/utils";
 import { useCrmAccountStore, useCrmOnboardingStore, useUserStore } from "@/stores";
@@ -37,13 +39,27 @@ export function CrmReportsChecklist({ companyId }: { companyId: string }) {
   const adjustReportExplanationCount = useCrmOnboardingStore((s) => s.adjustReportExplanationCount);
 
   const items = record.reportChecklist;
-  const done = items.filter((r) => r.status === "explained").length;
+  const applicable = items.filter((r) => !r.notApplicable);
+  const done = applicable.filter((r) => r.status === "explained").length;
   const totalSessions = items.reduce((s, r) => s + (r.explanationCount ?? 0), 0);
-  const pct = items.length ? Math.round((done / items.length) * 100) : 0;
+  const pct = applicable.length ? Math.round((done / applicable.length) * 100) : 0;
 
   const salesManager = useMemo(
     () => resolveCrmSalesManagerDefaults(account, users),
     [account, users],
+  );
+  const trainerNames = useMemo(
+    () =>
+      withCrmSalesManagerOption(
+        users.filter(
+          (user) =>
+            user.active &&
+            (user.productScope === "crm" || !user.productScope || user.role === "Admin"),
+        ),
+        salesManager,
+        users,
+      ).map((user) => user.name),
+    [salesManager, users],
   );
 
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -72,14 +88,21 @@ export function CrmReportsChecklist({ companyId }: { companyId: string }) {
   }, [items, categoryFilter]);
 
   function openLog(item: CrmReportChecklistItem) {
+    if (item.notApplicable) return;
     setLogging(item);
     setSessionDate(nowIso().slice(0, 10));
     setSessionTrainer(crmTrainerInputValue(item.trainerName, salesManager.name));
     setSessionNote("");
   }
 
+  function toggleNa(item: CrmReportChecklistItem) {
+    const next = !item.notApplicable;
+    setReportItem(companyId, item.key, { notApplicable: next });
+    toast.success(next ? `Marked N/A · ${item.label}` : `Restored · ${item.label}`);
+  }
+
   function confirmLog() {
-    if (!logging) return;
+    if (!logging || logging.notApplicable) return;
     logReportExplanation(companyId, logging.key, {
       explainedAt: sessionDate,
       trainerName:
@@ -99,13 +122,13 @@ export function CrmReportsChecklist({ companyId }: { companyId: string }) {
         title="Report explanation"
         action={
           <span className="text-[10px] tabular-nums text-muted-foreground">
-            {done}/{items.length} covered · {totalSessions} sessions · {pct}%
+            {done}/{applicable.length} covered · {totalSessions} sessions · {pct}%
           </span>
         }
       >
         <p className="mb-2 text-[10px] text-muted-foreground">
           Explain each report to the client. Use the counter when the same report is covered more than
-          once across sessions.
+          once across sessions. Mark N/A for reports that do not apply.
         </p>
         <ProgressBar value={pct} className="mb-3 h-1.5" />
 
@@ -150,7 +173,6 @@ export function CrmReportsChecklist({ companyId }: { companyId: string }) {
                 {category}
               </div>
 
-              {/* Mobile cards */}
               <div className="space-y-1.5 md:hidden">
                 {catItems.map((r) => (
                   <ReportCard
@@ -172,12 +194,13 @@ export function CrmReportsChecklist({ companyId }: { companyId: string }) {
                       })
                     }
                     trainerDisplay={crmTrainerInputValue(r.trainerName, salesManager.name)}
+                    trainerNames={trainerNames}
                     onNotes={(v) => setReportItem(companyId, r.key, { notes: v })}
+                    onNa={() => toggleNa(r)}
                   />
                 ))}
               </div>
 
-              {/* Desktop table */}
               <div className="hidden overflow-hidden rounded-lg border md:block">
                 <table className="w-full text-xs">
                   <thead className="bg-muted/60 text-[10px] uppercase tracking-wide text-muted-foreground">
@@ -192,98 +215,120 @@ export function CrmReportsChecklist({ companyId }: { companyId: string }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {catItems.map((r) => (
-                      <tr key={r.key} className="border-t hover:bg-muted/20">
-                        <td className="px-3 py-2 font-medium">{r.label}</td>
-                        <td className="px-2 py-2 text-center">
-                          <Pill tone={r.status === "explained" ? "success" : "muted"}>
-                            {r.status === "explained" ? "Explained" : "Pending"}
-                          </Pill>
-                        </td>
-                        <td className="px-2 py-2">
-                          <div className="flex items-center justify-center gap-1">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="h-7 w-7 p-0"
-                              disabled={(r.explanationCount ?? 0) <= 0}
-                              onClick={() => adjustReportExplanationCount(companyId, r.key, -1)}
-                              aria-label={`Decrease ${r.label} count`}
-                            >
-                              <Minus className="h-3 w-3" />
-                            </Button>
-                            <span className="min-w-[1.75rem] text-center text-sm font-semibold tabular-nums">
-                              {r.explanationCount ?? 0}
-                            </span>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="h-7 w-7 p-0"
-                              onClick={() => {
-                                adjustReportExplanationCount(companyId, r.key, 1);
-                                toast.success(`+1 · ${r.label}`);
-                              }}
-                              aria-label={`Increase ${r.label} count`}
-                            >
-                              <Plus className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </td>
-                        <td className="px-2 py-2 text-muted-foreground">
-                          {r.explainedAt ? formatDate(r.explainedAt) : "—"}
-                        </td>
-                        <td className="px-2 py-2">
-                          <input
-                            className="h-7 w-28 rounded border bg-background px-1.5 text-[11px]"
-                            value={crmTrainerInputValue(r.trainerName, salesManager.name)}
-                            placeholder="Trainer"
-                            onChange={(e) =>
-                              setReportItem(companyId, r.key, {
-                                trainerName: crmTrainerInputPatch(
-                                  e.target.value,
-                                  salesManager.name,
-                                ),
-                              })
-                            }
-                          />
-                        </td>
-                        <td className="px-2 py-2">
-                          <input
-                            className="h-7 w-full min-w-[8rem] rounded border bg-background px-1.5 text-[11px]"
-                            value={r.notes ?? ""}
-                            placeholder="Session notes…"
-                            onChange={(e) =>
-                              setReportItem(companyId, r.key, { notes: e.target.value })
-                            }
-                          />
-                        </td>
-                        <td className="px-2 py-2 text-right">
-                          <div className="inline-flex gap-1">
-                            <Button
-                              type="button"
-                              size="sm"
-                              className="h-7 gap-1 bg-primary text-[10px]"
-                              onClick={() => openLog(r)}
-                            >
-                              <Plus className="h-3 w-3" />
-                              Log
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="h-7 gap-1 text-[10px]"
-                              disabled={!r.explanationLog?.length}
-                              onClick={() => setHistoryFor(r)}
-                            >
-                              <History className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {catItems.map((r) => {
+                      const na = !!r.notApplicable;
+                      const covered = !na && r.status === "explained";
+                      return (
+                        <tr key={r.key} className={cn("border-t hover:bg-muted/20", na && "bg-muted/20")}>
+                          <td
+                            className={cn(
+                              "px-3 py-2 font-medium",
+                              na && "text-muted-foreground line-through",
+                            )}
+                          >
+                            {r.label}
+                          </td>
+                          <td className="px-2 py-2 text-center">
+                            <Pill tone={na ? "muted" : covered ? "success" : "warning"}>
+                              {na ? "N/A" : covered ? "Explained" : "Pending"}
+                            </Pill>
+                          </td>
+                          <td className="px-2 py-2">
+                            <div className="flex items-center justify-center gap-1">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-7 w-7 p-0"
+                                disabled={na || (r.explanationCount ?? 0) <= 0}
+                                onClick={() => adjustReportExplanationCount(companyId, r.key, -1)}
+                                aria-label={`Decrease ${r.label} count`}
+                              >
+                                <Minus className="h-3 w-3" />
+                              </Button>
+                              <span className="min-w-[1.75rem] text-center text-sm font-semibold tabular-nums">
+                                {r.explanationCount ?? 0}
+                              </span>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-7 w-7 p-0"
+                                disabled={na}
+                                onClick={() => {
+                                  adjustReportExplanationCount(companyId, r.key, 1);
+                                  toast.success(`+1 · ${r.label}`);
+                                }}
+                                aria-label={`Increase ${r.label} count`}
+                              >
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </td>
+                          <td className="px-2 py-2 text-muted-foreground">
+                            {r.explainedAt ? formatDate(r.explainedAt) : "—"}
+                          </td>
+                          <td className="px-2 py-2">
+                            <CrmTrainerSelect
+                              disabled={na}
+                              className="h-7 w-32"
+                              value={crmTrainerInputValue(r.trainerName, salesManager.name)}
+                              executiveNames={trainerNames}
+                              onChange={(value) =>
+                                setReportItem(companyId, r.key, {
+                                  trainerName: crmTrainerInputPatch(value, salesManager.name),
+                                })
+                              }
+                            />
+                          </td>
+                          <td className="px-2 py-2">
+                            <input
+                              disabled={na}
+                              className="h-7 w-full min-w-[8rem] rounded border bg-background px-1.5 text-[11px] disabled:opacity-50"
+                              value={r.notes ?? ""}
+                              placeholder="Session notes…"
+                              onChange={(e) =>
+                                setReportItem(companyId, r.key, { notes: e.target.value })
+                              }
+                            />
+                          </td>
+                          <td className="px-2 py-2 text-right">
+                            <div className="inline-flex gap-1">
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="h-7 gap-1 bg-primary text-[10px]"
+                                disabled={na}
+                                onClick={() => openLog(r)}
+                              >
+                                <Plus className="h-3 w-3" />
+                                Log
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-7 gap-1 text-[10px]"
+                                disabled={!r.explanationLog?.length}
+                                onClick={() => setHistoryFor(r)}
+                              >
+                                <History className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-7 gap-1 text-[10px]"
+                                onClick={() => toggleNa(r)}
+                              >
+                                <Ban className="h-3 w-3" />
+                                {na ? "Undo" : "N/A"}
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -319,10 +364,11 @@ export function CrmReportsChecklist({ companyId }: { companyId: string }) {
             </label>
             <label className="text-[10px] text-muted-foreground">
               Trainer / facilitator
-              <input
+              <CrmTrainerSelect
                 className={cn(fieldClass, "mt-1")}
                 value={sessionTrainer}
-                onChange={(e) => setSessionTrainer(e.target.value)}
+                executiveNames={trainerNames}
+                onChange={setSessionTrainer}
                 placeholder="Who explained this report?"
               />
             </label>
@@ -391,7 +437,9 @@ function ReportCard({
   onDec,
   onTrainer,
   trainerDisplay,
+  trainerNames,
   onNotes,
+  onNa,
 }: {
   item: CrmReportChecklistItem;
   onLog: () => void;
@@ -400,14 +448,21 @@ function ReportCard({
   onDec: () => void;
   onTrainer: (v: string) => void;
   trainerDisplay: string;
+  trainerNames: string[];
   onNotes: (v: string) => void;
+  onNa: () => void;
 }) {
+  const na = !!item.notApplicable;
+  const covered = !na && item.status === "explained";
+
   return (
-    <div className="card-soft space-y-2 p-2.5">
+    <div className={cn("card-soft space-y-2 p-2.5", na && "bg-muted/20")}>
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 text-xs font-medium">{item.label}</div>
-        <Pill tone={item.status === "explained" ? "success" : "muted"}>
-          {item.status === "explained" ? "Explained" : "Pending"}
+        <div className={cn("min-w-0 text-xs font-medium", na && "line-through text-muted-foreground")}>
+          {item.label}
+        </div>
+        <Pill tone={na ? "muted" : covered ? "success" : "warning"}>
+          {na ? "N/A" : covered ? "Explained" : "Pending"}
         </Pill>
       </div>
       <div className="flex items-center justify-between gap-2">
@@ -418,7 +473,7 @@ function ReportCard({
             size="sm"
             variant="outline"
             className="h-7 w-7 p-0"
-            disabled={(item.explanationCount ?? 0) <= 0}
+            disabled={na || (item.explanationCount ?? 0) <= 0}
             onClick={onDec}
           >
             <Minus className="h-3 w-3" />
@@ -426,25 +481,41 @@ function ReportCard({
           <span className="min-w-[1.75rem] text-center text-sm font-semibold tabular-nums">
             {item.explanationCount ?? 0}
           </span>
-          <Button type="button" size="sm" variant="outline" className="h-7 w-7 p-0" onClick={onInc}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-7 w-7 p-0"
+            disabled={na}
+            onClick={onInc}
+          >
             <Plus className="h-3 w-3" />
           </Button>
         </div>
       </div>
-      <input
+      <CrmTrainerSelect
+        disabled={na}
         className={selectClass}
         value={trainerDisplay}
+        executiveNames={trainerNames}
         placeholder="Trainer"
-        onChange={(e) => onTrainer(e.target.value)}
+        onChange={onTrainer}
       />
       <input
-        className={fieldClass}
+        disabled={na}
+        className={cn(fieldClass, "disabled:opacity-50")}
         value={item.notes ?? ""}
         placeholder="Notes…"
         onChange={(e) => onNotes(e.target.value)}
       />
-      <div className="flex gap-1.5">
-        <Button type="button" size="sm" className="h-7 flex-1 gap-1 bg-primary text-[10px]" onClick={onLog}>
+      <div className="flex flex-wrap gap-1.5">
+        <Button
+          type="button"
+          size="sm"
+          className="h-7 flex-1 gap-1 bg-primary text-[10px]"
+          disabled={na}
+          onClick={onLog}
+        >
           <Plus className="h-3 w-3" />
           Log session
         </Button>
@@ -458,6 +529,10 @@ function ReportCard({
         >
           <History className="h-3 w-3" />
           History
+        </Button>
+        <Button type="button" size="sm" variant="outline" className="h-7 gap-1 text-[10px]" onClick={onNa}>
+          <Ban className="h-3 w-3" />
+          {na ? "Undo" : "N/A"}
         </Button>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -32,6 +32,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { CRM_MODULE_PROVIDERS, CRM_PRODUCT_MODULES } from "@/data/crm-onboarding-defaults";
 import {
+  ensureCrmMasterModulesCatalog,
   getCrmMasterBookingCallTypes,
   getCrmMasterBookingHostHours,
   getCrmMasterMigrationFields,
@@ -667,6 +668,10 @@ function ModulesPanel() {
   const modules = useCrmMasterStore((s) => s.modules);
   const updateModule = useCrmMasterStore((s) => s.updateModule);
 
+  useEffect(() => {
+    ensureCrmMasterModulesCatalog();
+  }, []);
+
   return (
     <div className="space-y-2.5">
       <div>
@@ -702,6 +707,10 @@ function ProvidersPanel() {
   const moduleProviders = useCrmMasterStore((s) => s.moduleProviders);
   const setModuleProviders = useCrmMasterStore((s) => s.setModuleProviders);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    ensureCrmMasterModulesCatalog();
+  }, []);
 
   const integrationModules = useMemo(
     () =>

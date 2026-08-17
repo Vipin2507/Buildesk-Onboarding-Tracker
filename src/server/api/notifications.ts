@@ -25,12 +25,31 @@ function mapNotification(row: typeof t.notifications.$inferSelect): AppNotificat
   };
 }
 
-export function listActiveAdminUserIds(db: ReturnType<typeof getDb> = getDb()): string[] {
+type NotificationProductScope = "erp" | "crm";
+
+function scopeFromHref(href?: string | null): NotificationProductScope {
+  return href?.startsWith("/crm") ? "crm" : "erp";
+}
+
+export function listActiveAdminUserIds(
+  db: ReturnType<typeof getDb> = getDb(),
+  productScope?: NotificationProductScope,
+): string[] {
   return db
-    .select({ id: t.users.id, role: t.users.role, active: t.users.active })
+    .select({
+      id: t.users.id,
+      role: t.users.role,
+      active: t.users.active,
+      productScope: t.users.productScope,
+    })
     .from(t.users)
     .all()
-    .filter((u) => u.active && isAdminRoleKey(u.role))
+    .filter(
+      (u) =>
+        u.active &&
+        isAdminRoleKey(u.role) &&
+        (!productScope || (u.productScope || "erp") === productScope),
+    )
     .map((u) => u.id);
 }
 
@@ -48,9 +67,10 @@ export function resolveNotificationRecipientIds(
     companyId?: string;
     extraUserIds?: Array<string | undefined | null>;
     includeActorId?: string;
+    productScope?: NotificationProductScope;
   },
 ): string[] {
-  const ids = new Set<string>(listActiveAdminUserIds(db));
+  const ids = new Set<string>(listActiveAdminUserIds(db, opts.productScope));
 
   for (const id of opts.extraUserIds ?? []) {
     if (id?.trim()) ids.add(id.trim());
@@ -59,10 +79,19 @@ export function resolveNotificationRecipientIds(
 
   if (opts.companyId) {
     const users = db
-      .select({ id: t.users.id, name: t.users.name, active: t.users.active })
+      .select({
+        id: t.users.id,
+        name: t.users.name,
+        active: t.users.active,
+        productScope: t.users.productScope,
+      })
       .from(t.users)
       .all()
-      .filter((u) => u.active);
+      .filter(
+        (u) =>
+          u.active &&
+          (!opts.productScope || (u.productScope || "erp") === opts.productScope),
+      );
 
     const account = db
       .select()
@@ -183,6 +212,7 @@ export function insertNotificationsForAdmins(
   const recipientIds = resolveNotificationRecipientIds(db, {
     companyId: data.companyId,
     includeActorId: preferUserId,
+    productScope: scopeFromHref(data.href),
   });
   return insertForUserIds(db, data, recipientIds, preferUserId);
 }
@@ -206,6 +236,7 @@ export function insertBookingRequestNotification(
   const recipientIds = resolveNotificationRecipientIds(db, {
     companyId: opts.appointment.companyId,
     extraUserIds: [opts.appointment.hostUserId],
+    productScope: "crm",
   });
   return insertForUserIds(
     db,
@@ -252,7 +283,7 @@ export const listNotifications = createServerFn({ method: "GET" })
     const limit = data?.limit ?? 80;
     const db = getDb();
 
-    // Admins: full feed (deduped across fan-out + legacy broadcasts).
+    // Admins see the full feed for their product only (ERP and CRM stay isolated).
     if (isAdminRoleKey(user.role)) {
       const rows = db
         .select()
@@ -260,6 +291,11 @@ export const listNotifications = createServerFn({ method: "GET" })
         .orderBy(desc(t.notifications.createdAt))
         .limit(Math.min(limit * 8, 500))
         .all()
+        .filter(
+          (row) =>
+            scopeFromHref(row.href) ===
+            (((user.productScope as NotificationProductScope | undefined) ?? "erp")),
+        )
         .map(mapNotification);
       return dedupeAdminFeed(rows, user.id, limit);
     }
@@ -298,6 +334,7 @@ export const createNotification = createServerFn({ method: "POST" })
       companyId: data.companyId,
       extraUserIds: [...(data.recipientUserIds ?? []), data.userId],
       includeActorId: actor.id,
+      productScope: scopeFromHref(data.href),
     });
     const created = insertForUserIds(
       db,

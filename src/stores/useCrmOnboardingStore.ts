@@ -26,8 +26,10 @@ import {
   isDeveloperCompanyType,
   mergeCrmGoLiveChecklist,
   mergeCrmMigrationChecklist,
+  mergeCrmProductModules,
   mergeCrmReportChecklist,
   mergeCrmTrainingSessions,
+  needsProductModulesUpgrade,
   normalizeCrmMasterChecklist,
 } from "@/data/crm-onboarding-defaults";
 import { resolveCrmMigrationCatalog } from "@/lib/crm-migration-catalog";
@@ -390,12 +392,22 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
         changed = true;
       }
       const afterGoLive = get().getByCompanyId(companyId)!;
+      if (needsProductModulesUpgrade(afterGoLive.productModules)) {
+        set((s) => ({
+          records: updateRecord(s.records, companyId, (r) => ({
+            ...r,
+            productModules: mergeCrmProductModules(r.productModules),
+          })),
+        }));
+        changed = true;
+      }
+      const afterModules = get().getByCompanyId(companyId)!;
       if (
-        !afterGoLive.masterProjects ||
-        !afterGoLive.masterSources ||
-        !afterGoLive.masterStatuses ||
-        !afterGoLive.masterFollowUps ||
-        !afterGoLive.masterTeams
+        !afterModules.masterProjects ||
+        !afterModules.masterSources ||
+        !afterModules.masterStatuses ||
+        !afterModules.masterFollowUps ||
+        !afterModules.masterTeams
       ) {
         set((s) => ({
           records: updateRecord(s.records, companyId, (r) => ({

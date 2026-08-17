@@ -13,6 +13,7 @@ import { EntityFormModal } from "@/components/entity-form-modal";
 import { ProgressBar } from "@/components/progress-bar";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
+import { CrmTrainerSelect } from "@/components/crm/crm-trainer-select";
 import {
   CRM_TRAINING_CATEGORIES_BROKER,
   CRM_TRAINING_CATEGORIES_DEVELOPER,
@@ -94,6 +95,7 @@ export function CrmTrainingChecklist({ companyId }: { companyId: string }) {
       ),
     [users, salesManager],
   );
+  const trainerNames = useMemo(() => assignees.map((user) => user.name), [assignees]);
 
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [editing, setEditing] = useState<CrmTrainingSession | null>(null);
@@ -345,16 +347,16 @@ export function CrmTrainingChecklist({ companyId }: { companyId: string }) {
                             ) : null}
                           </td>
                           <td className="px-2 py-2">
-                            <input
+                            <CrmTrainerSelect
                               disabled={na}
-                              className="h-7 w-28 rounded border bg-background px-1.5 text-[11px] disabled:opacity-50"
+                              className="h-7 w-32"
                               value={crmTrainerInputValue(s.trainerName, salesManager.name)}
-                              placeholder="Trainer"
-                              onChange={(e) =>
+                              executiveNames={trainerNames}
+                              onChange={(value) =>
                                 upsert(companyId, {
                                   ...s,
                                   trainerName: crmTrainerInputPatch(
-                                    e.target.value,
+                                    value,
                                     salesManager.name,
                                   ),
                                 })
@@ -513,13 +515,14 @@ export function CrmTrainingChecklist({ companyId }: { companyId: string }) {
             </label>
             <label className="text-[10px] text-muted-foreground">
               Trainer
-              <input
+              <CrmTrainerSelect
                 className={cn(fieldClass, "mt-1")}
                 value={crmTrainerInputValue(editing.trainerName, salesManager.name)}
-                onChange={(e) =>
+                executiveNames={trainerNames}
+                onChange={(value) =>
                   setEditing({
                     ...editing,
-                    trainerName: crmTrainerInputPatch(e.target.value, salesManager.name),
+                    trainerName: crmTrainerInputPatch(value, salesManager.name),
                   })
                 }
               />
@@ -633,10 +636,11 @@ export function CrmTrainingChecklist({ companyId }: { companyId: string }) {
             </label>
             <label className="text-[10px] text-muted-foreground">
               Trainer
-              <input
+              <CrmTrainerSelect
                 className={cn(fieldClass, "mt-1")}
                 value={sessionTrainer}
-                onChange={(e) => setSessionTrainer(e.target.value)}
+                executiveNames={trainerNames}
+                onChange={setSessionTrainer}
               />
             </label>
             <label className="text-[10px] text-muted-foreground">

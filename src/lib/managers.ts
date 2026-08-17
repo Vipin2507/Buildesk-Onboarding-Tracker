@@ -1,9 +1,9 @@
 import type { Employee, User } from "@/types";
 
-/** Active login users available for onboarding-manager assignment. */
+/** Active ERP login users available for onboarding-manager / assignee dropdowns. */
 export function assignableManagerUsers(users: User[]) {
   return [...users]
-    .filter((u) => u.active)
+    .filter((u) => u.active && u.productScope !== "crm")
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 

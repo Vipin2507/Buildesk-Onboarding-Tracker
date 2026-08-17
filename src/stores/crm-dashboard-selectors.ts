@@ -179,7 +179,7 @@ export function useCrmDashboardOverview() {
     const pendingTraining = rows.reduce((s, r) => s + r.pendingTraining, 0);
     const pendingReports = rows.reduce((s, r) => {
       const record = recordFor(r, records);
-      return s + record.reportChecklist.filter((x) => x.status !== "explained").length;
+      return s + record.reportChecklist.filter((x) => !x.notApplicable && x.status !== "explained").length;
     }, 0);
     const overdueCount = rows.filter((r) => r.overdue).length;
     const highPriority = rows.filter((row) => {
@@ -279,7 +279,7 @@ export function useCrmDashboardOverview() {
             title: "Reports pending explanation",
             accounts: rows.filter((row) => {
               const record = recordFor(row, records);
-              return record.reportChecklist.some((x) => x.status !== "explained");
+              return record.reportChecklist.some((x) => !x.notApplicable && x.status !== "explained");
             }),
           };
         case "tickets":

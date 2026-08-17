@@ -28,6 +28,8 @@ export const CRM_MODULE_PROVIDERS: Partial<Record<CrmProductModuleKey, string[]>
   "sms-integration": ["MSG91", "Twilio", "Kaleyra", "Textlocal", "Gupshup", "Airtel IQ"],
   "ivr-integration": ["Exotel", "Knowlarity", "MyOperator", "Servetel", "Ozonetel"],
   "meta-lead-integration": ["Meta Business Suite", "LeadsBridge", "Zapier"],
+  "google-ads-integration": ["Google Ads API", "Google Tag Manager", "Zapier", "Manual Sync"],
+  "website-integration": ["Webhook", "Zapier", "WordPress", "Custom Form API", "Manual Sync"],
   "99acres-integration": ["99acres API", "Manual Sync"],
   "magicbricks-integration": ["MagicBricks API", "Manual Sync"],
   "housing-integration": ["Housing API", "Manual Sync"],
@@ -159,6 +161,8 @@ export const CRM_PRODUCT_MODULES: { key: CrmProductModuleKey; label: string }[] 
   { key: "sms-integration", label: "SMS Integration" },
   { key: "ivr-integration", label: "IVR Integration" },
   { key: "meta-lead-integration", label: "Meta Lead Integration" },
+  { key: "google-ads-integration", label: "Google Ads Integration" },
+  { key: "website-integration", label: "Website Integration" },
   { key: "99acres-integration", label: "99acres Integration" },
   { key: "magicbricks-integration", label: "MagicBricks Integration" },
   { key: "housing-integration", label: "Housing Integration" },
@@ -352,6 +356,31 @@ function defaultProductModules(): CrmProductModule[] {
   return CRM_PRODUCT_MODULES.map((m) => ({ ...m, enabled: false }));
 }
 
+/** Append newly catalogued modules onto existing account records (disabled by default). */
+export function mergeCrmProductModules(existing: CrmProductModule[]): CrmProductModule[] {
+  const byKey = new Map(existing.map((m) => [m.key, m]));
+  return CRM_PRODUCT_MODULES.map((def) => {
+    const prev = byKey.get(def.key);
+    if (!prev) {
+      return { key: def.key, label: def.label, enabled: false };
+    }
+    return {
+      ...prev,
+      key: def.key,
+      label: def.label,
+      enabled: !!prev.enabled,
+      provider: prev.provider,
+      workflow: prev.workflow,
+    };
+  });
+}
+
+export function needsProductModulesUpgrade(existing: CrmProductModule[] | undefined): boolean {
+  if (!Array.isArray(existing) || existing.length === 0) return true;
+  const keys = new Set(existing.map((m) => m.key));
+  return CRM_PRODUCT_MODULES.some((m) => !keys.has(m.key));
+}
+
 function defaultMasterChecklist(): CrmMasterChecklistItem[] {
   return CRM_MASTER_CHECKLIST_LABELS.map((m) => ({
     ...m,
@@ -506,6 +535,7 @@ function defaultReportChecklist(): CrmReportChecklistItem[] {
     explanationCount: 0,
     notes: "",
     explanationLog: [],
+    notApplicable: false,
   }));
 }
 
@@ -527,6 +557,7 @@ export function mergeCrmReportChecklist(
         explanationCount: 0,
         notes: "",
         explanationLog: [],
+        notApplicable: false,
       };
     }
     const count =
@@ -545,6 +576,7 @@ export function mergeCrmReportChecklist(
       trainerName: prev.trainerName,
       notes: prev.notes ?? "",
       explanationLog: prev.explanationLog ?? [],
+      notApplicable: !!prev.notApplicable,
     };
   });
 }
@@ -774,11 +806,10 @@ export function calcCrmOnboardingProgress(record: CrmOnboardingRecord): number {
     trainApplicable.length ? Math.round((trainDone / trainApplicable.length) * 100) : 0,
   );
 
-  const reportsDone = record.reportChecklist.filter((r) => r.status === "explained").length;
+  const reportApplicable = record.reportChecklist.filter((r) => !r.notApplicable);
+  const reportsDone = reportApplicable.filter((r) => r.status === "explained").length;
   sections.push(
-    record.reportChecklist.length
-      ? Math.round((reportsDone / record.reportChecklist.length) * 100)
-      : 0,
+    reportApplicable.length ? Math.round((reportsDone / reportApplicable.length) * 100) : 0,
   );
 
   const goLiveDone = record.goLiveChecklist.filter((g) => isCrmGoLiveItemComplete(g)).length;
@@ -798,7 +829,7 @@ export function crmPendingActivityCount(record: CrmOnboardingRecord): number {
     record.migrationChecklist.filter((m) => !isChecklistItemComplete(m)).length +
     record.trainingSessions.filter((s) => !s.notApplicable && !s.completed && !(s.sessionCount > 0))
       .length +
-    record.reportChecklist.filter((r) => r.status !== "explained").length +
+    record.reportChecklist.filter((r) => !r.notApplicable && r.status !== "explained").length +
     record.goLiveChecklist.filter((g) => !isCrmGoLiveItemComplete(g)).length
   );
 }

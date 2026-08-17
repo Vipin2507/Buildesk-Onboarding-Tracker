@@ -23,6 +23,8 @@ export type CrmProductModuleKey =
   | "sms-integration"
   | "ivr-integration"
   | "meta-lead-integration"
+  | "google-ads-integration"
+  | "website-integration"
   | "99acres-integration"
   | "magicbricks-integration"
   | "housing-integration";
@@ -152,6 +154,7 @@ export type CrmReportChecklistItem = {
   trainerName?: string;
   notes?: string;
   explanationLog?: CrmReportExplanationEntry[];
+  notApplicable?: boolean;
 };
 
 export type CrmGoLiveChecklistItem = {
