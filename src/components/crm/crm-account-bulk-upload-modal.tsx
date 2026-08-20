@@ -25,7 +25,11 @@ import { useCrmAccountStore, useCrmOnboardingStore, useUserStore } from "@/store
 
 type ManagerOverrides = Record<
   string,
-  { salesManagerName?: string; supportManager1Name?: string }
+  {
+    salesManagerName?: string;
+    supportManager1Name?: string;
+    supportManager2Name?: string;
+  }
 >;
 
 export function CrmAccountBulkUploadModal({
@@ -117,10 +121,17 @@ export function CrmAccountBulkUploadModal({
     }));
   }
 
+  function setSupport2Override(rowKey: string, value: string) {
+    setOverrides((prev) => ({
+      ...prev,
+      [rowKey]: { ...prev[rowKey], supportManager2Name: value },
+    }));
+  }
+
   const unresolvedPicks = plan?.rows.filter(
     (r) =>
       (r.action === "create" || r.action === "update") &&
-      (r.salesManagerNeedsPick || r.supportManager1NeedsPick),
+      (r.salesManagerNeedsPick || r.supportManager1NeedsPick || r.supportManager2NeedsPick),
   ).length;
 
   function applyImport() {
@@ -149,6 +160,7 @@ export function CrmAccountBulkUploadModal({
             ...row,
             salesManagerName: row.salesManagerNeedsPick ? "" : row.salesManagerName,
             supportManager1Name: row.supportManager1NeedsPick ? "" : row.supportManager1Name,
+            supportManager2Name: row.supportManager2NeedsPick ? "" : row.supportManager2Name,
           },
           existing,
         );
@@ -283,7 +295,7 @@ export function CrmAccountBulkUploadModal({
 
               <div className="overflow-hidden rounded-xl border">
                 <div className="max-h-[42vh] overflow-auto">
-                  <table className="w-full min-w-[880px] text-left text-xs">
+                  <table className="w-full min-w-[1020px] text-left text-xs">
                     <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
                       <tr className="border-b text-[10px] uppercase tracking-wide text-muted-foreground">
                         <th className="px-2 py-2 font-medium">Row</th>
@@ -292,6 +304,7 @@ export function CrmAccountBulkUploadModal({
                         <th className="px-2 py-2 font-medium">Client Id</th>
                         <th className="px-2 py-2 font-medium">Sales manager</th>
                         <th className="px-2 py-2 font-medium">Support mgr 1</th>
+                        <th className="px-2 py-2 font-medium">Support mgr 2</th>
                         <th className="px-2 py-2 font-medium">Notes</th>
                       </tr>
                     </thead>
@@ -364,6 +377,31 @@ export function CrmAccountBulkUploadModal({
                               </div>
                             ) : row.supportManager1Name ? (
                               <span>{row.supportManager1Name}</span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                          <td className="px-2 py-2">
+                            {row.supportManager2NeedsPick ? (
+                              <div className="space-y-1">
+                                <p className="text-[10px] text-amber-700 dark:text-amber-400">
+                                  Sheet: {row.supportManager2Raw}
+                                </p>
+                                <select
+                                  className="h-8 w-full min-w-[9rem] rounded-md border bg-background px-2 text-xs"
+                                  value={overrides[row.key]?.supportManager2Name ?? ""}
+                                  onChange={(e) => setSupport2Override(row.key, e.target.value)}
+                                >
+                                  <option value="">Skip / pick later</option>
+                                  {managers.map((m) => (
+                                    <option key={m.id} value={m.name}>
+                                      {m.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            ) : row.supportManager2Name ? (
+                              <span>{row.supportManager2Name}</span>
                             ) : (
                               <span className="text-muted-foreground">—</span>
                             )}

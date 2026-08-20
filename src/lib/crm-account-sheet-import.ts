@@ -22,6 +22,7 @@ export const CRM_ACCOUNT_IMPORT_HEADERS = [
   "End Date",
   "Sales Manager",
   "Support manager 1",
+  "Support manager 2",
 ] as const;
 
 export type CrmAccountImportHeader = (typeof CRM_ACCOUNT_IMPORT_HEADERS)[number];
@@ -48,6 +49,12 @@ const HEADER_ALIASES: Record<CrmAccountImportHeader, string[]> = {
     "supportmgr1",
     "csm",
   ],
+  "Support manager 2": [
+    "supportmanager2",
+    "support2",
+    "supportmgr2",
+    "csm2",
+  ],
 };
 
 export type CrmManagerOption = { id: string; name: string };
@@ -69,6 +76,7 @@ export type CrmAccountImportRawRow = {
   endDateRaw: string;
   salesManager: string;
   supportManager1: string;
+  supportManager2: string;
   startDate: string | null;
   endDate: string | null;
   usersPurchased: number | null;
@@ -96,11 +104,14 @@ export type CrmAccountImportPlanRow = {
   endDate: string | null;
   salesManagerRaw: string;
   supportManager1Raw: string;
+  supportManager2Raw: string;
   /** Resolved CRM user name, or "" if skipped / unresolved */
   salesManagerName: string;
   supportManager1Name: string;
+  supportManager2Name: string;
   salesManagerNeedsPick: boolean;
   supportManager1NeedsPick: boolean;
+  supportManager2NeedsPick: boolean;
   action: "create" | "update" | "skip" | "error";
   existingId?: string;
   message: string;
@@ -251,6 +262,7 @@ export function downloadCrmAccountImportTemplate() {
       "End Date": "2027-01-14",
       "Sales Manager": "",
       "Support manager 1": "",
+      "Support manager 2": "",
     },
   ];
   const ws = XLSX.utils.json_to_sheet(sample, {
@@ -302,6 +314,7 @@ export async function parseCrmAccountImportFile(file: File): Promise<CrmAccountI
     const endRaw = row[mapped["End Date"] ?? ""];
     const salesManager = cellStr(row[mapped["Sales Manager"] ?? ""]);
     const supportManager1 = cellStr(row[mapped["Support manager 1"] ?? ""]);
+    const supportManager2 = cellStr(row[mapped["Support manager 2"] ?? ""]);
 
     const startDate = normalizeImportDate(startRaw);
     const endDate = normalizeImportDate(endRaw);
@@ -336,6 +349,7 @@ export async function parseCrmAccountImportFile(file: File): Promise<CrmAccountI
       endDateRaw: cellStr(endRaw),
       salesManager,
       supportManager1,
+      supportManager2,
       startDate,
       endDate,
       usersPurchased,
@@ -350,7 +364,10 @@ export function buildCrmAccountImportPlan(
   rawRows: CrmAccountImportRawRow[],
   accounts: CrmAccount[],
   managers: CrmManagerOption[],
-  overrides?: Record<string, { salesManagerName?: string; supportManager1Name?: string }>,
+  overrides?: Record<
+    string,
+    { salesManagerName?: string; supportManager1Name?: string; supportManager2Name?: string }
+  >,
 ): CrmAccountImportPlan {
   const byUserId = new Map(
     accounts
@@ -391,10 +408,13 @@ export function buildCrmAccountImportPlan(
         endDate: raw.endDate,
         salesManagerRaw: raw.salesManager,
         supportManager1Raw: raw.supportManager1,
+        supportManager2Raw: raw.supportManager2,
         salesManagerName: "",
         supportManager1Name: "",
+        supportManager2Name: "",
         salesManagerNeedsPick: false,
         supportManager1NeedsPick: false,
+        supportManager2NeedsPick: false,
         action: "error",
         message: raw.parseErrors.join("; "),
       });
@@ -422,10 +442,13 @@ export function buildCrmAccountImportPlan(
         endDate: null,
         salesManagerRaw: "",
         supportManager1Raw: "",
+        supportManager2Raw: "",
         salesManagerName: "",
         supportManager1Name: "",
+        supportManager2Name: "",
         salesManagerNeedsPick: false,
         supportManager1NeedsPick: false,
+        supportManager2NeedsPick: false,
         action: "skip",
         message: "Empty row skipped",
       });
@@ -481,7 +504,27 @@ export function buildCrmAccountImportPlan(
       }
     }
 
-    if (salesManagerNeedsPick || supportManager1NeedsPick) needsManagerPick += 1;
+    let supportManager2Name = "";
+    let supportManager2NeedsPick = false;
+    if (override?.supportManager2Name !== undefined) {
+      supportManager2Name = override.supportManager2Name;
+      supportManager2NeedsPick = false;
+    } else if (!raw.supportManager2.trim()) {
+      supportManager2Name = "";
+      supportManager2NeedsPick = false;
+    } else {
+      const hit = matchCrmManager(raw.supportManager2, managers);
+      if (hit) {
+        supportManager2Name = hit.name;
+      } else {
+        supportManager2NeedsPick = true;
+        supportManager2Name = "";
+      }
+    }
+
+    if (salesManagerNeedsPick || supportManager1NeedsPick || supportManager2NeedsPick) {
+      needsManagerPick += 1;
+    }
 
     const action = existing ? "update" : "create";
     if (action === "create") create += 1;
@@ -492,10 +535,14 @@ export function buildCrmAccountImportPlan(
     else notes.push(`Update ${existing!.name}`);
     if (salesManagerNeedsPick) notes.push(`Sales manager “${raw.salesManager}” not found — pick manually`);
     if (supportManager1NeedsPick) {
-      notes.push(`Support manager “${raw.supportManager1}” not found — pick manually`);
+      notes.push(`Support manager 1 “${raw.supportManager1}” not found — pick manually`);
+    }
+    if (supportManager2NeedsPick) {
+      notes.push(`Support manager 2 “${raw.supportManager2}” not found — pick manually`);
     }
     if (!raw.salesManager.trim()) notes.push("Sales manager blank (skipped)");
-    if (!raw.supportManager1.trim()) notes.push("Support manager blank (skipped)");
+    if (!raw.supportManager1.trim()) notes.push("Support manager 1 blank (skipped)");
+    if (!raw.supportManager2.trim()) notes.push("Support manager 2 blank (skipped)");
 
     rows.push({
       rowNumber: raw.rowNumber,
@@ -516,10 +563,13 @@ export function buildCrmAccountImportPlan(
       endDate: raw.endDate,
       salesManagerRaw: raw.salesManager,
       supportManager1Raw: raw.supportManager1,
+      supportManager2Raw: raw.supportManager2,
       salesManagerName,
       supportManager1Name,
+      supportManager2Name,
       salesManagerNeedsPick,
       supportManager1NeedsPick,
+      supportManager2NeedsPick,
       action,
       existingId: existing?.id,
       message: notes.join(" · "),
@@ -600,6 +650,7 @@ export function mergeCrmAccountImportRow(
   // Only set managers when resolved (matched or manually picked). Never invent a random one.
   if (row.salesManagerName) next.salesManagerName = row.salesManagerName;
   if (row.supportManager1Name) next.supportManager1 = row.supportManager1Name;
+  if (row.supportManager2Name) next.supportManager2 = row.supportManager2Name;
 
   if (!next.ownerName) next.ownerName = next.pocName || next.contact;
   if (!next.pocName) next.pocName = next.contact;
