@@ -192,9 +192,10 @@ export function CrmAccountBulkUploadModal({
         <AlertDialogHeader className="shrink-0 border-b px-5 py-4 text-left">
           <AlertDialogTitle>Bulk upload accounts</AlertDialogTitle>
           <AlertDialogDescription>
-            Upload an Excel sheet with the template headers. Empty cells are skipped. Manager
-            names match CRM users case-insensitively — first, middle, or last name alone is fine
-            when unique (e.g. “asif” → Md Asif Ansari). Ambiguous names can be picked manually.
+            Upload an Excel sheet with the template headers. Empty cells are skipped, except an
+            empty Sales Manager cell clears the assignment (unassigned). Manager names match CRM
+            users case-insensitively — first, middle, or last name alone is fine when unique (e.g.
+            “asif” → Md Asif Ansari). Ambiguous names can be picked manually.
           </AlertDialogDescription>
         </AlertDialogHeader>
 
@@ -350,6 +351,8 @@ export function CrmAccountBulkUploadModal({
                                   ))}
                                 </select>
                               </div>
+                            ) : row.clearSalesManager ? (
+                              <span className="text-muted-foreground">Unassigned</span>
                             ) : row.salesManagerName ? (
                               <span>{row.salesManagerName}</span>
                             ) : (

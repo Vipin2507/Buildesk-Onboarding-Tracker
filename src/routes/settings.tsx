@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Bell,
   Building2,
@@ -1009,7 +1009,14 @@ function userToForm(u: User): UserForm {
 
 function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boolean }) {
   const allUsers = useUserStore((s) => s.users);
-  const users = allUsers.filter((u) => u.productScope !== "crm");
+  const users = useMemo(
+    () =>
+      allUsers
+        .filter((u) => u.productScope !== "crm")
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })),
+    [allUsers],
+  );
   const deleteUser = useUserStore((s) => s.deleteUser);
   const roles = useSettingsStore((s) => s.roles);
   const currentUser = useAuthStore((s) => s.user);

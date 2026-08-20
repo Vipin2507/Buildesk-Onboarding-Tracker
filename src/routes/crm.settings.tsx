@@ -707,7 +707,14 @@ function userToForm(u: User): UserForm {
 
 function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boolean }) {
   const allUsers = useUserStore((s) => s.users);
-  const users = useMemo(() => allUsers.filter((u) => u.productScope === "crm"), [allUsers]);
+  const users = useMemo(
+    () =>
+      allUsers
+        .filter((u) => u.productScope === "crm")
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })),
+    [allUsers],
+  );
   const deleteUser = useUserStore((s) => s.deleteUser);
   const currentUser = useAuthStore((s) => s.user);
   const setAuthUser = useAuthStore((s) => s.setUser);

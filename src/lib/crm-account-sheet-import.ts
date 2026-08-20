@@ -105,10 +105,12 @@ export type CrmAccountImportPlanRow = {
   salesManagerRaw: string;
   supportManager1Raw: string;
   supportManager2Raw: string;
-  /** Resolved CRM user name, or "" if skipped / unresolved */
+  /** Resolved CRM user name, or "" if cleared / unresolved */
   salesManagerName: string;
   supportManager1Name: string;
   supportManager2Name: string;
+  /** Empty Sales Manager cell → clear existing assignment on import */
+  clearSalesManager: boolean;
   salesManagerNeedsPick: boolean;
   supportManager1NeedsPick: boolean;
   supportManager2NeedsPick: boolean;
@@ -412,6 +414,7 @@ export function buildCrmAccountImportPlan(
         salesManagerName: "",
         supportManager1Name: "",
         supportManager2Name: "",
+        clearSalesManager: false,
         salesManagerNeedsPick: false,
         supportManager1NeedsPick: false,
         supportManager2NeedsPick: false,
@@ -446,6 +449,7 @@ export function buildCrmAccountImportPlan(
         salesManagerName: "",
         supportManager1Name: "",
         supportManager2Name: "",
+        clearSalesManager: false,
         salesManagerNeedsPick: false,
         supportManager1NeedsPick: false,
         supportManager2NeedsPick: false,
@@ -470,12 +474,15 @@ export function buildCrmAccountImportPlan(
 
     let salesManagerName = "";
     let salesManagerNeedsPick = false;
+    let clearSalesManager = false;
     if (override?.salesManagerName !== undefined) {
       salesManagerName = override.salesManagerName;
       salesManagerNeedsPick = false;
+      clearSalesManager = false;
     } else if (!raw.salesManager.trim()) {
       salesManagerName = "";
       salesManagerNeedsPick = false;
+      clearSalesManager = true;
     } else {
       const hit = matchCrmManager(raw.salesManager, managers);
       if (hit) {
@@ -540,7 +547,7 @@ export function buildCrmAccountImportPlan(
     if (supportManager2NeedsPick) {
       notes.push(`Support manager 2 “${raw.supportManager2}” not found — pick manually`);
     }
-    if (!raw.salesManager.trim()) notes.push("Sales manager blank (skipped)");
+    if (clearSalesManager) notes.push("Sales manager blank → unassigned");
     if (!raw.supportManager1.trim()) notes.push("Support manager 1 blank (skipped)");
     if (!raw.supportManager2.trim()) notes.push("Support manager 2 blank (skipped)");
 
@@ -567,6 +574,7 @@ export function buildCrmAccountImportPlan(
       salesManagerName,
       supportManager1Name,
       supportManager2Name,
+      clearSalesManager,
       salesManagerNeedsPick,
       supportManager1NeedsPick,
       supportManager2NeedsPick,
@@ -647,8 +655,12 @@ export function mergeCrmAccountImportRow(
   if (row.startDate) next.startDate = row.startDate;
   if (row.endDate) next.endDate = row.endDate;
 
-  // Only set managers when resolved (matched or manually picked). Never invent a random one.
-  if (row.salesManagerName) next.salesManagerName = row.salesManagerName;
+  // Sales manager: empty sheet cell clears assignment; support managers still skip blanks.
+  if (row.clearSalesManager) {
+    next.salesManagerName = undefined;
+  } else if (row.salesManagerName) {
+    next.salesManagerName = row.salesManagerName;
+  }
   if (row.supportManager1Name) next.supportManager1 = row.supportManager1Name;
   if (row.supportManager2Name) next.supportManager2 = row.supportManager2Name;
 
