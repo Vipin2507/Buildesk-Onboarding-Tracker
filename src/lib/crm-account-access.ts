@@ -9,7 +9,7 @@ export function normalizeCrmManagerLabel(name: string) {
     .toLowerCase();
 }
 
-/** True when assigned sales-manager label matches the logged-in user name. */
+/** True when assigned manager label matches the logged-in user name. */
 export function crmSalesManagerNamesMatch(
   assigned: string | undefined,
   userName: string | undefined,
@@ -21,20 +21,37 @@ export function crmSalesManagerNamesMatch(
   return a.replace(/\s+/g, "") === b.replace(/\s+/g, "");
 }
 
+export type CrmAccountAssignmentFields = Pick<
+  CrmAccount,
+  "salesManagerName" | "supportManager1" | "supportManager2"
+>;
+
+/** True when the user is sales manager or support manager 1/2 on the account. */
+export function isCrmAccountAssignedToUser(
+  account: CrmAccountAssignmentFields,
+  userName: string | undefined,
+) {
+  return (
+    crmSalesManagerNamesMatch(account.salesManagerName, userName) ||
+    crmSalesManagerNamesMatch(account.supportManager1, userName) ||
+    crmSalesManagerNamesMatch(account.supportManager2, userName)
+  );
+}
+
 export function canViewCrmAccount(
-  account: Pick<CrmAccount, "salesManagerName">,
+  account: CrmAccountAssignmentFields,
   user: { name: string; role?: string } | null | undefined,
 ) {
   if (!user) return false;
   if (isAdminRoleKey(user.role)) return true;
-  return crmSalesManagerNamesMatch(account.salesManagerName, user.name);
+  return isCrmAccountAssignedToUser(account, user.name);
 }
 
-export function filterCrmAccountsForUser<T extends Pick<CrmAccount, "salesManagerName">>(
+export function filterCrmAccountsForUser<T extends CrmAccountAssignmentFields>(
   accounts: T[],
   user: { name: string; role?: string } | null | undefined,
 ): T[] {
   if (!user) return [];
   if (isAdminRoleKey(user.role)) return accounts;
-  return accounts.filter((a) => crmSalesManagerNamesMatch(a.salesManagerName, user.name));
+  return accounts.filter((a) => isCrmAccountAssignedToUser(a, user.name));
 }

@@ -144,14 +144,32 @@ export const listCrmAccounts = createServerFn({ method: "GET" }).handler(async (
 
 function assertCanMutateAccount(
   user: { name: string; role: string },
-  existing: { salesManagerName: string | null } | undefined,
+  existing:
+    | {
+        salesManagerName: string | null;
+        supportManager1: string | null;
+        supportManager2: string | null;
+      }
+    | undefined,
   nextSalesManagerName: string | null | undefined,
 ) {
   if (isAdminRoleKey(user.role)) return;
-  // Managers may only create/update accounts assigned to themselves.
-  if (existing && !crmSalesManagerNamesMatch(existing.salesManagerName ?? undefined, user.name)) {
-    throw new ApiError(403, "You can only manage accounts assigned to you");
+  if (existing) {
+    if (
+      !canViewCrmAccount(
+        {
+          salesManagerName: existing.salesManagerName ?? undefined,
+          supportManager1: existing.supportManager1 ?? undefined,
+          supportManager2: existing.supportManager2 ?? undefined,
+        },
+        user,
+      )
+    ) {
+      throw new ApiError(403, "You can only manage accounts assigned to you");
+    }
+    return;
   }
+  // New accounts must be created with the current user as sales manager.
   if (!crmSalesManagerNamesMatch(nextSalesManagerName ?? undefined, user.name)) {
     throw new ApiError(403, "Sales manager must be you for accounts you manage");
   }
@@ -236,7 +254,17 @@ export const deleteCrmAccount = createServerFn({ method: "POST" })
     const db = getDb();
     const existing = db.select().from(t.crmAccounts).where(eq(t.crmAccounts.id, data.id)).get();
     if (!existing) throw new ApiError(404, "CRM account not found");
-    if (!isAdminRoleKey(user.role) && !crmSalesManagerNamesMatch(existing.salesManagerName ?? undefined, user.name)) {
+    if (
+      !isAdminRoleKey(user.role) &&
+      !canViewCrmAccount(
+        {
+          salesManagerName: existing.salesManagerName ?? undefined,
+          supportManager1: existing.supportManager1 ?? undefined,
+          supportManager2: existing.supportManager2 ?? undefined,
+        },
+        user,
+      )
+    ) {
       throw new ApiError(403, "You can only delete accounts assigned to you");
     }
     db.delete(t.crmOnboardingRecords).where(eq(t.crmOnboardingRecords.companyId, data.id)).run();

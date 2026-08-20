@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { asc, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { canViewCrmAccount, crmSalesManagerNamesMatch } from "@/lib/crm-account-access";
+import { canViewCrmAccount } from "@/lib/crm-account-access";
 import { isAdminRoleKey } from "@/lib/permissions";
 import { ApiError, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
@@ -20,7 +20,16 @@ function assertCanAccessCompany(user: { name: string; role: string }, companyId:
     .where(eq(t.crmAccounts.id, companyId))
     .get();
   if (!account) throw new ApiError(404, "CRM account not found");
-  if (!canViewCrmAccount({ salesManagerName: account.salesManagerName ?? undefined }, user)) {
+  if (
+    !canViewCrmAccount(
+      {
+        salesManagerName: account.salesManagerName ?? undefined,
+        supportManager1: account.supportManager1 ?? undefined,
+        supportManager2: account.supportManager2 ?? undefined,
+      },
+      user,
+    )
+  ) {
     throw new ApiError(403, "You can only access accounts assigned to you");
   }
   return account;
@@ -42,7 +51,14 @@ export const listCrmOnboardingRecords = createServerFn({ method: "GET" }).handle
   const allowed = new Set(
     accounts
       .filter((a) =>
-        crmSalesManagerNamesMatch(a.salesManagerName ?? undefined, user.name),
+        canViewCrmAccount(
+          {
+            salesManagerName: a.salesManagerName ?? undefined,
+            supportManager1: a.supportManager1 ?? undefined,
+            supportManager2: a.supportManager2 ?? undefined,
+          },
+          user,
+        ),
       )
       .map((a) => a.id),
   );

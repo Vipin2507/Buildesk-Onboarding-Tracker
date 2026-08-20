@@ -100,6 +100,7 @@ type AccountListFilters = {
   cityFilter: string;
   regionFilter: string;
   managerFilter: string;
+  supportManagerFilter: string;
   healthFilter: string;
   stageFilter: string;
   providerFilter: string;
@@ -118,6 +119,17 @@ function matchesAccountListFilters(row: CrmAccountRow, f: AccountListFilters) {
     f.managerFilter !== "all" &&
     f.managerFilter !== "unassigned" &&
     row.salesManagerName !== f.managerFilter
+  ) {
+    return false;
+  }
+  const hasSupport =
+    Boolean(row.supportManager1?.trim()) || Boolean(row.supportManager2?.trim());
+  if (f.supportManagerFilter === "unassigned" && hasSupport) return false;
+  if (
+    f.supportManagerFilter !== "all" &&
+    f.supportManagerFilter !== "unassigned" &&
+    row.supportManager1 !== f.supportManagerFilter &&
+    row.supportManager2 !== f.supportManagerFilter
   ) {
     return false;
   }
@@ -180,6 +192,7 @@ function CrmAccountsPage() {
   const [regionFilter, setRegionFilter] = useState("all");
   const [progressFilter, setProgressFilter] = useState("all");
   const [managerFilter, setManagerFilter] = useState("all");
+  const [supportManagerFilter, setSupportManagerFilter] = useState("all");
   const [healthFilter, setHealthFilter] = useState("all");
   const [stageFilter, setStageFilter] = useState("all");
   const [providerFilter, setProviderFilter] = useState("all");
@@ -222,6 +235,15 @@ function CrmAccountsPage() {
     return [...set].sort((a, b) => a.localeCompare(b));
   }, [rows]);
 
+  const supportManagers = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of rows) {
+      if (r.supportManager1?.trim()) set.add(r.supportManager1.trim());
+      if (r.supportManager2?.trim()) set.add(r.supportManager2.trim());
+    }
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [rows]);
+
   const stages = useMemo(() => {
     const set = new Set(rows.map((r) => r.stage));
     return [...set].sort((a, b) =>
@@ -240,6 +262,7 @@ function CrmAccountsPage() {
       cityFilter,
       regionFilter,
       managerFilter,
+      supportManagerFilter,
       healthFilter,
       stageFilter,
       providerFilter,
@@ -252,6 +275,7 @@ function CrmAccountsPage() {
       cityFilter,
       regionFilter,
       managerFilter,
+      supportManagerFilter,
       healthFilter,
       stageFilter,
       providerFilter,
@@ -306,6 +330,7 @@ function CrmAccountsPage() {
     regionFilter !== "all",
     progressFilter !== "all",
     managerFilter !== "all",
+    supportManagerFilter !== "all",
     healthFilter !== "all",
     stageFilter !== "all",
     providerFilter !== "all",
@@ -374,6 +399,7 @@ function CrmAccountsPage() {
     setRegionFilter("all");
     setProgressFilter("all");
     setManagerFilter("all");
+    setSupportManagerFilter("all");
     setHealthFilter("all");
     setStageFilter("all");
     setProviderFilter("all");
@@ -470,6 +496,9 @@ function CrmAccountsPage() {
   }
 
   const unassignedManagerCount = rows.filter((r) => !r.salesManagerName?.trim()).length;
+  const unassignedSupportManagerCount = rows.filter(
+    (r) => !r.supportManager1?.trim() && !r.supportManager2?.trim(),
+  ).length;
 
   return (
     <PageWrap compact>
@@ -582,6 +611,25 @@ function CrmAccountsPage() {
             ]}
           />
         </DesignTicketFilterField>
+        <DesignTicketFilterField label="Support Manager" compact>
+          <DesignTicketSelect
+            compact
+            value={supportManagerFilter}
+            onChange={setSupportManagerFilter}
+            options={[
+              { value: "all", label: "All support managers" },
+              ...(unassignedSupportManagerCount > 0
+                ? [
+                    {
+                      value: "unassigned",
+                      label: `Unassigned (${unassignedSupportManagerCount})`,
+                    },
+                  ]
+                : []),
+              ...supportManagers.map((m) => ({ value: m, label: m })),
+            ]}
+          />
+        </DesignTicketFilterField>
         <DesignTicketFilterField label="Provider" compact>
           <DesignTicketSelect
             compact
@@ -670,6 +718,8 @@ function CrmAccountsPage() {
                   "email",
                   "companyType",
                   "salesManagerName",
+                  "supportManager1",
+                  "supportManager2",
                   "stageLabel",
                 ]}
                 pageSize={15}
@@ -736,6 +786,21 @@ function CrmAccountsPage() {
                     render: (r) => (
                       <span className="text-xs">{r.salesManagerName || "—"}</span>
                     ),
+                  },
+                  {
+                    key: "supportManager1",
+                    header: "Support",
+                    sortable: true,
+                    render: (r) => {
+                      const names = [r.supportManager1, r.supportManager2]
+                        .map((n) => n?.trim())
+                        .filter(Boolean);
+                      return names.length ? (
+                        <span className="text-xs">{names.join(" · ")}</span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      );
+                    },
                   },
                   {
                     key: "stageLabel",

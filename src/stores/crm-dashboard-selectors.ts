@@ -111,7 +111,7 @@ export function useCrmDashboardOverview() {
   const bookingAppointments = useBookingStore((s) => s.appointments);
 
   return useMemo(() => {
-    // Admins see all; managers only accounts where they are the sales manager.
+    // Admins see all; others only accounts where they are sales or support manager.
     const accounts = filterCrmAccountsForUser(allAccounts, currentUser);
     const accountIds = new Set(accounts.map((a) => a.id));
     const today = todayYmd();
