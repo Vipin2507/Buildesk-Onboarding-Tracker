@@ -88,6 +88,28 @@ export function applyChecklistPhaseToggle<T extends ChecklistPhaseState>(
   return next;
 }
 
+/**
+ * Mark a phase complete directly, auto-completing any prior steps with the same date.
+ * Use when skipping sequential Collected → Uploaded → Live order.
+ */
+export function applyChecklistPhaseForceComplete<T extends ChecklistPhaseState>(
+  item: T,
+  phase: ChecklistPhase,
+  at?: string,
+): T | null {
+  if (item.notApplicable || item[phase]) return null;
+
+  const stamp = normalizePhaseAt(at);
+  const idx = PHASE_ORDER.indexOf(phase);
+  const next = { ...item };
+  for (let i = 0; i <= idx; i++) {
+    const p = PHASE_ORDER[i]!;
+    next[p] = true;
+    next[PHASE_AT[p]] = stamp;
+  }
+  return next;
+}
+
 /** Normalize a picked calendar date (or ISO) for checklist phase timestamps. */
 export function normalizePhaseAt(at?: string, fallback = nowIso()) {
   const raw = at?.trim();

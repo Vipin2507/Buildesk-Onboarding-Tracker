@@ -51,6 +51,7 @@ import { serverSync, serverSyncDebounced } from "@/lib/sync";
 import { useCrmAccountStore } from "./useCrmAccountStore";
 import {
   applyChecklistPhaseDate,
+  applyChecklistPhaseForceComplete,
   applyChecklistPhaseToggle,
 } from "@/lib/checklist";
 
@@ -85,6 +86,12 @@ type CrmOnboardingState = {
     phase: ChecklistPhase,
     at: string,
   ) => void;
+  forceCompleteMasterPhase: (
+    companyId: string,
+    key: string,
+    phase: ChecklistPhase,
+    at: string,
+  ) => void;
   setMasterNotApplicable: (companyId: string, key: string, notApplicable: boolean) => void;
   updateMasterRemarks: (companyId: string, key: string, remarks: string) => void;
   updateMasterAssignment: (
@@ -99,6 +106,12 @@ type CrmOnboardingState = {
     at?: string,
   ) => void;
   setMigrationPhaseDate: (
+    companyId: string,
+    key: string,
+    phase: ChecklistPhase,
+    at: string,
+  ) => void;
+  forceCompleteMigrationPhase: (
     companyId: string,
     key: string,
     phase: ChecklistPhase,
@@ -539,6 +552,16 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
     }));
   },
 
+  forceCompleteMasterPhase: (companyId, key, phase, at) => {
+    get().ensureForCompany(companyId);
+    set((s) => ({
+      records: mapMaster(s.records, companyId, key, (m) => {
+        const next = applyChecklistPhaseForceComplete(m, phase, at);
+        return next ?? m;
+      }),
+    }));
+  },
+
   setMasterNotApplicable: (companyId, key, notApplicable) => {
     get().ensureForCompany(companyId);
     set((s) => ({
@@ -598,6 +621,22 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
       records: mapMigration(s.records, companyId, key, (m) => {
         const next = applyChecklistPhaseDate(m, phase, at);
         return next ?? m;
+      }),
+    }));
+  },
+
+  forceCompleteMigrationPhase: (companyId, key, phase, at) => {
+    get().ensureForCompany(companyId);
+    set((s) => ({
+      records: mapMigration(s.records, companyId, key, (m) => {
+        const next = applyChecklistPhaseForceComplete(m, phase, at);
+        if (!next) return m;
+        const uploadedNewlyMarked =
+          (phase === "uploaded" || phase === "live") && !m.uploaded && next.uploaded;
+        if (uploadedNewlyMarked) {
+          return { ...next, uploadAttempts: (m.uploadAttempts ?? 0) + 1 };
+        }
+        return next;
       }),
     }));
   },

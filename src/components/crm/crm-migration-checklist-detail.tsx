@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Ban, Check, Minus, Plus } from "lucide-react";
+import { Ban, Minus, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -7,6 +7,7 @@ import {
   ticketFieldClass,
   ticketSelectClass,
 } from "@/components/design-ticket/design-ticket-shared";
+import { CrmChecklistPhaseCell } from "@/components/crm/crm-checklist-phase-cell";
 import { DatePickerField } from "@/components/date-picker-field";
 import { EntityFormModal } from "@/components/entity-form-modal";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,7 @@ import {
   resolveCrmSalesManagerDefaults,
   withCrmSalesManagerOption,
 } from "@/lib/crm-sales-manager-defaults";
-import { cn, formatDate, formatDateTime } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { useCrmAccountStore, useCrmOnboardingStore, useUserStore } from "@/stores";
 import type { CrmMigrationChecklistItem } from "@/types/crm-onboarding";
 
@@ -41,6 +42,7 @@ export function CrmMigrationChecklistDetail({ companyId }: { companyId: string }
   const users = useUserStore((s) => s.users);
   const toggleMigrationPhase = useCrmOnboardingStore((s) => s.toggleMigrationPhase);
   const setMigrationPhaseDate = useCrmOnboardingStore((s) => s.setMigrationPhaseDate);
+  const forceCompleteMigrationPhase = useCrmOnboardingStore((s) => s.forceCompleteMigrationPhase);
   const setMigrationNotApplicable = useCrmOnboardingStore((s) => s.setMigrationNotApplicable);
   const updateMigrationRemarks = useCrmOnboardingStore((s) => s.updateMigrationRemarks);
   const updateMigrationAssignment = useCrmOnboardingStore((s) => s.updateMigrationAssignment);
@@ -114,7 +116,7 @@ export function CrmMigrationChecklistDetail({ companyId }: { companyId: string }
     key: string;
     label: string;
     phase: ChecklistPhase;
-    mode: "complete" | "edit";
+    mode: "complete" | "edit" | "force";
   } | null>(null);
   const [phaseDate, setPhaseDate] = useState("");
 
@@ -134,6 +136,17 @@ export function CrmMigrationChecklistDetail({ companyId }: { companyId: string }
     setPhaseDate(phaseAtToYmd(at) || new Date().toISOString().slice(0, 10));
   }
 
+  function openForceCompleteDialog(item: CrmMigrationChecklistItem, phase: ChecklistPhase) {
+    if (item.notApplicable || item[phase]) return;
+    setPhaseDialog({
+      key: item.key,
+      label: item.label,
+      phase,
+      mode: "force",
+    });
+    setPhaseDate(new Date().toISOString().slice(0, 10));
+  }
+
   function confirmPhaseDialog() {
     if (!phaseDialog || !phaseDate) {
       toast.error("Pick a date for this step");
@@ -142,6 +155,13 @@ export function CrmMigrationChecklistDetail({ companyId }: { companyId: string }
     if (phaseDialog.mode === "edit") {
       setMigrationPhaseDate(companyId, phaseDialog.key, phaseDialog.phase, phaseDate);
       toast.success(`${phaseDialog.phase} date updated`);
+    } else if (phaseDialog.mode === "force") {
+      forceCompleteMigrationPhase(companyId, phaseDialog.key, phaseDialog.phase, phaseDate);
+      toast.success(
+        phaseDialog.phase === "uploaded" || phaseDialog.phase === "live"
+          ? `Marked through ${phaseDialog.phase} · upload counted`
+          : `Marked through ${phaseDialog.phase}`,
+      );
     } else {
       toggleMigrationPhase(companyId, phaseDialog.key, phaseDialog.phase, phaseDate);
       toast.success(
@@ -265,7 +285,6 @@ export function CrmMigrationChecklistDetail({ companyId }: { companyId: string }
                         <>
                           <div className="flex flex-wrap gap-2">
                             {(["collected", "uploaded", "live"] as const).map((phase) => {
-                              const allowed = canToggleChecklistPhase(item, phase);
                               const at =
                                 phase === "collected"
                                   ? item.collectedAt
@@ -279,41 +298,18 @@ export function CrmMigrationChecklistDetail({ companyId }: { companyId: string }
                                     ? "Uploaded"
                                     : "Live";
                               return (
-                                <button
+                                <CrmChecklistPhaseCell
                                   key={phase}
-                                  type="button"
-                                  disabled={!allowed && !item[phase]}
-                                  title={
-                                    !allowed && !item[phase]
-                                      ? PHASE_HINT
-                                      : at
-                                        ? formatDateTime(at)
-                                        : undefined
-                                  }
-                                  onClick={() => openPhaseDialog(item, phase)}
-                                  className={cn(
-                                    "inline-flex min-h-10 min-w-[5.5rem] flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-1.5 text-xs font-medium",
-                                    item[phase]
-                                      ? "border-success bg-success text-white"
-                                      : allowed
-                                        ? "border-input bg-background hover:border-primary"
-                                        : "cursor-not-allowed border-input bg-muted/40 text-muted-foreground opacity-50",
-                                  )}
-                                >
-                                  <span className="inline-flex items-center gap-1">
-                                    {item[phase] && <Check className="h-3.5 w-3.5" />}
-                                    {label}
-                                  </span>
-                                  {item[phase] && at ? (
-                                    <span className="text-[9px] font-normal normal-case opacity-90">
-                                      {formatDate(at)}
-                                    </span>
-                                  ) : (
-                                    <span className="text-[9px] font-normal normal-case opacity-70">
-                                      Pick date
-                                    </span>
-                                  )}
-                                </button>
+                                  item={item}
+                                  phase={phase}
+                                  na={na}
+                                  label={label}
+                                  layout="mobile"
+                                  priorStepsHint={PHASE_HINT}
+                                  at={at}
+                                  onToggle={() => openPhaseDialog(item, phase)}
+                                  onForceComplete={() => openForceCompleteDialog(item, phase)}
+                                />
                               );
                             })}
                           </div>
@@ -452,7 +448,6 @@ export function CrmMigrationChecklistDetail({ companyId }: { companyId: string }
                             {item.label}
                           </td>
                           {(["collected", "uploaded", "live"] as const).map((phase) => {
-                            const allowed = !na && canToggleChecklistPhase(item, phase);
                             const at =
                               phase === "collected"
                                 ? item.collectedAt
@@ -461,42 +456,16 @@ export function CrmMigrationChecklistDetail({ companyId }: { companyId: string }
                                   : item.liveAt;
                             return (
                               <td key={phase} className="px-2 py-2 text-center">
-                                <button
-                                  type="button"
-                                  disabled={na || (!allowed && !item[phase])}
-                                  title={
-                                    na
-                                      ? "Not applicable"
-                                      : !allowed && !item[phase]
-                                        ? "Complete prior steps first"
-                                        : at
-                                          ? formatDateTime(at)
-                                          : undefined
-                                  }
-                                  onClick={() => openPhaseDialog(item, phase)}
-                                  className={cn(
-                                    "inline-flex min-h-9 min-w-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-md border px-1.5 py-1",
-                                    (na || (!allowed && !item[phase])) &&
-                                      "cursor-not-allowed opacity-40",
-                                    !na && item[phase] && "border-success bg-success text-white",
-                                    !na &&
-                                      !item[phase] &&
-                                      allowed &&
-                                      "border-input hover:border-primary",
-                                  )}
-                                >
-                                  {!na && item[phase] && <Check className="h-3.5 w-3.5" />}
-                                  {na && <span className="text-[10px] text-muted-foreground">—</span>}
-                                  {!na && item[phase] && at ? (
-                                    <span className="text-[9px] font-normal leading-tight opacity-90">
-                                      {formatDate(at)}
-                                    </span>
-                                  ) : !na && allowed ? (
-                                    <span className="text-[9px] font-normal leading-tight text-muted-foreground">
-                                      Date
-                                    </span>
-                                  ) : null}
-                                </button>
+                                <CrmChecklistPhaseCell
+                                  item={item}
+                                  phase={phase}
+                                  na={na}
+                                  layout="desktop"
+                                  priorStepsHint={PHASE_HINT}
+                                  at={at}
+                                  onToggle={() => openPhaseDialog(item, phase)}
+                                  onForceComplete={() => openForceCompleteDialog(item, phase)}
+                                />
                               </td>
                             );
                           })}
@@ -644,17 +613,32 @@ export function CrmMigrationChecklistDetail({ companyId }: { companyId: string }
           phaseDialog
             ? phaseDialog.mode === "edit"
               ? `Edit ${phaseDialog.phase} date`
-              : `Mark ${phaseDialog.phase}`
+              : phaseDialog.mode === "force"
+                ? `Mark ${phaseDialog.phase} complete`
+                : `Mark ${phaseDialog.phase}`
             : "Phase"
         }
-        submitLabel={phaseDialog?.mode === "edit" ? "Save date" : "Confirm"}
+        submitLabel={
+          phaseDialog?.mode === "edit"
+            ? "Save date"
+            : phaseDialog?.mode === "force"
+              ? "Mark complete"
+              : "Confirm"
+        }
         onSubmit={confirmPhaseDialog}
       >
         {phaseDialog ? (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
               <span className="font-medium text-foreground">{phaseDialog.label}</span>
-              {phaseDialog.phase === "uploaded" && phaseDialog.mode === "complete" ? (
+              {phaseDialog.mode === "force" ? (
+                <span className="mt-1 block text-xs">
+                  Prior steps will also be marked complete with this date.
+                  {phaseDialog.phase === "uploaded" || phaseDialog.phase === "live" ? (
+                    <> This will also increment the upload attempt counter.</>
+                  ) : null}
+                </span>
+              ) : phaseDialog.phase === "uploaded" && phaseDialog.mode === "complete" ? (
                 <span className="mt-1 block text-xs">This will also increment the upload attempt counter.</span>
               ) : null}
             </p>
