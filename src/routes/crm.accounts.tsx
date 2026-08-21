@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import {
   Building2,
   CheckCircle2,
+  CalendarRange,
   ClipboardList,
   Pencil,
   Plus,
@@ -17,6 +18,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { CrmAccountBulkUploadModal } from "@/components/crm/crm-account-bulk-upload-modal";
+import { CrmAccountDateBulkUploadModal } from "@/components/crm/crm-account-date-bulk-upload-modal";
 import {
   CrmAccountFormFields,
   crmAccountSchema,
@@ -205,6 +207,7 @@ function CrmAccountsPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [dateBulkOpen, setDateBulkOpen] = useState(false);
   const [editing, setEditing] = useState<CrmAccount | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState<CrmAccountRow | null>(null);
@@ -512,6 +515,15 @@ function CrmAccountsPage() {
         subtitle="Customer accounts for CRM onboarding — progress, health, and go-live."
         actions={
           <div className="flex flex-wrap items-center gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1 text-xs"
+              onClick={() => setDateBulkOpen(true)}
+            >
+              <CalendarRange className="h-3.5 w-3.5" />
+              Update dates
+            </Button>
             <Button
               size="sm"
               variant="outline"
@@ -939,6 +951,7 @@ function CrmAccountsPage() {
       </EntityFormModal>
 
       <CrmAccountBulkUploadModal open={bulkOpen} onOpenChange={setBulkOpen} />
+      <CrmAccountDateBulkUploadModal open={dateBulkOpen} onOpenChange={setDateBulkOpen} />
 
       <ConfirmDeleteDialog
         open={deleteOpen}
