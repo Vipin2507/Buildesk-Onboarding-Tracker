@@ -16,6 +16,9 @@ export type CrmDashboardActivityItem = {
   createdAt: string;
   kind: ActivityKind;
   href?: string;
+  category?: import("@/lib/crm-activity-feed").CrmActivityCategory;
+  accountId?: string;
+  accountName?: string;
 };
 
 const kindDot: Record<ActivityKind, string> = {
@@ -74,6 +77,13 @@ function ActivityRow({
         {inner}
       </Link>
     );
+  } else if (item.href.startsWith("/crm/tickets/")) {
+    const ticketId = item.href.slice("/crm/tickets/".length);
+    link = (
+      <Link to="/crm/tickets/$ticketId" params={{ ticketId }} className={className}>
+        {inner}
+      </Link>
+    );
   } else if (item.href === "/crm/bookings") {
     link = (
       <Link to="/crm/bookings" search={{ tab: "pending" }} className={className}>
@@ -122,7 +132,7 @@ export function CrmDashboardActivityFeed({ items, onViewAll }: Props) {
             onClick={onViewAll}
             className="text-[10px] font-medium text-primary hover:underline"
           >
-            View all accounts
+            View all activity
           </button>
         </li>
       ) : null}

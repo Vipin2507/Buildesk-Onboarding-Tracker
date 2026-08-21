@@ -26,14 +26,29 @@ import {
   useDesignTicketStore,
   useTicketStore,
 } from "@/stores";
-import type { ActivityKind } from "@/types";
 import type { CrmAccount } from "@/types/crm-account";
-import type { CrmEvent, ModuleSubscriptionEvent } from "@/types/crm";
 import type { CrmImplementationStage, CrmOnboardingRecord } from "@/types/crm-onboarding";
-import { BOOKING_STATUS_LABEL } from "@/types/booking";
 import type { CrmDashboardActivityItem } from "@/components/crm/crm-dashboard-activity-feed";
+import {
+  buildCrmActivityFeed,
+  type CrmActivityItem,
+} from "@/lib/crm-activity-feed";
 
-export type { CrmDashboardActivityItem };
+function toDashboardActivityItem(item: CrmActivityItem): CrmDashboardActivityItem {
+  return {
+    id: item.id,
+    what: item.accountName ? `${item.accountName} · ${item.what}` : item.what,
+    who: item.who,
+    createdAt: item.createdAt,
+    kind: item.kind,
+    href: item.href,
+    category: item.category,
+    accountId: item.accountId,
+    accountName: item.accountName,
+  };
+}
+
+export type { CrmActivityItem } from "@/lib/crm-activity-feed";
 
 export type CrmAccountStatusFilter = "all" | CrmAccount["status"];
 
@@ -216,7 +231,7 @@ export function useCrmDashboardOverview() {
       value: rows.filter((r) => r.stage === stage).length,
     }));
 
-    const recentActivity = buildRecentActivity({
+    const recentActivity = buildCrmActivityFeed({
       accounts,
       records,
       accountIds,
@@ -224,6 +239,20 @@ export function useCrmDashboardOverview() {
       subscriptionEvents,
       designTickets,
       bookingAppointments,
+      tickets,
+    })
+      .slice(0, 10)
+      .map(toDashboardActivityItem);
+
+    const allActivity = buildCrmActivityFeed({
+      accounts,
+      records,
+      accountIds,
+      crmEvents,
+      subscriptionEvents,
+      designTickets,
+      bookingAppointments,
+      tickets,
     });
 
     const nowIso = new Date().toISOString().slice(0, 19);
@@ -400,6 +429,7 @@ export function useCrmDashboardOverview() {
       moduleAdoption,
       stageMix,
       recentActivity,
+      allActivity,
       resolveDrillDown,
     };
   }, [
@@ -414,132 +444,7 @@ export function useCrmDashboardOverview() {
   ]);
 }
 
-function crmEventKind(eventType: string): ActivityKind {
-  if (eventType.includes("completed") || eventType.includes("active") || eventType.includes("live")) {
-    return "success";
-  }
-  if (eventType.includes("cancelled") || eventType.includes("expired") || eventType.includes("failed")) {
-    return "danger";
-  }
-  if (eventType.includes("paused") || eventType.includes("blocked") || eventType.includes("overdue")) {
-    return "warning";
-  }
-  return "info";
-}
-
-function formatCrmEventLabel(event: CrmEvent, accountName: string) {
-  const label = event.eventType.replace(/_/g, " ");
-  if (event.remark?.trim()) return `${accountName}: ${label} — ${event.remark.trim()}`;
-  return `${accountName}: ${label}`;
-}
-
-function buildRecentActivity(input: {
-  accounts: CrmAccount[];
-  records: CrmOnboardingRecord[];
-  accountIds: Set<string>;
-  crmEvents: CrmEvent[];
-  subscriptionEvents: ModuleSubscriptionEvent[];
-  designTickets: { id: string; companyId: string; ticketNumber: string; subject: string; status: string; updatedAt: string; createdBy: { name: string } }[];
-  bookingAppointments: { id: string; companyId: string; guestName: string; status: string; updatedAt: string; createdAt: string }[];
-}): CrmDashboardActivityItem[] {
-  const nameById = new Map(input.accounts.map((a) => [a.id, a.name]));
-  const events: CrmDashboardActivityItem[] = [];
-
-  for (const e of input.crmEvents) {
-    if (!input.accountIds.has(e.companyId)) continue;
-    events.push({
-      id: `crm-event-${e.id}`,
-      what: formatCrmEventLabel(e, nameById.get(e.companyId) ?? "Account"),
-      who: e.actorName,
-      createdAt: e.createdAt,
-      kind: crmEventKind(e.eventType),
-      href: `/crm/accounts/${e.companyId}`,
-    });
-  }
-
-  for (const e of input.subscriptionEvents) {
-    if (!input.accountIds.has(e.companyId)) continue;
-    events.push({
-      id: `sub-event-${e.id}`,
-      what: `${nameById.get(e.companyId) ?? "Account"} · ${String(e.moduleKey).replace(/_/g, " ")} → ${e.newStatus}`,
-      who: e.actorName ?? "System",
-      createdAt: e.createdAt,
-      kind: crmEventKind(e.newStatus),
-      href: `/crm/accounts/${e.companyId}`,
-    });
-  }
-
-  for (const t of input.designTickets) {
-    if (!input.accountIds.has(t.companyId)) continue;
-    events.push({
-      id: `support-${t.id}`,
-      what: `Ticket ${t.ticketNumber}: ${t.subject}`,
-      who: t.createdBy.name || (nameById.get(t.companyId) ?? "Portal"),
-      createdAt: t.updatedAt,
-      kind:
-        t.status === "resolved" || t.status === "closed"
-          ? "success"
-          : t.status === "open"
-            ? "warning"
-            : "info",
-      href: `/crm/support/${t.id}`,
-    });
-  }
-
-  for (const b of input.bookingAppointments) {
-    if (!input.accountIds.has(b.companyId)) continue;
-    events.push({
-      id: `booking-${b.id}`,
-      what: `Call ${BOOKING_STATUS_LABEL[b.status as keyof typeof BOOKING_STATUS_LABEL] ?? b.status} — ${b.guestName}`,
-      who: nameById.get(b.companyId) ?? "Portal guest",
-      createdAt: b.updatedAt || b.createdAt,
-      kind:
-        b.status === "confirmed"
-          ? "success"
-          : b.status === "pending"
-            ? "warning"
-            : b.status === "cancelled" || b.status === "declined"
-              ? "danger"
-              : "info",
-      href: "/crm/bookings",
-    });
-  }
-
-  for (const account of input.accounts) {
-    const record = recordFor(account, input.records);
-    for (const c of record.commLog) {
-      events.push({
-        id: `comm-${c.id}`,
-        what: c.summary,
-        who: nameById.get(account.id) ?? account.name,
-        createdAt: c.createdAt,
-        kind: c.status === "failed" ? "danger" : "info",
-        href: `/crm/accounts/${account.id}`,
-      });
-    }
-    if (record.updatedAt) {
-      events.push({
-        id: `stage-${account.id}-${record.tracker.stage}-${record.updatedAt}`,
-        what: `${account.name} · ${CRM_STAGE_LABELS[record.tracker.stage] ?? record.tracker.stage}`,
-        who: record.tracker.lastUpdatedBy || account.accountManagerName || "Team",
-        createdAt: record.updatedAt,
-        kind: account.status === "live" ? "success" : "info",
-        href: `/crm/accounts/${account.id}`,
-      });
-    }
-  }
-
-  const seen = new Set<string>();
-  return events
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .filter((e) => {
-      const key = `${e.what}\0${e.createdAt}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .slice(0, 10);
-}
+export type { CrmDashboardActivityItem };
 
 export function crmDrillDownFilterKey(filter: CrmDashboardDrillDownFilter | null | undefined) {
   return filter ? JSON.stringify(filter) : "";

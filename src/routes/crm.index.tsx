@@ -8,6 +8,8 @@ import {
   CalendarClock,
   CheckCircle2,
   ClipboardList,
+  History,
+  LayoutDashboard,
   LifeBuoy,
   Plus,
   Rocket,
@@ -27,6 +29,7 @@ import {
 } from "recharts";
 
 import { CrmDashboardActivityFeed } from "@/components/crm/crm-dashboard-activity-feed";
+import { CrmDashboardActivityPanel } from "@/components/crm/crm-dashboard-activity-panel";
 import { CrmDashboardDrillDownSheet } from "@/components/crm/crm-dashboard-drill-down";
 import { CrmDashboardPendingSummary } from "@/components/crm/crm-dashboard-pending-summary";
 import { CrmDashboardWorkloadCard } from "@/components/crm/crm-dashboard-workload-card";
@@ -38,6 +41,7 @@ import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import {
   DesignTicketPageHeader,
+  DesignTicketTabNav,
 } from "@/components/design-ticket/design-ticket-shared";
 import type { ChecklistPhaseBucket } from "@/lib/checklist";
 import {
@@ -48,13 +52,24 @@ import {
 import { useCrmAccountStore, useCrmOnboardingStore } from "@/stores";
 
 export const Route = createFileRoute("/crm/")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    tab: search.tab === "activity" ? ("activity" as const) : ("overview" as const),
+  }),
   component: CrmDashboardPage,
 });
+
+const DASHBOARD_TABS = [
+  { id: "overview", label: "Overview", icon: LayoutDashboard },
+  { id: "activity", label: "Activity history", icon: History },
+] as const;
+
+type DashboardTabId = (typeof DASHBOARD_TABS)[number]["id"];
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
 function CrmDashboardPage() {
   const navigate = useNavigate();
+  const { tab } = Route.useSearch();
   const accounts = useCrmAccountStore((s) => s.accounts);
   const ensure = useCrmOnboardingStore((s) => s.ensureForCompany);
   const overview = useCrmDashboardOverview();
@@ -82,7 +97,8 @@ function CrmDashboardPage() {
     setActivePhase(undefined);
   }
 
-  const { kpis, pending, phaseStats, health, moduleAdoption, recentActivity, rows } = overview;
+  const { kpis, pending, phaseStats, health, moduleAdoption, recentActivity, allActivity, rows } =
+    overview;
 
   const progressBuckets = useMemo(() => {
     const low = rows.filter((r) => r.progress < 40).length;
@@ -208,12 +224,29 @@ function CrmDashboardPage() {
       ? moduleAdoption
       : [{ key: "none", name: "No modules", fullName: "None enabled", opted: 0 }];
 
+  const activityAccounts = useMemo(
+    () => rows.map((r) => ({ id: r.id, name: r.name })),
+    [rows],
+  );
+
+  function setDashboardTab(next: DashboardTabId) {
+    void navigate({
+      to: "/crm",
+      search: { tab: next === "overview" ? undefined : next },
+      replace: true,
+    });
+  }
+
   return (
     <PageWrap compact>
       <DesignTicketPageHeader
         compact
         title="CRM Dashboard"
-        subtitle="Pending work and onboarding status across CRM accounts."
+        subtitle={
+          tab === "activity"
+            ? "Full activity history across accounts, tracker, bookings, and support."
+            : "Pending work and onboarding status across CRM accounts."
+        }
         actions={
           <Button
             size="sm"
@@ -226,6 +259,16 @@ function CrmDashboardPage() {
         }
       />
 
+      <DesignTicketTabNav
+        compact
+        tabs={[...DASHBOARD_TABS]}
+        activeId={tab}
+        onChange={(id) => setDashboardTab(id as DashboardTabId)}
+      />
+
+      {tab === "activity" ? (
+        <CrmDashboardActivityPanel items={allActivity} accounts={activityAccounts} />
+      ) : (
       <div className="space-y-2.5">
         <CrmDashboardPendingSummary
           overdue={pending.overdue}
@@ -586,11 +629,12 @@ function CrmDashboardPage() {
             </div>
             <CrmDashboardActivityFeed
               items={recentActivity}
-              onViewAll={() => navigate({ to: "/crm/accounts" })}
+              onViewAll={() => setDashboardTab("activity")}
             />
           </motion.div>
         </div>
       </div>
+      )}
 
       <CrmDashboardDrillDownSheet
         open={Boolean(drillDown)}
