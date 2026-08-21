@@ -21,12 +21,13 @@ import {
   CRM_ACTIVITY_CATEGORY_LABEL,
   filterCrmActivityItems,
   groupCrmActivityByDate,
-  listCrmActivityManagerNames,
+  listCrmActivitySalesManagerNames,
+  listCrmActivitySupportManager1Names,
+  listCrmActivitySupportManager2Names,
   type CrmActivityAccountMeta,
   type CrmActivityCategory,
   type CrmActivityDateRange,
   type CrmActivityItem,
-  type CrmActivityManagerRole,
 } from "@/lib/crm-activity-feed";
 import { formatRelativeTime } from "@/types/common";
 import type { ActivityKind } from "@/types";
@@ -48,13 +49,6 @@ const KIND_TONE: Record<ActivityKind, "success" | "warning" | "danger" | "muted"
   warning: "warning",
   danger: "danger",
   info: "muted",
-};
-
-const MANAGER_ROLE_LABEL: Record<CrmActivityManagerRole, string> = {
-  all: "All roles",
-  sales: "Sales manager",
-  support1: "Support manager 1",
-  support2: "Support manager 2",
 };
 
 type Props = {
@@ -117,22 +111,45 @@ export function CrmDashboardActivityPanel({ items, accounts }: Props) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<CrmActivityCategory>("all");
   const [accountId, setAccountId] = useState("all");
-  const [managerRole, setManagerRole] = useState<CrmActivityManagerRole>("all");
-  const [managerName, setManagerName] = useState("all");
+  const [salesManagerFilter, setSalesManagerFilter] = useState("all");
+  const [supportManager1Filter, setSupportManager1Filter] = useState("all");
+  const [supportManager2Filter, setSupportManager2Filter] = useState("all");
   const [kind, setKind] = useState<ActivityKind | "all">("all");
   const [dateRange, setDateRange] = useState<CrmActivityDateRange>("30d");
 
   const categoryCounts = useMemo(() => countCrmActivityByCategory(items), [items]);
 
-  const managerOptions = useMemo(
+  const salesManagerOptions = useMemo(
     () => [
-      { value: "all", label: "All team members" },
-      ...listCrmActivityManagerNames(accounts, managerRole).map((name) => ({
+      { value: "all", label: "All sales managers" },
+      ...listCrmActivitySalesManagerNames(accounts).map((name) => ({
         value: name,
         label: name,
       })),
     ],
-    [accounts, managerRole],
+    [accounts],
+  );
+
+  const supportManager1Options = useMemo(
+    () => [
+      { value: "all", label: "All support managers 1" },
+      ...listCrmActivitySupportManager1Names(accounts).map((name) => ({
+        value: name,
+        label: name,
+      })),
+    ],
+    [accounts],
+  );
+
+  const supportManager2Options = useMemo(
+    () => [
+      { value: "all", label: "All support managers 2" },
+      ...listCrmActivitySupportManager2Names(accounts).map((name) => ({
+        value: name,
+        label: name,
+      })),
+    ],
+    [accounts],
   );
 
   const filtered = useMemo(
@@ -143,10 +160,21 @@ export function CrmDashboardActivityPanel({ items, accounts }: Props) {
         kind,
         query,
         dateRange,
-        managerRole,
-        managerName,
+        salesManagerFilter,
+        supportManager1Filter,
+        supportManager2Filter,
       }),
-    [items, category, accountId, kind, query, dateRange, managerRole, managerName],
+    [
+      items,
+      category,
+      accountId,
+      kind,
+      query,
+      dateRange,
+      salesManagerFilter,
+      supportManager1Filter,
+      supportManager2Filter,
+    ],
   );
 
   const grouped = useMemo(() => groupCrmActivityByDate(filtered), [filtered]);
@@ -154,17 +182,19 @@ export function CrmDashboardActivityPanel({ items, accounts }: Props) {
   const teamSummary = useMemo(() => {
     const executives = new Set<string>();
     const sales = new Set<string>();
-    const support = new Set<string>();
+    const support1 = new Set<string>();
+    const support2 = new Set<string>();
     for (const account of accounts) {
       if (account.accountManagerName?.trim()) executives.add(account.accountManagerName.trim());
       if (account.salesManagerName?.trim()) sales.add(account.salesManagerName.trim());
-      if (account.supportManager1?.trim()) support.add(account.supportManager1.trim());
-      if (account.supportManager2?.trim()) support.add(account.supportManager2.trim());
+      if (account.supportManager1?.trim()) support1.add(account.supportManager1.trim());
+      if (account.supportManager2?.trim()) support2.add(account.supportManager2.trim());
     }
     return {
       executives: executives.size,
       sales: sales.size,
-      support: support.size,
+      support1: support1.size,
+      support2: support2.size,
       accounts: accounts.length,
     };
   }, [accounts]);
@@ -172,8 +202,9 @@ export function CrmDashboardActivityPanel({ items, accounts }: Props) {
   const activeFilterCount =
     (category !== "all" ? 1 : 0) +
     (accountId !== "all" ? 1 : 0) +
-    (managerRole !== "all" ? 1 : 0) +
-    (managerName !== "all" ? 1 : 0) +
+    (salesManagerFilter !== "all" ? 1 : 0) +
+    (supportManager1Filter !== "all" ? 1 : 0) +
+    (supportManager2Filter !== "all" ? 1 : 0) +
     (kind !== "all" ? 1 : 0) +
     (dateRange !== "30d" ? 1 : 0);
 
@@ -208,20 +239,16 @@ export function CrmDashboardActivityPanel({ items, accounts }: Props) {
     [accounts],
   );
 
-  function handleManagerRoleChange(role: CrmActivityManagerRole) {
-    setManagerRole(role);
-    setManagerName("all");
-  }
-
   return (
     <div className="space-y-2.5">
-      <div className="grid gap-2 sm:grid-cols-4">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
         {(
           [
             { label: "Accounts", value: teamSummary.accounts, icon: Building2 },
             { label: "Executives", value: teamSummary.executives, icon: Users },
             { label: "Sales managers", value: teamSummary.sales, icon: Users },
-            { label: "Support managers", value: teamSummary.support, icon: Users },
+            { label: "Support manager 1", value: teamSummary.support1, icon: Users },
+            { label: "Support manager 2", value: teamSummary.support2, icon: Users },
           ] as const
         ).map((stat, i) => {
           const Icon = stat.icon;
@@ -260,21 +287,25 @@ export function CrmDashboardActivityPanel({ items, accounts }: Props) {
             onChange: setAccountId,
           },
           {
-            id: "managerRole",
-            label: "Team role",
-            value: managerRole,
-            options: (Object.keys(MANAGER_ROLE_LABEL) as CrmActivityManagerRole[]).map((role) => ({
-              value: role,
-              label: MANAGER_ROLE_LABEL[role],
-            })),
-            onChange: (v) => handleManagerRoleChange(v as CrmActivityManagerRole),
+            id: "salesManager",
+            label: "Sales manager",
+            value: salesManagerFilter,
+            options: salesManagerOptions,
+            onChange: setSalesManagerFilter,
           },
           {
-            id: "managerName",
-            label: "Team member",
-            value: managerName,
-            options: managerOptions,
-            onChange: setManagerName,
+            id: "supportManager1",
+            label: "Support manager 1",
+            value: supportManager1Filter,
+            options: supportManager1Options,
+            onChange: setSupportManager1Filter,
+          },
+          {
+            id: "supportManager2",
+            label: "Support manager 2",
+            value: supportManager2Filter,
+            options: supportManager2Options,
+            onChange: setSupportManager2Filter,
           },
           {
             id: "kind",
@@ -309,8 +340,9 @@ export function CrmDashboardActivityPanel({ items, accounts }: Props) {
           setQuery("");
           setCategory("all");
           setAccountId("all");
-          setManagerRole("all");
-          setManagerName("all");
+          setSalesManagerFilter("all");
+          setSupportManager1Filter("all");
+          setSupportManager2Filter("all");
           setKind("all");
           setDateRange("30d");
         }}

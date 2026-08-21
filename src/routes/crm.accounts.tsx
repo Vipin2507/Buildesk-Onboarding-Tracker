@@ -59,6 +59,7 @@ import {
   type CrmAccountRow,
 } from "@/stores/crm-dashboard-selectors";
 import { isCrmAccountEnded } from "@/lib/crm-account-status";
+import { sortCrmAccountsByStartDateDesc } from "@/lib/crm-account-sort";
 import { COMPANY_TYPES } from "@/types/company";
 import type { CrmAccount } from "@/types/crm-account";
 
@@ -106,7 +107,8 @@ type AccountListFilters = {
   cityFilter: string;
   regionFilter: string;
   managerFilter: string;
-  supportManagerFilter: string;
+  supportManager1Filter: string;
+  supportManager2Filter: string;
   healthFilter: string;
   stageFilter: string;
   providerFilter: string;
@@ -128,14 +130,21 @@ function matchesAccountListFilters(row: CrmAccountRow, f: AccountListFilters) {
   ) {
     return false;
   }
-  const hasSupport =
-    Boolean(row.supportManager1?.trim()) || Boolean(row.supportManager2?.trim());
-  if (f.supportManagerFilter === "unassigned" && hasSupport) return false;
+  const hasSupport1 = Boolean(row.supportManager1?.trim());
+  const hasSupport2 = Boolean(row.supportManager2?.trim());
+  if (f.supportManager1Filter === "unassigned" && hasSupport1) return false;
   if (
-    f.supportManagerFilter !== "all" &&
-    f.supportManagerFilter !== "unassigned" &&
-    row.supportManager1 !== f.supportManagerFilter &&
-    row.supportManager2 !== f.supportManagerFilter
+    f.supportManager1Filter !== "all" &&
+    f.supportManager1Filter !== "unassigned" &&
+    row.supportManager1 !== f.supportManager1Filter
+  ) {
+    return false;
+  }
+  if (f.supportManager2Filter === "unassigned" && hasSupport2) return false;
+  if (
+    f.supportManager2Filter !== "all" &&
+    f.supportManager2Filter !== "unassigned" &&
+    row.supportManager2 !== f.supportManager2Filter
   ) {
     return false;
   }
@@ -198,7 +207,8 @@ function CrmAccountsPage() {
   const [regionFilter, setRegionFilter] = useState("all");
   const [progressFilter, setProgressFilter] = useState("all");
   const [managerFilter, setManagerFilter] = useState("all");
-  const [supportManagerFilter, setSupportManagerFilter] = useState("all");
+  const [supportManager1Filter, setSupportManager1Filter] = useState("all");
+  const [supportManager2Filter, setSupportManager2Filter] = useState("all");
   const [healthFilter, setHealthFilter] = useState("all");
   const [stageFilter, setStageFilter] = useState("all");
   const [providerFilter, setProviderFilter] = useState("all");
@@ -242,12 +252,17 @@ function CrmAccountsPage() {
     return [...set].sort((a, b) => a.localeCompare(b));
   }, [rows]);
 
-  const supportManagers = useMemo(() => {
-    const set = new Set<string>();
-    for (const r of rows) {
-      if (r.supportManager1?.trim()) set.add(r.supportManager1.trim());
-      if (r.supportManager2?.trim()) set.add(r.supportManager2.trim());
-    }
+  const supportManagers1 = useMemo(() => {
+    const set = new Set(
+      rows.map((r) => r.supportManager1?.trim()).filter((n): n is string => Boolean(n)),
+    );
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [rows]);
+
+  const supportManagers2 = useMemo(() => {
+    const set = new Set(
+      rows.map((r) => r.supportManager2?.trim()).filter((n): n is string => Boolean(n)),
+    );
     return [...set].sort((a, b) => a.localeCompare(b));
   }, [rows]);
 
@@ -269,7 +284,8 @@ function CrmAccountsPage() {
       cityFilter,
       regionFilter,
       managerFilter,
-      supportManagerFilter,
+      supportManager1Filter,
+      supportManager2Filter,
       healthFilter,
       stageFilter,
       providerFilter,
@@ -282,7 +298,8 @@ function CrmAccountsPage() {
       cityFilter,
       regionFilter,
       managerFilter,
-      supportManagerFilter,
+      supportManager1Filter,
+      supportManager2Filter,
       healthFilter,
       stageFilter,
       providerFilter,
@@ -327,7 +344,9 @@ function CrmAccountsPage() {
   }, [scopedRows]);
 
   const filtered = useMemo(() => {
-    return scopedRows.filter((r) => matchesAccountKpi(r, kpiFilter));
+    return sortCrmAccountsByStartDateDesc(
+      scopedRows.filter((r) => matchesAccountKpi(r, kpiFilter)),
+    );
   }, [scopedRows, kpiFilter]);
 
   const activeFilterCount = [
@@ -337,7 +356,8 @@ function CrmAccountsPage() {
     regionFilter !== "all",
     progressFilter !== "all",
     managerFilter !== "all",
-    supportManagerFilter !== "all",
+    supportManager1Filter !== "all",
+    supportManager2Filter !== "all",
     healthFilter !== "all",
     stageFilter !== "all",
     providerFilter !== "all",
@@ -406,7 +426,8 @@ function CrmAccountsPage() {
     setRegionFilter("all");
     setProgressFilter("all");
     setManagerFilter("all");
-    setSupportManagerFilter("all");
+    setSupportManager1Filter("all");
+    setSupportManager2Filter("all");
     setHealthFilter("all");
     setStageFilter("all");
     setProviderFilter("all");
@@ -503,9 +524,8 @@ function CrmAccountsPage() {
   }
 
   const unassignedManagerCount = rows.filter((r) => !r.salesManagerName?.trim()).length;
-  const unassignedSupportManagerCount = rows.filter(
-    (r) => !r.supportManager1?.trim() && !r.supportManager2?.trim(),
-  ).length;
+  const unassignedSupportManager1Count = rows.filter((r) => !r.supportManager1?.trim()).length;
+  const unassignedSupportManager2Count = rows.filter((r) => !r.supportManager2?.trim()).length;
 
   return (
     <PageWrap compact>
@@ -627,22 +647,41 @@ function CrmAccountsPage() {
             ]}
           />
         </DesignTicketFilterField>
-        <DesignTicketFilterField label="Support Manager" compact>
+        <DesignTicketFilterField label="Support Manager 1" compact>
           <DesignTicketSelect
             compact
-            value={supportManagerFilter}
-            onChange={setSupportManagerFilter}
+            value={supportManager1Filter}
+            onChange={setSupportManager1Filter}
             options={[
-              { value: "all", label: "All support managers" },
-              ...(unassignedSupportManagerCount > 0
+              { value: "all", label: "All support managers 1" },
+              ...(unassignedSupportManager1Count > 0
                 ? [
                     {
                       value: "unassigned",
-                      label: `Unassigned (${unassignedSupportManagerCount})`,
+                      label: `Unassigned (${unassignedSupportManager1Count})`,
                     },
                   ]
                 : []),
-              ...supportManagers.map((m) => ({ value: m, label: m })),
+              ...supportManagers1.map((m) => ({ value: m, label: m })),
+            ]}
+          />
+        </DesignTicketFilterField>
+        <DesignTicketFilterField label="Support Manager 2" compact>
+          <DesignTicketSelect
+            compact
+            value={supportManager2Filter}
+            onChange={setSupportManager2Filter}
+            options={[
+              { value: "all", label: "All support managers 2" },
+              ...(unassignedSupportManager2Count > 0
+                ? [
+                    {
+                      value: "unassigned",
+                      label: `Unassigned (${unassignedSupportManager2Count})`,
+                    },
+                  ]
+                : []),
+              ...supportManagers2.map((m) => ({ value: m, label: m })),
             ]}
           />
         </DesignTicketFilterField>
@@ -725,6 +764,8 @@ function CrmAccountsPage() {
             >
               <DataTable
                 data={filtered}
+                initialSortKey="startDate"
+                initialSortDir="desc"
                 getRowId={(r) => r.id}
                 searchKeys={[
                   "name",
@@ -805,18 +846,19 @@ function CrmAccountsPage() {
                   },
                   {
                     key: "supportManager1",
-                    header: "Support",
+                    header: "Support 1",
                     sortable: true,
-                    render: (r) => {
-                      const names = [r.supportManager1, r.supportManager2]
-                        .map((n) => n?.trim())
-                        .filter(Boolean);
-                      return names.length ? (
-                        <span className="text-xs">{names.join(" · ")}</span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      );
-                    },
+                    render: (r) => (
+                      <span className="text-xs">{r.supportManager1?.trim() || "—"}</span>
+                    ),
+                  },
+                  {
+                    key: "supportManager2",
+                    header: "Support 2",
+                    sortable: true,
+                    render: (r) => (
+                      <span className="text-xs">{r.supportManager2?.trim() || "—"}</span>
+                    ),
                   },
                   {
                     key: "stageLabel",

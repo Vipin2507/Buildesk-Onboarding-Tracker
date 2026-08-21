@@ -1,11 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
-import { asc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { canViewCrmAccount, crmSalesManagerNamesMatch } from "@/lib/crm-account-access";
+import { sortCrmAccountsByStartDateDesc } from "@/lib/crm-account-sort";
 import { isAdminRoleKey } from "@/lib/permissions";
 import type { CrmAccount } from "@/types/crm-account";
 import type { CompanyType } from "@/types/company";
@@ -131,12 +132,9 @@ function toRowValues(
 export const listCrmAccounts = createServerFn({ method: "GET" }).handler(async () => {
   const user = requireUser();
   const db = getDb();
-  const rows = db
-    .select()
-    .from(t.crmAccounts)
-    .orderBy(asc(t.crmAccounts.name))
-    .all()
-    .map(mapRow);
+  const rows = sortCrmAccountsByStartDateDesc(
+    db.select().from(t.crmAccounts).all().map(mapRow),
+  );
 
   if (isAdminRoleKey(user.role)) return rows;
   return rows.filter((a) => canViewCrmAccount(a, user));

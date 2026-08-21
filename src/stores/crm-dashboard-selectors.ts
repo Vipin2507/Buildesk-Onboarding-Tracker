@@ -14,6 +14,7 @@ import {
 } from "@/lib/checklist";
 import { filterCrmAccountsForUser } from "@/lib/crm-account-access";
 import { isCrmAccountEnded } from "@/lib/crm-account-status";
+import { sortCrmAccountsByStartDateDesc } from "@/lib/crm-account-sort";
 import { resolveCrmMigrationCatalog } from "@/lib/crm-migration-catalog";
 import { resolveCrmTrainingCatalogForCompany } from "@/lib/crm-training-catalog";
 import { isDesignTicketActive } from "@/stores/design-ticket-selectors";
@@ -132,7 +133,9 @@ export function useCrmDashboardOverview() {
 
   return useMemo(() => {
     // Admins see all; others only accounts where they are sales or support manager.
-    const accounts = filterCrmAccountsForUser(allAccounts, currentUser);
+    const accounts = sortCrmAccountsByStartDateDesc(
+      filterCrmAccountsForUser(allAccounts, currentUser),
+    );
     const accountIds = new Set(accounts.map((a) => a.id));
     const today = todayYmd();
 

@@ -14,6 +14,7 @@ import { ConfirmDeleteDialog, EntityFormModal } from "@/components/entity-form-m
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { calcCrmOnboardingProgress } from "@/data/crm-onboarding-defaults";
+import { sortCrmAccountsByStartDateDesc } from "@/lib/crm-account-sort";
 import { cn } from "@/lib/utils";
 import { useCrmAccountStore, useCrmOnboardingStore } from "@/stores";
 import type { CrmAccount } from "@/types/crm-account";
@@ -41,7 +42,7 @@ export function CrmMasterDataControl() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = [...accounts].sort((a, b) => a.name.localeCompare(b.name));
+    const list = sortCrmAccountsByStartDateDesc(accounts);
     if (!q) return list;
     return list.filter(
       (a) =>

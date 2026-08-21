@@ -27,7 +27,11 @@ export type CrmProductModuleKey =
   | "website-integration"
   | "99acres-integration"
   | "magicbricks-integration"
-  | "housing-integration";
+  | "housing-integration"
+  | "sim-call-recording"
+  | "ai-call-analysis"
+  | "waha"
+  | "auto-dialer";
 
 export type CrmChecklistStatus = "pending" | "completed";
 export type CrmMigrationStatus = "pending" | "in_progress" | "completed";

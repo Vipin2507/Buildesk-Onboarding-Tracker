@@ -33,6 +33,9 @@ export const CRM_MODULE_PROVIDERS: Partial<Record<CrmProductModuleKey, string[]>
   "99acres-integration": ["99acres API", "Manual Sync"],
   "magicbricks-integration": ["MagicBricks API", "Manual Sync"],
   "housing-integration": ["Housing API", "Manual Sync"],
+  "sim-call-recording": ["Knowlarity", "Exotel", "MyOperator", "Servetel", "Ozonetel", "Custom SIM Gateway"],
+  waha: ["WAHA Self-hosted", "WAHA Cloud", "Custom"],
+  "auto-dialer": ["Exotel", "Knowlarity", "Ozonetel", "Servetel", "MyOperator"],
 };
 
 export function moduleRequiresProvider(key: CrmProductModuleKey): boolean {
@@ -166,6 +169,10 @@ export const CRM_PRODUCT_MODULES: { key: CrmProductModuleKey; label: string }[] 
   { key: "99acres-integration", label: "99acres Integration" },
   { key: "magicbricks-integration", label: "MagicBricks Integration" },
   { key: "housing-integration", label: "Housing Integration" },
+  { key: "sim-call-recording", label: "Sim Based Call Recording" },
+  { key: "ai-call-analysis", label: "AI Call Analysis" },
+  { key: "waha", label: "WAHA" },
+  { key: "auto-dialer", label: "Auto Dialer" },
 ];
 
 export const CRM_MASTER_CHECKLIST_LABELS: { key: string; label: string }[] = [

@@ -41,6 +41,8 @@ export function DataTable<T>({
   getRowId,
   selection,
   density = "compact",
+  initialSortKey = null,
+  initialSortDir = "asc",
 }: {
   data: T[];
   columns: {
@@ -59,10 +61,12 @@ export function DataTable<T>({
   getRowId?: (row: T) => string;
   selection?: DataTableSelection;
   density?: "default" | "compact";
+  initialSortKey?: string | null;
+  initialSortDir?: "asc" | "desc";
 }) {
   const [search, setSearch] = useState("");
-  const [sortKey, setSortKey] = useState<string | null>(null);
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [sortKey, setSortKey] = useState<string | null>(initialSortKey);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">(initialSortDir);
   const [page, setPage] = useState(0);
 
   const filtered = useMemo(() => {

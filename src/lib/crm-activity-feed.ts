@@ -113,6 +113,18 @@ export function listCrmActivityManagerNames(
   return [...names].sort((a, b) => a.localeCompare(b));
 }
 
+export function listCrmActivitySalesManagerNames(accounts: CrmActivityAccountMeta[]): string[] {
+  return listCrmActivityManagerNames(accounts, "sales");
+}
+
+export function listCrmActivitySupportManager1Names(accounts: CrmActivityAccountMeta[]): string[] {
+  return listCrmActivityManagerNames(accounts, "support1");
+}
+
+export function listCrmActivitySupportManager2Names(accounts: CrmActivityAccountMeta[]): string[] {
+  return listCrmActivityManagerNames(accounts, "support2");
+}
+
 export const CRM_ACTIVITY_CATEGORY_LABEL: Record<
   Exclude<CrmActivityCategory, "all">,
   string
@@ -375,14 +387,31 @@ export function filterCrmActivityItems(
     kind?: ActivityKind | "all";
     query?: string;
     dateRange?: CrmActivityDateRange;
+    /** @deprecated Prefer salesManagerFilter / supportManager filters */
     managerRole?: CrmActivityManagerRole;
+    /** @deprecated Prefer salesManagerFilter / supportManager filters */
     managerName?: string;
+    salesManagerFilter?: string;
+    supportManager1Filter?: string;
+    supportManager2Filter?: string;
   },
 ): CrmActivityItem[] {
   const q = filters.query?.trim().toLowerCase();
   const rangeStart = filters.dateRange ? crmActivityRangeStart(filters.dateRange) : null;
   const managerRole = filters.managerRole ?? "all";
   const managerName = filters.managerName?.trim();
+  const salesManagerFilter = filters.salesManagerFilter ?? "all";
+  const supportManager1Filter = filters.supportManager1Filter ?? "all";
+  const supportManager2Filter = filters.supportManager2Filter ?? "all";
+
+  function matchesManagerField(
+    assigned: string | undefined,
+    filterValue: string,
+  ): boolean {
+    if (filterValue === "all") return true;
+    if (filterValue === "unassigned") return !assigned?.trim();
+    return crmSalesManagerNamesMatch(assigned, filterValue);
+  }
 
   return items.filter((item) => {
     if (filters.category && filters.category !== "all" && item.category !== filters.category) {
@@ -394,6 +423,9 @@ export function filterCrmActivityItems(
     if (filters.kind && filters.kind !== "all" && item.kind !== filters.kind) {
       return false;
     }
+    if (!matchesManagerField(item.teamSalesManager, salesManagerFilter)) return false;
+    if (!matchesManagerField(item.teamSupportManager1, supportManager1Filter)) return false;
+    if (!matchesManagerField(item.teamSupportManager2, supportManager2Filter)) return false;
     if (managerRole !== "all") {
       const assigned = crmActivityManagerForRole(item, managerRole);
       if (!assigned?.trim()) return false;
