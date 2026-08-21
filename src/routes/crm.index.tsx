@@ -230,7 +230,15 @@ function CrmDashboardPage() {
       : [{ key: "none", name: "No modules", fullName: "None enabled", opted: 0 }];
 
   const activityAccounts = useMemo(
-    () => rows.map((r) => ({ id: r.id, name: r.name })),
+    () =>
+      rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        accountManagerName: r.accountManagerName,
+        salesManagerName: r.salesManagerName,
+        supportManager1: r.supportManager1,
+        supportManager2: r.supportManager2,
+      })),
     [rows],
   );
 

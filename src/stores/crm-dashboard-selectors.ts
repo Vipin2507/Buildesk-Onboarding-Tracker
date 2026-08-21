@@ -46,6 +46,10 @@ function toDashboardActivityItem(item: CrmActivityItem): CrmDashboardActivityIte
     category: item.category,
     accountId: item.accountId,
     accountName: item.accountName,
+    teamExecutive: item.teamExecutive,
+    teamSalesManager: item.teamSalesManager,
+    teamSupportManager1: item.teamSupportManager1,
+    teamSupportManager2: item.teamSupportManager2,
   };
 }
 

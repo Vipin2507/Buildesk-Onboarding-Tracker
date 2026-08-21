@@ -19,6 +19,10 @@ export type CrmDashboardActivityItem = {
   category?: import("@/lib/crm-activity-feed").CrmActivityCategory;
   accountId?: string;
   accountName?: string;
+  teamExecutive?: string;
+  teamSalesManager?: string;
+  teamSupportManager1?: string;
+  teamSupportManager2?: string;
 };
 
 const kindDot: Record<ActivityKind, string> = {
@@ -40,6 +44,14 @@ function ActivityRow({
   item: CrmDashboardActivityItem;
   index: number;
 }) {
+  const teamLine = [
+    item.teamExecutive ? `Exec: ${item.teamExecutive}` : null,
+    item.teamSalesManager ? `Sales: ${item.teamSalesManager}` : null,
+    item.teamSupportManager1 ? `Sup1: ${item.teamSupportManager1}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   const inner = (
     <>
       <span
@@ -51,8 +63,11 @@ function ActivityRow({
         <div className="mt-0.5 text-[10px] text-muted-foreground">
           {item.who} · {formatRelativeTime(item.createdAt)}
         </div>
+        {teamLine ? (
+          <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{teamLine}</div>
+        ) : null}
       </div>
-      {item.href ? (
+      {item.accountId ? (
         <ArrowRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
       ) : null}
     </>
@@ -60,39 +75,13 @@ function ActivityRow({
 
   const className = "group flex gap-2 rounded-lg px-1 py-1.5 transition-colors hover:bg-muted/50";
 
-  let link: ReactNode;
-  if (!item.href) {
-    link = <div className={cn(className, "px-1")}>{inner}</div>;
-  } else if (item.href.startsWith("/crm/accounts/")) {
-    const accountId = item.href.slice("/crm/accounts/".length);
-    link = (
-      <Link to="/crm/accounts/$accountId" params={{ accountId }} className={className}>
-        {inner}
-      </Link>
-    );
-  } else if (item.href.startsWith("/crm/support/")) {
-    const ticketId = item.href.slice("/crm/support/".length);
-    link = (
-      <Link to="/crm/support/$ticketId" params={{ ticketId }} className={className}>
-        {inner}
-      </Link>
-    );
-  } else if (item.href.startsWith("/crm/tickets/")) {
-    const ticketId = item.href.slice("/crm/tickets/".length);
-    link = (
-      <Link to="/crm/tickets/$ticketId" params={{ ticketId }} className={className}>
-        {inner}
-      </Link>
-    );
-  } else if (item.href === "/crm/bookings") {
-    link = (
-      <Link to="/crm/bookings" search={{ tab: "pending" }} className={className}>
-        {inner}
-      </Link>
-    );
-  } else {
-    link = <div className={cn(className, "px-1")}>{inner}</div>;
-  }
+  const link: ReactNode = item.accountId ? (
+    <Link to="/crm/accounts/$accountId" params={{ accountId: item.accountId }} className={className}>
+      {inner}
+    </Link>
+  ) : (
+    <div className={cn(className, "px-1")}>{inner}</div>
+  );
 
   return (
     <motion.li
