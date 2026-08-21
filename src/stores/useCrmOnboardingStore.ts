@@ -51,7 +51,7 @@ import { serverSync, serverSyncDebounced } from "@/lib/sync";
 import { useCrmAccountStore } from "./useCrmAccountStore";
 import {
   applyChecklistPhaseDate,
-  applyChecklistPhaseForceComplete,
+  applyChecklistForceCompleteAll,
   applyChecklistPhaseToggle,
 } from "@/lib/checklist";
 
@@ -86,12 +86,7 @@ type CrmOnboardingState = {
     phase: ChecklistPhase,
     at: string,
   ) => void;
-  forceCompleteMasterPhase: (
-    companyId: string,
-    key: string,
-    phase: ChecklistPhase,
-    at: string,
-  ) => void;
+  forceCompleteMasterItem: (companyId: string, key: string, at: string) => void;
   setMasterNotApplicable: (companyId: string, key: string, notApplicable: boolean) => void;
   updateMasterRemarks: (companyId: string, key: string, remarks: string) => void;
   updateMasterAssignment: (
@@ -111,12 +106,7 @@ type CrmOnboardingState = {
     phase: ChecklistPhase,
     at: string,
   ) => void;
-  forceCompleteMigrationPhase: (
-    companyId: string,
-    key: string,
-    phase: ChecklistPhase,
-    at: string,
-  ) => void;
+  forceCompleteMigrationItem: (companyId: string, key: string, at: string) => void;
   setMigrationNotApplicable: (companyId: string, key: string, notApplicable: boolean) => void;
   updateMigrationRemarks: (companyId: string, key: string, remarks: string) => void;
   updateMigrationAssignment: (
@@ -552,11 +542,11 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
     }));
   },
 
-  forceCompleteMasterPhase: (companyId, key, phase, at) => {
+  forceCompleteMasterItem: (companyId, key, at) => {
     get().ensureForCompany(companyId);
     set((s) => ({
       records: mapMaster(s.records, companyId, key, (m) => {
-        const next = applyChecklistPhaseForceComplete(m, phase, at);
+        const next = applyChecklistForceCompleteAll(m, at);
         return next ?? m;
       }),
     }));
@@ -625,15 +615,13 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
     }));
   },
 
-  forceCompleteMigrationPhase: (companyId, key, phase, at) => {
+  forceCompleteMigrationItem: (companyId, key, at) => {
     get().ensureForCompany(companyId);
     set((s) => ({
       records: mapMigration(s.records, companyId, key, (m) => {
-        const next = applyChecklistPhaseForceComplete(m, phase, at);
+        const next = applyChecklistForceCompleteAll(m, at);
         if (!next) return m;
-        const uploadedNewlyMarked =
-          (phase === "uploaded" || phase === "live") && !m.uploaded && next.uploaded;
-        if (uploadedNewlyMarked) {
+        if (!m.uploaded && next.uploaded) {
           return { ...next, uploadAttempts: (m.uploadAttempts ?? 0) + 1 };
         }
         return next;

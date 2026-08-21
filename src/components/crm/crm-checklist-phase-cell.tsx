@@ -1,9 +1,6 @@
 import { Check } from "lucide-react";
 
-import {
-  canToggleChecklistPhase,
-  type ChecklistPhase,
-} from "@/lib/checklist";
+import { canToggleChecklistPhase, type ChecklistPhase } from "@/lib/checklist";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import type { ChecklistPhaseState } from "@/types";
 
@@ -16,7 +13,6 @@ type Props = {
   priorStepsHint?: string;
   at?: string;
   onToggle: () => void;
-  onForceComplete: () => void;
 };
 
 export function CrmChecklistPhaseCell({
@@ -28,13 +24,12 @@ export function CrmChecklistPhaseCell({
   priorStepsHint = "Complete prior steps first (Collected → Uploaded → Live)",
   at,
   onToggle,
-  onForceComplete,
 }: Props) {
   const allowed = !na && canToggleChecklistPhase(item, phase);
   const displayLabel = label ?? phase;
   const isMobile = layout === "mobile";
 
-  const button = (
+  return (
     <button
       type="button"
       disabled={na || (!allowed && !item[phase])}
@@ -64,7 +59,7 @@ export function CrmChecklistPhaseCell({
     >
       {!na && item[phase] ? (
         <span className="inline-flex items-center gap-1">
-          <Check className={isMobile ? "h-3.5 w-3.5" : "h-3.5 w-3.5"} />
+          <Check className="h-3.5 w-3.5" />
           {isMobile ? displayLabel : null}
         </span>
       ) : na ? (
@@ -87,37 +82,5 @@ export function CrmChecklistPhaseCell({
         </span>
       ) : null}
     </button>
-  );
-
-  if (isMobile) {
-    return (
-      <div className="flex flex-col items-center gap-0.5">
-        {button}
-        {!na && !item[phase] ? (
-          <button
-            type="button"
-            onClick={onForceComplete}
-            className="text-[9px] font-medium text-primary hover:underline"
-          >
-            Mark complete
-          </button>
-        ) : null}
-      </div>
-    );
-  }
-
-  return (
-    <div className="inline-flex flex-col items-center gap-0.5">
-      {button}
-      {!na && !item[phase] ? (
-        <button
-          type="button"
-          onClick={onForceComplete}
-          className="text-[9px] font-medium text-primary hover:underline"
-        >
-          Mark complete
-        </button>
-      ) : null}
-    </div>
   );
 }

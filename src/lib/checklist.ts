@@ -110,6 +110,26 @@ export function applyChecklistPhaseForceComplete<T extends ChecklistPhaseState>(
   return next;
 }
 
+/** Mark Collected, Uploaded, and Live complete in one action with the same date. */
+export function applyChecklistForceCompleteAll<T extends ChecklistPhaseState>(
+  item: T,
+  at?: string,
+): T | null {
+  if (item.notApplicable) return null;
+  if (item.collected && item.uploaded && item.live) return null;
+
+  const stamp = normalizePhaseAt(at);
+  return {
+    ...item,
+    collected: true,
+    uploaded: true,
+    live: true,
+    collectedAt: stamp,
+    uploadedAt: stamp,
+    liveAt: stamp,
+  };
+}
+
 /** Normalize a picked calendar date (or ISO) for checklist phase timestamps. */
 export function normalizePhaseAt(at?: string, fallback = nowIso()) {
   const raw = at?.trim();

@@ -7,6 +7,7 @@ import {
   ticketFieldClass,
   ticketSelectClass,
 } from "@/components/design-ticket/design-ticket-shared";
+import { CrmChecklistMarkAllCompleteButton } from "@/components/crm/crm-checklist-mark-all-complete-button";
 import { CrmChecklistPhaseCell } from "@/components/crm/crm-checklist-phase-cell";
 import { DatePickerField } from "@/components/date-picker-field";
 import { EntityFormModal } from "@/components/entity-form-modal";
@@ -38,7 +39,7 @@ export function CrmMasterChecklistDetail({ companyId }: { companyId: string }) {
   const users = useUserStore((s) => s.users);
   const toggleMasterPhase = useCrmOnboardingStore((s) => s.toggleMasterPhase);
   const setMasterPhaseDate = useCrmOnboardingStore((s) => s.setMasterPhaseDate);
-  const forceCompleteMasterPhase = useCrmOnboardingStore((s) => s.forceCompleteMasterPhase);
+  const forceCompleteMasterItem = useCrmOnboardingStore((s) => s.forceCompleteMasterItem);
   const setMasterNotApplicable = useCrmOnboardingStore((s) => s.setMasterNotApplicable);
   const updateMasterRemarks = useCrmOnboardingStore((s) => s.updateMasterRemarks);
   const updateMasterAssignment = useCrmOnboardingStore((s) => s.updateMasterAssignment);
@@ -64,12 +65,20 @@ export function CrmMasterChecklistDetail({ companyId }: { companyId: string }) {
     [users, salesManager],
   );
 
-  const [phaseDialog, setPhaseDialog] = useState<{
-    key: string;
-    label: string;
-    phase: ChecklistPhase;
-    mode: "complete" | "edit" | "force";
-  } | null>(null);
+  const [phaseDialog, setPhaseDialog] = useState<
+    | {
+        key: string;
+        label: string;
+        phase: ChecklistPhase;
+        mode: "complete" | "edit";
+      }
+    | {
+        key: string;
+        label: string;
+        mode: "forceAll";
+      }
+    | null
+  >(null);
   const [phaseDate, setPhaseDate] = useState("");
 
   function openPhaseDialog(item: CrmMasterChecklistItem, phase: ChecklistPhase) {
@@ -90,13 +99,12 @@ export function CrmMasterChecklistDetail({ companyId }: { companyId: string }) {
     setPhaseDate(phaseAtToYmd(at) || new Date().toISOString().slice(0, 10));
   }
 
-  function openForceCompleteDialog(item: CrmMasterChecklistItem, phase: ChecklistPhase) {
-    if (item.notApplicable || item[phase]) return;
+  function openMarkAllCompleteDialog(item: CrmMasterChecklistItem) {
+    if (item.notApplicable || (item.collected && item.uploaded && item.live)) return;
     setPhaseDialog({
       key: item.key,
       label: item.label,
-      phase,
-      mode: "force",
+      mode: "forceAll",
     });
     setPhaseDate(new Date().toISOString().slice(0, 10));
   }
@@ -106,12 +114,12 @@ export function CrmMasterChecklistDetail({ companyId }: { companyId: string }) {
       toast.error("Pick a date for this step");
       return;
     }
-    if (phaseDialog.mode === "edit") {
+    if (phaseDialog.mode === "forceAll") {
+      forceCompleteMasterItem(companyId, phaseDialog.key, phaseDate);
+      toast.success("All steps marked complete");
+    } else if (phaseDialog.mode === "edit") {
       setMasterPhaseDate(companyId, phaseDialog.key, phaseDialog.phase, phaseDate);
       toast.success(`${phaseDialog.phase} date updated`);
-    } else if (phaseDialog.mode === "force") {
-      forceCompleteMasterPhase(companyId, phaseDialog.key, phaseDialog.phase, phaseDate);
-      toast.success(`Marked through ${phaseDialog.phase}`);
     } else {
       toggleMasterPhase(companyId, phaseDialog.key, phaseDialog.phase, phaseDate);
       toast.success(`Marked ${phaseDialog.phase}`);
@@ -120,7 +128,7 @@ export function CrmMasterChecklistDetail({ companyId }: { companyId: string }) {
   }
 
   function clearPhaseDialog() {
-    if (!phaseDialog) return;
+    if (!phaseDialog || phaseDialog.mode === "forceAll") return;
     toggleMasterPhase(companyId, phaseDialog.key, phaseDialog.phase);
     toast.success(`Cleared ${phaseDialog.phase}`);
     setPhaseDialog(null);
@@ -189,11 +197,16 @@ export function CrmMasterChecklistDetail({ companyId }: { companyId: string }) {
                             layout="mobile"
                             at={at}
                             onToggle={() => openPhaseDialog(item, phase)}
-                            onForceComplete={() => openForceCompleteDialog(item, phase)}
                           />
                         );
                       })}
                     </div>
+                    <CrmChecklistMarkAllCompleteButton
+                      item={item}
+                      na={na}
+                      layout="mobile"
+                      onClick={() => openMarkAllCompleteDialog(item)}
+                    />
                     <input
                       value={item.remarks}
                       onChange={(e) => updateMasterRemarks(companyId, item.key, e.target.value)}
@@ -259,6 +272,7 @@ export function CrmMasterChecklistDetail({ companyId }: { companyId: string }) {
                 <th className="px-2 py-1.5 text-center">Collected</th>
                 <th className="px-2 py-1.5 text-center">Uploaded</th>
                 <th className="px-2 py-1.5 text-center">Live</th>
+                <th className="px-2 py-1.5 text-center">Mark complete</th>
                 <th className="px-2 py-1.5 text-center">N/A</th>
                 <th className="px-2 py-1.5 text-left">Assignee</th>
                 <th className="px-2 py-1.5 text-left">Due</th>
@@ -294,11 +308,18 @@ export function CrmMasterChecklistDetail({ companyId }: { companyId: string }) {
                             layout="desktop"
                             at={at}
                             onToggle={() => openPhaseDialog(item, phase)}
-                            onForceComplete={() => openForceCompleteDialog(item, phase)}
                           />
                         </td>
                       );
                     })}
+                    <td className="px-2 py-2 text-center">
+                      <CrmChecklistMarkAllCompleteButton
+                        item={item}
+                        na={na}
+                        layout="desktop"
+                        onClick={() => openMarkAllCompleteDialog(item)}
+                      />
+                    </td>
                     <td className="px-2 py-2 text-center">
                       <button
                         type="button"
@@ -375,18 +396,18 @@ export function CrmMasterChecklistDetail({ companyId }: { companyId: string }) {
         }}
         title={
           phaseDialog
-            ? phaseDialog.mode === "edit"
-              ? `Edit ${phaseDialog.phase} date`
-              : phaseDialog.mode === "force"
-                ? `Mark ${phaseDialog.phase} complete`
+            ? phaseDialog.mode === "forceAll"
+              ? "Mark all steps complete"
+              : phaseDialog.mode === "edit"
+                ? `Edit ${phaseDialog.phase} date`
                 : `Mark ${phaseDialog.phase}`
             : "Phase"
         }
         submitLabel={
-          phaseDialog?.mode === "edit"
-            ? "Save date"
-            : phaseDialog?.mode === "force"
-              ? "Mark complete"
+          phaseDialog?.mode === "forceAll"
+            ? "Mark complete"
+            : phaseDialog?.mode === "edit"
+              ? "Save date"
               : "Confirm"
         }
         onSubmit={confirmPhaseDialog}
@@ -395,14 +416,16 @@ export function CrmMasterChecklistDetail({ companyId }: { companyId: string }) {
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
               <span className="font-medium text-foreground">{phaseDialog.label}</span>
-              {phaseDialog.mode === "force" ? (
+              {phaseDialog.mode === "forceAll" ? (
                 <span className="mt-1 block text-xs">
-                  Prior steps will also be marked complete with this date.
+                  Collected, Uploaded, and Live will all be marked complete with this date.
                 </span>
               ) : null}
             </p>
             <label className="block text-xs font-medium">
-              {phaseDialog.phase.charAt(0).toUpperCase() + phaseDialog.phase.slice(1)} date
+              {phaseDialog.mode === "forceAll"
+                ? "Completion date"
+                : `${phaseDialog.phase.charAt(0).toUpperCase()}${phaseDialog.phase.slice(1)} date`}
               <DatePickerField
                 modal
                 className="mt-1"
