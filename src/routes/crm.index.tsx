@@ -257,7 +257,7 @@ function CrmDashboardPage() {
         title="CRM Dashboard"
         subtitle={
           tab === "activity"
-            ? "Full activity history across accounts, tracker, bookings, and support."
+            ? "CRM-style activity log with filters, sorting, and pagination across accounts, follow-ups, and visits."
             : "Pending work and onboarding status across CRM accounts."
         }
         actions={

@@ -1,48 +1,23 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { motion } from "framer-motion";
-import {
-  ArrowRight,
-  Building2,
-  Calendar,
-  History,
-  LifeBuoy,
-  MessageSquare,
-  MessageSquareText,
-  Package,
-  Ticket,
-  Users,
-} from "lucide-react";
 
+import { DataTable } from "@/components/data-table";
 import { ListToolbar } from "@/components/list-toolbar";
 import { Pill } from "@/components/status-pill";
 import {
   countCrmActivityByCategory,
   CRM_ACTIVITY_CATEGORY_LABEL,
+  CRM_ACTIVITY_STATUS_LABEL,
   filterCrmActivityItems,
-  groupCrmActivityByDate,
-  listCrmActivitySalesManagerNames,
-  listCrmActivitySupportManager1Names,
-  listCrmActivitySupportManager2Names,
+  listCrmActivityExecutiveNames,
+  listCrmActivityLeadContactNames,
   type CrmActivityAccountMeta,
   type CrmActivityCategory,
   type CrmActivityDateRange,
   type CrmActivityItem,
 } from "@/lib/crm-activity-feed";
-import { formatRelativeTime } from "@/types/common";
+import { formatDate, formatDateTime } from "@/lib/utils";
 import type { ActivityKind } from "@/types";
-
-const EASE = [0.22, 1, 0.36, 1] as const;
-
-const CATEGORY_ICONS: Record<Exclude<CrmActivityCategory, "all">, typeof Building2> = {
-  account: Building2,
-  tracker: History,
-  module: Package,
-  booking: Calendar,
-  support: LifeBuoy,
-  ticket: Ticket,
-  communication: MessageSquare,
-};
 
 const KIND_TONE: Record<ActivityKind, "success" | "warning" | "danger" | "muted"> = {
   success: "success",
@@ -56,177 +31,33 @@ type Props = {
   accounts: CrmActivityAccountMeta[];
 };
 
-function AccountActivityLink({
-  accountId,
-  children,
-  className,
-}: {
-  accountId?: string;
-  children: ReactNode;
-  className?: string;
-}) {
-  if (!accountId) return <div className={className}>{children}</div>;
-  return (
-    <Link to="/crm/accounts/$accountId" params={{ accountId }} className={className}>
-      {children}
-    </Link>
-  );
-}
-
-function CategoryBadge({ category }: { category: Exclude<CrmActivityCategory, "all"> }) {
-  const Icon = CATEGORY_ICONS[category];
-  return (
-    <span className="inline-flex items-center gap-1 rounded-md bg-muted/70 px-1.5 py-0.5 text-[10px] text-muted-foreground">
-      <Icon className="h-3 w-3 shrink-0" />
-      {CRM_ACTIVITY_CATEGORY_LABEL[category]}
-    </span>
-  );
-}
-
-function TeamCell({ item }: { item: CrmActivityItem }) {
-  const rows = [
-    { label: "Executive", value: item.teamExecutive },
-    { label: "Sales", value: item.teamSalesManager },
-    { label: "Support 1", value: item.teamSupportManager1 },
-    { label: "Support 2", value: item.teamSupportManager2 },
-  ].filter((row) => row.value?.trim());
-
-  if (rows.length === 0) {
-    return <span className="text-muted-foreground">—</span>;
-  }
-
-  return (
-    <div className="space-y-0.5">
-      {rows.map((row) => (
-        <div key={row.label} className="truncate text-[10px] leading-snug">
-          <span className="text-muted-foreground">{row.label}:</span>{" "}
-          <span className="font-medium">{row.value}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export function CrmDashboardActivityPanel({ items, accounts }: Props) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<CrmActivityCategory>("all");
-  const [accountId, setAccountId] = useState("all");
-  const [salesManagerFilter, setSalesManagerFilter] = useState("all");
-  const [supportManager1Filter, setSupportManager1Filter] = useState("all");
-  const [supportManager2Filter, setSupportManager2Filter] = useState("all");
   const [kind, setKind] = useState<ActivityKind | "all">("all");
+  const [accountId, setAccountId] = useState("all");
+  const [executiveFilter, setExecutiveFilter] = useState("all");
+  const [leadContactFilter, setLeadContactFilter] = useState("all");
   const [dateRange, setDateRange] = useState<CrmActivityDateRange>("30d");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const categoryCounts = useMemo(() => countCrmActivityByCategory(items), [items]);
 
-  const salesManagerOptions = useMemo(
+  const executiveOptions = useMemo(
     () => [
-      { value: "all", label: "All sales managers" },
-      ...listCrmActivitySalesManagerNames(accounts).map((name) => ({
-        value: name,
-        label: name,
-      })),
+      { value: "all", label: "All executives" },
+      ...listCrmActivityExecutiveNames(items).map((name) => ({ value: name, label: name })),
     ],
-    [accounts],
+    [items],
   );
 
-  const supportManager1Options = useMemo(
+  const leadContactOptions = useMemo(
     () => [
-      { value: "all", label: "All support managers 1" },
-      ...listCrmActivitySupportManager1Names(accounts).map((name) => ({
-        value: name,
-        label: name,
-      })),
+      { value: "all", label: "All leads / contacts" },
+      ...listCrmActivityLeadContactNames(items).map((name) => ({ value: name, label: name })),
     ],
-    [accounts],
-  );
-
-  const supportManager2Options = useMemo(
-    () => [
-      { value: "all", label: "All support managers 2" },
-      ...listCrmActivitySupportManager2Names(accounts).map((name) => ({
-        value: name,
-        label: name,
-      })),
-    ],
-    [accounts],
-  );
-
-  const filtered = useMemo(
-    () =>
-      filterCrmActivityItems(items, {
-        category,
-        accountId,
-        kind,
-        query,
-        dateRange,
-        salesManagerFilter,
-        supportManager1Filter,
-        supportManager2Filter,
-      }),
-    [
-      items,
-      category,
-      accountId,
-      kind,
-      query,
-      dateRange,
-      salesManagerFilter,
-      supportManager1Filter,
-      supportManager2Filter,
-    ],
-  );
-
-  const grouped = useMemo(() => groupCrmActivityByDate(filtered), [filtered]);
-
-  const teamSummary = useMemo(() => {
-    const executives = new Set<string>();
-    const sales = new Set<string>();
-    const support1 = new Set<string>();
-    const support2 = new Set<string>();
-    for (const account of accounts) {
-      if (account.accountManagerName?.trim()) executives.add(account.accountManagerName.trim());
-      if (account.salesManagerName?.trim()) sales.add(account.salesManagerName.trim());
-      if (account.supportManager1?.trim()) support1.add(account.supportManager1.trim());
-      if (account.supportManager2?.trim()) support2.add(account.supportManager2.trim());
-    }
-    return {
-      executives: executives.size,
-      sales: sales.size,
-      support1: support1.size,
-      support2: support2.size,
-      accounts: accounts.length,
-    };
-  }, [accounts]);
-
-  const activeFilterCount =
-    (category !== "all" ? 1 : 0) +
-    (accountId !== "all" ? 1 : 0) +
-    (salesManagerFilter !== "all" ? 1 : 0) +
-    (supportManager1Filter !== "all" ? 1 : 0) +
-    (supportManager2Filter !== "all" ? 1 : 0) +
-    (kind !== "all" ? 1 : 0) +
-    (dateRange !== "30d" ? 1 : 0);
-
-  const categoryChips = useMemo(
-    () =>
-      (
-        [
-          { id: "all" as const, label: "All activity" },
-          { id: "account" as const, label: CRM_ACTIVITY_CATEGORY_LABEL.account },
-          { id: "tracker" as const, label: CRM_ACTIVITY_CATEGORY_LABEL.tracker },
-          { id: "module" as const, label: CRM_ACTIVITY_CATEGORY_LABEL.module },
-          { id: "booking" as const, label: CRM_ACTIVITY_CATEGORY_LABEL.booking },
-          { id: "support" as const, label: CRM_ACTIVITY_CATEGORY_LABEL.support },
-          { id: "ticket" as const, label: CRM_ACTIVITY_CATEGORY_LABEL.ticket },
-          { id: "communication" as const, label: CRM_ACTIVITY_CATEGORY_LABEL.communication },
-        ] as const
-      ).map((c) => ({
-        id: c.id,
-        label: c.label,
-        count: categoryCounts[c.id],
-      })),
-    [categoryCounts],
+    [items],
   );
 
   const accountOptions = useMemo(
@@ -239,46 +70,137 @@ export function CrmDashboardActivityPanel({ items, accounts }: Props) {
     [accounts],
   );
 
+  const filtered = useMemo(
+    () =>
+      filterCrmActivityItems(items, {
+        category,
+        accountId,
+        kind,
+        query,
+        dateRange: dateFrom || dateTo ? "all" : dateRange,
+        executiveFilter,
+        leadContactFilter,
+        dateFrom,
+        dateTo,
+      }),
+    [
+      items,
+      category,
+      accountId,
+      kind,
+      query,
+      dateRange,
+      dateFrom,
+      dateTo,
+      executiveFilter,
+      leadContactFilter,
+    ],
+  );
+
+  const activeFilterCount = [
+    category !== "all",
+    kind !== "all",
+    accountId !== "all",
+    executiveFilter !== "all",
+    leadContactFilter !== "all",
+    dateRange !== "30d",
+    Boolean(dateFrom),
+    Boolean(dateTo),
+  ].filter(Boolean).length;
+
+  const categoryChips = useMemo(
+    () =>
+      (
+        [
+          { id: "all" as const, label: "All activity" },
+          { id: "follow_up" as const, label: CRM_ACTIVITY_CATEGORY_LABEL.follow_up },
+          { id: "visit" as const, label: CRM_ACTIVITY_CATEGORY_LABEL.visit },
+          { id: "communication" as const, label: CRM_ACTIVITY_CATEGORY_LABEL.communication },
+          { id: "booking" as const, label: CRM_ACTIVITY_CATEGORY_LABEL.booking },
+          { id: "tracker" as const, label: CRM_ACTIVITY_CATEGORY_LABEL.tracker },
+          { id: "account" as const, label: CRM_ACTIVITY_CATEGORY_LABEL.account },
+          { id: "module" as const, label: CRM_ACTIVITY_CATEGORY_LABEL.module },
+          { id: "support" as const, label: CRM_ACTIVITY_CATEGORY_LABEL.support },
+          { id: "ticket" as const, label: CRM_ACTIVITY_CATEGORY_LABEL.ticket },
+        ] as const
+      ).map((c) => ({
+        id: c.id,
+        label: c.label,
+        count: categoryCounts[c.id],
+      })),
+    [categoryCounts],
+  );
+
+  function clearFilters() {
+    setQuery("");
+    setCategory("all");
+    setKind("all");
+    setAccountId("all");
+    setExecutiveFilter("all");
+    setLeadContactFilter("all");
+    setDateRange("30d");
+    setDateFrom("");
+    setDateTo("");
+  }
+
   return (
     <div className="space-y-2.5">
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-        {(
-          [
-            { label: "Accounts", value: teamSummary.accounts, icon: Building2 },
-            { label: "Executives", value: teamSummary.executives, icon: Users },
-            { label: "Sales managers", value: teamSummary.sales, icon: Users },
-            { label: "Support manager 1", value: teamSummary.support1, icon: Users },
-            { label: "Support manager 2", value: teamSummary.support2, icon: Users },
-          ] as const
-        ).map((stat, i) => {
-          const Icon = stat.icon;
-          return (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.04, duration: 0.28, ease: EASE }}
-              className="card-soft rounded-lg p-3"
-            >
-              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                <Icon className="h-3.5 w-3.5" />
-                {stat.label}
-              </div>
-              <div className="mt-0.5 text-lg font-semibold tabular-nums">{stat.value}</div>
-            </motion.div>
-          );
-        })}
-      </div>
-
       <ListToolbar
         search={query}
         onSearchChange={setQuery}
-        searchPlaceholder="Search activity, account, executive, or manager…"
+        searchPlaceholder="Search activity, account, executive, lead, or remarks…"
         chips={categoryChips}
         activeChip={category}
         onChipChange={(id) => setCategory(id as CrmActivityCategory)}
         defaultFiltersOpen
+        dateRange={{
+          label: "Activity date",
+          from: dateFrom,
+          to: dateTo,
+          onFromChange: setDateFrom,
+          onToChange: setDateTo,
+        }}
         selects={[
+          {
+            id: "type",
+            label: "Activity type",
+            value: category,
+            options: [
+              { value: "all", label: "All types" },
+              ...Object.entries(CRM_ACTIVITY_CATEGORY_LABEL).map(([value, label]) => ({
+                value,
+                label,
+              })),
+            ],
+            onChange: (v) => setCategory(v as CrmActivityCategory),
+          },
+          {
+            id: "status",
+            label: "Activity status",
+            value: kind,
+            options: [
+              { value: "all", label: "All statuses" },
+              ...Object.entries(CRM_ACTIVITY_STATUS_LABEL).map(([value, label]) => ({
+                value,
+                label,
+              })),
+            ],
+            onChange: (v) => setKind(v as ActivityKind | "all"),
+          },
+          {
+            id: "executive",
+            label: "User / executive",
+            value: executiveFilter,
+            options: executiveOptions,
+            onChange: setExecutiveFilter,
+          },
+          {
+            id: "lead",
+            label: "Lead / contact",
+            value: leadContactFilter,
+            options: leadContactOptions,
+            onChange: setLeadContactFilter,
+          },
           {
             id: "account",
             label: "Account",
@@ -287,42 +209,8 @@ export function CrmDashboardActivityPanel({ items, accounts }: Props) {
             onChange: setAccountId,
           },
           {
-            id: "salesManager",
-            label: "Sales manager",
-            value: salesManagerFilter,
-            options: salesManagerOptions,
-            onChange: setSalesManagerFilter,
-          },
-          {
-            id: "supportManager1",
-            label: "Support manager 1",
-            value: supportManager1Filter,
-            options: supportManager1Options,
-            onChange: setSupportManager1Filter,
-          },
-          {
-            id: "supportManager2",
-            label: "Support manager 2",
-            value: supportManager2Filter,
-            options: supportManager2Options,
-            onChange: setSupportManager2Filter,
-          },
-          {
-            id: "kind",
-            label: "Status",
-            value: kind,
-            options: [
-              { value: "all", label: "All statuses" },
-              { value: "success", label: "Success / completed" },
-              { value: "info", label: "Info / in progress" },
-              { value: "warning", label: "Needs attention" },
-              { value: "danger", label: "Failed / cancelled" },
-            ],
-            onChange: (v) => setKind(v as ActivityKind | "all"),
-          },
-          {
             id: "range",
-            label: "Time range",
+            label: "Quick range",
             value: dateRange,
             options: [
               { value: "7d", label: "Last 7 days" },
@@ -334,142 +222,117 @@ export function CrmDashboardActivityPanel({ items, accounts }: Props) {
           },
         ]}
         resultCount={filtered.length}
-        resultLabel="events"
+        resultLabel="activities"
         activeFilterCount={activeFilterCount}
-        onClear={() => {
-          setQuery("");
-          setCategory("all");
-          setAccountId("all");
-          setSalesManagerFilter("all");
-          setSupportManager1Filter("all");
-          setSupportManager2Filter("all");
-          setKind("all");
-          setDateRange("30d");
-        }}
+        onClear={clearFilters}
       />
 
-      {filtered.length === 0 ? (
-        <div className="card-soft flex flex-col items-center gap-2 py-12 text-center">
-          <MessageSquareText className="h-8 w-8 text-muted-foreground/60" />
-          <p className="text-sm font-medium">No activity matches your filters</p>
-          <p className="max-w-sm text-xs text-muted-foreground">
-            Try widening the date range, changing the team filter, or clearing filters. Every event
-            opens the related account detail page.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {grouped.map((group) => (
-            <section key={group.key} className="card-soft overflow-hidden">
-              <div className="border-b bg-muted/40 px-3 py-2">
-                <h3 className="text-xs font-semibold">{group.label}</h3>
-                <p className="text-[10px] text-muted-foreground">{group.items.length} events</p>
+      <DataTable
+        data={filtered}
+        hideSearch
+        pageSize={20}
+        density="compact"
+        initialSortKey="createdAt"
+        initialSortDir="desc"
+        getRowId={(row) => row.id}
+        emptyState={
+          <div className="card-soft flex flex-col items-center gap-2 py-12 text-center">
+            <p className="text-sm font-medium">No activity matches your filters</p>
+            <p className="max-w-sm text-xs text-muted-foreground">
+              Adjust date, activity type, status, executive, or lead/contact filters to see CRM
+              activity history.
+            </p>
+          </div>
+        }
+        columns={[
+          {
+            key: "createdAt",
+            header: "Date / time",
+            sortable: true,
+            render: (row) => (
+              <div className="whitespace-nowrap">
+                <div className="font-medium">{formatDate(row.createdAt)}</div>
+                <div className="text-[10px] text-muted-foreground">
+                  {formatDateTime(row.createdAt).split(", ").pop()}
+                </div>
               </div>
-
-              <div className="hidden lg:block">
-                <table className="w-full text-xs">
-                  <thead className="bg-muted/30 text-[10px] text-muted-foreground">
-                    <tr>
-                      <th className="px-3 py-2 text-left font-medium">Activity</th>
-                      <th className="px-3 py-2 text-left font-medium">Account</th>
-                      <th className="px-3 py-2 text-left font-medium">Team</th>
-                      <th className="px-3 py-2 text-left font-medium">Category</th>
-                      <th className="px-3 py-2 text-left font-medium">By</th>
-                      <th className="px-3 py-2 text-left font-medium">When</th>
-                      <th className="px-3 py-2 text-left font-medium">Status</th>
-                      <th className="px-3 py-2" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {group.items.map((item) => (
-                      <tr key={item.id} className="border-t hover:bg-muted/25">
-                        <td className="max-w-[220px] px-3 py-2">
-                          <div className="line-clamp-2 font-medium">{item.what}</div>
-                        </td>
-                        <td className="max-w-[120px] truncate px-3 py-2">
-                          {item.accountId ? (
-                            <AccountActivityLink
-                              accountId={item.accountId}
-                              className="font-medium text-primary hover:underline"
-                            >
-                              {item.accountName ?? "—"}
-                            </AccountActivityLink>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-                        <td className="max-w-[140px] px-3 py-2">
-                          <TeamCell item={item} />
-                        </td>
-                        <td className="px-3 py-2">
-                          <CategoryBadge category={item.category} />
-                        </td>
-                        <td className="max-w-[100px] truncate px-3 py-2 text-muted-foreground">
-                          {item.who}
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
-                          <span title={new Date(item.createdAt).toLocaleString()}>
-                            {formatRelativeTime(item.createdAt)}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2">
-                          <Pill tone={KIND_TONE[item.kind]}>{item.kind}</Pill>
-                        </td>
-                        <td className="px-2 py-2 text-right">
-                          {item.accountId ? (
-                            <AccountActivityLink
-                              accountId={item.accountId}
-                              className="inline-flex h-7 items-center gap-0.5 px-1.5 text-primary hover:underline"
-                            >
-                              Account <ArrowRight className="h-3 w-3" />
-                            </AccountActivityLink>
-                          ) : null}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            ),
+          },
+          {
+            key: "executive",
+            header: "Executive",
+            sortable: true,
+            render: (row) => (
+              <span className="text-xs">{row.executive?.trim() || row.who || "—"}</span>
+            ),
+          },
+          {
+            key: "category",
+            header: "Activity type",
+            sortable: true,
+            render: (row) => (
+              <span className="text-xs">{CRM_ACTIVITY_CATEGORY_LABEL[row.category]}</span>
+            ),
+          },
+          {
+            key: "leadContact",
+            header: "Lead / contact",
+            sortable: true,
+            render: (row) => (
+              <span className="text-xs">{row.leadContact?.trim() || "—"}</span>
+            ),
+          },
+          {
+            key: "kind",
+            header: "Status",
+            sortable: true,
+            render: (row) => (
+              <Pill tone={KIND_TONE[row.kind]}>{CRM_ACTIVITY_STATUS_LABEL[row.kind]}</Pill>
+            ),
+          },
+          {
+            key: "remarks",
+            header: "Remarks / details",
+            sortable: true,
+            render: (row) => (
+              <div className="max-w-[240px]">
+                <div className="line-clamp-2 text-xs font-medium">{row.remarks ?? row.what}</div>
+                {row.accountName ? (
+                  <div className="mt-0.5 text-[10px] text-muted-foreground">{row.accountName}</div>
+                ) : null}
               </div>
-
-              <ol className="divide-y lg:hidden">
-                {group.items.map((item, index) => (
-                  <motion.li
-                    key={item.id}
-                    initial={{ opacity: 0, x: -4 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.02, duration: 0.25, ease: EASE }}
-                  >
-                    <AccountActivityLink
-                      accountId={item.accountId}
-                      className="block px-3 py-3 transition-colors hover:bg-muted/30"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="line-clamp-2 text-sm font-medium">{item.what}</div>
-                          <div className="mt-1 text-[10px] font-medium text-primary">
-                            {item.accountName ?? "Account"}
-                          </div>
-                          <div className="mt-1 text-[10px] text-muted-foreground">{item.who}</div>
-                          <div className="mt-2">
-                            <TeamCell item={item} />
-                          </div>
-                          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                            <CategoryBadge category={item.category} />
-                            <Pill tone={KIND_TONE[item.kind]}>{item.kind}</Pill>
-                          </div>
-                        </div>
-                        <span className="shrink-0 text-[10px] text-muted-foreground">
-                          {formatRelativeTime(item.createdAt)}
-                        </span>
-                      </div>
-                    </AccountActivityLink>
-                  </motion.li>
-                ))}
-              </ol>
-            </section>
-          ))}
-        </div>
-      )}
+            ),
+          },
+          {
+            key: "nextFollowUp",
+            header: "Next follow-up",
+            sortable: true,
+            render: (row) => (
+              <span className="text-xs text-muted-foreground">
+                {row.nextFollowUp ? formatDate(row.nextFollowUp) : "—"}
+              </span>
+            ),
+          },
+          {
+            key: "accountName",
+            header: "Account",
+            sortable: true,
+            render: (row) =>
+              row.accountId ? (
+                <Link
+                  to="/crm/accounts/$accountId"
+                  params={{ accountId: row.accountId }}
+                  className="text-xs font-medium text-primary hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {row.accountName ?? "Account"}
+                </Link>
+              ) : (
+                <span className="text-xs text-muted-foreground">—</span>
+              ),
+          },
+        ]}
+      />
     </div>
   );
 }

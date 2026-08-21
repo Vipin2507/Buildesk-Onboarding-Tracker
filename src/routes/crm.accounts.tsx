@@ -19,6 +19,7 @@ import { toast } from "sonner";
 
 import { CrmAccountBulkUploadModal } from "@/components/crm/crm-account-bulk-upload-modal";
 import { CrmAccountDateBulkUploadModal } from "@/components/crm/crm-account-date-bulk-upload-modal";
+import { CrmAccountModulesCell } from "@/components/crm/crm-account-modules-cell";
 import {
   CrmAccountFormFields,
   crmAccountSchema,
@@ -866,6 +867,16 @@ function CrmAccountsPage() {
                     sortable: true,
                     render: (r) => (
                       <span className="text-xs text-muted-foreground">{r.stageLabel}</span>
+                    ),
+                  },
+                  {
+                    key: "subscribedModules",
+                    header: "Modules",
+                    render: (r) => (
+                      <CrmAccountModulesCell
+                        subscribed={r.subscribedModules}
+                        notSubscribed={r.notSubscribedModules}
+                      />
                     ),
                   },
                   {

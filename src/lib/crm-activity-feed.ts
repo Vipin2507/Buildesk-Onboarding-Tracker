@@ -6,6 +6,7 @@ import type { CrmEvent, ModuleSubscriptionEvent } from "@/types/crm";
 import type { CrmOnboardingRecord } from "@/types/crm-onboarding";
 import { BOOKING_STATUS_LABEL } from "@/types/booking";
 import type { Ticket } from "@/types/ticket";
+import type { ClientVisit, FollowUpTask } from "@/types/crm";
 import {
   createCrmOnboardingRecord,
   ensureMasterDataFields,
@@ -21,7 +22,9 @@ export type CrmActivityCategory =
   | "booking"
   | "support"
   | "ticket"
-  | "communication";
+  | "communication"
+  | "follow_up"
+  | "visit";
 
 export type CrmActivityItem = {
   id: string;
@@ -37,6 +40,14 @@ export type CrmActivityItem = {
   teamSalesManager?: string;
   teamSupportManager1?: string;
   teamSupportManager2?: string;
+  /** Primary user/executive shown in CRM activity table. */
+  executive?: string;
+  /** Lead or contact name tied to the activity. */
+  leadContact?: string;
+  /** Activity detail / remarks body. */
+  remarks?: string;
+  /** Next follow-up date (YYYY-MM-DD or ISO). */
+  nextFollowUp?: string;
   href?: string;
 };
 
@@ -64,20 +75,58 @@ function teamForAccount(account: CrmAccount) {
   };
 }
 
+function leadContactForAccount(account?: CrmAccount, override?: string) {
+  if (override?.trim()) return override.trim();
+  return (
+    account?.pocName?.trim() ||
+    account?.contact?.trim() ||
+    account?.ownerName?.trim() ||
+    undefined
+  );
+}
+
+function resolveExecutive(
+  account: CrmAccount | undefined,
+  who: string | undefined,
+  assigneeName?: string,
+) {
+  return (
+    assigneeName?.trim() ||
+    account?.accountManagerName?.trim() ||
+    who?.trim() ||
+    undefined
+  );
+}
+
 function withAccountContext(
   item: Omit<
     CrmActivityItem,
-    "teamExecutive" | "teamSalesManager" | "teamSupportManager1" | "teamSupportManager2" | "href"
-  >,
+    | "teamExecutive"
+    | "teamSalesManager"
+    | "teamSupportManager1"
+    | "teamSupportManager2"
+    | "href"
+    | "executive"
+    | "leadContact"
+    | "remarks"
+  > & {
+    executive?: string;
+    leadContact?: string;
+    remarks?: string;
+  },
   account?: CrmAccount,
 ): CrmActivityItem {
   const accountId = item.accountId ?? account?.id;
   const accountName = item.accountName ?? account?.name;
+  const team = teamForAccount(account ?? ({ id: accountId ?? "", name: accountName ?? "" } as CrmAccount));
   return {
     ...item,
     accountId,
     accountName,
-    ...teamForAccount(account ?? ({ id: accountId ?? "", name: accountName ?? "" } as CrmAccount)),
+    ...team,
+    leadContact: leadContactForAccount(account, item.leadContact),
+    executive: item.executive ?? resolveExecutive(account, item.who),
+    remarks: item.remarks ?? item.what,
     href: crmActivityAccountHref(accountId),
   };
 }
@@ -136,7 +185,34 @@ export const CRM_ACTIVITY_CATEGORY_LABEL: Record<
   support: "Portal support",
   ticket: "Ticket tracking",
   communication: "Communications",
+  follow_up: "Follow-up",
+  visit: "Site visit",
 };
+
+export const CRM_ACTIVITY_STATUS_LABEL: Record<ActivityKind, string> = {
+  success: "Completed",
+  info: "In progress",
+  warning: "Needs attention",
+  danger: "Failed / cancelled",
+};
+
+export function listCrmActivityExecutiveNames(items: CrmActivityItem[]): string[] {
+  const names = new Set<string>();
+  for (const item of items) {
+    const n = item.executive?.trim();
+    if (n) names.add(n);
+  }
+  return [...names].sort((a, b) => a.localeCompare(b));
+}
+
+export function listCrmActivityLeadContactNames(items: CrmActivityItem[]): string[] {
+  const names = new Set<string>();
+  for (const item of items) {
+    const n = item.leadContact?.trim();
+    if (n) names.add(n);
+  }
+  return [...names].sort((a, b) => a.localeCompare(b));
+}
 
 function recordFor(account: CrmAccount, records: CrmOnboardingRecord[]): CrmOnboardingRecord {
   const found = records.find((r) => r.companyId === account.id);
@@ -194,9 +270,14 @@ export function buildCrmActivityFeed(input: {
     createdAt: string;
   }[];
   tickets: Ticket[];
+  followUpTasks?: FollowUpTask[];
+  clientVisits?: ClientVisit[];
+  users?: { id: string; name: string }[];
 }): CrmActivityItem[] {
   const accountById = new Map(input.accounts.map((a) => [a.id, a]));
   const nameById = new Map(input.accounts.map((a) => [a.id, a.name]));
+  const userNameById = new Map((input.users ?? []).map((u) => [u.id, u.name]));
+  const todayYmd = new Date().toISOString().slice(0, 10);
   const events: CrmActivityItem[] = [];
 
   for (const e of input.crmEvents) {
@@ -314,6 +395,70 @@ export function buildCrmActivityFeed(input: {
           category: "booking",
           accountId: b.companyId,
           accountName,
+          leadContact: b.guestName,
+          remarks: `Booking with ${b.guestName}`,
+        },
+        account,
+      ),
+    );
+  }
+
+  for (const task of input.followUpTasks ?? []) {
+    if (!input.accountIds.has(task.companyId)) continue;
+    const account = accountById.get(task.companyId);
+    const assignee = task.assigneeUserId ? userNameById.get(task.assigneeUserId) : undefined;
+    const overdue = Boolean(task.dueDate && task.dueDate < todayYmd && task.status !== "completed");
+    events.push(
+      withAccountContext(
+        {
+          id: `followup-${task.id}`,
+          what: task.title,
+          who: assignee ?? task.status,
+          createdAt: task.updatedAt || task.createdAt,
+          kind:
+            task.status === "completed"
+              ? "success"
+              : task.status === "cancelled"
+                ? "danger"
+                : overdue
+                  ? "warning"
+                  : "info",
+          category: "follow_up",
+          accountId: task.companyId,
+          accountName: nameById.get(task.companyId) ?? "Account",
+          executive: resolveExecutive(account, assignee, assignee),
+          remarks: task.description ?? task.title,
+          nextFollowUp: task.dueDate,
+        },
+        account,
+      ),
+    );
+  }
+
+  for (const visit of input.clientVisits ?? []) {
+    if (!input.accountIds.has(visit.companyId)) continue;
+    const account = accountById.get(visit.companyId);
+    const assignee = visit.assignedUserId ? userNameById.get(visit.assignedUserId) : undefined;
+    events.push(
+      withAccountContext(
+        {
+          id: `visit-${visit.id}`,
+          what: visit.purpose,
+          who: assignee ?? visit.status,
+          createdAt: visit.updatedAt || visit.scheduledAt || visit.createdAt,
+          kind:
+            visit.status === "completed"
+              ? "success"
+              : visit.status === "cancelled" || visit.status === "no_show"
+                ? "danger"
+                : "info",
+          category: "visit",
+          accountId: visit.companyId,
+          accountName: nameById.get(visit.companyId) ?? "Account",
+          leadContact: visit.contactName,
+          executive: resolveExecutive(account, assignee, assignee),
+          remarks: visit.remarks || visit.outcome || visit.notes || visit.purpose,
+          nextFollowUp: visit.nextFollowUpDate,
         },
         account,
       ),
@@ -394,6 +539,10 @@ export function filterCrmActivityItems(
     salesManagerFilter?: string;
     supportManager1Filter?: string;
     supportManager2Filter?: string;
+    executiveFilter?: string;
+    leadContactFilter?: string;
+    dateFrom?: string;
+    dateTo?: string;
   },
 ): CrmActivityItem[] {
   const q = filters.query?.trim().toLowerCase();
@@ -403,6 +552,10 @@ export function filterCrmActivityItems(
   const salesManagerFilter = filters.salesManagerFilter ?? "all";
   const supportManager1Filter = filters.supportManager1Filter ?? "all";
   const supportManager2Filter = filters.supportManager2Filter ?? "all";
+  const executiveFilter = filters.executiveFilter ?? "all";
+  const leadContactFilter = filters.leadContactFilter ?? "all";
+  const dateFrom = filters.dateFrom?.trim();
+  const dateTo = filters.dateTo?.trim();
 
   function matchesManagerField(
     assigned: string | undefined,
@@ -426,6 +579,21 @@ export function filterCrmActivityItems(
     if (!matchesManagerField(item.teamSalesManager, salesManagerFilter)) return false;
     if (!matchesManagerField(item.teamSupportManager1, supportManager1Filter)) return false;
     if (!matchesManagerField(item.teamSupportManager2, supportManager2Filter)) return false;
+    if (
+      executiveFilter !== "all" &&
+      !crmSalesManagerNamesMatch(item.executive, executiveFilter)
+    ) {
+      return false;
+    }
+    if (
+      leadContactFilter !== "all" &&
+      !crmSalesManagerNamesMatch(item.leadContact, leadContactFilter)
+    ) {
+      return false;
+    }
+    const itemDay = item.createdAt.slice(0, 10);
+    if (dateFrom && itemDay < dateFrom) return false;
+    if (dateTo && itemDay > dateTo) return false;
     if (managerRole !== "all") {
       const assigned = crmActivityManagerForRole(item, managerRole);
       if (!assigned?.trim()) return false;
@@ -446,10 +614,15 @@ export function filterCrmActivityItems(
         item.what,
         item.who,
         item.accountName ?? "",
+        item.executive ?? "",
+        item.leadContact ?? "",
+        item.remarks ?? "",
         item.teamExecutive ?? "",
         item.teamSalesManager ?? "",
         item.teamSupportManager1 ?? "",
         item.teamSupportManager2 ?? "",
+        CRM_ACTIVITY_CATEGORY_LABEL[item.category],
+        CRM_ACTIVITY_STATUS_LABEL[item.kind],
       ]
         .join(" ")
         .toLowerCase();
@@ -505,6 +678,8 @@ export function countCrmActivityByCategory(items: CrmActivityItem[]) {
     support: 0,
     ticket: 0,
     communication: 0,
+    follow_up: 0,
+    visit: 0,
   };
   for (const item of items) counts[item.category] += 1;
   return counts;

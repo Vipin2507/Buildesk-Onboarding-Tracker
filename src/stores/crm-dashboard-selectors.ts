@@ -22,11 +22,14 @@ import { isTicketOpen } from "@/lib/tickets";
 import {
   useAuthStore,
   useBookingStore,
+  useClientVisitStore,
   useCrmAccountStore,
   useCrmEventStore,
   useCrmOnboardingStore,
   useDesignTicketStore,
+  useTaskStore,
   useTicketStore,
+  useUserStore,
 } from "@/stores";
 import type { CrmAccount } from "@/types/crm-account";
 import type { CrmImplementationStage, CrmOnboardingRecord } from "@/types/crm-onboarding";
@@ -88,6 +91,10 @@ export type CrmAccountRow = CrmAccount & {
   pendingTraining: number;
   /** Providers configured across opted integration modules. */
   providers: string[];
+  /** CRM product modules opted in for this account. */
+  subscribedModules: { key: string; label: string }[];
+  /** CRM product modules not opted in. */
+  notSubscribedModules: { key: string; label: string }[];
   overdue: boolean;
 };
 
@@ -126,6 +133,9 @@ export function useCrmDashboardOverview() {
   const currentUser = useAuthStore((s) => s.user);
   const records = useCrmOnboardingStore((s) => s.records);
   const tickets = useTicketStore((s) => s.tickets);
+  const followUpTasks = useTaskStore((s) => s.tasks);
+  const clientVisits = useClientVisitStore((s) => s.visits);
+  const users = useUserStore((s) => s.users);
   const crmEvents = useCrmEventStore((s) => s.events);
   const subscriptionEvents = useCrmEventStore((s) => s.subscriptionEvents);
   const designTickets = useDesignTicketStore((s) => s.tickets);
@@ -178,6 +188,12 @@ export function useCrmDashboardOverview() {
               .map((m) => m.provider as string),
           ),
         ),
+        subscribedModules: record.productModules
+          .filter((m) => m.enabled)
+          .map((m) => ({ key: m.key, label: m.label })),
+        notSubscribedModules: record.productModules
+          .filter((m) => !m.enabled)
+          .map((m) => ({ key: m.key, label: m.label })),
         overdue,
       };
     });
@@ -248,6 +264,9 @@ export function useCrmDashboardOverview() {
       designTickets,
       bookingAppointments,
       tickets,
+      followUpTasks,
+      clientVisits,
+      users: users.map((u) => ({ id: u.id, name: u.name })),
     })
       .slice(0, 10)
       .map(toDashboardActivityItem);
@@ -261,6 +280,9 @@ export function useCrmDashboardOverview() {
       designTickets,
       bookingAppointments,
       tickets,
+      followUpTasks,
+      clientVisits,
+      users: users.map((u) => ({ id: u.id, name: u.name })),
     });
 
     const nowIso = new Date().toISOString().slice(0, 19);
@@ -448,7 +470,9 @@ export function useCrmDashboardOverview() {
     designTickets,
     records,
     subscriptionEvents,
-    tickets,
+    followUpTasks,
+    clientVisits,
+    users,
   ]);
 }
 
