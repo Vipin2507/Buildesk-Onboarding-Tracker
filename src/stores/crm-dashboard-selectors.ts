@@ -13,6 +13,7 @@ import {
   type ChecklistPhaseBucket,
 } from "@/lib/checklist";
 import { filterCrmAccountsForUser } from "@/lib/crm-account-access";
+import { isCrmAccountEnded } from "@/lib/crm-account-status";
 import { resolveCrmMigrationCatalog } from "@/lib/crm-migration-catalog";
 import { resolveCrmTrainingCatalogForCompany } from "@/lib/crm-training-catalog";
 import { isDesignTicketActive } from "@/stores/design-ticket-selectors";
@@ -143,7 +144,7 @@ export function useCrmDashboardOverview() {
         record.tracker.expectedCompletionDate &&
           record.tracker.expectedCompletionDate < today &&
           account.status !== "live" &&
-          account.status !== "closed" && (account.status as string) !== "churned",
+          !isCrmAccountEnded(account.status),
       );
 
       return {
@@ -181,7 +182,7 @@ export function useCrmDashboardOverview() {
     const onboarding = rows.filter((r) => r.status === "onboarding").length;
     const active = rows.filter((r) => r.status === "active").length;
     const closed = rows.filter(
-      (r) => r.status === "closed" || (r.status as string) === "churned",
+      (r) => r.status === "closed" || r.status === "suspended" || r.status === "inactive" || (r.status as string) === "churned",
     ).length;
     const avgCompletion =
       rows.length === 0 ? 0 : Math.round(rows.reduce((s, r) => s + r.progress, 0) / rows.length);

@@ -80,7 +80,7 @@ const accountInput = z.object({
   paymentReceived: z.number().optional().nullable(),
   pendingAmount: z.number().optional().nullable(),
   healthScore: z.number().int().optional().nullable(),
-  status: z.enum(["active", "onboarding", "live", "closed"]).optional(),
+  status: z.enum(["active", "onboarding", "live", "suspended", "inactive", "closed"]).optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });

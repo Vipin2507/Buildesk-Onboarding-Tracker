@@ -78,6 +78,7 @@ import type {
   CrmCommChannel,
   CrmProductModuleKey,
 } from "@/types/crm-onboarding";
+import type { CrmAccount } from "@/types/crm-account";
 import { nowIso } from "@/types/common";
 import type { TicketPriority, TicketStatus, TicketType } from "@/types/ticket";
 
@@ -242,7 +243,7 @@ export function CrmOnboardingHub({
             <GoLiveTab
               companyId={accountId}
               accountName={accountName}
-              isLive={isLive}
+              accountStatus={account.status}
               who={currentUser?.name}
             />
           ) : null}
@@ -800,19 +801,19 @@ function ReportsTab({ companyId }: { companyId: string }) {
 function GoLiveTab({
   companyId,
   accountName,
-  isLive,
+  accountStatus,
   who,
 }: {
   companyId: string;
   accountName: string;
-  isLive: boolean;
+  accountStatus: CrmAccount["status"];
   who?: string;
 }) {
   return (
     <CrmGoLiveChecklist
       companyId={companyId}
       accountName={accountName}
-      isLive={isLive}
+      accountStatus={accountStatus}
       who={who}
     />
   );

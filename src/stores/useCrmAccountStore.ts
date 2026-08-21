@@ -19,6 +19,7 @@ type CrmAccountState = {
   upsertAccountsBatch: (rows: CrmAccountInput[]) => CrmAccount[];
   updateAccount: (id: string, patch: Partial<CrmAccount>) => void;
   markLive: (id: string, who?: string) => void;
+  setAccountStatus: (id: string, status: CrmAccount["status"], who?: string) => void;
   deleteAccount: (id: string) => CrmAccount | undefined;
 };
 
@@ -141,6 +142,15 @@ export const useCrmAccountStore = createStore<CrmAccountState>((set, get) => ({
     const alreadyLive = existing.status === "live";
     get().updateAccount(id, { status: "live" });
     if (!alreadyLive) {
+      notifyCrmGoLive(id, existing.name, who);
+    }
+  },
+
+  setAccountStatus: (id, status, who) => {
+    const existing = get().getById(id);
+    if (!existing || existing.status === status) return;
+    get().updateAccount(id, { status });
+    if (status === "live" && existing.status !== "live") {
       notifyCrmGoLive(id, existing.name, who);
     }
   },

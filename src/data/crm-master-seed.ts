@@ -40,7 +40,7 @@ export const CRM_SEED_ACCOUNT_FIELDS: CrmMasterFieldDef[] = [
   stampField({ key: "dealSize", label: "Deal Size", type: "number", required: true, enabled: true, order: 11, group: "Commercial" }),
   stampField({ key: "startDate", label: "Start Date", type: "date", required: true, enabled: true, order: 12, group: "Commercial" }),
   stampField({ key: "endDate", label: "End Date", type: "date", required: true, enabled: true, order: 13, group: "Commercial" }),
-  stampField({ key: "status", label: "Status", type: "select", required: true, enabled: true, order: 14, group: "Tracking", options: ["onboarding", "live", "active", "closed"] }),
+  stampField({ key: "status", label: "Status", type: "select", required: true, enabled: true, order: 14, group: "Tracking", options: ["onboarding", "live", "active", "suspended", "inactive", "closed"] }),
 ];
 
 export const CRM_SEED_PROJECT_FIELDS: CrmMasterFieldDef[] = [
@@ -101,7 +101,7 @@ export const CRM_SEED_PICKLISTS: CrmMasterPicklist[] = [
     id: newId(),
     key: "account-statuses",
     label: "Account Statuses",
-    values: ["onboarding", "live", "active", "closed"],
+    values: ["onboarding", "live", "active", "suspended", "inactive", "closed"],
     createdAt: nowIso(),
     updatedAt: nowIso(),
   },

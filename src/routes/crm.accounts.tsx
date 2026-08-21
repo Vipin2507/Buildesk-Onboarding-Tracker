@@ -56,6 +56,7 @@ import {
   useCrmDashboardOverview,
   type CrmAccountRow,
 } from "@/stores/crm-dashboard-selectors";
+import { isCrmAccountEnded } from "@/lib/crm-account-status";
 import { COMPANY_TYPES } from "@/types/company";
 import type { CrmAccount } from "@/types/crm-account";
 
@@ -70,13 +71,16 @@ const STATUS_CHIPS = [
   { id: "onboarding", label: "Onboarding", status: "onboarding" as const },
   { id: "live", label: "Live", status: "live" as const },
   { id: "active", label: "Active", status: "active" as const },
+  { id: "suspended", label: "Suspended", status: "suspended" as const },
+  { id: "inactive", label: "Inactive", status: "inactive" as const },
   { id: "closed", label: "Closed", status: "closed" as const },
 ] as const;
 
 function statusTone(status: CrmAccount["status"]) {
   if (status === "live") return "success" as const;
   if (status === "onboarding") return "warning" as const;
-  if (status === "closed") return "danger" as const;
+  if (status === "suspended") return "warning" as const;
+  if (status === "inactive" || status === "closed") return "danger" as const;
   return "info" as const;
 }
 
@@ -872,7 +876,7 @@ function CrmAccountsPage() {
                 ]}
                 actions={(r) => (
                   <div className="flex justify-end gap-0.5">
-                    {r.status !== "live" && r.status !== "closed" ? (
+                    {r.status !== "live" && !isCrmAccountEnded(r.status) ? (
                       <Button
                         size="icon"
                         variant="ghost"

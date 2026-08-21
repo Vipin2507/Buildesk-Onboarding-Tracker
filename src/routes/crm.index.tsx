@@ -44,17 +44,18 @@ import {
   DesignTicketTabNav,
 } from "@/components/design-ticket/design-ticket-shared";
 import type { ChecklistPhaseBucket } from "@/lib/checklist";
+import { isCrmAccountEnded } from "@/lib/crm-account-status";
+import {
+  crmDashboardSearchSchema,
+  parseCrmDashboardTab,
+  type CrmDashboardTab,
+} from "@/lib/crm-route-search";
 import {
   crmDrillDownFilterKey,
   useCrmDashboardOverview,
   type CrmDashboardDrillDownFilter,
 } from "@/stores/crm-dashboard-selectors";
 import { useCrmAccountStore, useCrmOnboardingStore } from "@/stores";
-import {
-  crmDashboardSearchSchema,
-  parseCrmDashboardTab,
-  type CrmDashboardTab,
-} from "@/lib/crm-route-search";
 
 export const Route = createFileRoute("/crm/")({
   validateSearch: (search) => crmDashboardSearchSchema.parse(search),
@@ -219,7 +220,7 @@ function CrmDashboardPage() {
   const healthPct = healthTotal ? Math.round((health.Healthy / healthTotal) * 100) : 0;
 
   const recent = rows
-    .filter((r) => r.status !== "live" && r.status !== "closed")
+    .filter((r) => r.status !== "live" && !isCrmAccountEnded(r.status))
     .sort((a, b) => b.progress - a.progress)
     .slice(0, 5);
 

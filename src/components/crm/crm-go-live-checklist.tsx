@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Ban, CheckCircle2, Rocket } from "lucide-react";
+import { Ban, CheckCircle2, PauseCircle, PowerOff, Rocket } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -18,14 +18,19 @@ import {
   crmGoLiveReady,
   isCrmGoLiveItemComplete,
 } from "@/data/crm-onboarding-defaults";
-import { cn } from "@/lib/utils";
+import {
+  crmAccountStatusLabel,
+  isCrmAccountEnded,
+} from "@/lib/crm-account-status";
 import {
   crmAssigneeSelectPatch,
   crmAssigneeSelectValue,
   resolveCrmSalesManagerDefaults,
   withCrmSalesManagerOption,
 } from "@/lib/crm-sales-manager-defaults";
+import { cn } from "@/lib/utils";
 import { useCrmAccountStore, useCrmOnboardingStore, useUserStore } from "@/stores";
+import type { CrmAccount } from "@/types/crm-account";
 import type { CrmGoLiveChecklistItem } from "@/types/crm-onboarding";
 
 const fieldClass = cn(ticketFieldClass, "h-8 text-xs");
@@ -38,15 +43,16 @@ function todayYmd() {
 type Props = {
   companyId: string;
   accountName: string;
-  isLive: boolean;
+  accountStatus: CrmAccount["status"];
   who?: string;
 };
 
-export function CrmGoLiveChecklist({ companyId, accountName, isLive, who }: Props) {
+export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who }: Props) {
   const record = useCrmOnboardingStore((s) => s.getByCompanyId(companyId))!;
   const users = useUserStore((s) => s.users);
   const account = useCrmAccountStore((s) => s.getById(companyId));
   const markLive = useCrmAccountStore((s) => s.markLive);
+  const setAccountStatus = useCrmAccountStore((s) => s.setAccountStatus);
   const setGoLiveItem = useCrmOnboardingStore((s) => s.setGoLiveItem);
   const setGoLiveNotApplicable = useCrmOnboardingStore((s) => s.setGoLiveNotApplicable);
   const updateGoLiveMeta = useCrmOnboardingStore((s) => s.updateGoLiveMeta);
@@ -54,6 +60,10 @@ export function CrmGoLiveChecklist({ companyId, accountName, isLive, who }: Prop
   const updateTracker = useCrmOnboardingStore((s) => s.updateTracker);
 
   const items = record.goLiveChecklist;
+  const isLive = accountStatus === "live";
+  const isSuspended = accountStatus === "suspended";
+  const isInactive = accountStatus === "inactive";
+  const isEnded = isCrmAccountEnded(accountStatus);
   const ready = crmGoLiveReady(record);
   const done = items.filter((g) => isCrmGoLiveItemComplete(g)).length;
   const pct = items.length ? Math.round((done / items.length) * 100) : 0;
@@ -61,6 +71,8 @@ export function CrmGoLiveChecklist({ companyId, accountName, isLive, who }: Prop
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [confirmApprove, setConfirmApprove] = useState(false);
   const [confirmForce, setConfirmForce] = useState(false);
+  const [confirmSuspended, setConfirmSuspended] = useState(false);
+  const [confirmInactive, setConfirmInactive] = useState(false);
   const [completeDialog, setCompleteDialog] = useState<{
     key: string;
     label: string;
@@ -153,22 +165,48 @@ export function CrmGoLiveChecklist({ companyId, accountName, isLive, who }: Prop
     setConfirmForce(false);
   }
 
+  function markSuspended() {
+    setAccountStatus(companyId, "suspended", who);
+    toast.success(`${accountName} marked Suspended`);
+    setConfirmSuspended(false);
+  }
+
+  function markInactive() {
+    setAccountStatus(companyId, "inactive", who);
+    toast.success(`${accountName} marked Inactive`);
+    setConfirmInactive(false);
+  }
+
+  const statusTone =
+    isLive ? "success" : isSuspended ? "warning" : isInactive || accountStatus === "closed" ? "danger" : ready ? "warning" : "muted";
+  const statusLabel = isLive
+    ? "Live"
+    : isSuspended
+      ? "Suspended"
+      : isInactive
+        ? "Inactive"
+        : ready
+          ? "Ready"
+          : crmAccountStatusLabel(accountStatus);
+
   return (
     <div className="space-y-2.5">
       <div className="card-soft flex flex-wrap items-center justify-between gap-3 p-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <div className="text-sm font-semibold">Go-Live & complete</div>
-            <Pill tone={isLive ? "success" : ready ? "warning" : "muted"}>
-              {isLive ? "Live" : ready ? "Ready" : "In progress"}
-            </Pill>
+            <Pill tone={statusTone}>{statusLabel}</Pill>
           </div>
           <p className="mt-1 text-[10px] text-muted-foreground">
             {isLive
               ? "This account is already live."
-              : ready
-                ? "All checklist items are done — approve go-live, or force-complete the account."
-                : "Finish verification items, or use Go Live & Complete to finish the account directly."}
+              : isSuspended
+                ? "This account is suspended — portal access and onboarding are paused."
+                : isInactive
+                  ? "This account is inactive — it is no longer in active onboarding."
+                  : ready
+                    ? "All checklist items are done — approve go-live, or force-complete the account."
+                    : "Finish verification items, or use Go Live & Complete to finish the account directly."}
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -176,7 +214,7 @@ export function CrmGoLiveChecklist({ companyId, accountName, isLive, who }: Prop
             size="sm"
             variant="outline"
             className="h-8 gap-1 text-xs"
-            disabled={isLive || ready}
+            disabled={isLive || ready || isEnded}
             onClick={() => {
               completeAllGoLiveItems(companyId);
               toast.success("All go-live items marked complete");
@@ -188,7 +226,7 @@ export function CrmGoLiveChecklist({ companyId, accountName, isLive, who }: Prop
           <Button
             size="sm"
             className="h-8 gap-1 bg-primary text-xs"
-            disabled={isLive || !ready}
+            disabled={isLive || !ready || isEnded}
             onClick={() => setConfirmApprove(true)}
           >
             <Rocket className="h-3.5 w-3.5" />
@@ -197,11 +235,31 @@ export function CrmGoLiveChecklist({ companyId, accountName, isLive, who }: Prop
           <Button
             size="sm"
             className="h-8 gap-1 bg-success text-xs text-white hover:bg-success/90"
-            disabled={isLive}
+            disabled={isLive || isEnded}
             onClick={() => setConfirmForce(true)}
           >
             <Rocket className="h-3.5 w-3.5" />
             Go Live & Complete
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 gap-1 border-warning/50 text-xs text-warning-foreground hover:bg-warning/10"
+            disabled={isSuspended || isInactive || isLive}
+            onClick={() => setConfirmSuspended(true)}
+          >
+            <PauseCircle className="h-3.5 w-3.5" />
+            {isSuspended ? "Suspended" : "Mark Suspended"}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 gap-1 border-destructive/40 text-xs text-destructive hover:bg-destructive/10"
+            disabled={isInactive}
+            onClick={() => setConfirmInactive(true)}
+          >
+            <PowerOff className="h-3.5 w-3.5" />
+            {isInactive ? "Inactive" : "Mark Inactive"}
           </Button>
         </div>
       </div>
@@ -507,6 +565,26 @@ export function CrmGoLiveChecklist({ companyId, accountName, isLive, who }: Prop
         confirmLabel="Go Live & Complete"
         confirmTone="default"
         onConfirm={forceCompleteAccount}
+      />
+
+      <ConfirmDeleteDialog
+        open={confirmSuspended}
+        onOpenChange={setConfirmSuspended}
+        title="Mark account suspended?"
+        description={`${accountName} will be marked Suspended. Use when the client is temporarily paused but may resume onboarding later.`}
+        confirmLabel="Mark Suspended"
+        confirmTone="default"
+        onConfirm={markSuspended}
+      />
+
+      <ConfirmDeleteDialog
+        open={confirmInactive}
+        onOpenChange={setConfirmInactive}
+        title="Mark account inactive?"
+        description={`${accountName} will be marked Inactive. Use when the account should no longer be treated as active onboarding.`}
+        confirmLabel="Mark Inactive"
+        confirmTone="destructive"
+        onConfirm={markInactive}
       />
     </div>
   );
