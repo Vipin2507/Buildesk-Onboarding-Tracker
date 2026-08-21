@@ -153,7 +153,7 @@ export const DEFAULT_CRM_AUTOMATION_RULES: AutomationRule[] = [
     isActive: true,
     templateSubject: "Your call is {{status}} — {{eventTypeTitle}}",
     templateBody:
-      "Hi {{guestName}},\n\nYour {{eventTypeTitle}} with {{hostName}} is now {{status}}.\n\nWhen: {{startsAt}} – {{endsAt}}\nAccount: {{accountName}}\n\nIf you need another time, open your portal and book again.",
+      "Hi {{guestName}},\n\nYour {{eventTypeTitle}} with {{hostName}} is now {{status}}.\n\nWhen: {{startsAt}} – {{endsAt}}\nAccount: {{accountName}}\n{{meetUrlLine}}\nIf you need another time, open your portal and book again.",
   }),
 ];
 
@@ -176,6 +176,8 @@ export const CRM_AUTOMATION_TEMPLATE_VARS = [
   "{{previousStatus}}",
   "{{bookingId}}",
   "{{bookingUrl}}",
+  "{{meetUrl}}",
+  "{{meetUrlLine}}",
 ] as const;
 
 export const CRM_AUTOMATION_SAMPLE_VARS: Record<string, string> = {
@@ -197,4 +199,6 @@ export const CRM_AUTOMATION_SAMPLE_VARS: Record<string, string> = {
   previousStatus: "pending",
   bookingId: "bk-1001",
   bookingUrl: "https://track.example.com/crm/bookings",
+  meetUrl: "https://meet.google.com/abc-defg-hij",
+  meetUrlLine: "Google Meet: https://meet.google.com/abc-defg-hij\n",
 };

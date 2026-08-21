@@ -606,6 +606,8 @@ export function dispatchCrmBookingAutomationTrigger(
       bookingUrl,
       ticketNumber: appointment.id,
       ticketUrl: bookingUrl,
+      meetUrl: appointment.meetUrl ?? "",
+      meetUrlLine: appointment.meetUrl ? `Google Meet: ${appointment.meetUrl}\n` : "",
     };
 
     for (const rule of rules) {

@@ -8,6 +8,7 @@ import {
   History,
   Inbox,
   LayoutList,
+  Video,
   X,
   XCircle,
 } from "lucide-react";
@@ -25,11 +26,15 @@ import {
 import { EmptyState } from "@/components/empty-state";
 import { WeeklyHoursEditor } from "@/components/crm/weekly-hours-editor";
 import { BookingBlocksPanel } from "@/components/crm/booking-blocks-panel";
+import { BookingGoogleCalendarPanel } from "@/components/crm/booking-google-calendar-panel";
 import { ListToolbar } from "@/components/list-toolbar";
 import { PageWrap } from "@/components/page-header";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  getGoogleCalendarConnectionStatus,
+} from "@/lib/api";
 import { isAdminRoleKey } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/stores/useAuthStore";
@@ -57,6 +62,7 @@ const BOOKING_TABS = [
 const SETTINGS_TABS = [
   { id: "availability", label: "Availability", icon: Clock },
   { id: "blocked", label: "Blocked", icon: CalendarOff },
+  { id: "calendar", label: "Calendar", icon: Video },
 ] as const;
 
 const TABS = [...BOOKING_TABS, ...SETTINGS_TABS] as const;
@@ -78,6 +84,11 @@ const CLOSED_STATUSES: BookingAppointmentStatus[] = ["declined", "cancelled"];
 export const Route = createFileRoute("/crm/bookings")({
   validateSearch: (search: Record<string, unknown>) => ({
     tab: TABS.some((t) => t.id === search.tab) ? (search.tab as TabId) : ("pending" as TabId),
+    google:
+      search.google === "connected" || search.google === "error"
+        ? (search.google as "connected" | "error")
+        : undefined,
+    googleError: typeof search.googleError === "string" ? search.googleError : undefined,
   }),
   component: CrmBookingsPage,
 });
@@ -144,6 +155,7 @@ function CrmBookingsPage() {
   const [blockReason, setBlockReason] = useState("");
   const [savingHours, setSavingHours] = useState(false);
   const [addingBlock, setAddingBlock] = useState(false);
+  const [googleConnected, setGoogleConnected] = useState(false);
 
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -153,6 +165,22 @@ function CrmBookingsPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
+  useEffect(() => {
+    void getGoogleCalendarConnectionStatus()
+      .then((s) => setGoogleConnected(s.connected))
+      .catch(() => setGoogleConnected(false));
+  }, [tab, search.google]);
+
+  useEffect(() => {
+    if (!search.google) return;
+    const timer = window.setTimeout(() => {
+      void navigate({
+        search: { tab: search.tab },
+        replace: true,
+      });
+    }, 2000);
+    return () => window.clearTimeout(timer);
+  }, [search.google, search.tab, navigate]);
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
@@ -336,7 +364,17 @@ function CrmBookingsPage() {
             onClick={(e) => {
               e.stopPropagation();
               void acceptAppointment(appt.id, noteById[appt.id])
-                .then(() => toast.success("Booking approved"))
+                .then((updated) => {
+                  if (updated.meetUrl) {
+                    toast.success("Booking approved · Meet link created");
+                  } else if (!googleConnected) {
+                    toast.success(
+                      "Booking approved — connect Google Calendar for Meet links",
+                    );
+                  } else {
+                    toast.success("Booking approved");
+                  }
+                })
                 .catch((err) => toast.error(err instanceof Error ? err.message : "Failed"));
             }}
           >
@@ -612,9 +650,23 @@ function CrmBookingsPage() {
                         header: "Status",
                         sortable: true,
                         render: (a) => (
-                          <Pill tone={statusTone(a.status)}>
-                            {BOOKING_STATUS_LABEL[a.status]}
-                          </Pill>
+                          <div className="space-y-1">
+                            <Pill tone={statusTone(a.status)}>
+                              {BOOKING_STATUS_LABEL[a.status]}
+                            </Pill>
+                            {a.meetUrl ? (
+                              <a
+                                href={a.meetUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-[10px] font-medium text-primary hover:underline"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Video className="h-3 w-3" />
+                                Meet
+                              </a>
+                            ) : null}
+                          </div>
                         ),
                       },
                     ]}
@@ -639,6 +691,37 @@ function CrmBookingsPage() {
                             {BOOKING_STATUS_LABEL[appt.status]}
                           </Detail>
                         </div>
+                        {appt.meetUrl ? (
+                          <div className="flex flex-wrap items-center gap-2 rounded-md border border-primary/20 bg-primary/5 px-2.5 py-2 text-xs">
+                            <Video className="h-3.5 w-3.5 text-primary" />
+                            <span className="font-medium">Google Meet</span>
+                            <a
+                              href={appt.meetUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="truncate text-primary hover:underline"
+                            >
+                              {appt.meetUrl}
+                            </a>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-[10px]"
+                              onClick={() => {
+                                void navigator.clipboard.writeText(appt.meetUrl!);
+                                toast.success("Meet link copied");
+                              }}
+                            >
+                              Copy
+                            </Button>
+                          </div>
+                        ) : null}
+                        {appt.googleSyncStatus === "error" && appt.googleSyncError ? (
+                          <p className="text-[10px] text-destructive">
+                            Google sync: {appt.googleSyncError}
+                          </p>
+                        ) : null}
                         {appt.notes ? (
                           <p className="rounded-md bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground">
                             {appt.notes}
@@ -786,6 +869,13 @@ function CrmBookingsPage() {
                     toast.error(err instanceof Error ? err.message : "Failed"),
                   );
               }}
+            />
+          )}
+
+          {tab === "calendar" && (
+            <BookingGoogleCalendarPanel
+              flash={search.google}
+              flashError={search.googleError}
             />
           )}
         </motion.div>

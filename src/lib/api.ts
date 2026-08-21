@@ -198,3 +198,10 @@ export {
   rescheduleBookingAppointment,
   getBookingSummaryForCompany,
 } from "@/server/api/bookings";
+
+export {
+  getGoogleCalendarConnectionStatus,
+  getGoogleCalendarAuthUrl,
+  disconnectGoogleCalendarConnection,
+  setGoogleCalendarBusySync,
+} from "@/server/api/google-calendar";

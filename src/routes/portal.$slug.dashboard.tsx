@@ -182,6 +182,16 @@ function PortalDashboard() {
                   <div className="text-xs text-muted-foreground truncate">
                     {appt.notes?.split("\n")[0] || "Call request"}
                   </div>
+                  {appt.meetUrl && appt.status === "confirmed" ? (
+                    <a
+                      href={appt.meetUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-1 inline-flex text-xs font-medium text-primary hover:underline"
+                    >
+                      Join Google Meet
+                    </a>
+                  ) : null}
                 </div>
                 <span className={cn("text-xs font-semibold", statusTone(appt.status))}>
                   {BOOKING_STATUS_LABEL[appt.status] ?? appt.status}

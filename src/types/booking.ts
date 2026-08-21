@@ -47,6 +47,8 @@ export type BookingBlock = {
   updatedAt: string;
 };
 
+export type BookingGoogleSyncStatus = "none" | "synced" | "error";
+
 export type BookingAppointment = {
   id: string;
   eventTypeId: string;
@@ -61,6 +63,10 @@ export type BookingAppointment = {
   notes?: string;
   hostNote?: string;
   createdVia: BookingCreatedVia;
+  googleEventId?: string;
+  meetUrl?: string;
+  googleSyncStatus?: BookingGoogleSyncStatus;
+  googleSyncError?: string;
   createdAt: string;
   updatedAt: string;
 };

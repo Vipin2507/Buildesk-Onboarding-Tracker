@@ -623,7 +623,8 @@ export function mergeCrmGoLiveChecklist(
 }
 
 export function isCrmGoLiveItemComplete(item: CrmGoLiveChecklistItem) {
-  return !!item.notApplicable || item.status === "completed";
+  if (item.notApplicable) return true;
+  return item.status === "completed" && Boolean(item.completedAt?.trim());
 }
 
 export function isDeveloperCompanyType(type?: CompanyType): boolean {

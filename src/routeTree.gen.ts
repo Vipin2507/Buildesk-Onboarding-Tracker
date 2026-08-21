@@ -60,6 +60,7 @@ import { Route as PortalSlugDashboardRouteImport } from './routes/portal.$slug.d
 import { Route as PortalSlugProfileRouteImport } from './routes/portal.$slug.profile'
 import { Route as PortalSlugSolvedRouteImport } from './routes/portal.$slug.solved'
 import { Route as PortalSlugTicketsRouteImport } from './routes/portal.$slug.tickets'
+import { Route as AuthGoogleCalendarCallbackRouteImport } from './routes/auth.google.calendar.callback'
 import { Route as CompaniesCompanyIdModulesModuleKeyRouteImport } from './routes/companies.$companyId.modules.$moduleKey'
 import { Route as PortalSlugTicketsTicketIdRouteImport } from './routes/portal.$slug.tickets.$ticketId'
 import { Route as CompaniesCompanyIdModulesPostSalesProjectsProjectIdRouteImport } from './routes/companies.$companyId.modules.post-sales.projects.$projectId'
@@ -319,6 +320,12 @@ const PortalSlugTicketsRoute = PortalSlugTicketsRouteImport.update({
   path: '/tickets',
   getParentRoute: () => PortalSlugRoute,
 } as any)
+const AuthGoogleCalendarCallbackRoute =
+  AuthGoogleCalendarCallbackRouteImport.update({
+    id: '/auth/google/calendar/callback',
+    path: '/auth/google/calendar/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const CompaniesCompanyIdModulesModuleKeyRoute =
   CompaniesCompanyIdModulesModuleKeyRouteImport.update({
     id: '/modules/$moduleKey',
@@ -390,6 +397,7 @@ export interface FileRoutesByFullPath {
   '/portal/$slug/solved': typeof PortalSlugSolvedRoute
   '/portal/$slug/tickets': typeof PortalSlugTicketsRouteWithChildren
   '/portal/$slug/': typeof PortalSlugIndexRoute
+  '/auth/google/calendar/callback': typeof AuthGoogleCalendarCallbackRoute
   '/companies/$companyId/modules/$moduleKey': typeof CompaniesCompanyIdModulesModuleKeyRoute
   '/portal/$slug/tickets/$ticketId': typeof PortalSlugTicketsTicketIdRoute
   '/companies/$companyId/modules/post-sales/projects/$projectId': typeof CompaniesCompanyIdModulesPostSalesProjectsProjectIdRoute
@@ -444,6 +452,7 @@ export interface FileRoutesByTo {
   '/portal/$slug/solved': typeof PortalSlugSolvedRoute
   '/portal/$slug/tickets': typeof PortalSlugTicketsRouteWithChildren
   '/portal/$slug': typeof PortalSlugIndexRoute
+  '/auth/google/calendar/callback': typeof AuthGoogleCalendarCallbackRoute
   '/companies/$companyId/modules/$moduleKey': typeof CompaniesCompanyIdModulesModuleKeyRoute
   '/portal/$slug/tickets/$ticketId': typeof PortalSlugTicketsTicketIdRoute
   '/companies/$companyId/modules/post-sales/projects/$projectId': typeof CompaniesCompanyIdModulesPostSalesProjectsProjectIdRoute
@@ -501,6 +510,7 @@ export interface FileRoutesById {
   '/portal/$slug/solved': typeof PortalSlugSolvedRoute
   '/portal/$slug/tickets': typeof PortalSlugTicketsRouteWithChildren
   '/portal/$slug/': typeof PortalSlugIndexRoute
+  '/auth/google/calendar/callback': typeof AuthGoogleCalendarCallbackRoute
   '/companies/$companyId/modules/$moduleKey': typeof CompaniesCompanyIdModulesModuleKeyRoute
   '/portal/$slug/tickets/$ticketId': typeof PortalSlugTicketsTicketIdRoute
   '/companies/$companyId/modules/post-sales/projects/$projectId': typeof CompaniesCompanyIdModulesPostSalesProjectsProjectIdRoute
@@ -559,6 +569,7 @@ export interface FileRouteTypes {
     | '/portal/$slug/solved'
     | '/portal/$slug/tickets'
     | '/portal/$slug/'
+    | '/auth/google/calendar/callback'
     | '/companies/$companyId/modules/$moduleKey'
     | '/portal/$slug/tickets/$ticketId'
     | '/companies/$companyId/modules/post-sales/projects/$projectId'
@@ -613,6 +624,7 @@ export interface FileRouteTypes {
     | '/portal/$slug/solved'
     | '/portal/$slug/tickets'
     | '/portal/$slug'
+    | '/auth/google/calendar/callback'
     | '/companies/$companyId/modules/$moduleKey'
     | '/portal/$slug/tickets/$ticketId'
     | '/companies/$companyId/modules/post-sales/projects/$projectId'
@@ -669,6 +681,7 @@ export interface FileRouteTypes {
     | '/portal/$slug/solved'
     | '/portal/$slug/tickets'
     | '/portal/$slug/'
+    | '/auth/google/calendar/callback'
     | '/companies/$companyId/modules/$moduleKey'
     | '/portal/$slug/tickets/$ticketId'
     | '/companies/$companyId/modules/post-sales/projects/$projectId'
@@ -701,6 +714,7 @@ export interface RootRouteChildren {
   TrainingRoute: typeof TrainingRoute
   VendorsRoute: typeof VendorsRoute
   PortalSlugRoute: typeof PortalSlugRouteWithChildren
+  AuthGoogleCalendarCallbackRoute: typeof AuthGoogleCalendarCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1062,6 +1076,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortalSlugTicketsRouteImport
       parentRoute: typeof PortalSlugRoute
     }
+    '/auth/google/calendar/callback': {
+      id: '/auth/google/calendar/callback'
+      path: '/auth/google/calendar/callback'
+      fullPath: '/auth/google/calendar/callback'
+      preLoaderRoute: typeof AuthGoogleCalendarCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/companies/$companyId/modules/$moduleKey': {
       id: '/companies/$companyId/modules/$moduleKey'
       path: '/modules/$moduleKey'
@@ -1275,6 +1296,7 @@ const rootRouteChildren: RootRouteChildren = {
   TrainingRoute: TrainingRoute,
   VendorsRoute: VendorsRoute,
   PortalSlugRoute: PortalSlugRouteWithChildren,
+  AuthGoogleCalendarCallbackRoute: AuthGoogleCalendarCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

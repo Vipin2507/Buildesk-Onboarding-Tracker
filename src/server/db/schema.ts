@@ -881,6 +881,10 @@ export const bookingAppointments = sqliteTable(
     notes: text("notes"),
     hostNote: text("host_note"),
     createdVia: text("created_via").notNull().default("portal"),
+    googleEventId: text("google_event_id"),
+    meetUrl: text("meet_url"),
+    googleSyncStatus: text("google_sync_status").notNull().default("none"),
+    googleSyncError: text("google_sync_error"),
     ...timestamps,
   },
   (t) => [
@@ -891,3 +895,19 @@ export const bookingAppointments = sqliteTable(
     index("booking_appointments_event_idx").on(t.eventTypeId),
   ],
 );
+
+/** Per-user Google Calendar OAuth connection for CRM bookings. */
+export const userGoogleCalendar = sqliteTable("user_google_calendar", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  googleEmail: text("google_email").notNull(),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  tokenExpiresAt: text("token_expires_at").notNull(),
+  calendarId: text("calendar_id").notNull().default("primary"),
+  scopes: text("scopes").notNull().default(""),
+  syncEnabled: integer("sync_enabled", { mode: "boolean" }).notNull().default(true),
+  connectedAt: text("connected_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});

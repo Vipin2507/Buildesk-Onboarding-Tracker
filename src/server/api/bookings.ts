@@ -11,6 +11,13 @@ import { insertBookingRequestNotification } from "@/server/api/notifications";
 import { ApiError, getSessionUser, newId, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
+import {
+  createGoogleMeetEvent,
+  deleteGoogleMeetEvent,
+  fetchGoogleFreeBusyRanges,
+  updateGoogleMeetEvent,
+} from "@/server/google/calendar-client";
+import { getGoogleCalendarConnection } from "@/server/google/calendar-oauth";
 import type {
   BookingAppointment,
   BookingAppointmentStatus,
@@ -85,6 +92,10 @@ function mapAppointment(row: typeof t.bookingAppointments.$inferSelect): Booking
     notes: row.notes ?? undefined,
     hostNote: row.hostNote ?? undefined,
     createdVia: row.createdVia as BookingCreatedVia,
+    googleEventId: row.googleEventId ?? undefined,
+    meetUrl: row.meetUrl ?? undefined,
+    googleSyncStatus: (row.googleSyncStatus as BookingAppointment["googleSyncStatus"]) ?? "none",
+    googleSyncError: row.googleSyncError ?? undefined,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -264,7 +275,7 @@ function resolveEventHost(event: BookingEventType): string {
   return resolved;
 }
 
-function collectBusyRanges(hostUserId: string, fromYmd: string, toYmd: string) {
+async function collectBusyRanges(hostUserId: string, fromYmd: string, toYmd: string) {
   const db = getDb();
   const rangeStart = `${fromYmd}T00:00:00`;
   const rangeEnd = `${toYmd}T23:59:59`;
@@ -294,13 +305,31 @@ function collectBusyRanges(hostUserId: string, fromYmd: string, toYmd: string) {
     )
     .all();
 
-  return [
+  const busy = [
     ...appts.map((a) => ({ startsAt: a.startsAt, endsAt: a.endsAt })),
     ...blocks.map((b) => ({ startsAt: b.startsAt, endsAt: b.endsAt })),
   ];
+
+  try {
+    const timeZone = resolveHostTimezone(hostUserId);
+    const googleBusy = await fetchGoogleFreeBusyRanges({
+      hostUserId,
+      fromYmd,
+      toYmd,
+      timeZone,
+    });
+    busy.push(...googleBusy);
+  } catch (err) {
+    console.warn(
+      "[booking] Google FreeBusy skipped:",
+      err instanceof Error ? err.message : err,
+    );
+  }
+
+  return busy;
 }
 
-function loadOpenSlots(event: BookingEventType, fromYmd: string, toYmd: string) {
+async function loadOpenSlots(event: BookingEventType, fromYmd: string, toYmd: string) {
   const hostUserId = resolveEventHost(event);
   const db = getDb();
   const windows = db
@@ -314,9 +343,9 @@ function loadOpenSlots(event: BookingEventType, fromYmd: string, toYmd: string) 
     )
     .all();
 
-  if (windows.length === 0) {
+    if (windows.length === 0) {
     seedDefaultAvailability(hostUserId, resolveHostTimezone(hostUserId));
-    return loadOpenSlots(event, fromYmd, toYmd);
+    return await loadOpenSlots(event, fromYmd, toYmd);
   }
 
   const timezone = windows[0]?.timezone ?? resolveHostTimezone(hostUserId);
@@ -328,9 +357,129 @@ function loadOpenSlots(event: BookingEventType, fromYmd: string, toYmd: string) 
     bufferBeforeMinutes: event.bufferBeforeMinutes,
     bufferAfterMinutes: event.bufferAfterMinutes,
     windows: windows.map(mapAvailability),
-    busy: collectBusyRanges(hostUserId, fromYmd, toYmd),
+    busy: await collectBusyRanges(hostUserId, fromYmd, toYmd),
     nowIso: localWallClockIso(timezone),
   });
+}
+
+async function syncGoogleCalendarForAppointment(
+  appointment: typeof t.bookingAppointments.$inferSelect,
+  action: "upsert" | "delete",
+) {
+  const db = getDb();
+  const timeZone = resolveHostTimezone(appointment.hostUserId);
+  const eventRow = db
+    .select()
+    .from(t.bookingEventTypes)
+    .where(eq(t.bookingEventTypes.id, appointment.eventTypeId))
+    .get();
+  const account = db
+    .select()
+    .from(t.crmAccounts)
+    .where(eq(t.crmAccounts.id, appointment.companyId))
+    .get();
+  const summary = `${eventRow?.title ?? "Call"} · ${account?.name ?? "CRM"} · ${appointment.guestName}`;
+  const description = [
+    `Guest: ${appointment.guestName} (${appointment.guestEmail})`,
+    appointment.guestPhone ? `Phone: ${appointment.guestPhone}` : null,
+    appointment.notes ? `Notes: ${appointment.notes}` : null,
+    `Buildesk booking: ${appointment.id}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  try {
+    if (action === "delete") {
+      if (appointment.googleEventId) {
+        await deleteGoogleMeetEvent({
+          hostUserId: appointment.hostUserId,
+          eventId: appointment.googleEventId,
+        });
+      }
+      db.update(t.bookingAppointments)
+        .set({
+          googleEventId: null,
+          meetUrl: null,
+          googleSyncStatus: "none",
+          googleSyncError: null,
+          updatedAt: nowIso(),
+        })
+        .where(eq(t.bookingAppointments.id, appointment.id))
+        .run();
+      return;
+    }
+
+    const connected = getGoogleCalendarConnection(appointment.hostUserId);
+    if (!connected) {
+      db.update(t.bookingAppointments)
+        .set({
+          googleSyncStatus: "none",
+          googleSyncError: null,
+          updatedAt: nowIso(),
+        })
+        .where(eq(t.bookingAppointments.id, appointment.id))
+        .run();
+      return;
+    }
+
+    if (appointment.googleEventId) {
+      const updated = await updateGoogleMeetEvent({
+        hostUserId: appointment.hostUserId,
+        eventId: appointment.googleEventId,
+        summary,
+        description,
+        startsAt: appointment.startsAt,
+        endsAt: appointment.endsAt,
+        timeZone,
+        guestEmail: appointment.guestEmail,
+        guestName: appointment.guestName,
+      });
+      db.update(t.bookingAppointments)
+        .set({
+          meetUrl: updated?.meetUrl ?? appointment.meetUrl,
+          googleSyncStatus: "synced",
+          googleSyncError: null,
+          updatedAt: nowIso(),
+        })
+        .where(eq(t.bookingAppointments.id, appointment.id))
+        .run();
+      return;
+    }
+
+    const created = await createGoogleMeetEvent({
+      hostUserId: appointment.hostUserId,
+      appointmentId: appointment.id,
+      summary,
+      description,
+      startsAt: appointment.startsAt,
+      endsAt: appointment.endsAt,
+      timeZone,
+      guestEmail: appointment.guestEmail,
+      guestName: appointment.guestName,
+    });
+    if (!created) return;
+    db.update(t.bookingAppointments)
+      .set({
+        googleEventId: created.eventId,
+        meetUrl: created.meetUrl ?? null,
+        googleSyncStatus: "synced",
+        googleSyncError: null,
+        updatedAt: nowIso(),
+      })
+      .where(eq(t.bookingAppointments.id, appointment.id))
+      .run();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Google Calendar sync failed";
+    console.warn("[booking] Google Calendar sync error:", message);
+    db.update(t.bookingAppointments)
+      .set({
+        googleSyncStatus: "error",
+        googleSyncError: message.slice(0, 500),
+        updatedAt: nowIso(),
+      })
+      .where(eq(t.bookingAppointments.id, appointment.id))
+      .run();
+  }
 }
 
 /* ---------- Portal (public) ---------- */
@@ -465,7 +614,7 @@ export const listPortalBookingSlots = createServerFn({ method: "GET" })
     const todayYmd = localWallClockIso(hostTimezone).slice(0, 10);
     const rangeFrom = fromYmd < todayYmd ? todayYmd : fromYmd;
     if (rangeFrom > toYmd) return [];
-    return loadOpenSlots(event, rangeFrom, toYmd);
+    return await loadOpenSlots(event, rangeFrom, toYmd);
   });
 
 export const createPortalBooking = createServerFn({ method: "POST" })
@@ -507,7 +656,7 @@ export const createPortalBooking = createServerFn({ method: "POST" })
     if (isBookingSlotInPast(startsAt, hostTimezone)) {
       throw new ApiError(400, "Please choose a time in the future");
     }
-    const open = loadOpenSlots(event, ymd, ymd);
+    const open = await loadOpenSlots(event, ymd, ymd);
     const slot = open.find((s) => s.startsAt.slice(0, 19) === startsAt);
     if (!slot) throw new ApiError(400, "Selected slot is no longer available");
 
@@ -528,6 +677,10 @@ export const createPortalBooking = createServerFn({ method: "POST" })
         notes: data.notes?.trim() || null,
         hostNote: null,
         createdVia: "portal",
+        googleEventId: null,
+        meetUrl: null,
+        googleSyncStatus: "none",
+        googleSyncError: null,
         createdAt: now,
         updatedAt: now,
       })
@@ -796,7 +949,7 @@ export const listStaffBookingSlots = createServerFn({ method: "GET" })
       .where(eq(t.bookingEventTypes.id, data.eventTypeId))
       .get();
     if (!row) throw new ApiError(404, "Event type not found");
-    return loadOpenSlots(mapEventType(row), data.from.slice(0, 10), data.to.slice(0, 10));
+    return await loadOpenSlots(mapEventType(row), data.from.slice(0, 10), data.to.slice(0, 10));
   });
 
 /* ---------- Staff mutations ---------- */
@@ -1020,6 +1173,19 @@ export const updateBookingAppointmentStatus = createServerFn({ method: "POST" })
       })
       .where(eq(t.bookingAppointments.id, data.id))
       .run();
+
+    const updated = db
+      .select()
+      .from(t.bookingAppointments)
+      .where(eq(t.bookingAppointments.id, data.id))
+      .get()!;
+
+    if (data.status === "confirmed") {
+      await syncGoogleCalendarForAppointment(updated, "upsert");
+    } else if (data.status === "cancelled" || data.status === "declined") {
+      await syncGoogleCalendarForAppointment(updated, "delete");
+    }
+
     return mapAppointment(
       db.select().from(t.bookingAppointments).where(eq(t.bookingAppointments.id, data.id)).get()!,
     );
@@ -1055,6 +1221,10 @@ export const rescheduleBookingAppointment = createServerFn({ method: "POST" })
     const startsAt = data.startsAt.slice(0, 19);
     const ymd = startsAt.slice(0, 10);
 
+    const busy = (await collectBusyRanges(row.hostUserId, ymd, ymd)).filter(
+      (b) => !(b.startsAt === row.startsAt && b.endsAt === row.endsAt),
+    );
+
     // Temporarily ignore this appointment when checking busy
     const open = computeOpenSlots({
       fromYmd: ymd,
@@ -1073,23 +1243,32 @@ export const rescheduleBookingAppointment = createServerFn({ method: "POST" })
         )
         .all()
         .map(mapAvailability),
-      busy: collectBusyRanges(row.hostUserId, ymd, ymd).filter(
-        (b) => !(b.startsAt === row.startsAt && b.endsAt === row.endsAt),
-      ),
+      busy,
     });
     const slot = open.find((s) => s.startsAt.slice(0, 19) === startsAt);
     if (!slot) throw new ApiError(400, "Selected slot is no longer available");
 
+    const nextStatus = row.status === "pending" ? "pending" : "confirmed";
     const now = nowIso();
     db.update(t.bookingAppointments)
       .set({
         startsAt: slot.startsAt,
         endsAt: slot.endsAt,
-        status: row.status === "pending" ? "pending" : "confirmed",
+        status: nextStatus,
         updatedAt: now,
       })
       .where(eq(t.bookingAppointments.id, data.id))
       .run();
+
+    const updated = db
+      .select()
+      .from(t.bookingAppointments)
+      .where(eq(t.bookingAppointments.id, data.id))
+      .get()!;
+
+    if (nextStatus === "confirmed") {
+      await syncGoogleCalendarForAppointment(updated, "upsert");
+    }
 
     return mapAppointment(
       db.select().from(t.bookingAppointments).where(eq(t.bookingAppointments.id, data.id)).get()!,

@@ -288,6 +288,14 @@ const EXTRA_COLUMNS = [
   { table: "companies", name: "payment_history_json", ddl: "TEXT" },
   { table: "users", name: "product_scope", ddl: "TEXT NOT NULL DEFAULT 'erp'" },
   { table: "users", name: "work_email", ddl: "TEXT" },
+  { table: "booking_appointments", name: "google_event_id", ddl: "TEXT" },
+  { table: "booking_appointments", name: "meet_url", ddl: "TEXT" },
+  {
+    table: "booking_appointments",
+    name: "google_sync_status",
+    ddl: "TEXT NOT NULL DEFAULT 'none'",
+  },
+  { table: "booking_appointments", name: "google_sync_error", ddl: "TEXT" },
 ];
 
 for (const col of EXTRA_COLUMNS) {
@@ -904,6 +912,10 @@ if (!tableExists("booking_appointments")) {
       notes TEXT,
       host_note TEXT,
       created_via TEXT NOT NULL DEFAULT 'portal',
+      google_event_id TEXT,
+      meet_url TEXT,
+      google_sync_status TEXT NOT NULL DEFAULT 'none',
+      google_sync_error TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY (event_type_id) REFERENCES booking_event_types(id) ON DELETE CASCADE
@@ -915,6 +927,25 @@ if (!tableExists("booking_appointments")) {
     CREATE INDEX IF NOT EXISTS booking_appointments_event_idx ON booking_appointments(event_type_id);
   `);
   console.log("+ CREATE TABLE booking_appointments");
+}
+
+if (!tableExists("user_google_calendar")) {
+  sqlite.exec(`
+    CREATE TABLE user_google_calendar (
+      user_id TEXT PRIMARY KEY NOT NULL,
+      google_email TEXT NOT NULL,
+      access_token TEXT NOT NULL,
+      refresh_token TEXT NOT NULL,
+      token_expires_at TEXT NOT NULL,
+      calendar_id TEXT NOT NULL DEFAULT 'primary',
+      scopes TEXT NOT NULL DEFAULT '',
+      sync_enabled INTEGER NOT NULL DEFAULT 1,
+      connected_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+  console.log("+ CREATE TABLE user_google_calendar");
 }
 
 /** Backfill module_subscriptions from opted-in company_modules (idempotent). */

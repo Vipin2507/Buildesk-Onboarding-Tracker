@@ -148,6 +148,7 @@ type CrmOnboardingState = {
     companyId: string,
     key: string,
     status: CrmGoLiveChecklistItem["status"],
+    completedAt?: string,
   ) => void;
   setGoLiveNotApplicable: (companyId: string, key: string, notApplicable: boolean) => void;
   updateGoLiveMeta: (
@@ -871,14 +872,22 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
     }));
   },
 
-  setGoLiveItem: (companyId, key, status) => {
+  setGoLiveItem: (companyId, key, status, completedAt) => {
     get().ensureForCompany(companyId);
-    const completedAt = status === "completed" ? nowIso().slice(0, 10) : undefined;
+    const nextCompletedAt =
+      status === "completed" ? (completedAt?.slice(0, 10) || undefined) : undefined;
     set((s) => ({
       records: updateRecord(s.records, companyId, (r) => ({
         ...r,
         goLiveChecklist: r.goLiveChecklist.map((g) =>
-          g.key === key ? { ...g, status, completedAt, notApplicable: false } : g,
+          g.key === key
+            ? {
+                ...g,
+                status,
+                completedAt: nextCompletedAt,
+                notApplicable: false,
+              }
+            : g,
         ),
       })),
     }));

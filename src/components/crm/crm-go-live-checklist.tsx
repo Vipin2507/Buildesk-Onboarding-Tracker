@@ -8,7 +8,7 @@ import {
   ticketSelectClass,
 } from "@/components/design-ticket/design-ticket-shared";
 import { DatePickerField } from "@/components/date-picker-field";
-import { ConfirmDeleteDialog } from "@/components/entity-form-modal";
+import { ConfirmDeleteDialog, EntityFormModal } from "@/components/entity-form-modal";
 import { ProgressBar } from "@/components/progress-bar";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import {
   crmGoLiveReady,
   isCrmGoLiveItemComplete,
 } from "@/data/crm-onboarding-defaults";
-import { cn, formatDate } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import {
   crmAssigneeSelectPatch,
   crmAssigneeSelectValue,
@@ -30,6 +30,10 @@ import type { CrmGoLiveChecklistItem } from "@/types/crm-onboarding";
 
 const fieldClass = cn(ticketFieldClass, "h-8 text-xs");
 const selectClass = cn(ticketSelectClass, "h-8 text-xs");
+
+function todayYmd() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 type Props = {
   companyId: string;
@@ -57,6 +61,11 @@ export function CrmGoLiveChecklist({ companyId, accountName, isLive, who }: Prop
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [confirmApprove, setConfirmApprove] = useState(false);
   const [confirmForce, setConfirmForce] = useState(false);
+  const [completeDialog, setCompleteDialog] = useState<{
+    key: string;
+    label: string;
+  } | null>(null);
+  const [completeDate, setCompleteDate] = useState(todayYmd);
 
   const salesManager = useMemo(
     () => resolveCrmSalesManagerDefaults(account, users),
@@ -91,6 +100,39 @@ export function CrmGoLiveChecklist({ companyId, accountName, isLive, who }: Prop
       .filter((c) => map.has(c))
       .map((c) => ({ category: c, items: map.get(c)! }));
   }, [items, categoryFilter]);
+
+  function openCompleteDialog(item: CrmGoLiveChecklistItem) {
+    setCompleteDialog({ key: item.key, label: item.label });
+    setCompleteDate((item.completedAt ?? todayYmd()).slice(0, 10));
+  }
+
+  function handleDoneToggle(item: CrmGoLiveChecklistItem, checked: boolean) {
+    if (!checked) {
+      setGoLiveItem(companyId, item.key, "pending");
+      return;
+    }
+    openCompleteDialog(item);
+  }
+
+  function confirmCompleteDate() {
+    if (!completeDialog) return;
+    const date = completeDate.trim().slice(0, 10);
+    if (!date) {
+      toast.error("Select a completed date");
+      return;
+    }
+    setGoLiveItem(companyId, completeDialog.key, "completed", date);
+    setCompleteDialog(null);
+  }
+
+  function setCompletedDate(item: CrmGoLiveChecklistItem, value: string) {
+    const date = value.trim().slice(0, 10);
+    if (!date) {
+      setGoLiveItem(companyId, item.key, "pending");
+      return;
+    }
+    setGoLiveItem(companyId, item.key, "completed", date);
+  }
 
   function approveGoLive() {
     if (!crmGoLiveReady(useCrmOnboardingStore.getState().getByCompanyId(companyId)!)) {
@@ -175,6 +217,7 @@ export function CrmGoLiveChecklist({ companyId, accountName, isLive, who }: Prop
       >
         <p className="mb-2 text-[10px] text-muted-foreground">
           Confirm readiness, verification, sign-off, and handover before (or while) going live.
+          Turning Done on asks for a completed date.
         </p>
         <ProgressBar value={pct} className="mb-3 h-1.5" />
 
@@ -244,11 +287,16 @@ export function CrmGoLiveChecklist({ companyId, accountName, isLive, who }: Prop
                           size="sm"
                           disabled={na}
                           checked={!na && item.status === "completed"}
-                          onCheckedChange={(v) =>
-                            setGoLiveItem(companyId, item.key, v ? "completed" : "pending")
-                          }
+                          onCheckedChange={(v) => handleDoneToggle(item, v)}
                         />
                       </div>
+                      <DatePickerField
+                        compact
+                        disabled={na}
+                        placeholder="Completed date"
+                        value={item.completedAt ?? ""}
+                        onChange={(v) => setCompletedDate(item, v)}
+                      />
                       <div className="flex gap-1.5">
                         <Button
                           type="button"
@@ -306,7 +354,7 @@ export function CrmGoLiveChecklist({ companyId, accountName, isLive, who }: Prop
               </div>
 
               <div className="hidden overflow-x-auto rounded-lg border md:block">
-                <table className="w-full min-w-[860px] text-xs">
+                <table className="w-full min-w-[920px] text-xs">
                   <thead className="bg-muted/60 text-[10px] uppercase tracking-wide text-muted-foreground">
                     <tr>
                       <th className="px-3 py-1.5 text-left">Item</th>
@@ -336,9 +384,7 @@ export function CrmGoLiveChecklist({ companyId, accountName, isLive, who }: Prop
                               size="sm"
                               disabled={na}
                               checked={!na && item.status === "completed"}
-                              onCheckedChange={(v) =>
-                                setGoLiveItem(companyId, item.key, v ? "completed" : "pending")
-                              }
+                              onCheckedChange={(v) => handleDoneToggle(item, v)}
                             />
                           </td>
                           <td className="px-2 py-2 text-center">
@@ -356,8 +402,15 @@ export function CrmGoLiveChecklist({ companyId, accountName, isLive, who }: Prop
                               N/A
                             </button>
                           </td>
-                          <td className="px-2 py-2 text-muted-foreground">
-                            {item.completedAt ? formatDate(item.completedAt) : "—"}
+                          <td className="px-2 py-2">
+                            <DatePickerField
+                              compact
+                              className="w-40"
+                              disabled={na}
+                              placeholder="Completed date"
+                              value={item.completedAt ?? ""}
+                              onChange={(v) => setCompletedDate(item, v)}
+                            />
                           </td>
                           <td className="px-2 py-2">
                             <select
@@ -413,6 +466,28 @@ export function CrmGoLiveChecklist({ companyId, accountName, isLive, who }: Prop
           ))}
         </div>
       </DesignTicketSection>
+
+      <EntityFormModal
+        open={!!completeDialog}
+        onOpenChange={(open) => {
+          if (!open) setCompleteDialog(null);
+        }}
+        title={completeDialog ? `Complete “${completeDialog.label}”` : "Complete item"}
+        submitLabel="Mark complete"
+        onSubmit={confirmCompleteDate}
+      >
+        {completeDialog ? (
+          <label className="block text-xs font-medium">
+            Completed date
+            <DatePickerField
+              modal
+              className="mt-1"
+              value={completeDate}
+              onChange={setCompleteDate}
+            />
+          </label>
+        ) : null}
+      </EntityFormModal>
 
       <ConfirmDeleteDialog
         open={confirmApprove}

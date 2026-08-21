@@ -12,6 +12,10 @@ function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.includes(pathname) || pathname.startsWith("/portal/");
 }
 
+function isGoogleOAuthCallbackPath(pathname: string) {
+  return pathname.startsWith("/auth/google/");
+}
+
 function RedirectingScreen({ message }: { message: string }) {
   return <AppLoadingScreen message={message} />;
 }
@@ -25,6 +29,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const setHydrated = useAuthStore((s) => s.setHydrated);
   const isPublic = isPublicPath(pathname);
   const isCrmPath = pathname === "/crm" || pathname.startsWith("/crm/");
+  const isGoogleOAuthCallback = isGoogleOAuthCallbackPath(pathname);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,13 +60,16 @@ export function AuthGate({ children }: { children: ReactNode }) {
     }
     if (!user) return;
 
+    // Let the OAuth callback finish before product-scope redirects.
+    if (isGoogleOAuthCallback) return;
+
     const crmUser = isCrmUser(user);
     if (crmUser && !isCrmPath) {
       void navigate({ to: "/crm", replace: true });
     } else if (!crmUser && isCrmPath) {
       void navigate({ to: "/", replace: true });
     }
-  }, [user, hydrated, isPublic, isCrmPath, navigate]);
+  }, [user, hydrated, isPublic, isCrmPath, isGoogleOAuthCallback, navigate]);
 
   if (!hydrated) {
     return <RedirectingScreen message="Loading session…" />;
@@ -76,6 +84,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }
 
   if (user) {
+    if (isGoogleOAuthCallback) {
+      return <>{children}</>;
+    }
     const crmUser = isCrmUser(user);
     if (crmUser && !isCrmPath) {
       return <RedirectingScreen message="Opening CRM…" />;
