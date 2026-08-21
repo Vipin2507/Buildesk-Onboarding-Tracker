@@ -36,6 +36,11 @@ import {
   getGoogleCalendarConnectionStatus,
 } from "@/lib/api";
 import { isAdminRoleKey } from "@/lib/permissions";
+import {
+  crmBookingsSearchSchema,
+  parseCrmBookingsTab,
+  type CrmBookingsTabId,
+} from "@/lib/crm-route-search";
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/stores/useAuthStore";
 import { useBookingStore } from "@/stores/useBookingStore";
@@ -67,7 +72,7 @@ const SETTINGS_TABS = [
 
 const TABS = [...BOOKING_TABS, ...SETTINGS_TABS] as const;
 
-type TabId = (typeof TABS)[number]["id"];
+type TabId = CrmBookingsTabId;
 
 const WEEKDAYS = [
   { id: 1, label: "Mon" },
@@ -82,14 +87,7 @@ const WEEKDAYS = [
 const CLOSED_STATUSES: BookingAppointmentStatus[] = ["declined", "cancelled"];
 
 export const Route = createFileRoute("/crm/bookings")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    tab: TABS.some((t) => t.id === search.tab) ? (search.tab as TabId) : ("pending" as TabId),
-    google:
-      search.google === "connected" || search.google === "error"
-        ? (search.google as "connected" | "error")
-        : undefined,
-    googleError: typeof search.googleError === "string" ? search.googleError : undefined,
-  }),
+  validateSearch: (search) => crmBookingsSearchSchema.parse(search),
   component: CrmBookingsPage,
 });
 
@@ -120,7 +118,7 @@ function CrmBookingsPage() {
   const isAdmin = isAdminRoleKey(user?.role);
   const navigate = useNavigate({ from: "/crm/bookings" });
   const search = Route.useSearch();
-  const tab = search.tab;
+  const tab = parseCrmBookingsTab(search.tab);
 
   const refreshStaff = useBookingStore((s) => s.refreshStaff);
   const appointments = useBookingStore((s) => s.appointments);

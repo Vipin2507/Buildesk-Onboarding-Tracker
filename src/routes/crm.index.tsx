@@ -50,18 +50,21 @@ import {
   type CrmDashboardDrillDownFilter,
 } from "@/stores/crm-dashboard-selectors";
 import { useCrmAccountStore, useCrmOnboardingStore } from "@/stores";
+import {
+  crmDashboardSearchSchema,
+  parseCrmDashboardTab,
+  type CrmDashboardTab,
+} from "@/lib/crm-route-search";
 
 export const Route = createFileRoute("/crm/")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    tab: search.tab === "activity" ? ("activity" as const) : ("overview" as const),
-  }),
+  validateSearch: (search) => crmDashboardSearchSchema.parse(search),
   component: CrmDashboardPage,
 });
 
 const DASHBOARD_TABS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "activity", label: "Activity history", icon: History },
-] as const;
+] as const satisfies { id: CrmDashboardTab; label: string; icon: typeof LayoutDashboard }[];
 
 type DashboardTabId = (typeof DASHBOARD_TABS)[number]["id"];
 
@@ -69,7 +72,8 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 
 function CrmDashboardPage() {
   const navigate = useNavigate();
-  const { tab } = Route.useSearch();
+  const { tab: tabParam } = Route.useSearch();
+  const tab = parseCrmDashboardTab(tabParam);
   const accounts = useCrmAccountStore((s) => s.accounts);
   const ensure = useCrmOnboardingStore((s) => s.ensureForCompany);
   const overview = useCrmDashboardOverview();
@@ -232,7 +236,7 @@ function CrmDashboardPage() {
   function setDashboardTab(next: DashboardTabId) {
     void navigate({
       to: "/crm",
-      search: { tab: next === "overview" ? undefined : next },
+      search: next === "overview" ? {} : { tab: next },
       replace: true,
     });
   }

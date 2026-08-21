@@ -8,18 +8,18 @@ export type CrmSalesManagerDefaults = {
   name?: string;
 };
 
-/** Resolve the account's sales manager to a CRM user id + display name. */
+/** Resolve the account's support manager 1 to a CRM user id + display name. */
 export function resolveCrmSalesManagerDefaults(
-  account: Pick<CrmAccount, "salesManagerName"> | null | undefined,
+  account: Pick<CrmAccount, "supportManager1"> | null | undefined,
   users: NamedUser[],
 ): CrmSalesManagerDefaults {
-  const name = account?.salesManagerName?.trim();
+  const name = account?.supportManager1?.trim();
   if (!name) return {};
   const match = users.find((u) => u.active !== false && crmSalesManagerNamesMatch(name, u.name));
   return { userId: match?.id, name: match?.name ?? name };
 }
 
-/** Select value: stored assignee, else sales manager. */
+/** Select value: stored assignee, else support manager 1. */
 export function crmAssigneeSelectValue(
   stored: string | undefined,
   salesManagerUserId?: string,
@@ -28,7 +28,7 @@ export function crmAssigneeSelectValue(
 }
 
 /**
- * Persist only when the user picks someone other than the default sales manager.
+ * Persist only when the user picks someone other than the default support manager 1.
  * Keeping the default virtual means a later manager change still flows through.
  */
 export function crmAssigneeSelectPatch(
@@ -40,12 +40,12 @@ export function crmAssigneeSelectPatch(
   return value;
 }
 
-/** Input value: stored trainer, else sales manager name. */
+/** Input value: stored trainer, else support manager 1 name. */
 export function crmTrainerInputValue(stored: string | undefined, salesManagerName?: string) {
   return stored?.trim() ? stored : (salesManagerName ?? "");
 }
 
-/** Persist blank when it still matches the default sales manager name. */
+/** Persist blank when it still matches the default support manager 1 name. */
 export function crmTrainerInputPatch(value: string, salesManagerName?: string) {
   const trimmed = value.trim();
   if (!trimmed) return "";
@@ -53,7 +53,7 @@ export function crmTrainerInputPatch(value: string, salesManagerName?: string) {
   return value;
 }
 
-/** Ensure the sales manager appears in assignee dropdowns. */
+/** Ensure support manager 1 appears in assignee dropdowns. */
 export function withCrmSalesManagerOption<T extends NamedUser>(
   users: T[],
   salesManager: CrmSalesManagerDefaults,
@@ -64,7 +64,7 @@ export function withCrmSalesManagerOption<T extends NamedUser>(
   const fromAll = allUsers.find((u) => u.id === salesManager.userId);
   if (fromAll) return [fromAll as T, ...users];
   return [
-    { id: salesManager.userId, name: salesManager.name ?? "Sales manager", active: true } as T,
+    { id: salesManager.userId, name: salesManager.name ?? "Support manager 1", active: true } as T,
     ...users,
   ];
 }
