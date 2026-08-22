@@ -873,10 +873,7 @@ function CrmAccountsPage() {
                     key: "subscribedModules",
                     header: "Modules",
                     render: (r) => (
-                      <CrmAccountModulesCell
-                        subscribed={r.subscribedModules}
-                        notSubscribed={r.notSubscribedModules}
-                      />
+                      <CrmAccountModulesCell subscribed={r.subscribedModules} />
                     ),
                   },
                   {

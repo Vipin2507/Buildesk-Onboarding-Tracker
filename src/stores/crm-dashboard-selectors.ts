@@ -93,8 +93,6 @@ export type CrmAccountRow = CrmAccount & {
   providers: string[];
   /** CRM product modules opted in for this account. */
   subscribedModules: { key: string; label: string }[];
-  /** CRM product modules not opted in. */
-  notSubscribedModules: { key: string; label: string }[];
   overdue: boolean;
 };
 
@@ -190,9 +188,6 @@ export function useCrmDashboardOverview() {
         ),
         subscribedModules: record.productModules
           .filter((m) => m.enabled)
-          .map((m) => ({ key: m.key, label: m.label })),
-        notSubscribedModules: record.productModules
-          .filter((m) => !m.enabled)
           .map((m) => ({ key: m.key, label: m.label })),
         overdue,
       };
