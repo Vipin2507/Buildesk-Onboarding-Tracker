@@ -10,9 +10,6 @@ import {
   CRM_ACTIVITY_STATUS_LABEL,
   crmActivityExecutiveDisplay,
   filterCrmActivityItems,
-  listCrmActivityExecutiveNames,
-  listCrmActivityLeadContactNames,
-  type CrmActivityAccountMeta,
   type CrmActivityCategory,
   type CrmActivityDateRange,
   type CrmActivityItem,
@@ -29,81 +26,58 @@ const KIND_TONE: Record<ActivityKind, "success" | "warning" | "danger" | "muted"
 
 type Props = {
   items: CrmActivityItem[];
-  accounts: CrmActivityAccountMeta[];
 };
 
-export function CrmDashboardActivityPanel({ items, accounts }: Props) {
+export function CrmDashboardActivityPanel({ items }: Props) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<CrmActivityCategory>("all");
   const [kind, setKind] = useState<ActivityKind | "all">("all");
-  const [accountId, setAccountId] = useState("all");
-  const [executiveFilter, setExecutiveFilter] = useState("all");
-  const [leadContactFilter, setLeadContactFilter] = useState("all");
+  const [accountSearch, setAccountSearch] = useState("");
+  const [userSearch, setUserSearch] = useState("");
+  const [accountExecutiveSearch, setAccountExecutiveSearch] = useState("");
+  const [leadContactSearch, setLeadContactSearch] = useState("");
   const [dateRange, setDateRange] = useState<CrmActivityDateRange>("30d");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
   const categoryCounts = useMemo(() => countCrmActivityByCategory(items), [items]);
 
-  const executiveOptions = useMemo(
-    () => [
-      { value: "all", label: "All executives" },
-      ...listCrmActivityExecutiveNames(items).map((name) => ({ value: name, label: name })),
-    ],
-    [items],
-  );
-
-  const leadContactOptions = useMemo(
-    () => [
-      { value: "all", label: "All leads / contacts" },
-      ...listCrmActivityLeadContactNames(items).map((name) => ({ value: name, label: name })),
-    ],
-    [items],
-  );
-
-  const accountOptions = useMemo(
-    () => [
-      { value: "all", label: "All accounts" },
-      ...[...accounts]
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map((a) => ({ value: a.id, label: a.name })),
-    ],
-    [accounts],
-  );
-
   const filtered = useMemo(
     () =>
       filterCrmActivityItems(items, {
         category,
-        accountId,
         kind,
         query,
         dateRange: dateFrom || dateTo ? "all" : dateRange,
-        executiveFilter,
-        leadContactFilter,
+        accountQuery: accountSearch,
+        userQuery: userSearch,
+        accountExecutiveQuery: accountExecutiveSearch,
+        leadContactQuery: leadContactSearch,
         dateFrom,
         dateTo,
       }),
     [
       items,
       category,
-      accountId,
       kind,
       query,
       dateRange,
       dateFrom,
       dateTo,
-      executiveFilter,
-      leadContactFilter,
+      accountSearch,
+      userSearch,
+      accountExecutiveSearch,
+      leadContactSearch,
     ],
   );
 
   const activeFilterCount = [
     category !== "all",
     kind !== "all",
-    accountId !== "all",
-    executiveFilter !== "all",
-    leadContactFilter !== "all",
+    Boolean(accountSearch.trim()),
+    Boolean(userSearch.trim()),
+    Boolean(accountExecutiveSearch.trim()),
+    Boolean(leadContactSearch.trim()),
     dateRange !== "30d",
     Boolean(dateFrom),
     Boolean(dateTo),
@@ -136,9 +110,10 @@ export function CrmDashboardActivityPanel({ items, accounts }: Props) {
     setQuery("");
     setCategory("all");
     setKind("all");
-    setAccountId("all");
-    setExecutiveFilter("all");
-    setLeadContactFilter("all");
+    setAccountSearch("");
+    setUserSearch("");
+    setAccountExecutiveSearch("");
+    setLeadContactSearch("");
     setDateRange("30d");
     setDateFrom("");
     setDateTo("");
@@ -149,7 +124,7 @@ export function CrmDashboardActivityPanel({ items, accounts }: Props) {
       <ListToolbar
         search={query}
         onSearchChange={setQuery}
-        searchPlaceholder="Search activity, account, executive, lead, or remarks…"
+        searchPlaceholder="Search remarks, activity details, or notes…"
         chips={categoryChips}
         activeChip={category}
         onChipChange={(id) => setCategory(id as CrmActivityCategory)}
@@ -161,6 +136,36 @@ export function CrmDashboardActivityPanel({ items, accounts }: Props) {
           onFromChange: setDateFrom,
           onToChange: setDateTo,
         }}
+        textFilters={[
+          {
+            id: "account",
+            label: "Account",
+            value: accountSearch,
+            placeholder: "Search account name…",
+            onChange: setAccountSearch,
+          },
+          {
+            id: "user",
+            label: "User",
+            value: userSearch,
+            placeholder: "Who performed the activity…",
+            onChange: setUserSearch,
+          },
+          {
+            id: "executive",
+            label: "Executive",
+            value: accountExecutiveSearch,
+            placeholder: "Account executive / manager…",
+            onChange: setAccountExecutiveSearch,
+          },
+          {
+            id: "lead",
+            label: "Lead / contact",
+            value: leadContactSearch,
+            placeholder: "Search lead or contact name…",
+            onChange: setLeadContactSearch,
+          },
+        ]}
         selects={[
           {
             id: "type",
@@ -187,27 +192,6 @@ export function CrmDashboardActivityPanel({ items, accounts }: Props) {
               })),
             ],
             onChange: (v) => setKind(v as ActivityKind | "all"),
-          },
-          {
-            id: "executive",
-            label: "User / executive",
-            value: executiveFilter,
-            options: executiveOptions,
-            onChange: setExecutiveFilter,
-          },
-          {
-            id: "lead",
-            label: "Lead / contact",
-            value: leadContactFilter,
-            options: leadContactOptions,
-            onChange: setLeadContactFilter,
-          },
-          {
-            id: "account",
-            label: "Account",
-            value: accountId,
-            options: accountOptions,
-            onChange: setAccountId,
           },
           {
             id: "range",
@@ -240,8 +224,7 @@ export function CrmDashboardActivityPanel({ items, accounts }: Props) {
           <div className="card-soft flex flex-col items-center gap-2 py-12 text-center">
             <p className="text-sm font-medium">No activity matches your filters</p>
             <p className="max-w-sm text-xs text-muted-foreground">
-              Adjust date, activity type, status, executive, or lead/contact filters to see CRM
-              activity history.
+              Adjust account, user, executive, lead/contact, date, or activity type filters.
             </p>
           </div>
         }
@@ -261,10 +244,20 @@ export function CrmDashboardActivityPanel({ items, accounts }: Props) {
           },
           {
             key: "executive",
-            header: "Executive",
+            header: "User",
             sortable: true,
             render: (row) => (
               <span className="text-xs">{crmActivityExecutiveDisplay(row)}</span>
+            ),
+          },
+          {
+            key: "teamExecutive",
+            header: "Executive",
+            sortable: true,
+            render: (row) => (
+              <span className="text-xs text-muted-foreground">
+                {row.teamExecutive?.trim() || "—"}
+              </span>
             ),
           },
           {
@@ -298,9 +291,6 @@ export function CrmDashboardActivityPanel({ items, accounts }: Props) {
             render: (row) => (
               <div className="max-w-[240px]">
                 <div className="line-clamp-2 text-xs font-medium">{row.remarks ?? row.what}</div>
-                {row.accountName ? (
-                  <div className="mt-0.5 text-[10px] text-muted-foreground">{row.accountName}</div>
-                ) : null}
               </div>
             ),
           },

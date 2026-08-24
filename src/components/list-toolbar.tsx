@@ -33,6 +33,14 @@ export type FilterSelect = {
   onChange: (value: string) => void;
 };
 
+export type FilterTextField = {
+  id: string;
+  label: string;
+  value: string;
+  placeholder?: string;
+  onChange: (value: string) => void;
+};
+
 export type SortOption = {
   value: string;
   label: string;
@@ -54,6 +62,7 @@ type ListToolbarProps = {
   activeChip?: string;
   onChipChange?: (id: string) => void;
   selects?: FilterSelect[];
+  textFilters?: FilterTextField[];
   dateRange?: DateRangeFilter;
   sortOptions?: SortOption[];
   sortBy?: string;
@@ -124,6 +133,7 @@ export function ListToolbar({
   activeChip,
   onChipChange,
   selects,
+  textFilters,
   dateRange,
   sortOptions,
   sortBy,
@@ -141,9 +151,10 @@ export function ListToolbar({
   const searchId = useId();
   const [filtersOpen, setFiltersOpen] = useState(defaultFiltersOpen);
   const hasSelects = Boolean(selects?.length);
+  const hasTextFilters = Boolean(textFilters?.length);
   const hasDateRange = Boolean(dateRange);
   const hasChips = Boolean(chips?.length);
-  const hasFilterPanel = hasSelects || hasDateRange || hasChips;
+  const hasFilterPanel = hasSelects || hasTextFilters || hasDateRange || hasChips;
   const hasSortSelect = Boolean(sortOptions?.length);
   const hasSort = hasSortSelect || Boolean(onSortDirChange);
 
@@ -319,7 +330,7 @@ export function ListToolbar({
                 </div>
               )}
 
-              {(hasSelects || hasDateRange) && filtersOpen ? (
+              {(hasSelects || hasTextFilters || hasDateRange) && filtersOpen ? (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   {hasDateRange && (
                     <>
@@ -349,6 +360,18 @@ export function ListToolbar({
                       </div>
                     </>
                   )}
+                  {textFilters?.map((field) => (
+                    <div key={field.id} className="min-w-0">
+                      <FieldLabel htmlFor={`${searchId}-${field.id}`}>{field.label}</FieldLabel>
+                      <Input
+                        id={`${searchId}-${field.id}`}
+                        value={field.value}
+                        onChange={(e) => field.onChange(e.target.value)}
+                        placeholder={field.placeholder}
+                        className={cn(fieldControl, "h-10")}
+                      />
+                    </div>
+                  ))}
                   {selects?.map((select) => (
                     <div key={select.id} className="min-w-0">
                       <FieldLabel htmlFor={`${searchId}-${select.id}`}>{select.label}</FieldLabel>

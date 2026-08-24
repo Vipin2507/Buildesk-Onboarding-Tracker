@@ -229,19 +229,6 @@ function CrmDashboardPage() {
       ? moduleAdoption
       : [{ key: "none", name: "No modules", fullName: "None enabled", opted: 0 }];
 
-  const activityAccounts = useMemo(
-    () =>
-      rows.map((r) => ({
-        id: r.id,
-        name: r.name,
-        accountManagerName: r.accountManagerName,
-        salesManagerName: r.salesManagerName,
-        supportManager1: r.supportManager1,
-        supportManager2: r.supportManager2,
-      })),
-    [rows],
-  );
-
   function setDashboardTab(next: DashboardTabId) {
     void navigate({
       to: "/crm",
@@ -280,7 +267,7 @@ function CrmDashboardPage() {
       />
 
       {tab === "activity" ? (
-        <CrmDashboardActivityPanel items={allActivity} accounts={activityAccounts} />
+        <CrmDashboardActivityPanel items={allActivity} />
       ) : (
       <div className="space-y-2.5">
         <CrmDashboardPendingSummary

@@ -560,7 +560,15 @@ export function filterCrmActivityItems(
     supportManager1Filter?: string;
     supportManager2Filter?: string;
     executiveFilter?: string;
+    /** Staff user who performed the activity (partial match). */
+    userQuery?: string;
+    /** Account executive / account manager on the CRM account (partial match). */
+    accountExecutiveQuery?: string;
+    /** Account name partial match (when accountId is not set). */
+    accountQuery?: string;
     leadContactFilter?: string;
+    /** Lead / contact partial match (when leadContactFilter is not set). */
+    leadContactQuery?: string;
     dateFrom?: string;
     dateTo?: string;
   },
@@ -573,7 +581,11 @@ export function filterCrmActivityItems(
   const supportManager1Filter = filters.supportManager1Filter ?? "all";
   const supportManager2Filter = filters.supportManager2Filter ?? "all";
   const executiveFilter = filters.executiveFilter ?? "all";
+  const userQuery = filters.userQuery?.trim().toLowerCase();
+  const accountExecutiveQuery = filters.accountExecutiveQuery?.trim().toLowerCase();
+  const accountQuery = filters.accountQuery?.trim().toLowerCase();
   const leadContactFilter = filters.leadContactFilter ?? "all";
+  const leadContactQuery = filters.leadContactQuery?.trim().toLowerCase();
   const dateFrom = filters.dateFrom?.trim();
   const dateTo = filters.dateTo?.trim();
 
@@ -590,8 +602,10 @@ export function filterCrmActivityItems(
     if (filters.category && filters.category !== "all" && item.category !== filters.category) {
       return false;
     }
-    if (filters.accountId && filters.accountId !== "all" && item.accountId !== filters.accountId) {
-      return false;
+    if (filters.accountId && filters.accountId !== "all") {
+      if (item.accountId !== filters.accountId) return false;
+    } else if (accountQuery) {
+      if (!(item.accountName ?? "").toLowerCase().includes(accountQuery)) return false;
     }
     if (filters.kind && filters.kind !== "all" && item.kind !== filters.kind) {
       return false;
@@ -605,11 +619,18 @@ export function filterCrmActivityItems(
     ) {
       return false;
     }
-    if (
-      leadContactFilter !== "all" &&
-      !crmSalesManagerNamesMatch(item.leadContact, leadContactFilter)
-    ) {
-      return false;
+    if (userQuery) {
+      const actor = (item.executive ?? item.who ?? "").toLowerCase();
+      if (!actor.includes(userQuery)) return false;
+    }
+    if (accountExecutiveQuery) {
+      const exec = (item.teamExecutive ?? "").toLowerCase();
+      if (!exec.includes(accountExecutiveQuery)) return false;
+    }
+    if (leadContactFilter !== "all") {
+      if (!crmSalesManagerNamesMatch(item.leadContact, leadContactFilter)) return false;
+    } else if (leadContactQuery) {
+      if (!(item.leadContact ?? "").toLowerCase().includes(leadContactQuery)) return false;
     }
     const itemDay = item.createdAt.slice(0, 10);
     if (dateFrom && itemDay < dateFrom) return false;
