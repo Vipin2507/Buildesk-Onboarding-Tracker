@@ -1039,6 +1039,7 @@ function TicketsTab({ companyId }: { companyId: string }) {
 function CommsTab({ companyId }: { companyId: string }) {
   const record = useCrmOnboardingStore((s) => s.getByCompanyId(companyId))!;
   const logComm = useCrmOnboardingStore((s) => s.logComm);
+  const currentUser = useAuthStore((s) => s.user);
   const [channel, setChannel] = useState<CrmCommChannel>("email");
   const [note, setNote] = useState("");
 
@@ -1085,7 +1086,7 @@ function CommsTab({ companyId }: { companyId: string }) {
                 const summary = note.trim()
                   ? `${a.label} via ${channel}: ${note.trim()}`
                   : `${a.label} via ${channel}`;
-                logComm(companyId, a.key, channel, summary, "logged");
+                logComm(companyId, a.key, channel, summary, "logged", currentUser?.name);
                 setNote("");
                 toast.success(`${a.label} logged on ${channel}`);
               }}

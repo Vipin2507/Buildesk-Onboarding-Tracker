@@ -8,6 +8,7 @@ import {
   countCrmActivityByCategory,
   CRM_ACTIVITY_CATEGORY_LABEL,
   CRM_ACTIVITY_STATUS_LABEL,
+  crmActivityExecutiveDisplay,
   filterCrmActivityItems,
   listCrmActivityExecutiveNames,
   listCrmActivityLeadContactNames,
@@ -263,7 +264,7 @@ export function CrmDashboardActivityPanel({ items, accounts }: Props) {
             header: "Executive",
             sortable: true,
             render: (row) => (
-              <span className="text-xs">{row.executive?.trim() || row.who || "—"}</span>
+              <span className="text-xs">{crmActivityExecutiveDisplay(row)}</span>
             ),
           },
           {

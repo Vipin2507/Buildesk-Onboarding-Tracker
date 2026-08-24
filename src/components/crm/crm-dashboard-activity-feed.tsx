@@ -5,6 +5,7 @@ import { ArrowRight } from "lucide-react";
 
 import { formatRelativeTime } from "@/types/common";
 import type { ActivityKind } from "@/types";
+import { crmActivityExecutiveDisplay } from "@/lib/crm-activity-feed";
 import { cn } from "@/lib/utils";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -12,17 +13,13 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 export type CrmDashboardActivityItem = {
   id: string;
   what: string;
-  who: string;
+  executive?: string;
   createdAt: string;
   kind: ActivityKind;
   href?: string;
   category?: import("@/lib/crm-activity-feed").CrmActivityCategory;
   accountId?: string;
   accountName?: string;
-  teamExecutive?: string;
-  teamSalesManager?: string;
-  teamSupportManager1?: string;
-  teamSupportManager2?: string;
 };
 
 const kindDot: Record<ActivityKind, string> = {
@@ -44,13 +41,7 @@ function ActivityRow({
   item: CrmDashboardActivityItem;
   index: number;
 }) {
-  const teamLine = [
-    item.teamExecutive ? `Exec: ${item.teamExecutive}` : null,
-    item.teamSalesManager ? `Sales: ${item.teamSalesManager}` : null,
-    item.teamSupportManager1 ? `Sup1: ${item.teamSupportManager1}` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const executive = crmActivityExecutiveDisplay({ executive: item.executive });
 
   const inner = (
     <>
@@ -61,11 +52,8 @@ function ActivityRow({
       <div className="min-w-0 flex-1">
         <div className="line-clamp-2 text-xs leading-snug">{item.what}</div>
         <div className="mt-0.5 text-[10px] text-muted-foreground">
-          {item.who} · {formatRelativeTime(item.createdAt)}
+          {executive} · {formatRelativeTime(item.createdAt)}
         </div>
-        {teamLine ? (
-          <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{teamLine}</div>
-        ) : null}
       </div>
       {item.accountId ? (
         <ArrowRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />

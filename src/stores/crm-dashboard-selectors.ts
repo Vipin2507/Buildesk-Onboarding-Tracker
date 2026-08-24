@@ -43,17 +43,13 @@ function toDashboardActivityItem(item: CrmActivityItem): CrmDashboardActivityIte
   return {
     id: item.id,
     what: item.accountName ? `${item.accountName} · ${item.what}` : item.what,
-    who: item.who,
+    executive: item.executive,
     createdAt: item.createdAt,
     kind: item.kind,
     href: item.href,
     category: item.category,
     accountId: item.accountId,
     accountName: item.accountName,
-    teamExecutive: item.teamExecutive,
-    teamSalesManager: item.teamSalesManager,
-    teamSupportManager1: item.teamSupportManager1,
-    teamSupportManager2: item.teamSupportManager2,
   };
 }
 

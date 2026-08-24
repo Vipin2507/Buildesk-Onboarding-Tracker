@@ -85,17 +85,17 @@ function leadContactForAccount(account?: CrmAccount, override?: string) {
   );
 }
 
-function resolveExecutive(
-  account: CrmAccount | undefined,
-  who: string | undefined,
-  assigneeName?: string,
-) {
-  return (
-    assigneeName?.trim() ||
-    account?.accountManagerName?.trim() ||
-    who?.trim() ||
-    undefined
-  );
+function resolveExecutive(actorName?: string): string | undefined {
+  const name = actorName?.trim();
+  return name || undefined;
+}
+
+function userName(
+  userId: string | undefined,
+  userNameById: Map<string, string>,
+): string | undefined {
+  if (!userId) return undefined;
+  return userNameById.get(userId)?.trim() || undefined;
 }
 
 function withAccountContext(
@@ -125,7 +125,7 @@ function withAccountContext(
     accountName,
     ...team,
     leadContact: leadContactForAccount(account, item.leadContact),
-    executive: item.executive ?? resolveExecutive(account, item.who),
+    executive: item.executive ?? resolveExecutive(item.who),
     remarks: item.remarks ?? item.what,
     href: crmActivityAccountHref(accountId),
   };
@@ -195,6 +195,12 @@ export const CRM_ACTIVITY_STATUS_LABEL: Record<ActivityKind, string> = {
   warning: "Needs attention",
   danger: "Failed / cancelled",
 };
+
+export function crmActivityExecutiveDisplay(
+  item: Pick<CrmActivityItem, "executive">,
+): string {
+  return item.executive?.trim() || "—";
+}
 
 export function listCrmActivityExecutiveNames(items: CrmActivityItem[]): string[] {
   const names = new Set<string>();
@@ -268,6 +274,7 @@ export function buildCrmActivityFeed(input: {
     status: string;
     updatedAt: string;
     createdAt: string;
+    hostUserId?: string;
   }[];
   tickets: Ticket[];
   followUpTasks?: FollowUpTask[];
@@ -289,6 +296,7 @@ export function buildCrmActivityFeed(input: {
           id: `crm-event-${e.id}`,
           what: formatCrmEventLabel(e, nameById.get(e.companyId) ?? "Account"),
           who: e.actorName,
+          executive: resolveExecutive(e.actorName),
           createdAt: e.createdAt,
           kind: crmEventKind(e.eventType),
           category: "account",
@@ -310,6 +318,7 @@ export function buildCrmActivityFeed(input: {
           id: `sub-event-${e.id}`,
           what: `${String(e.moduleKey).replace(/_/g, " ")} → ${e.newStatus}`,
           who: e.actorName ?? "System",
+          executive: resolveExecutive(e.actorName) ?? "System",
           createdAt: e.createdAt,
           kind: crmEventKind(e.newStatus),
           category: "module",
@@ -331,6 +340,7 @@ export function buildCrmActivityFeed(input: {
           id: `support-${t.id}`,
           what: `${t.ticketNumber}: ${t.subject}`,
           who: t.createdBy.name || accountName,
+          executive: resolveExecutive(t.createdBy.name),
           createdAt: t.updatedAt,
           kind:
             t.status === "resolved" || t.status === "closed"
@@ -351,12 +361,14 @@ export function buildCrmActivityFeed(input: {
     if (!input.accountIds.has(t.companyId)) continue;
     const account = accountById.get(t.companyId);
     const accountName = nameById.get(t.companyId) ?? "Account";
+    const owner = userName(t.assignedUserId ?? t.developerId, userNameById);
     events.push(
       withAccountContext(
         {
           id: `ticket-${t.id}`,
           what: `${t.type}: ${t.title}`,
-          who: t.status,
+          who: owner ?? "—",
+          executive: owner,
           createdAt: t.updatedAt,
           kind:
             t.status === "Closed" || t.resolutionStatus === "Resolved"
@@ -377,12 +389,14 @@ export function buildCrmActivityFeed(input: {
     if (!input.accountIds.has(b.companyId)) continue;
     const account = accountById.get(b.companyId);
     const accountName = nameById.get(b.companyId) ?? "Account";
+    const host = userName(b.hostUserId, userNameById);
     events.push(
       withAccountContext(
         {
           id: `booking-${b.id}`,
           what: `Call ${BOOKING_STATUS_LABEL[b.status as keyof typeof BOOKING_STATUS_LABEL] ?? b.status} — ${b.guestName}`,
-          who: accountName,
+          who: host ?? "—",
+          executive: host,
           createdAt: b.updatedAt || b.createdAt,
           kind:
             b.status === "confirmed"
@@ -406,14 +420,17 @@ export function buildCrmActivityFeed(input: {
   for (const task of input.followUpTasks ?? []) {
     if (!input.accountIds.has(task.companyId)) continue;
     const account = accountById.get(task.companyId);
-    const assignee = task.assigneeUserId ? userNameById.get(task.assigneeUserId) : undefined;
+    const assignee = userName(task.assigneeUserId, userNameById);
+    const creator = userName(task.createdByUserId, userNameById);
+    const actor = creator ?? assignee;
     const overdue = Boolean(task.dueDate && task.dueDate < todayYmd && task.status !== "completed");
     events.push(
       withAccountContext(
         {
           id: `followup-${task.id}`,
           what: task.title,
-          who: assignee ?? task.status,
+          who: actor ?? "—",
+          executive: actor,
           createdAt: task.updatedAt || task.createdAt,
           kind:
             task.status === "completed"
@@ -426,7 +443,6 @@ export function buildCrmActivityFeed(input: {
           category: "follow_up",
           accountId: task.companyId,
           accountName: nameById.get(task.companyId) ?? "Account",
-          executive: resolveExecutive(account, assignee, assignee),
           remarks: task.description ?? task.title,
           nextFollowUp: task.dueDate,
         },
@@ -438,13 +454,16 @@ export function buildCrmActivityFeed(input: {
   for (const visit of input.clientVisits ?? []) {
     if (!input.accountIds.has(visit.companyId)) continue;
     const account = accountById.get(visit.companyId);
-    const assignee = visit.assignedUserId ? userNameById.get(visit.assignedUserId) : undefined;
+    const assignee = userName(visit.assignedUserId, userNameById);
+    const creator = userName(visit.createdByUserId, userNameById);
+    const actor = assignee ?? creator;
     events.push(
       withAccountContext(
         {
           id: `visit-${visit.id}`,
           what: visit.purpose,
-          who: assignee ?? visit.status,
+          who: actor ?? "—",
+          executive: actor,
           createdAt: visit.updatedAt || visit.scheduledAt || visit.createdAt,
           kind:
             visit.status === "completed"
@@ -456,7 +475,6 @@ export function buildCrmActivityFeed(input: {
           accountId: visit.companyId,
           accountName: nameById.get(visit.companyId) ?? "Account",
           leadContact: visit.contactName,
-          executive: resolveExecutive(account, assignee, assignee),
           remarks: visit.remarks || visit.outcome || visit.notes || visit.purpose,
           nextFollowUp: visit.nextFollowUpDate,
         },
@@ -473,7 +491,8 @@ export function buildCrmActivityFeed(input: {
           {
             id: `comm-${c.id}`,
             what: c.summary,
-            who: c.channel ? `${c.channel}` : account.name,
+            who: c.loggedBy ?? "—",
+            executive: resolveExecutive(c.loggedBy),
             createdAt: c.createdAt,
             kind: c.status === "failed" ? "danger" : "info",
             category: "communication",
@@ -490,7 +509,8 @@ export function buildCrmActivityFeed(input: {
           {
             id: `stage-${account.id}-${record.tracker.stage}-${record.updatedAt}`,
             what: `Stage · ${CRM_STAGE_LABELS[record.tracker.stage] ?? record.tracker.stage}`,
-            who: record.tracker.lastUpdatedBy || account.accountManagerName || "Team",
+            who: record.tracker.lastUpdatedBy ?? "—",
+            executive: resolveExecutive(record.tracker.lastUpdatedBy),
             createdAt: record.updatedAt,
             kind: account.status === "live" ? "success" : "info",
             category: "tracker",

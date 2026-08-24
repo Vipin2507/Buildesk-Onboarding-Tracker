@@ -167,6 +167,7 @@ type CrmOnboardingState = {
     channel: CrmCommChannel,
     summary: string,
     status?: "sent" | "logged" | "failed",
+    loggedBy?: string,
   ) => void;
   resetTrainingForCompanyType: (companyId: string, companyType?: CompanyType) => void;
   removeRecord: (companyId: string) => void;
@@ -987,7 +988,7 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
     }
   },
 
-  logComm: (companyId, action, channel, summary, status = "logged") => {
+  logComm: (companyId, action, channel, summary, status = "logged", loggedBy) => {
     get().ensureForCompany(companyId);
     const now = nowIso();
     set((s) => ({
@@ -1000,6 +1001,7 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
             channel,
             summary,
             status,
+            loggedBy: loggedBy?.trim() || undefined,
             createdAt: now,
             updatedAt: now,
           },

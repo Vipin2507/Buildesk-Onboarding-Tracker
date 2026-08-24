@@ -200,6 +200,8 @@ export type CrmCommLogEntry = Timestamps & {
   channel: CrmCommChannel;
   summary: string;
   status: "sent" | "logged" | "failed";
+  /** Staff member who logged or sent the communication. */
+  loggedBy?: string;
 };
 
 export type CrmOnboardingRecord = Timestamps & {
