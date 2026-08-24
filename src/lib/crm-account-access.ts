@@ -23,8 +23,30 @@ export function crmSalesManagerNamesMatch(
 
 export type CrmAccountAssignmentFields = Pick<
   CrmAccount,
-  "salesManagerName" | "supportManager1" | "supportManager2"
+  "salesManagerName" | "supportManager1" | "supportManager2" | "accountManagerName"
 >;
+
+/** CRM users matching the account's sales / support / executive team. */
+export function crmAccountTeamAssigneeUsers<
+  T extends { id: string; name: string; active?: boolean },
+>(account: CrmAccountAssignmentFields, users: T[]): T[] {
+  const labels = [
+    account.salesManagerName,
+    account.supportManager1,
+    account.supportManager2,
+    account.accountManagerName,
+  ];
+  const out: T[] = [];
+  const seen = new Set<string>();
+  for (const user of users) {
+    if (user.active === false) continue;
+    if (labels.some((label) => crmSalesManagerNamesMatch(label, user.name)) && !seen.has(user.id)) {
+      out.push(user);
+      seen.add(user.id);
+    }
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
+}
 
 /** True when the user is sales manager or support manager 1/2 on the account. */
 export function isCrmAccountAssignedToUser(
@@ -45,6 +67,13 @@ export function canViewCrmAccount(
   if (!user) return false;
   if (isAdminRoleKey(user.role)) return true;
   return isCrmAccountAssignedToUser(account, user.name);
+}
+
+export function canManageCrmAccountTasks(
+  account: CrmAccountAssignmentFields,
+  user: { name: string; role?: string } | null | undefined,
+) {
+  return canViewCrmAccount(account, user);
 }
 
 export function filterCrmAccountsForUser<T extends CrmAccountAssignmentFields>(

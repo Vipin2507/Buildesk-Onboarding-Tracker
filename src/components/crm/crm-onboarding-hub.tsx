@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Check,
+  CheckSquare,
   ClipboardList,
   GraduationCap,
   LayoutDashboard,
@@ -30,6 +31,7 @@ import {
   type CrmAccountFormValues,
 } from "@/components/crm/crm-account-form";
 import { CrmAccountPortalPanel } from "@/components/crm/crm-account-portal-panel";
+import { CrmAccountTasksPanel } from "@/components/crm/crm-account-tasks-panel";
 import { CrmGoLiveChecklist } from "@/components/crm/crm-go-live-checklist";
 import { CrmMasterChecklistDetail } from "@/components/crm/crm-master-checklist-detail";
 import { CrmMigrationChecklistDetail } from "@/components/crm/crm-migration-checklist-detail";
@@ -72,6 +74,7 @@ import {
   useAuthStore,
   useCrmAccountStore,
   useCrmOnboardingStore,
+  useTaskStore,
   useTicketStore,
 } from "@/stores";
 import type {
@@ -81,6 +84,9 @@ import type {
 import type { CrmAccount } from "@/types/crm-account";
 import { nowIso } from "@/types/common";
 import type { TicketPriority, TicketStatus, TicketType } from "@/types/ticket";
+import type { FollowUpTaskStatus } from "@/types";
+
+const OPEN_TASK_STATUSES: FollowUpTaskStatus[] = ["open", "in_progress", "blocked"];
 
 const TABS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -90,6 +96,7 @@ const TABS = [
   { id: "training", label: "Training", icon: GraduationCap },
   { id: "reports", label: "Reports", icon: TrendingUp },
   { id: "golive", label: "Go-Live", icon: Rocket },
+  { id: "tasks", label: "Tasks", icon: CheckSquare },
   { id: "tickets", label: "Tickets", icon: Ticket },
   { id: "comms", label: "Comms", icon: MessageSquare },
 ] as const;
@@ -124,6 +131,7 @@ export function CrmOnboardingHub({
   const ensureForCompany = useCrmOnboardingStore((s) => s.ensureForCompany);
   const record = useCrmOnboardingStore((s) => s.getByCompanyId(accountId));
   const tickets = useTicketStore((s) => s.tickets);
+  const tasks = useTaskStore((s) => s.tasks);
   const currentUser = useAuthStore((s) => s.user);
 
   const [tab, setTab] = useState<TabId>("dashboard");
@@ -137,11 +145,15 @@ export function CrmOnboardingHub({
   const pct = calcCrmOnboardingProgress(liveRecord);
   const pending = crmPendingActivityCount(liveRecord);
   const openTickets = tickets.filter((t) => t.companyId === accountId && isTicketOpen(t)).length;
+  const openTasks = tasks.filter(
+    (t) => t.companyId === accountId && OPEN_TASK_STATUSES.includes(t.status),
+  ).length;
   const isLive = account?.status === "live";
 
   const kpis = [
     { id: "progress", label: "Completion", value: pct, icon: TrendingUp, tone: "text-primary" },
     { id: "pending", label: "Pending", value: pending, icon: ClipboardList, tone: "text-warning-foreground" },
+    { id: "tasks", label: "Open tasks", value: openTasks, icon: CheckSquare, tone: "text-primary" },
     { id: "tickets", label: "Open tickets", value: openTickets, icon: Ticket },
     {
       id: "modules",
@@ -200,17 +212,19 @@ export function CrmOnboardingHub({
             ...k,
             onClick: () => {
               if (k.id === "tickets") setTab("tickets");
+              else if (k.id === "tasks") setTab("tasks");
               else if (k.id === "modules") setTab("modules");
               else if (k.id === "pending") setTab("masters");
               else setTab("dashboard");
             },
             active:
               (k.id === "tickets" && tab === "tickets") ||
+              (k.id === "tasks" && tab === "tasks") ||
               (k.id === "modules" && tab === "modules") ||
               (k.id === "pending" && tab === "masters") ||
               (k.id === "progress" && tab === "dashboard"),
           }))}
-          columns={4}
+          columns={5}
           size="compact"
         />
       </div>
@@ -232,6 +246,7 @@ export function CrmOnboardingHub({
               pending={pending}
               openTickets={openTickets}
               isLive={isLive}
+              onOpenTasks={() => setTab("tasks")}
             />
           ) : null}
           {tab === "modules" ? <ModulesTab companyId={accountId} /> : null}
@@ -248,6 +263,7 @@ export function CrmOnboardingHub({
             />
           ) : null}
           {tab === "tickets" ? <TicketsTab companyId={accountId} /> : null}
+          {tab === "tasks" ? <CrmAccountTasksPanel accountId={accountId} /> : null}
           {tab === "comms" ? <CommsTab companyId={accountId} /> : null}
         </motion.div>
       </AnimatePresence>
@@ -279,6 +295,7 @@ function DashboardTab({
   pending,
   openTickets,
   isLive,
+  onOpenTasks,
 }: {
   accountId: string;
   accountName: string;
@@ -286,6 +303,7 @@ function DashboardTab({
   pending: number;
   openTickets: number;
   isLive: boolean;
+  onOpenTasks: () => void;
 }) {
   const account = useCrmAccountStore((s) => s.accounts.find((a) => a.id === accountId))!;
   const updateAccount = useCrmAccountStore((s) => s.updateAccount);
@@ -410,6 +428,8 @@ function DashboardTab({
           )}
         </div>
       </DesignTicketSection>
+
+      <CrmAccountTasksPanel accountId={accountId} compact onViewAll={onOpenTasks} />
 
       <EntityFormModal
         open={editing}

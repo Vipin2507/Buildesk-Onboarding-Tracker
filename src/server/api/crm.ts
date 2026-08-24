@@ -2,7 +2,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { requirePermission } from "@/server/auth/permissions";
+import { canViewCrmAccount } from "@/lib/crm-account-access";
+import { roleHasPermission } from "@/lib/permissions";
+import { requirePermission, loadServerRoles } from "@/server/auth/permissions";
 import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
@@ -18,6 +20,34 @@ import type {
 } from "@/types";
 
 /* ---------- Helpers ---------- */
+
+function assertCanManageFollowUpTask(user: ReturnType<typeof requireUser>, companyId: string) {
+  if (user.role === "Admin") return;
+
+  const roles = loadServerRoles();
+  if (roleHasPermission(roles, user.role, "manageTasks")) return;
+
+  const crmAccount = getDb()
+    .select()
+    .from(t.crmAccounts)
+    .where(eq(t.crmAccounts.id, companyId))
+    .get();
+  if (
+    crmAccount &&
+    canViewCrmAccount(
+      {
+        salesManagerName: crmAccount.salesManagerName ?? undefined,
+        supportManager1: crmAccount.supportManager1 ?? undefined,
+        supportManager2: crmAccount.supportManager2 ?? undefined,
+      },
+      user,
+    )
+  ) {
+    return;
+  }
+
+  throw new ApiError(403, "You do not have permission for this action");
+}
 
 function writeCrmEvent(input: {
   companyId: string;
@@ -373,7 +403,8 @@ const taskInput = z.object({
 export const createFollowUpTask = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => taskInput.parse(data))
   .handler(async ({ data }) => {
-    const user = requirePermission("manageTasks");
+    const user = requireUser();
+    assertCanManageFollowUpTask(user, data.companyId);
     const db = getDb();
     const id = data.id ?? newId();
     const now = nowIso();
@@ -436,10 +467,11 @@ export const updateFollowUpTask = createServerFn({ method: "POST" })
       .parse(data),
   )
   .handler(async ({ data }) => {
-    const user = requirePermission("manageTasks");
+    const user = requireUser();
     const db = getDb();
     const existing = db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, data.id)).get();
     if (!existing) throw new ApiError(404, "Task not found");
+    assertCanManageFollowUpTask(user, existing.companyId);
     const { remark, ...patch } = data.patch;
     const now = nowIso();
     const nextStatus = patch.status ?? existing.status;
@@ -513,10 +545,11 @@ export const cancelFollowUpTask = createServerFn({ method: "POST" })
     z.object({ id: z.string(), reason: z.string().optional() }).parse(data),
   )
   .handler(async ({ data }) => {
-    const user = requirePermission("manageTasks");
+    const user = requireUser();
     const db = getDb();
     const existing = db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, data.id)).get();
     if (!existing) throw new ApiError(404, "Task not found");
+    assertCanManageFollowUpTask(user, existing.companyId);
     db.update(t.followUpTasks)
       .set({ status: "cancelled", updatedAt: nowIso() })
       .where(eq(t.followUpTasks.id, data.id))
