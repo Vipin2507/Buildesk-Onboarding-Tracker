@@ -41,6 +41,7 @@ import { Route as SupportTicketIdRouteImport } from './routes/support.$ticketId'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects.$projectId'
 import { Route as PortalSlugRouteImport } from './routes/portal.$slug'
 import { Route as CrmTicketsRouteImport } from './routes/crm.tickets'
+import { Route as CrmTasksRouteImport } from './routes/crm.tasks'
 import { Route as CrmSupportRouteImport } from './routes/crm.support'
 import { Route as CrmSettingsRouteImport } from './routes/crm.settings'
 import { Route as CrmMasterRouteImport } from './routes/crm.master'
@@ -225,6 +226,11 @@ const CrmTicketsRoute = CrmTicketsRouteImport.update({
   path: '/tickets',
   getParentRoute: () => CrmRoute,
 } as any)
+const CrmTasksRoute = CrmTasksRouteImport.update({
+  id: '/tasks',
+  path: '/tasks',
+  getParentRoute: () => CrmRoute,
+} as any)
 const CrmSupportRoute = CrmSupportRouteImport.update({
   id: '/support',
   path: '/support',
@@ -379,6 +385,7 @@ export interface FileRoutesByFullPath {
   '/crm/master': typeof CrmMasterRoute
   '/crm/settings': typeof CrmSettingsRoute
   '/crm/support': typeof CrmSupportRouteWithChildren
+  '/crm/tasks': typeof CrmTasksRoute
   '/crm/tickets': typeof CrmTicketsRouteWithChildren
   '/portal/$slug': typeof PortalSlugRouteWithChildren
   '/projects/$projectId': typeof ProjectsProjectIdRoute
@@ -435,6 +442,7 @@ export interface FileRoutesByTo {
   '/crm/master': typeof CrmMasterRoute
   '/crm/settings': typeof CrmSettingsRoute
   '/crm/support': typeof CrmSupportRouteWithChildren
+  '/crm/tasks': typeof CrmTasksRoute
   '/crm/tickets': typeof CrmTicketsRouteWithChildren
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/support/$ticketId': typeof SupportTicketIdRoute
@@ -492,6 +500,7 @@ export interface FileRoutesById {
   '/crm/master': typeof CrmMasterRoute
   '/crm/settings': typeof CrmSettingsRoute
   '/crm/support': typeof CrmSupportRouteWithChildren
+  '/crm/tasks': typeof CrmTasksRoute
   '/crm/tickets': typeof CrmTicketsRouteWithChildren
   '/portal/$slug': typeof PortalSlugRouteWithChildren
   '/projects/$projectId': typeof ProjectsProjectIdRoute
@@ -551,6 +560,7 @@ export interface FileRouteTypes {
     | '/crm/master'
     | '/crm/settings'
     | '/crm/support'
+    | '/crm/tasks'
     | '/crm/tickets'
     | '/portal/$slug'
     | '/projects/$projectId'
@@ -607,6 +617,7 @@ export interface FileRouteTypes {
     | '/crm/master'
     | '/crm/settings'
     | '/crm/support'
+    | '/crm/tasks'
     | '/crm/tickets'
     | '/projects/$projectId'
     | '/support/$ticketId'
@@ -663,6 +674,7 @@ export interface FileRouteTypes {
     | '/crm/master'
     | '/crm/settings'
     | '/crm/support'
+    | '/crm/tasks'
     | '/crm/tickets'
     | '/portal/$slug'
     | '/projects/$projectId'
@@ -943,6 +955,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CrmTicketsRouteImport
       parentRoute: typeof CrmRoute
     }
+    '/crm/tasks': {
+      id: '/crm/tasks'
+      path: '/tasks'
+      fullPath: '/crm/tasks'
+      preLoaderRoute: typeof CrmTasksRouteImport
+      parentRoute: typeof CrmRoute
+    }
     '/crm/support': {
       id: '/crm/support'
       path: '/support'
@@ -1180,6 +1199,7 @@ interface CrmRouteChildren {
   CrmMasterRoute: typeof CrmMasterRoute
   CrmSettingsRoute: typeof CrmSettingsRoute
   CrmSupportRoute: typeof CrmSupportRouteWithChildren
+  CrmTasksRoute: typeof CrmTasksRoute
   CrmTicketsRoute: typeof CrmTicketsRouteWithChildren
   CrmIndexRoute: typeof CrmIndexRoute
 }
@@ -1192,6 +1212,7 @@ const CrmRouteChildren: CrmRouteChildren = {
   CrmMasterRoute: CrmMasterRoute,
   CrmSettingsRoute: CrmSettingsRoute,
   CrmSupportRoute: CrmSupportRouteWithChildren,
+  CrmTasksRoute: CrmTasksRoute,
   CrmTicketsRoute: CrmTicketsRouteWithChildren,
   CrmIndexRoute: CrmIndexRoute,
 }

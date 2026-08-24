@@ -492,7 +492,7 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
           >
             View on dashboard
           </Link>
-          <Link to="/tasks" className="text-[10px] font-medium text-primary hover:underline">
+          <Link to="/crm/tasks" className="text-[10px] font-medium text-primary hover:underline">
             Task calendar
           </Link>
         </div>

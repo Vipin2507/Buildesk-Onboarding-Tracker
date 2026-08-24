@@ -40,3 +40,31 @@ export function parseCrmBookingsTab(value: unknown): CrmBookingsTabId {
   }
   return "pending";
 }
+
+export const CRM_TASKS_TAB_IDS = [
+  "all",
+  "my",
+  "open",
+  "overdue",
+  "today",
+  "list",
+  "day",
+  "week",
+  "month",
+] as const;
+
+export type CrmTasksTabId = (typeof CRM_TASKS_TAB_IDS)[number];
+
+export const crmTasksSearchSchema = z.object({
+  tab: z.enum(CRM_TASKS_TAB_IDS).optional(),
+  taskId: z.string().optional(),
+});
+
+export type CrmTasksSearch = z.infer<typeof crmTasksSearchSchema>;
+
+export function parseCrmTasksTab(value: unknown): CrmTasksTabId {
+  if (typeof value === "string" && CRM_TASKS_TAB_IDS.includes(value as CrmTasksTabId)) {
+    return value as CrmTasksTabId;
+  }
+  return "all";
+}

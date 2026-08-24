@@ -26,6 +26,10 @@ type Props = {
   onViewChange: (view: TaskCalendarView) => void;
   onTaskClick?: (task: FollowUpTask) => void;
   canManage?: boolean;
+  /** Hide search/filters — parent provides them */
+  embedded?: boolean;
+  /** Hide day/week/month/list toggle — parent controls view via URL */
+  hideViewToggle?: boolean;
 };
 
 function addDays(ymd: string, days: number): string {
@@ -64,6 +68,8 @@ export function TaskCalendarPanel({
   view,
   onViewChange,
   onTaskClick,
+  embedded = false,
+  hideViewToggle = false,
 }: Props) {
   const [cursorDate, setCursorDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [typeFilter, setTypeFilter] = useState("all");
@@ -125,23 +131,26 @@ export function TaskCalendarPanel({
 
   return (
     <div className="space-y-2.5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-1 rounded-lg border p-0.5">
-          {viewTabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              className={cn(
-                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                view === tab.id ? "bg-primary text-primary-foreground" : "hover:bg-muted/50",
-              )}
-              onClick={() => onViewChange(tab.id)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-        {view !== "list" ? (
+      {!hideViewToggle ? (
+      <div className="flex items-center gap-1 rounded-lg border p-0.5">
+        {viewTabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            className={cn(
+              "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+              view === tab.id ? "bg-primary text-primary-foreground" : "hover:bg-muted/50",
+            )}
+            onClick={() => onViewChange(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      ) : null}
+
+      {view !== "list" ? (
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <div className="flex items-center gap-1">
             <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => shiftCursor(-1)}>
               <ChevronLeft className="h-3.5 w-3.5" />
@@ -168,9 +177,10 @@ export function TaskCalendarPanel({
               Today
             </Button>
           </div>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
+      {!embedded ? (
       <ListToolbar
         search={query}
         onSearchChange={setQuery}
@@ -206,6 +216,7 @@ export function TaskCalendarPanel({
           },
         ]}
       />
+      ) : null}
 
       {view === "list" ? (
         <TaskListTable
