@@ -229,7 +229,7 @@ function ensureEventTypesFromCatalog(
           title: ct.label.trim() || existing.title,
           durationMinutes: Math.max(5, ct.durationMinutes || existing.durationMinutes),
           isActive: ct.isActive !== false,
-          hostUserId: existing.hostUserId ?? hostUserId ?? null,
+          hostUserId: hostUserId ?? existing.hostUserId ?? null,
           updatedAt: now,
         })
         .where(eq(t.bookingEventTypes.id, existing.id))
@@ -274,10 +274,10 @@ function ensureDefaultEventType(companyId: string): BookingEventType {
 }
 
 function resolveEventHost(event: BookingEventType): string {
-  if (event.hostUserId) return event.hostUserId;
   const resolved = resolveBookingHostUserId(event.companyId);
-  if (!resolved) throw new ApiError(400, "No booking host configured for this account");
-  return resolved;
+  if (resolved) return resolved;
+  if (event.hostUserId) return event.hostUserId;
+  throw new ApiError(400, "No booking host configured for this account");
 }
 
 async function collectBusyRanges(hostUserId: string, fromYmd: string, toYmd: string) {

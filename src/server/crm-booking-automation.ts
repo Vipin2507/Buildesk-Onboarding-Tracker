@@ -84,6 +84,7 @@ export async function dispatchServerBookingCreatedEmail(
     accountName: opts.accountName,
     companyName: opts.accountName,
     salesManagerName: opts.hostName,
+    supportManagerName: opts.hostName,
     status: "Pending",
     guestName: opts.appointment.guestName,
     guestEmail: opts.appointment.guestEmail,
