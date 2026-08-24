@@ -5,6 +5,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** Basic email format check for forms (not full RFC validation). */
+export function isValidEmail(value: string) {
+  const v = value.trim();
+  if (!v || v.length > 254) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+}
+
 /** Display YYYY-MM-DD (or ISO) as a readable local date. */
 export function formatDate(value?: string | null) {
   if (!value) return "—";

@@ -8,6 +8,9 @@ import {
   History,
   Inbox,
   LayoutList,
+  Mail,
+  Phone,
+  User,
   Video,
   X,
   XCircle,
@@ -41,7 +44,6 @@ import {
   parseCrmBookingsTab,
   type CrmBookingsTabId,
 } from "@/lib/crm-route-search";
-import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/stores/useAuthStore";
 import { useBookingStore } from "@/stores/useBookingStore";
 import { useCrmAccountStore } from "@/stores/useCrmAccountStore";
@@ -630,9 +632,16 @@ function CrmBookingsPage() {
                         header: "Guest",
                         sortable: true,
                         render: (a) => (
-                          <div>
+                          <div className="min-w-[8rem]">
                             <div className="font-medium">{a.guestName}</div>
-                            <div className="text-[10px] text-muted-foreground">{a.guestEmail}</div>
+                            <a
+                              href={`mailto:${a.guestEmail}`}
+                              className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Mail className="h-3 w-3" />
+                              {a.guestEmail}
+                            </a>
                           </div>
                         ),
                       },
@@ -701,177 +710,87 @@ function CrmBookingsPage() {
 
                   {filtered.map((appt) =>
                     expandedId === appt.id ? (
-                      <div key={`${appt.id}-detail`} className="card-soft space-y-2 p-3">
-                        <div className="grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
-                          <Detail label="Guest">{appt.guestName}</Detail>
-                          <Detail label="Email">{appt.guestEmail}</Detail>
-                          <Detail label="Phone">{appt.guestPhone || "—"}</Detail>
-                          <Detail label="Executive">{hostName(appt.hostUserId)}</Detail>
-                          <Detail label="Account">{accountName(appt.companyId)}</Detail>
-                          <Detail label="Call type">{eventTitle(appt.eventTypeId)}</Detail>
-                          <Detail label="Scheduled">
-                            {formatWhen(appt.startsAt, appt.endsAt)} (
-                            {slotDurationMinutes(appt.startsAt, appt.endsAt)})
-                          </Detail>
-                          <Detail label="Status">
-                            {BOOKING_STATUS_LABEL[appt.status]}
-                          </Detail>
-                        </div>
-                        {appt.meetUrl ? (
-                          <div className="flex flex-wrap items-center gap-2 rounded-md border border-primary/20 bg-primary/5 px-2.5 py-2 text-xs">
-                            <Video className="h-3.5 w-3.5 text-primary" />
-                            <span className="font-medium">Google Meet</span>
-                            <a
-                              href={appt.meetUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="truncate text-primary hover:underline"
-                            >
-                              {appt.meetUrl}
-                            </a>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="h-7 text-[10px]"
-                              onClick={() => {
-                                void navigator.clipboard.writeText(appt.meetUrl!);
-                                toast.success("Meet link copied");
-                              }}
-                            >
-                              Copy
-                            </Button>
-                          </div>
-                        ) : null}
-                        {appt.googleSyncStatus === "error" && appt.googleSyncError ? (
-                          <div className="space-y-2">
-                            <p className="text-[10px] text-destructive">
-                              Google Calendar: {appt.googleSyncError}
-                            </p>
-                            {(appt.status === "confirmed" || appt.status === "postponed") &&
-                            !appt.meetUrl ? (
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-[10px]"
-                                onClick={() => {
-                                  void retryGoogleCalendarSync(appt.id)
-                                    .then((updated) => {
-                                      if (updated.meetUrl) {
-                                        toast.success("Calendar event & Meet link created");
-                                      } else if (updated.googleSyncError) {
-                                        toast.error(updated.googleSyncError);
-                                      } else {
-                                        toast.message(
-                                          "Sync attempted — connect Google Calendar under the Calendar tab if needed",
-                                        );
-                                      }
-                                    })
-                                    .catch((err) =>
-                                      toast.error(
-                                        err instanceof Error ? err.message : "Calendar sync failed",
-                                      ),
-                                    );
-                                }}
-                              >
-                                Retry calendar sync
-                              </Button>
-                            ) : null}
-                          </div>
-                        ) : (appt.status === "confirmed" || appt.status === "postponed") &&
-                          !appt.meetUrl ? (
-                          <div className="space-y-2">
-                            <p className="text-[10px] text-muted-foreground">
-                              No Google Calendar event yet. Connect under the Calendar tab, then
-                              retry sync.
-                            </p>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="h-7 text-[10px]"
-                              onClick={() => {
-                                void retryGoogleCalendarSync(appt.id)
-                                  .then((updated) => {
-                                    if (updated.meetUrl) {
-                                      toast.success("Calendar event & Meet link created");
-                                    } else if (updated.googleSyncError) {
-                                      toast.error(updated.googleSyncError);
-                                    } else {
-                                      toast.message(
-                                        "Sync attempted — connect Google Calendar under the Calendar tab if needed",
-                                      );
-                                    }
-                                  })
-                                  .catch((err) =>
-                                    toast.error(
-                                      err instanceof Error ? err.message : "Calendar sync failed",
-                                    ),
-                                  );
-                              }}
-                            >
-                              Retry calendar sync
-                            </Button>
-                          </div>
-                        ) : null}
-                        {appt.notes ? (
-                          <p className="rounded-md bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground">
-                            {appt.notes}
-                          </p>
-                        ) : null}
-                        {appt.status === "pending" ? (
-                          <Input
-                            placeholder="Optional note to guest (included in status email)"
-                            className="h-8 text-xs"
-                            value={noteById[appt.id] ?? ""}
-                            onChange={(e) =>
-                              setNoteById((prev) => ({ ...prev, [appt.id]: e.target.value }))
-                            }
-                          />
-                        ) : null}
-                        {expandedId === appt.id &&
-                        (appt.status === "confirmed" || appt.status === "postponed") &&
-                        appt.startsAt >= now ? (
-                          <div className="space-y-2 rounded-md border border-dashed p-2">
-                            <div className="text-[10px] font-medium text-muted-foreground">
-                              Reschedule
-                            </div>
-                            <DatePickerField
-                              value={rescheduleDate}
-                              onChange={(d) => void loadRescheduleSlots(appt.id, d)}
-                              yearsBack={0}
-                              yearsForward={1}
-                            />
-                            <div className="flex flex-wrap gap-1.5">
-                              {rescheduleSlots.map((slot) => (
-                                <button
-                                  key={slot.startsAt}
-                                  type="button"
-                                  className="rounded-md border px-2 py-1 text-[10px] hover:border-primary"
-                                  onClick={() => {
-                                    void rescheduleAppointment(appt.id, slot.startsAt)
-                                      .then(() => {
-                                        toast.success("Rescheduled");
-                                        setExpandedId(null);
-                                      })
-                                      .catch((err) =>
-                                        toast.error(err instanceof Error ? err.message : "Failed"),
-                                      );
-                                  }}
-                                >
-                                  {slot.startsAt.slice(11, 16)}
-                                </button>
-                              ))}
-                              {rescheduleSlots.length === 0 ? (
-                                <span className="text-[10px] text-muted-foreground">
-                                  No open slots
-                                </span>
-                              ) : null}
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
+                      <BookingDetailPanel
+                        key={`${appt.id}-detail`}
+                        appt={appt}
+                        now={now}
+                        note={noteById[appt.id] ?? ""}
+                        onNoteChange={(v) =>
+                          setNoteById((prev) => ({ ...prev, [appt.id]: v }))
+                        }
+                        accountName={accountName(appt.companyId)}
+                        executiveName={hostName(appt.hostUserId)}
+                        callType={eventTitle(appt.eventTypeId)}
+                        googleConnected={googleConnected}
+                        userId={user?.id}
+                        onAccept={() =>
+                          void acceptAppointment(appt.id, noteById[appt.id])
+                            .then((updated) => {
+                              showBookingApproveToast(
+                                updated,
+                                user?.id,
+                                googleConnected,
+                                hostName(appt.hostUserId),
+                              );
+                            })
+                            .catch((err) =>
+                              toast.error(err instanceof Error ? err.message : "Failed"),
+                            )
+                        }
+                        onDecline={() =>
+                          void declineAppointment(appt.id, noteById[appt.id])
+                            .then(() => toast.success("Booking declined"))
+                            .catch((err) =>
+                              toast.error(err instanceof Error ? err.message : "Failed"),
+                            )
+                        }
+                        onPostpone={() =>
+                          void postponeAppointment(appt.id, noteById[appt.id])
+                            .then(() => toast.success("Booking postponed"))
+                            .catch((err) =>
+                              toast.error(err instanceof Error ? err.message : "Failed"),
+                            )
+                        }
+                        onCancel={() =>
+                          void cancelAppointment(appt.id)
+                            .then(() => toast.success("Booking cancelled"))
+                            .catch((err) =>
+                              toast.error(err instanceof Error ? err.message : "Failed"),
+                            )
+                        }
+                        onRetrySync={() =>
+                          void retryGoogleCalendarSync(appt.id)
+                            .then((updated) => {
+                              if (updated.meetUrl) {
+                                toast.success("Calendar event & Meet link created");
+                              } else if (updated.googleSyncError) {
+                                toast.error(updated.googleSyncError);
+                              } else {
+                                toast.message(
+                                  "Sync attempted — connect Google Calendar under the Calendar tab if needed",
+                                );
+                              }
+                            })
+                            .catch((err) =>
+                              toast.error(
+                                err instanceof Error ? err.message : "Calendar sync failed",
+                              ),
+                            )
+                        }
+                        rescheduleDate={rescheduleDate}
+                        rescheduleSlots={rescheduleSlots}
+                        onRescheduleDateChange={(d) => void loadRescheduleSlots(appt.id, d)}
+                        onRescheduleSlot={(startsAt) =>
+                          void rescheduleAppointment(appt.id, startsAt)
+                            .then(() => {
+                              toast.success("Rescheduled");
+                              setExpandedId(null);
+                            })
+                            .catch((err) =>
+                              toast.error(err instanceof Error ? err.message : "Failed"),
+                            )
+                        }
+                      />
                     ) : null,
                   )}
                 </div>
@@ -977,13 +896,239 @@ function CrmBookingsPage() {
   );
 }
 
-function Detail({ label, children }: { label: string; children: React.ReactNode }) {
+function BookingDetailPanel({
+  appt,
+  now,
+  note,
+  onNoteChange,
+  accountName,
+  executiveName,
+  callType,
+  googleConnected,
+  userId,
+  onAccept,
+  onDecline,
+  onPostpone,
+  onCancel,
+  onRetrySync,
+  rescheduleDate,
+  rescheduleSlots,
+  onRescheduleDateChange,
+  onRescheduleSlot,
+}: {
+  appt: BookingAppointment;
+  now: string;
+  note: string;
+  onNoteChange: (v: string) => void;
+  accountName: string;
+  executiveName: string;
+  callType: string;
+  googleConnected: boolean;
+  userId?: string;
+  onAccept: () => void;
+  onDecline: () => void;
+  onPostpone: () => void;
+  onCancel: () => void;
+  onRetrySync: () => void;
+  rescheduleDate: string;
+  rescheduleSlots: { startsAt: string; endsAt: string }[];
+  onRescheduleDateChange: (d: string) => void;
+  onRescheduleSlot: (startsAt: string) => void;
+}) {
+  const canReschedule =
+    (appt.status === "confirmed" || appt.status === "postponed") && appt.startsAt >= now;
+
   return (
-    <div>
-      <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-        {label}
+    <div className="card-soft overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/20 px-3 py-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Pill tone={statusTone(appt.status)}>{BOOKING_STATUS_LABEL[appt.status]}</Pill>
+          <span className="text-xs text-muted-foreground">{callType}</span>
+        </div>
+        {appt.status === "pending" ? (
+          <div className="flex flex-wrap gap-1">
+            <Button size="sm" className="h-7 gap-1 px-2 text-[10px]" onClick={onAccept}>
+              <Check className="h-3 w-3" />
+              Approve
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1 px-2 text-[10px]"
+              onClick={onDecline}
+            >
+              <X className="h-3 w-3" />
+              Decline
+            </Button>
+          </div>
+        ) : canReschedule ? (
+          <div className="flex flex-wrap gap-1">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 px-2 text-[10px]"
+              onClick={onPostpone}
+            >
+              Postpone
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 px-2 text-[10px]"
+              onClick={onCancel}
+            >
+              Cancel
+            </Button>
+          </div>
+        ) : null}
       </div>
-      <div className="mt-0.5 font-medium">{children}</div>
+
+      <div className="grid gap-3 p-3 lg:grid-cols-[1fr_1fr]">
+        <div className="space-y-3">
+          <div className="rounded-lg border bg-background p-3">
+            <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <User className="h-3 w-3" />
+              Guest
+            </div>
+            <div className="text-sm font-semibold">{appt.guestName}</div>
+            <a
+              href={`mailto:${appt.guestEmail}`}
+              className="mt-1 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+            >
+              <Mail className="h-3 w-3" />
+              {appt.guestEmail}
+            </a>
+            {appt.guestPhone ? (
+              <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                <Phone className="h-3 w-3" />
+                {appt.guestPhone}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="rounded-lg border bg-background p-3">
+            <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <Calendar className="h-3 w-3" />
+              Schedule
+            </div>
+            <div className="text-sm font-medium">{formatWhen(appt.startsAt, appt.endsAt)}</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">
+              {slotDurationMinutes(appt.startsAt, appt.endsAt)} · {executiveName}
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">{accountName}</div>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {appt.meetUrl ? (
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+              <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                <Video className="h-3 w-3" />
+                Google Meet
+              </div>
+              <a
+                href={appt.meetUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="break-all text-xs text-primary hover:underline"
+              >
+                {appt.meetUrl}
+              </a>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="mt-2 h-7 text-[10px]"
+                onClick={() => {
+                  void navigator.clipboard.writeText(appt.meetUrl!);
+                  toast.success("Meet link copied");
+                }}
+              >
+                Copy link
+              </Button>
+            </div>
+          ) : appt.googleSyncStatus === "error" && appt.googleSyncError ? (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+              <p className="text-xs text-destructive">{appt.googleSyncError}</p>
+              {(appt.status === "confirmed" || appt.status === "postponed") && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="mt-2 h-7 text-[10px]"
+                  onClick={onRetrySync}
+                >
+                  Retry calendar sync
+                </Button>
+              )}
+            </div>
+          ) : (appt.status === "confirmed" || appt.status === "postponed") && !appt.meetUrl ? (
+            <div className="rounded-lg border border-dashed p-3">
+              <p className="text-xs text-muted-foreground">
+                No calendar event yet.
+                {!googleConnected && appt.hostUserId === userId
+                  ? " Connect Google Calendar under the Calendar tab."
+                  : " Use retry sync after connecting."}
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="mt-2 h-7 text-[10px]"
+                onClick={onRetrySync}
+              >
+                Retry calendar sync
+              </Button>
+            </div>
+          ) : null}
+
+          {appt.notes ? (
+            <div className="rounded-lg bg-muted/30 p-3 text-xs text-muted-foreground">
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide">Notes</div>
+              {appt.notes}
+            </div>
+          ) : null}
+
+          {appt.status === "pending" ? (
+            <Input
+              placeholder="Optional note to guest (included in status email)"
+              className="h-8 text-xs"
+              value={note}
+              onChange={(e) => onNoteChange(e.target.value)}
+            />
+          ) : null}
+
+          {canReschedule ? (
+            <div className="rounded-lg border border-dashed p-3">
+              <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                Reschedule
+              </div>
+              <DatePickerField
+                value={rescheduleDate}
+                onChange={onRescheduleDateChange}
+                yearsBack={0}
+                yearsForward={1}
+              />
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {rescheduleSlots.map((slot) => (
+                  <button
+                    key={slot.startsAt}
+                    type="button"
+                    className="rounded-md border px-2.5 py-1 text-[10px] font-medium hover:border-primary"
+                    onClick={() => onRescheduleSlot(slot.startsAt)}
+                  >
+                    {slot.startsAt.slice(11, 16)}
+                  </button>
+                ))}
+                {rescheduleSlots.length === 0 ? (
+                  <span className="text-[10px] text-muted-foreground">No open slots</span>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }

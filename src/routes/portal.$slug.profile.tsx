@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { copyTextToClipboard } from "@/lib/copy-to-clipboard";
 import { portalPublicCreateUrl } from "@/lib/design-ticket-portal";
+import { isValidEmail } from "@/lib/utils";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
 
 export const Route = createFileRoute("/portal/$slug/profile")({
@@ -77,18 +78,29 @@ function PortalProfile() {
               />
             </DesignTicketFormField>
 
-            <DesignTicketFormField label="Email">
+            <DesignTicketFormField label="Email" required hint="Required for booking confirmations.">
               <input
                 type="email"
                 defaultValue={access.contactEmail}
                 onBlur={(e) => {
                   const v = e.target.value.trim();
-                  if (v && v !== access.contactEmail) {
+                  if (!v) {
+                    toast.error("Email is required");
+                    e.target.value = access.contactEmail;
+                    return;
+                  }
+                  if (!isValidEmail(v)) {
+                    toast.error("Enter a valid email address");
+                    e.target.value = access.contactEmail;
+                    return;
+                  }
+                  if (v !== access.contactEmail) {
                     updateContact(access.companyId, { contactEmail: v });
                     toast.success("Profile updated");
                   }
                 }}
                 className={ticketFieldClass}
+                required
               />
             </DesignTicketFormField>
 

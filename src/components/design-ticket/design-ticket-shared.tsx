@@ -533,17 +533,26 @@ export function DesignTicketFormCard({ children }: { children: ReactNode }) {
 
 export function DesignTicketFormField({
   label,
+  required,
+  hint,
+  error,
   children,
 }: {
   label: string;
+  required?: boolean;
+  hint?: string;
+  error?: string;
   children: ReactNode;
 }) {
   return (
     <div className="block space-y-1.5">
       <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         {label}
+        {required ? <span className="text-destructive"> *</span> : null}
       </span>
+      {hint ? <p className="text-[10px] leading-snug text-muted-foreground">{hint}</p> : null}
       {children}
+      {error ? <p className="text-[10px] text-destructive">{error}</p> : null}
     </div>
   );
 }

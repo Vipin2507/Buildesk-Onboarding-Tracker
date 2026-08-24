@@ -1,6 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
-import { CalendarDays, CheckCircle2, ChevronLeft } from "lucide-react";
+import {
+  CalendarDays,
+  CheckCircle2,
+  ChevronLeft,
+  Clock,
+  Mail,
+  Phone,
+  User,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -17,7 +25,7 @@ import {
   ticketTextareaClass,
 } from "@/components/design-ticket/design-ticket-shared";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, isValidEmail } from "@/lib/utils";
 import { browserWallClockIso } from "@/lib/booking-slots";
 import { getCrmMasterBookingCallTypes } from "@/stores/useCrmMasterStore";
 import { useBookingStore } from "@/stores/useBookingStore";
@@ -30,12 +38,32 @@ export const Route = createFileRoute("/portal/$slug/book")({
 
 const OTHER_DURATION_OPTIONS = [15, 30, 45, 60];
 
+type BookStep = "contact" | "type" | "slot" | "form" | "done";
+
+const FLOW_STEPS: { id: BookStep; label: string }[] = [
+  { id: "contact", label: "Contact" },
+  { id: "type", label: "Call type" },
+  { id: "slot", label: "Date & time" },
+  { id: "form", label: "Confirm" },
+];
+
 function formatSlotLabel(startsAt: string) {
   const time = startsAt.slice(11, 16);
   const [h, m] = time.split(":").map(Number);
   const ampm = h >= 12 ? "PM" : "AM";
   const hour = ((h + 11) % 12) + 1;
   return `${hour}:${String(m).padStart(2, "0")} ${ampm}`;
+}
+
+function formatDateLabel(ymd: string) {
+  const d = new Date(`${ymd}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return ymd;
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 function addDaysYmd(ymd: string, days: number) {
@@ -55,8 +83,7 @@ function callTypeMeta(event: BookingEventType | null) {
   if (!event) return null;
   const fromMaster = getCrmMasterBookingCallTypes().find((c) => c.key === event.slug);
   if (fromMaster) return fromMaster;
-  const allowsCustomDuration =
-    event.slug === "other" || /other/i.test(event.title);
+  const allowsCustomDuration = event.slug === "other" || /other/i.test(event.title);
   return {
     key: event.slug,
     label: event.title,
@@ -67,6 +94,97 @@ function callTypeMeta(event: BookingEventType | null) {
   };
 }
 
+function BookingStepBar({ step }: { step: BookStep }) {
+  if (step === "done") return null;
+  const visible = FLOW_STEPS.filter((s) => s.id !== "contact" || step === "contact");
+  const activeIdx = visible.findIndex((s) => s.id === step);
+
+  return (
+    <div className="mx-auto flex w-full max-w-2xl items-center gap-1">
+      {visible.map((s, i) => {
+        const done = i < activeIdx;
+        const active = s.id === step;
+        return (
+          <div key={s.id} className="flex min-w-0 flex-1 items-center gap-1">
+            <div
+              className={cn(
+                "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold tabular-nums",
+                done || active
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground",
+              )}
+            >
+              {done ? "✓" : i + 1}
+            </div>
+            <span
+              className={cn(
+                "hidden truncate text-[10px] font-medium sm:inline",
+                active ? "text-foreground" : "text-muted-foreground",
+              )}
+            >
+              {s.label}
+            </span>
+            {i < visible.length - 1 ? (
+              <div
+                className={cn(
+                  "mx-0.5 h-px min-w-[0.75rem] flex-1",
+                  done ? "bg-primary/50" : "bg-border",
+                )}
+              />
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function BookingSummary({
+  selectedType,
+  effectiveDuration,
+  date,
+  selectedSlot,
+  guestName,
+  guestEmail,
+}: {
+  selectedType: BookingEventType | null;
+  effectiveDuration?: number;
+  date?: string;
+  selectedSlot?: BookingSlot | null;
+  guestName?: string;
+  guestEmail?: string;
+}) {
+  if (!selectedType && !guestEmail) return null;
+  return (
+    <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 text-xs">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-primary">
+        Booking summary
+      </div>
+      <div className="mt-1.5 space-y-0.5 text-muted-foreground">
+        {selectedType ? (
+          <div>
+            <span className="font-medium text-foreground">{selectedType.title}</span>
+            {effectiveDuration ? ` · ${effectiveDuration} min` : ""}
+          </div>
+        ) : null}
+        {date && selectedSlot ? (
+          <div className="flex items-center gap-1">
+            <CalendarDays className="h-3 w-3 shrink-0" />
+            {formatDateLabel(date)} · {formatSlotLabel(selectedSlot.startsAt)}
+          </div>
+        ) : null}
+        {guestName || guestEmail ? (
+          <div className="flex items-center gap-1 truncate">
+            <User className="h-3 w-3 shrink-0" />
+            {guestName || "—"}
+            {guestEmail ? ` · ${guestEmail}` : ""}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function PortalBookCall() {
   const { slug } = Route.useParams();
   const access = useCompanyPortalStore((s) => s.getBySlug(slug));
@@ -74,7 +192,7 @@ function PortalBookCall() {
   const listPortalSlots = useBookingStore((s) => s.listPortalSlots);
   const createPortalRequest = useBookingStore((s) => s.createPortalRequest);
 
-  const [step, setStep] = useState<"type" | "slot" | "form" | "done">("type");
+  const [step, setStep] = useState<BookStep>("contact");
   const [eventTypes, setEventTypes] = useState<BookingEventType[]>([]);
   const [selectedType, setSelectedType] = useState<BookingEventType | null>(null);
   const [customDuration, setCustomDuration] = useState<number | null>(null);
@@ -87,6 +205,7 @@ function PortalBookCall() {
   const [guestPhone, setGuestPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [specifyTopic, setSpecifyTopic] = useState("");
+  const [emailTouched, setEmailTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [confirmationId, setConfirmationId] = useState<string | null>(null);
 
@@ -98,6 +217,9 @@ function PortalBookCall() {
       : selectedType?.durationMinutes ?? selectedMeta?.durationMinutes;
 
   const minDate = todayYmd();
+  const emailError =
+    emailTouched && !isValidEmail(guestEmail) ? "Enter a valid email address" : undefined;
+  const canContinueContact = guestName.trim().length >= 2 && isValidEmail(guestEmail);
 
   function pickDate(next: string) {
     if (!next || next < minDate) {
@@ -109,14 +231,21 @@ function PortalBookCall() {
 
   useEffect(() => {
     if (!access) return;
-    setGuestName(access.contactName || "");
-    setGuestEmail(access.contactEmail || "");
+    const name = access.contactName?.trim() || "";
+    const email = access.contactEmail?.trim() || "";
+    setGuestName(name);
+    setGuestEmail(email);
+    const startAtContact = !isValidEmail(email) || name.length < 2;
     void listPortalEventTypes(slug)
       .then((rows) => {
         setEventTypes(rows);
-        if (rows.length === 1) {
+        if (startAtContact) {
+          setStep("contact");
+        } else if (rows.length === 1) {
           setSelectedType(rows[0]);
           setStep("slot");
+        } else {
+          setStep("type");
         }
       })
       .catch((err) => {
@@ -174,8 +303,13 @@ function PortalBookCall() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedType || !selectedSlot) return;
-    if (!guestName.trim() || !guestEmail.trim()) {
-      toast.error("Name and email are required");
+    setEmailTouched(true);
+    if (!guestName.trim() || guestName.trim().length < 2) {
+      toast.error("Enter your name");
+      return;
+    }
+    if (!isValidEmail(guestEmail)) {
+      toast.error("A valid email address is required");
       return;
     }
     if (allowsCustom && !specifyTopic.trim()) {
@@ -197,7 +331,7 @@ function PortalBookCall() {
         eventTypeId: selectedType.id,
         startsAt: selectedSlot.startsAt,
         guestName: guestName.trim(),
-        guestEmail: guestEmail.trim(),
+        guestEmail: guestEmail.trim().toLowerCase(),
         guestPhone: guestPhone.trim() || undefined,
         notes: noteParts.length > 0 ? noteParts.join("\n") : undefined,
         durationMinutes: allowsCustom ? effectiveDuration : undefined,
@@ -214,15 +348,91 @@ function PortalBookCall() {
 
   return (
     <PortalPageWrap>
-      <motion.div variants={ticketPageVariants} initial="hidden" animate="show" className="space-y-4">
-        <motion.div variants={ticketSectionVariants}>
+      <motion.div
+        variants={ticketPageVariants}
+        initial="hidden"
+        animate="show"
+        className="mx-auto max-w-2xl space-y-4"
+      >
+        <motion.div variants={ticketSectionVariants} className="space-y-3">
           <DesignTicketPageHeader
             title="Book a call"
-            subtitle="Pick a time that works — we'll confirm shortly."
+            subtitle="Choose a time — we'll confirm by email once approved."
           />
+          <BookingStepBar step={step} />
         </motion.div>
 
         <AnimatePresence mode="wait">
+          {step === "contact" && (
+            <motion.div
+              key="contact"
+              variants={ticketSectionVariants}
+              initial="hidden"
+              animate="show"
+              exit={{ opacity: 0, y: -8 }}
+            >
+              <DesignTicketFormCard>
+                <p className="text-xs text-muted-foreground">
+                  Your email is required so we can send confirmation and Meet links.
+                </p>
+                <DesignTicketFormField label="Your name" required>
+                  <div className="relative">
+                    <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      value={guestName}
+                      onChange={(e) => setGuestName(e.target.value)}
+                      className={cn(ticketFieldClass, "pl-9")}
+                      placeholder="Full name"
+                      autoComplete="name"
+                      required
+                    />
+                  </div>
+                </DesignTicketFormField>
+                <DesignTicketFormField
+                  label="Email"
+                  required
+                  hint="Required — used for booking confirmations and Google Meet invites."
+                  error={emailError}
+                >
+                  <div className="relative">
+                    <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="email"
+                      value={guestEmail}
+                      onChange={(e) => setGuestEmail(e.target.value)}
+                      onBlur={() => setEmailTouched(true)}
+                      className={cn(ticketFieldClass, "pl-9", emailError && "border-destructive")}
+                      placeholder="you@company.com"
+                      autoComplete="email"
+                      inputMode="email"
+                      required
+                    />
+                  </div>
+                </DesignTicketFormField>
+                <Button
+                  type="button"
+                  disabled={!canContinueContact}
+                  className="w-full"
+                  onClick={() => {
+                    setEmailTouched(true);
+                    if (!canContinueContact) {
+                      toast.error("Name and a valid email are required");
+                      return;
+                    }
+                    if (eventTypes.length === 1) {
+                      setSelectedType(eventTypes[0]);
+                      setStep("slot");
+                    } else {
+                      setStep("type");
+                    }
+                  }}
+                >
+                  Continue
+                </Button>
+              </DesignTicketFormCard>
+            </motion.div>
+          )}
+
           {step === "type" && (
             <motion.div
               key="type"
@@ -232,35 +442,56 @@ function PortalBookCall() {
               exit={{ opacity: 0, y: -8 }}
               className="space-y-3"
             >
-              {eventTypes.map((et) => {
-                const meta = callTypeMeta(et);
-                return (
-                  <button
-                    key={et.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedType(et);
-                      setCustomDuration(meta?.allowsCustomDuration ? null : null);
-                      setSpecifyTopic("");
-                      setStep("slot");
-                    }}
-                    className="card-soft flex w-full items-start gap-3 p-4 text-left transition hover:border-primary/40"
-                  >
-                    <CalendarDays className="mt-0.5 h-5 w-5 text-primary" />
-                    <div>
-                      <div className="text-sm font-semibold">{et.title}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {meta?.allowsCustomDuration
-                          ? "Choose length when booking"
-                          : `${et.durationMinutes} minutes`}
+              <BookingSummary
+                guestName={guestName}
+                guestEmail={guestEmail}
+                selectedType={null}
+              />
+              <div className="grid gap-2 sm:grid-cols-2">
+                {eventTypes.map((et) => {
+                  const meta = callTypeMeta(et);
+                  return (
+                    <button
+                      key={et.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedType(et);
+                        setCustomDuration(null);
+                        setSpecifyTopic("");
+                        setStep("slot");
+                      }}
+                      className="card-soft group flex items-start gap-3 p-4 text-left transition hover:border-primary/50 hover:shadow-sm"
+                    >
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
+                        <CalendarDays className="h-4 w-4" />
                       </div>
-                    </div>
-                  </button>
-                );
-              })}
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold">{et.title}</div>
+                        <div className="mt-0.5 text-xs text-muted-foreground">
+                          {meta?.allowsCustomDuration
+                            ? "Flexible duration"
+                            : `${et.durationMinutes} minutes`}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
               {eventTypes.length === 0 && (
-                <p className="text-sm text-muted-foreground">No meeting types available yet.</p>
+                <p className="text-center text-sm text-muted-foreground">
+                  No meeting types available yet.
+                </p>
               )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="gap-1 text-muted-foreground"
+                onClick={() => setStep("contact")}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Edit contact
+              </Button>
             </motion.div>
           )}
 
@@ -271,28 +502,48 @@ function PortalBookCall() {
               initial="hidden"
               animate="show"
               exit={{ opacity: 0, y: -8 }}
-              className="space-y-4"
+              className="space-y-3"
             >
-              <div className="flex items-center gap-2">
-                {eventTypes.length > 1 && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="gap-1 text-muted-foreground"
-                    onClick={() => setStep("type")}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    Back
-                  </Button>
-                )}
-                <div className="text-sm font-medium">{selectedType.title}</div>
-              </div>
+              <BookingSummary
+                selectedType={selectedType}
+                effectiveDuration={effectiveDuration}
+                guestName={guestName}
+                guestEmail={guestEmail}
+              />
 
               <DesignTicketFormCard>
+                <div className="flex items-center justify-between gap-2">
+                  {eventTypes.length > 1 ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1 text-muted-foreground"
+                      onClick={() => setStep("type")}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      Change type
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1 text-muted-foreground"
+                      onClick={() => setStep("contact")}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      Edit contact
+                    </Button>
+                  )}
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {selectedType.title}
+                  </span>
+                </div>
+
                 {allowsCustom ? (
-                  <DesignTicketFormField label="Call length">
-                    <div className="flex flex-wrap gap-2">
+                  <DesignTicketFormField label="Call length" required>
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                       {OTHER_DURATION_OPTIONS.map((mins) => {
                         const active = customDuration === mins;
                         return (
@@ -301,7 +552,7 @@ function PortalBookCall() {
                             type="button"
                             onClick={() => setCustomDuration(mins)}
                             className={cn(
-                              "rounded-lg border px-3 py-2 text-xs font-medium transition",
+                              "rounded-lg border px-3 py-2.5 text-xs font-medium transition",
                               active
                                 ? "border-primary bg-primary text-primary-foreground"
                                 : "bg-background hover:border-primary/50",
@@ -315,7 +566,7 @@ function PortalBookCall() {
                   </DesignTicketFormField>
                 ) : null}
 
-                <DesignTicketFormField label="Date">
+                <DesignTicketFormField label="Date" required>
                   <DatePickerField
                     value={date}
                     onChange={pickDate}
@@ -325,15 +576,17 @@ function PortalBookCall() {
                   />
                 </DesignTicketFormField>
 
-                <DesignTicketFormField label="Available times">
+                <DesignTicketFormField label="Available times" required>
                   {allowsCustom && !customDuration ? (
                     <p className="text-xs text-muted-foreground">Choose a call length first.</p>
                   ) : loadingSlots ? (
-                    <p className="text-xs text-muted-foreground">Loading slots…</p>
+                    <p className="text-xs text-muted-foreground">Loading available times…</p>
                   ) : daySlots.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No open slots this day. Try another date.</p>
+                    <p className="text-xs text-muted-foreground">
+                      No open slots on this day. Try another date.
+                    </p>
                   ) : (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                       {daySlots.map((slot) => {
                         const active = selectedSlot?.startsAt === slot.startsAt;
                         return (
@@ -346,7 +599,7 @@ function PortalBookCall() {
                             transition={{ duration: 0.2, ease: TICKET_EASE }}
                             onClick={() => setSelectedSlot(slot)}
                             className={cn(
-                              "rounded-lg border px-3 py-2 text-xs font-medium transition",
+                              "rounded-lg border px-2 py-2.5 text-xs font-medium transition",
                               active
                                 ? "border-primary bg-primary text-primary-foreground"
                                 : "bg-background hover:border-primary/50",
@@ -363,8 +616,8 @@ function PortalBookCall() {
                 <Button
                   type="button"
                   disabled={!selectedSlot}
+                  className="w-full"
                   onClick={() => setStep("form")}
-                  className="w-full sm:w-auto"
                 >
                   Continue
                 </Button>
@@ -380,61 +633,89 @@ function PortalBookCall() {
               animate="show"
               exit={{ opacity: 0, y: -8 }}
               onSubmit={onSubmit}
-              className="space-y-4"
+              className="space-y-3"
             >
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="gap-1 text-muted-foreground"
-                onClick={() => setStep("slot")}
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Change time
-              </Button>
+              <BookingSummary
+                selectedType={selectedType}
+                effectiveDuration={effectiveDuration}
+                date={date}
+                selectedSlot={selectedSlot}
+                guestName={guestName}
+                guestEmail={guestEmail}
+              />
 
               <DesignTicketFormCard>
-                <p className="text-xs text-muted-foreground">
-                  {selectedType.title}
-                  {effectiveDuration ? ` · ${effectiveDuration} min` : ""} · {date} ·{" "}
-                  {formatSlotLabel(selectedSlot.startsAt)}
-                </p>
-                {allowsCustom ? (
-                  <DesignTicketFormField label="Please specify">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="-ml-2 gap-1 text-muted-foreground"
+                  onClick={() => setStep("slot")}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Change time
+                </Button>
+
+                <DesignTicketFormField label="Your name" required>
+                  <div className="relative">
+                    <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <input
+                      value={guestName}
+                      onChange={(e) => setGuestName(e.target.value)}
+                      className={cn(ticketFieldClass, "pl-9")}
+                      required
+                    />
+                  </div>
+                </DesignTicketFormField>
+
+                <DesignTicketFormField
+                  label="Email"
+                  required
+                  hint="Required for confirmation emails and Meet links."
+                  error={emailError}
+                >
+                  <div className="relative">
+                    <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="email"
+                      value={guestEmail}
+                      onChange={(e) => setGuestEmail(e.target.value)}
+                      onBlur={() => setEmailTouched(true)}
+                      className={cn(ticketFieldClass, "pl-9", emailError && "border-destructive")}
+                      inputMode="email"
+                      autoComplete="email"
+                      required
+                    />
+                  </div>
+                </DesignTicketFormField>
+
+                {allowsCustom ? (
+                  <DesignTicketFormField label="What is this call about?" required>
+                    <textarea
                       value={specifyTopic}
                       onChange={(e) => setSpecifyTopic(e.target.value)}
-                      className={ticketFieldClass}
-                      placeholder="What should we cover on this call?"
+                      className={ticketTextareaClass}
+                      placeholder="Brief topic or agenda…"
+                      rows={2}
                       required
                     />
                   </DesignTicketFormField>
                 ) : null}
-                <DesignTicketFormField label="Your name">
-                  <input
-                    value={guestName}
-                    onChange={(e) => setGuestName(e.target.value)}
-                    className={ticketFieldClass}
-                    required
-                  />
+
+                <DesignTicketFormField label="Phone" hint="Optional">
+                  <div className="relative">
+                    <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      value={guestPhone}
+                      onChange={(e) => setGuestPhone(e.target.value)}
+                      className={cn(ticketFieldClass, "pl-9")}
+                      inputMode="tel"
+                      autoComplete="tel"
+                    />
+                  </div>
                 </DesignTicketFormField>
-                <DesignTicketFormField label="Email">
-                  <input
-                    type="email"
-                    value={guestEmail}
-                    onChange={(e) => setGuestEmail(e.target.value)}
-                    className={ticketFieldClass}
-                    required
-                  />
-                </DesignTicketFormField>
-                <DesignTicketFormField label="Phone (optional)">
-                  <input
-                    value={guestPhone}
-                    onChange={(e) => setGuestPhone(e.target.value)}
-                    className={ticketFieldClass}
-                  />
-                </DesignTicketFormField>
-                <DesignTicketFormField label="Notes (optional)">
+
+                <DesignTicketFormField label="Notes" hint="Optional">
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
@@ -443,7 +724,12 @@ function PortalBookCall() {
                     placeholder="Anything we should know beforehand?"
                   />
                 </DesignTicketFormField>
-                <Button type="submit" disabled={submitting} className="w-full sm:w-auto">
+
+                <Button
+                  type="submit"
+                  disabled={submitting || !isValidEmail(guestEmail) || guestName.trim().length < 2}
+                  className="w-full"
+                >
                   {submitting ? "Submitting…" : "Request booking"}
                 </Button>
               </DesignTicketFormCard>
@@ -456,19 +742,24 @@ function PortalBookCall() {
               initial={{ opacity: 0, scale: 0.97 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.35, ease: TICKET_EASE }}
-              className="card-soft flex flex-col items-center gap-3 p-8 text-center"
+              className="card-soft mx-auto flex w-full max-w-lg flex-col items-center gap-4 p-8 text-center"
             >
-              <CheckCircle2 className="h-10 w-10 text-success" />
-              <h2 className="text-lg font-semibold">Request received</h2>
-              <p className="max-w-sm text-sm text-muted-foreground">
-                Your booking is pending confirmation. Check status on your dashboard — we'll also
-                email you when it's approved, cancelled, or postponed.
-              </p>
-              {selectedSlot && (
-                <p className="text-xs text-muted-foreground">
-                  Requested: {date} · {formatSlotLabel(selectedSlot.startsAt)}
-                  {confirmationId ? ` · Ref ${confirmationId.slice(0, 8)}` : ""}
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-success/15">
+                <CheckCircle2 className="h-8 w-8 text-success" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">Request received</h2>
+                <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+                  We'll email <span className="font-medium text-foreground">{guestEmail}</span> when
+                  your booking is approved, rescheduled, or cancelled.
                 </p>
+              </div>
+              {selectedSlot && (
+                <div className="flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                  <Clock className="h-3.5 w-3.5" />
+                  {formatDateLabel(date)} · {formatSlotLabel(selectedSlot.startsAt)}
+                  {confirmationId ? ` · Ref ${confirmationId.slice(0, 8)}` : ""}
+                </div>
               )}
               <Button
                 type="button"
@@ -482,7 +773,7 @@ function PortalBookCall() {
                   setCustomDuration(null);
                 }}
               >
-                Book another
+                Book another call
               </Button>
             </motion.div>
           )}
