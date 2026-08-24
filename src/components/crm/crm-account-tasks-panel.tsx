@@ -1,40 +1,36 @@
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Ban, Plus } from "lucide-react";
+import { Ban, CheckCircle2, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { DataTable } from "@/components/data-table";
 import {
   DesignTicketSection,
-  ticketFieldClass,
-  ticketSelectClass,
-  ticketTextareaClass,
 } from "@/components/design-ticket/design-ticket-shared";
-import { DatePickerField } from "@/components/date-picker-field";
 import { EmptyState } from "@/components/empty-state";
 import { EntityFormModal } from "@/components/entity-form-modal";
 import { ListToolbar } from "@/components/list-toolbar";
-import { ProgressBar } from "@/components/progress-bar";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
+import {
+  TaskFormFields,
+  useTaskFormState,
+} from "@/components/tasks/task-form-fields";
 import {
   canManageCrmAccountTasks,
   crmAccountTeamAssigneeUsers,
 } from "@/lib/crm-account-access";
-import { cn, formatDate } from "@/lib/utils";
+import { resolveCrmSalesManagerDefaults, withCrmSalesManagerOption } from "@/lib/crm-sales-manager-defaults";
+import { formatTimeRange12h } from "@/lib/task-scheduling";
+import { formatDate, formatDateTime } from "@/lib/utils";
 import { resolveAssigneeLabel } from "@/lib/managers";
 import { useAuthStore, useCrmAccountStore, useTaskStore, useUserStore } from "@/stores";
 import {
-  FOLLOW_UP_TASK_PRIORITIES,
-  FOLLOW_UP_TASK_STATUSES,
+  FOLLOW_UP_TASK_TYPE_LABEL,
   type FollowUpTask,
-  type FollowUpTaskPriority,
   type FollowUpTaskStatus,
+  type FollowUpTaskType,
 } from "@/types";
-
-const fieldClass = cn(ticketFieldClass, "h-8 text-xs");
-const selectClass = cn(ticketSelectClass, "h-8 text-xs");
-const areaClass = cn(ticketTextareaClass, "min-h-[72px] text-xs");
 
 const OPEN_STATUSES: FollowUpTaskStatus[] = ["open", "in_progress", "blocked"];
 
@@ -42,11 +38,6 @@ function statusTone(status: FollowUpTaskStatus): "success" | "warning" | "danger
   if (status === "completed") return "success";
   if (status === "cancelled") return "danger";
   if (status === "blocked") return "warning";
-  return "muted";
-}
-
-function priorityTone(priority: FollowUpTaskPriority): "success" | "warning" | "danger" | "muted" {
-  if (priority === "urgent" || priority === "high") return "warning";
   return "muted";
 }
 
@@ -65,6 +56,7 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
   const tasks = useTaskStore((s) => s.tasks);
   const addTask = useTaskStore((s) => s.addTask);
   const updateTask = useTaskStore((s) => s.updateTask);
+  const completeTask = useTaskStore((s) => s.completeTask);
   const cancelTask = useTaskStore((s) => s.cancelTask);
   const users = useUserStore((s) => s.users);
   const currentUser = useAuthStore((s) => s.user);
@@ -79,29 +71,38 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
     [tasks, accountId],
   );
 
+  const salesDefaults = useMemo(
+    () => resolveCrmSalesManagerDefaults(account, users),
+    [account, users],
+  );
+
   const assignees = useMemo(() => {
     if (!account) return [];
     const team = crmAccountTeamAssigneeUsers(account, users);
-    return team.length > 0
-      ? team
-      : users.filter((u) => u.active && (u.productScope === "crm" || !u.productScope || u.role === "Admin"));
-  }, [account, users]);
+    const base =
+      team.length > 0
+        ? team
+        : users.filter((u) => u.active && (u.productScope === "crm" || !u.productScope || u.role === "Admin"));
+    return withCrmSalesManagerOption(base, salesDefaults, users);
+  }, [account, users, salesDefaults]);
+
+  const defaultAssigneeIds = salesDefaults.userId ? [salesDefaults.userId] : [];
 
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [priorityFilter, setPriorityFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [assigneeFilter, setAssigneeFilter] = useState("all");
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<FollowUpTask | null>(null);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [status, setStatus] = useState<FollowUpTaskStatus>("open");
-  const [priority, setPriority] = useState<FollowUpTaskPriority>("medium");
-  const [progressPercent, setProgressPercent] = useState(0);
-  const [dueDate, setDueDate] = useState("");
-  const [assigneeUserId, setAssigneeUserId] = useState("");
   const [remark, setRemark] = useState("");
+
+  const form = useTaskFormState({
+    users: assignees,
+    defaultAssigneeIds,
+    editing,
+    companyId: accountId,
+  });
 
   const openCount = accountTasks.filter((t) => OPEN_STATUSES.includes(t.status)).length;
   const overdueCount = accountTasks.filter(
@@ -115,93 +116,77 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
     const q = query.trim().toLowerCase();
     return accountTasks.filter((task) => {
       if (statusFilter !== "all" && task.status !== statusFilter) return false;
-      if (priorityFilter !== "all" && task.priority !== priorityFilter) return false;
-      if (assigneeFilter !== "all" && task.assigneeUserId !== assigneeFilter) return false;
+      if (typeFilter !== "all" && task.taskType !== typeFilter) return false;
+      if (assigneeFilter !== "all") {
+        const ids = task.assigneeUserIds?.length
+          ? task.assigneeUserIds
+          : task.assigneeUserId
+            ? [task.assigneeUserId]
+            : [];
+        if (!ids.includes(assigneeFilter)) return false;
+      }
       if (q) {
-        const hay = [
-          task.title,
-          task.description ?? "",
-          resolveAssigneeLabel(task.assigneeUserId, users),
-          task.status,
-          task.priority,
-        ]
+        const hay = [task.title, task.description ?? "", task.status, task.taskType ?? ""]
           .join(" ")
           .toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [accountTasks, statusFilter, priorityFilter, assigneeFilter, query, users]);
-
-  const assigneeOptions = useMemo(
-    () => [
-      { value: "all", label: "All assignees" },
-      ...assignees.map((u) => ({ value: u.id, label: u.name })),
-    ],
-    [assignees],
-  );
-
-  function resetForm() {
-    setTitle("");
-    setDescription("");
-    setStatus("open");
-    setPriority("medium");
-    setProgressPercent(0);
-    setDueDate("");
-    setAssigneeUserId("");
-    setRemark("");
-  }
+  }, [accountTasks, statusFilter, typeFilter, assigneeFilter, query]);
 
   function openCreate() {
     setEditing(null);
-    resetForm();
+    form.reset();
+    setRemark("");
     setOpen(true);
   }
 
   function openEdit(task: FollowUpTask) {
     if (!canManage) return;
     setEditing(task);
-    setTitle(task.title);
-    setDescription(task.description ?? "");
-    setStatus(task.status);
-    setPriority(task.priority);
-    setProgressPercent(task.progressPercent);
-    setDueDate(task.dueDate ?? "");
-    setAssigneeUserId(task.assigneeUserId ?? "");
     setRemark("");
     setOpen(true);
   }
 
-  function submit() {
-    if (!title.trim()) {
+  async function submit() {
+    if (!form.title.trim()) {
       toast.error("Title is required");
       return;
     }
+    if (!(await form.validateSchedule())) return;
+
+    const payload = {
+      companyId: accountId,
+      title: form.title.trim(),
+      description: form.description.trim() || undefined,
+      dueDate: form.dueDate || undefined,
+      taskType: form.taskType || undefined,
+      startTime: form.startTime || undefined,
+      endTime: form.endTime || undefined,
+      durationMinutes: form.durationMinutes || undefined,
+      assigneeUserIds: form.assigneeUserIds,
+      assigneeUserId: form.assigneeUserIds[0],
+      status: editing?.status ?? ("open" as const),
+      priority: editing?.priority ?? ("medium" as const),
+      progressPercent: editing?.progressPercent ?? 0,
+      remark: remark.trim() || undefined,
+    };
+
     if (editing) {
-      updateTask(editing.id, {
-        title: title.trim(),
-        description: description.trim() || undefined,
-        status,
-        priority,
-        progressPercent,
-        dueDate: dueDate || undefined,
-        assigneeUserId: assigneeUserId || undefined,
-        remark: remark.trim() || undefined,
-      });
+      updateTask(editing.id, payload);
       toast.success("Task updated");
     } else {
-      addTask({
-        companyId: accountId,
-        title: title.trim(),
-        description: description.trim() || undefined,
-        status,
-        priority,
-        progressPercent,
-        dueDate: dueDate || undefined,
-        assigneeUserId: assigneeUserId || undefined,
-      });
+      addTask({ ...payload, status: "open", priority: "medium", progressPercent: 0 });
       toast.success("Task created");
     }
+    setOpen(false);
+  }
+
+  function handleComplete() {
+    if (!editing) return;
+    completeTask(editing.id, remark.trim() || undefined);
+    toast.success("Task marked complete");
     setOpen(false);
   }
 
@@ -214,7 +199,7 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
 
   const activeFilterCount = [
     statusFilter !== "all",
-    priorityFilter !== "all",
+    typeFilter !== "all",
     assigneeFilter !== "all",
   ].filter(Boolean).length;
 
@@ -224,7 +209,7 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
         <ListToolbar
           search={query}
           onSearchChange={setQuery}
-          searchPlaceholder="Search tasks, assignee, or notes…"
+          searchPlaceholder="Search tasks…"
           selects={[
             {
               id: "status",
@@ -232,28 +217,34 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
               value: statusFilter,
               options: [
                 { value: "all", label: "All statuses" },
-                ...FOLLOW_UP_TASK_STATUSES.map((s) => ({
-                  value: s,
-                  label: formatStatusLabel(s),
-                })),
+                { value: "open", label: "Open" },
+                { value: "in_progress", label: "In progress" },
+                { value: "completed", label: "Completed" },
+                { value: "cancelled", label: "Cancelled" },
               ],
               onChange: setStatusFilter,
             },
             {
-              id: "priority",
-              label: "Priority",
-              value: priorityFilter,
+              id: "type",
+              label: "Task type",
+              value: typeFilter,
               options: [
-                { value: "all", label: "All priorities" },
-                ...FOLLOW_UP_TASK_PRIORITIES.map((p) => ({ value: p, label: p })),
+                { value: "all", label: "All types" },
+                ...Object.entries(FOLLOW_UP_TASK_TYPE_LABEL).map(([value, label]) => ({
+                  value,
+                  label,
+                })),
               ],
-              onChange: setPriorityFilter,
+              onChange: setTypeFilter,
             },
             {
               id: "assignee",
               label: "Assignee",
               value: assigneeFilter,
-              options: assigneeOptions,
+              options: [
+                { value: "all", label: "All assignees" },
+                ...assignees.map((u) => ({ value: u.id, label: u.name })),
+              ],
               onChange: setAssigneeFilter,
             },
           ]}
@@ -263,7 +254,7 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
           onClear={() => {
             setQuery("");
             setStatusFilter("all");
-            setPriorityFilter("all");
+            setTypeFilter("all");
             setAssigneeFilter("all");
           }}
           trailing={
@@ -292,18 +283,16 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
         <div className="space-y-1.5">
           {filtered.slice(0, 5).map((task) => {
             const row = (
-              <>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium">{task.title}</div>
-                    <div className="text-[10px] text-muted-foreground">
-                      {resolveAssigneeLabel(task.assigneeUserId, users)} · Due{" "}
-                      {task.dueDate ? formatDate(task.dueDate) : "—"}
-                    </div>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium">{task.title}</div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {formatTimeRange12h(task.startTime, task.endTime)} · Due{" "}
+                    {task.dueDate ? formatDate(task.dueDate) : "—"}
                   </div>
-                  <Pill tone={statusTone(task.status)}>{formatStatusLabel(task.status)}</Pill>
                 </div>
-              </>
+                <Pill tone={statusTone(task.status)}>{formatStatusLabel(task.status)}</Pill>
+              </div>
             );
             return canManage ? (
               <button
@@ -348,6 +337,46 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
               ),
             },
             {
+              key: "taskType",
+              header: "Type",
+              sortable: true,
+              render: (task) => (
+                <span className="text-xs">
+                  {task.taskType ? FOLLOW_UP_TASK_TYPE_LABEL[task.taskType as FollowUpTaskType] : "—"}
+                </span>
+              ),
+            },
+            {
+              key: "schedule",
+              header: "Date / time",
+              sortable: true,
+              render: (task) => (
+                <div className="text-xs">
+                  <div>{task.dueDate ? formatDate(task.dueDate) : "—"}</div>
+                  <div className="text-muted-foreground">
+                    {formatTimeRange12h(task.startTime, task.endTime)}
+                  </div>
+                </div>
+              ),
+            },
+            {
+              key: "assigneeUserId",
+              header: "Assignee",
+              sortable: true,
+              render: (task) => {
+                const ids = task.assigneeUserIds?.length
+                  ? task.assigneeUserIds
+                  : task.assigneeUserId
+                    ? [task.assigneeUserId]
+                    : [];
+                return (
+                  <span className="text-xs">
+                    {ids.map((id) => resolveAssigneeLabel(id, users)).join(", ") || "—"}
+                  </span>
+                );
+              },
+            },
+            {
               key: "status",
               header: "Status",
               sortable: true,
@@ -356,52 +385,10 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
               ),
             },
             {
-              key: "priority",
-              header: "Priority",
-              sortable: true,
+              key: "source",
+              header: "Source",
               render: (task) => (
-                <Pill tone={priorityTone(task.priority)}>{task.priority}</Pill>
-              ),
-            },
-            {
-              key: "assigneeUserId",
-              header: "Assignee",
-              sortable: true,
-              render: (task) => (
-                <span className="text-xs">
-                  {resolveAssigneeLabel(task.assigneeUserId, users)}
-                </span>
-              ),
-            },
-            {
-              key: "dueDate",
-              header: "Due",
-              sortable: true,
-              render: (task) => (
-                <span className="text-xs text-muted-foreground">
-                  {task.dueDate ? formatDate(task.dueDate) : "—"}
-                </span>
-              ),
-            },
-            {
-              key: "progressPercent",
-              header: "Progress",
-              sortable: true,
-              render: (task) => (
-                <div className="flex min-w-[5rem] items-center gap-2">
-                  <ProgressBar value={task.progressPercent} className="flex-1" />
-                  <span className="text-[10px] tabular-nums">{task.progressPercent}%</span>
-                </div>
-              ),
-            },
-            {
-              key: "updatedAt",
-              header: "Updated",
-              sortable: true,
-              render: (task) => (
-                <span className="text-[10px] text-muted-foreground">
-                  {formatDate(task.updatedAt)}
-                </span>
+                <span className="text-xs capitalize">{task.source ?? "manual"}</span>
               ),
             },
           ]}
@@ -415,99 +402,26 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
         submitLabel={editing ? "Save task" : "Create task"}
         onSubmit={submit}
       >
-        <div className="space-y-3">
-          <label className="block text-xs font-medium">
-            Title
-            <input
-              className={cn(fieldClass, "mt-1 w-full")}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Follow-up action…"
-            />
-          </label>
-          <label className="block text-xs font-medium">
-            Description
+        <TaskFormFields {...form} users={assignees} defaultAssigneeIds={defaultAssigneeIds} editing={editing} />
+        {editing ? (
+          <div className="mt-4 space-y-2 border-t pt-3">
+            {editing.completedAt ? (
+              <p className="text-xs text-muted-foreground">
+                Completed {formatDateTime(editing.completedAt)}
+              </p>
+            ) : null}
             <textarea
-              className={cn(areaClass, "mt-1 w-full")}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Context, next steps, client notes…"
+              className="min-h-[56px] w-full rounded-md border px-3 py-2 text-xs"
+              value={remark}
+              onChange={(e) => setRemark(e.target.value)}
+              placeholder="Optional remark for history"
             />
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block text-xs font-medium">
-              Status
-              <select
-                className={cn(selectClass, "mt-1 w-full")}
-                value={status}
-                onChange={(e) => setStatus(e.target.value as FollowUpTaskStatus)}
-              >
-                {FOLLOW_UP_TASK_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {formatStatusLabel(s)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block text-xs font-medium">
-              Priority
-              <select
-                className={cn(selectClass, "mt-1 w-full")}
-                value={priority}
-                onChange={(e) => setPriority(e.target.value as FollowUpTaskPriority)}
-              >
-                {FOLLOW_UP_TASK_PRIORITIES.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <label className="block text-xs font-medium">
-            Progress ({progressPercent}%)
-            <input
-              type="range"
-              min={0}
-              max={100}
-              className="mt-2 w-full"
-              value={progressPercent}
-              onChange={(e) => setProgressPercent(Number(e.target.value))}
-            />
-          </label>
-          <label className="block text-xs font-medium">
-            Due date
-            <div className="mt-1">
-              <DatePickerField value={dueDate} onChange={setDueDate} modal yearsBack={1} yearsForward={3} />
-            </div>
-          </label>
-          <label className="block text-xs font-medium">
-            Assignee
-            <select
-              className={cn(selectClass, "mt-1 w-full")}
-              value={assigneeUserId}
-              onChange={(e) => setAssigneeUserId(e.target.value)}
-            >
-              <option value="">Unassigned</option>
-              {assignees.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          {editing ? (
-            <>
-              <label className="block text-xs font-medium">
-                Remark (appended to history)
-                <textarea
-                  className={cn(areaClass, "mt-1 w-full")}
-                  value={remark}
-                  onChange={(e) => setRemark(e.target.value)}
-                  placeholder="Optional progress note"
-                />
-              </label>
-              {editing.status !== "cancelled" ? (
+            {editing.status !== "completed" && editing.status !== "cancelled" ? (
+              <>
+                <Button type="button" variant="outline" className="w-full gap-1" onClick={handleComplete}>
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Mark as complete
+                </Button>
                 <Button
                   type="button"
                   variant="outline"
@@ -517,10 +431,10 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
                   <Ban className="h-3.5 w-3.5" />
                   Cancel task
                 </Button>
-              ) : null}
-            </>
-          ) : null}
-        </div>
+              </>
+            ) : null}
+          </div>
+        ) : null}
       </EntityFormModal>
     </>
   );
@@ -577,6 +491,9 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
             className="text-[10px] font-medium text-primary hover:underline"
           >
             View on dashboard
+          </Link>
+          <Link to="/tasks" className="text-[10px] font-medium text-primary hover:underline">
+            Task calendar
           </Link>
         </div>
       }

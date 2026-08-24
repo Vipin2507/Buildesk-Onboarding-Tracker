@@ -296,6 +296,16 @@ const EXTRA_COLUMNS = [
     ddl: "TEXT NOT NULL DEFAULT 'none'",
   },
   { table: "booking_appointments", name: "google_sync_error", ddl: "TEXT" },
+  { table: "follow_up_tasks", name: "task_type", ddl: "TEXT" },
+  { table: "follow_up_tasks", name: "start_time", ddl: "TEXT" },
+  { table: "follow_up_tasks", name: "end_time", ddl: "TEXT" },
+  { table: "follow_up_tasks", name: "starts_at", ddl: "TEXT" },
+  { table: "follow_up_tasks", name: "ends_at", ddl: "TEXT" },
+  { table: "follow_up_tasks", name: "duration_minutes", ddl: "INTEGER" },
+  { table: "follow_up_tasks", name: "assignee_user_ids_json", ddl: "TEXT NOT NULL DEFAULT '[]'" },
+  { table: "follow_up_tasks", name: "completed_by_user_id", ddl: "TEXT" },
+  { table: "follow_up_tasks", name: "source", ddl: "TEXT NOT NULL DEFAULT 'manual'" },
+  { table: "follow_up_tasks", name: "booking_appointment_id", ddl: "TEXT" },
 ];
 
 for (const col of EXTRA_COLUMNS) {
@@ -606,9 +616,19 @@ function ensureCrmTables() {
         priority TEXT NOT NULL DEFAULT 'medium',
         progress_percent INTEGER NOT NULL DEFAULT 0,
         due_date TEXT,
+        task_type TEXT,
+        start_time TEXT,
+        end_time TEXT,
+        starts_at TEXT,
+        ends_at TEXT,
+        duration_minutes INTEGER,
         assignee_user_id TEXT,
+        assignee_user_ids_json TEXT NOT NULL DEFAULT '[]',
         created_by_user_id TEXT,
         completed_at TEXT,
+        completed_by_user_id TEXT,
+        source TEXT NOT NULL DEFAULT 'manual',
+        booking_appointment_id TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
@@ -616,6 +636,8 @@ function ensureCrmTables() {
       CREATE INDEX IF NOT EXISTS follow_up_tasks_assignee_idx ON follow_up_tasks(assignee_user_id);
       CREATE INDEX IF NOT EXISTS follow_up_tasks_status_idx ON follow_up_tasks(status);
       CREATE INDEX IF NOT EXISTS follow_up_tasks_due_idx ON follow_up_tasks(due_date);
+      CREATE INDEX IF NOT EXISTS follow_up_tasks_starts_idx ON follow_up_tasks(starts_at);
+      CREATE INDEX IF NOT EXISTS follow_up_tasks_booking_idx ON follow_up_tasks(booking_appointment_id);
     `);
     console.log("+ CREATE TABLE follow_up_tasks");
   }

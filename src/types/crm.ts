@@ -71,6 +71,28 @@ export const FOLLOW_UP_TASK_PRIORITIES: FollowUpTaskPriority[] = [
   "urgent",
 ];
 
+export type FollowUpTaskType =
+  | "on_call_phone"
+  | "on_call_gmeet_teams"
+  | "offline_site_visit"
+  | "offline_office";
+
+export const FOLLOW_UP_TASK_TYPES: FollowUpTaskType[] = [
+  "on_call_phone",
+  "on_call_gmeet_teams",
+  "offline_site_visit",
+  "offline_office",
+];
+
+export const FOLLOW_UP_TASK_TYPE_LABEL: Record<FollowUpTaskType, string> = {
+  on_call_phone: "On Call Via Phone",
+  on_call_gmeet_teams: "On Call Via GMeet / Teams",
+  offline_site_visit: "Offline - Site Visit",
+  offline_office: "Offline - Office",
+};
+
+export type FollowUpTaskSource = "manual" | "booking";
+
 export type FollowUpTask = Timestamps & {
   id: string;
   companyId: string;
@@ -83,9 +105,19 @@ export type FollowUpTask = Timestamps & {
   priority: FollowUpTaskPriority;
   progressPercent: number;
   dueDate?: string;
+  taskType?: FollowUpTaskType;
+  startTime?: string;
+  endTime?: string;
+  startsAt?: string;
+  endsAt?: string;
+  durationMinutes?: number;
   assigneeUserId?: string;
+  assigneeUserIds?: string[];
   createdByUserId?: string;
   completedAt?: string;
+  completedByUserId?: string;
+  source?: FollowUpTaskSource;
+  bookingAppointmentId?: string;
 };
 
 /* ---------- Client visits ---------- */

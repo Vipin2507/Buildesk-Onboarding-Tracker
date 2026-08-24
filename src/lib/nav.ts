@@ -51,7 +51,7 @@ export const APP_NAV: NavItem[] = [
   { to: "/support", label: "Support Desk", icon: LifeBuoy },
   { to: "/tickets", label: "Ticket Tracking", icon: MessageSquareText },
   { to: "/live-chat", label: "Live Chat", icon: MessagesSquare, permission: "manageTickets" },
-  { to: "/tasks", label: "Follow-up Tasks", icon: CheckSquare, permission: "manageTasks" },
+  { to: "/tasks", label: "Tasks", icon: CheckSquare, permission: "manageTasks" },
   { to: "/client-visits", label: "Client Visits", icon: MapPin, permission: "manageClientVisits" },
   { to: "/renewals", label: "Renewals", icon: RefreshCw },
   { to: "/employees", label: "Employees", icon: Users, permission: "manageEmployees" },

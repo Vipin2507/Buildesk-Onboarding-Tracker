@@ -18,6 +18,11 @@ import {
   updateGoogleMeetEvent,
 } from "@/server/google/calendar-client";
 import { getGoogleCalendarConnection } from "@/server/google/calendar-oauth";
+import {
+  cancelLinkedTaskForBooking,
+  collectTaskBusyRanges,
+  syncTaskFromBookingAppointment,
+} from "@/server/lib/task-schedule";
 import type {
   BookingAppointment,
   BookingAppointmentStatus,
@@ -308,6 +313,7 @@ async function collectBusyRanges(hostUserId: string, fromYmd: string, toYmd: str
   const busy = [
     ...appts.map((a) => ({ startsAt: a.startsAt, endsAt: a.endsAt })),
     ...blocks.map((b) => ({ startsAt: b.startsAt, endsAt: b.endsAt })),
+    ...collectTaskBusyRanges(hostUserId, fromYmd, toYmd),
   ];
 
   try {
@@ -1224,8 +1230,15 @@ export const updateBookingAppointmentStatus = createServerFn({ method: "POST" })
 
     if (data.status === "confirmed") {
       await syncGoogleCalendarForAppointment(updated, "upsert", user);
+      const fresh = db
+        .select()
+        .from(t.bookingAppointments)
+        .where(eq(t.bookingAppointments.id, data.id))
+        .get()!;
+      syncTaskFromBookingAppointment(fresh);
     } else if (data.status === "cancelled" || data.status === "declined") {
       await syncGoogleCalendarForAppointment(updated, "delete", user);
+      cancelLinkedTaskForBooking(data.id);
     }
 
     return mapAppointment(
@@ -1312,9 +1325,14 @@ export const rescheduleBookingAppointment = createServerFn({ method: "POST" })
       await syncGoogleCalendarForAppointment(updated, "upsert", user);
     }
 
-    return mapAppointment(
-      db.select().from(t.bookingAppointments).where(eq(t.bookingAppointments.id, data.id)).get()!,
-    );
+    const fresh = db
+      .select()
+      .from(t.bookingAppointments)
+      .where(eq(t.bookingAppointments.id, data.id))
+      .get()!;
+    syncTaskFromBookingAppointment(fresh);
+
+    return mapAppointment(fresh);
   });
 
 export const retryBookingGoogleCalendarSync = createServerFn({ method: "POST" })

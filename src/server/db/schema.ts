@@ -236,9 +236,19 @@ export const followUpTasks = sqliteTable(
     priority: text("priority").notNull().default("medium"),
     progressPercent: integer("progress_percent").notNull().default(0),
     dueDate: text("due_date"),
+    taskType: text("task_type"),
+    startTime: text("start_time"),
+    endTime: text("end_time"),
+    startsAt: text("starts_at"),
+    endsAt: text("ends_at"),
+    durationMinutes: integer("duration_minutes"),
     assigneeUserId: text("assignee_user_id"),
+    assigneeUserIdsJson: text("assignee_user_ids_json").notNull().default("[]"),
     createdByUserId: text("created_by_user_id"),
     completedAt: text("completed_at"),
+    completedByUserId: text("completed_by_user_id"),
+    source: text("source").notNull().default("manual"),
+    bookingAppointmentId: text("booking_appointment_id"),
     ...timestamps,
   },
   (t) => [
@@ -246,6 +256,8 @@ export const followUpTasks = sqliteTable(
     index("follow_up_tasks_assignee_idx").on(t.assigneeUserId),
     index("follow_up_tasks_status_idx").on(t.status),
     index("follow_up_tasks_due_idx").on(t.dueDate),
+    index("follow_up_tasks_starts_idx").on(t.startsAt),
+    index("follow_up_tasks_booking_idx").on(t.bookingAppointmentId),
   ],
 );
 

@@ -122,6 +122,8 @@ export {
   createFollowUpTask,
   updateFollowUpTask,
   cancelFollowUpTask,
+  completeFollowUpTask,
+  checkTaskScheduleConflicts,
   listClientVisits,
   getClientVisit,
   createClientVisit,

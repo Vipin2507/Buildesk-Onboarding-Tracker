@@ -9,6 +9,14 @@ import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { logActivity } from "@/server/api/mappers";
+import {
+  findScheduleConflicts,
+  mapTaskRow,
+  normalizeTaskSchedule,
+  resolvePrimaryAssignee,
+  serializeAssigneeIds,
+} from "@/server/lib/task-schedule";
+import { formatScheduleConflictMessage } from "@/lib/task-scheduling";
 import type {
   ClientVisit,
   CrmEvent,
@@ -95,27 +103,6 @@ function mapSubscription(row: typeof t.moduleSubscriptions.$inferSelect): Module
     startDate: row.startDate,
     validUntil: row.validUntil ?? undefined,
     notes: row.notes ?? undefined,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-  };
-}
-
-function mapTask(row: typeof t.followUpTasks.$inferSelect): FollowUpTask {
-  return {
-    id: row.id,
-    companyId: row.companyId,
-    onboardingProjectId: row.onboardingProjectId ?? undefined,
-    postSalesProjectId: row.postSalesProjectId ?? undefined,
-    sourceVisitId: row.sourceVisitId ?? undefined,
-    title: row.title,
-    description: row.description ?? undefined,
-    status: row.status as FollowUpTask["status"],
-    priority: row.priority as FollowUpTask["priority"],
-    progressPercent: row.progressPercent,
-    dueDate: row.dueDate ?? undefined,
-    assigneeUserId: row.assigneeUserId ?? undefined,
-    createdByUserId: row.createdByUserId ?? undefined,
-    completedAt: row.completedAt ?? undefined,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -372,8 +359,18 @@ export const listFollowUpTasks = createServerFn({ method: "GET" })
     let rows = db.select().from(t.followUpTasks).orderBy(desc(t.followUpTasks.updatedAt)).all();
     if (data?.companyId) rows = rows.filter((r) => r.companyId === data.companyId);
     if (data?.status) rows = rows.filter((r) => r.status === data.status);
-    if (data?.assigneeUserId) rows = rows.filter((r) => r.assigneeUserId === data.assigneeUserId);
-    return rows.map(mapTask);
+    if (data?.assigneeUserId) {
+      rows = rows.filter((r) => {
+        if (r.assigneeUserId === data.assigneeUserId) return true;
+        try {
+          const ids = JSON.parse(r.assigneeUserIdsJson || "[]") as unknown;
+          return Array.isArray(ids) && ids.includes(data.assigneeUserId);
+        } catch {
+          return false;
+        }
+      });
+    }
+    return rows.map(mapTaskRow);
   });
 
 export const getFollowUpTask = createServerFn({ method: "GET" })
@@ -382,7 +379,7 @@ export const getFollowUpTask = createServerFn({ method: "GET" })
     requireUser();
     const row = getDb().select().from(t.followUpTasks).where(eq(t.followUpTasks.id, data.id)).get();
     if (!row) throw new ApiError(404, "Task not found");
-    return mapTask(row);
+    return mapTaskRow(row);
   });
 
 const taskInput = z.object({
@@ -397,8 +394,32 @@ const taskInput = z.object({
   priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
   progressPercent: z.number().int().min(0).max(100).default(0),
   dueDate: z.string().optional().nullable(),
+  taskType: z
+    .enum(["on_call_phone", "on_call_gmeet_teams", "offline_site_visit", "offline_office"])
+    .optional()
+    .nullable(),
+  startTime: z.string().optional().nullable(),
+  endTime: z.string().optional().nullable(),
+  durationMinutes: z.number().int().min(1).optional().nullable(),
   assigneeUserId: z.string().optional().nullable(),
+  assigneeUserIds: z.array(z.string()).optional().nullable(),
+  source: z.enum(["manual", "booking"]).optional(),
+  bookingAppointmentId: z.string().optional().nullable(),
+  skipConflictCheck: z.boolean().optional(),
 });
+
+function assertNoScheduleConflicts(input: {
+  userIds: string[];
+  startsAt: string;
+  endsAt: string;
+  excludeTaskId?: string;
+  excludeBookingId?: string;
+}) {
+  const conflicts = findScheduleConflicts(input);
+  if (conflicts.length > 0) {
+    throw new ApiError(409, formatScheduleConflictMessage(conflicts[0]!));
+  }
+}
 
 export const createFollowUpTask = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => taskInput.parse(data))
@@ -409,6 +430,46 @@ export const createFollowUpTask = createServerFn({ method: "POST" })
     const id = data.id ?? newId();
     const now = nowIso();
     const completedAt = data.status === "completed" ? now : null;
+
+    let schedule;
+    try {
+      schedule = normalizeTaskSchedule({
+        dueDate: data.dueDate,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        durationMinutes: data.durationMinutes,
+        taskType: data.taskType,
+      });
+    } catch {
+      throw new ApiError(400, "End time must be after start time");
+    }
+
+    if (data.taskType && schedule.startsAt && schedule.endsAt && !data.skipConflictCheck) {
+      const assigneeIds = data.assigneeUserIds?.length
+        ? data.assigneeUserIds
+        : data.assigneeUserId
+          ? [data.assigneeUserId]
+          : [];
+      if (assigneeIds.length === 0) {
+        throw new ApiError(400, "Assign at least one user for a scheduled task");
+      }
+      assertNoScheduleConflicts({
+        userIds: assigneeIds,
+        startsAt: schedule.startsAt,
+        endsAt: schedule.endsAt,
+        excludeBookingId: data.bookingAppointmentId ?? undefined,
+      });
+    }
+
+    const assigneeUserIdsJson = serializeAssigneeIds(
+      data.assigneeUserIds ?? undefined,
+      data.assigneeUserId,
+    );
+    const primaryAssignee = resolvePrimaryAssignee(
+      data.assigneeUserIds ?? undefined,
+      data.assigneeUserId,
+    );
+
     db.insert(t.followUpTasks)
       .values({
         id,
@@ -421,8 +482,17 @@ export const createFollowUpTask = createServerFn({ method: "POST" })
         status: data.status,
         priority: data.priority,
         progressPercent: data.progressPercent,
-        dueDate: data.dueDate ?? null,
-        assigneeUserId: data.assigneeUserId ?? null,
+        dueDate: schedule.dueDate,
+        taskType: data.taskType ?? null,
+        startTime: schedule.startTime,
+        endTime: schedule.endTime,
+        startsAt: schedule.startsAt,
+        endsAt: schedule.endsAt,
+        durationMinutes: schedule.durationMinutes,
+        assigneeUserId: primaryAssignee,
+        assigneeUserIdsJson,
+        source: data.source ?? "manual",
+        bookingAppointmentId: data.bookingAppointmentId ?? null,
         createdByUserId: user.id,
         completedAt,
         createdAt: now,
@@ -439,12 +509,14 @@ export const createFollowUpTask = createServerFn({ method: "POST" })
       newValues: {
         title: data.title,
         status: data.status,
-        priority: data.priority,
-        dueDate: data.dueDate,
-        assigneeUserId: data.assigneeUserId,
+        taskType: data.taskType,
+        dueDate: schedule.dueDate,
+        startTime: schedule.startTime,
+        endTime: schedule.endTime,
+        assigneeUserId: primaryAssignee,
+        assigneeUserIds: data.assigneeUserIds,
       },
-      progressPercent: data.progressPercent,
-      dueDate: data.dueDate ?? undefined,
+      dueDate: schedule.dueDate ?? undefined,
     });
     logActivity({
       who: user.name,
@@ -452,7 +524,7 @@ export const createFollowUpTask = createServerFn({ method: "POST" })
       kind: "info",
       companyId: data.companyId,
     });
-    return mapTask(db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, id)).get()!);
+    return mapTaskRow(db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, id)).get()!);
   });
 
 export const updateFollowUpTask = createServerFn({ method: "POST" })
@@ -481,6 +553,66 @@ export const updateFollowUpTask = createServerFn({ method: "POST" })
         : nextStatus === "cancelled"
           ? existing.completedAt
           : null;
+    const completedByUserId =
+      nextStatus === "completed" && !existing.completedAt ? user.id : existing.completedByUserId;
+
+    const dueDate = patch.dueDate !== undefined ? patch.dueDate : existing.dueDate;
+    const startTime = patch.startTime !== undefined ? patch.startTime : existing.startTime;
+    const endTime = patch.endTime !== undefined ? patch.endTime : existing.endTime;
+    const durationMinutes =
+      patch.durationMinutes !== undefined ? patch.durationMinutes : existing.durationMinutes;
+    const taskType = patch.taskType !== undefined ? patch.taskType : existing.taskType;
+
+    let schedule;
+    try {
+      schedule = normalizeTaskSchedule({
+        dueDate,
+        startTime,
+        endTime,
+        durationMinutes,
+        taskType: taskType as FollowUpTask["taskType"],
+      });
+    } catch {
+      throw new ApiError(400, "End time must be after start time");
+    }
+
+    const assigneeUserIdsJson =
+      patch.assigneeUserIds !== undefined || patch.assigneeUserId !== undefined
+        ? serializeAssigneeIds(
+            patch.assigneeUserIds ?? undefined,
+            patch.assigneeUserId !== undefined ? patch.assigneeUserId : existing.assigneeUserId,
+          )
+        : existing.assigneeUserIdsJson;
+    const primaryAssignee =
+      patch.assigneeUserIds !== undefined || patch.assigneeUserId !== undefined
+        ? resolvePrimaryAssignee(
+            patch.assigneeUserIds ?? undefined,
+            patch.assigneeUserId !== undefined ? patch.assigneeUserId : existing.assigneeUserId,
+          )
+        : existing.assigneeUserId;
+
+    const assigneeIdsForConflict = patch.assigneeUserIds?.length
+      ? patch.assigneeUserIds
+      : primaryAssignee
+        ? [primaryAssignee]
+        : [];
+
+    if (
+      taskType &&
+      schedule.startsAt &&
+      schedule.endsAt &&
+      !patch.skipConflictCheck &&
+      assigneeIdsForConflict.length > 0 &&
+      ["open", "in_progress", "blocked"].includes(nextStatus)
+    ) {
+      assertNoScheduleConflicts({
+        userIds: assigneeIdsForConflict,
+        startsAt: schedule.startsAt,
+        endsAt: schedule.endsAt,
+        excludeTaskId: data.id,
+        excludeBookingId: existing.bookingAppointmentId ?? undefined,
+      });
+    }
 
     db.update(t.followUpTasks)
       .set({
@@ -489,18 +621,17 @@ export const updateFollowUpTask = createServerFn({ method: "POST" })
         status: nextStatus,
         priority: patch.priority ?? existing.priority,
         progressPercent: patch.progressPercent ?? existing.progressPercent,
-        dueDate: patch.dueDate !== undefined ? patch.dueDate : existing.dueDate,
-        assigneeUserId:
-          patch.assigneeUserId !== undefined ? patch.assigneeUserId : existing.assigneeUserId,
-        onboardingProjectId:
-          patch.onboardingProjectId !== undefined
-            ? patch.onboardingProjectId
-            : existing.onboardingProjectId,
-        postSalesProjectId:
-          patch.postSalesProjectId !== undefined
-            ? patch.postSalesProjectId
-            : existing.postSalesProjectId,
+        dueDate: schedule.dueDate,
+        taskType: taskType ?? null,
+        startTime: schedule.startTime,
+        endTime: schedule.endTime,
+        startsAt: schedule.startsAt,
+        endsAt: schedule.endsAt,
+        durationMinutes: schedule.durationMinutes,
+        assigneeUserId: primaryAssignee,
+        assigneeUserIdsJson,
         completedAt,
+        completedByUserId,
         updatedAt: now,
       })
       .where(eq(t.followUpTasks.id, data.id))
@@ -522,22 +653,84 @@ export const updateFollowUpTask = createServerFn({ method: "POST" })
       remark,
       oldValues: {
         status: existing.status,
-        progressPercent: existing.progressPercent,
         dueDate: existing.dueDate,
+        startTime: existing.startTime,
+        endTime: existing.endTime,
         assigneeUserId: existing.assigneeUserId,
       },
       newValues: {
         status: nextStatus,
-        progressPercent: patch.progressPercent ?? existing.progressPercent,
-        dueDate: patch.dueDate !== undefined ? patch.dueDate : existing.dueDate,
-        assigneeUserId:
-          patch.assigneeUserId !== undefined ? patch.assigneeUserId : existing.assigneeUserId,
+        dueDate: schedule.dueDate,
+        startTime: schedule.startTime,
+        endTime: schedule.endTime,
+        assigneeUserId: primaryAssignee,
+        completedAt,
       },
-      progressPercent: patch.progressPercent ?? existing.progressPercent,
-      dueDate: (patch.dueDate !== undefined ? patch.dueDate : existing.dueDate) ?? undefined,
+      dueDate: schedule.dueDate ?? undefined,
     });
 
-    return mapTask(db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, data.id)).get()!);
+    return mapTaskRow(db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, data.id)).get()!);
+  });
+
+export const completeFollowUpTask = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string(), remark: z.string().optional() }).parse(data))
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    const db = getDb();
+    const existing = db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, data.id)).get();
+    if (!existing) throw new ApiError(404, "Task not found");
+    assertCanManageFollowUpTask(user, existing.companyId);
+    const now = nowIso();
+    db.update(t.followUpTasks)
+      .set({
+        status: "completed",
+        progressPercent: 100,
+        completedAt: now,
+        completedByUserId: user.id,
+        updatedAt: now,
+      })
+      .where(eq(t.followUpTasks.id, data.id))
+      .run();
+    writeCrmEvent({
+      companyId: existing.companyId,
+      entityType: "task",
+      taskId: data.id,
+      eventType: "task_status_completed",
+      actorUserId: user.id,
+      actorName: user.name,
+      remark: data.remark,
+      oldValues: { status: existing.status, completedAt: existing.completedAt },
+      newValues: { status: "completed", completedAt: now, completedByUserId: user.id },
+    });
+    return mapTaskRow(db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, data.id)).get()!);
+  });
+
+export const checkTaskScheduleConflicts = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        assigneeUserIds: z.array(z.string()).min(1),
+        startsAt: z.string().min(10),
+        endsAt: z.string().min(10),
+        excludeTaskId: z.string().optional(),
+        excludeBookingId: z.string().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    requireUser();
+    const conflicts = findScheduleConflicts({
+      userIds: data.assigneeUserIds,
+      startsAt: data.startsAt,
+      endsAt: data.endsAt,
+      excludeTaskId: data.excludeTaskId,
+      excludeBookingId: data.excludeBookingId,
+    });
+    return {
+      hasConflict: conflicts.length > 0,
+      conflicts,
+      message: conflicts[0] ? formatScheduleConflictMessage(conflicts[0]) : undefined,
+    };
   });
 
 export const cancelFollowUpTask = createServerFn({ method: "POST" })
@@ -565,7 +758,7 @@ export const cancelFollowUpTask = createServerFn({ method: "POST" })
       oldValues: { status: existing.status },
       newValues: { status: "cancelled" },
     });
-    return mapTask(db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, data.id)).get()!);
+    return mapTaskRow(db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, data.id)).get()!);
   });
 
 /* ---------- Visits ---------- */
