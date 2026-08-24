@@ -93,7 +93,7 @@ export function BookingGoogleCalendarPanel({
       <DesignTicketSection compact title="Google Calendar & Meet">
         <p className="mb-2 text-[10px] text-muted-foreground">
           Connect your Google account so approved bookings create a Calendar event with a Meet link,
-          and your Google busy times block open slots (Cal.com-style).
+          and your Google busy times block open slots.
         </p>
       </DesignTicketSection>
 

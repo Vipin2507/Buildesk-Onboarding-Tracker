@@ -23,6 +23,7 @@ import {
   listStaffBookingSlots,
   replaceBookingAvailability,
   rescheduleBookingAppointment,
+  retryBookingGoogleCalendarSync,
   updateBookingAppointmentStatus,
 } from "@/lib/api";
 import { dispatchCrmBookingAutomationTrigger } from "@/services/crm-automation";
@@ -87,6 +88,7 @@ type BookingState = {
   cancelAppointment: (id: string, hostNote?: string) => Promise<BookingAppointment>;
   postponeAppointment: (id: string, hostNote?: string) => Promise<BookingAppointment>;
   rescheduleAppointment: (id: string, startsAt: string) => Promise<BookingAppointment>;
+  retryGoogleCalendarSync: (id: string) => Promise<BookingAppointment>;
   listSlotsForEvent: (eventTypeId: string, from: string, to: string) => Promise<BookingSlot[]>;
   saveAvailabilityWindows: (input: {
     hostUserId?: string;
@@ -264,6 +266,12 @@ export const useBookingStore = createStore<BookingState>((set, get) => ({
 
   rescheduleAppointment: async (id, startsAt) => {
     const updated = await rescheduleBookingAppointment({ data: { id, startsAt } });
+    get().mergeAppointment(updated);
+    return updated;
+  },
+
+  retryGoogleCalendarSync: async (id) => {
+    const updated = await retryBookingGoogleCalendarSync({ data: { id } });
     get().mergeAppointment(updated);
     return updated;
   },

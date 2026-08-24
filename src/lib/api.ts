@@ -196,6 +196,7 @@ export {
   deleteBookingBlock,
   updateBookingAppointmentStatus,
   rescheduleBookingAppointment,
+  retryBookingGoogleCalendarSync,
   getBookingSummaryForCompany,
 } from "@/server/api/bookings";
 

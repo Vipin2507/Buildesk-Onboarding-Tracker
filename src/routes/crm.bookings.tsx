@@ -113,6 +113,36 @@ function statusTone(status: BookingAppointmentStatus) {
   return "muted" as const;
 }
 
+function showBookingApproveToast(
+  updated: BookingAppointment,
+  currentUserId: string | undefined,
+  googleConnected: boolean,
+  executiveName: string,
+) {
+  if (updated.meetUrl) {
+    toast.success("Booking approved · added to Google Calendar with Meet link");
+    return;
+  }
+  if (updated.googleSyncStatus === "error" && updated.googleSyncError) {
+    toast.error(`Approved, but calendar sync failed: ${updated.googleSyncError}`);
+    return;
+  }
+  const isHost = updated.hostUserId === currentUserId;
+  if (isHost && !googleConnected) {
+    toast.warning(
+      "Booking approved — connect Google Calendar under the Calendar tab, then retry sync",
+    );
+    return;
+  }
+  if (!isHost && !googleConnected) {
+    toast.warning(
+      `Booking approved — connect Google Calendar or ask ${executiveName} to connect, then retry sync`,
+    );
+    return;
+  }
+  toast.success("Booking approved");
+}
+
 function CrmBookingsPage() {
   const user = useCurrentUser();
   const isAdmin = isAdminRoleKey(user?.role);
@@ -130,6 +160,7 @@ function CrmBookingsPage() {
   const cancelAppointment = useBookingStore((s) => s.cancelAppointment);
   const postponeAppointment = useBookingStore((s) => s.postponeAppointment);
   const rescheduleAppointment = useBookingStore((s) => s.rescheduleAppointment);
+  const retryGoogleCalendarSync = useBookingStore((s) => s.retryGoogleCalendarSync);
   const listSlotsForEvent = useBookingStore((s) => s.listSlotsForEvent);
   const saveAvailabilityWindows = useBookingStore((s) => s.saveAvailabilityWindows);
   const addBlock = useBookingStore((s) => s.addBlock);
@@ -363,15 +394,12 @@ function CrmBookingsPage() {
               e.stopPropagation();
               void acceptAppointment(appt.id, noteById[appt.id])
                 .then((updated) => {
-                  if (updated.meetUrl) {
-                    toast.success("Booking approved · Meet link created");
-                  } else if (!googleConnected) {
-                    toast.success(
-                      "Booking approved — connect Google Calendar for Meet links",
-                    );
-                  } else {
-                    toast.success("Booking approved");
-                  }
+                  showBookingApproveToast(
+                    updated,
+                    user?.id,
+                    googleConnected,
+                    hostName(appt.hostUserId),
+                  );
                 })
                 .catch((err) => toast.error(err instanceof Error ? err.message : "Failed"));
             }}
@@ -716,9 +744,76 @@ function CrmBookingsPage() {
                           </div>
                         ) : null}
                         {appt.googleSyncStatus === "error" && appt.googleSyncError ? (
-                          <p className="text-[10px] text-destructive">
-                            Google sync: {appt.googleSyncError}
-                          </p>
+                          <div className="space-y-2">
+                            <p className="text-[10px] text-destructive">
+                              Google Calendar: {appt.googleSyncError}
+                            </p>
+                            {(appt.status === "confirmed" || appt.status === "postponed") &&
+                            !appt.meetUrl ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-[10px]"
+                                onClick={() => {
+                                  void retryGoogleCalendarSync(appt.id)
+                                    .then((updated) => {
+                                      if (updated.meetUrl) {
+                                        toast.success("Calendar event & Meet link created");
+                                      } else if (updated.googleSyncError) {
+                                        toast.error(updated.googleSyncError);
+                                      } else {
+                                        toast.message(
+                                          "Sync attempted — connect Google Calendar under the Calendar tab if needed",
+                                        );
+                                      }
+                                    })
+                                    .catch((err) =>
+                                      toast.error(
+                                        err instanceof Error ? err.message : "Calendar sync failed",
+                                      ),
+                                    );
+                                }}
+                              >
+                                Retry calendar sync
+                              </Button>
+                            ) : null}
+                          </div>
+                        ) : (appt.status === "confirmed" || appt.status === "postponed") &&
+                          !appt.meetUrl ? (
+                          <div className="space-y-2">
+                            <p className="text-[10px] text-muted-foreground">
+                              No Google Calendar event yet. Connect under the Calendar tab, then
+                              retry sync.
+                            </p>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-[10px]"
+                              onClick={() => {
+                                void retryGoogleCalendarSync(appt.id)
+                                  .then((updated) => {
+                                    if (updated.meetUrl) {
+                                      toast.success("Calendar event & Meet link created");
+                                    } else if (updated.googleSyncError) {
+                                      toast.error(updated.googleSyncError);
+                                    } else {
+                                      toast.message(
+                                        "Sync attempted — connect Google Calendar under the Calendar tab if needed",
+                                      );
+                                    }
+                                  })
+                                  .catch((err) =>
+                                    toast.error(
+                                      err instanceof Error ? err.message : "Calendar sync failed",
+                                    ),
+                                  );
+                              }}
+                            >
+                              Retry calendar sync
+                            </Button>
+                          </div>
                         ) : null}
                         {appt.notes ? (
                           <p className="rounded-md bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground">

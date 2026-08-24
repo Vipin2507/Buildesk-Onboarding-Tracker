@@ -362,11 +362,43 @@ async function loadOpenSlots(event: BookingEventType, fromYmd: string, toYmd: st
   });
 }
 
+type ActingUser = { id: string; role?: string };
+
+/** Pick whose Google Calendar to write to: host first, then approver if host/admin with OAuth connected. */
+function resolveGoogleCalendarUserId(
+  appointment: { hostUserId: string },
+  actingUser: ActingUser,
+): string | null {
+  if (getGoogleCalendarConnection(appointment.hostUserId)) return appointment.hostUserId;
+  if (!getGoogleCalendarConnection(actingUser.id)) return null;
+  if (actingUser.id === appointment.hostUserId) return actingUser.id;
+  if (isAdminRoleKey(actingUser.role)) return actingUser.id;
+  return null;
+}
+
+function googleCalendarSyncErrorMessage(
+  appointment: { hostUserId: string },
+  actingUser: ActingUser,
+  hostName?: string,
+): string {
+  const hostLabel = hostName?.trim() || "The booking executive";
+  if (actingUser.id === appointment.hostUserId) {
+    return "Connect Google Calendar under CRM → Bookings → Calendar, then use Retry calendar sync.";
+  }
+  if (isAdminRoleKey(actingUser.role)) {
+    return `${hostLabel} has not connected Google Calendar. Connect your Google account under CRM → Bookings → Calendar, then retry sync.`;
+  }
+  return `${hostLabel} must connect Google Calendar under CRM → Bookings → Calendar.`;
+}
+
 async function syncGoogleCalendarForAppointment(
   appointment: typeof t.bookingAppointments.$inferSelect,
   action: "upsert" | "delete",
+  actingUser: ActingUser,
 ) {
   const db = getDb();
+  const hostUser = db.select().from(t.users).where(eq(t.users.id, appointment.hostUserId)).get();
+  const calendarUserId = resolveGoogleCalendarUserId(appointment, actingUser);
   const timeZone = resolveHostTimezone(appointment.hostUserId);
   const eventRow = db
     .select()
@@ -390,9 +422,9 @@ async function syncGoogleCalendarForAppointment(
 
   try {
     if (action === "delete") {
-      if (appointment.googleEventId) {
+      if (appointment.googleEventId && calendarUserId) {
         await deleteGoogleMeetEvent({
-          hostUserId: appointment.hostUserId,
+          hostUserId: calendarUserId,
           eventId: appointment.googleEventId,
         });
       }
@@ -409,12 +441,12 @@ async function syncGoogleCalendarForAppointment(
       return;
     }
 
-    const connected = getGoogleCalendarConnection(appointment.hostUserId);
-    if (!connected) {
+    if (!calendarUserId) {
+      const message = googleCalendarSyncErrorMessage(appointment, actingUser, hostUser?.name);
       db.update(t.bookingAppointments)
         .set({
-          googleSyncStatus: "none",
-          googleSyncError: null,
+          googleSyncStatus: "error",
+          googleSyncError: message.slice(0, 500),
           updatedAt: nowIso(),
         })
         .where(eq(t.bookingAppointments.id, appointment.id))
@@ -424,7 +456,7 @@ async function syncGoogleCalendarForAppointment(
 
     if (appointment.googleEventId) {
       const updated = await updateGoogleMeetEvent({
-        hostUserId: appointment.hostUserId,
+        hostUserId: calendarUserId,
         eventId: appointment.googleEventId,
         summary,
         description,
@@ -447,7 +479,7 @@ async function syncGoogleCalendarForAppointment(
     }
 
     const created = await createGoogleMeetEvent({
-      hostUserId: appointment.hostUserId,
+      hostUserId: calendarUserId,
       appointmentId: appointment.id,
       summary,
       description,
@@ -457,7 +489,17 @@ async function syncGoogleCalendarForAppointment(
       guestEmail: appointment.guestEmail,
       guestName: appointment.guestName,
     });
-    if (!created) return;
+    if (!created) {
+      db.update(t.bookingAppointments)
+        .set({
+          googleSyncStatus: "error",
+          googleSyncError: "Google Calendar authorization failed. Reconnect under CRM → Bookings → Calendar.",
+          updatedAt: nowIso(),
+        })
+        .where(eq(t.bookingAppointments.id, appointment.id))
+        .run();
+      return;
+    }
     db.update(t.bookingAppointments)
       .set({
         googleEventId: created.eventId,
@@ -1181,9 +1223,9 @@ export const updateBookingAppointmentStatus = createServerFn({ method: "POST" })
       .get()!;
 
     if (data.status === "confirmed") {
-      await syncGoogleCalendarForAppointment(updated, "upsert");
+      await syncGoogleCalendarForAppointment(updated, "upsert", user);
     } else if (data.status === "cancelled" || data.status === "declined") {
-      await syncGoogleCalendarForAppointment(updated, "delete");
+      await syncGoogleCalendarForAppointment(updated, "delete", user);
     }
 
     return mapAppointment(
@@ -1267,9 +1309,30 @@ export const rescheduleBookingAppointment = createServerFn({ method: "POST" })
       .get()!;
 
     if (nextStatus === "confirmed") {
-      await syncGoogleCalendarForAppointment(updated, "upsert");
+      await syncGoogleCalendarForAppointment(updated, "upsert", user);
     }
 
+    return mapAppointment(
+      db.select().from(t.bookingAppointments).where(eq(t.bookingAppointments.id, data.id)).get()!,
+    );
+  });
+
+export const retryBookingGoogleCalendarSync = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    const db = getDb();
+    const row = db
+      .select()
+      .from(t.bookingAppointments)
+      .where(eq(t.bookingAppointments.id, data.id))
+      .get();
+    if (!row) throw new ApiError(404, "Appointment not found");
+    assertCanManageAppointment(user, row);
+    if (row.status !== "confirmed" && row.status !== "postponed") {
+      throw new ApiError(400, "Only confirmed or postponed bookings can be synced to Google Calendar");
+    }
+    await syncGoogleCalendarForAppointment(row, "upsert", user);
     return mapAppointment(
       db.select().from(t.bookingAppointments).where(eq(t.bookingAppointments.id, data.id)).get()!,
     );
