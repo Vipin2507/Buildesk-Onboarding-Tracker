@@ -44,6 +44,7 @@ import {
   parseCrmBookingsTab,
   type CrmBookingsTabId,
 } from "@/lib/crm-route-search";
+import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/stores/useAuthStore";
 import { useBookingStore } from "@/stores/useBookingStore";
 import { useCrmAccountStore } from "@/stores/useCrmAccountStore";
@@ -385,10 +386,29 @@ function CrmBookingsPage() {
     setDateTo("");
   }
 
+  function renderMeetButton(meetUrl: string) {
+    return (
+      <Button
+        size="sm"
+        className="h-7 gap-1 px-2 text-[10px]"
+        asChild
+        onClick={(e) => e.stopPropagation()}
+      >
+        <a href={meetUrl} target="_blank" rel="noreferrer">
+          <Video className="h-3 w-3" />
+          Join Meet
+        </a>
+      </Button>
+    );
+  }
+
   function renderActions(appt: BookingAppointment) {
+    const meetBtn = appt.meetUrl ? renderMeetButton(appt.meetUrl) : null;
+
     if (appt.status === "pending") {
       return (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap items-center gap-1">
+          {meetBtn}
           <Button
             size="sm"
             className="h-7 gap-1 px-2 text-[10px]"
@@ -431,7 +451,8 @@ function CrmBookingsPage() {
       appt.startsAt >= now
     ) {
       return (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap items-center gap-1">
+          {meetBtn}
           <Button
             size="sm"
             variant="outline"
@@ -473,6 +494,9 @@ function CrmBookingsPage() {
           </Button>
         </div>
       );
+    }
+    if (meetBtn) {
+      return <div className="flex flex-wrap items-center gap-1">{meetBtn}</div>;
     }
     return <span className="text-[10px] text-muted-foreground">—</span>;
   }
@@ -623,9 +647,19 @@ function CrmBookingsPage() {
                     hideSearch
                     pageSize={12}
                     getRowId={(a) => a.id}
-                    onRowClick={(a) =>
-                      setExpandedId((prev) => (prev === a.id ? null : a.id))
-                    }
+                    onRowClick={(a) => {
+                      if (expandedId === a.id) {
+                        setExpandedId(null);
+                        return;
+                      }
+                      setExpandedId(a.id);
+                      if (
+                        (a.status === "confirmed" || a.status === "postponed") &&
+                        a.startsAt >= now
+                      ) {
+                        void loadRescheduleSlots(a.id, a.startsAt.slice(0, 10));
+                      }
+                    }}
                     columns={[
                       {
                         key: "guestName",
@@ -685,23 +719,9 @@ function CrmBookingsPage() {
                         header: "Status",
                         sortable: true,
                         render: (a) => (
-                          <div className="space-y-1">
-                            <Pill tone={statusTone(a.status)}>
-                              {BOOKING_STATUS_LABEL[a.status]}
-                            </Pill>
-                            {a.meetUrl ? (
-                              <a
-                                href={a.meetUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 text-[10px] font-medium text-primary hover:underline"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <Video className="h-3 w-3" />
-                                Meet
-                              </a>
-                            ) : null}
-                          </div>
+                          <Pill tone={statusTone(a.status)}>
+                            {BOOKING_STATUS_LABEL[a.status]}
+                          </Pill>
                         ),
                       },
                     ]}
@@ -940,105 +960,102 @@ function BookingDetailPanel({
 
   return (
     <div className="card-soft overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/20 px-3 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/20 px-4 py-2.5">
         <div className="flex flex-wrap items-center gap-2">
           <Pill tone={statusTone(appt.status)}>{BOOKING_STATUS_LABEL[appt.status]}</Pill>
-          <span className="text-xs text-muted-foreground">{callType}</span>
+          <span className="text-xs font-medium text-muted-foreground">{callType}</span>
         </div>
-        {appt.status === "pending" ? (
-          <div className="flex flex-wrap gap-1">
-            <Button size="sm" className="h-7 gap-1 px-2 text-[10px]" onClick={onAccept}>
-              <Check className="h-3 w-3" />
-              Approve
+        <div className="flex flex-wrap items-center gap-1.5">
+          {appt.meetUrl ? (
+            <Button size="sm" className="h-7 gap-1 px-2.5 text-[10px]" asChild>
+              <a href={appt.meetUrl} target="_blank" rel="noreferrer">
+                <Video className="h-3 w-3" />
+                Join Meet
+              </a>
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 gap-1 px-2 text-[10px]"
-              onClick={onDecline}
-            >
-              <X className="h-3 w-3" />
-              Decline
-            </Button>
-          </div>
-        ) : canReschedule ? (
-          <div className="flex flex-wrap gap-1">
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 px-2 text-[10px]"
-              onClick={onPostpone}
-            >
-              Postpone
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 px-2 text-[10px]"
-              onClick={onCancel}
-            >
-              Cancel
-            </Button>
-          </div>
-        ) : null}
+          ) : null}
+          {appt.status === "pending" ? (
+            <>
+              <Button size="sm" className="h-7 gap-1 px-2.5 text-[10px]" onClick={onAccept}>
+                <Check className="h-3 w-3" />
+                Approve
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1 px-2.5 text-[10px]"
+                onClick={onDecline}
+              >
+                <X className="h-3 w-3" />
+                Decline
+              </Button>
+            </>
+          ) : canReschedule ? (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2.5 text-[10px]"
+                onClick={onPostpone}
+              >
+                Postpone
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2.5 text-[10px]"
+                onClick={onCancel}
+              >
+                Cancel
+              </Button>
+            </>
+          ) : null}
+        </div>
       </div>
 
-      <div className="grid gap-3 p-3 lg:grid-cols-[1fr_1fr]">
-        <div className="space-y-3">
-          <div className="rounded-lg border bg-background p-3">
-            <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              <User className="h-3 w-3" />
-              Guest
+      <div className="grid gap-3 p-4 lg:grid-cols-2">
+        <BookingDetailSection icon={User} title="Guest">
+          <div className="text-sm font-semibold">{appt.guestName}</div>
+          <a
+            href={`mailto:${appt.guestEmail}`}
+            className="mt-1 inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+          >
+            <Mail className="h-3.5 w-3.5 shrink-0" />
+            <span className="break-all">{appt.guestEmail}</span>
+          </a>
+          {appt.guestPhone ? (
+            <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Phone className="h-3.5 w-3.5 shrink-0" />
+              {appt.guestPhone}
             </div>
-            <div className="text-sm font-semibold">{appt.guestName}</div>
-            <a
-              href={`mailto:${appt.guestEmail}`}
-              className="mt-1 inline-flex items-center gap-1 text-xs text-primary hover:underline"
-            >
-              <Mail className="h-3 w-3" />
-              {appt.guestEmail}
-            </a>
-            {appt.guestPhone ? (
-              <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                <Phone className="h-3 w-3" />
-                {appt.guestPhone}
-              </div>
-            ) : null}
-          </div>
+          ) : null}
+        </BookingDetailSection>
 
-          <div className="rounded-lg border bg-background p-3">
-            <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              <Calendar className="h-3 w-3" />
-              Schedule
-            </div>
-            <div className="text-sm font-medium">{formatWhen(appt.startsAt, appt.endsAt)}</div>
-            <div className="mt-0.5 text-xs text-muted-foreground">
-              {slotDurationMinutes(appt.startsAt, appt.endsAt)} · {executiveName}
-            </div>
-            <div className="mt-1 text-xs text-muted-foreground">{accountName}</div>
+        <BookingDetailSection icon={Calendar} title="Schedule">
+          <div className="text-sm font-medium">{formatWhen(appt.startsAt, appt.endsAt)}</div>
+          <div className="mt-1 text-xs text-muted-foreground">
+            {slotDurationMinutes(appt.startsAt, appt.endsAt)} · {executiveName}
           </div>
-        </div>
+          <div className="mt-0.5 text-xs text-muted-foreground">{accountName}</div>
+        </BookingDetailSection>
 
-        <div className="space-y-3">
-          {appt.meetUrl ? (
-            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
-              <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                <Video className="h-3 w-3" />
-                Google Meet
-              </div>
-              <a
-                href={appt.meetUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="break-all text-xs text-primary hover:underline"
-              >
-                {appt.meetUrl}
-              </a>
+        {appt.meetUrl ? (
+          <BookingDetailSection icon={Video} title="Google Meet" variant="accent" className="lg:col-span-2">
+            <div className="rounded-md border bg-background px-2.5 py-2 font-mono text-[11px] leading-relaxed text-primary break-all">
+              {appt.meetUrl}
+            </div>
+            <div className="mt-2.5 flex flex-wrap gap-2">
+              <Button size="sm" className="h-7 gap-1 px-2.5 text-[10px]" asChild>
+                <a href={appt.meetUrl} target="_blank" rel="noreferrer">
+                  <Video className="h-3 w-3" />
+                  Open Meet
+                </a>
+              </Button>
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
-                className="mt-2 h-7 text-[10px]"
+                className="h-7 px-2.5 text-[10px]"
                 onClick={() => {
                   void navigator.clipboard.writeText(appt.meetUrl!);
                   toast.success("Meet link copied");
@@ -1047,88 +1064,139 @@ function BookingDetailPanel({
                 Copy link
               </Button>
             </div>
-          ) : appt.googleSyncStatus === "error" && appt.googleSyncError ? (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
-              <p className="text-xs text-destructive">{appt.googleSyncError}</p>
-              {(appt.status === "confirmed" || appt.status === "postponed") && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="mt-2 h-7 text-[10px]"
-                  onClick={onRetrySync}
-                >
-                  Retry calendar sync
-                </Button>
-              )}
-            </div>
-          ) : (appt.status === "confirmed" || appt.status === "postponed") && !appt.meetUrl ? (
-            <div className="rounded-lg border border-dashed p-3">
-              <p className="text-xs text-muted-foreground">
-                No calendar event yet.
-                {!googleConnected && appt.hostUserId === userId
-                  ? " Connect Google Calendar under the Calendar tab."
-                  : " Use retry sync after connecting."}
-              </p>
+          </BookingDetailSection>
+        ) : appt.googleSyncStatus === "error" && appt.googleSyncError ? (
+          <BookingDetailSection icon={Video} title="Calendar sync" variant="danger" className="lg:col-span-2">
+            <p className="text-xs leading-relaxed text-destructive">{appt.googleSyncError}</p>
+            {(appt.status === "confirmed" || appt.status === "postponed") && (
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
-                className="mt-2 h-7 text-[10px]"
+                className="mt-2.5 h-7 text-[10px]"
                 onClick={onRetrySync}
               >
                 Retry calendar sync
               </Button>
-            </div>
-          ) : null}
+            )}
+          </BookingDetailSection>
+        ) : (appt.status === "confirmed" || appt.status === "postponed") && !appt.meetUrl ? (
+          <BookingDetailSection icon={Video} title="Google Meet" variant="muted" className="lg:col-span-2">
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              No calendar event yet.
+              {!googleConnected && appt.hostUserId === userId
+                ? " Connect Google Calendar under the Calendar tab."
+                : " Use retry sync after connecting."}
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="mt-2.5 h-7 text-[10px]"
+              onClick={onRetrySync}
+            >
+              Retry calendar sync
+            </Button>
+          </BookingDetailSection>
+        ) : null}
 
-          {appt.notes ? (
-            <div className="rounded-lg bg-muted/30 p-3 text-xs text-muted-foreground">
-              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide">Notes</div>
-              {appt.notes}
-            </div>
-          ) : null}
+        {appt.notes ? (
+          <BookingDetailSection icon={Inbox} title="Notes" className="lg:col-span-2">
+            <p className="whitespace-pre-wrap text-xs leading-relaxed text-foreground">{appt.notes}</p>
+          </BookingDetailSection>
+        ) : null}
 
-          {appt.status === "pending" ? (
+        {appt.status === "pending" ? (
+          <div className="lg:col-span-2">
             <Input
               placeholder="Optional note to guest (included in status email)"
               className="h-8 text-xs"
               value={note}
               onChange={(e) => onNoteChange(e.target.value)}
             />
-          ) : null}
+          </div>
+        ) : null}
 
-          {canReschedule ? (
-            <div className="rounded-lg border border-dashed p-3">
-              <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                <Clock className="h-3 w-3" />
-                Reschedule
-              </div>
-              <DatePickerField
-                value={rescheduleDate}
-                onChange={onRescheduleDateChange}
-                yearsBack={0}
-                yearsForward={1}
-              />
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {rescheduleSlots.map((slot) => (
-                  <button
-                    key={slot.startsAt}
-                    type="button"
-                    className="rounded-md border px-2.5 py-1 text-[10px] font-medium hover:border-primary"
-                    onClick={() => onRescheduleSlot(slot.startsAt)}
-                  >
-                    {slot.startsAt.slice(11, 16)}
-                  </button>
-                ))}
-                {rescheduleSlots.length === 0 ? (
-                  <span className="text-[10px] text-muted-foreground">No open slots</span>
-                ) : null}
-              </div>
+        {canReschedule ? (
+          <BookingDetailSection icon={Clock} title="Reschedule" variant="dashed" className="lg:col-span-2">
+            <DatePickerField
+              value={rescheduleDate}
+              onChange={onRescheduleDateChange}
+              yearsBack={0}
+              yearsForward={1}
+            />
+            <div className="mt-3">
+              {!rescheduleDate ? (
+                <p className="text-[10px] text-muted-foreground">
+                  Pick a date to see available times.
+                </p>
+              ) : rescheduleSlots.length === 0 ? (
+                <p className="text-[10px] text-muted-foreground">
+                  No open slots on {rescheduleDate}. Try another date.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {rescheduleSlots.map((slot) => (
+                    <button
+                      key={slot.startsAt}
+                      type="button"
+                      className="rounded-md border bg-background px-2.5 py-1.5 text-[10px] font-medium transition-colors hover:border-primary hover:bg-primary/5"
+                      onClick={() => onRescheduleSlot(slot.startsAt)}
+                    >
+                      {slot.startsAt.slice(11, 16)}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          ) : null}
-        </div>
+          </BookingDetailSection>
+        ) : null}
       </div>
+    </div>
+  );
+}
+
+function BookingDetailSection({
+  icon: Icon,
+  title,
+  children,
+  variant = "default",
+  className,
+}: {
+  icon: typeof User;
+  title: string;
+  children: React.ReactNode;
+  variant?: "default" | "accent" | "danger" | "muted" | "dashed";
+  className?: string;
+}) {
+  const styles = {
+    default: "border bg-background",
+    accent: "border border-primary/20 bg-primary/5",
+    danger: "border border-destructive/30 bg-destructive/5",
+    muted: "border border-dashed bg-muted/20",
+    dashed: "border border-dashed bg-background",
+  };
+
+  const titleStyles = {
+    default: "text-muted-foreground",
+    accent: "text-primary",
+    danger: "text-destructive",
+    muted: "text-muted-foreground",
+    dashed: "text-muted-foreground",
+  };
+
+  return (
+    <div className={cn("rounded-lg p-3", styles[variant], className)}>
+      <div
+        className={cn(
+          "mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide",
+          titleStyles[variant],
+        )}
+      >
+        <Icon className="h-3 w-3 shrink-0" />
+        {title}
+      </div>
+      {children}
     </div>
   );
 }
