@@ -101,14 +101,23 @@ function defaultCompanyFormValues(users: User[]): CompanyForm {
   };
 }
 
-function normalizeCompanyPayload(data: CompanyForm) {
+function normalizeCompanyPayload(data: CompanyForm, users: User[]) {
+  const managers = assignableManagerUsers(users);
+  const phone = data.phone.replace(/\D/g, "");
+  const onboardingManagerId = data.onboardingManagerId?.trim() || managers[0]?.id || "";
   return {
     ...data,
+    phone,
     ownerName: (data.ownerName ?? "").trim() || data.contact.trim(),
-    ownerMobile: (data.ownerMobile ?? "").trim() || data.phone.trim(),
+    ownerMobile: (data.ownerMobile ?? "").trim() || phone,
     pocName: (data.pocName ?? "").trim() || data.contact.trim(),
-    pocMobile: (data.pocMobile ?? "").trim() || data.phone.trim(),
+    pocMobile: (data.pocMobile ?? "").trim() || phone,
     csmId: data.csmId ?? "",
+    onboardingManagerId,
+    salesAgentId: data.salesAgentId?.trim() || undefined,
+    supportManager1Id: data.supportManager1Id?.trim() || undefined,
+    supportManager2Id: data.supportManager2Id?.trim() || undefined,
+    endDate: data.endDate?.trim() || undefined,
   };
 }
 
@@ -127,7 +136,7 @@ const companySchema = z.object({
   name: z.string().min(2),
   contact: z.string().min(2),
   designation: z.string().min(2),
-  phone: z.string().min(10),
+  phone: z.string().min(10, "Enter a valid mobile number (at least 10 digits)"),
   email: z.string().email(),
   city: z.string().min(2),
   region: z.enum(["NCR", "South", "West", "Rest of India"]),
@@ -580,7 +589,7 @@ function CompaniesListPage() {
   function onSubmit() {
     void form.handleSubmit(
       async (data) => {
-        const payload = normalizeCompanyPayload(data);
+        const payload = normalizeCompanyPayload(data, users);
         if (editing) {
           updateCompany(editing.id, {
             ...payload,
@@ -589,6 +598,13 @@ function CompaniesListPage() {
           });
           toast.success("Company updated");
           setModalOpen(false);
+          return;
+        }
+
+        if (!payload.onboardingManagerId) {
+          toast.error("No onboarding manager available", {
+            description: "Ask an admin to invite an ERP user before creating companies.",
+          });
           return;
         }
 
@@ -608,8 +624,11 @@ function CompaniesListPage() {
             },
           });
           setModalOpen(false);
-        } catch {
-          // Error toast is shown by serverSyncTrackedWithRollback.
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "Could not save company";
+          if (!/not saved|Failed to sync|permission/i.test(message)) {
+            toast.error(message);
+          }
         } finally {
           setSavingCompany(false);
         }
@@ -969,10 +988,14 @@ function CompaniesListPage() {
 
       <EntityFormModal
         open={modalOpen}
-        onOpenChange={setModalOpen}
+        onOpenChange={(open) => {
+          if (savingCompany) return;
+          setModalOpen(open);
+        }}
         title={editing ? "Edit Company" : "Add Company"}
         onSubmit={onSubmit}
         submitLabel={savingCompany ? "Saving…" : editing ? "Update" : "Create"}
+        submitDisabled={savingCompany}
       >
         <div className="grid gap-4">
           <div className="space-y-3">
@@ -1085,7 +1108,9 @@ function CompaniesListPage() {
               <p className="mt-1 text-xs text-destructive">{form.formState.errors.onboardingManagerId.message}</p>
             ) : null}
             {!isAdmin ? (
-              <p className="mt-1 text-xs text-muted-foreground">Only admins can assign onboarding managers.</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Assigned automatically to {resolveAssigneeLabel(form.watch("onboardingManagerId"), users, employees)}.
+              </p>
             ) : null}
           </div>
           <div>

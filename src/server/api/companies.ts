@@ -122,6 +122,28 @@ export const getCompany = createServerFn({ method: "GET" })
     return company;
   });
 
+const optionalNumber = z.preprocess(
+  (value) => {
+    if (value === "" || value === null || value === undefined) return undefined;
+    const n = typeof value === "number" ? value : Number(value);
+    return Number.isFinite(n) ? n : undefined;
+  },
+  z.number().optional().nullable(),
+);
+
+function parseCompanyInput(data: unknown) {
+  try {
+    return companyInput.parse(data);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      const first = err.errors[0];
+      const field = first?.path?.length ? first.path.join(".") : "input";
+      throw new ApiError(400, `${field}: ${first?.message ?? "Invalid value"}`);
+    }
+    throw err;
+  }
+}
+
 const companyInput = z.object({
   id: z.string().optional(),
   name: z.string().min(1),
@@ -157,11 +179,11 @@ const companyInput = z.object({
   supportManager2Id: z.string().optional().nullable(),
   additionalSupportContactIds: z.array(z.string()).optional().nullable(),
   annualLicense: z.boolean().optional().nullable(),
-  dealSize: z.number().optional().nullable(),
-  usersPurchased: z.number().optional().nullable(),
-  totalCost: z.number().optional().nullable(),
-  paymentReceived: z.number().optional().nullable(),
-  pendingAmount: z.number().optional().nullable(),
+  dealSize: optionalNumber,
+  usersPurchased: optionalNumber,
+  totalCost: optionalNumber,
+  paymentReceived: optionalNumber,
+  pendingAmount: optionalNumber,
   endDate: z.string().optional().nullable(),
   paymentHistory: z
     .array(
@@ -192,7 +214,7 @@ const companyInput = z.object({
 });
 
 export const createCompany = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => companyInput.parse(data))
+  .inputValidator((data: unknown) => parseCompanyInput(data))
   .handler(async ({ data }) => {
     const user = requirePermission("manageCompanies");
     if (data.salesAgentId) {

@@ -60,6 +60,7 @@ export function EntityFormModal({
   children,
   onSubmit,
   submitLabel = "Save",
+  submitDisabled = false,
   contentClassName,
 }: {
   open: boolean;
@@ -68,6 +69,7 @@ export function EntityFormModal({
   children: ReactNode;
   onSubmit: () => void;
   submitLabel?: string;
+  submitDisabled?: boolean;
   /** Optional extra classes for dialog content (e.g. wider modals). */
   contentClassName?: string;
 }) {
@@ -81,8 +83,10 @@ export function EntityFormModal({
         </AlertDialogHeader>
         <div className="py-2">{children}</div>
         <AlertDialogFooter>
-          <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
-          <Button type="button" onClick={onSubmit}>
+          <AlertDialogCancel type="button" disabled={submitDisabled}>
+            Cancel
+          </AlertDialogCancel>
+          <Button type="button" onClick={onSubmit} disabled={submitDisabled}>
             {submitLabel}
           </Button>
         </AlertDialogFooter>

@@ -33,6 +33,12 @@ type CompanyState = {
   ) => void;
 };
 
+function cleanOptionalNumber(value: unknown): number | undefined {
+  if (value === "" || value === null || value === undefined) return undefined;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
 function serializeCompanyForApi(company: Company) {
   return {
     id: company.id,
@@ -51,7 +57,7 @@ function serializeCompanyForApi(company: Company) {
     gstNumber: company.gstNumber,
     billingInfo: company.billingInfo,
     onboardingManagerId: company.onboardingManagerId,
-    csmId: company.csmId,
+    csmId: company.csmId ?? "",
     salesAgentId: company.salesAgentId || undefined,
     status: company.status,
     agreementDate: company.agreementDate,
@@ -60,18 +66,18 @@ function serializeCompanyForApi(company: Company) {
     planExpiry: company.planExpiry,
     plan: company.plan,
     health: company.health,
-    companyType: company.companyType,
-    state: company.state || undefined,
-    supportManager1Id: company.supportManager1Id || undefined,
-    supportManager2Id: company.supportManager2Id || undefined,
+    companyType: company.companyType || undefined,
+    state: company.state?.trim() || undefined,
+    supportManager1Id: company.supportManager1Id?.trim() || undefined,
+    supportManager2Id: company.supportManager2Id?.trim() || undefined,
     additionalSupportContactIds: company.additionalSupportContactIds,
     annualLicense: company.annualLicense,
-    dealSize: company.dealSize,
-    usersPurchased: company.usersPurchased,
-    totalCost: company.totalCost,
-    paymentReceived: company.paymentReceived,
-    pendingAmount: company.pendingAmount,
-    endDate: company.endDate || undefined,
+    dealSize: cleanOptionalNumber(company.dealSize),
+    usersPurchased: cleanOptionalNumber(company.usersPurchased),
+    totalCost: cleanOptionalNumber(company.totalCost),
+    paymentReceived: cleanOptionalNumber(company.paymentReceived),
+    pendingAmount: cleanOptionalNumber(company.pendingAmount),
+    endDate: company.endDate?.trim() || undefined,
     paymentHistory: company.paymentHistory,
     modules: normalizeCompanyModules(company.modules).map((m) => ({
       moduleKey: m.moduleKey,
@@ -101,7 +107,7 @@ export const useCompanyStore = createStore<CompanyState>((set, get) => ({
     useCompanyPortalStore.getState().generateAccessForCompany(company);
     logActivity({ who: "You", what: `Added company ${company.name}`, kind: "success", companyId: company.id });
     try {
-      await serverSyncTrackedWithRollback(
+      const saved = (await serverSyncTrackedWithRollback(
         `company:${company.id}`,
         "createCompany",
         () => apiCreateCompany({ data: serializeCompanyForApi(company) }),
@@ -111,13 +117,10 @@ export const useCompanyStore = createStore<CompanyState>((set, get) => ({
             access: s.access.filter((a) => a.companyId !== company.id),
           }));
         },
-      );
-      const rows = await listCompanies();
-      set({ companies: rows });
-      const saved = rows.find((c) => c.id === company.id);
-      if (!saved) {
-        throw new Error("Company was saved but did not appear in the server list.");
-      }
+      )) as Company;
+      set((s) => ({
+        companies: [saved, ...s.companies.filter((c) => c.id !== company.id && c.id !== saved.id)],
+      }));
       return saved;
     } catch (err) {
       throw err instanceof Error ? err : new Error("Failed to save company");
