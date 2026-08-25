@@ -3,7 +3,7 @@ import type { CrmAccount } from "@/types/crm-account";
 import type { Company } from "@/types/company";
 import type { User } from "@/types";
 
-type NamedUser = Pick<User, "id" | "name" | "active" | "productScope" | "role">;
+type NamedUser = Pick<User, "id" | "name" | "active" | "productScope">;
 
 /** Active CRM users for task assignee pickers. */
 export function crmTaskAssigneeUsers(users: NamedUser[]): NamedUser[] {
