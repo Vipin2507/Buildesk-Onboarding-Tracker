@@ -37,6 +37,38 @@ export function serverSyncTracked(key: string, label: string, fn: () => Promise<
   return run;
 }
 
+/**
+ * Tracked sync with rollback — use for creates where optimistic UI must not lie
+ * about persistence (permission errors included).
+ */
+export function serverSyncTrackedWithRollback(
+  key: string,
+  label: string,
+  fn: () => Promise<unknown>,
+  rollback: () => void | Promise<void>,
+) {
+  const run = Promise.resolve()
+    .then(fn)
+    .catch(async (e) => {
+      const message = e instanceof Error ? e.message : `Failed to sync ${label}`;
+      console.error(`[sync:${label}]`, e);
+      try {
+        await rollback();
+      } catch (rollbackErr) {
+        console.error(`[sync:${label}:rollback]`, rollbackErr);
+      }
+      toast.error(message, {
+        description: "The company was not saved. Please try again or contact an administrator.",
+      });
+      throw e;
+    })
+    .finally(() => {
+      if (pending.get(key) === run) pending.delete(key);
+    });
+  pending.set(key, run);
+  return run;
+}
+
 export function waitForSync(key: string): Promise<void> {
   const p = pending.get(key);
   if (!p) return Promise.resolve();

@@ -593,6 +593,7 @@ function CompaniesListPage() {
             status: "not_started",
             modules: createCompanyModules(data.modules),
           });
+          clearFilters();
           toast.success("Company added", {
             action: {
               label: "View",
@@ -783,6 +784,22 @@ function CompaniesListPage() {
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
                 Clear
+              </Button>
+            </motion.div>
+          ) : null}
+
+          {enriched.length > 0 && filtered.length < enriched.length ? (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2"
+            >
+              <p className="text-xs text-muted-foreground">
+                Showing {filtered.length} of {enriched.length} companies — filters or KPI selection may be
+                hiding some rows (new companies start as <strong>Pending</strong> / Not Started).
+              </p>
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={clearFilters}>
+                Clear filters
               </Button>
             </motion.div>
           ) : null}

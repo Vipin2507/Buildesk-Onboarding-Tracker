@@ -9,7 +9,7 @@ import {
   deleteCompany as apiDeleteCompany,
   renewCompany as apiRenewCompany,
 } from "@/lib/api";
-import { serverSync, serverSyncTracked, serverSyncWithRollback } from "@/lib/sync";
+import { serverSync, serverSyncTrackedWithRollback, serverSyncWithRollback } from "@/lib/sync";
 import { useCompanyPortalStore } from "./useCompanyPortalStore";
 
 type CompanyState = {
@@ -40,50 +40,59 @@ export const useCompanyStore = createStore<CompanyState>((set, get) => ({
     set((s) => ({ companies: [company, ...s.companies] }));
     useCompanyPortalStore.getState().generateAccessForCompany(company);
     logActivity({ who: "You", what: `Added company ${company.name}`, kind: "success", companyId: company.id });
-    serverSyncTracked(`company:${company.id}`, "createCompany", () =>
-      apiCreateCompany({
-        data: {
-          id: company.id,
-          name: company.name,
-          contact: company.contact,
-          designation: company.designation,
-          phone: company.phone,
-          email: company.email,
-          city: company.city,
-          region: company.region,
-          ownerName: company.ownerName,
-          ownerMobile: company.ownerMobile,
-          pocName: company.pocName,
-          pocMobile: company.pocMobile,
-          officeAddress: company.officeAddress,
-          gstNumber: company.gstNumber,
-          billingInfo: company.billingInfo,
-          onboardingManagerId: company.onboardingManagerId,
-          csmId: company.csmId,
-          salesAgentId: company.salesAgentId || undefined,
-          status: company.status,
-          agreementDate: company.agreementDate,
-          startDate: company.startDate,
-          goLiveTarget: company.goLiveTarget,
-          planExpiry: company.planExpiry,
-          plan: company.plan,
-          health: company.health,
-          companyType: company.companyType,
-          state: company.state,
-          supportManager1Id: company.supportManager1Id,
-          supportManager2Id: company.supportManager2Id,
-          additionalSupportContactIds: company.additionalSupportContactIds,
-          annualLicense: company.annualLicense,
-          dealSize: company.dealSize,
-          usersPurchased: company.usersPurchased,
-          totalCost: company.totalCost,
-          paymentReceived: company.paymentReceived,
-          pendingAmount: company.pendingAmount,
-          endDate: company.endDate,
-          paymentHistory: company.paymentHistory,
-          modules: company.modules,
-        },
-      }),
+    serverSyncTrackedWithRollback(
+      `company:${company.id}`,
+      "createCompany",
+      () =>
+        apiCreateCompany({
+          data: {
+            id: company.id,
+            name: company.name,
+            contact: company.contact,
+            designation: company.designation,
+            phone: company.phone,
+            email: company.email,
+            city: company.city,
+            region: company.region,
+            ownerName: company.ownerName,
+            ownerMobile: company.ownerMobile,
+            pocName: company.pocName,
+            pocMobile: company.pocMobile,
+            officeAddress: company.officeAddress,
+            gstNumber: company.gstNumber,
+            billingInfo: company.billingInfo,
+            onboardingManagerId: company.onboardingManagerId,
+            csmId: company.csmId,
+            salesAgentId: company.salesAgentId || undefined,
+            status: company.status,
+            agreementDate: company.agreementDate,
+            startDate: company.startDate,
+            goLiveTarget: company.goLiveTarget,
+            planExpiry: company.planExpiry,
+            plan: company.plan,
+            health: company.health,
+            companyType: company.companyType,
+            state: company.state,
+            supportManager1Id: company.supportManager1Id,
+            supportManager2Id: company.supportManager2Id,
+            additionalSupportContactIds: company.additionalSupportContactIds,
+            annualLicense: company.annualLicense,
+            dealSize: company.dealSize,
+            usersPurchased: company.usersPurchased,
+            totalCost: company.totalCost,
+            paymentReceived: company.paymentReceived,
+            pendingAmount: company.pendingAmount,
+            endDate: company.endDate,
+            paymentHistory: company.paymentHistory,
+            modules: company.modules,
+          },
+        }),
+      () => {
+        set((s) => ({ companies: s.companies.filter((c) => c.id !== company.id) }));
+        useCompanyPortalStore.setState((s) => ({
+          access: s.access.filter((a) => a.companyId !== company.id),
+        }));
+      },
     );
     return company;
   },

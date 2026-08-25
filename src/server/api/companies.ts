@@ -194,7 +194,7 @@ const companyInput = z.object({
 export const createCompany = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => companyInput.parse(data))
   .handler(async ({ data }) => {
-    const user = requireUser(["Admin", "Manager"]);
+    const user = requirePermission("manageCompanies");
     if (data.salesAgentId) {
       requirePermission("assignSalesAgent");
       requireActiveUserId(data.salesAgentId, "Sales agent");
@@ -292,7 +292,7 @@ export const updateCompany = createServerFn({ method: "POST" })
       .parse(data),
   )
   .handler(async ({ data }) => {
-    const user = requireUser(["Admin", "Manager"]);
+    const user = requirePermission("manageCompanies");
     const db = getDb();
     const existing = loadCompany(data.id);
     if (!existing) throw new ApiError(404, "Company not found");
@@ -351,7 +351,7 @@ export const updateCompany = createServerFn({ method: "POST" })
 export const deleteCompany = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ id: z.string() }).parse(data))
   .handler(async ({ data }) => {
-    const user = requireUser(["Admin"]);
+    const user = requirePermission("manageCompanies");
     const existing = loadCompany(data.id);
     if (!existing) return { ok: true as const, skipped: true as const };
     getDb().delete(t.companies).where(eq(t.companies.id, data.id)).run();
@@ -364,7 +364,7 @@ export const renewCompany = createServerFn({ method: "POST" })
     z.object({ id: z.string(), planExpiry: z.string().optional() }).parse(data),
   )
   .handler(async ({ data }) => {
-    const user = requireUser(["Admin", "Manager"]);
+    const user = requirePermission("manageCompanies");
     const existing = loadCompany(data.id);
     if (!existing) throw new ApiError(404, "Company not found");
     const expiry =
