@@ -102,6 +102,13 @@ export function useTaskFormState(props: Props) {
   }, [props.defaultAssigneeIds, props.editing, assigneeUserIds.length]);
 
   useEffect(() => {
+    if (!props.editing && props.companyId && props.defaultAssigneeIds?.length) {
+      setAssigneeUserIds(props.defaultAssigneeIds);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset assignees when company/account changes
+  }, [props.companyId, props.editing]);
+
+  useEffect(() => {
     if (props.companyId) setCompanyId(props.companyId);
   }, [props.companyId]);
 
@@ -371,6 +378,8 @@ export function TaskFormFields(props: Props & ReturnType<typeof useTaskFormState
           value={assigneeUserIds}
           onChange={setAssigneeUserIds}
           disabled={readOnlyBooking}
+          modal
+          placeholder="Select assignees (defaults to support manager 1)"
         />
       </div>
 

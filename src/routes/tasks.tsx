@@ -15,8 +15,7 @@ import {
   TaskCalendarPanel,
   type TaskCalendarView,
 } from "@/components/tasks/task-calendar-panel";
-import { resolveDefaultTaskAssigneeIds } from "@/lib/task-defaults";
-import { assignableManagerUsers } from "@/lib/managers";
+import { resolveDefaultTaskAssigneeIds, taskAssigneeUserOptions } from "@/lib/task-defaults";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { useCompanyStore, useTaskStore, useUserStore } from "@/stores";
 import type { FollowUpTask } from "@/types";
@@ -42,11 +41,15 @@ function TasksPage() {
   const [selectedCompanyId, setSelectedCompanyId] = useState("");
   const [markCompleteOnCreate, setMarkCompleteOnCreate] = useState(false);
 
-  const assignees = assignableManagerUsers(users);
-  const defaultAssigneeIds = useMemo(() => {
-    const company = companies.find((c) => c.id === selectedCompanyId);
-    return resolveDefaultTaskAssigneeIds({ company, users: assignees });
-  }, [companies, selectedCompanyId, assignees]);
+  const selectedCompany = companies.find((c) => c.id === selectedCompanyId);
+  const assignees = useMemo(
+    () => taskAssigneeUserOptions({ users, company: selectedCompany }),
+    [users, selectedCompany],
+  );
+  const defaultAssigneeIds = useMemo(
+    () => resolveDefaultTaskAssigneeIds({ company: selectedCompany, users }),
+    [selectedCompany, users],
+  );
 
   const form = useTaskFormState({
     users: assignees,

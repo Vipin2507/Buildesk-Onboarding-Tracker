@@ -37,11 +37,9 @@ import {
 } from "@/components/tasks/task-form-fields";
 import {
   canManageCrmAccountTasks,
-  crmAccountTeamAssigneeUsers,
   filterCrmAccountsForUser,
 } from "@/lib/crm-account-access";
-import { resolveCrmSalesManagerDefaults, withCrmSalesManagerOption } from "@/lib/crm-sales-manager-defaults";
-import { resolveDefaultTaskAssigneeIds } from "@/lib/task-defaults";
+import { resolveDefaultTaskAssigneeIds, taskAssigneeUserOptions } from "@/lib/task-defaults";
 import { formatTimeRange12h, resolveTaskAssigneeIds } from "@/lib/task-scheduling";
 import { resolveAssigneeLabel } from "@/lib/managers";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
@@ -192,23 +190,18 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
   const [markCompleteOnCreate, setMarkCompleteOnCreate] = useState(false);
 
   const createAccount = visibleAccounts.find((a) => a.id === createAccountId);
-  const salesDefaults = resolveCrmSalesManagerDefaults(createAccount, users);
-  const assignees = useMemo(() => {
-    if (!createAccount) {
-      const all = users.filter((u) => u.active);
-      return all;
-    }
-    const team = crmAccountTeamAssigneeUsers(createAccount, users);
-    const base =
-      team.length > 0
-        ? team
-        : users.filter((u) => u.active && (u.productScope === "crm" || !u.productScope || u.role === "Admin"));
-    return withCrmSalesManagerOption(base, salesDefaults, users);
-  }, [createAccount, users, salesDefaults]);
+  const assignees = useMemo(
+    () =>
+      taskAssigneeUserOptions({
+        users,
+        crmAccount: createAccount,
+      }),
+    [createAccount, users],
+  );
 
   const defaultAssigneeIds = useMemo(
-    () => resolveDefaultTaskAssigneeIds({ crmAccount: createAccount, users: assignees }),
-    [createAccount, assignees],
+    () => resolveDefaultTaskAssigneeIds({ crmAccount: createAccount, users }),
+    [createAccount, users],
   );
 
   const form = useTaskFormState({
@@ -516,12 +509,6 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
               value={createAccountId}
               onChange={(e) => {
                 setCreateAccountId(e.target.value);
-                form.setAssigneeUserIds(
-                  resolveDefaultTaskAssigneeIds({
-                    crmAccount: visibleAccounts.find((a) => a.id === e.target.value),
-                    users: assignees,
-                  }),
-                );
               }}
             >
               <option value="">Select account</option>

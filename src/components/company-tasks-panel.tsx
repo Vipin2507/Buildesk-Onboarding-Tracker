@@ -11,9 +11,9 @@ import {
   TaskFormFields,
   useTaskFormState,
 } from "@/components/tasks/task-form-fields";
-import { resolveDefaultTaskAssigneeIds } from "@/lib/task-defaults";
+import { resolveDefaultTaskAssigneeIds, taskAssigneeUserOptions } from "@/lib/task-defaults";
 import { formatTimeRange12h } from "@/lib/task-scheduling";
-import { assignableManagerUsers, resolveAssigneeLabel } from "@/lib/managers";
+import { resolveAssigneeLabel } from "@/lib/managers";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { useCompanyStore, useTaskStore, useUserStore } from "@/stores";
 import { FOLLOW_UP_TASK_TYPE_LABEL, type FollowUpTask, type FollowUpTaskType } from "@/types";
@@ -37,10 +37,13 @@ export function CompanyTasksPanel({ companyId }: { companyId: string }) {
     [tasks, companyId],
   );
 
-  const assignees = assignableManagerUsers(users);
+  const assignees = useMemo(
+    () => taskAssigneeUserOptions({ users, company }),
+    [users, company],
+  );
   const defaultAssigneeIds = useMemo(
-    () => resolveDefaultTaskAssigneeIds({ company, users: assignees }),
-    [company, assignees],
+    () => resolveDefaultTaskAssigneeIds({ company, users }),
+    [company, users],
   );
 
   const [open, setOpen] = useState(false);

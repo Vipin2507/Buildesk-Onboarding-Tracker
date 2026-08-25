@@ -18,9 +18,8 @@ import {
 } from "@/components/tasks/task-form-fields";
 import {
   canManageCrmAccountTasks,
-  crmAccountTeamAssigneeUsers,
 } from "@/lib/crm-account-access";
-import { resolveCrmSalesManagerDefaults, withCrmSalesManagerOption } from "@/lib/crm-sales-manager-defaults";
+import { resolveDefaultTaskAssigneeIds, taskAssigneeUserOptions } from "@/lib/task-defaults";
 import { formatTimeRange12h, formatDurationMinutes, resolveTaskDurationMinutes } from "@/lib/task-scheduling";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { resolveAssigneeLabel } from "@/lib/managers";
@@ -71,22 +70,19 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
     [tasks, accountId],
   );
 
-  const salesDefaults = useMemo(
-    () => resolveCrmSalesManagerDefaults(account, users),
+  const assignees = useMemo(
+    () =>
+      taskAssigneeUserOptions({
+        users,
+        crmAccount: account,
+      }),
     [account, users],
   );
 
-  const assignees = useMemo(() => {
-    if (!account) return [];
-    const team = crmAccountTeamAssigneeUsers(account, users);
-    const base =
-      team.length > 0
-        ? team
-        : users.filter((u) => u.active && (u.productScope === "crm" || !u.productScope || u.role === "Admin"));
-    return withCrmSalesManagerOption(base, salesDefaults, users);
-  }, [account, users, salesDefaults]);
-
-  const defaultAssigneeIds = salesDefaults.userId ? [salesDefaults.userId] : [];
+  const defaultAssigneeIds = useMemo(
+    () => resolveDefaultTaskAssigneeIds({ crmAccount: account, users }),
+    [account, users],
+  );
 
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");

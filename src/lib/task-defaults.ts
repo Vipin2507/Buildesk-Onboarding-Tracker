@@ -5,6 +5,13 @@ import type { User } from "@/types";
 
 type NamedUser = Pick<User, "id" | "name" | "active">;
 
+/** All active users for task assignee pickers. */
+export function allTaskAssigneeUsers(users: NamedUser[]): NamedUser[] {
+  return [...users]
+    .filter((u) => u.active !== false)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 /** Default assignee = Support Agent / Support Manager 1 for the account or company. */
 export function resolveDefaultTaskAssigneeIds(input: {
   company?: Pick<Company, "supportManager1Id"> | null;
@@ -18,15 +25,37 @@ export function resolveDefaultTaskAssigneeIds(input: {
   return defaults.userId ? [defaults.userId] : [];
 }
 
-export function resolveTaskAssigneeOptions(input: {
+/** All active users, ensuring the account/company support manager 1 is listed. */
+export function taskAssigneeUserOptions(input: {
   users: NamedUser[];
+  company?: Pick<Company, "supportManager1Id"> | null;
   crmAccount?: Pick<CrmAccount, "supportManager1"> | null;
 }): NamedUser[] {
-  const defaults = resolveCrmSalesManagerDefaults(input.crmAccount, input.users);
-  const active = input.users.filter((u) => u.active !== false);
-  if (!defaults.userId || active.some((u) => u.id === defaults.userId)) return active;
-  return [
-    { id: defaults.userId, name: defaults.name ?? "Support Agent 1", active: true },
-    ...active,
-  ];
+  const active = allTaskAssigneeUsers(input.users);
+  const defaultIds = resolveDefaultTaskAssigneeIds({
+    company: input.company,
+    crmAccount: input.crmAccount,
+    users: input.users,
+  });
+  const defaultId = defaultIds[0];
+  if (!defaultId || active.some((u) => u.id === defaultId)) return active;
+
+  const matched = input.users.find((u) => u.id === defaultId);
+  if (matched) return [matched, ...active];
+
+  if (input.crmAccount) {
+    const crmDefaults = resolveCrmSalesManagerDefaults(input.crmAccount, input.users);
+    if (crmDefaults.userId === defaultId) {
+      return [
+        {
+          id: crmDefaults.userId,
+          name: crmDefaults.name ?? "Support manager 1",
+          active: true,
+        },
+        ...active,
+      ];
+    }
+  }
+
+  return active;
 }
