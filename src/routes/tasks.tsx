@@ -40,6 +40,7 @@ function TasksPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<FollowUpTask | null>(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState("");
+  const [markCompleteOnCreate, setMarkCompleteOnCreate] = useState(false);
 
   const assignees = assignableManagerUsers(users);
   const defaultAssigneeIds = useMemo(() => {
@@ -67,6 +68,7 @@ function TasksPage() {
     setEditing(null);
     form.reset();
     setSelectedCompanyId("");
+    setMarkCompleteOnCreate(false);
     setOpen(true);
   }
 
@@ -108,6 +110,13 @@ function TasksPage() {
     if (editing) {
       updateTask(editing.id, payload);
       toast.success("Task updated");
+    } else if (markCompleteOnCreate) {
+      addTask({
+        ...payload,
+        status: "completed",
+        progressPercent: 100,
+      });
+      toast.success("Task created and marked complete");
     } else {
       addTask(payload);
       toast.success("Task created");
@@ -161,6 +170,8 @@ function TasksPage() {
           showCompanyField={!editing}
           companies={companies}
           onCompanyIdChange={setSelectedCompanyId}
+          markCompleteOnCreate={markCompleteOnCreate}
+          onMarkCompleteOnCreateChange={setMarkCompleteOnCreate}
         />
         {editing ? (
           <div className="mt-4 space-y-2 border-t pt-3">

@@ -189,6 +189,7 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
   const [editing, setEditing] = useState<FollowUpTask | null>(null);
   const [createAccountId, setCreateAccountId] = useState("");
   const [remark, setRemark] = useState("");
+  const [markCompleteOnCreate, setMarkCompleteOnCreate] = useState(false);
 
   const createAccount = visibleAccounts.find((a) => a.id === createAccountId);
   const salesDefaults = resolveCrmSalesManagerDefaults(createAccount, users);
@@ -234,6 +235,7 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
     setCreateAccountId(visibleAccounts[0]?.id ?? "");
     form.reset();
     setRemark("");
+    setMarkCompleteOnCreate(false);
     setModalOpen(true);
   }
 
@@ -277,6 +279,14 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
     if (editing) {
       updateTask(editing.id, payload);
       toast.success("Task updated");
+    } else if (markCompleteOnCreate) {
+      addTask({
+        ...payload,
+        status: "completed",
+        priority: "medium",
+        progressPercent: 100,
+      });
+      toast.success("Task created and marked complete");
     } else {
       addTask({ ...payload, status: "open", priority: "medium", progressPercent: 0 });
       toast.success("Task created");
@@ -466,6 +476,7 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
           canManage={canCreate}
           embedded={!isCalendarTab(tab)}
           hideViewToggle
+          entityLinkTarget="crm"
         />
 
         {selectedTask ? (
@@ -527,7 +538,14 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
           </p>
         ) : null}
 
-        <TaskFormFields {...form} users={assignees} defaultAssigneeIds={defaultAssigneeIds} editing={editing} />
+        <TaskFormFields
+          {...form}
+          users={assignees}
+          defaultAssigneeIds={defaultAssigneeIds}
+          editing={editing}
+          markCompleteOnCreate={markCompleteOnCreate}
+          onMarkCompleteOnCreateChange={setMarkCompleteOnCreate}
+        />
 
         {editing ? (
           <div className="mt-4 space-y-2 border-t pt-3">

@@ -11,7 +11,7 @@ import {
   type FollowUpTask,
   type FollowUpTaskType,
 } from "@/types";
-import { formatTimeRange12h } from "@/lib/task-scheduling";
+import { formatTimeRange12h, formatDurationMinutes, resolveTaskDurationMinutes } from "@/lib/task-scheduling";
 import { cn, formatDate } from "@/lib/utils";
 import { resolveAssigneeLabel } from "@/lib/managers";
 import type { User } from "@/types";
@@ -30,6 +30,8 @@ type Props = {
   embedded?: boolean;
   /** Hide day/week/month/list toggle — parent controls view via URL */
   hideViewToggle?: boolean;
+  /** Where "Open" links go — CRM tasks use account IDs, not ERP company IDs */
+  entityLinkTarget?: "company" | "crm";
 };
 
 function addDays(ymd: string, days: number): string {
@@ -70,6 +72,7 @@ export function TaskCalendarPanel({
   onTaskClick,
   embedded = false,
   hideViewToggle = false,
+  entityLinkTarget = "company",
 }: Props) {
   const [cursorDate, setCursorDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [typeFilter, setTypeFilter] = useState("all");
@@ -224,6 +227,7 @@ export function TaskCalendarPanel({
           users={users}
           companies={companies}
           onTaskClick={onTaskClick}
+          entityLinkTarget={entityLinkTarget}
         />
       ) : null}
 
@@ -272,11 +276,13 @@ function TaskListTable({
   users,
   companies,
   onTaskClick,
+  entityLinkTarget = "company",
 }: {
   tasks: FollowUpTask[];
   users: User[];
   companies: { id: string; name: string }[];
   onTaskClick?: (task: FollowUpTask) => void;
+  entityLinkTarget?: "company" | "crm";
 }) {
   return (
     <DataTable
@@ -321,6 +327,15 @@ function TaskListTable({
           ),
         },
         {
+          key: "duration",
+          header: "Duration",
+          render: (task) => (
+            <span className="text-xs tabular-nums">
+              {formatDurationMinutes(resolveTaskDurationMinutes(task))}
+            </span>
+          ),
+        },
+        {
           key: "assignee",
           header: "Assignee",
           render: (task) => {
@@ -355,9 +370,23 @@ function TaskListTable({
           header: "",
           render: (task) => (
             <Button size="sm" variant="outline" asChild onClick={(e) => e.stopPropagation()}>
-              <Link to="/companies/$companyId" params={{ companyId: task.companyId }} search={{ tab: "Tasks" }}>
-                Open
-              </Link>
+              {entityLinkTarget === "crm" ? (
+                <Link
+                  to="/crm/accounts/$accountId"
+                  params={{ accountId: task.companyId }}
+                  search={{ tab: "tasks" }}
+                >
+                  Open
+                </Link>
+              ) : (
+                <Link
+                  to="/companies/$companyId"
+                  params={{ companyId: task.companyId }}
+                  search={{ tab: "Tasks" }}
+                >
+                  Open
+                </Link>
+              )}
             </Button>
           ),
         },

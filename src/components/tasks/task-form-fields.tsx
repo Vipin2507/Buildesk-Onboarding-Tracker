@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { DatePickerField } from "@/components/date-picker-field";
+import { TimePickerField } from "@/components/time-picker-field";
 import {
   ticketFieldClass,
   ticketSelectClass,
@@ -42,6 +44,8 @@ type Props = {
   companyId?: string;
   onCompanyIdChange?: (id: string) => void;
   companies?: { id: string; name: string }[];
+  markCompleteOnCreate?: boolean;
+  onMarkCompleteOnCreateChange?: (checked: boolean) => void;
 };
 
 const fieldClass = cn(ticketFieldClass, "h-8 text-xs");
@@ -229,10 +233,13 @@ export function TaskFormFields(props: Props & ReturnType<typeof useTaskFormState
     companyId,
     setCompanyId,
     editing,
+    markCompleteOnCreate,
+    onMarkCompleteOnCreateChange,
   } = props;
 
   const scheduled = Boolean(taskType);
   const readOnlyBooking = editing?.source === "booking";
+  const showMarkCompleteOnCreate = !editing && Boolean(onMarkCompleteOnCreateChange);
 
   return (
     <div className="space-y-3">
@@ -310,41 +317,49 @@ export function TaskFormFields(props: Props & ReturnType<typeof useTaskFormState
       </label>
 
       {scheduled ? (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-3 rounded-lg border bg-muted/10 p-3">
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-xs font-medium">
+              Start time
+              <div className="mt-1">
+                <TimePickerField
+                  value={startTime}
+                  onChange={onStartTimeChange}
+                  modal
+                  compact
+                  disabled={readOnlyBooking}
+                />
+              </div>
+            </label>
+            <label className="block text-xs font-medium">
+              End time
+              <div className="mt-1">
+                <TimePickerField
+                  value={endTime}
+                  onChange={onEndTimeChange}
+                  modal
+                  compact
+                  disabled={readOnlyBooking}
+                />
+              </div>
+            </label>
+          </div>
           <label className="block text-xs font-medium">
-            Start time
-            <input
-              type="time"
-              className={cn(fieldClass, "mt-1 w-full")}
-              value={startTime}
-              onChange={(e) => onStartTimeChange(e.target.value)}
-              required
-              disabled={readOnlyBooking}
-            />
-          </label>
-          <label className="block text-xs font-medium">
-            End time
-            <input
-              type="time"
-              className={cn(fieldClass, "mt-1 w-full")}
-              value={endTime}
-              onChange={(e) => onEndTimeChange(e.target.value)}
-              required
-              disabled={readOnlyBooking}
-            />
-          </label>
-          <label className="col-span-2 block text-xs font-medium">
             Duration ({durationMinutes} mins)
             <input
               type="range"
-              min={15}
+              min={5}
               max={240}
-              step={15}
-              className="mt-2 w-full"
+              step={5}
+              className="mt-2 w-full accent-primary"
               value={durationMinutes}
               onChange={(e) => onDurationChange(Number(e.target.value))}
               disabled={readOnlyBooking}
             />
+            <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
+              <span>5m</span>
+              <span>4h</span>
+            </div>
           </label>
         </div>
       ) : null}
@@ -358,6 +373,19 @@ export function TaskFormFields(props: Props & ReturnType<typeof useTaskFormState
           disabled={readOnlyBooking}
         />
       </div>
+
+      {showMarkCompleteOnCreate ? (
+        <label className="flex cursor-pointer items-center gap-2 rounded-lg border bg-muted/10 px-3 py-2.5 text-xs">
+          <input
+            type="checkbox"
+            className="h-3.5 w-3.5 rounded border-input accent-primary"
+            checked={markCompleteOnCreate ?? false}
+            onChange={(e) => onMarkCompleteOnCreateChange?.(e.target.checked)}
+          />
+          <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground" />
+          <span>Mark as complete when creating</span>
+        </label>
+      ) : null}
 
       {editing?.source === "booking" ? (
         <p className="text-[10px] text-muted-foreground">

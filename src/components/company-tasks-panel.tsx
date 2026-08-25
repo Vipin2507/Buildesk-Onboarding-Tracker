@@ -46,6 +46,7 @@ export function CompanyTasksPanel({ companyId }: { companyId: string }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<FollowUpTask | null>(null);
   const [remark, setRemark] = useState("");
+  const [markCompleteOnCreate, setMarkCompleteOnCreate] = useState(false);
 
   const form = useTaskFormState({
     users: assignees,
@@ -68,6 +69,7 @@ export function CompanyTasksPanel({ companyId }: { companyId: string }) {
     setEditing(null);
     form.reset();
     setRemark("");
+    setMarkCompleteOnCreate(false);
     setOpen(true);
   }
 
@@ -104,6 +106,14 @@ export function CompanyTasksPanel({ companyId }: { companyId: string }) {
     if (editing) {
       updateTask(editing.id, payload);
       toast.success("Task updated");
+    } else if (markCompleteOnCreate) {
+      addTask({
+        ...payload,
+        status: "completed",
+        priority: "medium",
+        progressPercent: 100,
+      });
+      toast.success("Task created and marked complete");
     } else {
       addTask({ ...payload, status: "open", priority: "medium", progressPercent: 0 });
       toast.success("Task created");
@@ -183,7 +193,14 @@ export function CompanyTasksPanel({ companyId }: { companyId: string }) {
         submitLabel={editing ? "Save" : "Create"}
         onSubmit={submit}
       >
-        <TaskFormFields {...form} users={assignees} defaultAssigneeIds={defaultAssigneeIds} editing={editing} />
+        <TaskFormFields
+          {...form}
+          users={assignees}
+          defaultAssigneeIds={defaultAssigneeIds}
+          editing={editing}
+          markCompleteOnCreate={markCompleteOnCreate}
+          onMarkCompleteOnCreateChange={setMarkCompleteOnCreate}
+        />
         {editing ? (
           <div className="mt-4 space-y-2 border-t pt-3">
             {editing.completedAt ? (

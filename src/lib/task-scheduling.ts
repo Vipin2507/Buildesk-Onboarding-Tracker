@@ -124,3 +124,25 @@ export function formatScheduleConflictMessage(conflict: ScheduleConflict): strin
 export function isScheduledTaskType(taskType?: FollowUpTaskType): boolean {
   return Boolean(taskType);
 }
+
+export function resolveTaskDurationMinutes(task: {
+  durationMinutes?: number | null;
+  startTime?: string;
+  endTime?: string;
+}): number | undefined {
+  if (task.durationMinutes && task.durationMinutes > 0) return task.durationMinutes;
+  if (task.startTime && task.endTime) {
+    const mins = calcDurationFromTimes(task.startTime, task.endTime);
+    return mins > 0 ? mins : undefined;
+  }
+  return undefined;
+}
+
+/** Display e.g. "45m", "1h 30m", or "—". */
+export function formatDurationMinutes(mins?: number | null): string {
+  if (!mins || mins <= 0) return "—";
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}

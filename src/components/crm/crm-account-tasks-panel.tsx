@@ -21,7 +21,7 @@ import {
   crmAccountTeamAssigneeUsers,
 } from "@/lib/crm-account-access";
 import { resolveCrmSalesManagerDefaults, withCrmSalesManagerOption } from "@/lib/crm-sales-manager-defaults";
-import { formatTimeRange12h } from "@/lib/task-scheduling";
+import { formatTimeRange12h, formatDurationMinutes, resolveTaskDurationMinutes } from "@/lib/task-scheduling";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { resolveAssigneeLabel } from "@/lib/managers";
 import { useAuthStore, useCrmAccountStore, useTaskStore, useUserStore } from "@/stores";
@@ -96,6 +96,7 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<FollowUpTask | null>(null);
   const [remark, setRemark] = useState("");
+  const [markCompleteOnCreate, setMarkCompleteOnCreate] = useState(false);
 
   const form = useTaskFormState({
     users: assignees,
@@ -139,6 +140,7 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
     setEditing(null);
     form.reset();
     setRemark("");
+    setMarkCompleteOnCreate(false);
     setOpen(true);
   }
 
@@ -176,6 +178,14 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
     if (editing) {
       updateTask(editing.id, payload);
       toast.success("Task updated");
+    } else if (markCompleteOnCreate) {
+      addTask({
+        ...payload,
+        status: "completed",
+        priority: "medium",
+        progressPercent: 100,
+      });
+      toast.success("Task created and marked complete");
     } else {
       addTask({ ...payload, status: "open", priority: "medium", progressPercent: 0 });
       toast.success("Task created");
@@ -360,6 +370,16 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
               ),
             },
             {
+              key: "duration",
+              header: "Duration",
+              sortable: true,
+              render: (task) => (
+                <span className="text-xs tabular-nums">
+                  {formatDurationMinutes(resolveTaskDurationMinutes(task))}
+                </span>
+              ),
+            },
+            {
               key: "assigneeUserId",
               header: "Assignee",
               sortable: true,
@@ -402,7 +422,14 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
         submitLabel={editing ? "Save task" : "Create task"}
         onSubmit={submit}
       >
-        <TaskFormFields {...form} users={assignees} defaultAssigneeIds={defaultAssigneeIds} editing={editing} />
+        <TaskFormFields
+          {...form}
+          users={assignees}
+          defaultAssigneeIds={defaultAssigneeIds}
+          editing={editing}
+          markCompleteOnCreate={markCompleteOnCreate}
+          onMarkCompleteOnCreateChange={setMarkCompleteOnCreate}
+        />
         {editing ? (
           <div className="mt-4 space-y-2 border-t pt-3">
             {editing.completedAt ? (
