@@ -1,6 +1,5 @@
 import type {
   BookingAppointment,
-  BookingAppointmentStatus,
   BookingAvailability,
   BookingBlock,
   BookingEventType,
@@ -13,6 +12,7 @@ import {
   deleteBookingBlock,
   ensureBookingDefaults,
   ensureBookingDefaultsBatch,
+  getAppConfig,
   listBookingAppointments,
   listBookingAvailability,
   listBookingBlocks,
@@ -26,11 +26,12 @@ import {
   retryBookingGoogleCalendarSync,
   updateBookingAppointmentStatus,
 } from "@/lib/api";
-import { dispatchCrmBookingAutomationTrigger } from "@/services/crm-automation";
 import {
   getCrmMasterBookingCallTypes,
   getCrmMasterBookingHostHours,
 } from "@/stores/useCrmMasterStore";
+import { useCrmAutomationStore } from "@/stores/useCrmAutomationStore";
+import type { AutomationLog } from "@/types/automation";
 import { createStore } from "./persist";
 
 function masterCatalogPayload() {
@@ -105,15 +106,15 @@ type BookingState = {
   removeBlock: (id: string) => Promise<void>;
 };
 
-function fireStatusChange(updated: BookingAppointment, previousStatus: BookingAppointmentStatus) {
-  if (previousStatus === updated.status) return;
-  if (
-    updated.status === "confirmed" ||
-    updated.status === "cancelled" ||
-    updated.status === "postponed" ||
-    updated.status === "declined"
-  ) {
-    dispatchCrmBookingAutomationTrigger("booking-status-changed", updated, { previousStatus });
+async function refreshCrmAutomationLogsFromServer() {
+  try {
+    const cfg = await getAppConfig({ data: { key: "crm-automation" } });
+    if (cfg && typeof cfg === "object" && Array.isArray((cfg as { logs?: unknown }).logs)) {
+      const logs = (cfg as { logs: AutomationLog[] }).logs.slice(0, 500);
+      useCrmAutomationStore.setState((s) => ({ ...s, logs }));
+    }
+  } catch {
+    // Non-blocking — logs sync on next app bootstrap.
   }
 }
 
@@ -225,42 +226,38 @@ export const useBookingStore = createStore<BookingState>((set, get) => ({
   },
 
   acceptAppointment: async (id, hostNote) => {
-    const prev = get().appointments.find((a) => a.id === id);
     const updated = await updateBookingAppointmentStatus({
       data: { id, status: "confirmed", hostNote },
     });
     get().mergeAppointment(updated);
-    fireStatusChange(updated, prev?.status ?? "pending");
+    void refreshCrmAutomationLogsFromServer();
     return updated;
   },
 
   declineAppointment: async (id, hostNote) => {
-    const prev = get().appointments.find((a) => a.id === id);
     const updated = await updateBookingAppointmentStatus({
       data: { id, status: "declined", hostNote },
     });
     get().mergeAppointment(updated);
-    fireStatusChange(updated, prev?.status ?? "pending");
+    void refreshCrmAutomationLogsFromServer();
     return updated;
   },
 
   cancelAppointment: async (id, hostNote) => {
-    const prev = get().appointments.find((a) => a.id === id);
     const updated = await updateBookingAppointmentStatus({
       data: { id, status: "cancelled", hostNote },
     });
     get().mergeAppointment(updated);
-    fireStatusChange(updated, prev?.status ?? "confirmed");
+    void refreshCrmAutomationLogsFromServer();
     return updated;
   },
 
   postponeAppointment: async (id, hostNote) => {
-    const prev = get().appointments.find((a) => a.id === id);
     const updated = await updateBookingAppointmentStatus({
       data: { id, status: "postponed", hostNote },
     });
     get().mergeAppointment(updated);
-    fireStatusChange(updated, prev?.status ?? "confirmed");
+    void refreshCrmAutomationLogsFromServer();
     return updated;
   },
 

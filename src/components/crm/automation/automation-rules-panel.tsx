@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { Mail, MessageCircle, Pencil, Play, Plus, Power, Trash2, Zap } from "lucide-react";
+import { CalendarDays, Mail, MessageCircle, Pencil, Play, Plus, Power, Trash2, Ticket, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 import { AutomationRuleDialog } from "@/components/automation/automation-rule-dialog";
@@ -9,6 +9,7 @@ import { DataTable } from "@/components/data-table";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { CRM_BOOKING_AUTOMATION_TRIGGERS } from "@/data/crm-automation-defaults";
 import {
   AUTOMATION_TRIGGERS,
   type AutomationRule,
@@ -24,54 +25,24 @@ const TRIGGER_LABEL = Object.fromEntries(AUTOMATION_TRIGGERS.map((t) => [t.value
   string
 >;
 
-export function AutomationRulesPanel() {
-  const rules = useCrmAutomationStore((s) => s.rules);
-  const rulesEnabled = useCrmAutomationStore((s) => s.settings.automationsEnabled);
-  const setSettings = useCrmAutomationStore((s) => s.setSettings);
-  const deleteRule = useCrmAutomationStore((s) => s.deleteRule);
-  const toggleRule = useCrmAutomationStore((s) => s.toggleRule);
+const BOOKING_TRIGGER_SET = new Set<string>(CRM_BOOKING_AUTOMATION_TRIGGERS);
 
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [testingRuleId, setTestingRuleId] = useState<string | null>(null);
-  const [editing, setEditing] = useState<AutomationRule | null>(null);
+type RuleColumn = {
+  key: string;
+  header: string;
+  sortable?: boolean;
+  render: (r: AutomationRule) => ReactNode;
+};
 
-  function openCreate() {
-    setEditing(null);
-    setDialogOpen(true);
-  }
-
-  function openEdit(rule: AutomationRule) {
-    setEditing(rule);
-    setDialogOpen(true);
-  }
-
-  async function runRuleTest(rule: AutomationRule) {
-    if (!rulesEnabled) {
-      toast.info("Automation rules are paused", {
-        description: "Turn on the master switch above to send test notifications.",
-      });
-      return;
-    }
-    setTestingRuleId(rule.id);
-    try {
-      const log = await testCrmAutomationRule(rule.id);
-      if (!log) {
-        toast.error("Test failed — endpoint not found");
-        return;
-      }
-      notifyCrmAutomationResult(log, rule.name);
-    } finally {
-      setTestingRuleId(null);
-    }
-  }
-
-  const columns: {
-    key: string;
-    header: string;
-    sortable?: boolean;
-    render: (r: AutomationRule) => ReactNode;
-  }[] = [
+function buildRuleColumns(
+  rulesEnabled: boolean,
+  testingRuleId: string | null,
+  toggleRule: (id: string, isActive: boolean) => void,
+  runRuleTest: (rule: AutomationRule) => void,
+  openEdit: (rule: AutomationRule) => void,
+  openDelete: (rule: AutomationRule) => void,
+): RuleColumn[] {
+  return [
     {
       key: "name",
       header: "Rule",
@@ -130,13 +101,139 @@ export function AutomationRulesPanel() {
       render: (r) => <span className="text-muted-foreground">{formatRelativeTime(r.updatedAt)}</span>,
     },
   ];
+}
+
+export function AutomationRulesPanel() {
+  const rules = useCrmAutomationStore((s) => s.rules);
+  const rulesEnabled = useCrmAutomationStore((s) => s.settings.automationsEnabled);
+  const setSettings = useCrmAutomationStore((s) => s.setSettings);
+  const deleteRule = useCrmAutomationStore((s) => s.deleteRule);
+  const toggleRule = useCrmAutomationStore((s) => s.toggleRule);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [testingRuleId, setTestingRuleId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<AutomationRule | null>(null);
+
+  const { ticketRules, bookingRules } = useMemo(() => {
+    const ticketRules: AutomationRule[] = [];
+    const bookingRules: AutomationRule[] = [];
+    for (const rule of rules) {
+      if (BOOKING_TRIGGER_SET.has(rule.trigger)) bookingRules.push(rule);
+      else ticketRules.push(rule);
+    }
+    return { ticketRules, bookingRules };
+  }, [rules]);
+
+  function openCreate() {
+    setEditing(null);
+    setDialogOpen(true);
+  }
+
+  function openEdit(rule: AutomationRule) {
+    setEditing(rule);
+    setDialogOpen(true);
+  }
+
+  async function runRuleTest(rule: AutomationRule) {
+    if (!rulesEnabled) {
+      toast.info("Automation rules are paused", {
+        description: "Turn on the master switch above to send test notifications.",
+      });
+      return;
+    }
+    setTestingRuleId(rule.id);
+    try {
+      const log = await testCrmAutomationRule(rule.id);
+      if (!log) {
+        toast.error("Test failed — endpoint not found");
+        return;
+      }
+      notifyCrmAutomationResult(log, rule.name);
+    } finally {
+      setTestingRuleId(null);
+    }
+  }
+
+  const columns = buildRuleColumns(
+    rulesEnabled,
+    testingRuleId,
+    toggleRule,
+    runRuleTest,
+    openEdit,
+    (rule) => {
+      setEditing(rule);
+      setDeleteOpen(true);
+    },
+  );
+
+  const ruleActions = (r: AutomationRule) => (
+    <>
+      <Button
+        size="icon"
+        variant="ghost"
+        title={rulesEnabled ? "Send test notification" : "Turn on automation rules to test"}
+        disabled={testingRuleId === r.id || !rulesEnabled}
+        onClick={() => void runRuleTest(r)}
+      >
+        <Play className={testingRuleId === r.id ? "h-4 w-4 animate-pulse" : "h-4 w-4"} />
+      </Button>
+      <Button size="icon" variant="ghost" title="Edit rule" onClick={() => openEdit(r)}>
+        <Pencil className="h-4 w-4" />
+      </Button>
+      <Button
+        size="icon"
+        variant="ghost"
+        title="Delete rule"
+        onClick={() => {
+          setEditing(r);
+          setDeleteOpen(true);
+        }}
+      >
+        <Trash2 className="h-4 w-4 text-destructive" />
+      </Button>
+    </>
+  );
+
+  function renderRulesSection(
+    title: string,
+    description: string,
+    icon: ReactNode,
+    sectionRules: AutomationRule[],
+  ) {
+    if (sectionRules.length === 0) return null;
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-muted text-muted-foreground">
+            {icon}
+          </div>
+          <div>
+            <h3 className="text-xs font-semibold">{title}</h3>
+            <p className="text-[10px] text-muted-foreground">{description}</p>
+          </div>
+        </div>
+        <div className={cn(!rulesEnabled && "opacity-80")}>
+          <DataTable
+            data={sectionRules}
+            columns={columns}
+            getRowId={(r) => r.id}
+            searchKeys={["name", "trigger", "channel", "description"]}
+            actions={ruleActions}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-xs font-semibold text-muted-foreground">Automation rules</h2>
-          <p className="text-[10px] text-muted-foreground">Email via n8n · WhatsApp via WAHA.</p>
+          <p className="text-[10px] text-muted-foreground">
+            Support tickets and booking call notifications · Email via n8n · WhatsApp via WAHA.
+          </p>
         </div>
         <Button onClick={openCreate} size="sm" className="h-7 gap-1 px-2.5 text-xs bg-primary">
           <Plus className="h-3.5 w-3.5" /> New Rule
@@ -164,7 +261,7 @@ export function AutomationRulesPanel() {
             <div className="text-sm font-medium">Enable automation rules</div>
             <p className="mt-0.5 max-w-xl text-[10px] text-muted-foreground">
               {rulesEnabled
-                ? "Rules that are turned on will run on ticket events."
+                ? "Active rules run on support ticket events and booking approvals or status changes."
                 : "All rules are paused. Individual on/off settings are kept, but nothing will trigger until you turn this back on."}
             </p>
           </div>
@@ -190,55 +287,31 @@ export function AutomationRulesPanel() {
           </div>
           <h4 className="text-sm font-semibold">No automation rules yet</h4>
           <p className="mt-1.5 max-w-md text-xs text-muted-foreground">
-            Create rules to notify customers by email or WhatsApp when tickets are created, updated, or closed.
+            Create rules to notify customers by email or WhatsApp when tickets change, or when bookings are
+            requested or approved.
           </p>
           <Button onClick={openCreate} size="sm" className="mt-4 gap-1 h-7 px-2.5 text-xs bg-primary">
             <Plus className="h-3.5 w-3.5" /> Create your first rule
           </Button>
         </motion.div>
       ) : (
-        <div className={cn(!rulesEnabled && "opacity-80")}>
-        <DataTable
-          data={rules}
-          columns={columns}
-          getRowId={(r) => r.id}
-          searchKeys={["name", "trigger", "channel", "description"]}
-          actions={(r) => (
-            <>
-              <Button
-                size="icon"
-                variant="ghost"
-                title={rulesEnabled ? "Send test notification" : "Turn on automation rules to test"}
-                disabled={testingRuleId === r.id || !rulesEnabled}
-                onClick={() => void runRuleTest(r)}
-              >
-                <Play className={testingRuleId === r.id ? "h-4 w-4 animate-pulse" : "h-4 w-4"} />
-              </Button>
-              <Button size="icon" variant="ghost" title="Edit rule" onClick={() => openEdit(r)}>
-                <Pencil className="h-4 w-4" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                title="Delete rule"
-                onClick={() => {
-                  setEditing(r);
-                  setDeleteOpen(true);
-                }}
-              >
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
-            </>
+        <div className="space-y-5">
+          {renderRulesSection(
+            "Bookings",
+            "Portal call requests and approval / status emails to executives and guests.",
+            <CalendarDays className="h-3.5 w-3.5" />,
+            bookingRules,
           )}
-        />
+          {renderRulesSection(
+            "Support tickets",
+            "CRM ticket lifecycle notifications to account contacts.",
+            <Ticket className="h-3.5 w-3.5" />,
+            ticketRules,
+          )}
         </div>
       )}
 
-      <AutomationRuleDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        editing={editing}
-      />
+      <AutomationRuleDialog open={dialogOpen} onOpenChange={setDialogOpen} editing={editing} />
 
       <ConfirmDeleteDialog
         open={deleteOpen}

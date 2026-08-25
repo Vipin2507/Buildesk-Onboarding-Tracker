@@ -13,6 +13,7 @@ import {
   DEFAULT_CRM_AUTOMATION_SETTINGS,
   DEFAULT_CRM_HEALTH_CONFIG,
   DEFAULT_CRM_WAHA_CONFIG,
+  mergeCrmAutomationRules,
 } from "@/data/crm-automation-defaults";
 import { createPersistedStore, touch } from "./persist";
 
@@ -83,15 +84,8 @@ export const useCrmAutomationStore = createPersistedStore<AutomationState>(
         s.healthCheck?.webhookUrl?.includes("buildesk-crm-");
 
       const existingRules = s.rules.length > 0 ? s.rules : DEFAULT_CRM_AUTOMATION_RULES;
-      const byId = new Map(existingRules.map((r) => [r.id, r]));
-      let addedSeedRules = false;
-      for (const seed of DEFAULT_CRM_AUTOMATION_RULES) {
-        if (!byId.has(seed.id)) {
-          byId.set(seed.id, seed);
-          addedSeedRules = true;
-        }
-      }
-      const mergedRules = [...byId.values()];
+      const mergedRules = mergeCrmAutomationRules(existingRules);
+      const addedSeedRules = mergedRules.length > existingRules.length;
 
       if (
         s.seeded &&
@@ -263,7 +257,7 @@ export function hydrateCrmAutomationFromServer(snapshot: CrmAutomationSnapshot |
   }
   if (snapshot.waha) patch.waha = snapshot.waha;
   if (snapshot.healthCheck) patch.healthCheck = snapshot.healthCheck;
-  if (Array.isArray(snapshot.rules)) patch.rules = snapshot.rules;
+  if (Array.isArray(snapshot.rules)) patch.rules = mergeCrmAutomationRules(snapshot.rules);
   if ("logs" in snapshot && Array.isArray(snapshot.logs)) {
     patch.logs = snapshot.logs.slice(0, 500);
   }

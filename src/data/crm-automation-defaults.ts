@@ -69,6 +69,17 @@ function rule(
   return { ...partial, createdAt: now, updatedAt: now };
 }
 
+export const CRM_BOOKING_AUTOMATION_TRIGGERS = ["booking-created", "booking-status-changed"] as const;
+
+/** Merge seed rules by id so booking automations appear even on older saved configs. */
+export function mergeCrmAutomationRules(existing: AutomationRule[]): AutomationRule[] {
+  const byId = new Map(existing.map((r) => [r.id, r]));
+  for (const seed of DEFAULT_CRM_AUTOMATION_RULES) {
+    if (!byId.has(seed.id)) byId.set(seed.id, seed);
+  }
+  return [...byId.values()];
+}
+
 /** Seed rules for CRM Support Desk tickets (account-scoped). */
 export const DEFAULT_CRM_AUTOMATION_RULES: AutomationRule[] = [
   rule({

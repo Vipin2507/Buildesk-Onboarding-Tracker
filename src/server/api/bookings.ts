@@ -6,7 +6,7 @@ import { resolveBookingHostUserId, resolveHostTimezone } from "@/lib/booking-hos
 import { computeOpenSlots, localWallClockIso } from "@/lib/booking-slots";
 import { isAdminRoleKey } from "@/lib/permissions";
 import { resolveUserWorkEmail } from "@/lib/user-email";
-import { dispatchServerBookingCreatedEmail, isBookingSlotInPast } from "@/server/crm-booking-automation";
+import { dispatchServerBookingCreatedEmail, dispatchServerBookingStatusChangedEmail, isBookingSlotInPast } from "@/server/crm-booking-automation";
 import { insertBookingRequestNotification } from "@/server/api/notifications";
 import { ApiError, getSessionUser, newId, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
@@ -1212,6 +1212,7 @@ export const updateBookingAppointmentStatus = createServerFn({ method: "POST" })
       .get();
     if (!row) throw new ApiError(404, "Appointment not found");
     assertCanManageAppointment(user, row);
+    const previousStatus = row.status as BookingAppointmentStatus;
     const now = nowIso();
     db.update(t.bookingAppointments)
       .set({
@@ -1241,9 +1242,42 @@ export const updateBookingAppointmentStatus = createServerFn({ method: "POST" })
       cancelLinkedTaskForBooking(data.id);
     }
 
-    return mapAppointment(
-      db.select().from(t.bookingAppointments).where(eq(t.bookingAppointments.id, data.id)).get()!,
-    );
+    const finalRow = db
+      .select()
+      .from(t.bookingAppointments)
+      .where(eq(t.bookingAppointments.id, data.id))
+      .get()!;
+    const mapped = mapAppointment(finalRow);
+
+    if (
+      previousStatus !== data.status &&
+      (data.status === "confirmed" ||
+        data.status === "cancelled" ||
+        data.status === "postponed" ||
+        data.status === "declined")
+    ) {
+      const eventRow = db
+        .select({ title: t.bookingEventTypes.title })
+        .from(t.bookingEventTypes)
+        .where(eq(t.bookingEventTypes.id, finalRow.eventTypeId))
+        .get();
+      const account = db
+        .select({ name: t.crmAccounts.name })
+        .from(t.crmAccounts)
+        .where(eq(t.crmAccounts.id, finalRow.companyId))
+        .get();
+      const host = db.select().from(t.users).where(eq(t.users.id, finalRow.hostUserId)).get();
+      await dispatchServerBookingStatusChangedEmail(db, {
+        appointment: mapped,
+        previousStatus,
+        eventTitle: eventRow?.title ?? "Call",
+        accountName: account?.name ?? "CRM account",
+        hostName: host?.name ?? "Host",
+        hostEmail: resolveUserWorkEmail(host ?? undefined),
+      });
+    }
+
+    return mapped;
   });
 
 export const rescheduleBookingAppointment = createServerFn({ method: "POST" })

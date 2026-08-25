@@ -388,6 +388,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
 
         if (crmAutomation && typeof crmAutomation === "object" && Object.keys(crmAutomation).length > 0) {
           hydrateCrmAutomationFromServer(crmAutomation as Record<string, unknown>);
+          useCrmAutomationStore.getState().ensureDefaults();
           if (
             !("logs" in (crmAutomation as object)) &&
             useCrmAutomationStore.getState().logs.length > 0

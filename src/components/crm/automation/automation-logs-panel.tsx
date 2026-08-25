@@ -12,12 +12,25 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { CRM_BOOKING_AUTOMATION_TRIGGERS } from "@/data/crm-automation-defaults";
 import { retryCrmAutomationLog } from "@/services/crm-automation";
 import { useCrmAutomationStore } from "@/stores/useCrmAutomationStore";
 import { useCompanyStore } from "@/stores/useCompanyStore";
-import type { AutomationLog, AutomationLogStatus } from "@/types/automation";
+import {
+  AUTOMATION_TRIGGERS,
+  type AutomationLog,
+  type AutomationLogStatus,
+  type AutomationTrigger,
+} from "@/types/automation";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+
+const TRIGGER_LABEL = Object.fromEntries(AUTOMATION_TRIGGERS.map((t) => [t.value, t.label])) as Record<
+  AutomationTrigger,
+  string
+>;
+
+const BOOKING_TRIGGER_SET = new Set<string>(CRM_BOOKING_AUTOMATION_TRIGGERS);
 
 function statusTone(status: AutomationLogStatus) {
   if (status === "success") return "success" as const;
@@ -31,15 +44,18 @@ export function AutomationLogsPanel() {
   const [payloadLog, setPayloadLog] = useState<AutomationLog | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | AutomationLogStatus>("all");
   const [channelFilter, setChannelFilter] = useState<"all" | "email" | "whatsapp">("all");
+  const [scopeFilter, setScopeFilter] = useState<"all" | "bookings" | "tickets">("all");
   const [retryingId, setRetryingId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     return logs.filter((l) => {
       if (statusFilter !== "all" && l.status !== statusFilter) return false;
       if (channelFilter !== "all" && l.channel !== channelFilter) return false;
+      if (scopeFilter === "bookings" && !BOOKING_TRIGGER_SET.has(l.trigger)) return false;
+      if (scopeFilter === "tickets" && BOOKING_TRIGGER_SET.has(l.trigger)) return false;
       return true;
     });
-  }, [logs, statusFilter, channelFilter]);
+  }, [logs, statusFilter, channelFilter, scopeFilter]);
 
   async function handleRetry(log: AutomationLog) {
     setRetryingId(log.id);
@@ -77,7 +93,7 @@ export function AutomationLogsPanel() {
     },
     {
       key: "ticketNumber",
-      header: "Ticket",
+      header: "Reference",
       render: (l) => l.ticketNumber ?? "—",
     },
     {
@@ -86,7 +102,11 @@ export function AutomationLogsPanel() {
       render: (l) => companies.find((c) => c.id === l.companyId)?.name ?? "—",
     },
     { key: "channel", header: "Channel", render: (l) => l.channel },
-    { key: "trigger", header: "Trigger", render: (l) => l.trigger },
+    {
+      key: "trigger",
+      header: "Trigger",
+      render: (l) => TRIGGER_LABEL[l.trigger] ?? l.trigger,
+    },
     {
       key: "status",
       header: "Status",
@@ -143,6 +163,15 @@ export function AutomationLogsPanel() {
           <option value="all">All channels</option>
           <option value="email">Email</option>
           <option value="whatsapp">WhatsApp</option>
+        </select>
+        <select
+          className="h-8 rounded-md border bg-background px-2 text-xs"
+          value={scopeFilter}
+          onChange={(e) => setScopeFilter(e.target.value as typeof scopeFilter)}
+        >
+          <option value="all">All types</option>
+          <option value="bookings">Bookings</option>
+          <option value="tickets">Tickets</option>
         </select>
       </div>
 
