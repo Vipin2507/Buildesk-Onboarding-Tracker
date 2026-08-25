@@ -5,49 +5,11 @@
  * No tsx required (works with production installs).
  */
 import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const root = path.resolve(__dirname, "..");
+import { loadAppDotEnv, resolveDbPath } from "./lib/resolve-db-path.mjs";
 
-function loadDotEnv() {
-  try {
-    const envPath = path.join(root, ".env");
-    if (!fs.existsSync(envPath)) return;
-    for (const line of fs.readFileSync(envPath, "utf8").split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
-      const eq = trimmed.indexOf("=");
-      if (eq === -1) continue;
-      const key = trimmed.slice(0, eq).trim();
-      let val = trimmed.slice(eq + 1).trim();
-      if (
-        (val.startsWith('"') && val.endsWith('"')) ||
-        (val.startsWith("'") && val.endsWith("'"))
-      ) {
-        val = val.slice(1, -1);
-      }
-      if (!(key in process.env)) process.env[key] = val;
-    }
-  } catch {
-    /* ignore */
-  }
-}
-
-loadDotEnv();
-
-function resolveDbPath() {
-  const fromEnv = process.env.DATABASE_URL?.replace(/^file:/, "");
-  if (fromEnv) {
-    return path.isAbsolute(fromEnv) ? fromEnv : path.resolve(root, fromEnv);
-  }
-  if (process.env.DATA_DIR) {
-    return path.resolve(process.env.DATA_DIR, "buildesk.db");
-  }
-  return path.resolve(root, "data", "buildesk.db");
-}
+loadAppDotEnv();
 
 /** @type {{ name: string, ddl: string }[]} */
 const PROJECT_COLUMNS = [

@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { createCompanyModules } from "@/data/module-catalog";
+import { isCrmAccountCompanyStub } from "@/lib/design-ticket-portal";
 import { requireActiveUserId, requirePermission } from "@/server/auth/permissions";
 import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
@@ -224,55 +225,64 @@ export const createCompany = createServerFn({ method: "POST" })
     const db = getDb();
     const id = data.id ?? newId();
     const already = loadCompany(id);
-    if (already) return already;
+    if (already && !isCrmAccountCompanyStub(already.billingInfo)) {
+      return already;
+    }
     const now = nowIso();
     const moduleKeys = (data.moduleKeys ?? ["post-sales"]) as ModuleKey[];
-    db.insert(t.companies)
-      .values({
-        id,
-        name: data.name,
-        contact: data.contact,
-        designation: data.designation,
-        phone: data.phone,
-        email: data.email,
-        city: data.city,
-        region: data.region ?? "Rest of India",
-        ownerName: data.ownerName ?? "",
-        ownerMobile: data.ownerMobile ?? "",
-        pocName: data.pocName || data.contact,
-        pocMobile: data.pocMobile || data.phone,
-        officeAddress: data.officeAddress,
-        gstNumber: data.gstNumber,
-        billingInfo: data.billingInfo,
-        onboardingManagerId: data.onboardingManagerId,
-        csmId: data.csmId,
-        salesAgentId: data.salesAgentId || null,
-        status: data.status,
-        agreementDate: data.agreementDate,
-        startDate: data.startDate || data.agreementDate,
-        goLiveTarget: data.goLiveTarget,
-        planExpiry: data.planExpiry,
-        plan: data.plan,
-        health: data.health,
-        companyType: data.companyType || null,
-        state: data.state || null,
-        supportManager1Id: data.supportManager1Id || null,
-        supportManager2Id: data.supportManager2Id || null,
-        additionalSupportContactIdsJson: data.additionalSupportContactIds
-          ? JSON.stringify(data.additionalSupportContactIds)
-          : null,
-        annualLicense: data.annualLicense ?? null,
-        dealSize: data.dealSize != null ? String(data.dealSize) : null,
-        usersPurchased: data.usersPurchased ?? null,
-        totalCost: data.totalCost != null ? String(data.totalCost) : null,
-        paymentReceived: data.paymentReceived != null ? String(data.paymentReceived) : null,
-        pendingAmount: data.pendingAmount != null ? String(data.pendingAmount) : null,
-        endDate: data.endDate || null,
-        paymentHistoryJson: data.paymentHistory ? JSON.stringify(data.paymentHistory) : null,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+    const row = {
+      id,
+      name: data.name,
+      contact: data.contact,
+      designation: data.designation,
+      phone: data.phone,
+      email: data.email,
+      city: data.city,
+      region: data.region ?? "Rest of India",
+      ownerName: data.ownerName ?? "",
+      ownerMobile: data.ownerMobile ?? "",
+      pocName: data.pocName || data.contact,
+      pocMobile: data.pocMobile || data.phone,
+      officeAddress: data.officeAddress,
+      gstNumber: data.gstNumber,
+      billingInfo: data.billingInfo ?? null,
+      onboardingManagerId: data.onboardingManagerId,
+      csmId: data.csmId,
+      salesAgentId: data.salesAgentId || null,
+      status: data.status,
+      agreementDate: data.agreementDate,
+      startDate: data.startDate || data.agreementDate,
+      goLiveTarget: data.goLiveTarget,
+      planExpiry: data.planExpiry,
+      plan: data.plan,
+      health: data.health,
+      companyType: data.companyType || null,
+      state: data.state || null,
+      supportManager1Id: data.supportManager1Id || null,
+      supportManager2Id: data.supportManager2Id || null,
+      additionalSupportContactIdsJson: data.additionalSupportContactIds
+        ? JSON.stringify(data.additionalSupportContactIds)
+        : null,
+      annualLicense: data.annualLicense ?? null,
+      dealSize: data.dealSize != null ? String(data.dealSize) : null,
+      usersPurchased: data.usersPurchased ?? null,
+      totalCost: data.totalCost != null ? String(data.totalCost) : null,
+      paymentReceived: data.paymentReceived != null ? String(data.paymentReceived) : null,
+      pendingAmount: data.pendingAmount != null ? String(data.pendingAmount) : null,
+      endDate: data.endDate || null,
+      paymentHistoryJson: data.paymentHistory ? JSON.stringify(data.paymentHistory) : null,
+      updatedAt: now,
+    };
+    if (already) {
+      db.update(t.companies)
+        .set({ ...row, createdAt: already.createdAt })
+        .where(eq(t.companies.id, id))
+        .run();
+    } else {
+      db.insert(t.companies)
+        .values({ ...row, createdAt: now })
+        .run();
+    }
     const modules =
       data.modules ??
       createCompanyModules(moduleKeys, now.slice(0, 10)).map((m) => ({
@@ -342,6 +352,9 @@ export const updateCompany = createServerFn({ method: "POST" })
       pendingAmount?: number | null;
     };
     const set: Record<string, unknown> = { ...scalarRest, updatedAt: nowIso() };
+    if (isCrmAccountCompanyStub(existing.billingInfo) && scalarRest.billingInfo === undefined) {
+      set.billingInfo = null;
+    }
     if (salesAgentId !== undefined) set.salesAgentId = salesAgentId || null;
     if (additionalSupportContactIds !== undefined) {
       set.additionalSupportContactIdsJson = additionalSupportContactIds

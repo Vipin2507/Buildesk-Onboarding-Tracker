@@ -104,7 +104,6 @@ export const useCompanyStore = createStore<CompanyState>((set, get) => ({
     const now = nowIso();
     const company: Company = { ...data, id: newId(), createdAt: now, updatedAt: now };
     set((s) => ({ companies: [company, ...s.companies] }));
-    useCompanyPortalStore.getState().generateAccessForCompany(company);
     logActivity({ who: "You", what: `Added company ${company.name}`, kind: "success", companyId: company.id });
     try {
       const saved = (await serverSyncTrackedWithRollback(
@@ -113,9 +112,6 @@ export const useCompanyStore = createStore<CompanyState>((set, get) => ({
         () => apiCreateCompany({ data: serializeCompanyForApi(company) }),
         () => {
           set((s) => ({ companies: s.companies.filter((c) => c.id !== company.id) }));
-          useCompanyPortalStore.setState((s) => ({
-            access: s.access.filter((a) => a.companyId !== company.id),
-          }));
         },
       )) as Company;
 
@@ -125,14 +121,12 @@ export const useCompanyStore = createStore<CompanyState>((set, get) => ({
         set((s) => ({
           companies: s.companies.filter((c) => c.id !== company.id && c.id !== saved.id),
         }));
-        useCompanyPortalStore.setState((s) => ({
-          access: s.access.filter((a) => a.companyId !== company.id && a.companyId !== saved.id),
-        }));
         throw new Error(
-          "Company was not saved to the database. Restart the dev server and try again.",
+          "Company was not saved to the database. Check DATABASE_URL on the server and try again.",
         );
       }
 
+      useCompanyPortalStore.getState().generateAccessForCompany(persisted);
       set({ companies: rows });
       return persisted;
     } catch (err) {

@@ -3,18 +3,11 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import Database from "better-sqlite3";
 
-const require = createRequire(import.meta.url);
+import { loadAppDotEnv, projectRoot, resolveDbPath } from "./lib/resolve-db-path.mjs";
 
-function resolveDbPath() {
-  const fromEnv = process.env.DATABASE_URL?.replace(/^file:/, "");
-  if (fromEnv) {
-    return path.isAbsolute(fromEnv) ? fromEnv : path.resolve(process.cwd(), fromEnv);
-  }
-  if (process.env.DATA_DIR) {
-    return path.resolve(process.env.DATA_DIR, "buildesk.db");
-  }
-  return path.resolve(process.cwd(), "data", "buildesk.db");
-}
+loadAppDotEnv();
+
+const require = createRequire(import.meta.url);
 
 const dbPath = resolveDbPath();
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
@@ -23,7 +16,7 @@ const sqlite = new Database(dbPath);
 sqlite.pragma("journal_mode = WAL");
 sqlite.pragma("foreign_keys = ON");
 
-const migrationsFolder = path.resolve(process.cwd(), "drizzle");
+const migrationsFolder = path.resolve(projectRoot, "drizzle");
 const journalPath = path.join(migrationsFolder, "meta", "_journal.json");
 
 if (!fs.existsSync(journalPath)) {

@@ -53,11 +53,17 @@ echo "==> Building"
 npm run build
 
 echo "==> Restarting PM2 ($PM2_NAME)"
+if [[ -z "${DATABASE_URL:-}" ]]; then
+  echo "ERROR: DATABASE_URL is not set. Add it to $APP_DIR/.env"
+  echo "  Example: DATABASE_URL=file:/home/buildesk-track/data/buildesk.db"
+  exit 1
+fi
+echo "==> DATABASE_URL=$DATABASE_URL"
+
 if pm2 describe "$PM2_NAME" >/dev/null 2>&1; then
   pm2 delete "$PM2_NAME"
 fi
-# Capture current env (from .env) into the PM2 process
-pm2 start .output/server/index.mjs --name "$PM2_NAME"
+APP_DIR="$APP_DIR" PM2_NAME="$PM2_NAME" pm2 start ecosystem.config.cjs --update-env
 pm2 save
 
 pm2 status "$PM2_NAME"
