@@ -256,6 +256,7 @@ function CompaniesListPage() {
   const [dateTo, setDateTo] = useState("");
 
   const [modalOpen, setModalOpen] = useState(false);
+  const [savingCompany, setSavingCompany] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -577,8 +578,8 @@ function CompaniesListPage() {
   }
 
   function onSubmit() {
-    form.handleSubmit(
-      (data) => {
+    void form.handleSubmit(
+      async (data) => {
         const payload = normalizeCompanyPayload(data);
         if (editing) {
           updateCompany(editing.id, {
@@ -587,21 +588,31 @@ function CompaniesListPage() {
             modules: mergeModules(editing.modules, data.modules),
           });
           toast.success("Company updated");
-        } else {
-          const company = addCompany({
+          setModalOpen(false);
+          return;
+        }
+
+        setSavingCompany(true);
+        try {
+          const company = await addCompany({
             ...payload,
             status: "not_started",
             modules: createCompanyModules(data.modules),
           });
           clearFilters();
-          toast.success("Company added", {
+          toast.success("Company saved", {
+            description: `${company.name} is stored and will remain after refresh.`,
             action: {
               label: "View",
               onClick: () => navigate({ to: "/companies/$companyId", params: { companyId: company.id } }),
             },
           });
+          setModalOpen(false);
+        } catch {
+          // Error toast is shown by serverSyncTrackedWithRollback.
+        } finally {
+          setSavingCompany(false);
         }
-        setModalOpen(false);
       },
       (errors) => {
         const first = Object.values(errors)[0];
@@ -621,7 +632,7 @@ function CompaniesListPage() {
     const removed = deleteCompany(deleting.id);
     if (removed) {
       toast.success("Company deleted", {
-        action: { label: "Undo", onClick: () => addCompany({ ...removed, status: removed.status }) },
+        action: { label: "Undo", onClick: () => void addCompany({ ...removed, status: removed.status }) },
       });
     }
     setDeleteOpen(false);
@@ -961,7 +972,7 @@ function CompaniesListPage() {
         onOpenChange={setModalOpen}
         title={editing ? "Edit Company" : "Add Company"}
         onSubmit={onSubmit}
-        submitLabel={editing ? "Update" : "Create"}
+        submitLabel={savingCompany ? "Saving…" : editing ? "Update" : "Create"}
       >
         <div className="grid gap-4">
           <div className="space-y-3">

@@ -83,7 +83,7 @@ export function ProjectImportModal({
     }
   }
 
-  function applyImport() {
+  async function applyImport() {
     if (!plan || plan.summary.ready === 0) return;
     setBusy(true);
 
@@ -110,7 +110,7 @@ export function ProjectImportModal({
           if (action.kind === "create_company") {
             const key = normalizeEntityName(action.companyName);
             if (companyIdByName.has(key)) continue;
-            const company = addCompany({
+            const company = await addCompany({
               name: action.companyName,
               contact: "To be assigned",
               designation: "Pending",
@@ -338,7 +338,7 @@ export function ProjectImportModal({
 
         <AlertDialogFooter className="border-t px-6 py-4">
           <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
-          <Button type="button" disabled={!canImport} onClick={applyImport}>
+          <Button type="button" disabled={!canImport} onClick={() => void applyImport()}>
             {busy ? "Working…" : `Import ${plan?.summary.ready ?? 0} row${plan?.summary.ready === 1 ? "" : "s"}`}
           </Button>
         </AlertDialogFooter>

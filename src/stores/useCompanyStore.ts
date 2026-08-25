@@ -8,13 +8,15 @@ import {
   updateCompany as apiUpdateCompany,
   deleteCompany as apiDeleteCompany,
   renewCompany as apiRenewCompany,
+  listCompanies,
 } from "@/lib/api";
 import { serverSync, serverSyncTrackedWithRollback, serverSyncWithRollback } from "@/lib/sync";
 import { useCompanyPortalStore } from "./useCompanyPortalStore";
 
 type CompanyState = {
   companies: Company[];
-  addCompany: (data: Omit<Company, "id" | "createdAt" | "updatedAt">) => Company;
+  addCompany: (data: Omit<Company, "id" | "createdAt" | "updatedAt">) => Promise<Company>;
+  refreshCompaniesFromServer: () => Promise<Company[]>;
   updateCompany: (id: string, data: Partial<Company>) => void;
   deleteCompany: (id: string) => Company | undefined;
   getById: (id: string) => Company | undefined;
@@ -31,70 +33,95 @@ type CompanyState = {
   ) => void;
 };
 
+function serializeCompanyForApi(company: Company) {
+  return {
+    id: company.id,
+    name: company.name,
+    contact: company.contact,
+    designation: company.designation,
+    phone: company.phone,
+    email: company.email,
+    city: company.city,
+    region: company.region,
+    ownerName: company.ownerName,
+    ownerMobile: company.ownerMobile,
+    pocName: company.pocName,
+    pocMobile: company.pocMobile,
+    officeAddress: company.officeAddress,
+    gstNumber: company.gstNumber,
+    billingInfo: company.billingInfo,
+    onboardingManagerId: company.onboardingManagerId,
+    csmId: company.csmId,
+    salesAgentId: company.salesAgentId || undefined,
+    status: company.status,
+    agreementDate: company.agreementDate,
+    startDate: company.startDate,
+    goLiveTarget: company.goLiveTarget,
+    planExpiry: company.planExpiry,
+    plan: company.plan,
+    health: company.health,
+    companyType: company.companyType,
+    state: company.state || undefined,
+    supportManager1Id: company.supportManager1Id || undefined,
+    supportManager2Id: company.supportManager2Id || undefined,
+    additionalSupportContactIds: company.additionalSupportContactIds,
+    annualLicense: company.annualLicense,
+    dealSize: company.dealSize,
+    usersPurchased: company.usersPurchased,
+    totalCost: company.totalCost,
+    paymentReceived: company.paymentReceived,
+    pendingAmount: company.pendingAmount,
+    endDate: company.endDate || undefined,
+    paymentHistory: company.paymentHistory,
+    modules: normalizeCompanyModules(company.modules).map((m) => ({
+      moduleKey: m.moduleKey,
+      label: m.label,
+      optedIn: m.optedIn,
+      optedOnDate: m.optedOnDate,
+      liveAt: m.liveAt ?? null,
+      pocName: m.pocName ?? null,
+      pocMobile: m.pocMobile ?? null,
+    })),
+  };
+}
+
 export const useCompanyStore = createStore<CompanyState>((set, get) => ({
   companies: [],
 
-  addCompany: (data) => {
+  refreshCompaniesFromServer: async () => {
+    const rows = await listCompanies();
+    set({ companies: rows });
+    return rows;
+  },
+
+  addCompany: async (data) => {
     const now = nowIso();
     const company: Company = { ...data, id: newId(), createdAt: now, updatedAt: now };
     set((s) => ({ companies: [company, ...s.companies] }));
     useCompanyPortalStore.getState().generateAccessForCompany(company);
     logActivity({ who: "You", what: `Added company ${company.name}`, kind: "success", companyId: company.id });
-    serverSyncTrackedWithRollback(
-      `company:${company.id}`,
-      "createCompany",
-      () =>
-        apiCreateCompany({
-          data: {
-            id: company.id,
-            name: company.name,
-            contact: company.contact,
-            designation: company.designation,
-            phone: company.phone,
-            email: company.email,
-            city: company.city,
-            region: company.region,
-            ownerName: company.ownerName,
-            ownerMobile: company.ownerMobile,
-            pocName: company.pocName,
-            pocMobile: company.pocMobile,
-            officeAddress: company.officeAddress,
-            gstNumber: company.gstNumber,
-            billingInfo: company.billingInfo,
-            onboardingManagerId: company.onboardingManagerId,
-            csmId: company.csmId,
-            salesAgentId: company.salesAgentId || undefined,
-            status: company.status,
-            agreementDate: company.agreementDate,
-            startDate: company.startDate,
-            goLiveTarget: company.goLiveTarget,
-            planExpiry: company.planExpiry,
-            plan: company.plan,
-            health: company.health,
-            companyType: company.companyType,
-            state: company.state,
-            supportManager1Id: company.supportManager1Id,
-            supportManager2Id: company.supportManager2Id,
-            additionalSupportContactIds: company.additionalSupportContactIds,
-            annualLicense: company.annualLicense,
-            dealSize: company.dealSize,
-            usersPurchased: company.usersPurchased,
-            totalCost: company.totalCost,
-            paymentReceived: company.paymentReceived,
-            pendingAmount: company.pendingAmount,
-            endDate: company.endDate,
-            paymentHistory: company.paymentHistory,
-            modules: company.modules,
-          },
-        }),
-      () => {
-        set((s) => ({ companies: s.companies.filter((c) => c.id !== company.id) }));
-        useCompanyPortalStore.setState((s) => ({
-          access: s.access.filter((a) => a.companyId !== company.id),
-        }));
-      },
-    );
-    return company;
+    try {
+      await serverSyncTrackedWithRollback(
+        `company:${company.id}`,
+        "createCompany",
+        () => apiCreateCompany({ data: serializeCompanyForApi(company) }),
+        () => {
+          set((s) => ({ companies: s.companies.filter((c) => c.id !== company.id) }));
+          useCompanyPortalStore.setState((s) => ({
+            access: s.access.filter((a) => a.companyId !== company.id),
+          }));
+        },
+      );
+      const rows = await listCompanies();
+      set({ companies: rows });
+      const saved = rows.find((c) => c.id === company.id);
+      if (!saved) {
+        throw new Error("Company was saved but did not appear in the server list.");
+      }
+      return saved;
+    } catch (err) {
+      throw err instanceof Error ? err : new Error("Failed to save company");
+    }
   },
 
   updateCompany: (id, data) => {
