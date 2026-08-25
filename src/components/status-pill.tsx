@@ -36,10 +36,12 @@ export function Pill({
   children,
   tone = "muted",
   className,
+  title,
 }: {
   children: React.ReactNode;
   tone?: "muted" | "accent" | "success" | "warning" | "danger" | "info";
   className?: string;
+  title?: string;
 }) {
   const tones: Record<string, string> = {
     muted: "bg-muted text-muted-foreground border-border",
@@ -50,7 +52,14 @@ export function Pill({
     info: "bg-primary/15 text-primary border-primary/30",
   };
   return (
-    <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium", tones[tone], className)}>
+    <span
+      title={title}
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium",
+        tones[tone],
+        className,
+      )}
+    >
       {children}
     </span>
   );

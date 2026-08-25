@@ -3,12 +3,12 @@ import type { CrmAccount } from "@/types/crm-account";
 import type { Company } from "@/types/company";
 import type { User } from "@/types";
 
-type NamedUser = Pick<User, "id" | "name" | "active">;
+type NamedUser = Pick<User, "id" | "name" | "active" | "productScope" | "role">;
 
-/** All active users for task assignee pickers. */
-export function allTaskAssigneeUsers(users: NamedUser[]): NamedUser[] {
+/** Active CRM users for task assignee pickers. */
+export function crmTaskAssigneeUsers(users: NamedUser[]): NamedUser[] {
   return [...users]
-    .filter((u) => u.active !== false)
+    .filter((u) => u.active !== false && u.productScope === "crm")
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -31,7 +31,7 @@ export function taskAssigneeUserOptions(input: {
   company?: Pick<Company, "supportManager1Id"> | null;
   crmAccount?: Pick<CrmAccount, "supportManager1"> | null;
 }): NamedUser[] {
-  const active = allTaskAssigneeUsers(input.users);
+  const active = crmTaskAssigneeUsers(input.users);
   const defaultIds = resolveDefaultTaskAssigneeIds({
     company: input.company,
     crmAccount: input.crmAccount,

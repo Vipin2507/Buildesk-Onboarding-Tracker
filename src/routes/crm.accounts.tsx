@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { CrmAccountBulkUploadModal } from "@/components/crm/crm-account-bulk-upload-modal";
 import { CrmAccountDateBulkUploadModal } from "@/components/crm/crm-account-date-bulk-upload-modal";
 import { CrmAccountModulesCell } from "@/components/crm/crm-account-modules-cell";
+import { CrmAccountProvidersCell } from "@/components/crm/crm-account-providers-cell";
 import {
   CrmAccountFormFields,
   crmAccountSchema,
@@ -879,21 +880,7 @@ function CrmAccountsPage() {
                   {
                     key: "providers",
                     header: "Providers",
-                    render: (r) =>
-                      r.providers.length ? (
-                        <div className="flex flex-wrap gap-1">
-                          {r.providers.slice(0, 2).map((p) => (
-                            <Pill key={p} tone="accent">
-                              {p}
-                            </Pill>
-                          ))}
-                          {r.providers.length > 2 ? (
-                            <Pill tone="muted">+{r.providers.length - 2}</Pill>
-                          ) : null}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      ),
+                    render: (r) => <CrmAccountProvidersCell providers={r.providers} />,
                   },
                   {
                     key: "startDate",

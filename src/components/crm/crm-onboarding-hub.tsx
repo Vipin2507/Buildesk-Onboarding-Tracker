@@ -612,7 +612,7 @@ function ModulesTab({ companyId }: { companyId: string }) {
                         <div className="flex items-center gap-1.5 text-xs font-medium">
                           {m.label}
                           {requiresProvider ? (
-                            <Pill tone={m.provider ? "success" : "warning"}>
+                            <Pill tone={m.provider ? "success" : "warning"} className="max-w-[12rem] truncate">
                               {m.provider ?? "Provider pending"}
                             </Pill>
                           ) : null}
