@@ -118,10 +118,23 @@ export const useCompanyStore = createStore<CompanyState>((set, get) => ({
           }));
         },
       )) as Company;
-      set((s) => ({
-        companies: [saved, ...s.companies.filter((c) => c.id !== company.id && c.id !== saved.id)],
-      }));
-      return saved;
+
+      const rows = await listCompanies();
+      const persisted = rows.find((c) => c.id === saved.id);
+      if (!persisted) {
+        set((s) => ({
+          companies: s.companies.filter((c) => c.id !== company.id && c.id !== saved.id),
+        }));
+        useCompanyPortalStore.setState((s) => ({
+          access: s.access.filter((a) => a.companyId !== company.id && a.companyId !== saved.id),
+        }));
+        throw new Error(
+          "Company was not saved to the database. Restart the dev server and try again.",
+        );
+      }
+
+      set({ companies: rows });
+      return persisted;
     } catch (err) {
       throw err instanceof Error ? err : new Error("Failed to save company");
     }
