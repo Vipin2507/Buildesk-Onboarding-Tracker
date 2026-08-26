@@ -3,6 +3,12 @@ import { and, eq, gte, inArray, lte } from "drizzle-orm";
 import { z } from "zod";
 
 import { resolveBookingHostUserId, resolveHostTimezone } from "@/lib/booking-host";
+import {
+  allGuestEmails,
+  normalizeAdditionalGuestEmails,
+  parseAdditionalGuestEmailsJson,
+  serializeAdditionalGuestEmails,
+} from "@/lib/booking-guest-emails";
 import { computeOpenSlots, localWallClockIso } from "@/lib/booking-slots";
 import { isAdminRoleKey } from "@/lib/permissions";
 import { resolveUserWorkEmail } from "@/lib/user-email";
@@ -83,6 +89,7 @@ function mapBlock(row: typeof t.bookingBlocks.$inferSelect): BookingBlock {
 }
 
 function mapAppointment(row: typeof t.bookingAppointments.$inferSelect): BookingAppointment {
+  const additionalGuestEmails = parseAdditionalGuestEmailsJson(row.additionalGuestEmailsJson);
   return {
     id: row.id,
     eventTypeId: row.eventTypeId,
@@ -93,6 +100,7 @@ function mapAppointment(row: typeof t.bookingAppointments.$inferSelect): Booking
     status: row.status as BookingAppointmentStatus,
     guestName: row.guestName,
     guestEmail: row.guestEmail,
+    additionalGuestEmails: additionalGuestEmails.length ? additionalGuestEmails : undefined,
     guestPhone: row.guestPhone ?? undefined,
     notes: row.notes ?? undefined,
     hostNote: row.hostNote ?? undefined,
@@ -417,8 +425,17 @@ async function syncGoogleCalendarForAppointment(
     .where(eq(t.crmAccounts.id, appointment.companyId))
     .get();
   const summary = `${eventRow?.title ?? "Call"} · ${account?.name ?? "CRM"} · ${appointment.guestName}`;
+  const additionalGuestEmails = parseAdditionalGuestEmailsJson(appointment.additionalGuestEmailsJson);
+  const guestEmails = allGuestEmails({
+    guestEmail: appointment.guestEmail,
+    additionalGuestEmails,
+  });
+  const guestEmailLine =
+    guestEmails.length > 1
+      ? `Guests: ${guestEmails.join(", ")}`
+      : `Guest: ${appointment.guestName} (${appointment.guestEmail})`;
   const description = [
-    `Guest: ${appointment.guestName} (${appointment.guestEmail})`,
+    guestEmailLine,
     appointment.guestPhone ? `Phone: ${appointment.guestPhone}` : null,
     appointment.notes ? `Notes: ${appointment.notes}` : null,
     `Buildesk booking: ${appointment.id}`,
@@ -471,6 +488,7 @@ async function syncGoogleCalendarForAppointment(
         timeZone,
         guestEmail: appointment.guestEmail,
         guestName: appointment.guestName,
+        guestEmails,
       });
       db.update(t.bookingAppointments)
         .set({
@@ -494,6 +512,7 @@ async function syncGoogleCalendarForAppointment(
       timeZone,
       guestEmail: appointment.guestEmail,
       guestName: appointment.guestName,
+      guestEmails,
     });
     if (!created) {
       db.update(t.bookingAppointments)
@@ -674,6 +693,7 @@ export const createPortalBooking = createServerFn({ method: "POST" })
         startsAt: z.string().min(10),
         guestName: z.string().min(1),
         guestEmail: z.string().email(),
+        additionalGuestEmails: z.array(z.string().email()).optional(),
         guestPhone: z.string().optional(),
         notes: z.string().optional(),
         durationMinutes: z.number().int().min(5).optional(),
@@ -710,6 +730,11 @@ export const createPortalBooking = createServerFn({ method: "POST" })
 
     const now = nowIso();
     const id = newId();
+    const guestEmail = data.guestEmail.trim().toLowerCase();
+    const additionalGuestEmails = normalizeAdditionalGuestEmails(
+      guestEmail,
+      data.additionalGuestEmails ?? [],
+    );
     db.insert(t.bookingAppointments)
       .values({
         id,
@@ -720,7 +745,8 @@ export const createPortalBooking = createServerFn({ method: "POST" })
         endsAt: slot.endsAt,
         status: "pending",
         guestName: data.guestName.trim(),
-        guestEmail: data.guestEmail.trim().toLowerCase(),
+        guestEmail,
+        additionalGuestEmailsJson: serializeAdditionalGuestEmails(additionalGuestEmails),
         guestPhone: data.guestPhone?.trim() || null,
         notes: data.notes?.trim() || null,
         hostNote: null,

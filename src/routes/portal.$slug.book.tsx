@@ -7,7 +7,9 @@ import {
   Clock,
   Mail,
   Phone,
+  Plus,
   User,
+  X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -26,6 +28,7 @@ import {
 } from "@/components/design-ticket/design-ticket-shared";
 import { Button } from "@/components/ui/button";
 import { cn, isValidEmail } from "@/lib/utils";
+import { formatGuestEmailsLabel } from "@/lib/booking-guest-emails";
 import { browserWallClockIso } from "@/lib/booking-slots";
 import { getCrmMasterBookingCallTypes } from "@/stores/useCrmMasterStore";
 import { useBookingStore } from "@/stores/useBookingStore";
@@ -146,6 +149,7 @@ function BookingSummary({
   selectedSlot,
   guestName,
   guestEmail,
+  additionalGuestEmails = [],
 }: {
   selectedType: BookingEventType | null;
   effectiveDuration?: number;
@@ -153,7 +157,12 @@ function BookingSummary({
   selectedSlot?: BookingSlot | null;
   guestName?: string;
   guestEmail?: string;
+  additionalGuestEmails?: string[];
 }) {
+  const emailLabel = formatGuestEmailsLabel({
+    guestEmail: guestEmail ?? "",
+    additionalGuestEmails,
+  });
   if (!selectedType && !guestEmail) return null;
   return (
     <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 text-xs">
@@ -174,13 +183,133 @@ function BookingSummary({
           </div>
         ) : null}
         {guestName || guestEmail ? (
-          <div className="flex items-center gap-1 truncate">
-            <User className="h-3 w-3 shrink-0" />
-            {guestName || "—"}
-            {guestEmail ? ` · ${guestEmail}` : ""}
+          <div className="flex items-start gap-1">
+            <User className="mt-0.5 h-3 w-3 shrink-0" />
+            <span className="min-w-0 break-words">
+              {guestName || "—"}
+              {emailLabel ? ` · ${emailLabel}` : ""}
+            </span>
           </div>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+function GuestEmailsField({
+  primaryEmail,
+  onPrimaryEmailChange,
+  additionalEmails,
+  onAdditionalEmailsChange,
+  emailTouched,
+  onEmailTouched,
+  compact = false,
+}: {
+  primaryEmail: string;
+  onPrimaryEmailChange: (value: string) => void;
+  additionalEmails: string[];
+  onAdditionalEmailsChange: (value: string[]) => void;
+  emailTouched: boolean;
+  onEmailTouched: () => void;
+  compact?: boolean;
+}) {
+  const [draft, setDraft] = useState("");
+  const primaryError =
+    emailTouched && !isValidEmail(primaryEmail) ? "Enter a valid email address" : undefined;
+
+  function addEmail() {
+    onEmailTouched();
+    const next = draft.trim().toLowerCase();
+    if (!isValidEmail(next)) {
+      toast.error("Enter a valid email address");
+      return;
+    }
+    if (next === primaryEmail.trim().toLowerCase()) {
+      toast.error("This email is already set as your primary contact");
+      return;
+    }
+    if (additionalEmails.includes(next)) {
+      toast.error("Email already added");
+      return;
+    }
+    onAdditionalEmailsChange([...additionalEmails, next]);
+    setDraft("");
+  }
+
+  return (
+    <div className="space-y-3">
+      <DesignTicketFormField
+        label="Primary email"
+        required
+        hint="Required — used for booking confirmations and Google Meet invites."
+        error={primaryError}
+      >
+        <div className="relative">
+          <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="email"
+            value={primaryEmail}
+            onChange={(e) => onPrimaryEmailChange(e.target.value)}
+            onBlur={onEmailTouched}
+            className={cn(ticketFieldClass, "pl-9", primaryError && "border-destructive")}
+            placeholder="you@company.com"
+            autoComplete="email"
+            inputMode="email"
+            required
+          />
+        </div>
+      </DesignTicketFormField>
+
+      <DesignTicketFormField
+        label="Additional emails"
+        hint="Optional — add colleagues who should receive confirmations and Meet invites."
+      >
+        <div className={cn("flex gap-2", compact && "flex-col sm:flex-row")}>
+          <div className="relative min-w-0 flex-1">
+            <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="email"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addEmail();
+                }
+              }}
+              className={cn(ticketFieldClass, "pl-9")}
+              placeholder="colleague@company.com"
+              inputMode="email"
+            />
+          </div>
+          <Button type="button" variant="outline" className="shrink-0 gap-1" onClick={addEmail}>
+            <Plus className="h-4 w-4" />
+            Add
+          </Button>
+        </div>
+        {additionalEmails.length > 0 ? (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {additionalEmails.map((email) => (
+              <span
+                key={email}
+                className="inline-flex items-center gap-1 rounded-full border bg-muted/30 px-2 py-0.5 text-[11px]"
+              >
+                {email}
+                <button
+                  type="button"
+                  className="rounded-full text-muted-foreground hover:text-foreground"
+                  aria-label={`Remove ${email}`}
+                  onClick={() =>
+                    onAdditionalEmailsChange(additionalEmails.filter((item) => item !== email))
+                  }
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        ) : null}
+      </DesignTicketFormField>
     </div>
   );
 }
@@ -202,6 +331,7 @@ function PortalBookCall() {
   const [selectedSlot, setSelectedSlot] = useState<BookingSlot | null>(null);
   const [guestName, setGuestName] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
+  const [additionalGuestEmails, setAdditionalGuestEmails] = useState<string[]>([]);
   const [guestPhone, setGuestPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [specifyTopic, setSpecifyTopic] = useState("");
@@ -217,8 +347,6 @@ function PortalBookCall() {
       : selectedType?.durationMinutes ?? selectedMeta?.durationMinutes;
 
   const minDate = todayYmd();
-  const emailError =
-    emailTouched && !isValidEmail(guestEmail) ? "Enter a valid email address" : undefined;
   const canContinueContact = guestName.trim().length >= 2 && isValidEmail(guestEmail);
 
   function pickDate(next: string) {
@@ -332,6 +460,7 @@ function PortalBookCall() {
         startsAt: selectedSlot.startsAt,
         guestName: guestName.trim(),
         guestEmail: guestEmail.trim().toLowerCase(),
+        additionalGuestEmails,
         guestPhone: guestPhone.trim() || undefined,
         notes: noteParts.length > 0 ? noteParts.join("\n") : undefined,
         durationMinutes: allowsCustom ? effectiveDuration : undefined,
@@ -373,7 +502,7 @@ function PortalBookCall() {
             >
               <DesignTicketFormCard>
                 <p className="text-xs text-muted-foreground">
-                  Your email is required so we can send confirmation and Meet links.
+                  Add your email and any colleagues who should receive confirmations and Meet links.
                 </p>
                 <DesignTicketFormField label="Your name" required>
                   <div className="relative">
@@ -388,27 +517,14 @@ function PortalBookCall() {
                     />
                   </div>
                 </DesignTicketFormField>
-                <DesignTicketFormField
-                  label="Email"
-                  required
-                  hint="Required — used for booking confirmations and Google Meet invites."
-                  error={emailError}
-                >
-                  <div className="relative">
-                    <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <input
-                      type="email"
-                      value={guestEmail}
-                      onChange={(e) => setGuestEmail(e.target.value)}
-                      onBlur={() => setEmailTouched(true)}
-                      className={cn(ticketFieldClass, "pl-9", emailError && "border-destructive")}
-                      placeholder="you@company.com"
-                      autoComplete="email"
-                      inputMode="email"
-                      required
-                    />
-                  </div>
-                </DesignTicketFormField>
+                <GuestEmailsField
+                  primaryEmail={guestEmail}
+                  onPrimaryEmailChange={setGuestEmail}
+                  additionalEmails={additionalGuestEmails}
+                  onAdditionalEmailsChange={setAdditionalGuestEmails}
+                  emailTouched={emailTouched}
+                  onEmailTouched={() => setEmailTouched(true)}
+                />
                 <Button
                   type="button"
                   disabled={!canContinueContact}
@@ -445,6 +561,7 @@ function PortalBookCall() {
               <BookingSummary
                 guestName={guestName}
                 guestEmail={guestEmail}
+                additionalGuestEmails={additionalGuestEmails}
                 selectedType={null}
               />
               <div className="grid gap-2 sm:grid-cols-2">
@@ -509,6 +626,7 @@ function PortalBookCall() {
                 effectiveDuration={effectiveDuration}
                 guestName={guestName}
                 guestEmail={guestEmail}
+                additionalGuestEmails={additionalGuestEmails}
               />
 
               <DesignTicketFormCard>
@@ -642,6 +760,7 @@ function PortalBookCall() {
                 selectedSlot={selectedSlot}
                 guestName={guestName}
                 guestEmail={guestEmail}
+                additionalGuestEmails={additionalGuestEmails}
               />
 
               <DesignTicketFormCard>
@@ -668,26 +787,15 @@ function PortalBookCall() {
                   </div>
                 </DesignTicketFormField>
 
-                <DesignTicketFormField
-                  label="Email"
-                  required
-                  hint="Required for confirmation emails and Meet links."
-                  error={emailError}
-                >
-                  <div className="relative">
-                    <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <input
-                      type="email"
-                      value={guestEmail}
-                      onChange={(e) => setGuestEmail(e.target.value)}
-                      onBlur={() => setEmailTouched(true)}
-                      className={cn(ticketFieldClass, "pl-9", emailError && "border-destructive")}
-                      inputMode="email"
-                      autoComplete="email"
-                      required
-                    />
-                  </div>
-                </DesignTicketFormField>
+                <GuestEmailsField
+                  primaryEmail={guestEmail}
+                  onPrimaryEmailChange={setGuestEmail}
+                  additionalEmails={additionalGuestEmails}
+                  onAdditionalEmailsChange={setAdditionalGuestEmails}
+                  emailTouched={emailTouched}
+                  onEmailTouched={() => setEmailTouched(true)}
+                  compact
+                />
 
                 {allowsCustom ? (
                   <DesignTicketFormField label="What is this call about?" required>
@@ -750,8 +858,14 @@ function PortalBookCall() {
               <div>
                 <h2 className="text-lg font-semibold">Request received</h2>
                 <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-                  We'll email <span className="font-medium text-foreground">{guestEmail}</span> when
-                  your booking is approved, rescheduled, or cancelled.
+                  We'll email{" "}
+                  <span className="font-medium text-foreground">
+                    {formatGuestEmailsLabel({
+                      guestEmail,
+                      additionalGuestEmails,
+                    })}
+                  </span>{" "}
+                  when your booking is approved, rescheduled, or cancelled.
                 </p>
               </div>
               {selectedSlot && (
@@ -771,6 +885,7 @@ function PortalBookCall() {
                   setNotes("");
                   setSpecifyTopic("");
                   setCustomDuration(null);
+                  setAdditionalGuestEmails([]);
                 }}
               >
                 Book another call

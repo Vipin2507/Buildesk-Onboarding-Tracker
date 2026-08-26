@@ -676,6 +676,20 @@ function CrmBookingsPage() {
                               <Mail className="h-3 w-3" />
                               {a.guestEmail}
                             </a>
+                            {a.additionalGuestEmails?.length ? (
+                              <div className="mt-0.5 space-y-0.5 text-[10px] text-muted-foreground">
+                                {a.additionalGuestEmails.map((email) => (
+                                  <a
+                                    key={email}
+                                    href={`mailto:${email}`}
+                                    className="block hover:text-primary hover:underline"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    + {email}
+                                  </a>
+                                ))}
+                              </div>
+                            ) : null}
                           </div>
                         ),
                       },

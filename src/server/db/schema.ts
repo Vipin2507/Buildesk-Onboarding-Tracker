@@ -889,6 +889,7 @@ export const bookingAppointments = sqliteTable(
     status: text("status").notNull().default("pending"),
     guestName: text("guest_name").notNull(),
     guestEmail: text("guest_email").notNull(),
+    additionalGuestEmailsJson: text("additional_guest_emails_json").notNull().default("[]"),
     guestPhone: text("guest_phone"),
     notes: text("notes"),
     hostNote: text("host_note"),

@@ -59,6 +59,7 @@ export type BookingAppointment = {
   status: BookingAppointmentStatus;
   guestName: string;
   guestEmail: string;
+  additionalGuestEmails?: string[];
   guestPhone?: string;
   notes?: string;
   hostNote?: string;

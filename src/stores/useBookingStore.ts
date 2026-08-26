@@ -80,6 +80,7 @@ type BookingState = {
     startsAt: string;
     guestName: string;
     guestEmail: string;
+    additionalGuestEmails?: string[];
     guestPhone?: string;
     notes?: string;
     durationMinutes?: number;

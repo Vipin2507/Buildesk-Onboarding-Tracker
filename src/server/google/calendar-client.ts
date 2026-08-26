@@ -75,12 +75,21 @@ export async function createGoogleMeetEvent(input: {
   timeZone: string;
   guestEmail: string;
   guestName?: string;
+  guestEmails?: string[];
 }): Promise<GoogleMeetEventResult | null> {
   const auth = await getAuthorizedGoogleClient(input.hostUserId);
   if (!auth) return null;
 
   const calendar = google.calendar({ version: "v3", auth: auth.client });
   const calendarId = auth.connection.calendarId || "primary";
+  const attendeeEmails =
+    input.guestEmails?.length && input.guestEmails.length > 0
+      ? input.guestEmails
+      : [input.guestEmail];
+  const attendees = attendeeEmails.map((email) => ({
+    email,
+    displayName: email === input.guestEmail ? input.guestName : undefined,
+  }));
 
   const res = await calendar.events.insert({
     calendarId,
@@ -91,12 +100,7 @@ export async function createGoogleMeetEvent(input: {
       description: input.description,
       start: wallToGoogleDateTime(input.startsAt, input.timeZone),
       end: wallToGoogleDateTime(input.endsAt, input.timeZone),
-      attendees: [
-        {
-          email: input.guestEmail,
-          displayName: input.guestName,
-        },
-      ],
+      attendees,
       conferenceData: {
         createRequest: {
           requestId: meetRequestId(`booking-${input.appointmentId}`),
@@ -127,12 +131,19 @@ export async function updateGoogleMeetEvent(input: {
   timeZone: string;
   guestEmail?: string;
   guestName?: string;
+  guestEmails?: string[];
 }): Promise<GoogleMeetEventResult | null> {
   const auth = await getAuthorizedGoogleClient(input.hostUserId);
   if (!auth) return null;
 
   const calendar = google.calendar({ version: "v3", auth: auth.client });
   const calendarId = auth.connection.calendarId || "primary";
+  const attendeeEmails =
+    input.guestEmails?.length && input.guestEmails.length > 0
+      ? input.guestEmails
+      : input.guestEmail
+        ? [input.guestEmail]
+        : [];
 
   const res = await calendar.events.patch({
     calendarId,
@@ -143,14 +154,12 @@ export async function updateGoogleMeetEvent(input: {
       description: input.description,
       start: wallToGoogleDateTime(input.startsAt, input.timeZone),
       end: wallToGoogleDateTime(input.endsAt, input.timeZone),
-      ...(input.guestEmail
+      ...(attendeeEmails.length
         ? {
-            attendees: [
-              {
-                email: input.guestEmail,
-                displayName: input.guestName,
-              },
-            ],
+            attendees: attendeeEmails.map((email) => ({
+              email,
+              displayName: email === input.guestEmail ? input.guestName : undefined,
+            })),
           }
         : {}),
     },
