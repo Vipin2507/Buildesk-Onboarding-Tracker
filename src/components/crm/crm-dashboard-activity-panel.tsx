@@ -33,15 +33,24 @@ export function CrmDashboardActivityPanel({ items }: Props) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<CrmActivityCategory>("all");
   const [kind, setKind] = useState<ActivityKind | "all">("all");
-  const [accountSearch, setAccountSearch] = useState("");
-  const [userSearch, setUserSearch] = useState("");
-  const [accountExecutiveSearch, setAccountExecutiveSearch] = useState("");
-  const [leadContactSearch, setLeadContactSearch] = useState("");
+  const [accountFilter, setAccountFilter] = useState("all");
   const [dateRange, setDateRange] = useState<CrmActivityDateRange>("30d");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
   const categoryCounts = useMemo(() => countCrmActivityByCategory(items), [items]);
+
+  const accountOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const item of items) {
+      if (item.accountId && item.accountName) {
+        map.set(item.accountId, item.accountName);
+      }
+    }
+    return [...map.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [items]);
 
   const filtered = useMemo(
     () =>
@@ -49,36 +58,18 @@ export function CrmDashboardActivityPanel({ items }: Props) {
         category,
         kind,
         query,
+        accountId: accountFilter,
         dateRange: dateFrom || dateTo ? "all" : dateRange,
-        accountQuery: accountSearch,
-        userQuery: userSearch,
-        accountExecutiveQuery: accountExecutiveSearch,
-        leadContactQuery: leadContactSearch,
         dateFrom,
         dateTo,
       }),
-    [
-      items,
-      category,
-      kind,
-      query,
-      dateRange,
-      dateFrom,
-      dateTo,
-      accountSearch,
-      userSearch,
-      accountExecutiveSearch,
-      leadContactSearch,
-    ],
+    [items, category, kind, query, accountFilter, dateRange, dateFrom, dateTo],
   );
 
   const activeFilterCount = [
     category !== "all",
     kind !== "all",
-    Boolean(accountSearch.trim()),
-    Boolean(userSearch.trim()),
-    Boolean(accountExecutiveSearch.trim()),
-    Boolean(leadContactSearch.trim()),
+    accountFilter !== "all",
     dateRange !== "30d",
     Boolean(dateFrom),
     Boolean(dateTo),
@@ -111,10 +102,7 @@ export function CrmDashboardActivityPanel({ items }: Props) {
     setQuery("");
     setCategory("all");
     setKind("all");
-    setAccountSearch("");
-    setUserSearch("");
-    setAccountExecutiveSearch("");
-    setLeadContactSearch("");
+    setAccountFilter("all");
     setDateRange("30d");
     setDateFrom("");
     setDateTo("");
@@ -123,67 +111,34 @@ export function CrmDashboardActivityPanel({ items }: Props) {
   return (
     <div className="space-y-2.5">
       <ListToolbar
+        compact
+        chipsAlwaysVisible
         search={query}
         onSearchChange={setQuery}
-        searchPlaceholder="Search remarks, activity details, or notes…"
+        searchPlaceholder="Search activity, account, user, or contact…"
         chips={categoryChips}
         activeChip={category}
         onChipChange={(id) => setCategory(id as CrmActivityCategory)}
-        defaultFiltersOpen
         dateRange={{
-          label: "Activity date",
           from: dateFrom,
           to: dateTo,
           onFromChange: setDateFrom,
           onToChange: setDateTo,
         }}
-        textFilters={[
+        selects={[
           {
             id: "account",
             label: "Account",
-            value: accountSearch,
-            placeholder: "Search account name…",
-            onChange: setAccountSearch,
-          },
-          {
-            id: "user",
-            label: "User",
-            value: userSearch,
-            placeholder: "Who performed the activity…",
-            onChange: setUserSearch,
-          },
-          {
-            id: "executive",
-            label: "Executive",
-            value: accountExecutiveSearch,
-            placeholder: "Account executive / manager…",
-            onChange: setAccountExecutiveSearch,
-          },
-          {
-            id: "lead",
-            label: "Lead / contact",
-            value: leadContactSearch,
-            placeholder: "Search lead or contact name…",
-            onChange: setLeadContactSearch,
-          },
-        ]}
-        selects={[
-          {
-            id: "type",
-            label: "Activity type",
-            value: category,
+            value: accountFilter,
             options: [
-              { value: "all", label: "All types" },
-              ...Object.entries(CRM_ACTIVITY_CATEGORY_LABEL).map(([value, label]) => ({
-                value,
-                label,
-              })),
+              { value: "all", label: "All accounts" },
+              ...accountOptions.map((a) => ({ value: a.id, label: a.name })),
             ],
-            onChange: (v) => setCategory(v as CrmActivityCategory),
+            onChange: setAccountFilter,
           },
           {
             id: "status",
-            label: "Activity status",
+            label: "Status",
             value: kind,
             options: [
               { value: "all", label: "All statuses" },
@@ -210,7 +165,7 @@ export function CrmDashboardActivityPanel({ items }: Props) {
         resultCount={filtered.length}
         resultLabel="activities"
         activeFilterCount={activeFilterCount}
-        onClear={clearFilters}
+        onClear={activeFilterCount > 0 || query ? clearFilters : undefined}
       />
 
       <DataTable
@@ -225,7 +180,7 @@ export function CrmDashboardActivityPanel({ items }: Props) {
           <div className="card-soft flex flex-col items-center gap-2 py-12 text-center">
             <p className="text-sm font-medium">No activity matches your filters</p>
             <p className="max-w-sm text-xs text-muted-foreground">
-              Adjust account, user, executive, lead/contact, date, or activity type filters.
+              Adjust category, account, status, date, or search terms.
             </p>
           </div>
         }

@@ -75,15 +75,30 @@ type ListToolbarProps = {
   onClear?: () => void;
   /** Start with the filters panel open. Defaults to false. */
   defaultFiltersOpen?: boolean;
+  /** Dense controls and spacing (matches table-heavy list pages). */
+  compact?: boolean;
+  /** Keep category chips visible when the filter panel is collapsed. */
+  chipsAlwaysVisible?: boolean;
   trailing?: ReactNode;
   className?: string;
 };
 
-function FieldLabel({ htmlFor, children }: { htmlFor?: string; children: ReactNode }) {
+function FieldLabel({
+  htmlFor,
+  children,
+  compact = false,
+}: {
+  htmlFor?: string;
+  children: ReactNode;
+  compact?: boolean;
+}) {
   return (
     <label
       htmlFor={htmlFor}
-      className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
+      className={cn(
+        "block font-medium uppercase tracking-wide text-muted-foreground",
+        compact ? "mb-1 text-[10px]" : "mb-1.5 text-[11px]",
+      )}
     >
       {children}
     </label>
@@ -145,11 +160,17 @@ export function ListToolbar({
   activeFilterCount = 0,
   onClear,
   defaultFiltersOpen = false,
+  compact = false,
+  chipsAlwaysVisible = false,
   trailing,
   className,
 }: ListToolbarProps) {
   const searchId = useId();
   const [filtersOpen, setFiltersOpen] = useState(defaultFiltersOpen);
+  const controlClass = cn(fieldControl, compact ? "h-8 text-xs" : "h-10");
+  const chipButtonClass = compact
+    ? "min-h-7 shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+    : "min-h-9 shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]";
   const hasSelects = Boolean(selects?.length);
   const hasTextFilters = Boolean(textFilters?.length);
   const hasDateRange = Boolean(dateRange);
@@ -158,9 +179,43 @@ export function ListToolbar({
   const hasSortSelect = Boolean(sortOptions?.length);
   const hasSort = hasSortSelect || Boolean(onSortDirChange);
 
+  const chipRow =
+    hasChips && chips ? (
+      <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:flex-wrap md:overflow-visible">
+        {chips.map((chip) => {
+          const active = activeChip === chip.id;
+          return (
+            <button
+              key={chip.id}
+              type="button"
+              onClick={() => onChipChange?.(chip.id)}
+              className={cn(
+                chipButtonClass,
+                active
+                  ? "border-primary bg-primary text-primary-foreground shadow-[0_0_0_3px_rgb(0_155_255_/_0.14)] dark:shadow-[0_0_0_3px_rgb(46_176_255_/_0.18)]"
+                  : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground dark:bg-muted/30 dark:hover:bg-muted/50",
+              )}
+            >
+              {chip.label}
+              {typeof chip.count === "number" && (
+                <span
+                  className={cn(
+                    "ml-1.5 tabular-nums",
+                    active ? "text-primary-foreground/80" : "text-muted-foreground",
+                  )}
+                >
+                  {chip.count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    ) : null;
+
   return (
-    <div className={cn("card-soft mb-3 p-2.5 sm:p-3", className)}>
-      <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center">
+    <div className={cn("card-soft mb-3", compact ? "p-2 sm:p-2.5" : "p-2.5 sm:p-3", className)}>
+      <div className={cn("flex flex-col lg:flex-row lg:items-center", compact ? "gap-2" : "gap-2.5")}>
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -168,7 +223,7 @@ export function ListToolbar({
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder={searchPlaceholder}
-            className={cn(fieldControl, "pl-9 pr-9")}
+            className={cn(controlClass, "pl-9 pr-9")}
           />
           <AnimatePresence>
             {search ? (
@@ -195,7 +250,8 @@ export function ListToolbar({
               variant="outline"
               size="sm"
               className={cn(
-                "h-10 gap-1.5 border-input bg-card dark:bg-muted/40 dark:hover:bg-muted/55",
+                "gap-1.5 border-input bg-card dark:bg-muted/40 dark:hover:bg-muted/55",
+                compact ? "h-8" : "h-10",
                 filtersOpen && "border-primary/40 bg-primary/10 text-primary dark:bg-primary/15",
               )}
               aria-expanded={filtersOpen}
@@ -232,7 +288,10 @@ export function ListToolbar({
                 type="button"
                 variant="outline"
                 size="icon"
-                className="h-10 w-10 shrink-0 border-input bg-card hover:bg-muted dark:bg-muted/40 dark:hover:bg-muted/55"
+                className={cn(
+                  "shrink-0 border-input bg-card hover:bg-muted dark:bg-muted/40 dark:hover:bg-muted/55",
+                  compact ? "h-8 w-8" : "h-10 w-10",
+                )}
                 onClick={() => onSortDirChange?.(sortDir === "asc" ? "desc" : "asc")}
                 aria-label={sortDir === "asc" ? "Sort ascending" : "Sort descending"}
                 title={sortDir === "asc" ? "Ascending" : "Descending"}
@@ -266,7 +325,7 @@ export function ListToolbar({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-10 gap-1.5 text-muted-foreground hover:text-foreground"
+                  className={cn("gap-1.5 text-muted-foreground hover:text-foreground", compact ? "h-8" : "h-10")}
                   onClick={onClear}
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
@@ -280,12 +339,16 @@ export function ListToolbar({
         </div>
       </div>
 
+      {chipsAlwaysVisible && chipRow ? (
+        <div className={cn(compact ? "mt-2" : "mt-2.5")}>{chipRow}</div>
+      ) : null}
+
       {hasFilterPanel && (
         <div
           className={cn(
             "grid transition-[grid-template-rows,opacity,margin] duration-[380ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
             filtersOpen
-              ? "mt-3.5 grid-rows-[1fr] opacity-100"
+              ? cn(compact ? "mt-2 grid-rows-[1fr] opacity-100" : "mt-3.5 grid-rows-[1fr] opacity-100")
               : "pointer-events-none mt-0 grid-rows-[0fr] opacity-0",
           )}
           aria-hidden={!filtersOpen}
@@ -293,49 +356,19 @@ export function ListToolbar({
           <div className="min-h-0 overflow-hidden">
             <div
               className={cn(
-                "space-y-3.5 border-t border-border/70 pt-3.5 transition-[transform,opacity] duration-[380ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+                "border-t border-border/70 transition-[transform,opacity] duration-[380ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+                compact ? "space-y-2 pt-2" : "space-y-3.5 pt-3.5",
                 filtersOpen ? "translate-y-0 opacity-100" : "-translate-y-1.5 opacity-0",
               )}
             >
-              {hasChips && (
-                <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:flex-wrap md:overflow-visible">
-                  {chips!.map((chip) => {
-                    const active = activeChip === chip.id;
-                    return (
-                      <button
-                        key={chip.id}
-                        type="button"
-                        onClick={() => onChipChange?.(chip.id)}
-                        className={cn(
-                          "min-h-9 shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-                          active
-                            ? "border-primary bg-primary text-primary-foreground shadow-[0_0_0_3px_rgb(0_155_255_/_0.14)] dark:shadow-[0_0_0_3px_rgb(46_176_255_/_0.18)]"
-                            : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground dark:bg-muted/30 dark:hover:bg-muted/50",
-                        )}
-                      >
-                        {chip.label}
-                        {typeof chip.count === "number" && (
-                          <span
-                            className={cn(
-                              "ml-1.5 tabular-nums",
-                              active ? "text-primary-foreground/80" : "text-muted-foreground",
-                            )}
-                          >
-                            {chip.count}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              {!chipsAlwaysVisible && chipRow}
 
               {(hasSelects || hasTextFilters || hasDateRange) && filtersOpen ? (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className={cn("grid sm:grid-cols-2 lg:grid-cols-4", compact ? "gap-2" : "gap-3")}>
                   {hasDateRange && (
                     <>
                       <div className="min-w-0">
-                        <FieldLabel htmlFor={`${searchId}-from`}>
+                        <FieldLabel htmlFor={`${searchId}-from`} compact={compact}>
                           {dateRange!.label ? `${dateRange!.label} from` : "From"}
                         </FieldLabel>
                         <DatePickerField
@@ -344,10 +377,11 @@ export function ListToolbar({
                           max={dateRange!.to || undefined}
                           onChange={dateRange!.onFromChange}
                           placeholder="From date"
+                          compact={compact}
                         />
                       </div>
                       <div className="min-w-0">
-                        <FieldLabel htmlFor={`${searchId}-to`}>
+                        <FieldLabel htmlFor={`${searchId}-to`} compact={compact}>
                           {dateRange!.label ? `${dateRange!.label} to` : "To"}
                         </FieldLabel>
                         <DatePickerField
@@ -356,30 +390,36 @@ export function ListToolbar({
                           min={dateRange!.from || undefined}
                           onChange={dateRange!.onToChange}
                           placeholder="To date"
+                          compact={compact}
                         />
                       </div>
                     </>
                   )}
                   {textFilters?.map((field) => (
                     <div key={field.id} className="min-w-0">
-                      <FieldLabel htmlFor={`${searchId}-${field.id}`}>{field.label}</FieldLabel>
+                      <FieldLabel htmlFor={`${searchId}-${field.id}`} compact={compact}>
+                        {field.label}
+                      </FieldLabel>
                       <Input
                         id={`${searchId}-${field.id}`}
                         value={field.value}
                         onChange={(e) => field.onChange(e.target.value)}
                         placeholder={field.placeholder}
-                        className={cn(fieldControl, "h-10")}
+                        className={controlClass}
                       />
                     </div>
                   ))}
                   {selects?.map((select) => (
                     <div key={select.id} className="min-w-0">
-                      <FieldLabel htmlFor={`${searchId}-${select.id}`}>{select.label}</FieldLabel>
+                      <FieldLabel htmlFor={`${searchId}-${select.id}`} compact={compact}>
+                        {select.label}
+                      </FieldLabel>
                       <ThemedSelect
                         id={`${searchId}-${select.id}`}
                         value={select.value}
                         onChange={select.onChange}
                         options={select.options}
+                        className={compact ? "h-8 text-xs" : undefined}
                       />
                     </div>
                   ))}
@@ -391,7 +431,12 @@ export function ListToolbar({
       )}
 
       {typeof resultCount === "number" && (
-        <div className="mt-3.5 flex items-center justify-between border-t border-border/70 pt-2.5 text-xs text-muted-foreground">
+        <div
+          className={cn(
+            "flex items-center justify-between border-t border-border/70 text-xs text-muted-foreground",
+            compact ? "mt-2 pt-2" : "mt-3.5 pt-2.5",
+          )}
+        >
           <motion.span
             key={resultCount}
             initial={{ opacity: 0.4, y: 2 }}
