@@ -50,7 +50,7 @@ export function WebPushDevicePanel() {
   async function onTestPush() {
     setTesting(true);
     try {
-      await sendTestWebPush({ data: {} });
+      await sendTestWebPush();
       toast.success("Test notification sent — check your browser");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Test push failed");
