@@ -3,9 +3,14 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
+import { getTaskWebPushDiagnostics, processTaskWebPushReminders } from "@/server/crm-task-web-push";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
-import { getWebPushPublicKey, isWebPushConfigured } from "@/server/lib/web-push";
+import {
+  getWebPushPublicKey,
+  isWebPushConfigured,
+  sendPushToUser,
+} from "@/server/lib/web-push";
 
 export const getWebPushConfig = createServerFn({ method: "GET" }).handler(async () => {
   requireUser();
@@ -111,3 +116,39 @@ export const unsubscribeWebPush = createServerFn({ method: "POST" })
 
     return { ok: true };
   });
+
+export const getWebPushDiagnostics = createServerFn({ method: "GET" }).handler(async () => {
+  const user = requireUser();
+  const db = getDb();
+  return getTaskWebPushDiagnostics(db, user.id);
+});
+
+export const sendTestWebPush = createServerFn({ method: "POST" }).handler(async () => {
+  const user = requireUser();
+  if (!isWebPushConfigured()) {
+    throw new ApiError(503, "Web push is not configured on this server");
+  }
+
+  const db = getDb();
+  const sent = await sendPushToUser(db, user.id, {
+    title: "Buildesk CRM test",
+    body: "If you see this, web push is working on this device.",
+    url: "/crm/tasks",
+  });
+
+  if (sent === 0) {
+    throw new ApiError(
+      400,
+      "No push was delivered. Enable browser notifications under My Profile first.",
+    );
+  }
+
+  return { ok: true, sent };
+});
+
+export const runWebPushRemindersNow = createServerFn({ method: "POST" }).handler(async () => {
+  requireUser(["Admin"]);
+  const db = getDb();
+  const sent = await processTaskWebPushReminders(db);
+  return { ok: true, sent, diagnostics: getTaskWebPushDiagnostics(db) };
+});

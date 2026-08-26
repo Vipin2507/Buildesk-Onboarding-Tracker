@@ -5,6 +5,7 @@ import { subtractWallClockMinutes } from "@/lib/task-scheduling";
 import {
   isInCrmQuietHours,
   loadCrmServerNotificationSettings,
+  type CrmServerNotificationSettings,
 } from "@/server/lib/crm-settings-config";
 import { isWebPushConfigured, sendPushToUser } from "@/server/lib/web-push";
 import { getDb } from "@/server/db/client";
@@ -62,6 +63,91 @@ function recordReminderSent(
 
 function formatTaskWhen(iso: string) {
   return `${iso.slice(0, 10)} ${iso.slice(11, 16)}`;
+}
+
+export type TaskWebPushDiagnostics = {
+  vapidConfigured: boolean;
+  settings: CrmServerNotificationSettings;
+  crmSettingsSaved: boolean;
+  nowWall: string;
+  inQuietHours: boolean;
+  scheduledTaskCount: number;
+  subscriptionCount: number;
+  userSubscriptionCount: number;
+  dueNowCount: number;
+  dueTasks: Array<{
+    taskId: string;
+    title: string;
+    startsAt: string;
+    assigneeIds: string[];
+    alreadySent: boolean;
+  }>;
+};
+
+export function getTaskWebPushDiagnostics(
+  db: ReturnType<typeof getDb>,
+  userId?: string,
+  timezone = DEFAULT_BOOKING_TIMEZONE,
+): TaskWebPushDiagnostics {
+  const settings = loadCrmServerNotificationSettings(db);
+  const crmSettingsRow = db
+    .select({ valueJson: t.appConfig.valueJson })
+    .from(t.appConfig)
+    .where(eq(t.appConfig.key, "crm-settings"))
+    .get();
+  const nowWall = localWallClockIso(timezone);
+  const now = nowWall.slice(0, 19);
+  const offsetMinutes = settings.taskReminderWebPushMinutesBefore;
+
+  const taskRows = db
+    .select()
+    .from(t.followUpTasks)
+    .where(inArray(t.followUpTasks.status, ["open", "in_progress", "blocked"]))
+    .all()
+    .filter((row) => row.startsAt);
+
+  const subscriptionCount = db.select({ id: t.pushSubscriptions.id }).from(t.pushSubscriptions).all()
+    .length;
+  const userSubscriptionCount = userId
+    ? db
+        .select({ id: t.pushSubscriptions.id })
+        .from(t.pushSubscriptions)
+        .where(eq(t.pushSubscriptions.userId, userId))
+        .all().length
+    : 0;
+
+  const dueTasks: TaskWebPushDiagnostics["dueTasks"] = [];
+
+  for (const row of taskRows) {
+    const task = mapTaskRow(row);
+    const startsAt = task.startsAt!.slice(0, 19);
+    if (now >= startsAt) continue;
+
+    const reminderAt = subtractWallClockMinutes(startsAt, offsetMinutes);
+    if (now < reminderAt) continue;
+
+    const assigneeIds = taskAssigneeIds(row);
+    dueTasks.push({
+      taskId: task.id,
+      title: task.title,
+      startsAt,
+      assigneeIds,
+      alreadySent: assigneeIds.some((id) => reminderAlreadySent(db, task.id, id, startsAt)),
+    });
+  }
+
+  return {
+    vapidConfigured: isWebPushConfigured(),
+    settings,
+    crmSettingsSaved: Boolean(crmSettingsRow?.valueJson),
+    nowWall,
+    inQuietHours: isInCrmQuietHours(settings, nowWall),
+    scheduledTaskCount: taskRows.length,
+    subscriptionCount,
+    userSubscriptionCount,
+    dueNowCount: dueTasks.length,
+    dueTasks: dueTasks.slice(0, 10),
+  };
 }
 
 /** Send browser push notifications for upcoming scheduled tasks. */
@@ -133,6 +219,10 @@ export async function processTaskWebPushReminders(
       if (delivered > 0) {
         recordReminderSent(db, task.id, assigneeId, startsAt);
         sentCount += delivered;
+      } else {
+        console.warn(
+          `[web-push] no delivery task=${task.id} assignee=${assigneeId} (no subscription or send failed)`,
+        );
       }
     }
   }

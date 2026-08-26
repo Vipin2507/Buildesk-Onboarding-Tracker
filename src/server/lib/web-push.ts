@@ -84,8 +84,13 @@ export async function sendPushToUser(
     );
     if (result.ok) {
       sent += 1;
-    } else if (result.gone) {
-      db.delete(t.pushSubscriptions).where(eq(t.pushSubscriptions.id, row.id)).run();
+    } else {
+      console.warn(
+        `[web-push] send failed user=${userId} status=${result.statusCode ?? "?"} ${result.error}`,
+      );
+      if (result.gone) {
+        db.delete(t.pushSubscriptions).where(eq(t.pushSubscriptions.id, row.id)).run();
+      }
     }
   }
   return sent;

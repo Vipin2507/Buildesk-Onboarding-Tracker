@@ -16,11 +16,14 @@ export function startCrmReminderScheduler() {
     try {
       const db = getDb();
       await processTaskReminderAutomations(db, DEFAULT_BOOKING_TIMEZONE);
-      await processTaskWebPushReminders(db, DEFAULT_BOOKING_TIMEZONE);
+      const pushSent = await processTaskWebPushReminders(db, DEFAULT_BOOKING_TIMEZONE);
+      console.log(`[crm-reminder-scheduler] tick complete pushSent=${pushSent}`);
     } catch (err) {
       console.warn("[crm-reminder-scheduler]", err);
     }
   }
+
+  console.log("[crm-reminder-scheduler] started (60s interval)");
 
   setTimeout(() => void tick(), 8_000);
   setInterval(() => void tick(), TICK_MS);

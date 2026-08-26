@@ -207,6 +207,9 @@ export {
 export {
   getWebPushConfig,
   getWebPushSubscriptionStatus,
+  getWebPushDiagnostics,
+  sendTestWebPush,
+  runWebPushRemindersNow,
   subscribeWebPush,
   unsubscribeWebPush,
 } from "@/server/api/push";

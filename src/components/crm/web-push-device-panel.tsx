@@ -1,8 +1,12 @@
-import { BellOff, BellRing, Loader2 } from "lucide-react";
+import { BellOff, BellRing, Loader2, Send } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { getWebPushDiagnostics, sendTestWebPush } from "@/lib/api";
 import { useWebPush } from "@/hooks/use-web-push";
+
+type WebPushDiagnostics = Awaited<ReturnType<typeof getWebPushDiagnostics>>;
 
 export function WebPushDevicePanel() {
   const {
@@ -15,6 +19,15 @@ export function WebPushDevicePanel() {
     enable,
     disable,
   } = useWebPush();
+  const [diagnostics, setDiagnostics] = useState<WebPushDiagnostics | null>(null);
+  const [testing, setTesting] = useState(false);
+
+  useEffect(() => {
+    if (!configured) return;
+    void getWebPushDiagnostics()
+      .then(setDiagnostics)
+      .catch(() => setDiagnostics(null));
+  }, [configured, subscribed, deviceCount]);
 
   async function onEnable() {
     try {
@@ -34,6 +47,18 @@ export function WebPushDevicePanel() {
     }
   }
 
+  async function onTestPush() {
+    setTesting(true);
+    try {
+      await sendTestWebPush({ data: {} });
+      toast.success("Test notification sent — check your browser");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Test push failed");
+    } finally {
+      setTesting(false);
+    }
+  }
+
   if (!supported) {
     return (
       <p className="text-[11px] text-muted-foreground">
@@ -46,7 +71,7 @@ export function WebPushDevicePanel() {
     return (
       <p className="text-[11px] text-muted-foreground">
         Web push is not configured on the server yet. Ask an administrator to set VAPID keys in the
-        environment.
+        environment and restart PM2.
       </p>
     );
   }
@@ -75,6 +100,26 @@ export function WebPushDevicePanel() {
         ) : null}
       </div>
 
+      {diagnostics ? (
+        <div className="rounded-lg border border-dashed px-3 py-2 text-[10px] text-muted-foreground">
+          <div>
+            Server push enabled:{" "}
+            <span className="font-medium text-foreground">
+              {diagnostics.settings.taskReminderWebPushEnabled ? "Yes" : "No"}
+            </span>
+            {!diagnostics.crmSettingsSaved ? " (admin settings not saved to server yet)" : null}
+          </div>
+          <div>
+            Reminder offset: {diagnostics.settings.taskReminderWebPushMinutesBefore} min · Quiet
+            hours now: {diagnostics.inQuietHours ? "Yes (blocked)" : "No"}
+          </div>
+          <div>
+            Tasks due for reminder now: {diagnostics.dueNowCount} · Your subscriptions on server:{" "}
+            {diagnostics.userSubscriptionCount}
+          </div>
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap gap-2">
         {!subscribed ? (
           <Button
@@ -87,16 +132,28 @@ export function WebPushDevicePanel() {
             Enable on this browser
           </Button>
         ) : (
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1.5"
-            disabled={loading}
-            onClick={() => void onDisable()}
-          >
-            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BellOff className="h-3.5 w-3.5" />}
-            Disable on this browser
-          </Button>
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              disabled={loading}
+              onClick={() => void onDisable()}
+            >
+              {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BellOff className="h-3.5 w-3.5" />}
+              Disable on this browser
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="gap-1.5"
+              disabled={testing}
+              onClick={() => void onTestPush()}
+            >
+              {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+              Send test notification
+            </Button>
+          </>
         )}
       </div>
     </div>
