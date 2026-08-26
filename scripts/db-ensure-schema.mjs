@@ -269,6 +269,8 @@ const EXTRA_COLUMNS = [
   { table: "follow_up_tasks", name: "starts_at", ddl: "TEXT" },
   { table: "follow_up_tasks", name: "ends_at", ddl: "TEXT" },
   { table: "follow_up_tasks", name: "duration_minutes", ddl: "INTEGER" },
+  { table: "follow_up_tasks", name: "extra_time_minutes", ddl: "INTEGER NOT NULL DEFAULT 0" },
+  { table: "follow_up_tasks", name: "latest_remark", ddl: "TEXT" },
   { table: "follow_up_tasks", name: "assignee_user_ids_json", ddl: "TEXT NOT NULL DEFAULT '[]'" },
   { table: "follow_up_tasks", name: "completed_by_user_id", ddl: "TEXT" },
   { table: "follow_up_tasks", name: "source", ddl: "TEXT NOT NULL DEFAULT 'manual'" },

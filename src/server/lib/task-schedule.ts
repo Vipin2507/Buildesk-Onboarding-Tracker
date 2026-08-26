@@ -44,6 +44,8 @@ export function mapTaskRow(row: typeof t.followUpTasks.$inferSelect): FollowUpTa
     startsAt: row.startsAt ?? undefined,
     endsAt: row.endsAt ?? undefined,
     durationMinutes: row.durationMinutes ?? undefined,
+    extraTimeMinutes: row.extraTimeMinutes ?? 0,
+    latestRemark: row.latestRemark ?? undefined,
     assigneeUserId: primaryAssignee ?? undefined,
     assigneeUserIds: assigneeUserIds.length ? assigneeUserIds : primaryAssignee ? [primaryAssignee] : [],
     createdByUserId: row.createdByUserId ?? undefined,

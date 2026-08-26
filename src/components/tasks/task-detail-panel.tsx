@@ -4,18 +4,27 @@ import {
   Building2,
   Calendar,
   CheckCircle2,
+  Clock,
   LayoutList,
   Link2,
+  MessageSquare,
   Users,
   X,
 } from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
-import type { ReactNode } from "react";
+import { motion } from "framer-motion";
+import { useState, type ReactNode } from "react";
 
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { resolveAssigneeLabel } from "@/lib/managers";
-import { formatTimeRange12h, resolveTaskAssigneeIds } from "@/lib/task-scheduling";
+import {
+  formatTaskDurationDisplay,
+  formatTimeRange12h,
+  resolveTaskAssigneeIds,
+  resolveTaskDurationMinutes,
+  resolveTaskExtraTimeMinutes,
+  taskHasSchedule,
+} from "@/lib/task-scheduling";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import {
   FOLLOW_UP_TASK_TYPE_LABEL,
@@ -26,6 +35,8 @@ import {
 } from "@/types";
 
 const ease = [0.22, 1, 0.36, 1] as const;
+
+const EXTRA_TIME_OPTIONS = [5, 10, 15, 30, 60] as const;
 
 function statusTone(status: FollowUpTaskStatus) {
   if (status === "completed") return "success" as const;
@@ -44,6 +55,8 @@ type Props = {
   onComplete: () => void;
   onCancel: () => void;
   onClose: () => void;
+  onAddRemark?: (remark: string) => void;
+  onAddExtraTime?: (minutes: number) => void;
 };
 
 export function TaskDetailPanel({
@@ -56,10 +69,23 @@ export function TaskDetailPanel({
   onComplete,
   onCancel,
   onClose,
+  onAddRemark,
+  onAddExtraTime,
 }: Props) {
+  const [remarkDraft, setRemarkDraft] = useState("");
   const assigneeLabels = resolveTaskAssigneeIds(task)
     .map((id) => resolveAssigneeLabel(id, users))
     .join(", ");
+  const scheduled = taskHasSchedule(task);
+  const plannedDuration = resolveTaskDurationMinutes(task);
+  const extraTime = resolveTaskExtraTimeMinutes(task);
+
+  function submitRemark() {
+    const text = remarkDraft.trim();
+    if (!text || !onAddRemark) return;
+    onAddRemark(text);
+    setRemarkDraft("");
+  }
 
   return (
     <motion.div
@@ -136,8 +162,15 @@ export function TaskDetailPanel({
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
             {formatTimeRange12h(task.startTime, task.endTime)}
-            {task.durationMinutes ? ` · ${task.durationMinutes} mins` : ""}
           </div>
+          <div className="mt-1 text-xs font-medium tabular-nums">
+            Duration: {formatTaskDurationDisplay(task)}
+          </div>
+          {plannedDuration && extraTime > 0 ? (
+            <div className="mt-0.5 text-[10px] text-muted-foreground">
+              Planned {plannedDuration}m + {extraTime}m extra
+            </div>
+          ) : null}
         </TaskDetailSection>
 
         <TaskDetailSection icon={Users} title="Assignees">
@@ -154,6 +187,64 @@ export function TaskDetailPanel({
             {accountName}
           </Link>
         </TaskDetailSection>
+
+        <TaskDetailSection icon={MessageSquare} title="Remarks" className="lg:col-span-2">
+          {task.latestRemark ? (
+            <p className="mb-2 rounded-md border bg-background px-2.5 py-2 text-xs text-foreground">
+              {task.latestRemark}
+            </p>
+          ) : (
+            <p className="mb-2 text-xs text-muted-foreground">No remarks yet.</p>
+          )}
+          {canManage && onAddRemark ? (
+            <div className="space-y-2">
+              <textarea
+                className="min-h-[56px] w-full rounded-md border bg-background px-3 py-2 text-xs"
+                value={remarkDraft}
+                onChange={(e) => setRemarkDraft(e.target.value)}
+                placeholder="Add a remark about progress, blockers, or outcome…"
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 text-[10px]"
+                disabled={!remarkDraft.trim()}
+                onClick={submitRemark}
+              >
+                Add remark
+              </Button>
+            </div>
+          ) : null}
+        </TaskDetailSection>
+
+        {scheduled && canManage && onAddExtraTime ? (
+          <TaskDetailSection icon={Clock} title="Extra time" className="lg:col-span-2">
+            <p className="mb-2 text-xs text-muted-foreground">
+              Extend this task when it runs longer than the assigned slot. End time and duration update
+              automatically.
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {EXTRA_TIME_OPTIONS.map((mins) => (
+                <Button
+                  key={mins}
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2.5 text-[10px] tabular-nums"
+                  onClick={() => onAddExtraTime(mins)}
+                >
+                  +{mins}m
+                </Button>
+              ))}
+            </div>
+            {extraTime > 0 ? (
+              <p className="mt-2 text-[10px] font-medium text-primary">
+                Total extra time: {extraTime}m
+              </p>
+            ) : null}
+          </TaskDetailSection>
+        ) : null}
 
         {task.completedAt ? (
           <TaskDetailSection icon={CheckCircle2} title="Completed" className="lg:col-span-2">
@@ -195,6 +286,16 @@ function TaskDetailSection({
         {title}
       </div>
       {children}
+    </div>
+  );
+}
+
+/** Latest remark snippet for task list rows. */
+export function TaskRowRemark({ task }: { task: FollowUpTask }) {
+  if (!task.latestRemark) return null;
+  return (
+    <div className="mt-0.5 line-clamp-1 text-[10px] italic text-muted-foreground">
+      “{task.latestRemark}”
     </div>
   );
 }

@@ -12,9 +12,10 @@ import {
   type FollowUpTask,
   type FollowUpTaskType,
 } from "@/types";
-import { formatTimeRange12h, formatDurationMinutes, resolveTaskDurationMinutes } from "@/lib/task-scheduling";
+import { formatTimeRange12h, formatTaskDurationDisplay, resolveTaskAssigneeIds } from "@/lib/task-scheduling";
 import { cn, formatDate } from "@/lib/utils";
 import { resolveAssigneeLabel } from "@/lib/managers";
+import { TaskRowRemark } from "@/components/tasks/task-detail-panel";
 import type { User } from "@/types";
 
 export type TaskCalendarView = "list" | "day" | "week" | "month";
@@ -326,6 +327,7 @@ function TaskListTable({
               <div className="text-[10px] text-muted-foreground">
                 {companies.find((c) => c.id === task.companyId)?.name ?? "—"}
               </div>
+              <TaskRowRemark task={task} />
             </div>
           ),
         },
@@ -354,9 +356,7 @@ function TaskListTable({
           key: "duration",
           header: "Duration",
           render: (task) => (
-            <span className="text-xs tabular-nums">
-              {formatDurationMinutes(resolveTaskDurationMinutes(task))}
-            </span>
+            <span className="text-xs tabular-nums">{formatTaskDurationDisplay(task)}</span>
           ),
         },
         {
@@ -508,6 +508,7 @@ function TaskScheduleRow({
           {formatTimeRange12h(task.startTime, task.endTime)}
           {task.taskType ? ` · ${FOLLOW_UP_TASK_TYPE_LABEL[task.taskType]}` : ""}
         </div>
+        <TaskRowRemark task={task} />
         {!compact ? (
           <div className="mt-0.5 flex flex-wrap items-center gap-1">
             <Pill tone={statusTone(task.status)}>{task.status.replace(/_/g, " ")}</Pill>

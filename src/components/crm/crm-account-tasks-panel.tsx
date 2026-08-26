@@ -12,6 +12,7 @@ import { EntityFormModal } from "@/components/entity-form-modal";
 import { ListToolbar } from "@/components/list-toolbar";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
+import { TaskRowRemark } from "@/components/tasks/task-detail-panel";
 import {
   TaskFormFields,
   useTaskFormState,
@@ -20,7 +21,7 @@ import {
   canManageCrmAccountTasks,
 } from "@/lib/crm-account-access";
 import { resolveDefaultTaskAssigneeIds, taskAssigneeUserOptions } from "@/lib/task-defaults";
-import { formatTimeRange12h, formatDurationMinutes, resolveTaskDurationMinutes } from "@/lib/task-scheduling";
+import { formatTimeRange12h, formatTaskDurationDisplay } from "@/lib/task-scheduling";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { resolveAssigneeLabel } from "@/lib/managers";
 import { useAuthStore, useCrmAccountStore, useTaskStore, useUserStore } from "@/stores";
@@ -339,6 +340,7 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
                       {task.description}
                     </div>
                   ) : null}
+                  <TaskRowRemark task={task} />
                 </div>
               ),
             },
@@ -370,9 +372,7 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
               header: "Duration",
               sortable: true,
               render: (task) => (
-                <span className="text-xs tabular-nums">
-                  {formatDurationMinutes(resolveTaskDurationMinutes(task))}
-                </span>
+                <span className="text-xs tabular-nums">{formatTaskDurationDisplay(task)}</span>
               ),
             },
             {

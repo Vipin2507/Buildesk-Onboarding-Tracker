@@ -1,6 +1,7 @@
 import {
   AlertCircle,
   Ban,
+  Calendar,
   CalendarDays,
   CheckCircle2,
   Clock,
@@ -315,6 +316,24 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
           onSelectTask(undefined);
         }}
         onClose={() => onSelectTask(undefined)}
+        onAddRemark={
+          canManageTask(task)
+            ? (remark) => {
+                updateTask(task.id, { remark });
+                toast.success("Remark added");
+              }
+            : undefined
+        }
+        onAddExtraTime={
+          canManageTask(task)
+            ? (minutes) => {
+                updateTask(task.id, {
+                  extraTimeMinutes: (task.extraTimeMinutes ?? 0) + minutes,
+                });
+                toast.success(`Added ${minutes} min extra time`);
+              }
+            : undefined
+        }
       />
     );
   }

@@ -125,6 +125,65 @@ export function isScheduledTaskType(taskType?: FollowUpTaskType): boolean {
   return Boolean(taskType);
 }
 
+export function resolveTaskExtraTimeMinutes(task: { extraTimeMinutes?: number | null }): number {
+  const extra = task.extraTimeMinutes ?? 0;
+  return extra > 0 ? extra : 0;
+}
+
+export function resolveTaskTotalDurationMinutes(task: {
+  durationMinutes?: number | null;
+  extraTimeMinutes?: number | null;
+  startTime?: string;
+  endTime?: string;
+}): number | undefined {
+  const base = resolveTaskDurationMinutes(task);
+  if (!base) return undefined;
+  return base + resolveTaskExtraTimeMinutes(task);
+}
+
+/** Row/cell display for planned + extra duration. */
+export function formatTaskDurationDisplay(task: {
+  durationMinutes?: number | null;
+  extraTimeMinutes?: number | null;
+  startTime?: string;
+  endTime?: string;
+}): string {
+  const base = resolveTaskDurationMinutes(task);
+  const extra = resolveTaskExtraTimeMinutes(task);
+  if (!base && !extra) return "—";
+  const total = (base ?? 0) + extra;
+  if (extra > 0 && base) {
+    return `${formatDurationMinutes(total)} (+${formatDurationMinutes(extra)})`;
+  }
+  return formatDurationMinutes(total);
+}
+
+/** Rebuild end time / ISO window when extra minutes are added to a scheduled task. */
+export function buildTaskScheduleWithExtra(input: {
+  dueDate?: string | null;
+  startTime?: string | null;
+  durationMinutes?: number | null;
+  extraTimeMinutes?: number | null;
+}) {
+  const dueDate = input.dueDate?.slice(0, 10);
+  const startTime = input.startTime?.slice(0, 5);
+  const baseDuration = input.durationMinutes ?? 0;
+  const extra = resolveTaskExtraTimeMinutes(input);
+  const totalDuration = baseDuration + extra;
+  if (!dueDate || !startTime || totalDuration <= 0) return null;
+  const window = buildTaskScheduleWindow({
+    dueDate,
+    startTime,
+    durationMinutes: totalDuration,
+  });
+  if (!window) return null;
+  return {
+    ...window,
+    durationMinutes: baseDuration > 0 ? baseDuration : window.durationMinutes - extra,
+    extraTimeMinutes: extra,
+  };
+}
+
 export function resolveTaskDurationMinutes(task: {
   durationMinutes?: number | null;
   startTime?: string;

@@ -111,6 +111,10 @@ export type FollowUpTask = Timestamps & {
   startsAt?: string;
   endsAt?: string;
   durationMinutes?: number;
+  /** Minutes beyond the planned schedule slot. */
+  extraTimeMinutes?: number;
+  /** Most recent remark added from the task panel. */
+  latestRemark?: string;
   assigneeUserId?: string;
   assigneeUserIds?: string[];
   createdByUserId?: string;

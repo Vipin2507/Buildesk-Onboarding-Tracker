@@ -567,7 +567,7 @@ export function buildCrmActivityFeed(input: {
           category: "follow_up",
           accountId: task.companyId,
           accountName: nameById.get(task.companyId) ?? "Account",
-          remarks: task.description ?? task.title,
+          remarks: task.latestRemark ?? task.description ?? task.title,
           nextFollowUp: task.dueDate,
         },
         account,

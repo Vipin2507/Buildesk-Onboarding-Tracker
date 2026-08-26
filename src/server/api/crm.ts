@@ -16,7 +16,7 @@ import {
   resolvePrimaryAssignee,
   serializeAssigneeIds,
 } from "@/server/lib/task-schedule";
-import { formatScheduleConflictMessage } from "@/lib/task-scheduling";
+import { buildTaskScheduleWithExtra, formatScheduleConflictMessage } from "@/lib/task-scheduling";
 import type {
   ClientVisit,
   CrmEvent,
@@ -401,6 +401,7 @@ const taskInput = z.object({
   startTime: z.string().optional().nullable(),
   endTime: z.string().optional().nullable(),
   durationMinutes: z.number().int().min(1).optional().nullable(),
+  extraTimeMinutes: z.number().int().min(0).optional().nullable(),
   assigneeUserId: z.string().optional().nullable(),
   assigneeUserIds: z.array(z.string()).optional().nullable(),
   source: z.enum(["manual", "booking"]).optional(),
@@ -489,6 +490,7 @@ export const createFollowUpTask = createServerFn({ method: "POST" })
         startsAt: schedule.startsAt,
         endsAt: schedule.endsAt,
         durationMinutes: schedule.durationMinutes,
+        extraTimeMinutes: 0,
         assigneeUserId: primaryAssignee,
         assigneeUserIdsJson,
         source: data.source ?? "manual",
@@ -561,17 +563,36 @@ export const updateFollowUpTask = createServerFn({ method: "POST" })
     const endTime = patch.endTime !== undefined ? patch.endTime : existing.endTime;
     const durationMinutes =
       patch.durationMinutes !== undefined ? patch.durationMinutes : existing.durationMinutes;
+    const extraTimeMinutes =
+      patch.extraTimeMinutes !== undefined ? patch.extraTimeMinutes : existing.extraTimeMinutes ?? 0;
     const taskType = patch.taskType !== undefined ? patch.taskType : existing.taskType;
 
     let schedule;
     try {
-      schedule = normalizeTaskSchedule({
+      const extended = buildTaskScheduleWithExtra({
         dueDate,
         startTime,
-        endTime,
         durationMinutes,
-        taskType: taskType as FollowUpTask["taskType"],
+        extraTimeMinutes,
       });
+      if (extended) {
+        schedule = {
+          dueDate: dueDate?.slice(0, 10) ?? null,
+          startTime: extended.startTime,
+          endTime: extended.endTime,
+          startsAt: extended.startsAt,
+          endsAt: extended.endsAt,
+          durationMinutes: extended.durationMinutes,
+        };
+      } else {
+        schedule = normalizeTaskSchedule({
+          dueDate,
+          startTime,
+          endTime,
+          durationMinutes,
+          taskType: taskType as FollowUpTask["taskType"],
+        });
+      }
     } catch {
       throw new ApiError(400, "End time must be after start time");
     }
@@ -628,6 +649,8 @@ export const updateFollowUpTask = createServerFn({ method: "POST" })
         startsAt: schedule.startsAt,
         endsAt: schedule.endsAt,
         durationMinutes: schedule.durationMinutes,
+        extraTimeMinutes,
+        latestRemark: remark?.trim() ? remark.trim() : existing.latestRemark,
         assigneeUserId: primaryAssignee,
         assigneeUserIdsJson,
         completedAt,

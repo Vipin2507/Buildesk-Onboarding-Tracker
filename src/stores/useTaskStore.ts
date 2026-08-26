@@ -42,6 +42,8 @@ function taskPayload(task: Partial<FollowUpTask>) {
     startTime: task.startTime,
     endTime: task.endTime,
     durationMinutes: task.durationMinutes,
+    extraTimeMinutes: task.extraTimeMinutes,
+    latestRemark: task.latestRemark,
     assigneeUserId: task.assigneeUserId,
     assigneeUserIds: task.assigneeUserIds,
     source: task.source,
@@ -105,6 +107,7 @@ export const useTaskStore = createStore<TaskState>((set, get) => ({
               ...patch,
               assigneeUserIds,
               assigneeUserId: assigneeUserIds?.[0] ?? patch.assigneeUserId ?? t.assigneeUserId,
+              latestRemark: remark?.trim() ? remark.trim() : patch.latestRemark ?? t.latestRemark,
               completedAt:
                 patch.status === "completed"
                   ? t.completedAt || nowIso()
