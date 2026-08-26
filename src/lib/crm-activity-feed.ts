@@ -1,5 +1,6 @@
 import { CRM_STAGE_LABELS } from "@/data/crm-onboarding-defaults";
 import { crmSalesManagerNamesMatch } from "@/lib/crm-account-access";
+import type { CrmAccountTabId } from "@/lib/crm-route-search";
 import type { ActivityKind } from "@/types";
 import type { CrmAccount } from "@/types/crm-account";
 import type { CrmEvent, ModuleSubscriptionEvent } from "@/types/crm";
@@ -62,8 +63,106 @@ export type CrmActivityAccountMeta = {
   supportManager2?: string;
 };
 
-export function crmActivityAccountHref(accountId?: string) {
-  return accountId ? `/crm/accounts/${accountId}` : undefined;
+export function crmActivityAccountHref(accountId?: string, tab?: CrmAccountTabId) {
+  if (!accountId) return undefined;
+  const base = `/crm/accounts/${accountId}`;
+  if (!tab || tab === "dashboard") return base;
+  return `${base}?tab=${tab}`;
+}
+
+export type CrmActivityDestination =
+  | {
+      kind: "account";
+      accountId: string;
+      tab?: CrmAccountTabId;
+    }
+  | { kind: "crm-ticket"; ticketId: string }
+  | { kind: "support-ticket"; ticketId: string }
+  | { kind: "bookings" }
+  | { kind: "tasks"; taskId?: string }
+  | { kind: "visits" };
+
+export function crmActivityOpenLabel(category: Exclude<CrmActivityCategory, "all">): string {
+  const labels: Record<Exclude<CrmActivityCategory, "all">, string> = {
+    follow_up: "Open tasks",
+    visit: "Open visits",
+    ticket: "Open ticket",
+    support: "Open support",
+    booking: "Open bookings",
+    communication: "Open comms",
+    module: "Open modules",
+    tracker: "Open tracker",
+    account: "Open account",
+  };
+  return labels[category];
+}
+
+export function crmActivityAccountTabForCategory(
+  category: Exclude<CrmActivityCategory, "all">,
+): CrmAccountTabId | undefined {
+  switch (category) {
+    case "follow_up":
+      return "tasks";
+    case "ticket":
+      return "tickets";
+    case "communication":
+      return "comms";
+    case "module":
+      return "modules";
+    case "tracker":
+    case "account":
+      return "dashboard";
+    default:
+      return undefined;
+  }
+}
+
+function parseActivityEntityId(id: string): string | undefined {
+  const match = /^(?:followup|visit|ticket|support|booking|crm-event|sub-event|comm)-(.+)$/.exec(id);
+  return match?.[1];
+}
+
+export function resolveCrmActivityDestination(
+  item: Pick<CrmActivityItem, "id" | "category" | "accountId">,
+): CrmActivityDestination | null {
+  const entityId = parseActivityEntityId(item.id);
+
+  switch (item.category) {
+    case "follow_up":
+      if (item.accountId) {
+        return { kind: "account", accountId: item.accountId, tab: "tasks" };
+      }
+      return entityId ? { kind: "tasks", taskId: entityId } : { kind: "tasks" };
+    case "visit":
+      return { kind: "visits" };
+    case "ticket":
+      return entityId ? { kind: "crm-ticket", ticketId: entityId } : null;
+    case "support":
+      return entityId ? { kind: "support-ticket", ticketId: entityId } : null;
+    case "booking":
+      return { kind: "bookings" };
+    case "communication":
+      return item.accountId
+        ? { kind: "account", accountId: item.accountId, tab: "comms" }
+        : null;
+    case "module":
+      return item.accountId
+        ? { kind: "account", accountId: item.accountId, tab: "modules" }
+        : null;
+    case "tracker":
+    case "account":
+      return item.accountId
+        ? { kind: "account", accountId: item.accountId, tab: "dashboard" }
+        : null;
+    default:
+      return item.accountId
+        ? {
+            kind: "account",
+            accountId: item.accountId,
+            tab: crmActivityAccountTabForCategory(item.category),
+          }
+        : null;
+  }
 }
 
 function teamForAccount(account: CrmAccount) {
@@ -127,7 +226,7 @@ function withAccountContext(
     leadContact: leadContactForAccount(account, item.leadContact),
     executive: item.executive ?? resolveExecutive(item.who),
     remarks: item.remarks ?? item.what,
-    href: crmActivityAccountHref(accountId),
+    href: crmActivityAccountHref(accountId, crmActivityAccountTabForCategory(item.category)),
   };
 }
 

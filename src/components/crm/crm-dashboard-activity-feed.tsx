@@ -1,26 +1,34 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { ArrowRight } from "lucide-react";
 
+import { CrmActivityOpenLink } from "@/components/crm/crm-activity-open-link";
+import { Pill } from "@/components/status-pill";
+import {
+  CRM_ACTIVITY_CATEGORY_LABEL,
+  crmActivityExecutiveDisplay,
+  resolveCrmActivityDestination,
+  type CrmActivityItem,
+} from "@/lib/crm-activity-feed";
+import { cn, formatTime } from "@/lib/utils";
 import { formatRelativeTime } from "@/types/common";
 import type { ActivityKind } from "@/types";
-import { crmActivityExecutiveDisplay } from "@/lib/crm-activity-feed";
-import { cn } from "@/lib/utils";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
-export type CrmDashboardActivityItem = {
-  id: string;
-  what: string;
-  executive?: string;
-  createdAt: string;
-  kind: ActivityKind;
-  href?: string;
-  category?: import("@/lib/crm-activity-feed").CrmActivityCategory;
-  accountId?: string;
-  accountName?: string;
-};
+export type CrmDashboardActivityItem = Pick<
+  CrmActivityItem,
+  | "id"
+  | "what"
+  | "executive"
+  | "createdAt"
+  | "kind"
+  | "href"
+  | "category"
+  | "accountId"
+  | "accountName"
+  | "remarks"
+>;
 
 const kindDot: Record<ActivityKind, string> = {
   success: "bg-success",
@@ -42,6 +50,11 @@ function ActivityRow({
   index: number;
 }) {
   const executive = crmActivityExecutiveDisplay({ executive: item.executive });
+  const destination = resolveCrmActivityDestination(item);
+  const categoryLabel =
+    item.category && item.category !== "all"
+      ? CRM_ACTIVITY_CATEGORY_LABEL[item.category]
+      : null;
 
   const inner = (
     <>
@@ -50,21 +63,43 @@ function ActivityRow({
         aria-hidden
       />
       <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {categoryLabel ? (
+            <Pill tone="muted" className="text-[9px]">
+              {categoryLabel}
+            </Pill>
+          ) : null}
+          {item.accountName ? (
+            <span className="truncate text-[10px] font-medium text-primary">{item.accountName}</span>
+          ) : null}
+        </div>
         <div className="line-clamp-2 text-xs leading-snug">{item.what}</div>
+        {item.remarks && item.remarks !== item.what ? (
+          <div className="line-clamp-1 text-[10px] text-muted-foreground">{item.remarks}</div>
+        ) : null}
         <div className="mt-0.5 text-[10px] text-muted-foreground">
-          {executive} · {formatRelativeTime(item.createdAt)}
+          {executive} · {formatTime(item.createdAt)} · {formatRelativeTime(item.createdAt)}
         </div>
       </div>
-      {item.accountId ? (
-        <ArrowRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+      {destination ? (
+        <div className="shrink-0 self-center opacity-80 transition-opacity group-hover:opacity-100">
+          <CrmActivityOpenLink item={item} compact />
+        </div>
       ) : null}
     </>
   );
 
-  const className = "group flex gap-2 rounded-lg px-1 py-1.5 transition-colors hover:bg-muted/50";
+  const className =
+    "group flex items-start gap-2 rounded-lg px-1 py-1.5 transition-colors hover:bg-muted/50";
 
-  const link: ReactNode = item.accountId ? (
-    <Link to="/crm/accounts/$accountId" params={{ accountId: item.accountId }} className={className}>
+  const content: ReactNode = destination ? (
+    <div className={className}>{inner}</div>
+  ) : item.accountId ? (
+    <Link
+      to="/crm/accounts/$accountId"
+      params={{ accountId: item.accountId }}
+      className={className}
+    >
       {inner}
     </Link>
   ) : (
@@ -78,7 +113,7 @@ function ActivityRow({
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.04, duration: 0.28, ease: EASE }}
     >
-      {link}
+      {content}
     </motion.li>
   );
 }

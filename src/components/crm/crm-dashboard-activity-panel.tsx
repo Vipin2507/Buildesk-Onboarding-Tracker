@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 
+import { CrmActivityOpenLink } from "@/components/crm/crm-activity-open-link";
 import { DataTable } from "@/components/data-table";
 import { ListToolbar } from "@/components/list-toolbar";
 import { Pill } from "@/components/status-pill";
@@ -14,7 +15,7 @@ import {
   type CrmActivityDateRange,
   type CrmActivityItem,
 } from "@/lib/crm-activity-feed";
-import { formatDate, formatDateTime } from "@/lib/utils";
+import { formatDate, formatTime } from "@/lib/utils";
 import type { ActivityKind } from "@/types";
 
 const KIND_TONE: Record<ActivityKind, "success" | "warning" | "danger" | "muted"> = {
@@ -215,7 +216,7 @@ export function CrmDashboardActivityPanel({ items }: Props) {
       <DataTable
         data={filtered}
         hideSearch
-        pageSize={20}
+        pageSize={25}
         density="compact"
         initialSortKey="createdAt"
         initialSortDir="desc"
@@ -231,16 +232,71 @@ export function CrmDashboardActivityPanel({ items }: Props) {
         columns={[
           {
             key: "createdAt",
-            header: "Date / time",
+            header: "Date",
             sortable: true,
             render: (row) => (
-              <div className="whitespace-nowrap">
-                <div className="font-medium">{formatDate(row.createdAt)}</div>
-                <div className="text-[10px] text-muted-foreground">
-                  {formatDateTime(row.createdAt).split(", ").pop()}
-                </div>
+              <span className="whitespace-nowrap text-xs font-medium">{formatDate(row.createdAt)}</span>
+            ),
+          },
+          {
+            key: "time",
+            header: "Time",
+            render: (row) => (
+              <span className="whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+                {formatTime(row.createdAt)}
+              </span>
+            ),
+          },
+          {
+            key: "category",
+            header: "Type",
+            sortable: true,
+            render: (row) => (
+              <Pill tone="muted" className="text-[10px]">
+                {CRM_ACTIVITY_CATEGORY_LABEL[row.category]}
+              </Pill>
+            ),
+          },
+          {
+            key: "kind",
+            header: "Status",
+            sortable: true,
+            render: (row) => (
+              <Pill tone={KIND_TONE[row.kind]}>{CRM_ACTIVITY_STATUS_LABEL[row.kind]}</Pill>
+            ),
+          },
+          {
+            key: "remarks",
+            header: "Activity / remarks",
+            sortable: true,
+            render: (row) => (
+              <div className="min-w-[12rem] max-w-[320px]">
+                <div className="text-xs font-medium">{row.what}</div>
+                {row.remarks && row.remarks !== row.what ? (
+                  <div className="mt-0.5 line-clamp-2 text-[10px] text-muted-foreground">
+                    {row.remarks}
+                  </div>
+                ) : null}
               </div>
             ),
+          },
+          {
+            key: "accountName",
+            header: "Account",
+            sortable: true,
+            render: (row) =>
+              row.accountId ? (
+                <Link
+                  to="/crm/accounts/$accountId"
+                  params={{ accountId: row.accountId }}
+                  className="text-xs font-medium text-primary hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {row.accountName ?? "Account"}
+                </Link>
+              ) : (
+                <span className="text-xs text-muted-foreground">—</span>
+              ),
           },
           {
             key: "executive",
@@ -261,11 +317,13 @@ export function CrmDashboardActivityPanel({ items }: Props) {
             ),
           },
           {
-            key: "category",
-            header: "Activity type",
+            key: "teamSalesManager",
+            header: "Sales mgr",
             sortable: true,
             render: (row) => (
-              <span className="text-xs">{CRM_ACTIVITY_CATEGORY_LABEL[row.category]}</span>
+              <span className="text-xs text-muted-foreground">
+                {row.teamSalesManager?.trim() || "—"}
+              </span>
             ),
           },
           {
@@ -274,24 +332,6 @@ export function CrmDashboardActivityPanel({ items }: Props) {
             sortable: true,
             render: (row) => (
               <span className="text-xs">{row.leadContact?.trim() || "—"}</span>
-            ),
-          },
-          {
-            key: "kind",
-            header: "Status",
-            sortable: true,
-            render: (row) => (
-              <Pill tone={KIND_TONE[row.kind]}>{CRM_ACTIVITY_STATUS_LABEL[row.kind]}</Pill>
-            ),
-          },
-          {
-            key: "remarks",
-            header: "Remarks / details",
-            sortable: true,
-            render: (row) => (
-              <div className="max-w-[240px]">
-                <div className="line-clamp-2 text-xs font-medium">{row.remarks ?? row.what}</div>
-              </div>
             ),
           },
           {
@@ -305,22 +345,13 @@ export function CrmDashboardActivityPanel({ items }: Props) {
             ),
           },
           {
-            key: "accountName",
-            header: "Account",
-            sortable: true,
-            render: (row) =>
-              row.accountId ? (
-                <Link
-                  to="/crm/accounts/$accountId"
-                  params={{ accountId: row.accountId }}
-                  className="text-xs font-medium text-primary hover:underline"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {row.accountName ?? "Account"}
-                </Link>
-              ) : (
-                <span className="text-xs text-muted-foreground">—</span>
-              ),
+            key: "open",
+            header: "",
+            render: (row) => (
+              <div onClick={(e) => e.stopPropagation()}>
+                <CrmActivityOpenLink item={row} />
+              </div>
+            ),
           },
         ]}
       />

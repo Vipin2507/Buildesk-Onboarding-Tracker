@@ -20,6 +20,14 @@ export function formatDate(value?: string | null) {
   return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
 
+/** Display ISO as time only (e.g. 2:30 PM). */
+export function formatTime(value?: string | null) {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
+
 /** Display ISO as short date + time for checklist phase stamps. */
 export function formatDateTime(value?: string | null) {
   if (!value) return "";
