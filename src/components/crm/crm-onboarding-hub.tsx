@@ -402,6 +402,12 @@ function DashboardTab({
           <div className="mt-1 text-xs text-muted-foreground">
             Sales Manager: {account.salesManagerName || "—"}
           </div>
+          <div className="mt-0.5 text-xs text-muted-foreground">
+            Support Manager 1: {account.supportManager1 || "—"}
+          </div>
+          <div className="mt-0.5 text-xs text-muted-foreground">
+            Support Manager 2: {account.supportManager2 || "—"}
+          </div>
           <Pill className="mt-2" tone={isLive ? "success" : "warning"}>
             {isLive ? "Go-Live complete" : "Pre go-live"}
           </Pill>
