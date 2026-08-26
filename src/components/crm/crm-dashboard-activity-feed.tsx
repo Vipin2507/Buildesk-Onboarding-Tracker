@@ -51,10 +51,7 @@ function ActivityRow({
 }) {
   const executive = crmActivityExecutiveDisplay({ executive: item.executive });
   const destination = resolveCrmActivityDestination(item);
-  const categoryLabel =
-    item.category && item.category !== "all"
-      ? CRM_ACTIVITY_CATEGORY_LABEL[item.category]
-      : null;
+  const categoryLabel = CRM_ACTIVITY_CATEGORY_LABEL[item.category];
 
   const inner = (
     <>

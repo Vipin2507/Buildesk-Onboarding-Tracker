@@ -8,8 +8,10 @@ import {
   type CrmActivityItem,
 } from "@/lib/crm-activity-feed";
 
+type CrmActivityOpenLinkItem = Pick<CrmActivityItem, "id" | "category" | "accountId">;
+
 type Props = {
-  item: CrmActivityItem;
+  item: CrmActivityOpenLinkItem;
   compact?: boolean;
   onNavigate?: () => void;
 };
