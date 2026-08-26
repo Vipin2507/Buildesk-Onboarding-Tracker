@@ -27,6 +27,7 @@ const TRIGGER_SHORT: Record<AutomationRule["trigger"], string> = {
   "ticket-reply-from-team": "Team reply",
   "booking-created": "Booking request",
   "booking-status-changed": "Booking status",
+  "task-before-start": "Task reminder",
 };
 
 export function AutomationTestPanel({ className }: { className?: string }) {

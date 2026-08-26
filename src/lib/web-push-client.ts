@@ -37,7 +37,7 @@ export async function subscribeBrowserPush(publicKey: string): Promise<PushSubsc
 
   return registration.pushManager.subscribe({
     userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(publicKey),
+    applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
   });
 }
 
