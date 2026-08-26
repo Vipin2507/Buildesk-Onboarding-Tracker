@@ -38,6 +38,7 @@ import {
 } from "@/lib/crm-account-access";
 import { resolveDefaultTaskAssigneeIds, taskAssigneeUserOptions } from "@/lib/task-defaults";
 import { resolveTaskAssigneeIds } from "@/lib/task-scheduling";
+import { useTaskTimeStatusSync, useTasksWithTimeStatus } from "@/hooks/use-task-time-status";
 import { useAuthStore, useCrmAccountStore, useTaskStore, useUserStore } from "@/stores";
 import {
   FOLLOW_UP_TASK_TYPE_LABEL,
@@ -75,6 +76,8 @@ type Props = {
 
 export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: Props) {
   const tasks = useTaskStore((s) => s.tasks);
+  useTaskTimeStatusSync(true);
+  const timeAwareTasks = useTasksWithTimeStatus(tasks);
   const addTask = useTaskStore((s) => s.addTask);
   const updateTask = useTaskStore((s) => s.updateTask);
   const completeTask = useTaskStore((s) => s.completeTask);
@@ -95,8 +98,8 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
   );
 
   const crmTasks = useMemo(
-    () => tasks.filter((t) => accountIds.has(t.companyId)),
-    [tasks, accountIds],
+    () => timeAwareTasks.filter((t) => accountIds.has(t.companyId)),
+    [timeAwareTasks, accountIds],
   );
 
   const today = new Date().toISOString().slice(0, 10);

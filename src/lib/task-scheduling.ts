@@ -1,4 +1,5 @@
-import type { FollowUpTaskType } from "@/types";
+import { browserWallClockIso, localWallClockIso } from "@/lib/booking-slots";
+import type { FollowUpTaskStatus, FollowUpTaskType } from "@/types";
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -204,4 +205,103 @@ export function formatDurationMinutes(mins?: number | null): string {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
+/** Wall-clock now for comparing against task startsAt / endsAt (YYYY-MM-DDTHH:mm:ss). */
+export function taskWallClockNow(timezone?: string): string {
+  return timezone ? localWallClockIso(timezone) : browserWallClockIso();
+}
+
+/** Effective schedule bounds including extra time when present. */
+export function resolveTaskScheduleIsoBounds(task: {
+  startsAt?: string | null;
+  endsAt?: string | null;
+  dueDate?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  durationMinutes?: number | null;
+  extraTimeMinutes?: number | null;
+}): { startsAt: string; endsAt: string } | null {
+  const extra = resolveTaskExtraTimeMinutes(task);
+  const baseDuration = resolveTaskDurationMinutes(task);
+
+  if (task.startsAt && task.endsAt) {
+    if (extra > 0 && task.dueDate && task.startTime && baseDuration) {
+      const extended = buildTaskScheduleWithExtra({
+        dueDate: task.dueDate,
+        startTime: task.startTime,
+        durationMinutes: baseDuration,
+        extraTimeMinutes: extra,
+      });
+      if (extended) {
+        return { startsAt: extended.startsAt, endsAt: extended.endsAt };
+      }
+    }
+    return {
+      startsAt: task.startsAt.slice(0, 19),
+      endsAt: task.endsAt.slice(0, 19),
+    };
+  }
+
+  if (!task.dueDate || !task.startTime) return null;
+  const totalDuration = (baseDuration ?? 0) + extra;
+  const window = buildTaskScheduleWindow({
+    dueDate: task.dueDate,
+    startTime: task.startTime,
+    endTime: task.endTime ?? undefined,
+    durationMinutes: totalDuration > 0 ? totalDuration : undefined,
+  });
+  if (!window) return null;
+  return { startsAt: window.startsAt, endsAt: window.endsAt };
+}
+
+export function isTaskInActiveWindow(
+  task: Parameters<typeof resolveTaskScheduleIsoBounds>[0],
+  nowWallClock: string,
+): boolean {
+  const bounds = resolveTaskScheduleIsoBounds(task);
+  if (!bounds) return false;
+  const now = nowWallClock.slice(0, 19);
+  return now >= bounds.startsAt && now < bounds.endsAt;
+}
+
+/**
+ * Auto status from schedule: open → in_progress when the slot starts.
+ * in_progress stays until manually completed (even after the slot ends).
+ */
+export function resolveAutoTaskStatus(
+  task: {
+    status: FollowUpTaskStatus;
+    startsAt?: string | null;
+    endsAt?: string | null;
+    dueDate?: string | null;
+    startTime?: string | null;
+    endTime?: string | null;
+    durationMinutes?: number | null;
+    extraTimeMinutes?: number | null;
+  },
+  nowWallClock: string,
+): FollowUpTaskStatus {
+  if (task.status === "completed" || task.status === "cancelled" || task.status === "blocked") {
+    return task.status;
+  }
+
+  const bounds = resolveTaskScheduleIsoBounds(task);
+  if (!bounds) return task.status;
+
+  const now = nowWallClock.slice(0, 19);
+  const inWindow = now >= bounds.startsAt && now < bounds.endsAt;
+  const beforeWindow = now < bounds.startsAt;
+
+  if (inWindow && task.status === "open") return "in_progress";
+  if (beforeWindow && task.status === "in_progress") return "open";
+  return task.status;
+}
+
+export function applyAutoTaskStatus<T extends { status: FollowUpTaskStatus }>(
+  task: T,
+  nowWallClock = taskWallClockNow(),
+): T {
+  const status = resolveAutoTaskStatus(task, nowWallClock);
+  return status === task.status ? task : { ...task, status };
 }

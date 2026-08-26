@@ -15,8 +15,10 @@ import {
   normalizeTaskSchedule,
   resolvePrimaryAssignee,
   serializeAssigneeIds,
+  syncFollowUpTaskStatusesByTime,
 } from "@/server/lib/task-schedule";
 import { buildTaskScheduleWithExtra, formatScheduleConflictMessage } from "@/lib/task-scheduling";
+import { DEFAULT_BOOKING_TIMEZONE } from "@/types/booking";
 import type {
   ClientVisit,
   CrmEvent,
@@ -354,8 +356,9 @@ export const listFollowUpTasks = createServerFn({ method: "GET" })
       .parse(data ?? {}),
   )
   .handler(async ({ data }) => {
-    requireUser();
+    const user = requireUser();
     const db = getDb();
+    syncFollowUpTaskStatusesByTime(db, user.timezone || DEFAULT_BOOKING_TIMEZONE);
     let rows = db.select().from(t.followUpTasks).orderBy(desc(t.followUpTasks.updatedAt)).all();
     if (data?.companyId) rows = rows.filter((r) => r.companyId === data.companyId);
     if (data?.status) rows = rows.filter((r) => r.status === data.status);
@@ -371,6 +374,14 @@ export const listFollowUpTasks = createServerFn({ method: "GET" })
       });
     }
     return rows.map(mapTaskRow);
+  });
+
+export const syncFollowUpTaskStatuses = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({}).optional().parse(data ?? {}))
+  .handler(async () => {
+    const user = requireUser();
+    const db = getDb();
+    return syncFollowUpTaskStatusesByTime(db, user.timezone || DEFAULT_BOOKING_TIMEZONE);
   });
 
 export const getFollowUpTask = createServerFn({ method: "GET" })

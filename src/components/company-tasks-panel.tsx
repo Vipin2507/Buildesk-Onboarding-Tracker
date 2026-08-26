@@ -13,6 +13,7 @@ import {
 } from "@/components/tasks/task-form-fields";
 import { resolveDefaultTaskAssigneeIds, taskAssigneeUserOptions } from "@/lib/task-defaults";
 import { formatTimeRange12h } from "@/lib/task-scheduling";
+import { useTaskTimeStatusSync, useTasksWithTimeStatus } from "@/hooks/use-task-time-status";
 import { resolveAssigneeLabel } from "@/lib/managers";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { useCompanyStore, useTaskStore, useUserStore } from "@/stores";
@@ -21,6 +22,8 @@ import { usePermissions } from "@/hooks/use-permissions";
 
 export function CompanyTasksPanel({ companyId }: { companyId: string }) {
   const tasks = useTaskStore((s) => s.tasks);
+  useTaskTimeStatusSync(true);
+  const timeAwareTasks = useTasksWithTimeStatus(tasks);
   const addTask = useTaskStore((s) => s.addTask);
   const updateTask = useTaskStore((s) => s.updateTask);
   const completeTask = useTaskStore((s) => s.completeTask);
@@ -31,10 +34,10 @@ export function CompanyTasksPanel({ companyId }: { companyId: string }) {
 
   const companyTasks = useMemo(
     () =>
-      tasks
+      timeAwareTasks
         .filter((t) => t.companyId === companyId)
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
-    [tasks, companyId],
+    [timeAwareTasks, companyId],
   );
 
   const assignees = useMemo(

@@ -118,6 +118,7 @@ export {
   listModuleSubscriptionEvents,
   upsertModuleSubscription,
   listFollowUpTasks,
+  syncFollowUpTaskStatuses,
   getFollowUpTask,
   createFollowUpTask,
   updateFollowUpTask,

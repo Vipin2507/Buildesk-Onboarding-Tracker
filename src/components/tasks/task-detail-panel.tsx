@@ -13,6 +13,7 @@ import {
   resolveTaskExtraTimeMinutes,
   taskHasSchedule,
 } from "@/lib/task-scheduling";
+import { taskStatusTone } from "@/hooks/use-task-time-status";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import {
   FOLLOW_UP_TASK_TYPE_LABEL,
@@ -25,10 +26,7 @@ import {
 const EXTRA_TIME_OPTIONS = [5, 10, 15, 30, 60] as const;
 
 function statusTone(status: FollowUpTaskStatus) {
-  if (status === "completed") return "success" as const;
-  if (status === "cancelled") return "danger" as const;
-  if (status === "blocked") return "warning" as const;
-  return "muted" as const;
+  return taskStatusTone(status);
 }
 
 type Props = {

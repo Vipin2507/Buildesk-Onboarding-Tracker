@@ -2,11 +2,14 @@ import { and, eq, gte, inArray, lte, ne } from "drizzle-orm";
 
 import {
   buildTaskScheduleWindow,
+  resolveAutoTaskStatus,
   resolveTaskAssigneeIds,
   scheduleRangesOverlap,
   type ScheduleConflict,
 } from "@/lib/task-scheduling";
+import { localWallClockIso } from "@/lib/booking-slots";
 import type { FollowUpTask, FollowUpTaskType } from "@/types";
+import { DEFAULT_BOOKING_TIMEZONE } from "@/types/booking";
 import { newId, nowIso } from "@/types";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
@@ -316,6 +319,39 @@ export function syncTaskFromBookingAppointment(
     .run();
 
   return mapTaskRow(db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, id)).get()!);
+}
+
+/** Persist open ↔ in_progress transitions when scheduled start/end times elapse. */
+export function syncFollowUpTaskStatusesByTime(
+  db: ReturnType<typeof getDb>,
+  timezone = DEFAULT_BOOKING_TIMEZONE,
+): FollowUpTask[] {
+  const nowWall = localWallClockIso(timezone);
+  const rows = db
+    .select()
+    .from(t.followUpTasks)
+    .where(inArray(t.followUpTasks.status, ["open", "in_progress"]))
+    .all();
+
+  const updated: FollowUpTask[] = [];
+  const ts = nowIso();
+
+  for (const row of rows) {
+    const mapped = mapTaskRow(row);
+    const nextStatus = resolveAutoTaskStatus(mapped, nowWall);
+    if (nextStatus === row.status) continue;
+    db.update(t.followUpTasks)
+      .set({ status: nextStatus, updatedAt: ts })
+      .where(eq(t.followUpTasks.id, row.id))
+      .run();
+    updated.push(
+      mapTaskRow(
+        db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, row.id)).get()!,
+      ),
+    );
+  }
+
+  return updated;
 }
 
 export function cancelLinkedTaskForBooking(bookingId: string) {

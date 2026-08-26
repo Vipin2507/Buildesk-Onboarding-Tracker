@@ -13,6 +13,7 @@ import {
   type FollowUpTaskType,
 } from "@/types";
 import { formatTimeRange12h, formatTaskDurationDisplay, resolveTaskAssigneeIds } from "@/lib/task-scheduling";
+import { taskStatusTone } from "@/hooks/use-task-time-status";
 import { cn, formatDate } from "@/lib/utils";
 import { resolveAssigneeLabel } from "@/lib/managers";
 import { TaskRowRemark } from "@/components/tasks/task-detail-panel";
@@ -61,10 +62,7 @@ function taskSortKey(task: FollowUpTask): string {
 }
 
 function statusTone(status: FollowUpTask["status"]) {
-  if (status === "completed") return "success" as const;
-  if (status === "cancelled") return "danger" as const;
-  if (status === "blocked") return "warning" as const;
-  return "muted" as const;
+  return taskStatusTone(status);
 }
 
 export function TaskCalendarPanel({

@@ -22,6 +22,11 @@ import {
 } from "@/lib/crm-account-access";
 import { resolveDefaultTaskAssigneeIds, taskAssigneeUserOptions } from "@/lib/task-defaults";
 import { formatTimeRange12h, formatTaskDurationDisplay } from "@/lib/task-scheduling";
+import {
+  taskStatusTone,
+  useTaskTimeStatusSync,
+  useTasksWithTimeStatus,
+} from "@/hooks/use-task-time-status";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { resolveAssigneeLabel } from "@/lib/managers";
 import { useAuthStore, useCrmAccountStore, useTaskStore, useUserStore } from "@/stores";
@@ -34,11 +39,8 @@ import {
 
 const OPEN_STATUSES: FollowUpTaskStatus[] = ["open", "in_progress", "blocked"];
 
-function statusTone(status: FollowUpTaskStatus): "success" | "warning" | "danger" | "muted" {
-  if (status === "completed") return "success";
-  if (status === "cancelled") return "danger";
-  if (status === "blocked") return "warning";
-  return "muted";
+function statusTone(status: FollowUpTaskStatus): "success" | "warning" | "danger" | "muted" | "info" {
+  return taskStatusTone(status);
 }
 
 function formatStatusLabel(status: FollowUpTaskStatus) {
@@ -54,6 +56,8 @@ type Props = {
 export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: Props) {
   const account = useCrmAccountStore((s) => s.getById(accountId));
   const tasks = useTaskStore((s) => s.tasks);
+  useTaskTimeStatusSync(true);
+  const timeAwareTasks = useTasksWithTimeStatus(tasks);
   const addTask = useTaskStore((s) => s.addTask);
   const updateTask = useTaskStore((s) => s.updateTask);
   const completeTask = useTaskStore((s) => s.completeTask);
@@ -65,10 +69,10 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
 
   const accountTasks = useMemo(
     () =>
-      tasks
+      timeAwareTasks
         .filter((t) => t.companyId === accountId)
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
-    [tasks, accountId],
+    [timeAwareTasks, accountId],
   );
 
   const assignees = useMemo(
