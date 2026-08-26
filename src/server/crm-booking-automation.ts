@@ -4,6 +4,7 @@ import {
   DEFAULT_CRM_AUTOMATION_ENDPOINTS,
   DEFAULT_CRM_AUTOMATION_RULES,
   DEFAULT_CRM_AUTOMATION_SETTINGS,
+  DEFAULT_CRM_WAHA_CONFIG,
   mergeCrmAutomationRules,
   N8N_EMAIL_SEGMENT,
 } from "@/data/crm-automation-defaults";
@@ -21,6 +22,7 @@ import type {
   AutomationRule,
   AutomationSettings,
   AutomationTrigger,
+  WahaConfig,
 } from "@/types/automation";
 import { BOOKING_STATUS_LABEL, type BookingAppointment, type BookingAppointmentStatus } from "@/types/booking";
 
@@ -32,13 +34,14 @@ function buildN8nUrl(base: string, segment: string) {
   return `${trimSlash(base)}/${segment.replace(/^\/+/, "")}`;
 }
 
-function loadCrmAutomationConfig(db: ReturnType<typeof getDb>) {
+export function loadCrmAutomationConfig(db: ReturnType<typeof getDb>) {
   const row = db.select().from(t.appConfig).where(eq(t.appConfig.key, "crm-automation")).get();
   let snapshot: {
     settings?: AutomationSettings;
     rules?: AutomationRule[];
     endpoints?: AutomationEndpoint[];
     logs?: AutomationLog[];
+    waha?: WahaConfig;
   } = {};
   if (row?.valueJson) {
     try {
@@ -59,11 +62,12 @@ function loadCrmAutomationConfig(db: ReturnType<typeof getDb>) {
       Array.isArray(snapshot.endpoints) && snapshot.endpoints.length > 0
         ? snapshot.endpoints
         : DEFAULT_CRM_AUTOMATION_ENDPOINTS,
+    waha: { ...DEFAULT_CRM_WAHA_CONFIG, ...snapshot.waha },
     logs: Array.isArray(snapshot.logs) ? snapshot.logs : [],
   };
 }
 
-function appendServerCrmAutomationLog(db: ReturnType<typeof getDb>, log: AutomationLog) {
+export function appendServerCrmAutomationLog(db: ReturnType<typeof getDb>, log: AutomationLog) {
   const row = db.select().from(t.appConfig).where(eq(t.appConfig.key, "crm-automation")).get();
   let snapshot: Record<string, unknown> = {};
   if (row?.valueJson) {

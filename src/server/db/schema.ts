@@ -263,6 +263,48 @@ export const followUpTasks = sqliteTable(
   ],
 );
 
+export const automationRemindersSent = sqliteTable(
+  "automation_reminders_sent",
+  {
+    id: text("id").primaryKey(),
+    taskId: text("task_id").notNull(),
+    ruleId: text("rule_id").notNull(),
+    assigneeUserId: text("assignee_user_id").notNull(),
+    startsAt: text("starts_at").notNull(),
+    sentAt: text("sent_at").notNull(),
+  },
+  (t) => [
+    index("automation_reminders_task_idx").on(t.taskId),
+    uniqueIndex("automation_reminders_dedupe_idx").on(
+      t.taskId,
+      t.ruleId,
+      t.assigneeUserId,
+      t.startsAt,
+    ),
+  ],
+);
+
+/** Browser web push subscriptions per user/device. */
+export const pushSubscriptions = sqliteTable(
+  "push_subscriptions",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    userAgent: text("user_agent"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("push_subscriptions_endpoint_uidx").on(t.endpoint),
+    index("push_subscriptions_user_idx").on(t.userId),
+  ],
+);
+
 export const clientVisits = sqliteTable(
   "client_visits",
   {

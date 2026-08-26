@@ -1,15 +1,15 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { CalendarDays, Mail, MessageCircle, Pencil, Play, Plus, Power, Trash2, Ticket, Zap } from "lucide-react";
+import { CalendarDays, ClipboardList, Mail, MessageCircle, Pencil, Play, Plus, Power, Trash2, Ticket, Zap } from "lucide-react";
 import { toast } from "sonner";
 
-import { AutomationRuleDialog } from "@/components/automation/automation-rule-dialog";
+import { AutomationRuleDialog } from "@/components/crm/automation/automation-rule-dialog";
 import { ConfirmDeleteDialog } from "@/components/entity-form-modal";
 import { DataTable } from "@/components/data-table";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { CRM_BOOKING_AUTOMATION_TRIGGERS } from "@/data/crm-automation-defaults";
+import { CRM_BOOKING_AUTOMATION_TRIGGERS, CRM_TASK_AUTOMATION_TRIGGERS } from "@/data/crm-automation-defaults";
 import {
   AUTOMATION_TRIGGERS,
   type AutomationRule,
@@ -26,6 +26,7 @@ const TRIGGER_LABEL = Object.fromEntries(AUTOMATION_TRIGGERS.map((t) => [t.value
 >;
 
 const BOOKING_TRIGGER_SET = new Set<string>(CRM_BOOKING_AUTOMATION_TRIGGERS);
+const TASK_TRIGGER_SET = new Set<string>(CRM_TASK_AUTOMATION_TRIGGERS);
 
 type RuleColumn = {
   key: string;
@@ -59,7 +60,14 @@ function buildRuleColumns(
     {
       key: "trigger",
       header: "Trigger",
-      render: (r) => TRIGGER_LABEL[r.trigger],
+      render: (r) => (
+        <div className="min-w-0">
+          <div>{TRIGGER_LABEL[r.trigger]}</div>
+          {r.trigger === "task-before-start" && r.offsetMinutes ? (
+            <div className="text-[10px] text-muted-foreground">{r.offsetMinutes} min before start</div>
+          ) : null}
+        </div>
+      ),
     },
     {
       key: "channel",
@@ -115,14 +123,16 @@ export function AutomationRulesPanel() {
   const [testingRuleId, setTestingRuleId] = useState<string | null>(null);
   const [editing, setEditing] = useState<AutomationRule | null>(null);
 
-  const { ticketRules, bookingRules } = useMemo(() => {
+  const { ticketRules, bookingRules, taskRules } = useMemo(() => {
     const ticketRules: AutomationRule[] = [];
     const bookingRules: AutomationRule[] = [];
+    const taskRules: AutomationRule[] = [];
     for (const rule of rules) {
       if (BOOKING_TRIGGER_SET.has(rule.trigger)) bookingRules.push(rule);
+      else if (TASK_TRIGGER_SET.has(rule.trigger)) taskRules.push(rule);
       else ticketRules.push(rule);
     }
-    return { ticketRules, bookingRules };
+    return { ticketRules, bookingRules, taskRules };
   }, [rules]);
 
   function openCreate() {
@@ -232,7 +242,7 @@ export function AutomationRulesPanel() {
         <div>
           <h2 className="text-xs font-semibold text-muted-foreground">Automation rules</h2>
           <p className="text-[10px] text-muted-foreground">
-            Support tickets and booking call notifications · Email via n8n · WhatsApp via WAHA.
+            Support tickets, scheduled task reminders, and booking notifications · Email via n8n · WhatsApp via WAHA.
           </p>
         </div>
         <Button onClick={openCreate} size="sm" className="h-7 gap-1 px-2.5 text-xs bg-primary">
@@ -261,7 +271,7 @@ export function AutomationRulesPanel() {
             <div className="text-sm font-medium">Enable automation rules</div>
             <p className="mt-0.5 max-w-xl text-[10px] text-muted-foreground">
               {rulesEnabled
-                ? "Active rules run on support ticket events and booking approvals or status changes."
+                ? "Active rules run on support ticket events, task reminders, and booking status changes."
                 : "All rules are paused. Individual on/off settings are kept, but nothing will trigger until you turn this back on."}
             </p>
           </div>
@@ -301,6 +311,12 @@ export function AutomationRulesPanel() {
             "Portal call requests and approval / status emails to executives and guests.",
             <CalendarDays className="h-3.5 w-3.5" />,
             bookingRules,
+          )}
+          {renderRulesSection(
+            "Scheduled tasks",
+            "Email and WhatsApp reminders to assignees before a task start time.",
+            <ClipboardList className="h-3.5 w-3.5" />,
+            taskRules,
           )}
           {renderRulesSection(
             "Support tickets",

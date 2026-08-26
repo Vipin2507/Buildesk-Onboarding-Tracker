@@ -940,6 +940,42 @@ if (!tableExists("user_google_calendar")) {
   console.log("+ CREATE TABLE user_google_calendar");
 }
 
+if (!tableExists("automation_reminders_sent")) {
+  sqlite.exec(`
+    CREATE TABLE automation_reminders_sent (
+      id TEXT PRIMARY KEY NOT NULL,
+      task_id TEXT NOT NULL,
+      rule_id TEXT NOT NULL,
+      assignee_user_id TEXT NOT NULL,
+      starts_at TEXT NOT NULL,
+      sent_at TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS automation_reminders_dedupe_idx
+      ON automation_reminders_sent(task_id, rule_id, assignee_user_id, starts_at);
+    CREATE INDEX IF NOT EXISTS automation_reminders_task_idx ON automation_reminders_sent(task_id);
+  `);
+  console.log("+ CREATE TABLE automation_reminders_sent");
+}
+
+if (!tableExists("push_subscriptions")) {
+  sqlite.exec(`
+    CREATE TABLE push_subscriptions (
+      id TEXT PRIMARY KEY NOT NULL,
+      user_id TEXT NOT NULL,
+      endpoint TEXT NOT NULL,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      user_agent TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS push_subscriptions_endpoint_uidx ON push_subscriptions(endpoint);
+    CREATE INDEX IF NOT EXISTS push_subscriptions_user_idx ON push_subscriptions(user_id);
+  `);
+  console.log("+ CREATE TABLE push_subscriptions");
+}
+
 /** Backfill module_subscriptions from opted-in company_modules (idempotent). */
 if (tableExists("module_subscriptions") && tableExists("company_modules")) {
   sqlite.exec(`

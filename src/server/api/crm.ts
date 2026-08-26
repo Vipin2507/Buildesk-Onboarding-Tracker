@@ -17,7 +17,8 @@ import {
   serializeAssigneeIds,
   syncFollowUpTaskStatusesByTime,
 } from "@/server/lib/task-schedule";
-import { buildTaskScheduleWithExtra, formatScheduleConflictMessage } from "@/lib/task-scheduling";
+import { processTaskReminderAutomations } from "@/server/crm-task-reminder-automation";
+import { processTaskWebPushReminders } from "@/server/crm-task-web-push";
 import { DEFAULT_BOOKING_TIMEZONE } from "@/types/booking";
 import type {
   ClientVisit,
@@ -359,6 +360,8 @@ export const listFollowUpTasks = createServerFn({ method: "GET" })
     const user = requireUser();
     const db = getDb();
     syncFollowUpTaskStatusesByTime(db, user.timezone || DEFAULT_BOOKING_TIMEZONE);
+    void processTaskReminderAutomations(db, user.timezone || DEFAULT_BOOKING_TIMEZONE);
+    void processTaskWebPushReminders(db, user.timezone || DEFAULT_BOOKING_TIMEZONE);
     let rows = db.select().from(t.followUpTasks).orderBy(desc(t.followUpTasks.updatedAt)).all();
     if (data?.companyId) rows = rows.filter((r) => r.companyId === data.companyId);
     if (data?.status) rows = rows.filter((r) => r.status === data.status);
@@ -381,7 +384,11 @@ export const syncFollowUpTaskStatuses = createServerFn({ method: "POST" })
   .handler(async () => {
     const user = requireUser();
     const db = getDb();
-    return syncFollowUpTaskStatusesByTime(db, user.timezone || DEFAULT_BOOKING_TIMEZONE);
+    const tz = user.timezone || DEFAULT_BOOKING_TIMEZONE;
+    const updated = syncFollowUpTaskStatusesByTime(db, tz);
+    await processTaskReminderAutomations(db, tz);
+    await processTaskWebPushReminders(db, tz);
+    return updated;
   });
 
 export const getFollowUpTask = createServerFn({ method: "GET" })

@@ -71,6 +71,10 @@ function rule(
 
 export const CRM_BOOKING_AUTOMATION_TRIGGERS = ["booking-created", "booking-status-changed"] as const;
 
+export const CRM_TASK_AUTOMATION_TRIGGERS = ["task-before-start"] as const;
+
+export const DEFAULT_TASK_REMINDER_OFFSET_MINUTES = 15;
+
 /** Merge seed rules by id so booking automations appear even on older saved configs. */
 export function mergeCrmAutomationRules(existing: AutomationRule[]): AutomationRule[] {
   const byId = new Map(existing.map((r) => [r.id, r]));
@@ -166,6 +170,29 @@ export const DEFAULT_CRM_AUTOMATION_RULES: AutomationRule[] = [
     templateBody:
       "Hi {{guestName}},\n\nYour {{eventTypeTitle}} with {{hostName}} is now {{status}}.\n\nWhen: {{startsAt}} – {{endsAt}}\nAccount: {{accountName}}\n{{meetUrlLine}}\nIf you need another time, open your portal and book again.",
   }),
+  rule({
+    id: "crm-rule-task-before-email",
+    name: "Task reminder — Executive email",
+    description: "Email assignees before a scheduled CRM task starts",
+    trigger: "task-before-start",
+    channel: "email",
+    isActive: true,
+    offsetMinutes: DEFAULT_TASK_REMINDER_OFFSET_MINUTES,
+    templateSubject: "Upcoming task in {{offsetMinutes}} min — {{taskTitle}}",
+    templateBody:
+      "Hi {{assigneeName}},\n\nReminder: you have a scheduled task starting at {{startsAt}}.\n\nTask: {{taskTitle}}\nAccount: {{accountName}}\nWhen: {{startsAt}} – {{endsAt}}\n\nOpen in CRM: {{taskUrl}}",
+  }),
+  rule({
+    id: "crm-rule-task-before-whatsapp",
+    name: "Task reminder — Executive WhatsApp",
+    description: "WhatsApp assignees before a scheduled CRM task starts",
+    trigger: "task-before-start",
+    channel: "whatsapp",
+    isActive: true,
+    offsetMinutes: DEFAULT_TASK_REMINDER_OFFSET_MINUTES,
+    templateBody:
+      "Hi {{assigneeName}}, reminder: \"{{taskTitle}}\" for {{accountName}} starts at {{startsAt}} (in {{offsetMinutes}} min). {{taskUrl}}",
+  }),
 ];
 
 export const CRM_AUTOMATION_TEMPLATE_VARS = [
@@ -189,6 +216,11 @@ export const CRM_AUTOMATION_TEMPLATE_VARS = [
   "{{bookingUrl}}",
   "{{meetUrl}}",
   "{{meetUrlLine}}",
+  "{{taskId}}",
+  "{{taskTitle}}",
+  "{{taskUrl}}",
+  "{{assigneeName}}",
+  "{{offsetMinutes}}",
 ] as const;
 
 export const CRM_AUTOMATION_SAMPLE_VARS: Record<string, string> = {
@@ -212,4 +244,9 @@ export const CRM_AUTOMATION_SAMPLE_VARS: Record<string, string> = {
   bookingUrl: "https://track.example.com/crm/bookings",
   meetUrl: "https://meet.google.com/abc-defg-hij",
   meetUrlLine: "Google Meet: https://meet.google.com/abc-defg-hij\n",
+  taskId: "task-9001",
+  taskTitle: "GMeet onboarding walkthrough",
+  taskUrl: "https://track.example.com/crm/tasks?task=task-9001",
+  assigneeName: "Priya Sales",
+  offsetMinutes: "15",
 };

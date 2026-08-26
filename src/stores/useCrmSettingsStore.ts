@@ -15,6 +15,8 @@ export type CrmNotificationSettings = {
   quietHoursEnabled: boolean;
   quietHoursStart: string;
   quietHoursEnd: string;
+  taskReminderWebPushEnabled: boolean;
+  taskReminderWebPushMinutesBefore: number;
 };
 
 const SEED_NOTIFICATIONS: CrmNotificationSettings = {
@@ -32,6 +34,8 @@ const SEED_NOTIFICATIONS: CrmNotificationSettings = {
   quietHoursEnabled: true,
   quietHoursStart: "22:00",
   quietHoursEnd: "07:00",
+  taskReminderWebPushEnabled: false,
+  taskReminderWebPushMinutesBefore: 15,
 };
 
 type CrmSettingsState = {
@@ -48,3 +52,21 @@ export const useCrmSettingsStore = createPersistedStore<CrmSettingsState>(
     },
   }),
 );
+
+export function hydrateCrmSettingsFromServer(raw: Record<string, unknown>) {
+  const notifications = raw.notifications;
+  if (!notifications || typeof notifications !== "object") return;
+
+  useCrmSettingsStore.setState((s) => ({
+    notifications: {
+      ...s.notifications,
+      ...(notifications as Partial<CrmNotificationSettings>),
+    },
+  }));
+}
+
+function crmSettingsSnapshot() {
+  return { notifications: useCrmSettingsStore.getState().notifications };
+}
+
+export { crmSettingsSnapshot };

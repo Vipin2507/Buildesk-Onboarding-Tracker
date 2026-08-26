@@ -205,6 +205,13 @@ export {
 } from "@/server/api/bookings";
 
 export {
+  getWebPushConfig,
+  getWebPushSubscriptionStatus,
+  subscribeWebPush,
+  unsubscribeWebPush,
+} from "@/server/api/push";
+
+export {
   getGoogleCalendarConnectionStatus,
   getGoogleCalendarAuthUrl,
   disconnectGoogleCalendarConnection,

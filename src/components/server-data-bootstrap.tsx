@@ -79,6 +79,7 @@ import {
   hydrateCrmAutomationFromServer,
   useCrmAutomationStore,
 } from "@/stores/useCrmAutomationStore";
+import { hydrateCrmSettingsFromServer } from "@/stores/useCrmSettingsStore";
 import type { CrmOnboardingRecord } from "@/types/crm-onboarding";
 
 function readLegacyCrmOnboarding(): CrmOnboardingRecord[] {
@@ -140,6 +141,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           settings,
           automation,
           crmAutomation,
+          crmSettings,
           notes,
           attachments,
           checklist,
@@ -182,6 +184,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           getAppConfig({ data: { key: "settings" } }).catch(() => ({})),
           getAppConfig({ data: { key: "automation" } }).catch(() => ({})),
           getAppConfig({ data: { key: "crm-automation" } }).catch(() => ({})),
+          getAppConfig({ data: { key: "crm-settings" } }).catch(() => ({})),
           listAllNotes().catch(() => []),
           listAllAttachments().catch(() => []),
           listAllChecklist().catch(() => []),
@@ -357,6 +360,9 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
         if (settings && typeof settings === "object" && Object.keys(settings).length > 1) {
           const { hydrateSettingsFromServer } = await import("@/stores/useSettingsStore");
           hydrateSettingsFromServer(settings as Record<string, unknown>);
+        }
+        if (crmSettings && typeof crmSettings === "object" && Object.keys(crmSettings).length > 0) {
+          hydrateCrmSettingsFromServer(crmSettings as Record<string, unknown>);
         }
         if (automation && typeof automation === "object" && Object.keys(automation).length > 0) {
           hydrateAutomationFromServer(automation as Record<string, unknown>);

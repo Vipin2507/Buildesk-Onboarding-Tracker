@@ -39,7 +39,8 @@ export type AutomationTrigger =
   | "ticket-closed"
   | "ticket-reply-from-team"
   | "booking-created"
-  | "booking-status-changed";
+  | "booking-status-changed"
+  | "task-before-start";
 
 export interface AutomationRule {
   id: string;
@@ -53,6 +54,8 @@ export interface AutomationRule {
   templateBody: string;
   /** Rule-level CC merged with global settings CC for email sends. */
   emailCc?: string;
+  /** Minutes before a scheduled task start (task-before-start trigger only). */
+  offsetMinutes?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -123,6 +126,12 @@ export type AutomationPayload = {
   hostEmail?: string;
   guestName?: string;
   guestEmail?: string;
+  /** Scheduled task fields (optional). */
+  taskId?: string;
+  taskTitle?: string;
+  taskUrl?: string;
+  assigneeName?: string;
+  offsetMinutes?: number;
 };
 
 export const AUTOMATION_TRIGGERS: { value: AutomationTrigger; label: string }[] = [
@@ -132,6 +141,7 @@ export const AUTOMATION_TRIGGERS: { value: AutomationTrigger; label: string }[] 
   { value: "ticket-reply-from-team", label: "Team reply on ticket" },
   { value: "booking-created", label: "Booking request (executive)" },
   { value: "booking-status-changed", label: "Booking status (customer)" },
+  { value: "task-before-start", label: "Before scheduled task" },
 ];
 
 export const AUTOMATION_TEMPLATE_VARS = [
@@ -152,4 +162,9 @@ export const AUTOMATION_TEMPLATE_VARS = [
   "{{previousStatus}}",
   "{{bookingId}}",
   "{{bookingUrl}}",
+  "{{taskId}}",
+  "{{taskTitle}}",
+  "{{taskUrl}}",
+  "{{assigneeName}}",
+  "{{offsetMinutes}}",
 ] as const;

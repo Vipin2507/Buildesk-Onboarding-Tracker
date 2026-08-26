@@ -38,7 +38,7 @@ import {
   type AutomationRule,
   type AutomationTrigger,
 } from "@/types/automation";
-import { CRM_AUTOMATION_TEMPLATE_VARS, CRM_AUTOMATION_SAMPLE_VARS } from "@/data/crm-automation-defaults";
+import { CRM_AUTOMATION_TEMPLATE_VARS, CRM_AUTOMATION_SAMPLE_VARS, DEFAULT_TASK_REMINDER_OFFSET_MINUTES } from "@/data/crm-automation-defaults";
 import {
   renderAutomationSubject,
   renderAutomationTemplate,
@@ -58,6 +58,7 @@ export type RuleFormState = {
   templateSubject: string;
   templateBody: string;
   emailCc: string;
+  offsetMinutes: string;
   testEmail: string;
   testPhone: string;
 };
@@ -72,6 +73,7 @@ const DEFAULT_FORM: RuleFormState = {
   templateBody:
     "Hi {{customerName}},\n\nYour CRM support ticket {{ticketNumber}} for {{accountName}} has been updated.\n\nSubject: {{title}}\nStatus: {{status}}\nSales manager: {{salesManagerName}}\n\nView details: {{ticketUrl}}",
   emailCc: "",
+  offsetMinutes: String(DEFAULT_TASK_REMINDER_OFFSET_MINUTES),
   testEmail: "test@example.com",
   testPhone: "+919999999999",
 };
@@ -86,6 +88,7 @@ function ruleToForm(rule: AutomationRule): RuleFormState {
     templateSubject: rule.templateSubject ?? "",
     templateBody: rule.templateBody,
     emailCc: rule.emailCc ?? "",
+    offsetMinutes: String(rule.offsetMinutes ?? DEFAULT_TASK_REMINDER_OFFSET_MINUTES),
     testEmail: "test@example.com",
     testPhone: "+919999999999",
   };
@@ -381,10 +384,21 @@ export function AutomationRuleDialog({
       toast.error("Email subject is required");
       return false;
     }
+    if (form.trigger === "task-before-start") {
+      const offset = Number(form.offsetMinutes);
+      if (!Number.isFinite(offset) || offset <= 0) {
+        toast.error("Reminder offset must be at least 1 minute");
+        return false;
+      }
+    }
     return true;
   }
 
   function buildPayload() {
+    const offsetMinutes =
+      form.trigger === "task-before-start"
+        ? Math.max(1, Math.round(Number(form.offsetMinutes) || DEFAULT_TASK_REMINDER_OFFSET_MINUTES))
+        : undefined;
     return {
       name: form.name.trim(),
       description: form.description.trim() || undefined,
@@ -394,6 +408,7 @@ export function AutomationRuleDialog({
       templateSubject: form.channel === "email" ? form.templateSubject.trim() : undefined,
       templateBody: form.templateBody.trim(),
       emailCc: form.channel === "email" ? form.emailCc.trim() || undefined : undefined,
+      offsetMinutes,
     };
   }
 
@@ -510,7 +525,9 @@ export function AutomationRuleDialog({
                 <Field label="When this happens" required>
                   <Select
                     value={form.trigger}
-                    onValueChange={(v) => setForm({ ...form, trigger: v as AutomationTrigger })}
+                    onValueChange={(v) =>
+                      setForm({ ...form, trigger: v as AutomationTrigger })
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select trigger" />
@@ -524,6 +541,25 @@ export function AutomationRuleDialog({
                     </SelectContent>
                   </Select>
                 </Field>
+                {form.trigger === "task-before-start" ? (
+                  <Field
+                    label="Send before task starts"
+                    required
+                    hint="Fixed lead time before the scheduled start (e.g. 15 = fifteen minutes before)."
+                  >
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={1440}
+                        value={form.offsetMinutes}
+                        onChange={(e) => setForm({ ...form, offsetMinutes: e.target.value })}
+                        className="w-24"
+                      />
+                      <span className="text-sm text-muted-foreground">minutes</span>
+                    </div>
+                  </Field>
+                ) : null}
                 <Field label="Delivery channel" required>
                   <ChannelToggle
                     value={form.channel}
@@ -532,6 +568,15 @@ export function AutomationRuleDialog({
                 </Field>
                 <div className="rounded-lg bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
                   Fires on: <span className="font-medium text-foreground">{triggerLabel}</span>
+                  {form.trigger === "task-before-start" ? (
+                    <>
+                      {" "}
+                      ·{" "}
+                      <span className="font-medium text-foreground">
+                        {form.offsetMinutes || DEFAULT_TASK_REMINDER_OFFSET_MINUTES} min before start
+                      </span>
+                    </>
+                  ) : null}
                 </div>
               </FormSection>
 
@@ -587,14 +632,23 @@ export function AutomationRuleDialog({
                   >
                     <FormSection
                       title="WhatsApp delivery"
-                      description="Sent directly via WAHA to the customer phone on the ticket."
+                      description="Sent via WAHA to the assignee phone on their user profile."
                       icon={MessageCircle}
                       delay={0}
                     >
                       <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-3 py-3 text-xs leading-relaxed text-muted-foreground">
-                        Recipient phone is taken from the company / portal contact when a ticket
-                        fires. Numbers are normalized to India format (<code className="rounded bg-muted px-1">91XXXXXXXXXX</code>
-                        ) before sending.
+                        {form.trigger === "task-before-start" ? (
+                          <>
+                            Recipient phone is taken from each task assignee&apos;s user profile when the
+                            reminder runs.
+                          </>
+                        ) : (
+                          <>
+                            Recipient phone is taken from the company / portal contact when a ticket fires.
+                            Numbers are normalized to India format (
+                            <code className="rounded bg-muted px-1">91XXXXXXXXXX</code>) before sending.
+                          </>
+                        )}
                       </div>
                     </FormSection>
                   </motion.div>

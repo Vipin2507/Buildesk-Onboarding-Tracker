@@ -4,6 +4,7 @@ import { flushServerSyncDebounced, serverSyncDebounced } from "@/lib/sync";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useAutomationStore } from "@/stores/useAutomationStore";
 import { useCrmAutomationStore } from "@/stores/useCrmAutomationStore";
+import { crmSettingsSnapshot, useCrmSettingsStore } from "@/stores/useCrmSettingsStore";
 import { useMasterStore } from "@/stores/useMasterStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import type { AutomationLog } from "@/types/automation";
@@ -141,6 +142,13 @@ export function wireConfigPersistence() {
 
   useCrmAutomationStore.subscribe(() => {
     persistCrmAutomationConfig();
+  });
+
+  useCrmSettingsStore.subscribe(() => {
+    if (!canPersistAppConfig()) return;
+    serverSyncDebounced("crm-settings-config", 1000, () =>
+      setAppConfig({ data: { key: "crm-settings", value: crmSettingsSnapshot() } }),
+    );
   });
 
   const flush = () => flushAutomationConfigPersistence();

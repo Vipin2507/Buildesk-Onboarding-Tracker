@@ -212,6 +212,18 @@ export function taskWallClockNow(timezone?: string): string {
   return timezone ? localWallClockIso(timezone) : browserWallClockIso();
 }
 
+/** Subtract minutes from a wall-clock ISO string (YYYY-MM-DDTHH:mm:ss). */
+export function subtractWallClockMinutes(iso: string, minutes: number): string {
+  const clean = iso.slice(0, 19);
+  const [datePart, timePart] = clean.split("T");
+  const [y, mo, d] = datePart.split("-").map(Number);
+  const [h, mi, s = 0] = (timePart ?? "00:00:00").split(":").map(Number);
+  const dt = new Date(y, mo - 1, d, h, mi, s);
+  dt.setMinutes(dt.getMinutes() - minutes);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}:${pad(dt.getSeconds())}`;
+}
+
 /** Effective schedule bounds including extra time when present. */
 export function resolveTaskScheduleIsoBounds(task: {
   startsAt?: string | null;

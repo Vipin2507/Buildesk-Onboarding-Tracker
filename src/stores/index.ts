@@ -30,7 +30,7 @@ export { useClientVisitStore } from "./useClientVisitStore";
 export { useCrmOnboardingStore } from "./useCrmOnboardingStore";
 export { useCrmAccountStore } from "./useCrmAccountStore";
 export { useCrmMasterStore, getCrmPicklistValues, getCrmMasterMigrationFields, getCrmMasterTrainingFields, getCrmMasterBookingCallTypes, getCrmMasterBookingHostHours } from "./useCrmMasterStore";
-export { useCrmSettingsStore } from "./useCrmSettingsStore";
+export { useCrmSettingsStore, hydrateCrmSettingsFromServer } from "./useCrmSettingsStore";
 export type { CrmNotificationSettings } from "./useCrmSettingsStore";
 export { useCrmEventStore } from "./useCrmEventStore";
 export { useDesignTicketStore } from "./useDesignTicketStore";

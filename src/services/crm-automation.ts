@@ -70,7 +70,11 @@ function buildN8nPayload(
     emailSubject: payload.subject,
     emailCc: mergeEmailCc(settings.emailCc, ruleMeta?.emailCc),
     delayHours: 0,
-    entityType: payload.bookingId ? "crm-booking" : "crm-ticket",
+    entityType: payload.taskId
+      ? "crm-task"
+      : payload.bookingId
+        ? "crm-booking"
+        : "crm-ticket",
     productScope: "crm",
     entityId: payload.bookingId ?? payload.ticketNumber,
     entityName: payload.eventTypeTitle ?? payload.subject,
@@ -481,6 +485,13 @@ function buildPayloadFromRule(
     status: vars.status as TicketStatus,
     message: `${prefix}${message}`,
     ticketUrl: vars.ticketUrl,
+    taskId: vars.taskId,
+    taskTitle: vars.taskTitle,
+    taskUrl: vars.taskUrl,
+    assigneeName: vars.assigneeName,
+    startsAt: vars.startsAt,
+    endsAt: vars.endsAt,
+    offsetMinutes: rule.offsetMinutes,
     test: opts?.test ?? false,
   };
 }
