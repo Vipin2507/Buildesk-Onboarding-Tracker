@@ -8,6 +8,7 @@ import {
   LayoutList,
   Link2,
   Plus,
+  Trash2,
   User as UserIcon,
 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -19,7 +20,7 @@ import {
   DesignTicketTabNav,
   ticketSectionVariants,
 } from "@/components/design-ticket/design-ticket-shared";
-import { EntityFormModal } from "@/components/entity-form-modal";
+import { ConfirmDeleteDialog, EntityFormModal } from "@/components/entity-form-modal";
 import { ListToolbar } from "@/components/list-toolbar";
 import { PageWrap } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -82,6 +83,7 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
   const updateTask = useTaskStore((s) => s.updateTask);
   const completeTask = useTaskStore((s) => s.completeTask);
   const cancelTask = useTaskStore((s) => s.cancelTask);
+  const deleteTask = useTaskStore((s) => s.deleteTask);
   const accounts = useCrmAccountStore((s) => s.accounts);
   const users = useUserStore((s) => s.users);
   const currentUser = useAuthStore((s) => s.user);
@@ -176,6 +178,7 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
   const [createAccountId, setCreateAccountId] = useState("");
   const [remark, setRemark] = useState("");
   const [markCompleteOnCreate, setMarkCompleteOnCreate] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<FollowUpTask | null>(null);
 
   const createAccount = visibleAccounts.find((a) => a.id === createAccountId);
   const assignees = useMemo(
@@ -307,6 +310,7 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
         accountName={accountOptions.find((a) => a.id === task.companyId)?.name ?? "—"}
         users={users}
         canManage={canManageTask(task)}
+        canDeleteAdmin={isAdmin}
         onEdit={() => openEdit(task)}
         onComplete={() => {
           completeTask(task.id);
@@ -318,6 +322,7 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
           toast.success("Task cancelled");
           onSelectTask(undefined);
         }}
+        onDelete={isAdmin ? () => setDeleteTarget(task) : undefined}
         onClose={() => onSelectTask(undefined)}
         onAddRemark={
           canManageTask(task)
@@ -588,11 +593,43 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
                     Cancel task
                   </Button>
                 ) : null}
+                {isAdmin ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full gap-1 text-destructive hover:text-destructive"
+                    onClick={() => setDeleteTarget(editing)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete task
+                  </Button>
+                ) : null}
               </>
             ) : null}
           </div>
         ) : null}
       </EntityFormModal>
+
+      <ConfirmDeleteDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title="Delete task?"
+        description={
+          deleteTarget
+            ? `Permanently remove “${deleteTarget.title}”. This cannot be undone.`
+            : undefined
+        }
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          deleteTask(deleteTarget.id);
+          toast.success("Task deleted");
+          if (selectedTaskId === deleteTarget.id) onSelectTask(undefined);
+          if (editing?.id === deleteTarget.id) setModalOpen(false);
+          setDeleteTarget(null);
+        }}
+      />
     </PageWrap>
   );
 }

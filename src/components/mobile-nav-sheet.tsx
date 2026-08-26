@@ -12,6 +12,7 @@ import { APP_NAV, filterNavItems, isNavActive } from "@/lib/nav";
 import { CRM_NAV } from "@/lib/crm-nav";
 import { isCrmUser } from "@/lib/product-scope";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useUpcomingTaskReminderCount } from "@/hooks/use-upcoming-task-reminders";
 import { useAuthStore } from "@/stores";
 import { useChatStore } from "@/stores/useChatStore";
 import { cn } from "@/lib/utils";
@@ -33,6 +34,7 @@ export function MobileNavSheet({
     ? CRM_NAV.filter((item) => !item.adminOnly || isAdmin)
     : filterNavItems(APP_NAV, { isAdmin, can });
   const chatBadge = useChatStore((s) => s.getLiveChatBadgeCount(crm ? "crm" : "erp"));
+  const upcomingTaskBadge = useUpcomingTaskReminderCount();
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -98,6 +100,11 @@ export function MobileNavSheet({
                     {crm && item.to === "/crm/live-chat" && chatBadge > 0 ? (
                       <span className="ml-auto rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground">
                         {chatBadge}
+                      </span>
+                    ) : null}
+                    {crm && item.to === "/crm/tasks" && upcomingTaskBadge > 0 ? (
+                      <span className="ml-auto rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                        {upcomingTaskBadge}
                       </span>
                     ) : null}
                   </Link>

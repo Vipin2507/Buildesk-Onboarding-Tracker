@@ -33,8 +33,12 @@ if (!cfg) {
   try {
     const parsed = JSON.parse(cfg.value_json);
     const n = parsed.notifications ?? {};
+    console.log("taskReminderInAppEnabled:", n.taskReminderInAppEnabled ?? true);
     console.log("taskReminderWebPushEnabled:", n.taskReminderWebPushEnabled ?? false);
-    console.log("taskReminderWebPushMinutesBefore:", n.taskReminderWebPushMinutesBefore ?? "(default 15)");
+    console.log(
+      "taskReminderMinutesBefore:",
+      n.taskReminderMinutesBefore ?? n.taskReminderWebPushMinutesBefore ?? "(default 15)",
+    );
     console.log("quietHoursEnabled:", n.quietHoursEnabled ?? false);
     console.log("quietHoursStart:", n.quietHoursStart ?? "?");
     console.log("quietHoursEnd:", n.quietHoursEnd ?? "?");

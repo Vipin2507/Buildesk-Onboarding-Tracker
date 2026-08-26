@@ -443,9 +443,9 @@ function NotificationsSection() {
       smtpFromEmail: form.smtpFromEmail.trim(),
       smtpPort: Number(form.smtpPort) || 587,
       digestHour: Math.min(23, Math.max(0, Number(form.digestHour) || 0)),
-      taskReminderWebPushMinutesBefore: Math.min(
+      taskReminderMinutesBefore: Math.min(
         24 * 60,
-        Math.max(1, Number(form.taskReminderWebPushMinutesBefore) || 15),
+        Math.max(1, Number(form.taskReminderMinutesBefore) || 15),
       ),
       notifyOnPendingActivities: form.notifyOnPendingActivities,
     };
@@ -516,16 +516,44 @@ function NotificationsSection() {
 
       <div className="card-soft p-3">
         <SectionTitle
-          title="Task reminder web push"
-          subtitle="Browser notifications for assignees before a scheduled task starts. Each user must enable push on their device under My Profile. The server checks every minute."
+          title="Scheduled task reminders"
+          subtitle="Alerts assignees before a task start time. In-app bell + sidebar badge; optional browser push under My Profile. Server checks every minute."
         />
         <div className="space-y-3">
+          <Field label="Minutes before task start">
+            <input
+              type="number"
+              min={1}
+              max={1440}
+              className={FIELD}
+              disabled={!form.taskReminderInAppEnabled && !form.taskReminderWebPushEnabled}
+              value={form.taskReminderMinutesBefore}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  taskReminderMinutesBefore: Number(e.target.value) || 15,
+                })
+              }
+            />
+          </Field>
           <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
             <div className="min-w-0">
-              <div className="text-xs font-medium">Enable web push reminders</div>
+              <div className="text-xs font-medium">In-app bell & Tasks badge</div>
               <div className="text-[10px] text-muted-foreground">
-                Sends a notification to browsers that have opted in when a task is approaching its
-                start time.
+                Top-right notification bell and a count on the Tasks sidebar item for upcoming
+                assigned tasks.
+              </div>
+            </div>
+            <Switch
+              checked={Boolean(form.taskReminderInAppEnabled)}
+              onCheckedChange={(v) => setForm({ ...form, taskReminderInAppEnabled: v === true })}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
+            <div className="min-w-0">
+              <div className="text-xs font-medium">Web push (browser)</div>
+              <div className="text-[10px] text-muted-foreground">
+                Each user must opt in under My Profile → Browser notifications.
               </div>
             </div>
             <Switch
@@ -533,25 +561,9 @@ function NotificationsSection() {
               onCheckedChange={(v) => setForm({ ...form, taskReminderWebPushEnabled: v === true })}
             />
           </div>
-          <Field label="Minutes before task start">
-            <input
-              type="number"
-              min={1}
-              max={1440}
-              className={FIELD}
-              disabled={!form.taskReminderWebPushEnabled}
-              value={form.taskReminderWebPushMinutesBefore}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  taskReminderWebPushMinutesBefore: Number(e.target.value) || 15,
-                })
-              }
-            />
-          </Field>
           {form.quietHoursEnabled ? (
             <p className="text-[10px] text-muted-foreground">
-              Quiet hours below are respected — web push will not fire during those times.
+              Quiet hours below are respected — task reminders will not fire during those times.
             </p>
           ) : null}
         </div>
@@ -1257,7 +1269,7 @@ function ProfileSection() {
       <div className="card-soft p-3">
         <SectionTitle
           title="Browser notifications"
-          subtitle="Enable web push on this device to receive upcoming task reminders configured under Email & Alerts."
+          subtitle="Enabled automatically when you sign in to CRM. You can turn them off for this browser below."
         />
         <WebPushDevicePanel />
       </div>

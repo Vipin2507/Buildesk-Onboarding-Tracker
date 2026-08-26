@@ -203,6 +203,16 @@ function insertForUserIds(
   return created;
 }
 
+/** Targeted in-app notifications for specific users (e.g. task assignees). */
+export function insertNotificationsForUserIds(
+  db: ReturnType<typeof getDb>,
+  userIds: string[],
+  data: NotificationInsert,
+): AppNotification[] {
+  const ids = userIds.filter((id) => id?.trim());
+  return insertForUserIds(db, data, ids);
+}
+
 /** @deprecated name kept for design-ticket callers — fans out to admins + account stakeholders. */
 export function insertNotificationsForAdmins(
   db: ReturnType<typeof getDb>,

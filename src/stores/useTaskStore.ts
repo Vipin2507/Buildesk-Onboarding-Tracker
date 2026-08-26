@@ -5,6 +5,7 @@ import {
   cancelFollowUpTask as apiCancel,
   completeFollowUpTask as apiComplete,
   createFollowUpTask as apiCreate,
+  deleteFollowUpTask as apiDelete,
   updateFollowUpTask as apiUpdate,
   listCrmEvents as apiListCrmEvents,
 } from "@/lib/api";
@@ -22,6 +23,7 @@ type TaskState = {
   ) => void;
   completeTask: (id: string, remark?: string) => void;
   cancelTask: (id: string, reason?: string) => void;
+  deleteTask: (id: string) => void;
   getById: (id: string) => FollowUpTask | undefined;
   getByCompany: (companyId: string) => FollowUpTask[];
 };
@@ -203,6 +205,17 @@ export const useTaskStore = createStore<TaskState>((set, get) => ({
         set((s) => ({
           tasks: s.tasks.map((t) => (t.id === id ? previous : t)),
         })),
+    );
+  },
+
+  deleteTask: (id) => {
+    const previous = get().getById(id);
+    if (!previous) return;
+    set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) }));
+    serverSyncWithRollback(
+      "deleteFollowUpTask",
+      () => apiDelete({ data: { id } }),
+      () => set((s) => ({ tasks: [previous, ...s.tasks] })),
     );
   },
 

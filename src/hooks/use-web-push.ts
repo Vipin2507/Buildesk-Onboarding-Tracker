@@ -1,17 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 
-import {
-  getWebPushConfig,
-  getWebPushSubscriptionStatus,
-  subscribeWebPush,
-  unsubscribeWebPush,
-} from "@/lib/api";
+import { getWebPushConfig, getWebPushSubscriptionStatus, unsubscribeWebPush } from "@/lib/api";
 import {
   isWebPushSupported,
-  pushSubscriptionToJson,
-  subscribeBrowserPush,
   unsubscribeBrowserPush,
 } from "@/lib/web-push-client";
+import { registerWebPushSubscription, setWebPushOptedOut } from "@/lib/web-push-register";
 
 type WebPushState = {
   supported: boolean;
@@ -68,37 +62,25 @@ export function useWebPush() {
   }, [refresh]);
 
   const enable = useCallback(async () => {
-    if (!isWebPushSupported()) {
+    setWebPushOptedOut(false);
+    const result = await registerWebPushSubscription({ requestPermission: true });
+    if (result === "not-supported") {
       throw new Error("This browser does not support web push notifications");
     }
-
-    const config = await getWebPushConfig();
-    if (!config.configured || !config.publicKey) {
+    if (result === "not-configured") {
       throw new Error("Web push is not configured on the server");
     }
-
-    const permission = await Notification.requestPermission();
-    setState((s) => ({ ...s, permission }));
-    if (permission !== "granted") {
+    if (result === "denied") {
       throw new Error("Notification permission was denied");
     }
-
-    const subscription = await subscribeBrowserPush(config.publicKey);
-    if (!subscription) {
+    if (result === "failed") {
       throw new Error("Could not subscribe this browser for push notifications");
     }
-
-    await subscribeWebPush({
-      data: {
-        subscription: pushSubscriptionToJson(subscription),
-        userAgent: navigator.userAgent,
-      },
-    });
-
     await refresh();
   }, [refresh]);
 
   const disable = useCallback(async () => {
+    setWebPushOptedOut(true);
     await unsubscribeBrowserPush();
     await unsubscribeWebPush({ data: {} });
     await refresh();

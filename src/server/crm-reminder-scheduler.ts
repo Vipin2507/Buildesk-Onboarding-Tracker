@@ -1,3 +1,4 @@
+import { processTaskInAppReminders } from "@/server/crm-task-in-app-reminder";
 import { processTaskReminderAutomations } from "@/server/crm-task-reminder-automation";
 import { processTaskWebPushReminders } from "@/server/crm-task-web-push";
 import { getDb } from "@/server/db/client";
@@ -16,8 +17,9 @@ export function startCrmReminderScheduler() {
     try {
       const db = getDb();
       await processTaskReminderAutomations(db, DEFAULT_BOOKING_TIMEZONE);
+      const inAppSent = processTaskInAppReminders(db, DEFAULT_BOOKING_TIMEZONE);
       const pushSent = await processTaskWebPushReminders(db, DEFAULT_BOOKING_TIMEZONE);
-      console.log(`[crm-reminder-scheduler] tick complete pushSent=${pushSent}`);
+      console.log(`[crm-reminder-scheduler] tick inApp=${inAppSent} push=${pushSent}`);
     } catch (err) {
       console.warn("[crm-reminder-scheduler]", err);
     }

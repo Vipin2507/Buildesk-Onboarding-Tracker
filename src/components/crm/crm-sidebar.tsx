@@ -3,6 +3,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { Contact, ChevronLeft, ChevronRight } from "lucide-react";
 
+import { useUpcomingTaskReminderCount } from "@/hooks/use-upcoming-task-reminders";
 import { CRM_NAV } from "@/lib/crm-nav";
 import { isNavActive } from "@/lib/nav";
 import { cn } from "@/lib/utils";
@@ -16,6 +17,7 @@ export function CrmSidebar() {
   const user = useAuthStore((s) => s.user);
   const isAdmin = user?.role === "Admin";
   const chatBadge = useChatStore((s) => s.getLiveChatBadgeCount("crm"));
+  const upcomingTaskBadge = useUpcomingTaskReminderCount();
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -118,6 +120,19 @@ export function CrmSidebar() {
                     )}
                   >
                     {chatBadge > 9 ? "9+" : chatBadge}
+                  </span>
+                ) : null}
+                {item.to === "/crm/tasks" && upcomingTaskBadge > 0 ? (
+                  <span
+                    className={cn(
+                      "relative z-10 rounded-full bg-amber-500 text-[10px] font-semibold text-white",
+                      collapsed
+                        ? "absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center px-0.5"
+                        : "ml-auto px-1.5",
+                    )}
+                    title="Upcoming task reminders"
+                  >
+                    {upcomingTaskBadge > 9 ? "9+" : upcomingTaskBadge}
                   </span>
                 ) : null}
               </Link>

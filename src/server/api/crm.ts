@@ -21,6 +21,7 @@ import {
   serializeAssigneeIds,
   syncFollowUpTaskStatusesByTime,
 } from "@/server/lib/task-schedule";
+import { processTaskInAppReminders } from "@/server/crm-task-in-app-reminder";
 import { processTaskReminderAutomations } from "@/server/crm-task-reminder-automation";
 import { processTaskWebPushReminders } from "@/server/crm-task-web-push";
 import { DEFAULT_BOOKING_TIMEZONE } from "@/types/booking";
@@ -365,6 +366,7 @@ export const listFollowUpTasks = createServerFn({ method: "GET" })
     const db = getDb();
     syncFollowUpTaskStatusesByTime(db, user.timezone || DEFAULT_BOOKING_TIMEZONE);
     void processTaskReminderAutomations(db, user.timezone || DEFAULT_BOOKING_TIMEZONE);
+    void processTaskInAppReminders(db, user.timezone || DEFAULT_BOOKING_TIMEZONE);
     void processTaskWebPushReminders(db, user.timezone || DEFAULT_BOOKING_TIMEZONE);
     let rows = db.select().from(t.followUpTasks).orderBy(desc(t.followUpTasks.updatedAt)).all();
     if (data?.companyId) rows = rows.filter((r) => r.companyId === data.companyId);
@@ -391,6 +393,7 @@ export const syncFollowUpTaskStatuses = createServerFn({ method: "POST" })
     const tz = user.timezone || DEFAULT_BOOKING_TIMEZONE;
     const updated = syncFollowUpTaskStatusesByTime(db, tz);
     await processTaskReminderAutomations(db, tz);
+    processTaskInAppReminders(db, tz);
     await processTaskWebPushReminders(db, tz);
     return updated;
   });
@@ -549,6 +552,7 @@ export const createFollowUpTask = createServerFn({ method: "POST" })
       companyId: data.companyId,
     });
     const tz = user.timezone || DEFAULT_BOOKING_TIMEZONE;
+    processTaskInAppReminders(db, tz);
     void processTaskWebPushReminders(db, tz);
     void processTaskReminderAutomations(db, tz);
     return mapTaskRow(db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, id)).get()!);
@@ -718,6 +722,7 @@ export const updateFollowUpTask = createServerFn({ method: "POST" })
     });
 
     const tz = user.timezone || DEFAULT_BOOKING_TIMEZONE;
+    processTaskInAppReminders(db, tz);
     void processTaskWebPushReminders(db, tz);
     void processTaskReminderAutomations(db, tz);
     return mapTaskRow(db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, data.id)).get()!);
@@ -810,6 +815,38 @@ export const cancelFollowUpTask = createServerFn({ method: "POST" })
       newValues: { status: "cancelled" },
     });
     return mapTaskRow(db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, data.id)).get()!);
+  });
+
+export const deleteFollowUpTask = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const user = requireUser(["Admin"]);
+    const db = getDb();
+    const existing = db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, data.id)).get();
+    if (!existing) throw new ApiError(404, "Task not found");
+
+    writeCrmEvent({
+      companyId: existing.companyId,
+      entityType: "task",
+      taskId: data.id,
+      eventType: "task_deleted",
+      actorUserId: user.id,
+      actorName: user.name,
+      oldValues: {
+        title: existing.title,
+        status: existing.status,
+        dueDate: existing.dueDate,
+        startTime: existing.startTime,
+        endTime: existing.endTime,
+      },
+    });
+
+    db.delete(t.automationRemindersSent)
+      .where(eq(t.automationRemindersSent.taskId, data.id))
+      .run();
+    db.delete(t.followUpTasks).where(eq(t.followUpTasks.id, data.id)).run();
+
+    return { ok: true as const, id: data.id };
   });
 
 /* ---------- Visits ---------- */

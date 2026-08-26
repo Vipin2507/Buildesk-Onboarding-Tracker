@@ -103,15 +103,20 @@ export function WebPushDevicePanel() {
       {diagnostics ? (
         <div className="rounded-lg border border-dashed px-3 py-2 text-[10px] text-muted-foreground">
           <div>
-            Server push enabled:{" "}
+            Server in-app enabled:{" "}
+            <span className="font-medium text-foreground">
+              {diagnostics.settings.taskReminderInAppEnabled ? "Yes" : "No"}
+            </span>
+            {" · "}
+            Web push:{" "}
             <span className="font-medium text-foreground">
               {diagnostics.settings.taskReminderWebPushEnabled ? "Yes" : "No"}
             </span>
             {!diagnostics.crmSettingsSaved ? " (admin settings not saved to server yet)" : null}
           </div>
           <div>
-            Reminder offset: {diagnostics.settings.taskReminderWebPushMinutesBefore} min · Quiet
-            hours now: {diagnostics.inQuietHours ? "Yes (blocked)" : "No"}
+            Reminder offset: {diagnostics.settings.taskReminderMinutesBefore} min · Quiet hours
+            now: {diagnostics.inQuietHours ? "Yes (blocked)" : "No"}
           </div>
           <div>
             Tasks due for reminder now: {diagnostics.dueNowCount} · Your subscriptions on server:{" "}

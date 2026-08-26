@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { CheckCircle2, Link2, Plus, X } from "lucide-react";
+import { CheckCircle2, Link2, Plus, Trash2, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { Pill } from "@/components/status-pill";
@@ -34,10 +34,12 @@ type Props = {
   accountName: string;
   users: User[];
   canManage: boolean;
+  canDeleteAdmin?: boolean;
   embedded?: boolean;
   onEdit: () => void;
   onComplete: () => void;
   onCancel: () => void;
+  onDelete?: () => void;
   onClose: () => void;
   onAddRemark?: (remark: string) => void;
   onAdjustExtraTime?: (deltaMinutes: number) => void;
@@ -48,10 +50,12 @@ export function TaskDetailPanel({
   accountName,
   users,
   canManage,
+  canDeleteAdmin = false,
   embedded = false,
   onEdit,
   onComplete,
   onCancel,
+  onDelete,
   onClose,
   onAddRemark,
   onAdjustExtraTime,
@@ -247,6 +251,17 @@ export function TaskDetailPanel({
                 </Button>
               ) : null}
             </>
+          ) : null}
+          {canDeleteAdmin && onDelete ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1 px-2 text-[10px] text-destructive hover:text-destructive"
+              onClick={onDelete}
+            >
+              <Trash2 className="h-3 w-3" />
+              Delete
+            </Button>
           ) : null}
           <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={onClose} aria-label="Close">
             <X className="h-3.5 w-3.5" />

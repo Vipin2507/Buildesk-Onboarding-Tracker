@@ -5,16 +5,18 @@ import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 
 export type CrmServerNotificationSettings = {
+  taskReminderInAppEnabled: boolean;
   taskReminderWebPushEnabled: boolean;
-  taskReminderWebPushMinutesBefore: number;
+  taskReminderMinutesBefore: number;
   quietHoursEnabled: boolean;
   quietHoursStart: string;
   quietHoursEnd: string;
 };
 
 const DEFAULTS: CrmServerNotificationSettings = {
+  taskReminderInAppEnabled: true,
   taskReminderWebPushEnabled: false,
-  taskReminderWebPushMinutesBefore: DEFAULT_TASK_REMINDER_OFFSET_MINUTES,
+  taskReminderMinutesBefore: DEFAULT_TASK_REMINDER_OFFSET_MINUTES,
   quietHoursEnabled: false,
   quietHoursStart: "22:00",
   quietHoursEnd: "07:00",
@@ -31,13 +33,17 @@ export function loadCrmServerNotificationSettings(
     const n = parsed.notifications;
     if (!n || typeof n !== "object") return { ...DEFAULTS };
 
-    const minutes = Number(n.taskReminderWebPushMinutesBefore);
+    const minutes = Number(n.taskReminderMinutesBefore ?? n.taskReminderWebPushMinutesBefore);
     return {
+      taskReminderInAppEnabled:
+        n.taskReminderInAppEnabled !== undefined
+          ? Boolean(n.taskReminderInAppEnabled)
+          : DEFAULTS.taskReminderInAppEnabled,
       taskReminderWebPushEnabled: Boolean(n.taskReminderWebPushEnabled),
-      taskReminderWebPushMinutesBefore:
+      taskReminderMinutesBefore:
         Number.isFinite(minutes) && minutes > 0
           ? Math.min(24 * 60, Math.round(minutes))
-          : DEFAULTS.taskReminderWebPushMinutesBefore,
+          : DEFAULTS.taskReminderMinutesBefore,
       quietHoursEnabled: Boolean(n.quietHoursEnabled),
       quietHoursStart:
         typeof n.quietHoursStart === "string" && n.quietHoursStart
