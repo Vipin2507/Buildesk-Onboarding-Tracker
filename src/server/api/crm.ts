@@ -564,7 +564,7 @@ export const updateFollowUpTask = createServerFn({ method: "POST" })
     const durationMinutes =
       patch.durationMinutes !== undefined ? patch.durationMinutes : existing.durationMinutes;
     const extraTimeMinutes =
-      patch.extraTimeMinutes !== undefined ? patch.extraTimeMinutes : existing.extraTimeMinutes ?? 0;
+      patch.extraTimeMinutes != null ? patch.extraTimeMinutes : existing.extraTimeMinutes ?? 0;
     const taskType = patch.taskType !== undefined ? patch.taskType : existing.taskType;
 
     let schedule;
