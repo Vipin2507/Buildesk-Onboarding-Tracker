@@ -400,6 +400,7 @@ function resolveCrmBookingHostUserId(input: {
   hostUserId?: string;
   actingUser: ActingUser;
 }): string {
+  const { actingUser } = input;
   if (isAdminRoleKey(actingUser.role)) {
     if (input.hostUserId) {
       assertCrmHostUser(input.hostUserId);

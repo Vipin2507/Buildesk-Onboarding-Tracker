@@ -134,8 +134,8 @@ export function resolveTaskExtraTimeMinutes(task: { extraTimeMinutes?: number | 
 export function resolveTaskTotalDurationMinutes(task: {
   durationMinutes?: number | null;
   extraTimeMinutes?: number | null;
-  startTime?: string;
-  endTime?: string;
+  startTime?: string | null;
+  endTime?: string | null;
 }): number | undefined {
   const base = resolveTaskDurationMinutes(task);
   if (!base) return undefined;
@@ -146,8 +146,8 @@ export function resolveTaskTotalDurationMinutes(task: {
 export function formatTaskDurationDisplay(task: {
   durationMinutes?: number | null;
   extraTimeMinutes?: number | null;
-  startTime?: string;
-  endTime?: string;
+  startTime?: string | null;
+  endTime?: string | null;
 }): string {
   const base = resolveTaskDurationMinutes(task);
   const extra = resolveTaskExtraTimeMinutes(task);
@@ -187,8 +187,8 @@ export function buildTaskScheduleWithExtra(input: {
 
 export function resolveTaskDurationMinutes(task: {
   durationMinutes?: number | null;
-  startTime?: string;
-  endTime?: string;
+  startTime?: string | null;
+  endTime?: string | null;
 }): number | undefined {
   if (task.durationMinutes && task.durationMinutes > 0) return task.durationMinutes;
   if (task.startTime && task.endTime) {
