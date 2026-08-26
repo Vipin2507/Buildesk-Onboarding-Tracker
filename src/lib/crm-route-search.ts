@@ -68,3 +68,31 @@ export function parseCrmTasksTab(value: unknown): CrmTasksTabId {
   }
   return "all";
 }
+
+export const CRM_ACCOUNT_TAB_IDS = [
+  "dashboard",
+  "modules",
+  "masters",
+  "migration",
+  "training",
+  "reports",
+  "golive",
+  "tasks",
+  "tickets",
+  "comms",
+] as const;
+
+export type CrmAccountTabId = (typeof CRM_ACCOUNT_TAB_IDS)[number];
+
+export const crmAccountSearchSchema = z.object({
+  tab: z.enum(CRM_ACCOUNT_TAB_IDS).optional(),
+});
+
+export type CrmAccountSearch = z.infer<typeof crmAccountSearchSchema>;
+
+export function parseCrmAccountTab(value: unknown): CrmAccountTabId {
+  if (typeof value === "string" && CRM_ACCOUNT_TAB_IDS.includes(value as CrmAccountTabId)) {
+    return value as CrmAccountTabId;
+  }
+  return "dashboard";
+}

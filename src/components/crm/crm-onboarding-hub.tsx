@@ -119,10 +119,14 @@ export function CrmOnboardingHub({
   accountId,
   accountName,
   progress,
+  tab: controlledTab,
+  onTabChange,
 }: {
   accountId: string;
   accountName: string;
   progress?: number;
+  tab?: TabId;
+  onTabChange?: (tab: TabId) => void;
 }) {
   const account = useCrmAccountStore((s) => s.accounts.find((a) => a.id === accountId));
   const markLive = useCrmAccountStore((s) => s.markLive);
@@ -134,7 +138,12 @@ export function CrmOnboardingHub({
   const tasks = useTaskStore((s) => s.tasks);
   const currentUser = useAuthStore((s) => s.user);
 
-  const [tab, setTab] = useState<TabId>("dashboard");
+  const [internalTab, setInternalTab] = useState<TabId>("dashboard");
+  const tab = controlledTab ?? internalTab;
+  const setTab = (next: TabId) => {
+    if (onTabChange) onTabChange(next);
+    else setInternalTab(next);
+  };
   const [confirmForceLive, setConfirmForceLive] = useState(false);
 
   useEffect(() => {
