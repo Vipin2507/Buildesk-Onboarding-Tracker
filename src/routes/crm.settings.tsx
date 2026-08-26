@@ -31,6 +31,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import {
   createUser as apiCreateUser,
   setUserPassword as apiSetUserPassword,
+  setAppConfig,
   updateUser as apiUpdateUser,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -42,6 +43,7 @@ import {
   useUserStore,
 } from "@/stores";
 import type { CrmNotificationSettings } from "@/stores/useCrmSettingsStore";
+import { crmSettingsSnapshot } from "@/stores/useCrmSettingsStore";
 import type { CrmMasterPlatformSettings } from "@/types/crm-master";
 import type { User } from "@/types";
 import { CRM_SEED_PLATFORM } from "@/data/crm-master-seed";
@@ -433,11 +435,7 @@ function NotificationsSection() {
   useEffect(() => setForm(notifications), [notifications]);
 
   function save() {
-    if (!form.smtpHost.trim() || !form.smtpFromEmail.trim()) {
-      toast.error("SMTP host and from email are required");
-      return;
-    }
-    updateNotifications({
+    const next = {
       ...form,
       smtpHost: form.smtpHost.trim(),
       smtpUser: form.smtpUser.trim(),
@@ -449,10 +447,14 @@ function NotificationsSection() {
         24 * 60,
         Math.max(1, Number(form.taskReminderWebPushMinutesBefore) || 15),
       ),
-      // Pending digest is not wired yet — keep stored value but do not imply it is active.
       notifyOnPendingActivities: form.notifyOnPendingActivities,
-    });
-    toast.success("Notification settings saved");
+    };
+    updateNotifications(next);
+    void setAppConfig({ data: { key: "crm-settings", value: crmSettingsSnapshot() } })
+      .then(() => toast.success("Notification settings saved"))
+      .catch((e) =>
+        toast.error(e instanceof Error ? e.message : "Saved locally but server sync failed"),
+      );
   }
 
   const eventToggles: {
@@ -515,7 +517,7 @@ function NotificationsSection() {
       <div className="card-soft p-3">
         <SectionTitle
           title="Task reminder web push"
-          subtitle="Browser notifications for assignees before a scheduled task starts. Each user must enable push on their device under My Profile."
+          subtitle="Browser notifications for assignees before a scheduled task starts. Each user must enable push on their device under My Profile. The server checks every minute."
         />
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">

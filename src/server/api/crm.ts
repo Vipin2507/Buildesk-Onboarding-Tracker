@@ -548,6 +548,9 @@ export const createFollowUpTask = createServerFn({ method: "POST" })
       kind: "info",
       companyId: data.companyId,
     });
+    const tz = user.timezone || DEFAULT_BOOKING_TIMEZONE;
+    void processTaskWebPushReminders(db, tz);
+    void processTaskReminderAutomations(db, tz);
     return mapTaskRow(db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, id)).get()!);
   });
 
@@ -714,6 +717,9 @@ export const updateFollowUpTask = createServerFn({ method: "POST" })
       dueDate: schedule.dueDate ?? undefined,
     });
 
+    const tz = user.timezone || DEFAULT_BOOKING_TIMEZONE;
+    void processTaskWebPushReminders(db, tz);
+    void processTaskReminderAutomations(db, tz);
     return mapTaskRow(db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, data.id)).get()!);
   });
 

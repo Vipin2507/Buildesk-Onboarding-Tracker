@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 
 import { listBookingAppointments, listCrmEvents, listDesignTickets, listModuleSubscriptionEvents } from "@/lib/api";
+import { useTaskTimeStatusSync } from "@/hooks/use-task-time-status";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useBookingStore } from "@/stores/useBookingStore";
 import { useCrmEventStore } from "@/stores/useCrmEventStore";
@@ -11,6 +12,7 @@ const POLL_MS = 15_000;
 /** Keeps CRM dashboard metrics fresh while viewing /crm routes. */
 export function CrmDashboardBootstrap() {
   const user = useAuthStore((s) => s.user);
+  useTaskTimeStatusSync(Boolean(user));
   const setEvents = useCrmEventStore((s) => s.setEvents);
   const setSubscriptionEvents = useCrmEventStore((s) => s.setSubscriptionEvents);
   const hydrateTickets = useDesignTicketStore((s) => s.hydrateTickets);
