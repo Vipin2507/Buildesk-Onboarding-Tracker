@@ -43,7 +43,9 @@ export function CrmDashboardDrillDownSheet({ open, filter, data, onClose }: Prop
         a.name.toLowerCase().includes(q) ||
         a.city.toLowerCase().includes(q) ||
         a.companyType.toLowerCase().includes(q) ||
-        (a.salesManagerName ?? "").toLowerCase().includes(q),
+        (a.salesManagerName ?? "").toLowerCase().includes(q) ||
+        (a.supportManager1 ?? "").toLowerCase().includes(q) ||
+        (a.supportManager2 ?? "").toLowerCase().includes(q),
     );
   }, [data, query]);
 
@@ -103,10 +105,20 @@ export function CrmDashboardDrillDownSheet({ open, filter, data, onClose }: Prop
                   <ProgressBar value={a.progress} className="h-1.5 flex-1" />
                   <span className="text-[10px] tabular-nums text-muted-foreground">{a.progress}%</span>
                 </div>
-                <div className="mt-1.5 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
-                  <span>Health {a.resolvedHealth}</span>
-                  {a.openTickets > 0 ? <span>· {a.openTickets} tickets</span> : null}
-                  {a.salesManagerName ? <span>· {a.salesManagerName}</span> : null}
+                <div className="mt-1.5 space-y-0.5 text-[10px] text-muted-foreground">
+                  <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+                    <span>Health {a.resolvedHealth}</span>
+                    {a.openTickets > 0 ? <span>· {a.openTickets} tickets</span> : null}
+                  </div>
+                  <div className="truncate" title={a.salesManagerName || undefined}>
+                    Sales: {a.salesManagerName || "—"}
+                  </div>
+                  <div className="truncate" title={a.supportManager1 || undefined}>
+                    Support 1: {a.supportManager1 || "—"}
+                  </div>
+                  <div className="truncate" title={a.supportManager2 || undefined}>
+                    Support 2: {a.supportManager2 || "—"}
+                  </div>
                 </div>
               </Link>
             ))
