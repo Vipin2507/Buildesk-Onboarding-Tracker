@@ -556,6 +556,11 @@ function CrmDashboardPage() {
                           Open <ArrowRight className="h-3 w-3" />
                         </span>
                       </div>
+                      <div className="mt-1.5 space-y-0.5 text-[10px] text-muted-foreground">
+                        <div className="truncate">Sales: {a.salesManagerName || "—"}</div>
+                        <div className="truncate">Support 1: {a.supportManager1 || "—"}</div>
+                        <div className="truncate">Support 2: {a.supportManager2 || "—"}</div>
+                      </div>
                     </Link>
                   ))}
                 </div>
@@ -568,7 +573,7 @@ function CrmDashboardPage() {
                         <th className="px-2 py-1.5 text-left font-medium">Status</th>
                         <th className="px-2 py-1.5 text-left font-medium">Progress</th>
                         <th className="px-2 py-1.5 text-left font-medium">Stage</th>
-                        <th className="px-2 py-1.5 text-left font-medium">Sales Manager</th>
+                        <th className="px-2 py-1.5 text-left font-medium">Managers</th>
                         <th className="px-2 py-1.5" />
                       </tr>
                     </thead>
@@ -598,8 +603,18 @@ function CrmDashboardPage() {
                           <td className="max-w-[100px] truncate px-2 py-1.5 text-muted-foreground">
                             {a.stageLabel}
                           </td>
-                          <td className="max-w-[80px] truncate px-2 py-1.5 text-muted-foreground">
-                            {a.salesManagerName || "—"}
+                          <td className="min-w-[9rem] px-2 py-1.5 text-[10px] text-muted-foreground">
+                            <div className="space-y-0.5">
+                              <div className="truncate" title={a.salesManagerName || undefined}>
+                                Sales: {a.salesManagerName || "—"}
+                              </div>
+                              <div className="truncate" title={a.supportManager1 || undefined}>
+                                Support 1: {a.supportManager1 || "—"}
+                              </div>
+                              <div className="truncate" title={a.supportManager2 || undefined}>
+                                Support 2: {a.supportManager2 || "—"}
+                              </div>
+                            </div>
                           </td>
                           <td className="px-2 py-1.5 text-right">
                             <Button size="sm" variant="ghost" className="h-7 gap-0.5 px-1.5 text-primary" asChild>
