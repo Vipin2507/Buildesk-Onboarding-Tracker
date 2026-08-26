@@ -4,7 +4,7 @@ import type { CrmAccountTabId } from "@/lib/crm-route-search";
 import type { ActivityKind } from "@/types";
 import type { CrmAccount } from "@/types/crm-account";
 import type { CrmEvent, ModuleSubscriptionEvent } from "@/types/crm";
-import type { CrmOnboardingRecord } from "@/types/crm-onboarding";
+import type { CrmImplementationStage, CrmOnboardingRecord } from "@/types/crm-onboarding";
 import { BOOKING_STATUS_LABEL } from "@/types/booking";
 import type { Ticket } from "@/types/ticket";
 import type { ClientVisit, FollowUpTask } from "@/types/crm";
@@ -49,6 +49,8 @@ export type CrmActivityItem = {
   remarks?: string;
   /** Next follow-up date (YYYY-MM-DD or ISO). */
   nextFollowUp?: string;
+  /** Implementation tracker stage when category is tracker. */
+  trackerStage?: CrmImplementationStage;
   href?: string;
 };
 
@@ -82,7 +84,23 @@ export type CrmActivityDestination =
   | { kind: "tasks"; taskId?: string }
   | { kind: "visits" };
 
-export function crmActivityOpenLabel(category: Exclude<CrmActivityCategory, "all">): string {
+export function crmActivityTrackerStageLabel(stage: CrmImplementationStage | string): string {
+  if (stage === "customer_success") return "Go Live";
+  return CRM_STAGE_LABELS[stage] ?? stage;
+}
+
+function crmActivityTrackerTab(stage?: CrmImplementationStage): CrmAccountTabId {
+  if (stage === "go_live" || stage === "customer_success") return "golive";
+  return "dashboard";
+}
+
+export function crmActivityOpenLabel(
+  category: Exclude<CrmActivityCategory, "all">,
+  trackerStage?: CrmImplementationStage,
+): string {
+  if (category === "tracker" && trackerStage && crmActivityTrackerTab(trackerStage) === "golive") {
+    return "Open go-live";
+  }
   const labels: Record<Exclude<CrmActivityCategory, "all">, string> = {
     follow_up: "Open tasks",
     visit: "Open visits",
@@ -123,7 +141,7 @@ function parseActivityEntityId(id: string): string | undefined {
 }
 
 export function resolveCrmActivityDestination(
-  item: Pick<CrmActivityItem, "id" | "category" | "accountId">,
+  item: Pick<CrmActivityItem, "id" | "category" | "accountId" | "trackerStage">,
 ): CrmActivityDestination | null {
   const entityId = parseActivityEntityId(item.id);
 
@@ -150,6 +168,13 @@ export function resolveCrmActivityDestination(
         ? { kind: "account", accountId: item.accountId, tab: "modules" }
         : null;
     case "tracker":
+      return item.accountId
+        ? {
+            kind: "account",
+            accountId: item.accountId,
+            tab: crmActivityTrackerTab(item.trackerStage),
+          }
+        : null;
     case "account":
       return item.accountId
         ? { kind: "account", accountId: item.accountId, tab: "dashboard" }
@@ -607,12 +632,13 @@ export function buildCrmActivityFeed(input: {
         withAccountContext(
           {
             id: `stage-${account.id}-${record.tracker.stage}-${record.updatedAt}`,
-            what: `Stage · ${CRM_STAGE_LABELS[record.tracker.stage] ?? record.tracker.stage}`,
+            what: `Stage · ${crmActivityTrackerStageLabel(record.tracker.stage)}`,
             who: record.tracker.lastUpdatedBy ?? "—",
             executive: resolveExecutive(record.tracker.lastUpdatedBy),
             createdAt: record.updatedAt,
             kind: account.status === "live" ? "success" : "info",
             category: "tracker",
+            trackerStage: record.tracker.stage,
             accountId: account.id,
             accountName: account.name,
           },

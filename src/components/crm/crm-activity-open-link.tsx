@@ -8,7 +8,7 @@ import {
   type CrmActivityItem,
 } from "@/lib/crm-activity-feed";
 
-type CrmActivityOpenLinkItem = Pick<CrmActivityItem, "id" | "category" | "accountId">;
+type CrmActivityOpenLinkItem = Pick<CrmActivityItem, "id" | "category" | "accountId" | "trackerStage">;
 
 type Props = {
   item: CrmActivityOpenLinkItem;
@@ -20,7 +20,7 @@ export function CrmActivityOpenLink({ item, compact = false, onNavigate }: Props
   const destination = resolveCrmActivityDestination(item);
   if (!destination) return null;
 
-  const label = crmActivityOpenLabel(item.category);
+  const label = crmActivityOpenLabel(item.category, item.trackerStage);
   const className = compact
     ? "h-7 gap-1 px-2 text-[10px]"
     : "h-7 gap-1 px-2.5 text-[10px]";
