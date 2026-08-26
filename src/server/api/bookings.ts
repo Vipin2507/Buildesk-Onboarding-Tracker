@@ -343,8 +343,13 @@ async function collectBusyRanges(hostUserId: string, fromYmd: string, toYmd: str
   return busy;
 }
 
-async function loadOpenSlots(event: BookingEventType, fromYmd: string, toYmd: string) {
-  const hostUserId = resolveEventHost(event);
+async function loadOpenSlots(
+  event: BookingEventType,
+  fromYmd: string,
+  toYmd: string,
+  hostUserIdOverride?: string,
+) {
+  const hostUserId = hostUserIdOverride ?? resolveEventHost(event);
   const db = getDb();
   const windows = db
     .select()
@@ -357,9 +362,9 @@ async function loadOpenSlots(event: BookingEventType, fromYmd: string, toYmd: st
     )
     .all();
 
-    if (windows.length === 0) {
+  if (windows.length === 0) {
     seedDefaultAvailability(hostUserId, resolveHostTimezone(hostUserId));
-    return await loadOpenSlots(event, fromYmd, toYmd);
+    return await loadOpenSlots(event, fromYmd, toYmd, hostUserId);
   }
 
   const timezone = windows[0]?.timezone ?? resolveHostTimezone(hostUserId);
@@ -377,6 +382,43 @@ async function loadOpenSlots(event: BookingEventType, fromYmd: string, toYmd: st
 }
 
 type ActingUser = { id: string; role?: string };
+
+function assertCrmHostUser(hostUserId: string) {
+  const db = getDb();
+  const host = db.select().from(t.users).where(eq(t.users.id, hostUserId)).get();
+  if (!host || host.active === false) {
+    throw new ApiError(400, "Invalid executive");
+  }
+  if (host.productScope !== "crm") {
+    throw new ApiError(400, "Executive must be a CRM user");
+  }
+  return host;
+}
+
+function resolveCrmBookingHostUserId(input: {
+  companyId: string;
+  hostUserId?: string;
+  actingUser: ActingUser;
+}): string {
+  if (isAdminRoleKey(actingUser.role)) {
+    if (input.hostUserId) {
+      assertCrmHostUser(input.hostUserId);
+      return input.hostUserId;
+    }
+    const fromAccount = resolveBookingHostUserId(input.companyId);
+    if (fromAccount) {
+      assertCrmHostUser(fromAccount);
+      return fromAccount;
+    }
+    throw new ApiError(400, "Choose an executive for this booking");
+  }
+
+  if (input.hostUserId && input.hostUserId !== actingUser.id) {
+    throw new ApiError(403, "Not allowed to assign another executive");
+  }
+  assertCrmHostUser(actingUser.id);
+  return actingUser.id;
+}
 
 /** Pick whose Google Calendar to write to: host first, then approver if host/admin with OAuth connected. */
 function resolveGoogleCalendarUserId(
@@ -790,6 +832,121 @@ export const createPortalBooking = createServerFn({ method: "POST" })
     return mapped;
   });
 
+export const createCrmBooking = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        companyId: z.string().min(1),
+        eventTypeId: z.string().min(1),
+        hostUserId: z.string().optional(),
+        startsAt: z.string().min(10),
+        guestName: z.string().min(1),
+        guestEmail: z.string().email(),
+        additionalGuestEmails: z.array(z.string().email()).optional(),
+        guestPhone: z.string().optional(),
+        notes: z.string().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    const db = getDb();
+    const account = db
+      .select()
+      .from(t.crmAccounts)
+      .where(eq(t.crmAccounts.id, data.companyId))
+      .get();
+    if (!account) throw new ApiError(404, "Account not found");
+
+    const row = db
+      .select()
+      .from(t.bookingEventTypes)
+      .where(eq(t.bookingEventTypes.id, data.eventTypeId))
+      .get();
+    if (!row || row.companyId !== data.companyId || !row.isActive) {
+      throw new ApiError(404, "Call type not found");
+    }
+
+    const event = mapEventType(row);
+    const hostUserId = resolveCrmBookingHostUserId({
+      companyId: data.companyId,
+      hostUserId: data.hostUserId,
+      actingUser: user,
+    });
+    const hostTimezone = resolveHostTimezone(hostUserId);
+    const startsAt = data.startsAt.slice(0, 19);
+    const ymd = startsAt.slice(0, 10);
+    const todayYmd = localWallClockIso(hostTimezone).slice(0, 10);
+    if (ymd < todayYmd) {
+      throw new ApiError(400, "Please choose a future date");
+    }
+    if (isBookingSlotInPast(startsAt, hostTimezone)) {
+      throw new ApiError(400, "Please choose a time in the future");
+    }
+
+    const open = await loadOpenSlots(event, ymd, ymd, hostUserId);
+    const slot = open.find((s) => s.startsAt.slice(0, 19) === startsAt);
+    if (!slot) throw new ApiError(400, "Selected slot is no longer available");
+
+    const now = nowIso();
+    const id = newId();
+    const guestEmail = data.guestEmail.trim().toLowerCase();
+    const additionalGuestEmails = normalizeAdditionalGuestEmails(
+      guestEmail,
+      data.additionalGuestEmails ?? [],
+    );
+    db.insert(t.bookingAppointments)
+      .values({
+        id,
+        eventTypeId: event.id,
+        companyId: data.companyId,
+        hostUserId,
+        startsAt: slot.startsAt,
+        endsAt: slot.endsAt,
+        status: "confirmed",
+        guestName: data.guestName.trim(),
+        guestEmail,
+        additionalGuestEmailsJson: serializeAdditionalGuestEmails(additionalGuestEmails),
+        guestPhone: data.guestPhone?.trim() || null,
+        notes: data.notes?.trim() || null,
+        hostNote: null,
+        createdVia: "crm",
+        googleEventId: null,
+        meetUrl: null,
+        googleSyncStatus: "none",
+        googleSyncError: null,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+
+    let fresh = db
+      .select()
+      .from(t.bookingAppointments)
+      .where(eq(t.bookingAppointments.id, id))
+      .get()!;
+
+    await syncGoogleCalendarForAppointment(fresh, "upsert", user);
+    fresh = db
+      .select()
+      .from(t.bookingAppointments)
+      .where(eq(t.bookingAppointments.id, id))
+      .get()!;
+    syncTaskFromBookingAppointment(fresh);
+
+    const mapped = mapAppointment(fresh);
+    const host = db.select().from(t.users).where(eq(t.users.id, hostUserId)).get();
+    await dispatchServerBookingCreatedEmail(db, {
+      appointment: mapped,
+      eventTitle: event.title,
+      accountName: account.name,
+      hostName: host?.name ?? "Host",
+      hostEmail: resolveUserWorkEmail(host ?? undefined),
+    });
+
+    return mapped;
+  });
+
 /* ---------- Staff: ensure / list ---------- */
 
 export const ensureBookingDefaults = createServerFn({ method: "POST" })
@@ -1011,11 +1168,12 @@ export const listStaffBookingSlots = createServerFn({ method: "GET" })
         eventTypeId: z.string().min(1),
         from: z.string().min(8),
         to: z.string().min(8),
+        hostUserId: z.string().optional(),
       })
       .parse(data),
   )
   .handler(async ({ data }) => {
-    requireUser();
+    const user = requireUser();
     const db = getDb();
     const row = db
       .select()
@@ -1023,7 +1181,25 @@ export const listStaffBookingSlots = createServerFn({ method: "GET" })
       .where(eq(t.bookingEventTypes.id, data.eventTypeId))
       .get();
     if (!row) throw new ApiError(404, "Event type not found");
-    return await loadOpenSlots(mapEventType(row), data.from.slice(0, 10), data.to.slice(0, 10));
+
+    let hostUserId = data.hostUserId;
+    if (hostUserId) {
+      if (!isAdminRoleKey(user.role) && hostUserId !== user.id) {
+        throw new ApiError(403, "Not allowed");
+      }
+      assertCrmHostUser(hostUserId);
+    } else {
+      hostUserId = resolveEventHost(mapEventType(row));
+    }
+
+    const fromYmd = data.from.slice(0, 10);
+    const toYmd = data.to.slice(0, 10);
+    const hostTimezone = resolveHostTimezone(hostUserId);
+    const todayYmd = localWallClockIso(hostTimezone).slice(0, 10);
+    const rangeFrom = fromYmd < todayYmd ? todayYmd : fromYmd;
+    if (rangeFrom > toYmd) return [];
+
+    return await loadOpenSlots(mapEventType(row), rangeFrom, toYmd, hostUserId);
   });
 
 /* ---------- Staff mutations ---------- */

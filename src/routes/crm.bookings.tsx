@@ -10,6 +10,7 @@ import {
   LayoutList,
   Mail,
   Phone,
+  Plus,
   User,
   Video,
   X,
@@ -30,6 +31,7 @@ import { EmptyState } from "@/components/empty-state";
 import { WeeklyHoursEditor } from "@/components/crm/weekly-hours-editor";
 import { BookingBlocksPanel } from "@/components/crm/booking-blocks-panel";
 import { BookingGoogleCalendarPanel } from "@/components/crm/booking-google-calendar-panel";
+import { CreateCrmBookingDialog } from "@/components/crm/create-crm-booking-dialog";
 import { ListToolbar } from "@/components/list-toolbar";
 import { PageWrap } from "@/components/page-header";
 import { Pill } from "@/components/status-pill";
@@ -196,6 +198,7 @@ function CrmBookingsPage() {
   const [callTypeFilter, setCallTypeFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
     void getGoogleCalendarConnectionStatus()
@@ -507,6 +510,22 @@ function CrmBookingsPage() {
         compact
         title="Bookings"
         subtitle="Review portal call requests, manage schedules, and set availability."
+        actions={
+          <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setCreateOpen(true)}>
+            <Plus className="h-3.5 w-3.5" />
+            Create booking
+          </Button>
+        }
+      />
+
+      <CreateCrmBookingDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        accounts={accounts}
+        users={users}
+        currentUserId={user?.id}
+        isAdmin={isAdmin}
+        onCreated={() => void refreshStaff()}
       />
 
       <DesignTicketKpiGrid

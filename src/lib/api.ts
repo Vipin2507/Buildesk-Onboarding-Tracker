@@ -184,6 +184,7 @@ export {
   listPortalBookingSlots,
   listPortalBookings,
   createPortalBooking,
+  createCrmBooking,
   ensureBookingDefaults,
   ensureBookingDefaultsBatch,
   listBookingEventTypes,

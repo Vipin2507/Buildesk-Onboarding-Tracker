@@ -324,13 +324,14 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
               }
             : undefined
         }
-        onAddExtraTime={
+        onAdjustExtraTime={
           canManageTask(task)
-            ? (minutes) => {
-                updateTask(task.id, {
-                  extraTimeMinutes: (task.extraTimeMinutes ?? 0) + minutes,
-                });
-                toast.success(`Added ${minutes} min extra time`);
+            ? (delta) => {
+                const next = Math.max(0, (task.extraTimeMinutes ?? 0) + delta);
+                updateTask(task.id, { extraTimeMinutes: next });
+                if (delta > 0) toast.success(`Added ${delta} min extra time`);
+                else if (delta < 0 && next === 0) toast.success("Extra time cleared");
+                else if (delta < 0) toast.success(`Removed ${Math.abs(delta)} min extra time`);
               }
             : undefined
         }

@@ -7,6 +7,7 @@ import type {
 } from "@/types/booking";
 import {
   createBookingBlock,
+  createCrmBooking,
   createPortalBooking,
   deleteBookingAvailability,
   deleteBookingBlock,
@@ -85,13 +86,29 @@ type BookingState = {
     notes?: string;
     durationMinutes?: number;
   }) => Promise<BookingAppointment>;
+  createCrmBooking: (input: {
+    companyId: string;
+    eventTypeId: string;
+    hostUserId?: string;
+    startsAt: string;
+    guestName: string;
+    guestEmail: string;
+    additionalGuestEmails?: string[];
+    guestPhone?: string;
+    notes?: string;
+  }) => Promise<BookingAppointment>;
   acceptAppointment: (id: string, hostNote?: string) => Promise<BookingAppointment>;
   declineAppointment: (id: string, hostNote?: string) => Promise<BookingAppointment>;
   cancelAppointment: (id: string, hostNote?: string) => Promise<BookingAppointment>;
   postponeAppointment: (id: string, hostNote?: string) => Promise<BookingAppointment>;
   rescheduleAppointment: (id: string, startsAt: string) => Promise<BookingAppointment>;
   retryGoogleCalendarSync: (id: string) => Promise<BookingAppointment>;
-  listSlotsForEvent: (eventTypeId: string, from: string, to: string) => Promise<BookingSlot[]>;
+  listSlotsForEvent: (
+    eventTypeId: string,
+    from: string,
+    to: string,
+    hostUserId?: string,
+  ) => Promise<BookingSlot[]>;
   saveAvailabilityWindows: (input: {
     hostUserId?: string;
     timezone?: string;
@@ -226,6 +243,13 @@ export const useBookingStore = createStore<BookingState>((set, get) => ({
     return created;
   },
 
+  createCrmBooking: async (input) => {
+    const created = await createCrmBooking({ data: input });
+    get().mergeAppointment(created);
+    void refreshCrmAutomationLogsFromServer();
+    return created;
+  },
+
   acceptAppointment: async (id, hostNote) => {
     const updated = await updateBookingAppointmentStatus({
       data: { id, status: "confirmed", hostNote },
@@ -274,8 +298,8 @@ export const useBookingStore = createStore<BookingState>((set, get) => ({
     return updated;
   },
 
-  listSlotsForEvent: (eventTypeId, from, to) =>
-    listStaffBookingSlots({ data: { eventTypeId, from, to } }),
+  listSlotsForEvent: (eventTypeId, from, to, hostUserId) =>
+    listStaffBookingSlots({ data: { eventTypeId, from, to, hostUserId } }),
 
   saveAvailabilityWindows: async (input) => {
     const rows = await replaceBookingAvailability({ data: input });

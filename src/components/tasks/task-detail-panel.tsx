@@ -42,7 +42,7 @@ type Props = {
   onCancel: () => void;
   onClose: () => void;
   onAddRemark?: (remark: string) => void;
-  onAddExtraTime?: (minutes: number) => void;
+  onAdjustExtraTime?: (deltaMinutes: number) => void;
 };
 
 export function TaskDetailPanel({
@@ -56,7 +56,7 @@ export function TaskDetailPanel({
   onCancel,
   onClose,
   onAddRemark,
-  onAddExtraTime,
+  onAdjustExtraTime,
 }: Props) {
   const [remarkDraft, setRemarkDraft] = useState("");
   const assigneeLabels = resolveTaskAssigneeIds(task)
@@ -171,7 +171,7 @@ export function TaskDetailPanel({
             </div>
           ) : null}
 
-          {scheduled && canManage && onAddExtraTime ? (
+          {scheduled && canManage && onAdjustExtraTime ? (
             <div
               className="flex flex-wrap items-center gap-1.5 pt-0.5"
               onClick={(e) => e.stopPropagation()}
@@ -181,20 +181,43 @@ export function TaskDetailPanel({
               </span>
               {EXTRA_TIME_OPTIONS.map((mins) => (
                 <Button
-                  key={mins}
+                  key={`add-${mins}`}
                   type="button"
                   size="sm"
                   variant="outline"
                   className="h-6 px-2 text-[10px] tabular-nums"
-                  onClick={() => onAddExtraTime(mins)}
+                  onClick={() => onAdjustExtraTime(mins)}
                 >
                   +{mins}m
                 </Button>
               ))}
               {extraTime > 0 ? (
-                <span className="text-[10px] font-medium text-primary tabular-nums">
-                  +{extraTime}m total
-                </span>
+                <>
+                  {EXTRA_TIME_OPTIONS.filter((mins) => mins <= extraTime).map((mins) => (
+                    <Button
+                      key={`remove-${mins}`}
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-6 px-2 text-[10px] tabular-nums text-destructive hover:text-destructive"
+                      onClick={() => onAdjustExtraTime(-mins)}
+                    >
+                      −{mins}m
+                    </Button>
+                  ))}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 text-[10px] text-destructive hover:text-destructive"
+                    onClick={() => onAdjustExtraTime(-extraTime)}
+                  >
+                    Clear extra
+                  </Button>
+                  <span className="text-[10px] font-medium text-primary tabular-nums">
+                    +{extraTime}m total
+                  </span>
+                </>
               ) : null}
             </div>
           ) : null}
