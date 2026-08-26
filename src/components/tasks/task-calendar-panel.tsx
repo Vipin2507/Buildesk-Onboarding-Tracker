@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Building2, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { DataTable } from "@/components/data-table";
 import { ListToolbar } from "@/components/list-toolbar";
@@ -25,6 +26,8 @@ type Props = {
   view: TaskCalendarView;
   onViewChange: (view: TaskCalendarView) => void;
   onTaskClick?: (task: FollowUpTask) => void;
+  selectedTaskId?: string;
+  renderTaskDetail?: (task: FollowUpTask) => ReactNode;
   canManage?: boolean;
   /** Hide search/filters — parent provides them */
   embedded?: boolean;
@@ -70,6 +73,8 @@ export function TaskCalendarPanel({
   view,
   onViewChange,
   onTaskClick,
+  selectedTaskId,
+  renderTaskDetail,
   embedded = false,
   hideViewToggle = false,
   entityLinkTarget = "company",
@@ -227,6 +232,8 @@ export function TaskCalendarPanel({
           users={users}
           companies={companies}
           onTaskClick={onTaskClick}
+          selectedTaskId={selectedTaskId}
+          renderTaskDetail={renderTaskDetail}
           entityLinkTarget={entityLinkTarget}
         />
       ) : null}
@@ -237,6 +244,8 @@ export function TaskCalendarPanel({
           tasks={dayTasks}
           users={users}
           onTaskClick={onTaskClick}
+          selectedTaskId={selectedTaskId}
+          renderTaskDetail={renderTaskDetail}
         />
       ) : null}
 
@@ -250,6 +259,8 @@ export function TaskCalendarPanel({
               users={users}
               compact
               onTaskClick={onTaskClick}
+              selectedTaskId={selectedTaskId}
+              renderTaskDetail={renderTaskDetail}
             />
           ))}
         </div>
@@ -260,7 +271,14 @@ export function TaskCalendarPanel({
           {[...monthTasks]
             .sort((a, b) => taskSortKey(a).localeCompare(taskSortKey(b)))
             .map((task) => (
-              <TaskScheduleRow key={task.id} task={task} users={users} onClick={onTaskClick} />
+              <TaskScheduleRow
+                key={task.id}
+                task={task}
+                users={users}
+                onClick={onTaskClick}
+                selected={selectedTaskId === task.id}
+                renderTaskDetail={renderTaskDetail}
+              />
             ))}
           {monthTasks.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">No tasks this month</p>
@@ -276,12 +294,16 @@ function TaskListTable({
   users,
   companies,
   onTaskClick,
+  selectedTaskId,
+  renderTaskDetail,
   entityLinkTarget = "company",
 }: {
   tasks: FollowUpTask[];
   users: User[];
   companies: { id: string; name: string }[];
   onTaskClick?: (task: FollowUpTask) => void;
+  selectedTaskId?: string;
+  renderTaskDetail?: (task: FollowUpTask) => ReactNode;
   entityLinkTarget?: "company" | "crm";
 }) {
   return (
@@ -292,6 +314,8 @@ function TaskListTable({
       density="compact"
       getRowId={(t) => t.id}
       onRowClick={onTaskClick}
+      expandedRowId={selectedTaskId ?? null}
+      renderExpandedRow={renderTaskDetail}
       columns={[
         {
           key: "title",
@@ -367,16 +391,23 @@ function TaskListTable({
         },
         {
           key: "company",
-          header: "",
+          header: "Account",
           render: (task) => (
-            <Button size="sm" variant="outline" asChild onClick={(e) => e.stopPropagation()}>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1 px-2 text-[10px]"
+              asChild
+              onClick={(e) => e.stopPropagation()}
+            >
               {entityLinkTarget === "crm" ? (
                 <Link
                   to="/crm/accounts/$accountId"
                   params={{ accountId: task.companyId }}
                   search={{ tab: "tasks" }}
                 >
-                  Open
+                  <Building2 className="h-3 w-3" />
+                  Account
                 </Link>
               ) : (
                 <Link
@@ -384,7 +415,8 @@ function TaskListTable({
                   params={{ companyId: task.companyId }}
                   search={{ tab: "Tasks" }}
                 >
-                  Open
+                  <Building2 className="h-3 w-3" />
+                  Account
                 </Link>
               )}
             </Button>
@@ -401,12 +433,16 @@ function ScheduleDayColumn({
   users,
   compact,
   onTaskClick,
+  selectedTaskId,
+  renderTaskDetail,
 }: {
   date: string;
   tasks: FollowUpTask[];
   users: User[];
   compact?: boolean;
   onTaskClick?: (task: FollowUpTask) => void;
+  selectedTaskId?: string;
+  renderTaskDetail?: (task: FollowUpTask) => ReactNode;
 }) {
   const isToday = date === new Date().toISOString().slice(0, 10);
   return (
@@ -422,6 +458,8 @@ function ScheduleDayColumn({
             users={users}
             compact={compact}
             onClick={onTaskClick}
+            selected={selectedTaskId === task.id}
+            renderTaskDetail={renderTaskDetail}
           />
         ))}
         {tasks.length === 0 ? (
@@ -437,11 +475,15 @@ function TaskScheduleRow({
   users,
   compact,
   onClick,
+  selected = false,
+  renderTaskDetail,
 }: {
   task: FollowUpTask;
   users: User[];
   compact?: boolean;
   onClick?: (task: FollowUpTask) => void;
+  selected?: boolean;
+  renderTaskDetail?: (task: FollowUpTask) => ReactNode;
 }) {
   const ids = task.assigneeUserIds?.length
     ? task.assigneeUserIds
@@ -451,30 +493,47 @@ function TaskScheduleRow({
   const assigneeLabel = ids.map((id) => resolveAssigneeLabel(id, users)).join(", ");
 
   return (
-    <button
-      type="button"
-      className={cn(
-        "w-full rounded-md border bg-background px-2 py-1.5 text-left transition-colors hover:bg-muted/40",
-        compact && "px-1.5 py-1",
-      )}
-      onClick={() => onClick?.(task)}
-    >
-      <div className={cn("font-medium", compact ? "text-[10px]" : "text-xs")}>{task.title}</div>
-      <div className="text-[10px] text-muted-foreground">
-        {formatTimeRange12h(task.startTime, task.endTime)}
-        {task.taskType ? ` · ${FOLLOW_UP_TASK_TYPE_LABEL[task.taskType]}` : ""}
-      </div>
-      {!compact ? (
-        <div className="mt-0.5 flex flex-wrap items-center gap-1">
-          <Pill tone={statusTone(task.status)}>{task.status}</Pill>
-          {assigneeLabel ? (
-            <span className="text-[10px] text-muted-foreground">{assigneeLabel}</span>
-          ) : null}
-          {task.source === "booking" ? (
-            <span className="text-[10px] text-primary">Booking</span>
-          ) : null}
+    <div className="space-y-0">
+      <button
+        type="button"
+        className={cn(
+          "w-full rounded-md border bg-background px-2 py-1.5 text-left transition-colors hover:bg-muted/40",
+          compact && "px-1.5 py-1",
+          selected && "border-primary/40 bg-primary/[0.06] ring-1 ring-primary/15",
+        )}
+        onClick={() => onClick?.(task)}
+      >
+        <div className={cn("font-medium", compact ? "text-[10px]" : "text-xs")}>{task.title}</div>
+        <div className="text-[10px] text-muted-foreground">
+          {formatTimeRange12h(task.startTime, task.endTime)}
+          {task.taskType ? ` · ${FOLLOW_UP_TASK_TYPE_LABEL[task.taskType]}` : ""}
         </div>
-      ) : null}
-    </button>
+        {!compact ? (
+          <div className="mt-0.5 flex flex-wrap items-center gap-1">
+            <Pill tone={statusTone(task.status)}>{task.status.replace(/_/g, " ")}</Pill>
+            {assigneeLabel ? (
+              <span className="text-[10px] text-muted-foreground">{assigneeLabel}</span>
+            ) : null}
+            {task.source === "booking" ? (
+              <span className="text-[10px] text-primary">Booking</span>
+            ) : null}
+          </div>
+        ) : null}
+      </button>
+      <AnimatePresence initial={false}>
+        {selected && renderTaskDetail ? (
+          <motion.div
+            key={`${task.id}-detail`}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="pt-1.5">{renderTaskDetail(task)}</div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
   );
 }

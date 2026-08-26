@@ -1,9 +1,6 @@
-import { Link } from "@tanstack/react-router";
 import {
   AlertCircle,
   Ban,
-  Building2,
-  Calendar,
   CalendarDays,
   CheckCircle2,
   Clock,
@@ -11,7 +8,6 @@ import {
   Link2,
   Plus,
   User as UserIcon,
-  Users,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -25,12 +21,12 @@ import {
 import { EntityFormModal } from "@/components/entity-form-modal";
 import { ListToolbar } from "@/components/list-toolbar";
 import { PageWrap } from "@/components/page-header";
-import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import {
   TaskCalendarPanel,
   type TaskCalendarView,
 } from "@/components/tasks/task-calendar-panel";
+import { TaskDetailPanel } from "@/components/tasks/task-detail-panel";
 import {
   TaskFormFields,
   useTaskFormState,
@@ -40,21 +36,16 @@ import {
   filterCrmAccountsForUser,
 } from "@/lib/crm-account-access";
 import { resolveDefaultTaskAssigneeIds, taskAssigneeUserOptions } from "@/lib/task-defaults";
-import { formatTimeRange12h, resolveTaskAssigneeIds } from "@/lib/task-scheduling";
-import { resolveAssigneeLabel } from "@/lib/managers";
-import { cn, formatDate, formatDateTime } from "@/lib/utils";
+import { resolveTaskAssigneeIds } from "@/lib/task-scheduling";
 import { useAuthStore, useCrmAccountStore, useTaskStore, useUserStore } from "@/stores";
 import {
   FOLLOW_UP_TASK_TYPE_LABEL,
   type FollowUpTask,
   type FollowUpTaskStatus,
-  type FollowUpTaskType,
-  type User,
 } from "@/types";
 import { usePermissions } from "@/hooks/use-permissions";
 import type { CrmTasksTabId } from "@/lib/crm-route-search";
 import { motion } from "framer-motion";
-import type { ReactNode } from "react";
 
 const OPEN_STATUSES: FollowUpTaskStatus[] = ["open", "in_progress", "blocked"];
 
@@ -65,17 +56,10 @@ const TASK_TABS = [
   { id: "today", label: "Due today", icon: CalendarDays },
   { id: "overdue", label: "Overdue", icon: AlertCircle },
   { id: "list", label: "List view", icon: LayoutList },
-  { id: "day", label: "Day", icon: Calendar },
+  { id: "day", label: "Day", icon: Clock },
   { id: "week", label: "Week", icon: CalendarDays },
   { id: "month", label: "Month", icon: Calendar },
 ] as const;
-
-function statusTone(status: FollowUpTaskStatus) {
-  if (status === "completed") return "success" as const;
-  if (status === "cancelled") return "danger" as const;
-  if (status === "blocked") return "warning" as const;
-  return "muted" as const;
-}
 
 function isCalendarTab(tab: CrmTasksTabId): tab is TaskCalendarView {
   return tab === "list" || tab === "day" || tab === "week" || tab === "month";
@@ -307,6 +291,34 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
     ];
   }, [crmTasks, users]);
 
+  function toggleTaskSelection(task: FollowUpTask) {
+    onSelectTask(selectedTaskId === task.id ? undefined : task.id);
+  }
+
+  function renderTaskDetail(task: FollowUpTask) {
+    return (
+      <TaskDetailPanel
+        embedded
+        task={task}
+        accountName={accountOptions.find((a) => a.id === task.companyId)?.name ?? "—"}
+        users={users}
+        canManage={canManageTask(task)}
+        onEdit={() => openEdit(task)}
+        onComplete={() => {
+          completeTask(task.id);
+          toast.success("Task marked complete");
+          onSelectTask(undefined);
+        }}
+        onCancel={() => {
+          cancelTask(task.id);
+          toast.success("Task cancelled");
+          onSelectTask(undefined);
+        }}
+        onClose={() => onSelectTask(undefined)}
+      />
+    );
+  }
+
   return (
     <PageWrap>
       <DesignTicketPageHeader
@@ -465,33 +477,14 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
           companies={accountOptions}
           view={calendarView}
           onViewChange={(v) => onTabChange(v)}
-          onTaskClick={(task) => onSelectTask(task.id)}
+          onTaskClick={toggleTaskSelection}
+          selectedTaskId={selectedTaskId}
+          renderTaskDetail={renderTaskDetail}
           canManage={canCreate}
           embedded={!isCalendarTab(tab)}
           hideViewToggle
           entityLinkTarget="crm"
         />
-
-        {selectedTask ? (
-          <TaskDetailPanel
-            task={selectedTask}
-            accountName={accountOptions.find((a) => a.id === selectedTask.companyId)?.name ?? "—"}
-            users={users}
-            canManage={canManageTask(selectedTask)}
-            onEdit={() => openEdit(selectedTask)}
-            onComplete={() => {
-              completeTask(selectedTask.id);
-              toast.success("Task marked complete");
-              onSelectTask(undefined);
-            }}
-            onCancel={() => {
-              cancelTask(selectedTask.id);
-              toast.success("Task cancelled");
-              onSelectTask(undefined);
-            }}
-            onClose={() => onSelectTask(undefined)}
-          />
-        ) : null}
       </motion.div>
 
       <EntityFormModal
@@ -578,147 +571,5 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
         ) : null}
       </EntityFormModal>
     </PageWrap>
-  );
-}
-
-function TaskDetailPanel({
-  task,
-  accountName,
-  users,
-  canManage,
-  onEdit,
-  onComplete,
-  onCancel,
-  onClose,
-}: {
-  task: FollowUpTask;
-  accountName: string;
-  users: User[];
-  canManage: boolean;
-  onEdit: () => void;
-  onComplete: () => void;
-  onCancel: () => void;
-  onClose: () => void;
-}) {
-  const assigneeLabels = resolveTaskAssigneeIds(task)
-    .map((id) => resolveAssigneeLabel(id, users))
-    .join(", ");
-
-  return (
-    <div className="card-soft overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/20 px-4 py-2.5">
-        <div className="flex flex-wrap items-center gap-2">
-          <Pill tone={statusTone(task.status)}>{task.status.replace(/_/g, " ")}</Pill>
-          {task.taskType ? (
-            <span className="text-xs font-medium text-muted-foreground">
-              {FOLLOW_UP_TASK_TYPE_LABEL[task.taskType as FollowUpTaskType]}
-            </span>
-          ) : null}
-          <span className="text-xs capitalize text-muted-foreground">{task.source ?? "manual"}</span>
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {canManage ? (
-            <Button size="sm" variant="outline" className="h-7 px-2.5 text-[10px]" onClick={onEdit}>
-              Edit
-            </Button>
-          ) : null}
-          {canManage && task.status !== "completed" && task.status !== "cancelled" ? (
-            <>
-              <Button size="sm" className="h-7 gap-1 px-2.5 text-[10px]" onClick={onComplete}>
-                <CheckCircle2 className="h-3 w-3" />
-                Complete
-              </Button>
-              {task.source !== "booking" ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 px-2.5 text-[10px] text-destructive"
-                  onClick={onCancel}
-                >
-                  Cancel
-                </Button>
-              ) : null}
-            </>
-          ) : null}
-          <Button size="sm" variant="ghost" className="h-7 px-2 text-[10px]" onClick={onClose}>
-            Close
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid gap-3 p-4 lg:grid-cols-2">
-        <TaskDetailSection icon={LayoutList} title="Task">
-          <div className="text-sm font-semibold">{task.title}</div>
-          {task.description ? (
-            <p className="mt-1 text-xs text-muted-foreground whitespace-pre-wrap">{task.description}</p>
-          ) : null}
-        </TaskDetailSection>
-
-        <TaskDetailSection icon={Calendar} title="Schedule">
-          <div className="text-sm font-medium">
-            {task.dueDate ? formatDate(task.dueDate) : "No date set"}
-          </div>
-          <div className="mt-1 text-xs text-muted-foreground">
-            {formatTimeRange12h(task.startTime, task.endTime)}
-            {task.durationMinutes ? ` · ${task.durationMinutes} mins` : ""}
-          </div>
-        </TaskDetailSection>
-
-        <TaskDetailSection icon={Users} title="Assignees">
-          <div className="text-sm font-medium">{assigneeLabels || "Unassigned"}</div>
-        </TaskDetailSection>
-
-        <TaskDetailSection icon={Building2} title="Account">
-          <Link
-            to="/crm/accounts/$accountId"
-            params={{ accountId: task.companyId }}
-            search={{ tab: "tasks" }}
-            className="text-sm font-medium text-primary hover:underline"
-          >
-            {accountName}
-          </Link>
-        </TaskDetailSection>
-
-        {task.completedAt ? (
-          <TaskDetailSection icon={CheckCircle2} title="Completed" className="lg:col-span-2">
-            <div className="text-sm">{formatDateTime(task.completedAt)}</div>
-          </TaskDetailSection>
-        ) : null}
-
-        {task.bookingAppointmentId ? (
-          <TaskDetailSection icon={Link2} title="Linked booking" className="lg:col-span-2">
-            <Link
-              to="/crm/bookings"
-              search={{ tab: "all" }}
-              className="text-xs text-primary hover:underline"
-            >
-              View in Bookings
-            </Link>
-          </TaskDetailSection>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function TaskDetailSection({
-  icon: Icon,
-  title,
-  children,
-  className,
-}: {
-  icon: typeof Calendar;
-  title: string;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={cn("rounded-lg border bg-muted/10 p-3", className)}>
-      <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-        <Icon className="h-3.5 w-3.5" />
-        {title}
-      </div>
-      {children}
-    </div>
   );
 }

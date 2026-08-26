@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, ChevronRight, Search } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,8 @@ export function DataTable<T>({
   density = "compact",
   initialSortKey = null,
   initialSortDir = "asc",
+  expandedRowId = null,
+  renderExpandedRow,
 }: {
   data: T[];
   columns: {
@@ -63,6 +65,9 @@ export function DataTable<T>({
   density?: "default" | "compact";
   initialSortKey?: string | null;
   initialSortDir?: "asc" | "desc";
+  /** When set, renders an expanded panel directly beneath the matching row. */
+  expandedRowId?: string | null;
+  renderExpandedRow?: (row: T) => ReactNode;
 }) {
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<string | null>(initialSortKey);
@@ -167,6 +172,7 @@ export function DataTable<T>({
           {paged.map((row, i) => {
             const id = getRowId?.(row) ?? String(i);
             const selected = selection?.selectedIds.has(id) ?? false;
+            const expanded = expandedRowId === id;
             return (
               <motion.div
                 key={id}
@@ -176,55 +182,79 @@ export function DataTable<T>({
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.25, delay: Math.min(i * 0.03, 0.24), ease }}
                 className={cn(
-                  "rounded-lg border border-border bg-card p-3",
+                  "overflow-hidden rounded-lg border border-border bg-card",
                   onRowClick && "active:bg-muted/50",
                   selected && "border-primary/40 bg-primary/5",
+                  expanded && "border-primary/30 ring-1 ring-primary/15",
                 )}
-                onClick={() => onRowClick?.(row)}
-                role={onRowClick ? "button" : undefined}
               >
-                <div className="flex items-start gap-2">
-                  {selection && (
-                    <div onClick={(e) => e.stopPropagation()} className="pt-0.5">
-                      <Checkbox
-                        checked={selected}
-                        onCheckedChange={(checked) => selection.onToggle(id, checked === true)}
-                        aria-label="Select row"
-                      />
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <div className={cn("font-medium text-foreground", compact ? "text-xs" : "text-sm")}>
-                      {primary?.render(row)}
-                    </div>
-                    {secondary && (
-                      <div className="mt-1 text-xs text-muted-foreground">{secondary.render(row)}</div>
-                    )}
-                    {tertiary && tertiary !== primary && tertiary !== secondary && (
-                      <div className="mt-2">{tertiary.render(row)}</div>
-                    )}
-                    {mobileExtras.map((col) => (
-                      <div
-                        key={col.key}
-                        className="mt-1.5 flex items-start justify-between gap-2 text-xs"
-                      >
-                        <span className="shrink-0 text-muted-foreground">{col.header}</span>
-                        <span className="min-w-0 text-right">{col.render(row)}</span>
+                <div
+                  className={cn("p-3", onRowClick && "cursor-pointer")}
+                  onClick={() => onRowClick?.(row)}
+                  role={onRowClick ? "button" : undefined}
+                >
+                  <div className="flex items-start gap-2">
+                    {selection && (
+                      <div onClick={(e) => e.stopPropagation()} className="pt-0.5">
+                        <Checkbox
+                          checked={selected}
+                          onCheckedChange={(checked) => selection.onToggle(id, checked === true)}
+                          aria-label="Select row"
+                        />
                       </div>
-                    ))}
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className={cn("font-medium text-foreground", compact ? "text-xs" : "text-sm")}>
+                        {primary?.render(row)}
+                      </div>
+                      {secondary && (
+                        <div className="mt-1 text-xs text-muted-foreground">{secondary.render(row)}</div>
+                      )}
+                      {tertiary && tertiary !== primary && tertiary !== secondary && (
+                        <div className="mt-2">{tertiary.render(row)}</div>
+                      )}
+                      {mobileExtras.map((col) => (
+                        <div
+                          key={col.key}
+                          className="mt-1.5 flex items-start justify-between gap-2 text-xs"
+                        >
+                          <span className="shrink-0 text-muted-foreground">{col.header}</span>
+                          <span className="min-w-0 text-right">{col.render(row)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {onRowClick && (
+                      <ChevronRight
+                        className={cn(
+                          "mt-1 h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform",
+                          expanded && "rotate-90 text-primary",
+                        )}
+                      />
+                    )}
                   </div>
-                  {onRowClick && (
-                    <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground/70" />
+                  {actions && (
+                    <div
+                      className="mt-2.5 flex flex-wrap justify-end gap-1 border-t border-border/60 pt-2"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {actions(row)}
+                    </div>
                   )}
                 </div>
-                {actions && (
-                  <div
-                    className="mt-2.5 flex flex-wrap justify-end gap-1 border-t border-border/60 pt-2"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {actions(row)}
-                  </div>
-                )}
+                <AnimatePresence initial={false}>
+                  {expanded && renderExpandedRow ? (
+                    <motion.div
+                      key={`${id}-expanded`}
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.24, ease }}
+                      className="overflow-hidden"
+                    >
+                      {renderExpandedRow(row)}
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
               </motion.div>
             );
           })}
@@ -289,36 +319,58 @@ export function DataTable<T>({
               {paged.map((row, i) => {
                 const id = getRowId?.(row) ?? String(i);
                 const selected = selection?.selectedIds.has(id) ?? false;
+                const expanded = expandedRowId === id;
+                const colSpan =
+                  columns.length + (selection ? 1 : 0) + (actions ? 1 : 0);
                 return (
-                  <tr
-                    key={id}
-                    className={cn(
-                      "border-t transition-colors",
-                      onRowClick && "cursor-pointer hover:bg-muted/40",
-                      selected && "bg-primary/5",
-                    )}
-                    onClick={() => onRowClick?.(row)}
-                  >
-                    {selection && (
-                      <td className={cn(cellPad, "w-9")} onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={selected}
-                          onCheckedChange={(checked) => selection.onToggle(id, checked === true)}
-                          aria-label="Select row"
-                        />
-                      </td>
-                    )}
-                    {columns.map((col) => (
-                      <td key={col.key} className={cellPad}>
-                        {col.render(row)}
-                      </td>
-                    ))}
-                    {actions && (
-                      <td className={cn(cellPad, "text-right")} onClick={(e) => e.stopPropagation()}>
-                        {actions(row)}
-                      </td>
-                    )}
-                  </tr>
+                  <Fragment key={id}>
+                    <tr
+                      className={cn(
+                        "border-t transition-colors",
+                        onRowClick && "cursor-pointer hover:bg-muted/40",
+                        selected && "bg-primary/5",
+                        expanded && "bg-primary/[0.04]",
+                      )}
+                      onClick={() => onRowClick?.(row)}
+                    >
+                      {selection && (
+                        <td className={cn(cellPad, "w-9")} onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selected}
+                            onCheckedChange={(checked) => selection.onToggle(id, checked === true)}
+                            aria-label="Select row"
+                          />
+                        </td>
+                      )}
+                      {columns.map((col) => (
+                        <td key={col.key} className={cellPad}>
+                          {col.render(row)}
+                        </td>
+                      ))}
+                      {actions && (
+                        <td className={cn(cellPad, "text-right")} onClick={(e) => e.stopPropagation()}>
+                          {actions(row)}
+                        </td>
+                      )}
+                    </tr>
+                    <AnimatePresence initial={false}>
+                      {expanded && renderExpandedRow ? (
+                        <tr key={`${id}-expanded`}>
+                          <td colSpan={colSpan} className="p-0">
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.24, ease }}
+                              className="overflow-hidden"
+                            >
+                              {renderExpandedRow(row)}
+                            </motion.div>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </AnimatePresence>
+                  </Fragment>
                 );
               })}
             </tbody>
