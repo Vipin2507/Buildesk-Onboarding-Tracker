@@ -97,7 +97,7 @@ export async function sendAutomationRequest(
 ): Promise<AutomationLog> {
   const store = useAutomationStore.getState();
 
-  if (!store.settings.automationsEnabled) {
+  if (!store.settings.automationsEnabled && !payload.test) {
     const attemptedAt = new Date().toISOString();
     const log: AutomationLog = {
       id: meta?.existingLogId ?? logId(),

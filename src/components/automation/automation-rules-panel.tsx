@@ -47,12 +47,6 @@ export function AutomationRulesPanel() {
   }
 
   async function runRuleTest(rule: AutomationRule) {
-    if (!rulesEnabled) {
-      toast.info("Automation rules are paused", {
-        description: "Turn on the master switch above to send test notifications.",
-      });
-      return;
-    }
     setTestingRuleId(rule.id);
     try {
       const log = await testAutomationRule(rule.id);
@@ -208,8 +202,8 @@ export function AutomationRulesPanel() {
               <Button
                 size="icon"
                 variant="ghost"
-                title={rulesEnabled ? "Send test notification" : "Turn on automation rules to test"}
-                disabled={testingRuleId === r.id || !rulesEnabled}
+                title="Send test notification"
+                disabled={testingRuleId === r.id}
                 onClick={() => void runRuleTest(r)}
               >
                 <Play className={testingRuleId === r.id ? "h-4 w-4 animate-pulse" : "h-4 w-4"} />

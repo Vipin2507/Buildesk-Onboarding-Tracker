@@ -116,7 +116,7 @@ export async function sendCrmAutomationRequest(
 ): Promise<AutomationLog> {
   const store = useCrmAutomationStore.getState();
 
-  if (!store.settings.automationsEnabled) {
+  if (!store.settings.automationsEnabled && !payload.test) {
     const attemptedAt = new Date().toISOString();
     const log: AutomationLog = {
       id: meta?.existingLogId ?? logId(),
