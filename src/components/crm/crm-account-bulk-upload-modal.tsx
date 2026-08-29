@@ -176,12 +176,13 @@ export function CrmAccountBulkUploadModal({
 
   const planStats = useMemo(() => {
     if (!plan) return null;
-    if (!updatesOnly) return plan.summary;
-    return {
-      ...plan.summary,
-      notFound: plan.rows.filter((r) => r.message.includes("not found")).length,
-      skip: plan.rows.filter((r) => r.message === "Empty row skipped").length,
-    };
+    const notFound = updatesOnly
+      ? plan.rows.filter((r) => r.message.includes("not found")).length
+      : 0;
+    const skip = updatesOnly
+      ? plan.rows.filter((r) => r.message === "Empty row skipped").length
+      : plan.summary.skip;
+    return { ...plan.summary, notFound, skip };
   }, [plan, updatesOnly]);
 
   function applyImport() {
