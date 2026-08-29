@@ -16,7 +16,7 @@ export const pageSectionVariants = {
 
 export function PageHeader({
   title,
-  subtitle,
+  subtitle: _subtitle,
   actions,
   compact = true,
 }: {
@@ -45,16 +45,6 @@ export function PageHeader({
         >
           {title}
         </h1>
-        {subtitle ? (
-          <p
-            className={cn(
-              "text-muted-foreground",
-              compact ? "mt-0.5 line-clamp-2 text-xs sm:line-clamp-1" : "mt-1 text-sm",
-            )}
-          >
-            {subtitle}
-          </p>
-        ) : null}
       </div>
       {actions ? (
         <div

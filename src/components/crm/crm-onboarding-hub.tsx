@@ -31,6 +31,7 @@ import {
   normalizeCrmAccountForm,
   type CrmAccountFormValues,
 } from "@/components/crm/crm-account-form";
+import { CrmAccountGoLiveActions } from "@/components/crm/crm-account-go-live-actions";
 import { CrmAccountModulesOverview } from "@/components/crm/crm-account-modules-overview";
 import { CrmAccountPortalPanel } from "@/components/crm/crm-account-portal-panel";
 import { CrmAccountTasksPanel } from "@/components/crm/crm-account-tasks-panel";
@@ -50,7 +51,7 @@ import {
   ticketSelectClass,
   ticketTextareaClass,
 } from "@/components/design-ticket/design-ticket-shared";
-import { ConfirmDeleteDialog, EntityFormModal } from "@/components/entity-form-modal";
+import { EntityFormModal } from "@/components/entity-form-modal";
 import { PageWrap } from "@/components/page-header";
 import { Pill } from "@/components/status-pill";
 import { ProgressBar } from "@/components/progress-bar";
@@ -132,9 +133,6 @@ export function CrmOnboardingHub({
   onTabChange?: (tab: TabId) => void;
 }) {
   const account = useCrmAccountStore((s) => s.accounts.find((a) => a.id === accountId));
-  const markLive = useCrmAccountStore((s) => s.markLive);
-  const completeAllGoLiveItems = useCrmOnboardingStore((s) => s.completeAllGoLiveItems);
-  const updateTracker = useCrmOnboardingStore((s) => s.updateTracker);
   const ensureForCompany = useCrmOnboardingStore((s) => s.ensureForCompany);
   const record = useCrmOnboardingStore((s) => s.getByCompanyId(accountId));
   const tickets = useTicketStore((s) => s.tickets);
@@ -147,7 +145,6 @@ export function CrmOnboardingHub({
     if (onTabChange) onTabChange(next);
     else setInternalTab(next);
   };
-  const [confirmForceLive, setConfirmForceLive] = useState(false);
 
   useEffect(() => {
     ensureForCompany(accountId, account?.companyType);
@@ -201,26 +198,13 @@ export function CrmOnboardingHub({
           <div className="flex flex-wrap items-center gap-1.5">
             <Pill tone={isLive ? "success" : "muted"}>{isLive ? "Live" : "Not Live"}</Pill>
             <span className="text-xs tabular-nums text-muted-foreground">{progress ?? pct}%</span>
-            {!isLive ? (
-              <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 gap-1 text-xs"
-                  onClick={() => setTab("golive")}
-                >
-                  Go-Live checklist
-                </Button>
-                <Button
-                  size="sm"
-                  className="h-8 gap-1 bg-success text-xs text-white hover:bg-success/90"
-                  onClick={() => setConfirmForceLive(true)}
-                >
-                  <Rocket className="h-3.5 w-3.5" />
-                  Go Live & Complete
-                </Button>
-              </>
-            ) : null}
+            <CrmAccountGoLiveActions
+              companyId={accountId}
+              accountName={accountName}
+              accountStatus={account.status}
+              who={currentUser?.name}
+              onOpenGoLiveTab={() => setTab("golive")}
+            />
           </div>
         }
       />
@@ -288,23 +272,6 @@ export function CrmOnboardingHub({
           {tab === "comms" ? <CommsTab companyId={accountId} /> : null}
         </motion.div>
       </AnimatePresence>
-
-      <ConfirmDeleteDialog
-        open={confirmForceLive}
-        onOpenChange={setConfirmForceLive}
-        title="Go Live & Complete account?"
-        description={`This will complete remaining go-live checklist items and mark ${accountName} as Live immediately.`}
-        confirmLabel="Go Live & Complete"
-        confirmTone="default"
-        onConfirm={() => {
-          completeAllGoLiveItems(accountId);
-          markLive(accountId, currentUser?.name);
-          updateTracker(accountId, { stage: "customer_success", priority: "medium" }, currentUser?.name);
-          toast.success(`${accountName} completed & marked Live`);
-          setConfirmForceLive(false);
-          setTab("golive");
-        }}
-      />
     </PageWrap>
   );
 }

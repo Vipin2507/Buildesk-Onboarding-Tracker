@@ -159,7 +159,7 @@ export function DesignTicketKpiGrid({
 
 export function DesignTicketPageHeader({
   title,
-  subtitle,
+  subtitle: _subtitle,
   actions,
   compact = true,
 }: {
@@ -187,18 +187,6 @@ export function DesignTicketPageHeader({
         >
           {title}
         </h1>
-        {subtitle ? (
-          <p
-            className={cn(
-              "text-muted-foreground",
-              compact
-                ? "mt-0.5 line-clamp-2 text-xs sm:line-clamp-1"
-                : "mt-1 text-sm",
-            )}
-          >
-            {subtitle}
-          </p>
-        ) : null}
       </div>
       {actions ? (
         <div className="flex w-full min-w-0 flex-wrap items-center gap-1.5 sm:w-auto sm:justify-end">

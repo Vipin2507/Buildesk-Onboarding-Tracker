@@ -815,7 +815,6 @@ function CrmAccountsPage() {
                   "salesManagerName",
                   "supportManager1",
                   "supportManager2",
-                  "stageLabel",
                 ]}
                 pageSize={15}
                 density="compact"
@@ -875,14 +874,6 @@ function CrmAccountsPage() {
                     ),
                   },
                   {
-                    key: "salesManagerName",
-                    header: "Sales Manager",
-                    sortable: true,
-                    render: (r) => (
-                      <span className="text-xs">{r.salesManagerName || "—"}</span>
-                    ),
-                  },
-                  {
                     key: "supportManager1",
                     header: "Support 1",
                     sortable: true,
@@ -899,11 +890,11 @@ function CrmAccountsPage() {
                     ),
                   },
                   {
-                    key: "stageLabel",
-                    header: "Stage",
+                    key: "salesManagerName",
+                    header: "Sales Manager",
                     sortable: true,
                     render: (r) => (
-                      <span className="text-xs text-muted-foreground">{r.stageLabel}</span>
+                      <span className="text-xs">{r.salesManagerName || "—"}</span>
                     ),
                   },
                   {
