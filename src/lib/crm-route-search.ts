@@ -1,17 +1,8 @@
 import { z } from "zod";
 
-export const CRM_DASHBOARD_TABS = ["overview", "activity"] as const;
-export type CrmDashboardTab = (typeof CRM_DASHBOARD_TABS)[number];
-
-export const crmDashboardSearchSchema = z.object({
-  tab: z.enum(CRM_DASHBOARD_TABS).optional(),
-});
+export const crmDashboardSearchSchema = z.object({});
 
 export type CrmDashboardSearch = z.infer<typeof crmDashboardSearchSchema>;
-
-export function parseCrmDashboardTab(value: unknown): CrmDashboardTab {
-  return value === "activity" ? "activity" : "overview";
-}
 
 export const CRM_BOOKINGS_TAB_IDS = [
   "all",

@@ -39,7 +39,6 @@ const kindDot: Record<ActivityKind, string> = {
 
 type Props = {
   items: CrmDashboardActivityItem[];
-  onViewAll?: () => void;
 };
 
 function ActivityRow({
@@ -115,7 +114,7 @@ function ActivityRow({
   );
 }
 
-export function CrmDashboardActivityFeed({ items, onViewAll }: Props) {
+export function CrmDashboardActivityFeed({ items }: Props) {
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 py-8 text-center">
@@ -134,17 +133,11 @@ export function CrmDashboardActivityFeed({ items, onViewAll }: Props) {
       {items.map((a, i) => (
         <ActivityRow key={a.id} item={a} index={i} />
       ))}
-      {onViewAll ? (
-        <li className="pt-1">
-          <button
-            type="button"
-            onClick={onViewAll}
-            className="text-[10px] font-medium text-primary hover:underline"
-          >
-            View all activity
-          </button>
-        </li>
-      ) : null}
+      <li className="pt-1">
+        <Link to="/crm/activity" className="text-[10px] font-medium text-primary hover:underline">
+          View all activity
+        </Link>
+      </li>
     </ol>
   );
 }

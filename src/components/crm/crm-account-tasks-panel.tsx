@@ -514,11 +514,10 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
             {openCount} open · {overdueCount} overdue · {accountTasks.length} total
           </span>
           <Link
-            to="/crm"
-            search={{ tab: "activity" }}
+            to="/crm/activity"
             className="text-[10px] font-medium text-primary hover:underline"
           >
-            View on dashboard
+            Activity history
           </Link>
           <Link to="/crm/tasks" className="text-[10px] font-medium text-primary hover:underline">
             Task calendar

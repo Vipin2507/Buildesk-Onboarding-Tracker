@@ -48,6 +48,7 @@ import { Route as CrmMasterRouteImport } from './routes/crm.master'
 import { Route as CrmLiveChatRouteImport } from './routes/crm.live-chat'
 import { Route as CrmBookingsRouteImport } from './routes/crm.bookings'
 import { Route as CrmAutomationRouteImport } from './routes/crm.automation'
+import { Route as CrmActivityRouteImport } from './routes/crm.activity'
 import { Route as CrmAccountsRouteImport } from './routes/crm.accounts'
 import { Route as CompaniesCompanyIdRouteImport } from './routes/companies.$companyId'
 import { Route as PortalSlugIndexRouteImport } from './routes/portal.$slug.index'
@@ -261,6 +262,11 @@ const CrmAutomationRoute = CrmAutomationRouteImport.update({
   path: '/automation',
   getParentRoute: () => CrmRoute,
 } as any)
+const CrmActivityRoute = CrmActivityRouteImport.update({
+  id: '/activity',
+  path: '/activity',
+  getParentRoute: () => CrmRoute,
+} as any)
 const CrmAccountsRoute = CrmAccountsRouteImport.update({
   id: '/accounts',
   path: '/accounts',
@@ -379,6 +385,7 @@ export interface FileRoutesByFullPath {
   '/vendors': typeof VendorsRoute
   '/companies/$companyId': typeof CompaniesCompanyIdRouteWithChildren
   '/crm/accounts': typeof CrmAccountsRouteWithChildren
+  '/crm/activity': typeof CrmActivityRoute
   '/crm/automation': typeof CrmAutomationRoute
   '/crm/bookings': typeof CrmBookingsRoute
   '/crm/live-chat': typeof CrmLiveChatRoute
@@ -436,6 +443,7 @@ export interface FileRoutesByTo {
   '/vendors': typeof VendorsRoute
   '/companies/$companyId': typeof CompaniesCompanyIdRouteWithChildren
   '/crm/accounts': typeof CrmAccountsRouteWithChildren
+  '/crm/activity': typeof CrmActivityRoute
   '/crm/automation': typeof CrmAutomationRoute
   '/crm/bookings': typeof CrmBookingsRoute
   '/crm/live-chat': typeof CrmLiveChatRoute
@@ -494,6 +502,7 @@ export interface FileRoutesById {
   '/vendors': typeof VendorsRoute
   '/companies/$companyId': typeof CompaniesCompanyIdRouteWithChildren
   '/crm/accounts': typeof CrmAccountsRouteWithChildren
+  '/crm/activity': typeof CrmActivityRoute
   '/crm/automation': typeof CrmAutomationRoute
   '/crm/bookings': typeof CrmBookingsRoute
   '/crm/live-chat': typeof CrmLiveChatRoute
@@ -554,6 +563,7 @@ export interface FileRouteTypes {
     | '/vendors'
     | '/companies/$companyId'
     | '/crm/accounts'
+    | '/crm/activity'
     | '/crm/automation'
     | '/crm/bookings'
     | '/crm/live-chat'
@@ -611,6 +621,7 @@ export interface FileRouteTypes {
     | '/vendors'
     | '/companies/$companyId'
     | '/crm/accounts'
+    | '/crm/activity'
     | '/crm/automation'
     | '/crm/bookings'
     | '/crm/live-chat'
@@ -668,6 +679,7 @@ export interface FileRouteTypes {
     | '/vendors'
     | '/companies/$companyId'
     | '/crm/accounts'
+    | '/crm/activity'
     | '/crm/automation'
     | '/crm/bookings'
     | '/crm/live-chat'
@@ -1004,6 +1016,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CrmAutomationRouteImport
       parentRoute: typeof CrmRoute
     }
+    '/crm/activity': {
+      id: '/crm/activity'
+      path: '/activity'
+      fullPath: '/crm/activity'
+      preLoaderRoute: typeof CrmActivityRouteImport
+      parentRoute: typeof CrmRoute
+    }
     '/crm/accounts': {
       id: '/crm/accounts'
       path: '/accounts'
@@ -1193,6 +1212,7 @@ const CrmTicketsRouteWithChildren = CrmTicketsRoute._addFileChildren(
 
 interface CrmRouteChildren {
   CrmAccountsRoute: typeof CrmAccountsRouteWithChildren
+  CrmActivityRoute: typeof CrmActivityRoute
   CrmAutomationRoute: typeof CrmAutomationRoute
   CrmBookingsRoute: typeof CrmBookingsRoute
   CrmLiveChatRoute: typeof CrmLiveChatRoute
@@ -1206,6 +1226,7 @@ interface CrmRouteChildren {
 
 const CrmRouteChildren: CrmRouteChildren = {
   CrmAccountsRoute: CrmAccountsRouteWithChildren,
+  CrmActivityRoute: CrmActivityRoute,
   CrmAutomationRoute: CrmAutomationRoute,
   CrmBookingsRoute: CrmBookingsRoute,
   CrmLiveChatRoute: CrmLiveChatRoute,
