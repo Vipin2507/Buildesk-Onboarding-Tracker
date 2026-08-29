@@ -71,7 +71,7 @@ export function parseCrmTasksTab(value: unknown): CrmTasksTabId {
 
 export const CRM_ACCOUNT_TAB_IDS = [
   "dashboard",
-  "modules",
+  "integrations",
   "masters",
   "migration",
   "training",
@@ -91,6 +91,7 @@ export const crmAccountSearchSchema = z.object({
 export type CrmAccountSearch = z.infer<typeof crmAccountSearchSchema>;
 
 export function parseCrmAccountTab(value: unknown): CrmAccountTabId {
+  if (value === "modules") return "dashboard";
   if (typeof value === "string" && CRM_ACCOUNT_TAB_IDS.includes(value as CrmAccountTabId)) {
     return value as CrmAccountTabId;
   }

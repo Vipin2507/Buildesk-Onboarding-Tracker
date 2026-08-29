@@ -5,27 +5,34 @@ import { Pill } from "@/components/status-pill";
 import {
   calcModuleWorkflowProgress,
   isCrmIntegrationModule,
-  moduleRequiresProvider,
 } from "@/data/crm-onboarding-defaults";
 import { cn } from "@/lib/utils";
 import type { CrmProductModule } from "@/types/crm-onboarding";
 
-function ModuleCard({ module: m }: { module: CrmProductModule }) {
+function CoreModuleCard({ module: m }: { module: CrmProductModule }) {
+  return (
+    <div className="card-soft flex items-center gap-2 p-3">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <Package className="h-4 w-4" />
+      </div>
+      <div className="min-w-0 text-sm font-semibold leading-snug">{m.label}</div>
+    </div>
+  );
+}
+
+function IntegrationModuleCard({ module: m }: { module: CrmProductModule }) {
   const pct = calcModuleWorkflowProgress(m);
   const steps = m.workflow ?? [];
-  const requiresProvider = moduleRequiresProvider(m.key);
 
   return (
     <div className="card-soft flex flex-col gap-2 p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="text-sm font-semibold leading-snug">{m.label}</div>
-          {requiresProvider ? (
-            <div className="mt-1 text-xs text-muted-foreground">
-              Provider:{" "}
-              <span className="font-medium text-foreground">{m.provider?.trim() || "Not set"}</span>
-            </div>
-          ) : null}
+          <div className="mt-1 text-xs text-muted-foreground">
+            Provider:{" "}
+            <span className="font-medium text-foreground">{m.provider?.trim() || "Not set"}</span>
+          </div>
         </div>
         <Pill tone={pct >= 100 ? "success" : pct > 0 ? "info" : "muted"} className="shrink-0 text-[10px]">
           {pct}%
@@ -46,7 +53,7 @@ type Props = {
   className?: string;
 };
 
-/** Dashboard-style module + integration cards (not compact pills). */
+/** Dashboard overview — core modules are display-only; integrations show setup progress. */
 export function CrmAccountModulesOverview({
   modules,
   emptyModulesHint = "None selected yet.",
@@ -70,7 +77,7 @@ export function CrmAccountModulesOverview({
         ) : (
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {core.map((m) => (
-              <ModuleCard key={m.key} module={m} />
+              <CoreModuleCard key={m.key} module={m} />
             ))}
           </div>
         )}
@@ -87,7 +94,7 @@ export function CrmAccountModulesOverview({
         ) : (
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {integrations.map((m) => (
-              <ModuleCard key={m.key} module={m} />
+              <IntegrationModuleCard key={m.key} module={m} />
             ))}
           </div>
         )}

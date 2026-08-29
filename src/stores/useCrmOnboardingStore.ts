@@ -23,6 +23,7 @@ import {
   defaultModuleWorkflow,
   defaultTrainingSessions,
   ensureMasterDataFields,
+  isCrmIntegrationModule,
   isDeveloperCompanyType,
   mergeCrmGoLiveChecklist,
   mergeCrmMigrationChecklist,
@@ -480,11 +481,14 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
         ...r,
         productModules: r.productModules.map((m) => {
           if (m.key !== key) return m;
+          const integration = isCrmIntegrationModule(key);
           const workflow =
-            enabled && (!m.workflow || m.workflow.length === 0)
+            enabled && integration && (!m.workflow || m.workflow.length === 0)
               ? defaultModuleWorkflow(key)
-              : m.workflow;
-          return { ...m, enabled, workflow };
+              : integration
+                ? m.workflow
+                : undefined;
+          return { ...m, enabled, workflow, provider: integration ? m.provider : undefined };
         }),
       })),
     }));
