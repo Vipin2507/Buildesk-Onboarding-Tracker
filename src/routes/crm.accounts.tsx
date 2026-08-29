@@ -54,6 +54,7 @@ import { CRM_STAGE_LABELS } from "@/data/crm-onboarding-defaults";
 import { formatDate } from "@/lib/utils";
 import {
   useAuthStore,
+  useCompanyPortalStore,
   useCrmAccountStore,
   useCrmOnboardingStore,
 } from "@/stores";
@@ -62,6 +63,7 @@ import {
   type CrmAccountRow,
 } from "@/stores/crm-dashboard-selectors";
 import { sortCrmAccountsByStartDateDesc } from "@/lib/crm-account-sort";
+import { isValidPortalSlug, normalizePortalSlug } from "@/lib/design-ticket-portal";
 import { getCrmMasterProductModuleCatalog } from "@/stores/useCrmMasterStore";
 import type { CrmProductModuleKey } from "@/types/crm-onboarding";
 import { COMPANY_TYPES } from "@/types/company";
@@ -464,10 +466,33 @@ function CrmAccountsPage() {
           ensure(editing.id, data.companyType);
           toast.success(`${data.name} updated`);
         } else {
+          const portalSlug = normalizePortalSlug(values.portalApiKey ?? "");
+          if (!portalSlug) {
+            toast.error("Portal API key is required");
+            return;
+          }
+          if (!isValidPortalSlug(portalSlug)) {
+            toast.error("Portal API key must be 3–48 characters (letters, numbers, hyphens)");
+            return;
+          }
+          if (useCompanyPortalStore.getState().getBySlug(portalSlug)) {
+            toast.error("This portal API key is already in use");
+            return;
+          }
+
           const created = upsertAccount({
             ...data,
             status: "onboarding",
           });
+          useCompanyPortalStore.getState().generateAccessForCompany(
+            {
+              id: created.id,
+              name: created.name,
+              contact: created.contact,
+              email: created.email,
+            },
+            { slug: portalSlug },
+          );
           const record = ensure(created.id, created.companyType);
           const catalogKeys = new Set(getCrmMasterProductModuleCatalog().map((m) => m.key));
           for (const mod of record.productModules) {
@@ -972,6 +997,7 @@ function CrmAccountsPage() {
         <CrmAccountFormFields
           form={form}
           showModulePicker={!editing}
+          showPortalApiKey={!editing}
           selectedModules={selectedModules}
           onSelectedModulesChange={setSelectedModules}
         />

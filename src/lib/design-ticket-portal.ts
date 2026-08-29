@@ -67,3 +67,17 @@ export function generatePortalSlug(existing: string[]) {
   }
   return `co-${Date.now().toString(36).slice(-6)}`;
 }
+
+/** Normalize user input into a URL-safe portal slug. */
+export function normalizePortalSlug(input: string): string {
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+}
+
+export function isValidPortalSlug(slug: string): boolean {
+  return /^[a-z0-9](?:[a-z0-9-]{1,46}[a-z0-9])?$/.test(slug);
+}

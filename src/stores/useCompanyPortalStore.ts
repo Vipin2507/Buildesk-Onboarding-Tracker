@@ -7,7 +7,7 @@ import {
   updateCompanyPortalContact,
   upsertCompanyPortalAccess,
 } from "@/lib/api";
-import { generatePortalSlug } from "@/lib/design-ticket-portal";
+import { generatePortalSlug, normalizePortalSlug } from "@/lib/design-ticket-portal";
 import { serverSync } from "@/lib/sync";
 import { createPersistedStore, touch } from "./persist";
 
@@ -17,6 +17,7 @@ type CompanyPortalState = {
   mergeAccess: (record: CompanyPortalAccess) => void;
   generateAccessForCompany: (
     company: Pick<Company, "id" | "name" | "contact" | "email">,
+    opts?: { slug?: string },
   ) => CompanyPortalAccess;
   ensureAllCompanies: (companies: Company[]) => void;
   regenerateSlug: (companyId: string) => string | undefined;
@@ -57,7 +58,7 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
       });
     },
 
-    generateAccessForCompany: (company) => {
+    generateAccessForCompany: (company, opts) => {
       const existing = get().getByCompanyId(company.id);
       if (existing) {
         if (existing.companyName !== company.name) {
@@ -70,7 +71,9 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
       }
 
       const now = nowIso();
-      const slug = generatePortalSlug(get().access.map((a) => a.slug));
+      const taken = new Set(get().access.map((a) => a.slug));
+      const requested = opts?.slug ? normalizePortalSlug(opts.slug) : "";
+      const slug = requested || generatePortalSlug([...taken]);
       const record: CompanyPortalAccess = {
         companyId: company.id,
         companyName: company.name,

@@ -16,6 +16,7 @@ import { COMPANY_TYPES, type CompanyRegion, type CompanyType } from "@/types/com
 import type { CrmAccount } from "@/types/crm-account";
 import type { CrmProductModuleKey } from "@/types/crm-onboarding";
 import { CrmAccountProductModulesPicker } from "@/components/crm/crm-account-product-modules-picker";
+import { normalizePortalSlug, portalDashboardPath } from "@/lib/design-ticket-portal";
 
 export const crmAccountSchema = z.object({
   name: z.string().min(2, "Account name is required"),
@@ -46,6 +47,7 @@ export const crmAccountSchema = z.object({
   pendingAmount: z.coerce.number().min(0),
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
+  portalApiKey: z.string().optional(),
 });
 
 export type CrmAccountFormValues = z.infer<typeof crmAccountSchema>;
@@ -75,6 +77,7 @@ export function emptyCrmAccountForm(): CrmAccountFormValues {
     pendingAmount: 0,
     startDate: today,
     endDate: end,
+    portalApiKey: "",
   };
 }
 
@@ -193,11 +196,13 @@ function Label({ children, required }: { children: React.ReactNode; required?: b
 export function CrmAccountFormFields({
   form,
   showModulePicker,
+  showPortalApiKey,
   selectedModules,
   onSelectedModulesChange,
 }: {
   form: UseFormReturn<CrmAccountFormValues>;
   showModulePicker?: boolean;
+  showPortalApiKey?: boolean;
   selectedModules?: CrmProductModuleKey[];
   onSelectedModulesChange?: (keys: CrmProductModuleKey[]) => void;
 }) {
@@ -205,6 +210,10 @@ export function CrmAccountFormFields({
   const users = useUserStore((s) => s.users);
   const city = form.watch("city");
   const state = form.watch("state");
+  const portalApiKey = form.watch("portalApiKey");
+  const portalSlugPreview = portalApiKey?.trim()
+    ? normalizePortalSlug(portalApiKey)
+    : "";
 
   const salesManagerName = form.watch("salesManagerName");
   const supportManager1 = form.watch("supportManager1");
@@ -271,6 +280,26 @@ export function CrmAccountFormFields({
             />
             <FieldError message={errors.userId?.message} />
           </div>
+          {showPortalApiKey ? (
+            <div>
+              <Label required>Portal API key</Label>
+              <input
+                {...form.register("portalApiKey")}
+                placeholder="e.g. capital-infra or 126371"
+                className={fieldClass(!!errors.portalApiKey)}
+              />
+              <FieldError message={errors.portalApiKey?.message} />
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Used as the client portal URL slug
+                {portalSlugPreview ? (
+                  <>
+                    {" "}
+                    — <code className="rounded bg-muted px-1">{portalDashboardPath(portalSlugPreview)}</code>
+                  </>
+                ) : null}
+              </p>
+            </div>
+          ) : null}
           <div>
             <Label required>Company type</Label>
             <select {...form.register("companyType")} className={fieldClass()}>
