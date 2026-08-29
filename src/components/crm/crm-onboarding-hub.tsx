@@ -8,6 +8,7 @@ import {
   ClipboardList,
   GraduationCap,
   LayoutDashboard,
+  Link2,
   Lock,
   MessageSquare,
   Package,
@@ -60,6 +61,7 @@ import {
   calcCrmOnboardingProgress,
   calcModuleWorkflowProgress,
   crmPendingActivityCount,
+  isCrmIntegrationModule,
   moduleRequiresProvider,
 } from "@/data/crm-onboarding-defaults";
 import { calcChecklistProgress } from "@/lib/checklist";
@@ -91,6 +93,7 @@ const OPEN_TASK_STATUSES: FollowUpTaskStatus[] = ["open", "in_progress", "blocke
 const TABS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "modules", label: "Modules", icon: Package },
+  { id: "integrations", label: "Integrations", icon: Link2 },
   { id: "masters", label: "Masters", icon: ClipboardList },
   { id: "migration", label: "Migration", icon: Upload },
   { id: "training", label: "Training", icon: GraduationCap },
@@ -166,10 +169,17 @@ export function CrmOnboardingHub({
     { id: "tickets", label: "Open tickets", value: openTickets, icon: Ticket },
     {
       id: "modules",
-      label: "CRM modules",
-      value: liveRecord.productModules.filter((m) => m.enabled).length,
+      label: "Modules",
+      value: liveRecord.productModules.filter((m) => m.enabled && !isCrmIntegrationModule(m.key)).length,
       icon: Package,
       tone: "text-success",
+    },
+    {
+      id: "integrations",
+      label: "Integrations",
+      value: liveRecord.productModules.filter((m) => m.enabled && isCrmIntegrationModule(m.key)).length,
+      icon: Link2,
+      tone: "text-info",
     },
   ];
 
@@ -223,6 +233,7 @@ export function CrmOnboardingHub({
               if (k.id === "tickets") setTab("tickets");
               else if (k.id === "tasks") setTab("tasks");
               else if (k.id === "modules") setTab("modules");
+              else if (k.id === "integrations") setTab("integrations");
               else if (k.id === "pending") setTab("masters");
               else setTab("dashboard");
             },
@@ -230,10 +241,11 @@ export function CrmOnboardingHub({
               (k.id === "tickets" && tab === "tickets") ||
               (k.id === "tasks" && tab === "tasks") ||
               (k.id === "modules" && tab === "modules") ||
+              (k.id === "integrations" && tab === "integrations") ||
               (k.id === "pending" && tab === "masters") ||
               (k.id === "progress" && tab === "dashboard"),
           }))}
-          columns={5}
+          columns={6}
           size="compact"
         />
       </div>
@@ -258,7 +270,10 @@ export function CrmOnboardingHub({
               onOpenTasks={() => setTab("tasks")}
             />
           ) : null}
-          {tab === "modules" ? <ModulesTab companyId={accountId} /> : null}
+          {tab === "modules" ? <ProductModulesTab companyId={accountId} scope="core" /> : null}
+          {tab === "integrations" ? (
+            <ProductModulesTab companyId={accountId} scope="integration" />
+          ) : null}
           {tab === "masters" ? <MastersTab companyId={accountId} /> : null}
           {tab === "migration" ? <MigrationTab companyId={accountId} /> : null}
           {tab === "training" ? <TrainingTab companyId={accountId} /> : null}
@@ -328,8 +343,6 @@ function DashboardTab({
   useEffect(() => {
     if (editing) form.reset(crmAccountToFormValues(account));
   }, [editing, account, form]);
-
-  const enabledMods = record.productModules.filter((m) => m.enabled);
   const trainApplicable = record.trainingSessions.filter((s) => !s.notApplicable);
   const trainPct = trainApplicable.length
     ? Math.round(
@@ -430,18 +443,12 @@ function DashboardTab({
         <StatCard label="Data upload" value={`${migPct}%`} bar={migPct} />
       </div>
 
-      <DesignTicketSection compact title="Purchased CRM modules">
-        <div className="flex flex-wrap gap-1.5">
-          {enabledMods.length === 0 ? (
-            <span className="text-xs text-muted-foreground">None enabled yet — use Modules tab.</span>
-          ) : (
-            enabledMods.map((m) => (
-              <Pill key={m.key} tone="accent">
-                {m.label}
-              </Pill>
-            ))
-          )}
-        </div>
+      <DesignTicketSection compact title="Modules & integrations">
+        <CrmAccountModulesOverview
+          modules={record.productModules}
+          emptyModulesHint="No modules selected — open the Modules tab to opt in."
+          emptyIntegrationsHint="No integrations selected — open the Integrations tab to opt in."
+        />
       </DesignTicketSection>
 
       <CrmAccountTasksPanel accountId={accountId} compact onViewAll={onOpenTasks} />
@@ -541,7 +548,13 @@ function ModuleProviderSelect({
   );
 }
 
-function ModulesTab({ companyId }: { companyId: string }) {
+function ProductModulesTab({
+  companyId,
+  scope,
+}: {
+  companyId: string;
+  scope: "core" | "integration";
+}) {
   const record = useCrmOnboardingStore((s) => s.getByCompanyId(companyId))!;
   const setEnabled = useCrmOnboardingStore((s) => s.setProductModuleEnabled);
   const toggleStep = useCrmOnboardingStore((s) => s.toggleModuleWorkflowStep);
@@ -579,8 +592,13 @@ function ModulesTab({ companyId }: { companyId: string }) {
     setStepDialog(null);
   }
 
-  const enabled = record.productModules.filter((m) => m.enabled);
-  const available = record.productModules.filter((m) => !m.enabled);
+  const scopeLabel = scope === "core" ? "module" : "integration";
+  const scopeTitle = scope === "core" ? "Modules" : "Integrations";
+  const inScope = (key: CrmProductModuleKey) =>
+    scope === "core" ? !isCrmIntegrationModule(key) : isCrmIntegrationModule(key);
+
+  const enabled = record.productModules.filter((m) => m.enabled && inScope(m.key));
+  const available = record.productModules.filter((m) => !m.enabled && inScope(m.key));
   const needsProvider = enabled.filter((m) => moduleRequiresProvider(m.key) && !m.provider).length;
 
   return (
@@ -588,22 +606,23 @@ function ModulesTab({ companyId }: { companyId: string }) {
     <div className="space-y-2.5">
       <DesignTicketSection
         compact
-        title="Opted modules & workflow"
+        title={`Opted ${scopeTitle.toLowerCase()} & workflow`}
         action={
           <span className="text-[10px] tabular-nums text-muted-foreground">
-            {enabled.length} / {record.productModules.length} opted
+            {enabled.length} opted
             {needsProvider > 0 ? ` · ${needsProvider} need provider` : ""}
           </span>
         }
       >
         <p className="mb-2 text-[10px] text-muted-foreground">
-          Opting a module seeds its implementation workflow so it can be tracked. Integration
-          modules can be delivered via a provider.
+          {scope === "core"
+            ? "Core CRM products for this client. Opting in seeds an implementation workflow."
+            : "Channel and lead integrations. Select a provider where required, then complete workflow steps."}
         </p>
 
         {enabled.length === 0 ? (
           <div className="rounded-lg border border-dashed px-3 py-8 text-center text-xs text-muted-foreground">
-            No modules opted yet. Toggle a module below to start tracking its workflow.
+            No {scopeLabel}s opted yet. Toggle an item below to start tracking its workflow.
           </div>
         ) : (
           <div className="space-y-1.5">
@@ -738,13 +757,13 @@ function ModulesTab({ companyId }: { companyId: string }) {
         )}
       </DesignTicketSection>
 
-      <DesignTicketSection compact title="Available modules">
+      <DesignTicketSection compact title={`Available ${scopeTitle.toLowerCase()}`}>
         <p className="mb-2 text-[10px] text-muted-foreground">
-          Toggle to opt a module in for this customer.
+          Toggle to opt a {scopeLabel} in for this customer.
         </p>
         {available.length === 0 ? (
           <div className="rounded-lg border border-dashed px-3 py-6 text-center text-[11px] text-muted-foreground">
-            All modules are opted in.
+            All {scopeTitle.toLowerCase()} are opted in.
           </div>
         ) : (
           <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">

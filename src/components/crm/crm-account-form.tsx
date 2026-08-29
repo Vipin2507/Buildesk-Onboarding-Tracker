@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 import { useUserStore } from "@/stores";
 import { COMPANY_TYPES, type CompanyRegion, type CompanyType } from "@/types/company";
 import type { CrmAccount } from "@/types/crm-account";
+import type { CrmProductModuleKey } from "@/types/crm-onboarding";
+import { CrmAccountProductModulesPicker } from "@/components/crm/crm-account-product-modules-picker";
 
 export const crmAccountSchema = z.object({
   name: z.string().min(2, "Account name is required"),
@@ -188,7 +190,17 @@ function Label({ children, required }: { children: React.ReactNode; required?: b
   );
 }
 
-export function CrmAccountFormFields({ form }: { form: UseFormReturn<CrmAccountFormValues> }) {
+export function CrmAccountFormFields({
+  form,
+  showModulePicker,
+  selectedModules,
+  onSelectedModulesChange,
+}: {
+  form: UseFormReturn<CrmAccountFormValues>;
+  showModulePicker?: boolean;
+  selectedModules?: CrmProductModuleKey[];
+  onSelectedModulesChange?: (keys: CrmProductModuleKey[]) => void;
+}) {
   const errors = form.formState.errors;
   const users = useUserStore((s) => s.users);
   const city = form.watch("city");
@@ -491,6 +503,18 @@ export function CrmAccountFormFields({ form }: { form: UseFormReturn<CrmAccountF
           </div>
         </div>
       </Section>
+
+      {showModulePicker && selectedModules && onSelectedModulesChange ? (
+        <Section
+          title="Modules & integrations"
+          description="Select the products and integrations purchased for this client. You can change these later on the account dashboard."
+        >
+          <CrmAccountProductModulesPicker
+            selected={selectedModules}
+            onChange={onSelectedModulesChange}
+          />
+        </Section>
+      ) : null}
     </div>
   );
 }

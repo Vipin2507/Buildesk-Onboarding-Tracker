@@ -39,7 +39,7 @@ export const CRM_MODULE_PROVIDERS: Partial<Record<CrmProductModuleKey, string[]>
 };
 
 export function moduleRequiresProvider(key: CrmProductModuleKey): boolean {
-  return key in CRM_MODULE_PROVIDERS;
+  return isCrmIntegrationModule(key) || key in CRM_MODULE_PROVIDERS;
 }
 
 /** Built-in defaults only — prefer resolveCrmProviderOptions() for UI (includes Master edits + Other). */
@@ -148,18 +148,19 @@ export function ensureMasterDataFields(
   };
 }
 
-export const CRM_PRODUCT_MODULES: { key: CrmProductModuleKey; label: string }[] = [
+/** Core CRM product modules (not third-party integrations). */
+export const CRM_CORE_MODULES: { key: CrmProductModuleKey; label: string }[] = [
   { key: "sales-crm", label: "Sales CRM" },
   { key: "cp-application", label: "CP Application" },
   { key: "reception-application", label: "Reception Application" },
-  { key: "site-visit-application", label: "Site Visit Application" },
-  { key: "inventory", label: "Inventory" },
-  { key: "booking", label: "Booking" },
-  { key: "collections", label: "Collections" },
-  { key: "demand-letter", label: "Demand Letter" },
-  { key: "receipt-management", label: "Receipt Management" },
-  { key: "reports", label: "Reports" },
-  { key: "marketing", label: "Marketing" },
+  { key: "sim-call-recording", label: "Sim Based Call Recording" },
+  { key: "ai-call-analysis", label: "AI Call Analysis" },
+  { key: "waha", label: "WAHA" },
+  { key: "auto-dialer", label: "Auto Dialer" },
+];
+
+/** Third-party / channel integrations. */
+export const CRM_INTEGRATION_MODULES: { key: CrmProductModuleKey; label: string }[] = [
   { key: "whatsapp-integration", label: "WhatsApp Integration" },
   { key: "sms-integration", label: "SMS Integration" },
   { key: "ivr-integration", label: "IVR Integration" },
@@ -169,11 +170,22 @@ export const CRM_PRODUCT_MODULES: { key: CrmProductModuleKey; label: string }[] 
   { key: "99acres-integration", label: "99acres Integration" },
   { key: "magicbricks-integration", label: "MagicBricks Integration" },
   { key: "housing-integration", label: "Housing Integration" },
-  { key: "sim-call-recording", label: "Sim Based Call Recording" },
-  { key: "ai-call-analysis", label: "AI Call Analysis" },
-  { key: "waha", label: "WAHA" },
-  { key: "auto-dialer", label: "Auto Dialer" },
 ];
+
+export const CRM_PRODUCT_MODULES: { key: CrmProductModuleKey; label: string }[] = [
+  ...CRM_CORE_MODULES,
+  ...CRM_INTEGRATION_MODULES,
+];
+
+const CRM_INTEGRATION_KEY_SET = new Set(CRM_INTEGRATION_MODULES.map((m) => m.key));
+
+export function isCrmIntegrationModule(key: CrmProductModuleKey | string): boolean {
+  return CRM_INTEGRATION_KEY_SET.has(key as CrmProductModuleKey);
+}
+
+export function isCrmCoreModule(key: CrmProductModuleKey | string): boolean {
+  return !isCrmIntegrationModule(key);
+}
 
 export const CRM_MASTER_CHECKLIST_LABELS: { key: string; label: string }[] = [
   { key: "company_master", label: "Company Master Created" },

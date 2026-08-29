@@ -6,11 +6,8 @@ import type {
   CrmMasterTeam,
 } from "./crm-master";
 
-/** Purchased CRM product features (not Buildesk ModuleKey). */
-export type CrmProductModuleKey =
-  | "sales-crm"
-  | "cp-application"
-  | "reception-application"
+/** @deprecated Legacy ERP module keys kept for older account records. */
+export type CrmLegacyProductModuleKey =
   | "site-visit-application"
   | "inventory"
   | "booking"
@@ -18,7 +15,13 @@ export type CrmProductModuleKey =
   | "demand-letter"
   | "receipt-management"
   | "reports"
-  | "marketing"
+  | "marketing";
+
+/** Purchased CRM product features (not Buildesk ModuleKey). */
+export type CrmProductModuleKey =
+  | "sales-crm"
+  | "cp-application"
+  | "reception-application"
   | "whatsapp-integration"
   | "sms-integration"
   | "ivr-integration"
@@ -31,7 +34,8 @@ export type CrmProductModuleKey =
   | "sim-call-recording"
   | "ai-call-analysis"
   | "waha"
-  | "auto-dialer";
+  | "auto-dialer"
+  | CrmLegacyProductModuleKey;
 
 export type CrmChecklistStatus = "pending" | "completed";
 export type CrmMigrationStatus = "pending" | "in_progress" | "completed";

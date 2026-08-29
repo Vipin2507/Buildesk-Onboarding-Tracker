@@ -20,6 +20,8 @@ import {
   seedCrmMigrationFields,
   seedCrmModuleProviders,
   seedCrmTrainingFields,
+  CRM_CORE_MODULES,
+  CRM_INTEGRATION_MODULES,
   CRM_PRODUCT_MODULES,
   type CrmTrainingTrack,
 } from "@/data/crm-onboarding-defaults";
@@ -314,13 +316,17 @@ export function getCrmMasterBookingHostHours(): CrmBookingHostHoursDef[] {
   return normalizeCrmBookingHostHours(useCrmMasterStore.getState().bookingHostHours);
 }
 
-/** Product modules enabled in Master → Modules (drives account onboarding catalogs). */
+/** Core modules are always available; integrations respect Master → Integrations toggles. */
 export function getCrmMasterProductModuleCatalog(): { key: string; label: string }[] {
   ensureCrmMasterModulesCatalog();
-  return normalizeMasterModules(useCrmMasterStore.getState().modules)
-    .filter((m) => m.enabled)
-    .sort((a, b) => a.order - b.order)
-    .map((m) => ({ key: m.key, label: m.label }));
+  const byKey = new Map(
+    normalizeMasterModules(useCrmMasterStore.getState().modules).map((m) => [m.key, m]),
+  );
+  const core = CRM_CORE_MODULES.map((m) => ({ key: m.key, label: m.label }));
+  const integrations = CRM_INTEGRATION_MODULES.filter(
+    (m) => byKey.get(m.key)?.enabled !== false,
+  ).map((m) => ({ key: m.key, label: m.label }));
+  return [...core, ...integrations];
 }
 
 export function crmMasterSnapshot() {

@@ -1,4 +1,4 @@
-import { Pill } from "@/components/status-pill";
+import { isCrmIntegrationModule } from "@/data/crm-onboarding-defaults";
 
 type ModuleRef = { key: string; label: string };
 
@@ -7,30 +7,40 @@ type Props = {
   maxVisible?: number;
 };
 
-export function CrmAccountModulesCell({ subscribed, maxVisible = 4 }: Props) {
+export function CrmAccountModulesCell({ subscribed }: Props) {
   if (subscribed.length === 0) {
-    return <span className="text-[10px] text-muted-foreground">None</span>;
+    return <span className="text-xs text-muted-foreground">None</span>;
   }
 
-  const visible = subscribed.slice(0, maxVisible);
-  const rest = subscribed.length - visible.length;
+  const core = subscribed.filter((m) => !isCrmIntegrationModule(m.key));
+  const integrations = subscribed.filter((m) => isCrmIntegrationModule(m.key));
+
+  function list(items: ModuleRef[]) {
+    if (items.length === 0) return <span className="text-[11px] text-muted-foreground">—</span>;
+    return (
+      <ul className="space-y-0.5 text-[11px] leading-snug text-foreground">
+        {items.map((m) => (
+          <li key={m.key} className="truncate">
+            {m.label}
+          </li>
+        ))}
+      </ul>
+    );
+  }
 
   return (
-    <div className="min-w-[9rem]">
-      <div className="text-[9px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
-        Subscribed ({subscribed.length})
+    <div className="min-w-[10rem] space-y-2">
+      <div>
+        <div className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Modules ({core.length})
+        </div>
+        {list(core)}
       </div>
-      <div className="mt-0.5 flex flex-wrap gap-0.5">
-        {visible.map((m) => (
-          <Pill key={m.key} tone="success" className="text-[9px]">
-            {m.label}
-          </Pill>
-        ))}
-        {rest > 0 ? (
-          <Pill tone="muted" className="text-[9px]">
-            +{rest}
-          </Pill>
-        ) : null}
+      <div>
+        <div className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Integrations ({integrations.length})
+        </div>
+        {list(integrations)}
       </div>
     </div>
   );

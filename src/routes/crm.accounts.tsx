@@ -65,6 +65,8 @@ import {
 } from "@/stores/crm-dashboard-selectors";
 import { isCrmAccountEnded } from "@/lib/crm-account-status";
 import { sortCrmAccountsByStartDateDesc } from "@/lib/crm-account-sort";
+import { getCrmMasterProductModuleCatalog } from "@/stores/useCrmMasterStore";
+import type { CrmProductModuleKey } from "@/types/crm-onboarding";
 import { COMPANY_TYPES } from "@/types/company";
 import type { CrmAccount } from "@/types/crm-account";
 
@@ -197,6 +199,7 @@ function CrmAccountsPage() {
   const deleteAccount = useCrmAccountStore((s) => s.deleteAccount);
   const markLive = useCrmAccountStore((s) => s.markLive);
   const ensure = useCrmOnboardingStore((s) => s.ensureForCompany);
+  const setProductModuleEnabled = useCrmOnboardingStore((s) => s.setProductModuleEnabled);
   const removeRecord = useCrmOnboardingStore((s) => s.removeRecord);
   const completeAllGoLiveItems = useCrmOnboardingStore((s) => s.completeAllGoLiveItems);
   const updateTracker = useCrmOnboardingStore((s) => s.updateTracker);
@@ -230,6 +233,7 @@ function CrmAccountsPage() {
   const [deleting, setDeleting] = useState<CrmAccountRow | null>(null);
   const [goLiveOpen, setGoLiveOpen] = useState(false);
   const [goingLive, setGoingLive] = useState<CrmAccountRow | null>(null);
+  const [selectedModules, setSelectedModules] = useState<CrmProductModuleKey[]>([]);
 
   const form = useForm<CrmAccountFormValues>({
     resolver: zodResolver(crmAccountSchema),
@@ -444,6 +448,7 @@ function CrmAccountsPage() {
 
   function openCreate() {
     setEditing(null);
+    setSelectedModules([]);
     form.reset(emptyCrmAccountForm());
     setModalOpen(true);
   }
@@ -471,7 +476,15 @@ function CrmAccountsPage() {
             ...data,
             status: "onboarding",
           });
-          ensure(created.id, created.companyType);
+          const record = ensure(created.id, created.companyType);
+          const catalogKeys = new Set(getCrmMasterProductModuleCatalog().map((m) => m.key));
+          for (const mod of record.productModules) {
+            if (!catalogKeys.has(mod.key)) continue;
+            const shouldEnable = selectedModules.includes(mod.key as CrmProductModuleKey);
+            if (mod.enabled !== shouldEnable) {
+              setProductModuleEnabled(created.id, mod.key, shouldEnable);
+            }
+          }
           toast.success(`${created.name} created`, {
             action: {
               label: "Open",
@@ -895,7 +908,7 @@ function CrmAccountsPage() {
                   },
                   {
                     key: "subscribedModules",
-                    header: "Modules",
+                    header: "Modules & integrations",
                     render: (r) => (
                       <CrmAccountModulesCell subscribed={r.subscribedModules} />
                     ),
@@ -1000,14 +1013,22 @@ function CrmAccountsPage() {
         open={modalOpen}
         onOpenChange={(open) => {
           setModalOpen(open);
-          if (!open) setEditing(null);
+          if (!open) {
+            setEditing(null);
+            setSelectedModules([]);
+          }
         }}
         title={editing ? "Edit CRM account" : "Add CRM account"}
         submitLabel={editing ? "Save changes" : "Create account"}
         onSubmit={onSubmit}
         contentClassName="max-w-3xl"
       >
-        <CrmAccountFormFields form={form} />
+        <CrmAccountFormFields
+          form={form}
+          showModulePicker={!editing}
+          selectedModules={selectedModules}
+          onSelectedModulesChange={setSelectedModules}
+        />
       </EntityFormModal>
 
       <CrmAccountBulkUploadModal open={bulkOpen} onOpenChange={setBulkOpen} />

@@ -7,13 +7,13 @@ import {
   Calendar,
   Database,
   GraduationCap,
+  Link2,
   ListChecks,
   Pencil,
   Plus,
   ShieldAlert,
   Table2,
   Trash2,
-  Layers,
   RotateCcw,
   Upload,
 } from "lucide-react";
@@ -31,7 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { flushCrmMasterConfigPersistence } from "@/lib/config-persistence";
-import { CRM_MODULE_PROVIDERS, CRM_PRODUCT_MODULES } from "@/data/crm-onboarding-defaults";
+import { CRM_MODULE_PROVIDERS, CRM_INTEGRATION_MODULES, isCrmIntegrationModule } from "@/data/crm-onboarding-defaults";
 import { normalizeCrmBookingHostHours } from "@/data/crm-booking-defaults";
 import {
   ensureCrmMasterModulesCatalog,
@@ -62,8 +62,7 @@ const SECTIONS = [
   { id: "account-fields", label: "Account Fields", icon: Building2 },
   { id: "project-fields", label: "Project Fields", icon: Boxes },
   { id: "picklists", label: "Picklists", icon: ListChecks },
-  { id: "modules", label: "Modules", icon: Layers },
-  { id: "providers", label: "Providers", icon: Database },
+  { id: "integrations", label: "Integrations", icon: Link2 },
   { id: "migration", label: "Migration", icon: Upload },
   { id: "training", label: "Training", icon: GraduationCap },
   { id: "bookings", label: "Meetings", icon: Calendar },
@@ -157,8 +156,7 @@ function CrmMasterPage() {
             {section === "account-fields" ? <FieldsPanel entity="account" /> : null}
             {section === "project-fields" ? <FieldsPanel entity="project" /> : null}
             {section === "picklists" ? <PicklistsPanel /> : null}
-            {section === "modules" ? <ModulesPanel /> : null}
-            {section === "providers" ? <ProvidersPanel /> : null}
+            {section === "integrations" ? <IntegrationsPanel /> : null}
             {section === "migration" ? <MigrationPanel /> : null}
             {section === "training" ? <TrainingPanel /> : null}
             {section === "bookings" ? <BookingsPanel /> : null}
@@ -203,10 +201,10 @@ function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) 
       suffix: "values",
     },
     {
-      label: "Modules",
-      value: modules.filter((m) => m.enabled).length,
-      total: modules.length,
-      to: "modules" as const,
+      label: "Integrations",
+      value: modules.filter((m) => isCrmIntegrationModule(m.key) && m.enabled).length,
+      total: CRM_INTEGRATION_MODULES.length,
+      to: "integrations" as const,
     },
     {
       label: "Migration",
@@ -667,83 +665,9 @@ function PicklistsPanel() {
   );
 }
 
-function ModulesPanel() {
+function IntegrationsPanel() {
   const modules = useCrmMasterStore((s) => s.modules);
   const updateModule = useCrmMasterStore((s) => s.updateModule);
-  const applyToAllAccounts = useCrmOnboardingStore((s) => s.applyProductModulesCatalogToAllAccounts);
-  const accountCount = useCrmOnboardingStore((s) => s.records.length);
-
-  useEffect(() => {
-    ensureCrmMasterModulesCatalog();
-  }, []);
-
-  function syncForMe() {
-    flushCrmMasterConfigPersistence();
-    toast.success("Module catalog saved", {
-      description:
-        "Synced to server for all admins. Account records update when each account is opened.",
-    });
-  }
-
-  function syncForAll() {
-    flushCrmMasterConfigPersistence();
-    const updated = applyToAllAccounts();
-    toast.success("Module catalog applied to all accounts", {
-      description:
-        updated > 0
-          ? `Updated ${updated} of ${accountCount} CRM account onboarding record(s).`
-          : `All ${accountCount} account(s) already matched the master catalog.`,
-    });
-  }
-
-  const enabledCount = getCrmMasterProductModuleCatalog().length;
-
-  return (
-    <div className="space-y-2.5">
-      <div>
-        <h3 className="text-sm font-semibold">CRM modules</h3>
-        <p className="text-[10px] text-muted-foreground">
-          Enable or disable product modules available during account onboarding. Changes sync to the
-          server for all admins. Use the buttons below to push the catalog into account records.
-        </p>
-      </div>
-      <div className="card-soft flex flex-col gap-2 border border-primary/20 bg-primary/5 p-2.5 sm:flex-row sm:items-center sm:justify-between">
-        <div className="text-[10px] text-muted-foreground">
-          <span className="font-medium text-foreground">{enabledCount}</span> module(s) enabled in
-          master · <span className="font-medium text-foreground">{accountCount}</span> CRM account(s)
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={syncForMe}>
-            Update for me
-          </Button>
-          <Button type="button" size="sm" className="h-7 text-xs" onClick={syncForAll}>
-            Update for all
-          </Button>
-        </div>
-      </div>
-      <div className="space-y-1.5">
-        {modules
-          .slice()
-          .sort((a, b) => a.order - b.order)
-          .map((m) => (
-            <div key={m.id} className="card-soft flex items-center justify-between gap-2 p-2.5">
-              <div className="min-w-0">
-                <div className="text-xs font-medium">{m.label}</div>
-                <div className="text-[10px] text-muted-foreground">{m.description}</div>
-              </div>
-              <Switch
-                size="sm"
-                checked={m.enabled}
-                onCheckedChange={(v) => updateModule(m.id, { enabled: v === true })}
-              />
-            </div>
-          ))}
-      </div>
-    </div>
-  );
-}
-
-function ProvidersPanel() {
   const moduleProviders = useCrmMasterStore((s) => s.moduleProviders);
   const setModuleProviders = useCrmMasterStore((s) => s.setModuleProviders);
   const applyToAllAccounts = useCrmOnboardingStore((s) => s.applyProductModulesCatalogToAllAccounts);
@@ -756,12 +680,14 @@ function ProvidersPanel() {
 
   const integrationModules = useMemo(
     () =>
-      CRM_PRODUCT_MODULES.filter((m) => m.key in CRM_MODULE_PROVIDERS).map((m) => ({
-        key: m.key as CrmProductModuleKey,
-        label: m.label,
-      })),
-    [],
+      modules
+        .filter((m) => isCrmIntegrationModule(m.key))
+        .slice()
+        .sort((a, b) => a.order - b.order),
+    [modules],
   );
+
+  const enabledCount = integrationModules.filter((m) => m.enabled).length;
 
   function providersFor(key: string) {
     const fromStore = moduleProviders?.[key];
@@ -797,115 +723,116 @@ function ProvidersPanel() {
     toast.success(`Added ${value}`);
   }
 
+  function syncForMe() {
+    flushCrmMasterConfigPersistence();
+    toast.success("Integration catalog saved", {
+      description:
+        "Synced to server for all admins. Account records update when each account is opened.",
+    });
+  }
+
+  function syncForAll() {
+    flushCrmMasterConfigPersistence();
+    const updated = applyToAllAccounts();
+    toast.success("Integration catalog applied to all accounts", {
+      description:
+        updated > 0
+          ? `Updated ${updated} of ${accountCount} CRM account onboarding record(s).`
+          : `All ${accountCount} account(s) already matched the master catalog.`,
+    });
+  }
+
   return (
     <div className="space-y-2.5">
       <div>
-        <h3 className="text-sm font-semibold">Integration providers</h3>
+        <h3 className="text-sm font-semibold">Integrations</h3>
         <p className="text-[10px] text-muted-foreground">
-          Rename, add, or remove vendor options shown on account Modules. Provider lists are read
-          live from master — save to sync across admins, then apply to accounts if needed.
+          Enable integrations for account onboarding and manage vendor/provider options shown when
+          configuring each integration on an account.
         </p>
       </div>
 
       <div className="card-soft flex flex-col gap-2 border border-primary/20 bg-primary/5 p-2.5 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-[10px] text-muted-foreground">
-          Provider options apply immediately on account Modules screens after server sync.
+          <span className="font-medium text-foreground">{enabledCount}</span> of{" "}
+          {integrationModules.length} integration(s) enabled ·{" "}
+          <span className="font-medium text-foreground">{accountCount}</span> CRM account(s)
         </div>
         <div className="flex flex-wrap gap-1.5">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-7 text-xs"
-            onClick={() => {
-              flushCrmMasterConfigPersistence();
-              toast.success("Providers saved", {
-                description: "Synced to server for all admins.",
-              });
-            }}
-          >
+          <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={syncForMe}>
             Update for me
           </Button>
-          <Button
-            type="button"
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => {
-              flushCrmMasterConfigPersistence();
-              const updated = applyToAllAccounts();
-              toast.success("Providers and module catalog applied", {
-                description:
-                  updated > 0
-                    ? `Updated ${updated} of ${accountCount} account record(s).`
-                    : `All ${accountCount} account(s) already up to date.`,
-              });
-            }}
-          >
+          <Button type="button" size="sm" className="h-7 text-xs" onClick={syncForAll}>
             Update for all
           </Button>
         </div>
       </div>
 
-      <div className="space-y-2">
-        {integrationModules.map((mod) => {
-          const list = providersFor(mod.key);
-          return (
-            <div key={mod.key} className="card-soft space-y-2 p-2.5">
-              <div className="text-xs font-medium">{mod.label}</div>
-              <div className="space-y-1">
-                {list.map((name, index) => (
-                  <div key={`${mod.key}-${index}`} className="flex items-center gap-1.5">
-                    <input
-                      className="h-7 flex-1 rounded-md border bg-background px-2 text-xs"
-                      value={name}
-                      onChange={(e) => renameProvider(mod.key, index, e.target.value)}
-                      onBlur={(e) => {
-                        if (!e.target.value.trim()) {
-                          removeProvider(mod.key, index);
-                        }
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 w-7 shrink-0 p-0 text-muted-foreground hover:text-destructive"
-                      onClick={() => removeProvider(mod.key, index)}
-                      aria-label={`Remove ${name}`}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-              <div className="flex items-center gap-1.5">
-                <input
-                  className="h-7 flex-1 rounded-md border bg-background px-2 text-xs"
-                  placeholder="Add provider name…"
-                  value={drafts[mod.key] ?? ""}
-                  onChange={(e) => setDrafts((d) => ({ ...d, [mod.key]: e.target.value }))}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addProvider(mod.key);
-                    }
-                  }}
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-7 gap-1 text-xs"
-                  onClick={() => addProvider(mod.key)}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Add
-                </Button>
-              </div>
+      <div className="space-y-1.5">
+        {integrationModules.map((m) => (
+          <div key={m.id} className="card-soft flex items-center justify-between gap-2 p-2.5">
+            <div className="min-w-0">
+              <div className="text-xs font-medium">{m.label}</div>
+              <div className="text-[10px] text-muted-foreground">{m.description}</div>
             </div>
-          );
-        })}
+            <Switch
+              size="sm"
+              checked={m.enabled}
+              onCheckedChange={(v) => updateModule(m.id, { enabled: v === true })}
+            />
+          </div>
+        ))}
       </div>
+
+      {integrationModules
+        .filter((m) => m.enabled)
+        .map((mod) => (
+          <div key={mod.key} className="card-soft space-y-2 p-3">
+            <div>
+              <h4 className="text-xs font-semibold">{mod.label} providers</h4>
+              <p className="text-[10px] text-muted-foreground">
+                Vendor options shown on account Integrations when configuring this integration.
+              </p>
+            </div>
+            <div className="space-y-1">
+              {providersFor(mod.key).map((provider, index) => (
+                <div key={`${mod.key}-${index}`} className="flex items-center gap-1.5">
+                  <input
+                    value={provider}
+                    onChange={(e) => renameProvider(mod.key, index, e.target.value)}
+                    className="h-8 min-w-0 flex-1 rounded-md border bg-background px-2 text-xs"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 w-8 shrink-0 p-0 text-destructive"
+                    onClick={() => removeProvider(mod.key, index)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <input
+                value={drafts[mod.key] ?? ""}
+                onChange={(e) => setDrafts((d) => ({ ...d, [mod.key]: e.target.value }))}
+                placeholder="Add provider…"
+                className="h-8 min-w-[10rem] flex-1 rounded-md border bg-background px-2 text-xs"
+              />
+              <Button
+                type="button"
+                size="sm"
+                className="h-8 gap-1 text-xs"
+                onClick={() => addProvider(mod.key)}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add
+              </Button>
+            </div>
+          </div>
+        ))}
     </div>
   );
 }
