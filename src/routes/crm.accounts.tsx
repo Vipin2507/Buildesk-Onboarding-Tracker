@@ -841,20 +841,20 @@ function CrmAccountsPage() {
                             {r.name}
                           </a>
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          {r.city}
-                          {r.region ? ` · ${r.region}` : ""}
+                        <div className="font-mono text-xs text-muted-foreground">
+                          {r.userId?.trim() || "—"}
                         </div>
                       </div>
                     ),
                   },
                   {
-                    key: "userId",
-                    header: "User ID",
+                    key: "city",
+                    header: "Location",
                     sortable: true,
                     render: (r) => (
-                      <span className="font-mono text-xs text-muted-foreground">
-                        {r.userId?.trim() || "—"}
+                      <span className="text-xs text-muted-foreground">
+                        {r.city}
+                        {r.region ? ` · ${r.region}` : ""}
                       </span>
                     ),
                   },

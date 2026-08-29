@@ -15,11 +15,14 @@ export function AppSidebar() {
   const { isAdmin, can } = usePermissions();
   const navItems = filterNavItems(APP_NAV, { isAdmin, can });
   const chatBadge = useChatStore((s) => s.getLiveChatBadgeCount("erp"));
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   useEffect(() => {
     try {
-      setCollapsed(localStorage.getItem(STORAGE_KEY) === "1");
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored !== null) {
+        setCollapsed(stored === "1");
+      }
     } catch {
       /* ignore */
     }

@@ -18,11 +18,14 @@ export function CrmSidebar() {
   const isAdmin = user?.role === "Admin";
   const chatBadge = useChatStore((s) => s.getLiveChatBadgeCount("crm"));
   const upcomingTaskBadge = useUpcomingTaskReminderCount();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   useEffect(() => {
     try {
-      setCollapsed(localStorage.getItem(STORAGE_KEY) === "1");
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored !== null) {
+        setCollapsed(stored === "1");
+      }
     } catch {
       /* ignore */
     }
