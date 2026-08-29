@@ -32,6 +32,7 @@ import {
   mergeCrmTrainingSessions,
   needsProductModulesUpgrade,
   normalizeCrmMasterChecklist,
+  syncGoLiveChecklistFromTabs,
 } from "@/data/crm-onboarding-defaults";
 import { resolveCrmMigrationCatalog } from "@/lib/crm-migration-catalog";
 import { resolveCrmTrainingCatalogForCompany } from "@/lib/crm-training-catalog";
@@ -202,7 +203,10 @@ function updateRecord(
   companyId: string,
   mutator: (r: CrmOnboardingRecord) => CrmOnboardingRecord,
 ): CrmOnboardingRecord[] {
-  return records.map((r) => (r.companyId === companyId ? touch(mutator(r)) : r));
+  return records.map((r) => {
+    if (r.companyId !== companyId) return r;
+    return touch(syncGoLiveChecklistFromTabs(mutator(r)));
+  });
 }
 
 function mapMaster(
@@ -321,14 +325,16 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
     hydratingCrmOnboarding = true;
     try {
       rawSet({
-        records: records.map((r) => ({
-          ...r,
-          masterProjects: r.masterProjects ?? [],
-          masterSources: r.masterSources ?? [],
-          masterStatuses: r.masterStatuses ?? [],
-          masterFollowUps: r.masterFollowUps ?? [],
-          masterTeams: r.masterTeams ?? [],
-        })),
+        records: records.map((r) =>
+          syncGoLiveChecklistFromTabs({
+            ...r,
+            masterProjects: r.masterProjects ?? [],
+            masterSources: r.masterSources ?? [],
+            masterStatuses: r.masterStatuses ?? [],
+            masterFollowUps: r.masterFollowUps ?? [],
+            masterTeams: r.masterTeams ?? [],
+          }),
+        ),
       });
     } finally {
       hydratingCrmOnboarding = false;
@@ -461,7 +467,15 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
         get().resetTrainingForCompanyType(companyId, companyType);
         return get().getByCompanyId(companyId)!;
       }
-      return get().getByCompanyId(companyId)!;
+      const latest = get().getByCompanyId(companyId)!;
+      const synced = syncGoLiveChecklistFromTabs(latest);
+      if (synced !== latest) {
+        set((s) => ({
+          records: s.records.map((r) => (r.companyId === companyId ? touch(synced) : r)),
+        }));
+        return synced;
+      }
+      return latest;
     }
     const created = createCrmOnboardingRecord(
       companyId,

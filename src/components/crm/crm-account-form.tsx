@@ -16,7 +16,16 @@ import { COMPANY_TYPES, type CompanyRegion, type CompanyType } from "@/types/com
 import type { CrmAccount } from "@/types/crm-account";
 import type { CrmProductModuleKey } from "@/types/crm-onboarding";
 import { CrmAccountProductModulesPicker } from "@/components/crm/crm-account-product-modules-picker";
+import { CrmAccountCommercialFields } from "@/components/crm/crm-account-commercial-fields";
+import {
+  buildInstallmentSchedule,
+  calcInstallmentAmount,
+  calcValuePerUser,
+  installmentBaseAmount,
+  roundMoney,
+} from "@/lib/crm-account-commercial";
 import { normalizePortalSlug, portalDashboardPath } from "@/lib/design-ticket-portal";
+import type { CrmAccountInstallment } from "@/types/crm-account";
 
 export const crmAccountSchema = z.object({
   name: z.string().min(2, "Account name is required"),
@@ -44,7 +53,18 @@ export const crmAccountSchema = z.object({
   supportManager2: z.string().optional(),
   usersPurchased: z.coerce.number().int().min(1, "Users purchased is required"),
   dealSize: z.coerce.number().min(0),
+  valuePerUser: z.coerce.number().min(0).optional(),
   pendingAmount: z.coerce.number().min(0),
+  installmentCount: z.coerce.number().int().min(0).optional(),
+  installmentAmount: z.coerce.number().min(0).optional(),
+  installments: z
+    .array(
+      z.object({
+        amount: z.coerce.number().min(0),
+        dueDate: z.string(),
+      }),
+    )
+    .optional(),
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
   portalApiKey: z.string().optional(),
@@ -74,7 +94,11 @@ export function emptyCrmAccountForm(): CrmAccountFormValues {
     supportManager2: "",
     usersPurchased: 1,
     dealSize: 0,
+    valuePerUser: 0,
     pendingAmount: 0,
+    installmentCount: 0,
+    installmentAmount: 0,
+    installments: [] as CrmAccountInstallment[],
     startDate: today,
     endDate: end,
     portalApiKey: "",
@@ -85,6 +109,11 @@ export function crmAccountToFormValues(account: CrmAccount): CrmAccountFormValue
   const ownerName = account.ownerName ?? account.contact;
   const ownerPhone = account.ownerPhone ?? account.phone;
   const ownerEmail = account.ownerEmail ?? account.email;
+  const deal = account.dealSize ?? account.totalCost ?? 0;
+  const users = account.usersPurchased ?? 1;
+  const pending = account.pendingAmount ?? 0;
+  const installments = account.installments ?? [];
+  const installmentCount = account.installmentCount ?? installments.length;
   return {
     name: account.name,
     userId: account.userId ?? "",
@@ -102,9 +131,15 @@ export function crmAccountToFormValues(account: CrmAccount): CrmAccountFormValue
     salesManagerName: account.salesManagerName ?? "",
     supportManager1: account.supportManager1 ?? "",
     supportManager2: account.supportManager2 ?? "",
-    usersPurchased: account.usersPurchased ?? 1,
-    dealSize: account.dealSize ?? account.totalCost ?? 0,
-    pendingAmount: account.pendingAmount ?? 0,
+    usersPurchased: users,
+    dealSize: deal,
+    valuePerUser: account.valuePerUser ?? calcValuePerUser(deal, users),
+    pendingAmount: pending,
+    installmentCount,
+    installmentAmount:
+      installments[0]?.amount ??
+      calcInstallmentAmount(installmentBaseAmount(deal, pending), installmentCount),
+    installments,
     startDate: account.startDate ?? "",
     endDate: account.endDate ?? "",
   };
@@ -116,7 +151,17 @@ export function normalizeCrmAccountForm(data: CrmAccountFormValues) {
   const ownerPhone = data.ownerPhone.trim();
   const ownerEmail = data.ownerEmail.trim();
   const dealSize = Number(data.dealSize) || 0;
+  const usersPurchased = Number(data.usersPurchased) || 1;
   const pendingAmount = Number(data.pendingAmount) || 0;
+  const valuePerUser =
+    data.valuePerUser != null && !Number.isNaN(Number(data.valuePerUser))
+      ? roundMoney(Number(data.valuePerUser))
+      : calcValuePerUser(dealSize, usersPurchased);
+  const installmentCount = Math.max(0, Math.floor(Number(data.installmentCount) || 0));
+  const installments = (data.installments ?? []).map((row) => ({
+    amount: roundMoney(Number(row.amount) || 0),
+    dueDate: row.dueDate.slice(0, 10),
+  }));
   return {
     name: data.name.trim(),
     userId: data.userId.trim(),
@@ -137,11 +182,14 @@ export function normalizeCrmAccountForm(data: CrmAccountFormValues) {
     salesManagerName: data.salesManagerName.trim(),
     supportManager1: data.supportManager1.trim(),
     supportManager2: (data.supportManager2 ?? "").trim() || undefined,
-    usersPurchased: Number(data.usersPurchased) || 1,
+    usersPurchased,
     dealSize,
+    valuePerUser,
     totalCost: dealSize,
     pendingAmount,
-    paymentReceived: Math.max(0, dealSize - pendingAmount),
+    paymentReceived: Math.max(0, roundMoney(dealSize - pendingAmount)),
+    installmentCount: installmentCount || undefined,
+    installments: installments.length > 0 ? installments : undefined,
     annualLicense: true,
     startDate: data.startDate,
     endDate: data.endDate,
@@ -471,66 +519,8 @@ export function CrmAccountFormFields({
         ) : null}
       </Section>
 
-      <Section title="Commercial" description="License seats, deal value, and contract dates.">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <Label required>Users purchased</Label>
-            <input
-              type="number"
-              min={1}
-              step={1}
-              {...form.register("usersPurchased")}
-              className={fieldClass(!!errors.usersPurchased)}
-            />
-            <FieldError message={errors.usersPurchased?.message} />
-          </div>
-          <div>
-            <Label>Total deal value (₹)</Label>
-            <input
-              type="number"
-              min={0}
-              step="any"
-              {...form.register("dealSize")}
-              className={fieldClass(!!errors.dealSize)}
-            />
-            <FieldError message={errors.dealSize?.message} />
-          </div>
-          <div>
-            <Label>Pending amount (₹)</Label>
-            <input
-              type="number"
-              min={0}
-              step="any"
-              {...form.register("pendingAmount")}
-              className={fieldClass(!!errors.pendingAmount)}
-            />
-            <FieldError message={errors.pendingAmount?.message} />
-          </div>
-          <div>
-            <Label required>Start date</Label>
-            <DatePickerField
-              modal
-              className="mt-1.5"
-              value={form.watch("startDate") ?? ""}
-              onChange={(v) =>
-                form.setValue("startDate", v, { shouldValidate: true, shouldDirty: true })
-              }
-            />
-            <FieldError message={errors.startDate?.message} />
-          </div>
-          <div>
-            <Label required>End date</Label>
-            <DatePickerField
-              modal
-              className="mt-1.5"
-              value={form.watch("endDate") ?? ""}
-              onChange={(v) =>
-                form.setValue("endDate", v, { shouldValidate: true, shouldDirty: true })
-              }
-            />
-            <FieldError message={errors.endDate?.message} />
-          </div>
-        </div>
+      <Section title="Commercial" description="License seats, deal value, installments, and contract dates.">
+        <CrmAccountCommercialFields form={form} />
       </Section>
 
       {showModulePicker && selectedModules && onSelectedModulesChange ? (

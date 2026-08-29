@@ -1,3 +1,4 @@
+import { serializeInstallments } from "@/lib/crm-account-commercial";
 import type { CrmAccount } from "@/types/crm-account";
 import { newId, nowIso } from "@/types/common";
 import { notifyCrmGoLive } from "@/lib/crm-notify";
@@ -51,9 +52,15 @@ function toApiPayload(account: CrmAccount) {
     annualLicense: account.annualLicense,
     dealSize: account.dealSize,
     usersPurchased: account.usersPurchased,
+    valuePerUser: account.valuePerUser,
     totalCost: account.totalCost,
     paymentReceived: account.paymentReceived,
     pendingAmount: account.pendingAmount,
+    installmentCount: account.installmentCount,
+    installmentsJson:
+      account.installments && account.installments.length > 0
+        ? serializeInstallments(account.installments)
+        : null,
     healthScore: account.healthScore,
     status: account.status,
     createdAt: account.createdAt,

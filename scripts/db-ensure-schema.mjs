@@ -276,6 +276,9 @@ const EXTRA_COLUMNS = [
   { table: "follow_up_tasks", name: "source", ddl: "TEXT NOT NULL DEFAULT 'manual'" },
   { table: "follow_up_tasks", name: "booking_appointment_id", ddl: "TEXT" },
   { table: "follow_up_tasks", name: "product_scope", ddl: "TEXT NOT NULL DEFAULT 'erp'" },
+  { table: "crm_accounts", name: "value_per_user", ddl: "REAL" },
+  { table: "crm_accounts", name: "installment_count", ddl: "INTEGER" },
+  { table: "crm_accounts", name: "installments_json", ddl: "TEXT" },
 ];
 
 for (const col of EXTRA_COLUMNS) {
@@ -804,9 +807,12 @@ if (!tableExists("crm_accounts")) {
       annual_license INTEGER,
       deal_size REAL,
       users_purchased INTEGER,
+      value_per_user REAL,
       total_cost REAL,
       payment_received REAL,
       pending_amount REAL,
+      installment_count INTEGER,
+      installments_json TEXT,
       health_score INTEGER,
       status TEXT NOT NULL DEFAULT 'onboarding',
       created_at TEXT NOT NULL,

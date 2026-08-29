@@ -8,6 +8,7 @@ import * as t from "@/server/db/schema";
 import { canViewCrmAccount, crmSalesManagerNamesMatch } from "@/lib/crm-account-access";
 import { sortCrmAccountsByStartDateDesc } from "@/lib/crm-account-sort";
 import { isAdminRoleKey } from "@/lib/permissions";
+import { parseInstallmentsJson } from "@/lib/crm-account-commercial";
 import type { CrmAccount } from "@/types/crm-account";
 import type { CompanyType } from "@/types/company";
 
@@ -40,9 +41,12 @@ function mapRow(row: typeof t.crmAccounts.$inferSelect): CrmAccount {
     annualLicense: row.annualLicense ?? undefined,
     dealSize: row.dealSize ?? undefined,
     usersPurchased: row.usersPurchased ?? undefined,
+    valuePerUser: row.valuePerUser ?? undefined,
     totalCost: row.totalCost ?? undefined,
     paymentReceived: row.paymentReceived ?? undefined,
     pendingAmount: row.pendingAmount ?? undefined,
+    installmentCount: row.installmentCount ?? undefined,
+    installments: parseInstallmentsJson(row.installmentsJson),
     healthScore: row.healthScore ?? undefined,
     status: status as CrmAccount["status"],
     createdAt: row.createdAt,
@@ -77,9 +81,12 @@ const accountInput = z.object({
   annualLicense: z.boolean().optional().nullable(),
   dealSize: z.number().optional().nullable(),
   usersPurchased: z.number().int().optional().nullable(),
+  valuePerUser: z.number().optional().nullable(),
   totalCost: z.number().optional().nullable(),
   paymentReceived: z.number().optional().nullable(),
   pendingAmount: z.number().optional().nullable(),
+  installmentCount: z.number().int().optional().nullable(),
+  installmentsJson: z.string().optional().nullable(),
   healthScore: z.number().int().optional().nullable(),
   status: z.enum(["active", "onboarding", "live", "suspended", "inactive", "closed"]).optional(),
   createdAt: z.string().optional(),
@@ -119,9 +126,12 @@ function toRowValues(
     annualLicense: data.annualLicense ?? null,
     dealSize: data.dealSize ?? null,
     usersPurchased: data.usersPurchased ?? null,
+    valuePerUser: data.valuePerUser ?? null,
     totalCost: data.totalCost ?? null,
     paymentReceived: data.paymentReceived ?? null,
     pendingAmount: data.pendingAmount ?? null,
+    installmentCount: data.installmentCount ?? null,
+    installmentsJson: data.installmentsJson ?? null,
     healthScore: data.healthScore ?? null,
     status: data.status ?? "onboarding",
     createdAt,

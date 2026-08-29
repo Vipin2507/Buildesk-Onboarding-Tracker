@@ -31,9 +31,17 @@ export type CrmAccount = Timestamps & {
   annualLicense?: boolean;
   dealSize?: number;
   usersPurchased?: number;
+  valuePerUser?: number;
   totalCost?: number;
   paymentReceived?: number;
   pendingAmount?: number;
+  installmentCount?: number;
+  installments?: CrmAccountInstallment[];
   healthScore?: number;
   status: "active" | "onboarding" | "live" | "suspended" | "inactive" | "closed";
+};
+
+export type CrmAccountInstallment = {
+  amount: number;
+  dueDate: string;
 };

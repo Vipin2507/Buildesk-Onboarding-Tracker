@@ -21,6 +21,7 @@ import {
   CRM_GO_LIVE_CATEGORIES,
   crmGoLiveReady,
   isCrmGoLiveItemComplete,
+  isGoLiveTabSyncedItem,
 } from "@/data/crm-onboarding-defaults";
 import {
   crmAssigneeSelectPatch,
@@ -110,6 +111,10 @@ export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who 
   }
 
   function handleDoneToggle(item: CrmGoLiveChecklistItem, checked: boolean) {
+    if (isGoLiveTabSyncedItem(item.key)) {
+      toast.info("This readiness item syncs automatically from its onboarding tab.");
+      return;
+    }
     if (!checked) {
       setGoLiveItem(companyId, item.key, "pending");
       return;
@@ -129,6 +134,10 @@ export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who 
   }
 
   function setCompletedDate(item: CrmGoLiveChecklistItem, value: string) {
+    if (isGoLiveTabSyncedItem(item.key)) {
+      toast.info("This readiness item syncs automatically from its onboarding tab.");
+      return;
+    }
     const date = value.trim().slice(0, 10);
     if (!date) {
       setGoLiveItem(companyId, item.key, "pending");
@@ -188,7 +197,8 @@ export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who 
       >
         <p className="mb-2 text-[10px] text-muted-foreground">
           Confirm readiness, verification, sign-off, and handover before (or while) going live.
-          Turning Done on asks for a completed date.
+          Readiness items (Masters, Migration, Integrations, Training, Reports) auto-complete when
+          their tab reaches 100%.
         </p>
         <ProgressBar value={pct} className="mb-3 h-1.5" />
 
@@ -247,6 +257,11 @@ export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who 
                           )}
                         >
                           {item.label}
+                          {isGoLiveTabSyncedItem(item.key) ? (
+                            <Pill tone="info" className="ml-1.5 align-middle text-[9px]">
+                              Auto-synced
+                            </Pill>
+                          ) : null}
                         </div>
                         <Pill tone={na ? "muted" : doneItem ? "success" : "warning"}>
                           {na ? "N/A" : doneItem ? "Done" : "Pending"}
@@ -256,14 +271,14 @@ export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who 
                         <span className="text-[10px] text-muted-foreground">Completed</span>
                         <Switch
                           size="sm"
-                          disabled={na}
+                          disabled={na || isGoLiveTabSyncedItem(item.key)}
                           checked={!na && item.status === "completed"}
                           onCheckedChange={(v) => handleDoneToggle(item, v)}
                         />
                       </div>
                       <DatePickerField
                         compact
-                        disabled={na}
+                        disabled={na || isGoLiveTabSyncedItem(item.key)}
                         placeholder="Completed date"
                         value={item.completedAt ?? ""}
                         onChange={(v) => setCompletedDate(item, v)}
@@ -348,12 +363,17 @@ export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who 
                               na && "text-muted-foreground line-through",
                             )}
                           >
-                            {item.label}
+                            <span>{item.label}</span>
+                            {isGoLiveTabSyncedItem(item.key) ? (
+                              <Pill tone="info" className="ml-1.5 align-middle text-[9px]">
+                                Auto-synced
+                              </Pill>
+                            ) : null}
                           </td>
                           <td className="px-2 py-2 text-center">
                             <Switch
                               size="sm"
-                              disabled={na}
+                              disabled={na || isGoLiveTabSyncedItem(item.key)}
                               checked={!na && item.status === "completed"}
                               onCheckedChange={(v) => handleDoneToggle(item, v)}
                             />
@@ -377,7 +397,7 @@ export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who 
                             <DatePickerField
                               compact
                               className="w-40"
-                              disabled={na}
+                              disabled={na || isGoLiveTabSyncedItem(item.key)}
                               placeholder="Completed date"
                               value={item.completedAt ?? ""}
                               onChange={(v) => setCompletedDate(item, v)}

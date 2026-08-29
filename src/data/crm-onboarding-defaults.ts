@@ -84,6 +84,79 @@ export function calcModuleWorkflowProgress(module: CrmProductModule): number {
   return Math.round((steps.filter((s) => s.done).length / steps.length) * 100);
 }
 
+/** Enabled integration modules workflow completion (100 when none opted). */
+export function calcIntegrationsTabProgress(record: CrmOnboardingRecord): number {
+  const integrations = record.productModules.filter(
+    (m) => m.enabled && isCrmIntegrationModule(m.key),
+  );
+  if (integrations.length === 0) return 100;
+  const sum = integrations.reduce((acc, m) => acc + calcModuleWorkflowProgress(m), 0);
+  return Math.round(sum / integrations.length);
+}
+
+export function calcTrainingTabProgress(record: CrmOnboardingRecord): number {
+  const applicable = record.trainingSessions.filter((s) => !s.notApplicable);
+  if (applicable.length === 0) return 100;
+  const done = applicable.filter((s) => s.completed || (s.sessionCount ?? 0) > 0).length;
+  return Math.round((done / applicable.length) * 100);
+}
+
+export function calcReportsTabProgress(record: CrmOnboardingRecord): number {
+  const applicable = record.reportChecklist.filter((r) => !r.notApplicable);
+  if (applicable.length === 0) return 100;
+  const done = applicable.filter((r) => r.status === "explained").length;
+  return Math.round((done / applicable.length) * 100);
+}
+
+const GO_LIVE_TAB_SYNC_KEYS: Record<
+  "masters" | "data_migration" | "integrations" | "training" | "reports",
+  (record: CrmOnboardingRecord) => boolean
+> = {
+  masters: (record) => calcChecklistProgress(record.masterChecklist) >= 100,
+  data_migration: (record) => calcChecklistProgress(record.migrationChecklist) >= 100,
+  integrations: (record) => calcIntegrationsTabProgress(record) >= 100,
+  training: (record) => calcTrainingTabProgress(record) >= 100,
+  reports: (record) => calcReportsTabProgress(record) >= 100,
+};
+
+export function isGoLiveTabSyncedItem(key: string): key is keyof typeof GO_LIVE_TAB_SYNC_KEYS {
+  return key in GO_LIVE_TAB_SYNC_KEYS;
+}
+
+/** Keep Go-Live readiness rows aligned with Masters / Migration / Integrations / Training / Reports tabs. */
+export function syncGoLiveChecklistFromTabs(record: CrmOnboardingRecord): CrmOnboardingRecord {
+  const today = new Date().toISOString().slice(0, 10);
+  let changed = false;
+
+  const goLiveChecklist = record.goLiveChecklist.map((item) => {
+    const isTabSynced = item.key in GO_LIVE_TAB_SYNC_KEYS;
+    if (!isTabSynced) return item;
+    if (item.notApplicable) return item;
+
+    const complete = GO_LIVE_TAB_SYNC_KEYS[item.key as keyof typeof GO_LIVE_TAB_SYNC_KEYS](record);
+
+    if (complete) {
+      if (item.status === "completed" && item.completedAt) return item;
+      changed = true;
+      return {
+        ...item,
+        status: "completed" as const,
+        completedAt: item.completedAt ?? today,
+      };
+    }
+
+    if (item.status === "completed") {
+      changed = true;
+      return { ...item, status: "pending" as const, completedAt: undefined };
+    }
+
+    return item;
+  });
+
+  if (!changed) return record;
+  return { ...record, goLiveChecklist };
+}
+
 const DEFAULT_SOURCE_VALUES = [
   "Website",
   "Meta Ads",
