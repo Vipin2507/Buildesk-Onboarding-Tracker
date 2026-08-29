@@ -506,8 +506,8 @@ export function CrmAccountFormFields({
 
       {showModulePicker && selectedModules && onSelectedModulesChange ? (
         <Section
-          title="Modules & integrations"
-          description="Select the products and integrations purchased for this client. You can change these later on the account dashboard."
+          title="Modules"
+          description="Select the CRM products purchased for this client. Integrations can be configured later from the account hub."
         >
           <CrmAccountProductModulesPicker
             selected={selectedModules}

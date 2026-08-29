@@ -1,11 +1,8 @@
 import { useMemo } from "react";
+import { Check, Package } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import {
-  CRM_CORE_MODULES,
-  CRM_INTEGRATION_MODULES,
-  isCrmIntegrationModule,
-} from "@/data/crm-onboarding-defaults";
+import { CRM_CORE_MODULES } from "@/data/crm-onboarding-defaults";
 import { getCrmMasterProductModuleCatalog } from "@/stores/useCrmMasterStore";
 import type { CrmProductModuleKey } from "@/types/crm-onboarding";
 
@@ -20,87 +17,69 @@ function toggleKey(list: CrmProductModuleKey[], key: CrmProductModuleKey, on: bo
   return list.filter((k) => k !== key);
 }
 
-function ModuleGroup({
-  title,
-  description,
-  items,
-  selected,
-  onChange,
-  compact,
-}: {
-  title: string;
-  description: string;
-  items: { key: CrmProductModuleKey; label: string }[];
-  selected: CrmProductModuleKey[];
-  onChange: (keys: CrmProductModuleKey[]) => void;
-  compact?: boolean;
-}) {
-  if (items.length === 0) return null;
-
-  return (
-    <div className="space-y-2">
-      <div>
-        <div className="text-xs font-semibold">{title}</div>
-        <p className="text-[10px] text-muted-foreground">{description}</p>
-      </div>
-      <div className={cn("grid gap-1.5", compact ? "sm:grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-3")}>
-        {items.map((m) => {
-          const checked = selected.includes(m.key);
-          return (
-            <label
-              key={m.key}
-              className={cn(
-                "flex cursor-pointer items-start gap-2 rounded-lg border px-2.5 py-2 text-xs transition-colors",
-                checked ? "border-primary/40 bg-primary/5" : "border-border/70 bg-background hover:bg-muted/30",
-              )}
-            >
-              <input
-                type="checkbox"
-                className="mt-0.5"
-                checked={checked}
-                onChange={(e) => onChange(toggleKey(selected, m.key, e.target.checked))}
-              />
-              <span className="min-w-0 font-medium leading-snug">{m.label}</span>
-            </label>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/** Checkbox picker for core modules + integrations when creating or editing an account. */
+/** Checkbox picker for core modules when creating an account. */
 export function CrmAccountProductModulesPicker({ selected, onChange, compact }: Props) {
   const catalog = useMemo(() => getCrmMasterProductModuleCatalog(), []);
   const catalogKeys = useMemo(() => new Set(catalog.map((m) => m.key)), [catalog]);
+  const items = useMemo(
+    () => CRM_CORE_MODULES.filter((m) => catalogKeys.has(m.key)),
+    [catalogKeys],
+  );
 
-  const coreItems = CRM_CORE_MODULES.filter((m) => catalogKeys.has(m.key));
-  const integrationItems = CRM_INTEGRATION_MODULES.filter((m) => catalogKeys.has(m.key));
+  const selectedCoreCount = selected.filter((key) => items.some((m) => m.key === key)).length;
 
   return (
-    <div className="space-y-4 rounded-lg border border-dashed bg-muted/10 p-3">
-      <ModuleGroup
-        title="Modules"
-        description="Core CRM products purchased for this client."
-        items={coreItems}
-        selected={selected}
-        onChange={onChange}
-        compact={compact}
-      />
-      <ModuleGroup
-        title="Integrations"
-        description="Channel and lead-source integrations to configure during onboarding."
-        items={integrationItems}
-        selected={selected}
-        onChange={onChange}
-        compact={compact}
-      />
-      {selected.length > 0 ? (
-        <p className="text-[10px] text-muted-foreground">
-          {selected.filter((k) => !isCrmIntegrationModule(k)).length} module(s) ·{" "}
-          {selected.filter((k) => isCrmIntegrationModule(k)).length} integration(s) selected
+    <div className="space-y-3">
+      <div className={cn("grid gap-2", compact ? "sm:grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-3")}>
+        {items.map((m) => {
+          const checked = selected.includes(m.key);
+          return (
+            <button
+              key={m.key}
+              type="button"
+              role="checkbox"
+              aria-checked={checked}
+              aria-label={m.label}
+              onClick={() => onChange(toggleKey(selected, m.key, !checked))}
+              className={cn(
+                "group flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-xs transition-all",
+                checked
+                  ? "border-primary/50 bg-primary/5 shadow-sm ring-1 ring-primary/15"
+                  : "border-border/80 bg-card hover:border-primary/25 hover:bg-muted/20",
+              )}
+            >
+              <div
+                className={cn(
+                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors",
+                  checked
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted/70 text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary",
+                )}
+              >
+                <Package className="h-4 w-4" />
+              </div>
+              <span className="min-w-0 flex-1 font-medium leading-snug">{m.label}</span>
+              <div
+                className={cn(
+                  "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors",
+                  checked
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-muted-foreground/25 bg-background",
+                )}
+              >
+                {checked ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      {selectedCoreCount > 0 ? (
+        <p className="text-[11px] text-muted-foreground">
+          {selectedCoreCount} module{selectedCoreCount === 1 ? "" : "s"} selected
         </p>
-      ) : null}
+      ) : (
+        <p className="text-[11px] text-muted-foreground">No modules selected yet.</p>
+      )}
     </div>
   );
 }
