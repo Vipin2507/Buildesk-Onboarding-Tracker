@@ -1,4 +1,4 @@
-import { CRM_STAGE_LABELS } from "@/data/crm-onboarding-defaults";
+import { CRM_STAGE_LABELS, isCrmIntegrationModule } from "@/data/crm-onboarding-defaults";
 import { crmSalesManagerNamesMatch } from "@/lib/crm-account-access";
 import type { CrmAccountTabId } from "@/lib/crm-route-search";
 import type { ActivityKind } from "@/types";
@@ -51,6 +51,8 @@ export type CrmActivityItem = {
   nextFollowUp?: string;
   /** Implementation tracker stage when category is tracker. */
   trackerStage?: CrmImplementationStage;
+  /** Product module key when category is module. */
+  moduleKey?: string;
   href?: string;
 };
 
@@ -115,8 +117,14 @@ export function crmActivityOpenLabel(
   return labels[category];
 }
 
+export function crmActivityTabForModule(moduleKey?: string): CrmAccountTabId {
+  if (moduleKey && isCrmIntegrationModule(moduleKey)) return "integrations";
+  return "dashboard";
+}
+
 export function crmActivityAccountTabForCategory(
   category: Exclude<CrmActivityCategory, "all">,
+  moduleKey?: string,
 ): CrmAccountTabId | undefined {
   switch (category) {
     case "follow_up":
@@ -126,7 +134,7 @@ export function crmActivityAccountTabForCategory(
     case "communication":
       return "comms";
     case "module":
-      return "modules";
+      return crmActivityTabForModule(moduleKey);
     case "tracker":
     case "account":
       return "dashboard";
@@ -141,7 +149,7 @@ function parseActivityEntityId(id: string): string | undefined {
 }
 
 export function resolveCrmActivityDestination(
-  item: Pick<CrmActivityItem, "id" | "category" | "accountId" | "trackerStage">,
+  item: Pick<CrmActivityItem, "id" | "category" | "accountId" | "trackerStage" | "moduleKey">,
 ): CrmActivityDestination | null {
   const entityId = parseActivityEntityId(item.id);
 
@@ -165,7 +173,11 @@ export function resolveCrmActivityDestination(
         : null;
     case "module":
       return item.accountId
-        ? { kind: "account", accountId: item.accountId, tab: "modules" }
+        ? {
+            kind: "account",
+            accountId: item.accountId,
+            tab: crmActivityTabForModule(item.moduleKey),
+          }
         : null;
     case "tracker":
       return item.accountId
@@ -184,7 +196,7 @@ export function resolveCrmActivityDestination(
         ? {
             kind: "account",
             accountId: item.accountId,
-            tab: crmActivityAccountTabForCategory(item.category),
+            tab: crmActivityAccountTabForCategory(item.category, item.moduleKey),
           }
         : null;
   }
@@ -251,7 +263,10 @@ function withAccountContext(
     leadContact: leadContactForAccount(account, item.leadContact),
     executive: item.executive ?? resolveExecutive(item.who),
     remarks: item.remarks ?? item.what,
-    href: crmActivityAccountHref(accountId, crmActivityAccountTabForCategory(item.category)),
+    href: crmActivityAccountHref(
+      accountId,
+      crmActivityAccountTabForCategory(item.category, item.moduleKey),
+    ),
   };
 }
 
@@ -446,6 +461,7 @@ export function buildCrmActivityFeed(input: {
           createdAt: e.createdAt,
           kind: crmEventKind(e.newStatus),
           category: "module",
+          moduleKey: e.moduleKey,
           accountId: e.companyId,
           accountName,
         },
