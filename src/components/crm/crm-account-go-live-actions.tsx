@@ -3,9 +3,12 @@ import {
   CheckCircle2,
   ChevronDown,
   ClipboardList,
+  MoreHorizontal,
   PauseCircle,
+  Pencil,
   PowerOff,
   Rocket,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -31,6 +34,9 @@ type Props = {
   accountStatus: CrmAccount["status"];
   who?: string;
   onOpenGoLiveTab?: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  variant?: "button" | "icon";
   className?: string;
 };
 
@@ -40,6 +46,9 @@ export function CrmAccountGoLiveActions({
   accountStatus,
   who,
   onOpenGoLiveTab,
+  onEdit,
+  onDelete,
+  variant = "button",
   className,
 }: Props) {
   const markLive = useCrmAccountStore((s) => s.markLive);
@@ -100,16 +109,27 @@ export function CrmAccountGoLiveActions({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button
-            size="sm"
-            variant="outline"
-            className={cn("h-8 gap-1 text-xs", className)}
-          >
-            Actions
-            <ChevronDown className="h-3.5 w-3.5 opacity-60" />
-          </Button>
+          {variant === "icon" ? (
+            <Button
+              size="icon"
+              variant="ghost"
+              className={cn("h-8 w-8", className)}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              className={cn("h-8 gap-1 text-xs", className)}
+            >
+              Actions
+              <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+            </Button>
+          )}
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuContent align="end" className="w-56" onClick={(e) => e.stopPropagation()}>
           <DropdownMenuLabel className="text-[11px] uppercase tracking-wide text-muted-foreground">
             Go-Live
           </DropdownMenuLabel>
@@ -159,6 +179,30 @@ export function CrmAccountGoLiveActions({
             <PowerOff className="mr-2 h-4 w-4 text-destructive" />
             {isInactive ? "Already Inactive" : "Mark Inactive"}
           </DropdownMenuItem>
+
+          {onEdit || onDelete ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                Account
+              </DropdownMenuLabel>
+              {onEdit ? (
+                <DropdownMenuItem onClick={onEdit}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit account
+                </DropdownMenuItem>
+              ) : null}
+              {onDelete ? (
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={onDelete}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete account
+                </DropdownMenuItem>
+              ) : null}
+            </>
+          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
 

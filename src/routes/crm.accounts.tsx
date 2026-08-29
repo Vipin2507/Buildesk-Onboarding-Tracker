@@ -9,10 +9,7 @@ import {
   CalendarRange,
   ClipboardList,
   FileSpreadsheet,
-  Pencil,
   Plus,
-  Rocket,
-  Trash2,
   TrendingUp,
   Upload,
 } from "lucide-react";
@@ -22,6 +19,7 @@ import { toast } from "sonner";
 import { CrmAccountBulkUploadModal } from "@/components/crm/crm-account-bulk-upload-modal";
 import { CrmAccountClientTransferModal } from "@/components/crm/crm-account-client-transfer-modal";
 import { CrmAccountDateBulkUploadModal } from "@/components/crm/crm-account-date-bulk-upload-modal";
+import { CrmAccountGoLiveActions } from "@/components/crm/crm-account-go-live-actions";
 import { CrmAccountModulesCell } from "@/components/crm/crm-account-modules-cell";
 import { CrmAccountProvidersCell } from "@/components/crm/crm-account-providers-cell";
 import {
@@ -63,7 +61,6 @@ import {
   useCrmDashboardOverview,
   type CrmAccountRow,
 } from "@/stores/crm-dashboard-selectors";
-import { isCrmAccountEnded } from "@/lib/crm-account-status";
 import { sortCrmAccountsByStartDateDesc } from "@/lib/crm-account-sort";
 import { getCrmMasterProductModuleCatalog } from "@/stores/useCrmMasterStore";
 import type { CrmProductModuleKey } from "@/types/crm-onboarding";
@@ -197,12 +194,9 @@ function CrmAccountsPage() {
   const accounts = useCrmAccountStore((s) => s.accounts);
   const upsertAccount = useCrmAccountStore((s) => s.upsertAccount);
   const deleteAccount = useCrmAccountStore((s) => s.deleteAccount);
-  const markLive = useCrmAccountStore((s) => s.markLive);
   const ensure = useCrmOnboardingStore((s) => s.ensureForCompany);
   const setProductModuleEnabled = useCrmOnboardingStore((s) => s.setProductModuleEnabled);
   const removeRecord = useCrmOnboardingStore((s) => s.removeRecord);
-  const completeAllGoLiveItems = useCrmOnboardingStore((s) => s.completeAllGoLiveItems);
-  const updateTracker = useCrmOnboardingStore((s) => s.updateTracker);
   const currentUser = useAuthStore((s) => s.user);
   const overview = useCrmDashboardOverview();
 
@@ -231,8 +225,6 @@ function CrmAccountsPage() {
   const [editing, setEditing] = useState<CrmAccount | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState<CrmAccountRow | null>(null);
-  const [goLiveOpen, setGoLiveOpen] = useState(false);
-  const [goingLive, setGoingLive] = useState<CrmAccountRow | null>(null);
   const [selectedModules, setSelectedModules] = useState<CrmProductModuleKey[]>([]);
 
   const form = useForm<CrmAccountFormValues>({
@@ -527,20 +519,6 @@ function CrmAccountsPage() {
     }
     setDeleteOpen(false);
     setDeleting(null);
-  }
-
-  function confirmGoLive() {
-    if (!goingLive) return;
-    completeAllGoLiveItems(goingLive.id);
-    markLive(goingLive.id, currentUser?.name);
-    updateTracker(
-      goingLive.id,
-      { stage: "customer_success", priority: "medium" },
-      currentUser?.name,
-    );
-    toast.success(`${goingLive.name} completed & marked Live`);
-    setGoLiveOpen(false);
-    setGoingLive(null);
   }
 
   const unassignedManagerCount = rows.filter((r) => !r.salesManagerName?.trim()).length;
@@ -951,48 +929,25 @@ function CrmAccountsPage() {
                   },
                 ]}
                 actions={(r) => (
-                  <div className="flex justify-end gap-0.5">
-                    {r.status !== "live" && !isCrmAccountEnded(r.status) ? (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8"
-                        title="Go Live & Complete"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setGoingLive(r);
-                          setGoLiveOpen(true);
-                        }}
-                      >
-                        <Rocket className="h-3.5 w-3.5 text-success" />
-                      </Button>
-                    ) : null}
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8"
-                      title="Edit"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openEdit(r);
-                      }}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8"
-                      title="Delete"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeleting(r);
-                        setDeleteOpen(true);
-                      }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                    </Button>
-                  </div>
+                  <CrmAccountGoLiveActions
+                    variant="icon"
+                    companyId={r.id}
+                    accountName={r.name}
+                    accountStatus={r.status}
+                    who={currentUser?.name}
+                    onOpenGoLiveTab={() =>
+                      void navigate({
+                        to: "/crm/accounts/$accountId",
+                        params: { accountId: r.id },
+                        search: { tab: "golive" },
+                      })
+                    }
+                    onEdit={() => openEdit(r)}
+                    onDelete={() => {
+                      setDeleting(r);
+                      setDeleteOpen(true);
+                    }}
+                  />
                 )}
               />
             </motion.div>
@@ -1042,20 +997,6 @@ function CrmAccountsPage() {
         }
         confirmLabel="Delete account"
         onConfirm={confirmDelete}
-      />
-
-      <ConfirmDeleteDialog
-        open={goLiveOpen}
-        onOpenChange={setGoLiveOpen}
-        title="Go Live & Complete account?"
-        description={
-          goingLive
-            ? `This will complete remaining go-live checklist items and mark ${goingLive.name} as Live immediately.`
-            : "Mark this account Live."
-        }
-        confirmLabel="Go Live & Complete"
-        confirmTone="default"
-        onConfirm={confirmGoLive}
       />
     </PageWrap>
   );
