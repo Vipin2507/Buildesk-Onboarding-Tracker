@@ -12,7 +12,7 @@ import {
   type ClientVisit,
   type ClientVisitStatus,
 } from "@/types";
-import { useClientVisitStore, useTaskStore, useUserStore } from "@/stores";
+import { useClientVisitStore, useErpTaskStore, useUserStore } from "@/stores";
 import { assignableManagerUsers, resolveAssigneeLabel } from "@/lib/managers";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -21,7 +21,7 @@ export function CompanyVisitsPanel({ companyId }: { companyId: string }) {
   const visits = useClientVisitStore((s) => s.visits);
   const addVisit = useClientVisitStore((s) => s.addVisit);
   const updateVisit = useClientVisitStore((s) => s.updateVisit);
-  const addTask = useTaskStore((s) => s.addTask);
+  const addTask = useErpTaskStore((s) => s.addTask);
   const users = useUserStore((s) => s.users);
   const { can, isAdmin } = usePermissions();
   const canManage = isAdmin || can("manageClientVisits");

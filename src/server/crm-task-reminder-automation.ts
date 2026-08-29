@@ -334,7 +334,7 @@ export async function processTaskReminderAutomations(
     .from(t.followUpTasks)
     .where(inArray(t.followUpTasks.status, ["open", "in_progress", "blocked"]))
     .all()
-    .filter((row) => row.startsAt);
+    .filter((row) => row.productScope === "crm" && row.startsAt);
 
   let sentCount = 0;
 

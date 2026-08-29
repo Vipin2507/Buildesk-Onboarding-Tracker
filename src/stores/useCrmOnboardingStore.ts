@@ -10,6 +10,7 @@ import type {
   CrmMigrationChecklistItem,
   CrmOnboardingRecord,
   CrmProductModuleKey,
+  CrmProductModuleKey,
   CrmReportChecklistItem,
   CrmTrackerMeta,
   CrmTrackerPriority,
@@ -49,6 +50,7 @@ import {
 } from "@/lib/api";
 import { serverSync, serverSyncDebounced } from "@/lib/sync";
 import { useCrmAccountStore } from "./useCrmAccountStore";
+import { getCrmMasterProductModuleCatalog } from "./useCrmMasterStore";
 import {
   applyChecklistPhaseDate,
   applyChecklistForceCompleteAll,
@@ -58,6 +60,7 @@ import {
 type CrmOnboardingState = {
   records: CrmOnboardingRecord[];
   hydrateRecords: (records: CrmOnboardingRecord[]) => void;
+  applyProductModulesCatalogToAllAccounts: () => number;
   ensureForCompany: (companyId: string, companyType?: CompanyType) => CrmOnboardingRecord;
   getByCompanyId: (companyId: string) => CrmOnboardingRecord | undefined;
   setProductModuleEnabled: (companyId: string, key: CrmProductModuleKey, enabled: boolean) => void;
@@ -334,7 +337,30 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
 
   getByCompanyId: (companyId) => get().records.find((r) => r.companyId === companyId),
 
+  applyProductModulesCatalogToAllAccounts: () => {
+    const catalog = getCrmMasterProductModuleCatalog();
+    let updated = 0;
+    set((s) => ({
+      records: s.records.map((r) => {
+        const next = mergeCrmProductModules(r.productModules, catalog as { key: CrmProductModuleKey; label: string }[]);
+        const same =
+          next.length === r.productModules.length &&
+          next.every(
+            (m, i) =>
+              m.key === r.productModules[i]?.key &&
+              m.label === r.productModules[i]?.label &&
+              m.enabled === r.productModules[i]?.enabled,
+          );
+        if (same) return r;
+        updated += 1;
+        return touch({ ...r, productModules: next });
+      }),
+    }));
+    return updated;
+  },
+
   ensureForCompany: (companyId, companyType) => {
+    const moduleCatalog = getCrmMasterProductModuleCatalog();
     const existing = get().getByCompanyId(companyId);
     if (existing) {
       let changed = false;
@@ -397,11 +423,14 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
         changed = true;
       }
       const afterGoLive = get().getByCompanyId(companyId)!;
-      if (needsProductModulesUpgrade(afterGoLive.productModules)) {
+      if (needsProductModulesUpgrade(afterGoLive.productModules, moduleCatalog as { key: CrmProductModuleKey; label: string }[])) {
         set((s) => ({
           records: updateRecord(s.records, companyId, (r) => ({
             ...r,
-            productModules: mergeCrmProductModules(r.productModules),
+            productModules: mergeCrmProductModules(
+              r.productModules,
+              moduleCatalog as { key: CrmProductModuleKey; label: string }[],
+            ),
           })),
         }));
         changed = true;
@@ -439,6 +468,7 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
       companyType,
       resolveCrmMigrationCatalog(),
       resolveCrmTrainingCatalogForCompany(companyType),
+      moduleCatalog as { key: CrmProductModuleKey; label: string }[],
     );
     set((s) => ({ records: [created, ...s.records] }));
     return created;

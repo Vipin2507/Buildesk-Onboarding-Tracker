@@ -35,9 +35,12 @@ type ManagerOverrides = Record<
 export function CrmAccountBulkUploadModal({
   open,
   onOpenChange,
+  updatesOnly = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** When true, only updates existing accounts matched by Client Id / company name. */
+  updatesOnly?: boolean;
 }) {
   const accounts = useCrmAccountStore((s) => s.accounts);
   const upsertAccountsBatch = useCrmAccountStore((s) => s.upsertAccountsBatch);
@@ -65,8 +68,43 @@ export function CrmAccountBulkUploadModal({
 
   const plan: CrmAccountImportPlan | null = useMemo(() => {
     if (!rawPlanSeed) return null;
-    return buildCrmAccountImportPlan(rawPlanSeed, accounts, managers, overrides);
-  }, [rawPlanSeed, accounts, managers, overrides]);
+    const base = buildCrmAccountImportPlan(rawPlanSeed, accounts, managers, overrides);
+    if (!updatesOnly) return base;
+
+    let update = 0;
+    let notFound = 0;
+    let needsManagerPick = 0;
+    const rows = base.rows.map((row) => {
+      if (row.action === "create") {
+        notFound += 1;
+        return {
+          ...row,
+          action: "skip" as const,
+          message: row.clientId
+            ? `Client Id “${row.clientId}” not found — use Bulk upload to add new accounts`
+            : `Account “${row.companyName}” not found — use Bulk upload to add new accounts`,
+        };
+      }
+      if (row.action === "update") {
+        update += 1;
+        if (row.salesManagerNeedsPick || row.supportManager1NeedsPick || row.supportManager2NeedsPick) {
+          needsManagerPick += 1;
+        }
+      }
+      return row;
+    });
+
+    return {
+      rows,
+      summary: {
+        create: 0,
+        update,
+        skip: base.summary.skip + notFound,
+        error: base.summary.error,
+        needsManagerPick,
+      },
+    };
+  }, [rawPlanSeed, accounts, managers, overrides, updatesOnly]);
 
   function reset() {
     setFileName(null);
@@ -95,6 +133,8 @@ export function CrmAccountBulkUploadModal({
       const preview = buildCrmAccountImportPlan(raw, accounts, managers, {});
       if (preview.summary.error > 0 && preview.summary.create + preview.summary.update === 0) {
         toast.error("Import sheet has errors — fix rows and try again");
+      } else if (updatesOnly && preview.summary.update === 0 && preview.summary.error === 0) {
+        toast.message("No matching accounts to update — check Client Id / company names");
       } else if (preview.summary.needsManagerPick > 0) {
         toast.message("Some managers were not found — pick them before importing");
       }
@@ -130,16 +170,28 @@ export function CrmAccountBulkUploadModal({
 
   const unresolvedPicks = plan?.rows.filter(
     (r) =>
-      (r.action === "create" || r.action === "update") &&
+      r.action === "update" &&
       (r.salesManagerNeedsPick || r.supportManager1NeedsPick || r.supportManager2NeedsPick),
   ).length;
+
+  const planStats = useMemo(() => {
+    if (!plan) return null;
+    if (!updatesOnly) return plan.summary;
+    return {
+      ...plan.summary,
+      notFound: plan.rows.filter((r) => r.message.includes("not found")).length,
+      skip: plan.rows.filter((r) => r.message === "Empty row skipped").length,
+    };
+  }, [plan, updatesOnly]);
 
   function applyImport() {
     if (!plan) return;
 
-    const ready = plan.rows.filter((r) => r.action === "create" || r.action === "update");
-    if (ready.length === 0) {
-      toast.error("Nothing to import");
+    const actionable = updatesOnly
+      ? plan.rows.filter((r) => r.action === "update")
+      : plan.rows.filter((r) => r.action === "create" || r.action === "update");
+    if (actionable.length === 0) {
+      toast.error(updatesOnly ? "No matching accounts to update" : "Nothing to import");
       return;
     }
 
@@ -149,7 +201,7 @@ export function CrmAccountBulkUploadModal({
 
     try {
       const current = useCrmAccountStore.getState().accounts;
-      const payloads = ready.map((row) => {
+      const payloads = actionable.map((row) => {
         const existing = row.existingId
           ? current.find((a) => a.id === row.existingId)
           : undefined;
@@ -173,10 +225,15 @@ export function CrmAccountBulkUploadModal({
 
       const leftBlank = unresolvedPicks ?? 0;
       toast.success(
-        `Imported ${created + updated} account${created + updated === 1 ? "" : "s"} (${created} new, ${updated} updated)` +
-          (leftBlank > 0
-            ? ` · ${leftBlank} row${leftBlank === 1 ? "" : "s"} left manager blank for manual edit`
-            : ""),
+        updatesOnly
+          ? `Updated ${updated} account${updated === 1 ? "" : "s"}` +
+              (leftBlank > 0
+                ? ` · ${leftBlank} row${leftBlank === 1 ? "" : "s"} left manager blank for manual edit`
+                : "")
+          : `Imported ${created + updated} account${created + updated === 1 ? "" : "s"} (${created} new, ${updated} updated)` +
+              (leftBlank > 0
+                ? ` · ${leftBlank} row${leftBlank === 1 ? "" : "s"} left manager blank for manual edit`
+                : ""),
       );
       handleOpenChange(false);
     } catch (e) {
@@ -190,12 +247,13 @@ export function CrmAccountBulkUploadModal({
     <AlertDialog open={open} onOpenChange={handleOpenChange}>
       <AlertDialogContent className="flex max-h-[90vh] max-w-5xl flex-col gap-0 overflow-hidden p-0">
         <AlertDialogHeader className="shrink-0 border-b px-5 py-4 text-left">
-          <AlertDialogTitle>Bulk upload accounts</AlertDialogTitle>
+          <AlertDialogTitle>
+            {updatesOnly ? "Client bulk update" : "Bulk upload accounts"}
+          </AlertDialogTitle>
           <AlertDialogDescription>
-            Upload an Excel sheet with the template headers. Empty cells are skipped, except an
-            empty Sales Manager cell clears the assignment (unassigned). Manager names match CRM
-            users case-insensitively — first, middle, or last name alone is fine when unique (e.g.
-            “asif” → Md Asif Ansari). Ambiguous names can be picked manually.
+            {updatesOnly
+              ? "Upload an Excel sheet to update existing CRM accounts matched by Client Id or company name. Rows that do not match an account are skipped — use Bulk upload to add new clients. Empty cells are skipped, except an empty Sales Manager cell clears the assignment."
+              : "Upload an Excel sheet with the template headers. Empty cells are skipped, except an empty Sales Manager cell clears the assignment (unassigned). Manager names match CRM users case-insensitively — first, middle, or last name alone is fine when unique (e.g. “asif” → Md Asif Ansari). Ambiguous names can be picked manually."}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
@@ -272,13 +330,22 @@ export function CrmAccountBulkUploadModal({
           {plan ? (
             <>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-                {[
-                  { label: "Create", value: plan.summary.create },
-                  { label: "Update", value: plan.summary.update },
-                  { label: "Skip", value: plan.summary.skip },
-                  { label: "Errors", value: plan.summary.error },
-                  { label: "Need manager pick", value: plan.summary.needsManagerPick },
-                ].map((k) => (
+                {(updatesOnly
+                  ? [
+                      { label: "Update", value: planStats?.update ?? 0 },
+                      { label: "Not found", value: planStats?.notFound ?? 0 },
+                      { label: "Skip", value: planStats?.skip ?? 0 },
+                      { label: "Errors", value: planStats?.error ?? 0 },
+                      { label: "Need manager pick", value: planStats?.needsManagerPick ?? 0 },
+                    ]
+                  : [
+                      { label: "Create", value: planStats?.create ?? 0 },
+                      { label: "Update", value: planStats?.update ?? 0 },
+                      { label: "Skip", value: planStats?.skip ?? 0 },
+                      { label: "Errors", value: planStats?.error ?? 0 },
+                      { label: "Need manager pick", value: planStats?.needsManagerPick ?? 0 },
+                    ]
+                ).map((k) => (
                   <div key={k.label} className="rounded-lg border bg-card/50 px-2.5 py-2">
                     <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
                       {k.label}
@@ -428,12 +495,20 @@ export function CrmAccountBulkUploadModal({
           </AlertDialogCancel>
           <Button
             type="button"
-            disabled={busy || !plan || plan.summary.create + plan.summary.update === 0}
+            disabled={
+              busy ||
+              !plan ||
+              (updatesOnly ? plan.summary.update === 0 : plan.summary.create + plan.summary.update === 0)
+            }
             onClick={applyImport}
           >
             {busy
-              ? "Importing…"
-              : `Import ${plan ? plan.summary.create + plan.summary.update : 0} accounts`}
+              ? updatesOnly
+                ? "Updating…"
+                : "Importing…"
+              : updatesOnly
+                ? `Update ${plan?.summary.update ?? 0} accounts`
+                : `Import ${plan ? plan.summary.create + plan.summary.update : 0} accounts`}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

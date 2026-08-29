@@ -16,7 +16,7 @@ import type { NavItem } from "@/lib/nav";
 export const CRM_NAV: NavItem[] = [
   { to: "/crm", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { to: "/crm/accounts", label: "Accounts", icon: Building2 },
-  { to: "/crm/bookings", label: "Bookings", icon: Calendar },
+  { to: "/crm/bookings", label: "Meetings", icon: Calendar },
   { to: "/crm/tasks", label: "Tasks", icon: CheckSquare },
   { to: "/crm/support", label: "Support Desk", icon: LifeBuoy },
   { to: "/crm/tickets", label: "Ticket Tracking", icon: MessageSquareText },

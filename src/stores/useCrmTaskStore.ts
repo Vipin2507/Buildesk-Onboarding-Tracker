@@ -11,11 +11,11 @@ import {
 } from "@/lib/api";
 import { serverSyncWithRollback } from "@/lib/sync";
 
-type TaskState = {
+type CrmTaskState = {
   tasks: FollowUpTask[];
   setTasks: (tasks: FollowUpTask[]) => void;
   addTask: (
-    data: Omit<FollowUpTask, "id" | "createdAt" | "updatedAt" | "completedAt" | "completedByUserId">,
+    data: Omit<FollowUpTask, "id" | "createdAt" | "updatedAt" | "completedAt" | "completedByUserId" | "productScope">,
   ) => FollowUpTask;
   updateTask: (
     id: string,
@@ -53,7 +53,7 @@ function taskPayload(task: Partial<FollowUpTask>) {
   };
 }
 
-export const useTaskStore = createStore<TaskState>((set, get) => ({
+export const useCrmTaskStore = createStore<CrmTaskState>((set, get) => ({
   tasks: [],
 
   setTasks: (tasks) => set({ tasks }),
@@ -68,6 +68,7 @@ export const useTaskStore = createStore<TaskState>((set, get) => ({
           : [];
     const task: FollowUpTask = {
       ...data,
+      productScope: "crm",
       assigneeUserIds,
       assigneeUserId: assigneeUserIds[0] ?? data.assigneeUserId,
       id: newId(),
@@ -222,3 +223,6 @@ export const useTaskStore = createStore<TaskState>((set, get) => ({
   getById: (id) => get().tasks.find((t) => t.id === id),
   getByCompany: (companyId) => get().tasks.filter((t) => t.companyId === companyId),
 }));
+
+/** @deprecated Use useCrmTaskStore for CRM or useErpTaskStore for ERP. */
+export const useTaskStore = useCrmTaskStore;

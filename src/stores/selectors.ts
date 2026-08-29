@@ -17,7 +17,7 @@ import { usePostSalesStore } from "./usePostSalesStore";
 import { useTicketStore } from "./useTicketStore";
 import { useEmployeeStore } from "./useEmployeeStore";
 import { useUserStore } from "./useUserStore";
-import { useTaskStore } from "./useTaskStore";
+import { useErpTaskStore } from "./useErpTaskStore";
 import { useClientVisitStore } from "./useClientVisitStore";
 import { resolveAssigneeName } from "@/lib/managers";
 import { isTicketOpen } from "@/lib/tickets";
@@ -209,7 +209,7 @@ export function useDashboardKpis() {
   const progressByProject = useProjectProgressStore((s) => s.byProjectId);
   const checklistItems = useOnboardingStore((s) => s.checklistItems);
   const projects = useProjectStore((s) => s.projects);
-  const followUpTasks = useTaskStore((s) => s.tasks);
+  const followUpTasks = useErpTaskStore((s) => s.tasks);
   const clientVisits = useClientVisitStore((s) => s.visits);
 
   return useMemo(() => {
@@ -375,7 +375,7 @@ export function useGlobalSearch(query: string) {
   const companies = useCompanyStore((s) => s.companies);
   const projects = useProjectStore((s) => s.projects);
   const employees = useEmployeeStore((s) => s.employees);
-  const tasks = useTaskStore((s) => s.tasks);
+  const tasks = useErpTaskStore((s) => s.tasks);
   const visits = useClientVisitStore((s) => s.visits);
 
   return useMemo(() => {

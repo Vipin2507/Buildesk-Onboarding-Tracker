@@ -1,3 +1,4 @@
+import { assignableManagerUsers } from "@/lib/managers";
 import { resolveCrmSalesManagerDefaults } from "@/lib/crm-sales-manager-defaults";
 import type { CrmAccount } from "@/types/crm-account";
 import type { Company } from "@/types/company";
@@ -10,6 +11,16 @@ export function crmTaskAssigneeUsers(users: NamedUser[]): NamedUser[] {
   return [...users]
     .filter((u) => u.active !== false && u.productScope === "crm")
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Active ERP users for task assignee pickers. */
+export function erpTaskAssigneeUsers(users: NamedUser[]): NamedUser[] {
+  return assignableManagerUsers(users as User[]).map((u) => ({
+    id: u.id,
+    name: u.name,
+    active: u.active,
+    productScope: u.productScope,
+  }));
 }
 
 /** Default assignee = Support Agent / Support Manager 1 for the account or company. */
@@ -57,5 +68,23 @@ export function taskAssigneeUserOptions(input: {
     }
   }
 
+  return active;
+}
+
+/** ERP task assignee options — defaults to company support manager 1. */
+export function erpTaskAssigneeUserOptions(input: {
+  users: NamedUser[];
+  company?: Pick<Company, "supportManager1Id"> | null;
+}): NamedUser[] {
+  const active = erpTaskAssigneeUsers(input.users);
+  const defaultIds = resolveDefaultTaskAssigneeIds({
+    company: input.company,
+    users: input.users,
+  });
+  const defaultId = defaultIds[0];
+  if (!defaultId || active.some((u) => u.id === defaultId)) return active;
+
+  const matched = input.users.find((u) => u.id === defaultId);
+  if (matched) return [matched, ...active];
   return active;
 }

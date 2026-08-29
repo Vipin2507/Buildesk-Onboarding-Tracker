@@ -111,7 +111,7 @@ function AutomationPage() {
       <DesignTicketPageHeader
         compact
         title="CRM Automation"
-        subtitle="Support ticket and booking call rules & logs (separate from ERP). Shared n8n routes: buildesk-email · buildesk-health."
+        subtitle="Support ticket and meeting call rules & logs (separate from ERP). Shared n8n routes: buildesk-email · buildesk-health."
         actions={
           <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
             <Bolt className="h-3 w-3" /> Admin

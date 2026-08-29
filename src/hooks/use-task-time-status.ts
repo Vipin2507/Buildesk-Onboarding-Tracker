@@ -1,24 +1,27 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { syncFollowUpTaskStatuses } from "@/lib/api";
+import { syncErpFollowUpTaskStatuses, syncFollowUpTaskStatuses } from "@/lib/api";
 import { applyAutoTaskStatus, taskWallClockNow } from "@/lib/task-scheduling";
-import { useTaskStore } from "@/stores/useTaskStore";
-import type { FollowUpTask } from "@/types";
+import { useCrmTaskStore } from "@/stores/useCrmTaskStore";
+import { useErpTaskStore } from "@/stores/useErpTaskStore";
+import type { FollowUpTask, TaskProductScope } from "@/types";
 
 const SYNC_MS = 30_000;
 const TICK_MS = 15_000;
 
 /** Keep task statuses in sync with scheduled start/end times (client display + server persist). */
-export function useTaskTimeStatusSync(enabled = true) {
+export function useTaskTimeStatusSync(enabled = true, scope: TaskProductScope = "crm") {
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
+    const store = scope === "erp" ? useErpTaskStore : useCrmTaskStore;
+    const syncFn = scope === "erp" ? syncErpFollowUpTaskStatuses : syncFollowUpTaskStatuses;
 
     async function run() {
       try {
-        const updated = await syncFollowUpTaskStatuses({ data: {} });
+        const updated = await syncFn({ data: {} });
         if (cancelled || updated.length === 0) return;
-        useTaskStore.setState((state) => {
+        store.setState((state) => {
           const byId = new Map(updated.map((task) => [task.id, task]));
           return {
             tasks: state.tasks.map((task) => byId.get(task.id) ?? task),
@@ -35,7 +38,7 @@ export function useTaskTimeStatusSync(enabled = true) {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [enabled]);
+  }, [enabled, scope]);
 }
 
 /** Derive in_progress from schedule between server sync ticks. */

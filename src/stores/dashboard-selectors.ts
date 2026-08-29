@@ -10,7 +10,7 @@ import { useProjectStore } from "./useProjectStore";
 import { usePostSalesStore } from "./usePostSalesStore";
 import { useProjectProgressStore } from "./useProjectProgressStore";
 import { useTicketStore } from "./useTicketStore";
-import { useTaskStore } from "./useTaskStore";
+import { useErpTaskStore } from "./useErpTaskStore";
 import { useClientVisitStore } from "./useClientVisitStore";
 import { useDesignTicketStore } from "./useDesignTicketStore";
 import { useDashboardKpis } from "./selectors";
@@ -107,7 +107,7 @@ export function useDashboardOverview() {
   const projects = useProjectStore((s) => s.projects);
   const companies = useCompanyStore((s) => s.companies);
   const tickets = useTicketStore((s) => s.tickets);
-  const followUpTasks = useTaskStore((s) => s.tasks);
+  const followUpTasks = useErpTaskStore((s) => s.tasks);
   const clientVisits = useClientVisitStore((s) => s.visits);
   const designTickets = useDesignTicketStore((s) => s.tickets);
 

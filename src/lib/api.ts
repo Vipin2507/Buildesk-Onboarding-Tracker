@@ -135,6 +135,17 @@ export {
 } from "@/server/api/crm";
 
 export {
+  listErpFollowUpTasks,
+  syncErpFollowUpTaskStatuses,
+  createErpFollowUpTask,
+  updateErpFollowUpTask,
+  cancelErpFollowUpTask,
+  completeErpFollowUpTask,
+  deleteErpFollowUpTask,
+  checkErpTaskScheduleConflicts,
+} from "@/server/api/erp-tasks";
+
+export {
   listCrmAccounts,
   upsertCrmAccount,
   upsertCrmAccountsBatch,

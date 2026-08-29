@@ -16,12 +16,13 @@ import {
   calcEndTimeFromDuration,
 } from "@/lib/task-scheduling";
 import { cn } from "@/lib/utils";
-import { checkTaskScheduleConflicts } from "@/lib/api";
+import { checkErpTaskScheduleConflicts, checkTaskScheduleConflicts } from "@/lib/api";
 import {
   FOLLOW_UP_TASK_TYPES,
   FOLLOW_UP_TASK_TYPE_LABEL,
   type FollowUpTask,
   type FollowUpTaskType,
+  type TaskProductScope,
 } from "@/types";
 
 export type TaskFormValues = {
@@ -46,6 +47,7 @@ type Props = {
   companies?: { id: string; name: string }[];
   markCompleteOnCreate?: boolean;
   onMarkCompleteOnCreateChange?: (checked: boolean) => void;
+  productScope?: TaskProductScope;
 };
 
 const fieldClass = cn(ticketFieldClass, "h-8 text-xs");
@@ -151,13 +153,17 @@ export function useTaskFormState(props: Props) {
       return false;
     }
     try {
-      const result = await checkTaskScheduleConflicts({
+      const checkConflicts =
+        props.productScope === "erp" ? checkErpTaskScheduleConflicts : checkTaskScheduleConflicts;
+      const result = await checkConflicts({
         data: {
           assigneeUserIds,
           startsAt: window.startsAt,
           endsAt: window.endsAt,
           excludeTaskId: props.editing?.id,
-          excludeBookingId: props.editing?.bookingAppointmentId,
+          ...(props.productScope === "crm"
+            ? { excludeBookingId: props.editing?.bookingAppointmentId }
+            : {}),
         },
       });
       if (result.hasConflict) {
@@ -398,7 +404,7 @@ export function TaskFormFields(props: Props & ReturnType<typeof useTaskFormState
 
       {editing?.source === "booking" ? (
         <p className="text-[10px] text-muted-foreground">
-          Linked to booking {editing.bookingAppointmentId?.slice(0, 8)}… — schedule syncs from booking.
+          Linked to meeting {editing.bookingAppointmentId?.slice(0, 8)}… — schedule syncs from meeting.
         </p>
       ) : null}
     </div>

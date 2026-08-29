@@ -133,7 +133,7 @@ function assertCanManageAppointment(
 ) {
   if (isAdminRoleKey(user.role)) return;
   if (appointment.hostUserId !== user.id) {
-    throw new ApiError(403, "Not allowed to manage this booking");
+    throw new ApiError(403, "Not allowed to manage this meeting");
   }
 }
 
@@ -285,7 +285,7 @@ function resolveEventHost(event: BookingEventType): string {
   const resolved = resolveBookingHostUserId(event.companyId);
   if (resolved) return resolved;
   if (event.hostUserId) return event.hostUserId;
-  throw new ApiError(400, "No booking host configured for this account");
+  throw new ApiError(400, "No meeting host configured for this account");
 }
 
 async function collectBusyRanges(hostUserId: string, fromYmd: string, toYmd: string) {
@@ -411,7 +411,7 @@ function resolveCrmBookingHostUserId(input: {
       assertCrmHostUser(fromAccount);
       return fromAccount;
     }
-    throw new ApiError(400, "Choose an executive for this booking");
+    throw new ApiError(400, "Choose an executive for this meeting");
   }
 
   if (input.hostUserId && input.hostUserId !== actingUser.id) {
@@ -438,14 +438,14 @@ function googleCalendarSyncErrorMessage(
   actingUser: ActingUser,
   hostName?: string,
 ): string {
-  const hostLabel = hostName?.trim() || "The booking executive";
+  const hostLabel = hostName?.trim() || "The assigned executive";
   if (actingUser.id === appointment.hostUserId) {
-    return "Connect Google Calendar under CRM → Bookings → Calendar, then use Retry calendar sync.";
+    return "Connect Google Calendar under CRM → Meetings → Calendar, then use Retry calendar sync.";
   }
   if (isAdminRoleKey(actingUser.role)) {
-    return `${hostLabel} has not connected Google Calendar. Connect your Google account under CRM → Bookings → Calendar, then retry sync.`;
+    return `${hostLabel} has not connected Google Calendar. Connect your Google account under CRM → Meetings → Calendar, then retry sync.`;
   }
-  return `${hostLabel} must connect Google Calendar under CRM → Bookings → Calendar.`;
+  return `${hostLabel} must connect Google Calendar under CRM → Meetings → Calendar.`;
 }
 
 async function syncGoogleCalendarForAppointment(
@@ -481,7 +481,7 @@ async function syncGoogleCalendarForAppointment(
     guestEmailLine,
     appointment.guestPhone ? `Phone: ${appointment.guestPhone}` : null,
     appointment.notes ? `Notes: ${appointment.notes}` : null,
-    `Buildesk booking: ${appointment.id}`,
+    `Buildesk meeting: ${appointment.id}`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -561,7 +561,7 @@ async function syncGoogleCalendarForAppointment(
       db.update(t.bookingAppointments)
         .set({
           googleSyncStatus: "error",
-          googleSyncError: "Google Calendar authorization failed. Reconnect under CRM → Bookings → Calendar.",
+          googleSyncError: "Google Calendar authorization failed. Reconnect under CRM → Meetings → Calendar.",
           updatedAt: nowIso(),
         })
         .where(eq(t.bookingAppointments.id, appointment.id))
@@ -1585,7 +1585,7 @@ export const retryBookingGoogleCalendarSync = createServerFn({ method: "POST" })
     if (!row) throw new ApiError(404, "Appointment not found");
     assertCanManageAppointment(user, row);
     if (row.status !== "confirmed" && row.status !== "postponed") {
-      throw new ApiError(400, "Only confirmed or postponed bookings can be synced to Google Calendar");
+      throw new ApiError(400, "Only confirmed or postponed meetings can be synced to Google Calendar");
     }
     await syncGoogleCalendarForAppointment(row, "upsert", user);
     return mapAppointment(

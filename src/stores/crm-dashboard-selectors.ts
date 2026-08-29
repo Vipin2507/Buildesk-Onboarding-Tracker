@@ -26,8 +26,8 @@ import {
   useCrmAccountStore,
   useCrmEventStore,
   useCrmOnboardingStore,
+  useCrmTaskStore,
   useDesignTicketStore,
-  useTaskStore,
   useTicketStore,
   useUserStore,
 } from "@/stores";
@@ -127,7 +127,7 @@ export function useCrmDashboardOverview() {
   const currentUser = useAuthStore((s) => s.user);
   const records = useCrmOnboardingStore((s) => s.records);
   const tickets = useTicketStore((s) => s.tickets);
-  const followUpTasks = useTaskStore((s) => s.tasks);
+  const followUpTasks = useCrmTaskStore((s) => s.tasks);
   const clientVisits = useClientVisitStore((s) => s.visits);
   const users = useUserStore((s) => s.users);
   const crmEvents = useCrmEventStore((s) => s.events);
@@ -381,7 +381,7 @@ export function useCrmDashboardOverview() {
           return {
             kind: "accounts" as const,
             title:
-              filter.scope === "pending" ? "Accounts with pending bookings" : "Upcoming booked calls",
+              filter.scope === "pending" ? "Accounts with pending meetings" : "Upcoming scheduled calls",
             accounts: rows.filter((row) => {
               const mine = bookingAppointments.filter((b) => b.companyId === row.id);
               if (filter.scope === "pending") return mine.some((b) => b.status === "pending");

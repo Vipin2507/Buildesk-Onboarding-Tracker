@@ -164,7 +164,7 @@ function CrmDashboardPage() {
 
   const opsKpis = [
     {
-      label: "Pending bookings",
+      label: "Pending meetings",
       value: kpis.pendingBookings,
       icon: Calendar,
       tone: "bg-warning/15 text-warning-foreground",

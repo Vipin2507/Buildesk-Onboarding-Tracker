@@ -275,6 +275,7 @@ const EXTRA_COLUMNS = [
   { table: "follow_up_tasks", name: "completed_by_user_id", ddl: "TEXT" },
   { table: "follow_up_tasks", name: "source", ddl: "TEXT NOT NULL DEFAULT 'manual'" },
   { table: "follow_up_tasks", name: "booking_appointment_id", ddl: "TEXT" },
+  { table: "follow_up_tasks", name: "product_scope", ddl: "TEXT NOT NULL DEFAULT 'erp'" },
 ];
 
 for (const col of EXTRA_COLUMNS) {
@@ -598,10 +599,12 @@ function ensureCrmTables() {
         completed_by_user_id TEXT,
         source TEXT NOT NULL DEFAULT 'manual',
         booking_appointment_id TEXT,
+        product_scope TEXT NOT NULL DEFAULT 'erp',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS follow_up_tasks_company_idx ON follow_up_tasks(company_id);
+      CREATE INDEX IF NOT EXISTS follow_up_tasks_scope_idx ON follow_up_tasks(product_scope);
       CREATE INDEX IF NOT EXISTS follow_up_tasks_assignee_idx ON follow_up_tasks(assignee_user_id);
       CREATE INDEX IF NOT EXISTS follow_up_tasks_status_idx ON follow_up_tasks(status);
       CREATE INDEX IF NOT EXISTS follow_up_tasks_due_idx ON follow_up_tasks(due_date);
@@ -1014,6 +1017,20 @@ if (tableExists("module_subscriptions") && tableExists("company_modules")) {
       .prepare(`INSERT INTO _schema_patches (name, applied_at) VALUES (?, ?)`)
       .run(patch, now);
     console.log(`subscriptions: backfilled ${n} row(s) (${patch})`);
+  }
+}
+
+if (tableExists("follow_up_tasks") && existingColumns("follow_up_tasks").has("product_scope")) {
+  const crmBackfill = sqlite
+    .prepare(
+      `UPDATE follow_up_tasks
+       SET product_scope = 'crm'
+       WHERE product_scope = 'erp'
+         AND company_id IN (SELECT id FROM crm_accounts)`,
+    )
+    .run();
+  if (crmBackfill.changes > 0) {
+    console.log(`follow_up_tasks: scoped ${crmBackfill.changes} row(s) to crm`);
   }
 }
 

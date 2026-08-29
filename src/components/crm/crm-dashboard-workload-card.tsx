@@ -65,7 +65,7 @@ export function CrmDashboardWorkloadCard({
   const items: WorkItem[] = [
     {
       id: "bookings",
-      label: "Pending bookings",
+      label: "Pending meetings",
       value: pending.bookings,
       barClass: "bg-warning",
       icon: Calendar,

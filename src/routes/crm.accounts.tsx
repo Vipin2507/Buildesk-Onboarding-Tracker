@@ -3,10 +3,12 @@ import { createFileRoute, Outlet, useChildMatches, useNavigate } from "@tanstack
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
 import {
+  ArrowLeftRight,
   Building2,
   CheckCircle2,
   CalendarRange,
   ClipboardList,
+  FileSpreadsheet,
   Pencil,
   Plus,
   Rocket,
@@ -18,6 +20,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { CrmAccountBulkUploadModal } from "@/components/crm/crm-account-bulk-upload-modal";
+import { CrmAccountClientTransferModal } from "@/components/crm/crm-account-client-transfer-modal";
 import { CrmAccountDateBulkUploadModal } from "@/components/crm/crm-account-date-bulk-upload-modal";
 import { CrmAccountModulesCell } from "@/components/crm/crm-account-modules-cell";
 import { CrmAccountProvidersCell } from "@/components/crm/crm-account-providers-cell";
@@ -219,6 +222,8 @@ function CrmAccountsPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkUpdateOpen, setBulkUpdateOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
   const [dateBulkOpen, setDateBulkOpen] = useState(false);
   const [editing, setEditing] = useState<CrmAccount | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -537,6 +542,24 @@ function CrmAccountsPage() {
         subtitle="Customer accounts for CRM onboarding — progress, health, and go-live."
         actions={
           <div className="flex flex-wrap items-center gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1 text-xs"
+              onClick={() => setTransferOpen(true)}
+            >
+              <ArrowLeftRight className="h-3.5 w-3.5" />
+              Client transfer
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1 text-xs"
+              onClick={() => setBulkUpdateOpen(true)}
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              Client bulk update
+            </Button>
             <Button
               size="sm"
               variant="outline"
@@ -988,6 +1011,12 @@ function CrmAccountsPage() {
       </EntityFormModal>
 
       <CrmAccountBulkUploadModal open={bulkOpen} onOpenChange={setBulkOpen} />
+      <CrmAccountBulkUploadModal
+        open={bulkUpdateOpen}
+        onOpenChange={setBulkUpdateOpen}
+        updatesOnly
+      />
+      <CrmAccountClientTransferModal open={transferOpen} onOpenChange={setTransferOpen} />
       <CrmAccountDateBulkUploadModal open={dateBulkOpen} onOpenChange={setDateBulkOpen} />
 
       <ConfirmDeleteDialog

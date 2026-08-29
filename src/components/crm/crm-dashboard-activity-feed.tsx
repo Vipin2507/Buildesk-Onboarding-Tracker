@@ -120,7 +120,7 @@ export function CrmDashboardActivityFeed({ items, onViewAll }: Props) {
     return (
       <div className="flex flex-col items-center gap-2 py-8 text-center">
         <p className="text-xs text-muted-foreground">
-          Activity from bookings, tickets, subscriptions, and account updates will appear here.
+          Activity from meetings, tickets, subscriptions, and account updates will appear here.
         </p>
         <Link to="/crm/accounts" className="text-xs font-medium text-primary hover:underline">
           Open accounts

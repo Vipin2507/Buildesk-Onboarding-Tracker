@@ -55,7 +55,7 @@ import {
   useOnboardingStore,
   useUserStore,
   useClientVisitStore,
-  useTaskStore,
+  useErpTaskStore,
   useCrmEventStore,
 } from "@/stores";
 import { getModuleLabel } from "@/data/module-catalog";
@@ -145,7 +145,7 @@ function CompanyDetailContent() {
   );
   const progress = useCompanyProgress(companyId);
   const modulesWithProgress = useCompanyModulesWithProgress(companyId);
-  const allTasks = useTaskStore((s) => s.tasks);
+  const allTasks = useErpTaskStore((s) => s.tasks);
   const allVisits = useClientVisitStore((s) => s.visits);
   const allSubscriptions = useCrmEventStore((s) => s.subscriptions);
   const companyTasks = useMemo(

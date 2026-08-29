@@ -92,7 +92,7 @@ export function BookingGoogleCalendarPanel({
     <div className="space-y-3">
       <DesignTicketSection compact title="Google Calendar & Meet">
         <p className="mb-2 text-[10px] text-muted-foreground">
-          Connect your Google account so approved bookings create a Calendar event with a Meet link,
+          Connect your Google account so approved meetings create a Calendar event with a Meet link,
           and your Google busy times block open slots.
         </p>
       </DesignTicketSection>
@@ -126,7 +126,7 @@ export function BookingGoogleCalendarPanel({
             <div className="min-w-0 flex-1">
               <div className="text-sm font-medium">Connect Google Calendar</div>
               <p className="mt-1 text-[11px] text-muted-foreground">
-                When you approve a booking, Buildesk creates a Google Calendar event with Meet and
+                When you approve a meeting, Buildesk creates a Google Calendar event with Meet and
                 invites the guest. While connected, Google busy times are removed from bookable
                 slots.
               </p>
@@ -203,7 +203,7 @@ export function BookingGoogleCalendarPanel({
           </label>
 
           <p className="text-[10px] text-muted-foreground">
-            Approving a booking creates a Meet link and emails the guest. Cancel / decline removes
+            Approving a meeting creates a Meet link and emails the guest. Cancel / decline removes
             the calendar event.
           </p>
         </div>
@@ -216,7 +216,7 @@ export function BookingGoogleCalendarPanel({
         </div>
         <ol className="list-decimal space-y-1 pl-4">
           <li>Guest books a pending slot in the portal.</li>
-          <li>You approve in CRM Bookings → Google creates the event + Meet.</li>
+          <li>You approve in CRM Meetings → Google creates the event + Meet.</li>
           <li>Guest receives the Meet link in the status email (and on their portal).</li>
         </ol>
       </div>

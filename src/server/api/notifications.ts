@@ -251,7 +251,7 @@ export function insertBookingRequestNotification(
   return insertForUserIds(
     db,
     {
-      title: `New booking request — ${opts.appointment.guestName}`,
+      title: `New meeting request — ${opts.appointment.guestName}`,
       body: `${opts.eventTitle} · ${opts.accountName} · ${when}`,
       kind: "info",
       href: "/crm/bookings?tab=pending",

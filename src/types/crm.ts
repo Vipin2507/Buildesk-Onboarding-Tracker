@@ -93,9 +93,13 @@ export const FOLLOW_UP_TASK_TYPE_LABEL: Record<FollowUpTaskType, string> = {
 
 export type FollowUpTaskSource = "manual" | "booking";
 
+export type TaskProductScope = "erp" | "crm";
+
 export type FollowUpTask = Timestamps & {
   id: string;
+  /** ERP company id or CRM account id depending on productScope. */
   companyId: string;
+  productScope?: TaskProductScope;
   onboardingProjectId?: string;
   postSalesProjectId?: string;
   sourceVisitId?: string;

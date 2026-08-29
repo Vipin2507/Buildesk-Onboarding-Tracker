@@ -251,10 +251,12 @@ export const followUpTasks = sqliteTable(
     completedByUserId: text("completed_by_user_id"),
     source: text("source").notNull().default("manual"),
     bookingAppointmentId: text("booking_appointment_id"),
+    productScope: text("product_scope").notNull().default("erp"),
     ...timestamps,
   },
   (t) => [
     index("follow_up_tasks_company_idx").on(t.companyId),
+    index("follow_up_tasks_scope_idx").on(t.productScope),
     index("follow_up_tasks_assignee_idx").on(t.assigneeUserId),
     index("follow_up_tasks_status_idx").on(t.status),
     index("follow_up_tasks_due_idx").on(t.dueDate),

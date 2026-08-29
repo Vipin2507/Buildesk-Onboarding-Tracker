@@ -359,14 +359,19 @@ export const CRM_STAGE_LABELS: Record<string, string> = {
   customer_success: "Customer Success",
 };
 
-function defaultProductModules(): CrmProductModule[] {
-  return CRM_PRODUCT_MODULES.map((m) => ({ ...m, enabled: false }));
+function defaultProductModules(
+  catalog: { key: CrmProductModuleKey; label: string }[] = CRM_PRODUCT_MODULES,
+): CrmProductModule[] {
+  return catalog.map((m) => ({ ...m, enabled: false }));
 }
 
 /** Append newly catalogued modules onto existing account records (disabled by default). */
-export function mergeCrmProductModules(existing: CrmProductModule[]): CrmProductModule[] {
+export function mergeCrmProductModules(
+  existing: CrmProductModule[],
+  catalog: { key: CrmProductModuleKey; label: string }[] = CRM_PRODUCT_MODULES,
+): CrmProductModule[] {
   const byKey = new Map(existing.map((m) => [m.key, m]));
-  return CRM_PRODUCT_MODULES.map((def) => {
+  return catalog.map((def) => {
     const prev = byKey.get(def.key);
     if (!prev) {
       return { key: def.key, label: def.label, enabled: false };
@@ -382,10 +387,17 @@ export function mergeCrmProductModules(existing: CrmProductModule[]): CrmProduct
   });
 }
 
-export function needsProductModulesUpgrade(existing: CrmProductModule[] | undefined): boolean {
+export function needsProductModulesUpgrade(
+  existing: CrmProductModule[] | undefined,
+  catalog: { key: CrmProductModuleKey; label: string }[] = CRM_PRODUCT_MODULES,
+): boolean {
   if (!Array.isArray(existing) || existing.length === 0) return true;
   const keys = new Set(existing.map((m) => m.key));
-  return CRM_PRODUCT_MODULES.some((m) => !keys.has(m.key));
+  const catalogKeys = new Set(catalog.map((m) => m.key));
+  if (existing.some((m) => !catalogKeys.has(m.key))) return true;
+  if (catalog.some((m) => !keys.has(m.key))) return true;
+  const byKey = new Map(existing.map((m) => [m.key, m]));
+  return catalog.some((def) => byKey.get(def.key)?.label !== def.label);
 }
 
 function defaultMasterChecklist(): CrmMasterChecklistItem[] {
@@ -772,13 +784,14 @@ export function createCrmOnboardingRecord(
   companyType?: CompanyType,
   migrationCatalog: typeof CRM_MIGRATION_CHECKLIST_LABELS = CRM_MIGRATION_CHECKLIST_LABELS,
   trainingCatalog?: { key: string; label: string; category: string }[],
+  productModuleCatalog: { key: CrmProductModuleKey; label: string }[] = CRM_PRODUCT_MODULES,
 ): CrmOnboardingRecord {
   const now = nowIso();
   return {
     id: newId(),
     companyId,
     companyTypeHint: companyType,
-    productModules: defaultProductModules(),
+    productModules: defaultProductModules(productModuleCatalog),
     masterChecklist: defaultMasterChecklist(),
     ...defaultMasterData(),
     migrationChecklist: defaultMigrationChecklist(migrationCatalog),

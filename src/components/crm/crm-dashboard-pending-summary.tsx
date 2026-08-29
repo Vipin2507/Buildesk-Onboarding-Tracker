@@ -69,7 +69,7 @@ export function CrmDashboardPendingSummary({
   const chips: SummaryChip[] = [
     {
       id: "bookings",
-      label: "Pending bookings",
+      label: "Pending meetings",
       value: bookings,
       icon: Calendar,
       tone: "border-warning/30 bg-warning/10 text-warning-foreground",

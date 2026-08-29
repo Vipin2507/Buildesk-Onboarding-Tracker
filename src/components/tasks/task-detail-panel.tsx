@@ -119,7 +119,7 @@ export function TaskDetailPanel({
               <MetaItem label="Completed">{formatDateTime(task.completedAt)}</MetaItem>
             ) : null}
             {task.bookingAppointmentId ? (
-              <MetaItem label="Booking">
+              <MetaItem label="Meeting">
                 <Link
                   to="/crm/bookings"
                   search={{ tab: "all" }}

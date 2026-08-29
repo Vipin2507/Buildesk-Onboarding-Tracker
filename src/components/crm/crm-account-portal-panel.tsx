@@ -175,7 +175,7 @@ export function CrmAccountPortalPanel({ accountId }: { accountId: string }) {
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <div className="text-xs font-semibold">Bookings</div>
+            <div className="text-xs font-semibold">Meetings</div>
             <p className="text-[10px] text-muted-foreground">
               {bookingSummary.pending} pending · {bookingSummary.upcoming} upcoming
             </p>

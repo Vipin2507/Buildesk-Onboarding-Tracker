@@ -56,6 +56,7 @@ export function mapTaskRow(row: typeof t.followUpTasks.$inferSelect): FollowUpTa
     completedByUserId: row.completedByUserId ?? undefined,
     source: (row.source as FollowUpTask["source"]) ?? "manual",
     bookingAppointmentId: row.bookingAppointmentId ?? undefined,
+    productScope: (row.productScope as FollowUpTask["productScope"]) ?? "erp",
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -67,7 +68,7 @@ function taskAssigneeIds(row: typeof t.followUpTasks.$inferSelect): string[] {
   return row.assigneeUserId ? [row.assigneeUserId] : [];
 }
 
-/** Busy ranges from scheduled tasks for a user in a date window. */
+/** Busy ranges from scheduled CRM tasks for a user in a date window (booking availability). */
 export function collectTaskBusyRanges(userId: string, fromYmd: string, toYmd: string) {
   const db = getDb();
   const rangeStart = `${fromYmd}T00:00:00`;
@@ -78,6 +79,7 @@ export function collectTaskBusyRanges(userId: string, fromYmd: string, toYmd: st
     .from(t.followUpTasks)
     .where(
       and(
+        eq(t.followUpTasks.productScope, "crm"),
         inArray(t.followUpTasks.status, OCCUPIED_TASK_STATUSES),
         lte(t.followUpTasks.startsAt, rangeEnd),
         gte(t.followUpTasks.endsAt, rangeStart),
@@ -96,12 +98,16 @@ export function findScheduleConflicts(input: {
   endsAt: string;
   excludeTaskId?: string;
   excludeBookingId?: string;
+  productScope?: FollowUpTask["productScope"];
+  includeBookings?: boolean;
 }): ScheduleConflict[] {
   const db = getDb();
   const ymd = input.startsAt.slice(0, 10);
   const rangeStart = `${ymd}T00:00:00`;
   const rangeEnd = `${ymd}T23:59:59`;
   const conflicts: ScheduleConflict[] = [];
+  const scope = input.productScope ?? "crm";
+  const includeBookings = input.includeBookings ?? scope === "crm";
 
   for (const userId of input.userIds) {
     const tasks = db
@@ -109,6 +115,7 @@ export function findScheduleConflicts(input: {
       .from(t.followUpTasks)
       .where(
         and(
+          eq(t.followUpTasks.productScope, scope),
           inArray(t.followUpTasks.status, OCCUPIED_TASK_STATUSES),
           lte(t.followUpTasks.startsAt, rangeEnd),
           gte(t.followUpTasks.endsAt, rangeStart),
@@ -131,31 +138,33 @@ export function findScheduleConflicts(input: {
       }
     }
 
-    const bookings = db
-      .select()
-      .from(t.bookingAppointments)
-      .where(
-        and(
-          eq(t.bookingAppointments.hostUserId, userId),
-          inArray(t.bookingAppointments.status, ["pending", "confirmed", "postponed"]),
-          lte(t.bookingAppointments.startsAt, rangeEnd),
-          gte(t.bookingAppointments.endsAt, rangeStart),
-          input.excludeBookingId
-            ? ne(t.bookingAppointments.id, input.excludeBookingId)
-            : undefined,
-        ),
-      )
-      .all();
+    if (includeBookings) {
+      const bookings = db
+        .select()
+        .from(t.bookingAppointments)
+        .where(
+          and(
+            eq(t.bookingAppointments.hostUserId, userId),
+            inArray(t.bookingAppointments.status, ["pending", "confirmed", "postponed"]),
+            lte(t.bookingAppointments.startsAt, rangeEnd),
+            gte(t.bookingAppointments.endsAt, rangeStart),
+            input.excludeBookingId
+              ? ne(t.bookingAppointments.id, input.excludeBookingId)
+              : undefined,
+          ),
+        )
+        .all();
 
-    for (const booking of bookings) {
-      if (scheduleRangesOverlap(input.startsAt, input.endsAt, booking.startsAt, booking.endsAt)) {
-        conflicts.push({
-          kind: "booking",
-          title: booking.guestName ? `Booking – ${booking.guestName}` : "Booking",
-          startsAt: booking.startsAt,
-          endsAt: booking.endsAt,
-          userId,
-        });
+      for (const booking of bookings) {
+        if (scheduleRangesOverlap(input.startsAt, input.endsAt, booking.startsAt, booking.endsAt)) {
+          conflicts.push({
+            kind: "booking",
+            title: booking.guestName ? `Meeting – ${booking.guestName}` : "Meeting",
+            startsAt: booking.startsAt,
+            endsAt: booking.endsAt,
+            userId,
+          });
+        }
       }
     }
   }
@@ -313,6 +322,7 @@ export function syncTaskFromBookingAppointment(
       assigneeUserIdsJson: serializeAssigneeIds(assigneeIds),
       source: "booking",
       bookingAppointmentId: appointment.id,
+      productScope: "crm",
       createdAt: now,
       updatedAt: now,
     })

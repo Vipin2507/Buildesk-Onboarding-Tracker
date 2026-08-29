@@ -19,7 +19,7 @@ import {
   useCurrentUser,
   useOnboardingStore,
   useProjectStore,
-  useTaskStore,
+  useErpTaskStore,
   useTicketStore,
   useUserStore,
 } from "@/stores";
@@ -39,8 +39,8 @@ export function PendingWorkDashboard() {
   const currentUser = useCurrentUser();
   const users = useUserStore((s) => s.users);
   const tickets = useTicketStore((s) => s.tickets);
-  const tasks = useTaskStore((s) => s.tasks);
-  const updateTask = useTaskStore((s) => s.updateTask);
+  const tasks = useErpTaskStore((s) => s.tasks);
+  const updateTask = useErpTaskStore((s) => s.updateTask);
   const checklist = useOnboardingStore((s) => s.checklistItems);
   const visits = useClientVisitStore((s) => s.visits);
   const projects = useProjectStore((s) => s.projects);

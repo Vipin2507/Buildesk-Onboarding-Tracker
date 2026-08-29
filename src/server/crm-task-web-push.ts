@@ -103,7 +103,7 @@ export function getTaskWebPushDiagnostics(
     .from(t.followUpTasks)
     .where(inArray(t.followUpTasks.status, ["open", "in_progress", "blocked"]))
     .all()
-    .filter((row) => row.startsAt);
+    .filter((row) => row.productScope === "crm" && row.startsAt);
 
   const subscriptionCount = db.select({ id: t.pushSubscriptions.id }).from(t.pushSubscriptions).all()
     .length;
@@ -167,7 +167,7 @@ export async function processTaskWebPushReminders(
     .from(t.followUpTasks)
     .where(inArray(t.followUpTasks.status, ["open", "in_progress", "blocked"]))
     .all()
-    .filter((row) => row.startsAt);
+    .filter((row) => row.productScope === "crm" && row.startsAt);
 
   let sentCount = 0;
 

@@ -5,7 +5,7 @@ import {
   useCompanyStore,
   useOnboardingStore,
   useProjectStore,
-  useTaskStore,
+  useErpTaskStore,
   useTicketStore,
 } from "@/stores";
 import { isTicketOpen } from "@/lib/tickets";
@@ -27,7 +27,7 @@ export type PendingWorkItem = {
 
 export function buildPendingWorkItems(input: {
   tickets: ReturnType<typeof useTicketStore.getState>["tickets"];
-  tasks: ReturnType<typeof useTaskStore.getState>["tasks"];
+  tasks: ReturnType<typeof useErpTaskStore.getState>["tasks"];
   checklist: ReturnType<typeof useOnboardingStore.getState>["checklistItems"];
   visits: ReturnType<typeof useClientVisitStore.getState>["visits"];
   projects: ReturnType<typeof useProjectStore.getState>["projects"];
@@ -110,7 +110,7 @@ export function buildPendingWorkItems(input: {
 
 export function usePendingWorkSummary() {
   const tickets = useTicketStore((s) => s.tickets);
-  const tasks = useTaskStore((s) => s.tasks);
+  const tasks = useErpTaskStore((s) => s.tasks);
   const checklist = useOnboardingStore((s) => s.checklistItems);
   const visits = useClientVisitStore((s) => s.visits);
   const projects = useProjectStore((s) => s.projects);

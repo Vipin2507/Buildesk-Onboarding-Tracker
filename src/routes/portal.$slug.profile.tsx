@@ -78,7 +78,7 @@ function PortalProfile() {
               />
             </DesignTicketFormField>
 
-            <DesignTicketFormField label="Email" required hint="Required for booking confirmations.">
+            <DesignTicketFormField label="Email" required hint="Required for meeting confirmations.">
               <input
                 type="email"
                 defaultValue={access.contactEmail}

@@ -242,11 +242,11 @@ export function CreateCrmBookingDialog({
         guestPhone: guestPhone.trim() || undefined,
         notes: notes.trim() || undefined,
       });
-      toast.success("Booking created");
+      toast.success("Meeting created");
       onOpenChange(false);
       onCreated?.();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to create booking");
+      toast.error(err instanceof Error ? err.message : "Failed to create meeting");
     } finally {
       setSaving(false);
     }
@@ -260,8 +260,8 @@ export function CreateCrmBookingDialog({
     <EntityFormModal
       open={open}
       onOpenChange={onOpenChange}
-      title="Create booking"
-      submitLabel={saving ? "Creating…" : "Create booking"}
+      title="Create meeting"
+      submitLabel={saving ? "Creating…" : "Create meeting"}
       submitDisabled={saving || bootstrapping}
       contentClassName="max-w-xl"
       onSubmit={() => void submit()}

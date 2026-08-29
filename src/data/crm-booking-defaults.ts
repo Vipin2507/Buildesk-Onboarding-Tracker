@@ -30,14 +30,33 @@ export function seedCrmBookingCallTypes(): CrmBookingCallTypeDef[] {
   ];
 }
 
-/** Default executive weekly hours (Mon–Fri 10:00–17:00). */
+/** Default executive weekly hours (Mon–Sat 10:30–18:00). */
 export function seedCrmBookingHostHours(): CrmBookingHostHoursDef[] {
-  return [1, 2, 3, 4, 5].map((weekday) => ({
+  return [1, 2, 3, 4, 5, 6].map((weekday) => ({
     weekday,
-    startTime: "10:00",
-    endTime: "17:00",
+    startTime: "10:30",
+    endTime: "18:00",
     enabled: true,
   }));
+}
+
+function defaultHostHour(weekday: number): CrmBookingHostHoursDef {
+  return {
+    weekday,
+    startTime: "10:30",
+    endTime: "18:00",
+    enabled: weekday >= 1 && weekday <= 6,
+  };
+}
+
+/** Upgrade legacy Mon–Fri 10:00–17:00 rows saved before the Sat / 10:30–18:00 defaults. */
+function upgradeHostHour(row: CrmBookingHostHoursDef): CrmBookingHostHoursDef {
+  const startTime = String(row.startTime || "10:30").slice(0, 5);
+  const endTime = String(row.endTime || "18:00").slice(0, 5);
+  if (startTime === "10:00" && endTime === "17:00") {
+    return { ...row, startTime: "10:30", endTime: "18:00" };
+  }
+  return { ...row, startTime, endTime };
 }
 
 export function normalizeCrmBookingCallTypes(
@@ -69,22 +88,17 @@ export function normalizeCrmBookingHostHours(
   for (const row of existing) {
     const weekday = Number(row.weekday);
     if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) continue;
-    byDay.set(weekday, {
+    byDay.set(weekday, upgradeHostHour({
       weekday,
-      startTime: String(row.startTime || "10:00").slice(0, 5),
-      endTime: String(row.endTime || "17:00").slice(0, 5),
+      startTime: String(row.startTime || "10:30").slice(0, 5),
+      endTime: String(row.endTime || "18:00").slice(0, 5),
       enabled: row.enabled !== false,
-    });
+    }));
   }
   // Ensure all weekdays present for the editor.
   for (let d = 0; d <= 6; d++) {
     if (!byDay.has(d)) {
-      byDay.set(d, {
-        weekday: d,
-        startTime: "10:00",
-        endTime: "17:00",
-        enabled: d >= 1 && d <= 5,
-      });
+      byDay.set(d, defaultHostHour(d));
     }
   }
   return [...byDay.values()].sort((a, b) => a.weekday - b.weekday);

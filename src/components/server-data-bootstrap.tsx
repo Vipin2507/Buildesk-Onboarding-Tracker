@@ -27,6 +27,7 @@ import {
   getAppConfig,
   setAppConfig,
   listFollowUpTasks,
+  listErpFollowUpTasks,
   listClientVisits,
   listModuleSubscriptions,
   listModuleSubscriptionEvents,
@@ -64,7 +65,8 @@ import {
   useVendorStore,
   useMasterStore,
   useSettingsStore,
-  useTaskStore,
+  useCrmTaskStore,
+  useErpTaskStore,
   useClientVisitStore,
   useCrmEventStore,
   useCrmAccountStore,
@@ -80,6 +82,7 @@ import {
   useCrmAutomationStore,
 } from "@/stores/useCrmAutomationStore";
 import { hydrateCrmSettingsFromServer } from "@/stores/useCrmSettingsStore";
+import { hydrateCrmMasterFromServer, useCrmMasterStore } from "@/stores/useCrmMasterStore";
 import type { CrmOnboardingRecord } from "@/types/crm-onboarding";
 
 function readLegacyCrmOnboarding(): CrmOnboardingRecord[] {
@@ -142,6 +145,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           automation,
           crmAutomation,
           crmSettings,
+          crmMaster,
           notes,
           attachments,
           checklist,
@@ -150,6 +154,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           progressRows,
           customerApps,
           followUpTasks,
+          erpFollowUpTasks,
           clientVisits,
           moduleSubscriptions,
           subscriptionEvents,
@@ -185,6 +190,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           getAppConfig({ data: { key: "automation" } }).catch(() => ({})),
           getAppConfig({ data: { key: "crm-automation" } }).catch(() => ({})),
           getAppConfig({ data: { key: "crm-settings" } }).catch(() => ({})),
+          getAppConfig({ data: { key: "crm-master" } }).catch(() => ({})),
           listAllNotes().catch(() => []),
           listAllAttachments().catch(() => []),
           listAllChecklist().catch(() => []),
@@ -193,6 +199,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           listAllProgress().catch(() => []),
           listAllCustomerAppConfigs().catch(() => []),
           listFollowUpTasks({ data: {} }).catch(() => []),
+          listErpFollowUpTasks({ data: {} }).catch(() => []),
           listClientVisits({ data: {} }).catch(() => []),
           listModuleSubscriptions({ data: {} }).catch(() => []),
           listModuleSubscriptionEvents({ data: {} }).catch(() => []),
@@ -273,7 +280,8 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
             ]),
           ),
         });
-        useTaskStore.setState({ tasks: followUpTasks });
+        useCrmTaskStore.setState({ tasks: followUpTasks });
+        useErpTaskStore.setState({ tasks: erpFollowUpTasks });
         useClientVisitStore.setState({ visits: clientVisits });
         useCrmEventStore.setState({
           subscriptions: moduleSubscriptions,
@@ -363,6 +371,26 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
         }
         if (crmSettings && typeof crmSettings === "object" && Object.keys(crmSettings).length > 0) {
           hydrateCrmSettingsFromServer(crmSettings as Record<string, unknown>);
+        }
+        if (crmMaster && typeof crmMaster === "object" && Object.keys(crmMaster).length > 0) {
+          hydrateCrmMasterFromServer(crmMaster as Record<string, unknown>);
+        } else {
+          const localCrmMaster = useCrmMasterStore.getState();
+          await setAppConfig({
+            data: { key: "crm-master", value: {
+              platform: localCrmMaster.platform,
+              accountFields: localCrmMaster.accountFields,
+              projectFields: localCrmMaster.projectFields,
+              picklists: localCrmMaster.picklists,
+              modules: localCrmMaster.modules,
+              moduleProviders: localCrmMaster.moduleProviders,
+              migrationFields: localCrmMaster.migrationFields,
+              trainingFieldsDeveloper: localCrmMaster.trainingFieldsDeveloper,
+              trainingFieldsBroker: localCrmMaster.trainingFieldsBroker,
+              bookingCallTypes: localCrmMaster.bookingCallTypes,
+              bookingHostHours: localCrmMaster.bookingHostHours,
+            } },
+          }).catch(() => {});
         }
         if (automation && typeof automation === "object" && Object.keys(automation).length > 0) {
           hydrateAutomationFromServer(automation as Record<string, unknown>);
@@ -463,7 +491,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
         messages={[
           "Preparing your workspace…",
           "Loading accounts & projects…",
-          "Syncing CRM & bookings…",
+          "Syncing CRM & meetings…",
           "Almost ready…",
         ]}
       />

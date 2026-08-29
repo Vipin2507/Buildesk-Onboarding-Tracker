@@ -11,22 +11,22 @@ import {
   TaskFormFields,
   useTaskFormState,
 } from "@/components/tasks/task-form-fields";
-import { resolveDefaultTaskAssigneeIds, taskAssigneeUserOptions } from "@/lib/task-defaults";
+import { erpTaskAssigneeUserOptions, resolveDefaultTaskAssigneeIds } from "@/lib/task-defaults";
 import { formatTimeRange12h } from "@/lib/task-scheduling";
 import { useTaskTimeStatusSync, useTasksWithTimeStatus } from "@/hooks/use-task-time-status";
 import { resolveAssigneeLabel } from "@/lib/managers";
 import { formatDate, formatDateTime } from "@/lib/utils";
-import { useCompanyStore, useTaskStore, useUserStore } from "@/stores";
+import { useCompanyStore, useErpTaskStore, useUserStore } from "@/stores";
 import { FOLLOW_UP_TASK_TYPE_LABEL, type FollowUpTask, type FollowUpTaskType } from "@/types";
 import { usePermissions } from "@/hooks/use-permissions";
 
 export function CompanyTasksPanel({ companyId }: { companyId: string }) {
-  const tasks = useTaskStore((s) => s.tasks);
-  useTaskTimeStatusSync(true);
+  const tasks = useErpTaskStore((s) => s.tasks);
+  useTaskTimeStatusSync(true, "erp");
   const timeAwareTasks = useTasksWithTimeStatus(tasks);
-  const addTask = useTaskStore((s) => s.addTask);
-  const updateTask = useTaskStore((s) => s.updateTask);
-  const completeTask = useTaskStore((s) => s.completeTask);
+  const addTask = useErpTaskStore((s) => s.addTask);
+  const updateTask = useErpTaskStore((s) => s.updateTask);
+  const completeTask = useErpTaskStore((s) => s.completeTask);
   const company = useCompanyStore((s) => s.getById(companyId));
   const users = useUserStore((s) => s.users);
   const { can, isAdmin } = usePermissions();
@@ -41,7 +41,7 @@ export function CompanyTasksPanel({ companyId }: { companyId: string }) {
   );
 
   const assignees = useMemo(
-    () => taskAssigneeUserOptions({ users, company }),
+    () => erpTaskAssigneeUserOptions({ users, company }),
     [users, company],
   );
   const defaultAssigneeIds = useMemo(
@@ -206,6 +206,7 @@ export function CompanyTasksPanel({ companyId }: { companyId: string }) {
           editing={editing}
           markCompleteOnCreate={markCompleteOnCreate}
           onMarkCompleteOnCreateChange={setMarkCompleteOnCreate}
+          productScope="erp"
         />
         {editing ? (
           <div className="mt-4 space-y-2 border-t pt-3">

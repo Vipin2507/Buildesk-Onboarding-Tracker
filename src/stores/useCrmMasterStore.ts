@@ -313,3 +313,72 @@ export function getCrmMasterBookingCallTypes(): CrmBookingCallTypeDef[] {
 export function getCrmMasterBookingHostHours(): CrmBookingHostHoursDef[] {
   return normalizeCrmBookingHostHours(useCrmMasterStore.getState().bookingHostHours);
 }
+
+/** Product modules enabled in Master → Modules (drives account onboarding catalogs). */
+export function getCrmMasterProductModuleCatalog(): { key: string; label: string }[] {
+  ensureCrmMasterModulesCatalog();
+  return normalizeMasterModules(useCrmMasterStore.getState().modules)
+    .filter((m) => m.enabled)
+    .sort((a, b) => a.order - b.order)
+    .map((m) => ({ key: m.key, label: m.label }));
+}
+
+export function crmMasterSnapshot() {
+  const s = useCrmMasterStore.getState();
+  return {
+    platform: s.platform,
+    accountFields: s.accountFields,
+    projectFields: s.projectFields,
+    picklists: s.picklists,
+    modules: s.modules,
+    moduleProviders: s.moduleProviders,
+    migrationFields: s.migrationFields,
+    trainingFieldsDeveloper: s.trainingFieldsDeveloper,
+    trainingFieldsBroker: s.trainingFieldsBroker,
+    bookingCallTypes: s.bookingCallTypes,
+    bookingHostHours: s.bookingHostHours,
+  };
+}
+
+export function hydrateCrmMasterFromServer(raw: Record<string, unknown>) {
+  if (!raw || typeof raw !== "object" || Object.keys(raw).length === 0) return;
+  useCrmMasterStore.setState((s) => ({
+    ...s,
+    ...(raw.platform && typeof raw.platform === "object"
+      ? { platform: normalizePlatform({ ...s.platform, ...(raw.platform as object) }) }
+      : {}),
+    ...(Array.isArray(raw.accountFields) ? { accountFields: raw.accountFields as CrmMasterFieldDef[] } : {}),
+    ...(Array.isArray(raw.projectFields) ? { projectFields: raw.projectFields as CrmMasterFieldDef[] } : {}),
+    ...(Array.isArray(raw.picklists) ? { picklists: raw.picklists as CrmMasterPicklist[] } : {}),
+    ...(Array.isArray(raw.modules) ? { modules: normalizeMasterModules(raw.modules as CrmMasterModuleDef[]) } : {}),
+    ...(raw.moduleProviders && typeof raw.moduleProviders === "object"
+      ? { moduleProviders: normalizeModuleProviders(raw.moduleProviders as Record<string, string[]>) }
+      : {}),
+    ...(Array.isArray(raw.migrationFields)
+      ? { migrationFields: normalizeCrmMigrationFields(raw.migrationFields as CrmMigrationFieldDef[]) }
+      : {}),
+    ...(Array.isArray(raw.trainingFieldsDeveloper)
+      ? {
+          trainingFieldsDeveloper: normalizeCrmTrainingFields(
+            "developer",
+            raw.trainingFieldsDeveloper as CrmTrainingFieldDef[],
+          ),
+        }
+      : {}),
+    ...(Array.isArray(raw.trainingFieldsBroker)
+      ? {
+          trainingFieldsBroker: normalizeCrmTrainingFields(
+            "broker_cp",
+            raw.trainingFieldsBroker as CrmTrainingFieldDef[],
+          ),
+        }
+      : {}),
+    ...(Array.isArray(raw.bookingCallTypes)
+      ? { bookingCallTypes: normalizeCrmBookingCallTypes(raw.bookingCallTypes as CrmBookingCallTypeDef[]) }
+      : {}),
+    ...(Array.isArray(raw.bookingHostHours)
+      ? { bookingHostHours: normalizeCrmBookingHostHours(raw.bookingHostHours as CrmBookingHostHoursDef[]) }
+      : {}),
+  }));
+  ensureCrmMasterModulesCatalog();
+}

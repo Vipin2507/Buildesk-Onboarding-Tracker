@@ -25,8 +25,8 @@ const TRIGGER_SHORT: Record<AutomationRule["trigger"], string> = {
   "ticket-updated": "Updated",
   "ticket-closed": "Closed",
   "ticket-reply-from-team": "Team reply",
-  "booking-created": "Booking request",
-  "booking-status-changed": "Booking status",
+  "booking-created": "Meeting request",
+  "booking-status-changed": "Meeting status",
   "task-before-start": "Task reminder",
 };
 

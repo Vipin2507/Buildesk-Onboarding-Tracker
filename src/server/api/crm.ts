@@ -37,6 +37,14 @@ import type {
 
 /* ---------- Helpers ---------- */
 
+const CRM_SCOPE = "crm" as const;
+
+function assertCrmTaskRow(row: typeof t.followUpTasks.$inferSelect) {
+  if (row.productScope !== CRM_SCOPE) {
+    throw new ApiError(404, "Task not found");
+  }
+}
+
 function assertCanManageFollowUpTask(user: ReturnType<typeof requireUser>, companyId: string) {
   if (user.role === "Admin") return;
 
@@ -368,7 +376,12 @@ export const listFollowUpTasks = createServerFn({ method: "GET" })
     void processTaskReminderAutomations(db, user.timezone || DEFAULT_BOOKING_TIMEZONE);
     void processTaskInAppReminders(db, user.timezone || DEFAULT_BOOKING_TIMEZONE);
     void processTaskWebPushReminders(db, user.timezone || DEFAULT_BOOKING_TIMEZONE);
-    let rows = db.select().from(t.followUpTasks).orderBy(desc(t.followUpTasks.updatedAt)).all();
+    let rows = db
+      .select()
+      .from(t.followUpTasks)
+      .where(eq(t.followUpTasks.productScope, CRM_SCOPE))
+      .orderBy(desc(t.followUpTasks.updatedAt))
+      .all();
     if (data?.companyId) rows = rows.filter((r) => r.companyId === data.companyId);
     if (data?.status) rows = rows.filter((r) => r.status === data.status);
     if (data?.assigneeUserId) {
@@ -395,7 +408,7 @@ export const syncFollowUpTaskStatuses = createServerFn({ method: "POST" })
     await processTaskReminderAutomations(db, tz);
     processTaskInAppReminders(db, tz);
     await processTaskWebPushReminders(db, tz);
-    return updated;
+    return updated.filter((task) => task.productScope === CRM_SCOPE);
   });
 
 export const getFollowUpTask = createServerFn({ method: "GET" })
@@ -404,6 +417,7 @@ export const getFollowUpTask = createServerFn({ method: "GET" })
     requireUser();
     const row = getDb().select().from(t.followUpTasks).where(eq(t.followUpTasks.id, data.id)).get();
     if (!row) throw new ApiError(404, "Task not found");
+    assertCrmTaskRow(row);
     return mapTaskRow(row);
   });
 
@@ -441,7 +455,11 @@ function assertNoScheduleConflicts(input: {
   excludeTaskId?: string;
   excludeBookingId?: string;
 }) {
-  const conflicts = findScheduleConflicts(input);
+  const conflicts = findScheduleConflicts({
+    ...input,
+    productScope: CRM_SCOPE,
+    includeBookings: true,
+  });
   if (conflicts.length > 0) {
     throw new ApiError(409, formatScheduleConflictMessage(conflicts[0]!));
   }
@@ -520,6 +538,7 @@ export const createFollowUpTask = createServerFn({ method: "POST" })
         assigneeUserIdsJson,
         source: data.source ?? "manual",
         bookingAppointmentId: data.bookingAppointmentId ?? null,
+        productScope: CRM_SCOPE,
         createdByUserId: user.id,
         completedAt,
         createdAt: now,
@@ -574,6 +593,7 @@ export const updateFollowUpTask = createServerFn({ method: "POST" })
     const db = getDb();
     const existing = db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, data.id)).get();
     if (!existing) throw new ApiError(404, "Task not found");
+    assertCrmTaskRow(existing);
     assertCanManageFollowUpTask(user, existing.companyId);
     const { remark, ...patch } = data.patch;
     const now = nowIso();
@@ -735,6 +755,7 @@ export const completeFollowUpTask = createServerFn({ method: "POST" })
     const db = getDb();
     const existing = db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, data.id)).get();
     if (!existing) throw new ApiError(404, "Task not found");
+    assertCrmTaskRow(existing);
     assertCanManageFollowUpTask(user, existing.companyId);
     const now = nowIso();
     db.update(t.followUpTasks)
@@ -781,6 +802,8 @@ export const checkTaskScheduleConflicts = createServerFn({ method: "POST" })
       endsAt: data.endsAt,
       excludeTaskId: data.excludeTaskId,
       excludeBookingId: data.excludeBookingId,
+      productScope: CRM_SCOPE,
+      includeBookings: true,
     });
     return {
       hasConflict: conflicts.length > 0,
@@ -798,6 +821,7 @@ export const cancelFollowUpTask = createServerFn({ method: "POST" })
     const db = getDb();
     const existing = db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, data.id)).get();
     if (!existing) throw new ApiError(404, "Task not found");
+    assertCrmTaskRow(existing);
     assertCanManageFollowUpTask(user, existing.companyId);
     db.update(t.followUpTasks)
       .set({ status: "cancelled", updatedAt: nowIso() })
@@ -824,6 +848,7 @@ export const deleteFollowUpTask = createServerFn({ method: "POST" })
     const db = getDb();
     const existing = db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, data.id)).get();
     if (!existing) throw new ApiError(404, "Task not found");
+    assertCrmTaskRow(existing);
 
     writeCrmEvent({
       companyId: existing.companyId,

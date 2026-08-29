@@ -16,7 +16,7 @@ import {
   useCrmEventStore,
   useProjectStore,
   usePostSalesStore,
-  useTaskStore,
+  useErpTaskStore,
   useClientVisitStore,
 } from "@/stores";
 import type { ActivityKind } from "@/types";
@@ -80,7 +80,7 @@ function crmKind(eventType: string): ActivityKind {
 export function CompanyHistoryTab({ companyId }: { companyId: string }) {
   const allActivities = useActivityStore((s) => s.activities);
   const crmEvents = useCrmEventStore((s) => s.events);
-  const tasks = useTaskStore((s) => s.tasks);
+  const tasks = useErpTaskStore((s) => s.tasks);
   const visits = useClientVisitStore((s) => s.visits);
   const onboardingProjects = useProjectStore((s) => s.projects);
   const postSalesProjects = usePostSalesStore((s) => s.projects);

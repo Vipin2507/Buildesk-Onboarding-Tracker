@@ -170,7 +170,7 @@ export function AutomationLogsPanel() {
           onChange={(e) => setScopeFilter(e.target.value as typeof scopeFilter)}
         >
           <option value="all">All types</option>
-          <option value="bookings">Bookings</option>
+          <option value="bookings">Meetings</option>
           <option value="tickets">Tickets</option>
         </select>
       </div>

@@ -30,15 +30,18 @@ import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { flushCrmMasterConfigPersistence } from "@/lib/config-persistence";
 import { CRM_MODULE_PROVIDERS, CRM_PRODUCT_MODULES } from "@/data/crm-onboarding-defaults";
+import { normalizeCrmBookingHostHours } from "@/data/crm-booking-defaults";
 import {
   ensureCrmMasterModulesCatalog,
   getCrmMasterBookingCallTypes,
   getCrmMasterBookingHostHours,
   getCrmMasterMigrationFields,
+  getCrmMasterProductModuleCatalog,
   getCrmMasterTrainingFields,
 } from "@/stores/useCrmMasterStore";
-import { useAuthStore, useCrmMasterStore } from "@/stores";
+import { useAuthStore, useCrmMasterStore, useCrmOnboardingStore } from "@/stores";
 import type {
   CrmBookingCallTypeDef,
   CrmBookingHostHoursDef,
@@ -63,7 +66,7 @@ const SECTIONS = [
   { id: "providers", label: "Providers", icon: Database },
   { id: "migration", label: "Migration", icon: Upload },
   { id: "training", label: "Training", icon: GraduationCap },
-  { id: "bookings", label: "Bookings", icon: Calendar },
+  { id: "bookings", label: "Meetings", icon: Calendar },
   { id: "data-control", label: "Data Control", icon: Table2 },
   { id: "danger", label: "Reset & Safety", icon: ShieldAlert },
 ] as const;
@@ -220,7 +223,7 @@ function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) 
       to: "training" as const,
     },
     {
-      label: "Bookings",
+      label: "Meetings",
       value: (bookingCallTypes?.length ?? getCrmMasterBookingCallTypes().length),
       total: "call types · host hours",
       to: "bookings" as const,
@@ -667,19 +670,56 @@ function PicklistsPanel() {
 function ModulesPanel() {
   const modules = useCrmMasterStore((s) => s.modules);
   const updateModule = useCrmMasterStore((s) => s.updateModule);
+  const applyToAllAccounts = useCrmOnboardingStore((s) => s.applyProductModulesCatalogToAllAccounts);
+  const accountCount = useCrmOnboardingStore((s) => s.records.length);
 
   useEffect(() => {
     ensureCrmMasterModulesCatalog();
   }, []);
+
+  function syncForMe() {
+    flushCrmMasterConfigPersistence();
+    toast.success("Module catalog saved", {
+      description:
+        "Synced to server for all admins. Account records update when each account is opened.",
+    });
+  }
+
+  function syncForAll() {
+    flushCrmMasterConfigPersistence();
+    const updated = applyToAllAccounts();
+    toast.success("Module catalog applied to all accounts", {
+      description:
+        updated > 0
+          ? `Updated ${updated} of ${accountCount} CRM account onboarding record(s).`
+          : `All ${accountCount} account(s) already matched the master catalog.`,
+    });
+  }
+
+  const enabledCount = getCrmMasterProductModuleCatalog().length;
 
   return (
     <div className="space-y-2.5">
       <div>
         <h3 className="text-sm font-semibold">CRM modules</h3>
         <p className="text-[10px] text-muted-foreground">
-          Enable or disable product modules available during account onboarding. Edit integration
-          vendor names under Providers.
+          Enable or disable product modules available during account onboarding. Changes sync to the
+          server for all admins. Use the buttons below to push the catalog into account records.
         </p>
+      </div>
+      <div className="card-soft flex flex-col gap-2 border border-primary/20 bg-primary/5 p-2.5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-[10px] text-muted-foreground">
+          <span className="font-medium text-foreground">{enabledCount}</span> module(s) enabled in
+          master · <span className="font-medium text-foreground">{accountCount}</span> CRM account(s)
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={syncForMe}>
+            Update for me
+          </Button>
+          <Button type="button" size="sm" className="h-7 text-xs" onClick={syncForAll}>
+            Update for all
+          </Button>
+        </div>
       </div>
       <div className="space-y-1.5">
         {modules
@@ -706,6 +746,8 @@ function ModulesPanel() {
 function ProvidersPanel() {
   const moduleProviders = useCrmMasterStore((s) => s.moduleProviders);
   const setModuleProviders = useCrmMasterStore((s) => s.setModuleProviders);
+  const applyToAllAccounts = useCrmOnboardingStore((s) => s.applyProductModulesCatalogToAllAccounts);
+  const accountCount = useCrmOnboardingStore((s) => s.records.length);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -760,9 +802,48 @@ function ProvidersPanel() {
       <div>
         <h3 className="text-sm font-semibold">Integration providers</h3>
         <p className="text-[10px] text-muted-foreground">
-          Rename, add, or remove vendor options shown on account Modules. Accounts can also pick{" "}
-          <span className="font-medium text-foreground">Other</span> and type a custom name.
+          Rename, add, or remove vendor options shown on account Modules. Provider lists are read
+          live from master — save to sync across admins, then apply to accounts if needed.
         </p>
+      </div>
+
+      <div className="card-soft flex flex-col gap-2 border border-primary/20 bg-primary/5 p-2.5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-[10px] text-muted-foreground">
+          Provider options apply immediately on account Modules screens after server sync.
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            onClick={() => {
+              flushCrmMasterConfigPersistence();
+              toast.success("Providers saved", {
+                description: "Synced to server for all admins.",
+              });
+            }}
+          >
+            Update for me
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => {
+              flushCrmMasterConfigPersistence();
+              const updated = applyToAllAccounts();
+              toast.success("Providers and module catalog applied", {
+                description:
+                  updated > 0
+                    ? `Updated ${updated} of ${accountCount} account record(s).`
+                    : `All ${accountCount} account(s) already up to date.`,
+              });
+            }}
+          >
+            Update for all
+          </Button>
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -1188,10 +1269,7 @@ function BookingsPanel() {
     [bookingCallTypes],
   );
   const hostHours = useMemo(
-    () =>
-      Array.isArray(bookingHostHours) && bookingHostHours.length > 0
-        ? bookingHostHours
-        : getCrmMasterBookingHostHours(),
+    () => normalizeCrmBookingHostHours(bookingHostHours),
     [bookingHostHours],
   );
 
@@ -1244,6 +1322,13 @@ function BookingsPanel() {
     toast.success("Call type added");
   }
 
+  useEffect(() => {
+    const normalized = normalizeCrmBookingHostHours(bookingHostHours);
+    if (JSON.stringify(normalized) !== JSON.stringify(bookingHostHours ?? [])) {
+      setBookingHostHours(normalized);
+    }
+  }, [bookingHostHours, setBookingHostHours]);
+
   function updateHostHour(weekday: number, patch: Partial<CrmBookingHostHoursDef>) {
     const next = hostHours.map((row) => (row.weekday === weekday ? { ...row, ...patch } : row));
     setBookingHostHours(next);
@@ -1256,7 +1341,7 @@ function BookingsPanel() {
           <h3 className="text-sm font-semibold">Call types</h3>
           <p className="text-[10px] text-muted-foreground">
             Durations drive open portal slots (Query 15m, Training 30m, Other custom). Changes apply
-            when booking defaults sync for an account.
+            when meeting defaults sync for an account.
           </p>
         </div>
 
@@ -1351,11 +1436,13 @@ function BookingsPanel() {
           <h3 className="text-sm font-semibold">Executive weekly hours</h3>
           <p className="text-[10px] text-muted-foreground">
             Default availability seeded for hosts who have no windows yet. Executives can still
-            refine hours under CRM → Bookings → Availability.
+            refine hours under CRM → Meetings → Availability.
           </p>
         </div>
         <div className="divide-y rounded-md border">
-          {hostHours.map((row) => (
+          {hostHours
+            .filter((row) => row.weekday >= 1 && row.weekday <= 6)
+            .map((row) => (
             <div key={row.weekday} className="flex flex-wrap items-center gap-2 px-2.5 py-2">
               <div className="w-10 text-xs font-medium">{WEEKDAY_LABELS[row.weekday]}</div>
               <Switch
@@ -1395,7 +1482,7 @@ function DangerPanel() {
         <h3 className="text-sm font-semibold text-destructive">Reset CRM Master Config</h3>
         <p className="mt-1 text-[10px] text-muted-foreground">
           Restores seeded account fields, project fields, picklists, modules, providers, migration,
-          training, and booking catalogs. Does not delete CRM accounts or onboarding checklists.
+          training, and meeting catalogs. Does not delete CRM accounts or onboarding checklists.
         </p>
         <Button
           size="sm"
@@ -1411,7 +1498,7 @@ function DangerPanel() {
         open={open}
         onOpenChange={setOpen}
         title="Reset CRM Master Config?"
-        description="All field catalogs, picklists, modules, providers, migration, training, and booking fields will revert to seed defaults."
+        description="All field catalogs, picklists, modules, providers, migration, training, and meeting fields will revert to seed defaults."
         confirmLabel="Reset"
         onConfirm={() => {
           resetAll();

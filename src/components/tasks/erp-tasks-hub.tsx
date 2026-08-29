@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   Clock,
   LayoutList,
-  Link2,
   Plus,
   Trash2,
   User as UserIcon,
@@ -33,21 +32,17 @@ import {
   TaskFormFields,
   useTaskFormState,
 } from "@/components/tasks/task-form-fields";
-import {
-  canManageCrmAccountTasks,
-  filterCrmAccountsForUser,
-} from "@/lib/crm-account-access";
-import { resolveDefaultTaskAssigneeIds, taskAssigneeUserOptions } from "@/lib/task-defaults";
+import { erpTaskAssigneeUserOptions, resolveDefaultTaskAssigneeIds } from "@/lib/task-defaults";
 import { resolveTaskAssigneeIds } from "@/lib/task-scheduling";
 import { useTaskTimeStatusSync, useTasksWithTimeStatus } from "@/hooks/use-task-time-status";
-import { useAuthStore, useCrmAccountStore, useCrmTaskStore, useUserStore } from "@/stores";
+import { useAuthStore, useCompanyStore, useErpTaskStore, useUserStore } from "@/stores";
 import {
   FOLLOW_UP_TASK_TYPE_LABEL,
   type FollowUpTask,
   type FollowUpTaskStatus,
 } from "@/types";
 import { usePermissions } from "@/hooks/use-permissions";
-import type { CrmTasksTabId } from "@/lib/crm-route-search";
+import type { ErpTasksTabId } from "@/lib/erp-route-search";
 import { motion } from "framer-motion";
 
 const OPEN_STATUSES: FollowUpTaskStatus[] = ["open", "in_progress", "blocked"];
@@ -64,159 +59,144 @@ const TASK_TABS = [
   { id: "month", label: "Month", icon: Calendar },
 ] as const;
 
-function isCalendarTab(tab: CrmTasksTabId): tab is TaskCalendarView {
+function isCalendarTab(tab: ErpTasksTabId): tab is TaskCalendarView {
   return tab === "list" || tab === "day" || tab === "week" || tab === "month";
 }
 
 type Props = {
-  tab: CrmTasksTabId;
-  onTabChange: (tab: CrmTasksTabId) => void;
+  tab: ErpTasksTabId;
+  onTabChange: (tab: ErpTasksTabId) => void;
   selectedTaskId?: string;
   onSelectTask: (taskId: string | undefined) => void;
 };
 
-export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: Props) {
-  const tasks = useCrmTaskStore((s) => s.tasks);
-  useTaskTimeStatusSync(true, "crm");
+export function ErpTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: Props) {
+  const tasks = useErpTaskStore((s) => s.tasks);
+  useTaskTimeStatusSync(true, "erp");
   const timeAwareTasks = useTasksWithTimeStatus(tasks);
-  const addTask = useCrmTaskStore((s) => s.addTask);
-  const updateTask = useCrmTaskStore((s) => s.updateTask);
-  const completeTask = useCrmTaskStore((s) => s.completeTask);
-  const cancelTask = useCrmTaskStore((s) => s.cancelTask);
-  const deleteTask = useCrmTaskStore((s) => s.deleteTask);
-  const accounts = useCrmAccountStore((s) => s.accounts);
+  const addTask = useErpTaskStore((s) => s.addTask);
+  const updateTask = useErpTaskStore((s) => s.updateTask);
+  const completeTask = useErpTaskStore((s) => s.completeTask);
+  const cancelTask = useErpTaskStore((s) => s.cancelTask);
+  const deleteTask = useErpTaskStore((s) => s.deleteTask);
+  const companies = useCompanyStore((s) => s.companies);
   const users = useUserStore((s) => s.users);
   const currentUser = useAuthStore((s) => s.user);
   const { can, isAdmin } = usePermissions();
 
-  const visibleAccounts = useMemo(
-    () => filterCrmAccountsForUser(accounts, currentUser),
-    [accounts, currentUser],
-  );
-  const accountIds = useMemo(() => new Set(visibleAccounts.map((a) => a.id)), [visibleAccounts]);
-  const accountOptions = useMemo(
-    () => visibleAccounts.map((a) => ({ id: a.id, name: a.name })),
-    [visibleAccounts],
+  const companyOptions = useMemo(
+    () => companies.map((c) => ({ id: c.id, name: c.name })),
+    [companies],
   );
 
-  const crmTasks = useMemo(
-    () => timeAwareTasks.filter((t) => accountIds.has(t.companyId)),
-    [timeAwareTasks, accountIds],
-  );
+  const erpTasks = timeAwareTasks;
 
   const today = new Date().toISOString().slice(0, 10);
 
   const kpis = useMemo(() => {
-    const open = crmTasks.filter((t) => OPEN_STATUSES.includes(t.status)).length;
-    const dueToday = crmTasks.filter(
+    const open = erpTasks.filter((t) => OPEN_STATUSES.includes(t.status)).length;
+    const dueToday = erpTasks.filter(
       (t) => OPEN_STATUSES.includes(t.status) && t.dueDate === today,
     ).length;
-    const overdue = crmTasks.filter(
+    const overdue = erpTasks.filter(
       (t) => OPEN_STATUSES.includes(t.status) && t.dueDate && t.dueDate < today,
     ).length;
-    const fromBooking = crmTasks.filter((t) => t.source === "booking" && OPEN_STATUSES.includes(t.status)).length;
-    const myOpen = crmTasks.filter((t) => {
+    const myOpen = erpTasks.filter((t) => {
       if (!OPEN_STATUSES.includes(t.status) || !currentUser?.id) return false;
       return resolveTaskAssigneeIds(t).includes(currentUser.id);
     }).length;
-    return { open, dueToday, overdue, fromBooking, myOpen, total: crmTasks.length };
-  }, [crmTasks, today, currentUser?.id]);
+    return { open, dueToday, overdue, myOpen, total: erpTasks.length };
+  }, [erpTasks, today, currentUser?.id]);
 
   const tabFiltered = useMemo(() => {
     switch (tab) {
       case "my":
-        return crmTasks.filter((t) =>
+        return erpTasks.filter((t) =>
           currentUser?.id ? resolveTaskAssigneeIds(t).includes(currentUser.id) : false,
         );
       case "open":
-        return crmTasks.filter((t) => OPEN_STATUSES.includes(t.status));
+        return erpTasks.filter((t) => OPEN_STATUSES.includes(t.status));
       case "today":
-        return crmTasks.filter((t) => OPEN_STATUSES.includes(t.status) && t.dueDate === today);
+        return erpTasks.filter((t) => OPEN_STATUSES.includes(t.status) && t.dueDate === today);
       case "overdue":
-        return crmTasks.filter(
+        return erpTasks.filter(
           (t) => OPEN_STATUSES.includes(t.status) && t.dueDate && t.dueDate < today,
         );
       default:
-        return crmTasks;
+        return erpTasks;
     }
-  }, [crmTasks, tab, today, currentUser?.id]);
+  }, [erpTasks, tab, today, currentUser?.id]);
 
   const [query, setQuery] = useState("");
-  const [accountFilter, setAccountFilter] = useState("all");
+  const [companyFilter, setCompanyFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [assigneeFilter, setAssigneeFilter] = useState("all");
-  const [sourceFilter, setSourceFilter] = useState("all");
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return tabFiltered.filter((task) => {
-      if (accountFilter !== "all" && task.companyId !== accountFilter) return false;
+      if (companyFilter !== "all" && task.companyId !== companyFilter) return false;
       if (typeFilter !== "all" && task.taskType !== typeFilter) return false;
       if (statusFilter !== "all" && task.status !== statusFilter) return false;
-      if (sourceFilter !== "all" && (task.source ?? "manual") !== sourceFilter) return false;
       if (assigneeFilter !== "all" && !resolveTaskAssigneeIds(task).includes(assigneeFilter)) {
         return false;
       }
       if (!q) return true;
-      const accountName = accountOptions.find((a) => a.id === task.companyId)?.name ?? "";
+      const companyName = companyOptions.find((a) => a.id === task.companyId)?.name ?? "";
       return (
         task.title.toLowerCase().includes(q) ||
-        accountName.toLowerCase().includes(q) ||
+        companyName.toLowerCase().includes(q) ||
         (task.description ?? "").toLowerCase().includes(q)
       );
     });
-  }, [tabFiltered, query, accountFilter, typeFilter, statusFilter, assigneeFilter, sourceFilter, accountOptions]);
+  }, [tabFiltered, query, companyFilter, typeFilter, statusFilter, assigneeFilter, companyOptions]);
 
-  const selectedTask = selectedTaskId ? crmTasks.find((t) => t.id === selectedTaskId) : undefined;
-  const editingAccount = selectedTask
-    ? visibleAccounts.find((a) => a.id === selectedTask.companyId)
+  const selectedTask = selectedTaskId ? erpTasks.find((t) => t.id === selectedTaskId) : undefined;
+  const editingCompany = selectedTask
+    ? companies.find((c) => c.id === selectedTask.companyId)
     : undefined;
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<FollowUpTask | null>(null);
-  const [createAccountId, setCreateAccountId] = useState("");
+  const [createCompanyId, setCreateCompanyId] = useState("");
   const [remark, setRemark] = useState("");
   const [markCompleteOnCreate, setMarkCompleteOnCreate] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<FollowUpTask | null>(null);
 
-  const createAccount = visibleAccounts.find((a) => a.id === createAccountId);
+  const createCompany = companies.find((c) => c.id === createCompanyId);
   const assignees = useMemo(
     () =>
-      taskAssigneeUserOptions({
+      erpTaskAssigneeUserOptions({
         users,
-        crmAccount: createAccount,
+        company: createCompany,
       }),
-    [createAccount, users],
+    [createCompany, users],
   );
 
   const defaultAssigneeIds = useMemo(
-    () => resolveDefaultTaskAssigneeIds({ crmAccount: createAccount, users }),
-    [createAccount, users],
+    () => resolveDefaultTaskAssigneeIds({ company: createCompany, users }),
+    [createCompany, users],
   );
 
   const form = useTaskFormState({
     users: assignees,
     defaultAssigneeIds,
     editing,
-    companyId: createAccountId,
+    companyId: createCompanyId,
   });
 
-  function canManageTask(task?: FollowUpTask) {
-    if (!task) return false;
-    if (isAdmin || can("manageTasks")) return true;
-    const account = visibleAccounts.find((a) => a.id === task.companyId);
-    return account ? canManageCrmAccountTasks(account, currentUser) : false;
+  const canManage = isAdmin || can("manageTasks");
+
+  function canManageTask(_task?: FollowUpTask) {
+    return canManage;
   }
 
-  const canCreate =
-    isAdmin ||
-    can("manageTasks") ||
-    visibleAccounts.some((a) => canManageCrmAccountTasks(a, currentUser));
+  const canCreate = canManage;
 
   function openCreate() {
     setEditing(null);
-    setCreateAccountId(visibleAccounts[0]?.id ?? "");
+    setCreateCompanyId(companies[0]?.id ?? "");
     form.reset();
     setRemark("");
     setMarkCompleteOnCreate(false);
@@ -225,7 +205,7 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
 
   function openEdit(task: FollowUpTask) {
     setEditing(task);
-    setCreateAccountId(task.companyId);
+    setCreateCompanyId(task.companyId);
     setRemark("");
     setModalOpen(true);
     onSelectTask(task.id);
@@ -236,9 +216,9 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
       toast.error("Title is required");
       return;
     }
-    const companyId = createAccountId || editing?.companyId;
+    const companyId = createCompanyId || editing?.companyId;
     if (!companyId) {
-      toast.error("Account is required");
+      toast.error("Company is required");
       return;
     }
     if (!(await form.validateSchedule())) return;
@@ -280,23 +260,22 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
 
   const calendarView: TaskCalendarView = isCalendarTab(tab) ? tab : "list";
   const activeFilterCount = [
-    accountFilter !== "all",
+    companyFilter !== "all",
     typeFilter !== "all",
     statusFilter !== "all",
     assigneeFilter !== "all",
-    sourceFilter !== "all",
   ].filter(Boolean).length;
 
   const assigneeOptions = useMemo(() => {
     const ids = new Set<string>();
-    for (const task of crmTasks) {
+    for (const task of erpTasks) {
       for (const id of resolveTaskAssigneeIds(task)) ids.add(id);
     }
     return [
       { value: "all", label: "All assignees" },
       ...users.filter((u) => ids.has(u.id)).map((u) => ({ value: u.id, label: u.name })),
     ];
-  }, [crmTasks, users]);
+  }, [erpTasks, users]);
 
   function toggleTaskSelection(task: FollowUpTask) {
     onSelectTask(selectedTaskId === task.id ? undefined : task.id);
@@ -307,7 +286,7 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
       <TaskDetailPanel
         embedded
         task={task}
-        accountName={accountOptions.find((a) => a.id === task.companyId)?.name ?? "—"}
+        accountName={companyOptions.find((a) => a.id === task.companyId)?.name ?? "—"}
         users={users}
         canManage={canManageTask(task)}
         canDeleteAdmin={isAdmin}
@@ -351,7 +330,7 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
     <PageWrap>
       <DesignTicketPageHeader
         title="Tasks"
-        subtitle="Schedule, assign, and track follow-ups across CRM accounts"
+        subtitle="Schedule, assign, and track follow-ups across ERP companies"
         actions={
           canCreate ? (
             <Button size="sm" className="gap-1.5" onClick={openCreate}>
@@ -364,7 +343,7 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
 
       <DesignTicketKpiGrid
         size="compact"
-        columns={6}
+        columns={5}
         items={[
           {
             id: "open",
@@ -400,12 +379,6 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
             onClick: () => onTabChange("overdue"),
           },
           {
-            id: "booking",
-            label: "From meetings",
-            value: kpis.fromBooking,
-            icon: Link2,
-          },
-          {
             id: "all",
             label: "Total",
             value: kpis.total,
@@ -420,7 +393,7 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
         compact
         tabs={[...TASK_TABS]}
         activeId={tab}
-        onChange={(id) => onTabChange(id as CrmTasksTabId)}
+        onChange={(id) => onTabChange(id as ErpTasksTabId)}
       />
 
       <motion.div variants={ticketSectionVariants} initial="hidden" animate="show" className="space-y-2.5">
@@ -428,27 +401,26 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
           <ListToolbar
             search={query}
             onSearchChange={setQuery}
-            searchPlaceholder="Search tasks, accounts, descriptions…"
+            searchPlaceholder="Search tasks, companies, descriptions…"
             resultCount={filtered.length}
             resultLabel="tasks"
             activeFilterCount={activeFilterCount}
             onClear={() => {
               setQuery("");
-              setAccountFilter("all");
+              setCompanyFilter("all");
               setTypeFilter("all");
               setStatusFilter("all");
               setAssigneeFilter("all");
-              setSourceFilter("all");
             }}
             selects={[
               {
-                id: "account",
-                label: "Account",
-                value: accountFilter,
-                onChange: setAccountFilter,
+                id: "company",
+                label: "Company",
+                value: companyFilter,
+                onChange: setCompanyFilter,
                 options: [
-                  { value: "all", label: "All accounts" },
-                  ...accountOptions.map((a) => ({ value: a.id, label: a.name })),
+                  { value: "all", label: "All companies" },
+                  ...companyOptions.map((a) => ({ value: a.id, label: a.name })),
                 ],
               },
               {
@@ -484,17 +456,6 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
                 onChange: setAssigneeFilter,
                 options: assigneeOptions,
               },
-              {
-                id: "source",
-                label: "Source",
-                value: sourceFilter,
-                onChange: setSourceFilter,
-                options: [
-                  { value: "all", label: "All sources" },
-                  { value: "manual", label: "Manual" },
-                  { value: "booking", label: "Meeting" },
-                ],
-              },
             ]}
           />
         ) : null}
@@ -502,7 +463,7 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
         <TaskCalendarPanel
           tasks={isCalendarTab(tab) ? tabFiltered : filtered}
           users={users}
-          companies={accountOptions}
+          companies={companyOptions}
           view={calendarView}
           onViewChange={(v) => onTabChange(v)}
           onTaskClick={toggleTaskSelection}
@@ -511,7 +472,7 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
           canManage={canCreate}
           embedded={!isCalendarTab(tab)}
           hideViewToggle
-          entityLinkTarget="crm"
+          entityLinkTarget="company"
         />
       </motion.div>
 
@@ -524,25 +485,25 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
       >
         {!editing ? (
           <label className="mb-3 block text-xs font-medium">
-            Account
+            Company
             <select
               className="mt-1 h-9 w-full rounded-md border px-3 text-sm"
-              value={createAccountId}
+              value={createCompanyId}
               onChange={(e) => {
-                setCreateAccountId(e.target.value);
+                setCreateCompanyId(e.target.value);
               }}
             >
-              <option value="">Select account</option>
-              {visibleAccounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
+              <option value="">Select company</option>
+              {companies.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
                 </option>
               ))}
             </select>
           </label>
-        ) : editingAccount ? (
+        ) : editingCompany ? (
           <p className="mb-3 text-xs text-muted-foreground">
-            Account: <span className="font-medium text-foreground">{editingAccount.name}</span>
+            Company: <span className="font-medium text-foreground">{editingCompany.name}</span>
           </p>
         ) : null}
 
@@ -553,7 +514,7 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
           editing={editing}
           markCompleteOnCreate={markCompleteOnCreate}
           onMarkCompleteOnCreateChange={setMarkCompleteOnCreate}
-          productScope="crm"
+          productScope="erp"
         />
 
         {editing ? (

@@ -29,7 +29,7 @@ import {
 } from "@/hooks/use-task-time-status";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { resolveAssigneeLabel } from "@/lib/managers";
-import { useAuthStore, useCrmAccountStore, useTaskStore, useUserStore } from "@/stores";
+import { useAuthStore, useCrmAccountStore, useCrmTaskStore, useUserStore } from "@/stores";
 import {
   FOLLOW_UP_TASK_TYPE_LABEL,
   type FollowUpTask,
@@ -55,13 +55,13 @@ type Props = {
 
 export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: Props) {
   const account = useCrmAccountStore((s) => s.getById(accountId));
-  const tasks = useTaskStore((s) => s.tasks);
-  useTaskTimeStatusSync(true);
+  const tasks = useCrmTaskStore((s) => s.tasks);
+  useTaskTimeStatusSync(true, "crm");
   const timeAwareTasks = useTasksWithTimeStatus(tasks);
-  const addTask = useTaskStore((s) => s.addTask);
-  const updateTask = useTaskStore((s) => s.updateTask);
-  const completeTask = useTaskStore((s) => s.completeTask);
-  const cancelTask = useTaskStore((s) => s.cancelTask);
+  const addTask = useCrmTaskStore((s) => s.addTask);
+  const updateTask = useCrmTaskStore((s) => s.updateTask);
+  const completeTask = useCrmTaskStore((s) => s.completeTask);
+  const cancelTask = useCrmTaskStore((s) => s.cancelTask);
   const users = useUserStore((s) => s.users);
   const currentUser = useAuthStore((s) => s.user);
 
@@ -429,6 +429,7 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
           editing={editing}
           markCompleteOnCreate={markCompleteOnCreate}
           onMarkCompleteOnCreateChange={setMarkCompleteOnCreate}
+          productScope="crm"
         />
         {editing ? (
           <div className="mt-4 space-y-2 border-t pt-3">

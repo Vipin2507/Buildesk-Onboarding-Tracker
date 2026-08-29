@@ -118,7 +118,7 @@ export type ScheduleConflict = {
 export function formatScheduleConflictMessage(conflict: ScheduleConflict): string {
   const start = conflict.startsAt.slice(11, 16);
   const end = conflict.endsAt.slice(11, 16);
-  const label = conflict.kind === "booking" ? "booking" : "task";
+  const label = conflict.kind === "booking" ? "meeting" : "task";
   return `Time slot unavailable: This user already has a ${label} scheduled from ${formatTimeRange12h(start, end)} (${conflict.title}).`;
 }
 

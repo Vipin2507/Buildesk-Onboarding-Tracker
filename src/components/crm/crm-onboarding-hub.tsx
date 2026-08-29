@@ -74,7 +74,7 @@ import {
   useAuthStore,
   useCrmAccountStore,
   useCrmOnboardingStore,
-  useTaskStore,
+  useCrmTaskStore,
   useTicketStore,
 } from "@/stores";
 import type {
@@ -135,7 +135,7 @@ export function CrmOnboardingHub({
   const ensureForCompany = useCrmOnboardingStore((s) => s.ensureForCompany);
   const record = useCrmOnboardingStore((s) => s.getByCompanyId(accountId));
   const tickets = useTicketStore((s) => s.tickets);
-  const tasks = useTaskStore((s) => s.tasks);
+  const tasks = useCrmTaskStore((s) => s.tasks);
   const currentUser = useAuthStore((s) => s.user);
 
   const [internalTab, setInternalTab] = useState<TabId>("dashboard");

@@ -167,7 +167,7 @@ function BookingSummary({
   return (
     <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 text-xs">
       <div className="text-[10px] font-semibold uppercase tracking-wide text-primary">
-        Booking summary
+        Meeting summary
       </div>
       <div className="mt-1.5 space-y-0.5 text-muted-foreground">
         {selectedType ? (
@@ -241,7 +241,7 @@ function GuestEmailsField({
       <DesignTicketFormField
         label="Primary email"
         required
-        hint="Required — used for booking confirmations and Google Meet invites."
+        hint="Required — used for meeting confirmations and Google Meet invites."
         error={primaryError}
       >
         <div className="relative">
@@ -467,9 +467,9 @@ function PortalBookCall() {
       });
       setConfirmationId(created.id);
       setStep("done");
-      toast.success("Booking request submitted");
+      toast.success("Meeting request submitted");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to book");
+      toast.error(err instanceof Error ? err.message : "Failed to request meeting");
     } finally {
       setSubmitting(false);
     }
@@ -838,7 +838,7 @@ function PortalBookCall() {
                   disabled={submitting || !isValidEmail(guestEmail) || guestName.trim().length < 2}
                   className="w-full"
                 >
-                  {submitting ? "Submitting…" : "Request booking"}
+                  {submitting ? "Submitting…" : "Request meeting"}
                 </Button>
               </DesignTicketFormCard>
             </motion.form>
@@ -865,7 +865,7 @@ function PortalBookCall() {
                       additionalGuestEmails,
                     })}
                   </span>{" "}
-                  when your booking is approved, rescheduled, or cancelled.
+                  when your meeting is approved, rescheduled, or cancelled.
                 </p>
               </div>
               {selectedSlot && (

@@ -125,7 +125,7 @@ function showBookingApproveToast(
   executiveName: string,
 ) {
   if (updated.meetUrl) {
-    toast.success("Booking approved · added to Google Calendar with Meet link");
+    toast.success("Meeting approved · added to Google Calendar with Meet link");
     return;
   }
   if (updated.googleSyncStatus === "error" && updated.googleSyncError) {
@@ -135,17 +135,17 @@ function showBookingApproveToast(
   const isHost = updated.hostUserId === currentUserId;
   if (isHost && !googleConnected) {
     toast.warning(
-      "Booking approved — connect Google Calendar under the Calendar tab, then retry sync",
+      "Meeting approved — connect Google Calendar under the Calendar tab, then retry sync",
     );
     return;
   }
   if (!isHost && !googleConnected) {
     toast.warning(
-      `Booking approved — connect Google Calendar or ask ${executiveName} to connect, then retry sync`,
+      `Meeting approved — connect Google Calendar or ask ${executiveName} to connect, then retry sync`,
     );
     return;
   }
-  toast.success("Booking approved");
+  toast.success("Meeting approved");
 }
 
 function CrmBookingsPage() {
@@ -439,7 +439,7 @@ function CrmBookingsPage() {
             onClick={(e) => {
               e.stopPropagation();
               void declineAppointment(appt.id, noteById[appt.id])
-                .then(() => toast.success("Booking declined"))
+                .then(() => toast.success("Meeting declined"))
                 .catch((err) => toast.error(err instanceof Error ? err.message : "Failed"));
             }}
           >
@@ -476,7 +476,7 @@ function CrmBookingsPage() {
             onClick={(e) => {
               e.stopPropagation();
               void postponeAppointment(appt.id, noteById[appt.id])
-                .then(() => toast.success("Booking postponed"))
+                .then(() => toast.success("Meeting postponed"))
                 .catch((err) => toast.error(err instanceof Error ? err.message : "Failed"));
             }}
           >
@@ -489,7 +489,7 @@ function CrmBookingsPage() {
             onClick={(e) => {
               e.stopPropagation();
               void cancelAppointment(appt.id)
-                .then(() => toast.success("Booking cancelled"))
+                .then(() => toast.success("Meeting cancelled"))
                 .catch((err) => toast.error(err instanceof Error ? err.message : "Failed"));
             }}
           >
@@ -508,12 +508,12 @@ function CrmBookingsPage() {
     <PageWrap compact>
       <DesignTicketPageHeader
         compact
-        title="Bookings"
+        title="Meetings"
         subtitle="Review portal call requests, manage schedules, and set availability."
         actions={
           <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setCreateOpen(true)}>
             <Plus className="h-3.5 w-3.5" />
-            Create booking
+            Create meeting
           </Button>
         }
       />
@@ -586,7 +586,7 @@ function CrmBookingsPage() {
                 onSearchChange={setQuery}
                 searchPlaceholder="Search guest, account, executive, call type…"
                 resultCount={filtered.length}
-                resultLabel="bookings"
+                resultLabel="meetings"
                 activeFilterCount={activeFilterCount}
                 onClear={activeFilterCount > 0 || query ? clearFilters : undefined}
                 dateRange={{
@@ -651,11 +651,11 @@ function CrmBookingsPage() {
                       ? "No pending requests"
                       : tab === "upcoming"
                         ? "No upcoming calls"
-                        : "No bookings match your filters"
+                        : "No meetings match your filters"
                   }
                   description={
                     tab === "pending"
-                      ? "Portal booking requests appear here and in your notification bell."
+                      ? "Portal meeting requests appear here and in your notification bell."
                       : "Try clearing filters or check another tab."
                   }
                 />
@@ -792,21 +792,21 @@ function CrmBookingsPage() {
                         }
                         onDecline={() =>
                           void declineAppointment(appt.id, noteById[appt.id])
-                            .then(() => toast.success("Booking declined"))
+                            .then(() => toast.success("Meeting declined"))
                             .catch((err) =>
                               toast.error(err instanceof Error ? err.message : "Failed"),
                             )
                         }
                         onPostpone={() =>
                           void postponeAppointment(appt.id, noteById[appt.id])
-                            .then(() => toast.success("Booking postponed"))
+                            .then(() => toast.success("Meeting postponed"))
                             .catch((err) =>
                               toast.error(err instanceof Error ? err.message : "Failed"),
                             )
                         }
                         onCancel={() =>
                           void cancelAppointment(appt.id)
-                            .then(() => toast.success("Booking cancelled"))
+                            .then(() => toast.success("Meeting cancelled"))
                             .catch((err) =>
                               toast.error(err instanceof Error ? err.message : "Failed"),
                             )

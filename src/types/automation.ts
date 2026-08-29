@@ -139,8 +139,8 @@ export const AUTOMATION_TRIGGERS: { value: AutomationTrigger; label: string }[] 
   { value: "ticket-updated", label: "Ticket updated" },
   { value: "ticket-closed", label: "Ticket closed" },
   { value: "ticket-reply-from-team", label: "Team reply on ticket" },
-  { value: "booking-created", label: "Booking request (executive)" },
-  { value: "booking-status-changed", label: "Booking status (customer)" },
+  { value: "booking-created", label: "Meeting request (executive)" },
+  { value: "booking-status-changed", label: "Meeting status (customer)" },
   { value: "task-before-start", label: "Before scheduled task" },
 ];
 

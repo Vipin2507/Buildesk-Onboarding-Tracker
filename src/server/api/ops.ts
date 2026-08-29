@@ -551,7 +551,12 @@ export const mutateIntegration = createServerFn({ method: "POST" })
 
 export const getAppConfig = createServerFn({ method: "GET" })
   .inputValidator(
-    (data: unknown) => z.object({ key: z.enum(["master", "settings", "automation", "crm-automation", "crm-settings"]) }).parse(data),
+    (data: unknown) =>
+      z
+        .object({
+          key: z.enum(["master", "settings", "automation", "crm-automation", "crm-settings", "crm-master"]),
+        })
+        .parse(data),
   )
   .handler(async ({ data }) => {
     requireUser(["Admin"]);
@@ -561,7 +566,12 @@ export const getAppConfig = createServerFn({ method: "GET" })
 
 export const setAppConfig = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({ key: z.enum(["master", "settings", "automation", "crm-automation", "crm-settings"]), value: z.any() }).parse(data),
+    z
+      .object({
+        key: z.enum(["master", "settings", "automation", "crm-automation", "crm-settings", "crm-master"]),
+        value: z.any(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     requireUser(["Admin"]);

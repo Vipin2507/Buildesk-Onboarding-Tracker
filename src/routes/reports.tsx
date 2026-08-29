@@ -55,7 +55,7 @@ import {
   useOnboardingStore,
   useProjectStore,
   useTicketStore,
-  useTaskStore,
+  useErpTaskStore,
   useCrmEventStore,
   useVendorStore,
 } from "@/stores";
@@ -109,7 +109,7 @@ function useReportSnapshot(): ReportSnapshot {
   const employees = useEmployeeStore((s) => s.employees);
   const integrations = useIntegrationStore((s) => s.integrations);
   const tickets = useTicketStore((s) => s.tickets);
-  const followUpTasks = useTaskStore((s) => s.tasks);
+  const followUpTasks = useErpTaskStore((s) => s.tasks);
   const crmEvents = useCrmEventStore((s) => s.events);
 
   return useMemo(

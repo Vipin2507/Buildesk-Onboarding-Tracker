@@ -236,7 +236,7 @@ export function AutomationRulesPanel() {
         <div>
           <h2 className="text-xs font-semibold text-muted-foreground">Automation rules</h2>
           <p className="text-[10px] text-muted-foreground">
-            Support tickets, scheduled task reminders, and booking notifications · Email via n8n · WhatsApp via WAHA.
+            Support tickets, scheduled task reminders, and meeting notifications · Email via n8n · WhatsApp via WAHA.
           </p>
         </div>
         <Button onClick={openCreate} size="sm" className="h-7 gap-1 px-2.5 text-xs bg-primary">
@@ -265,7 +265,7 @@ export function AutomationRulesPanel() {
             <div className="text-sm font-medium">Enable automation rules</div>
             <p className="mt-0.5 max-w-xl text-[10px] text-muted-foreground">
               {rulesEnabled
-                ? "Active rules run on support ticket events, task reminders, and booking status changes."
+                ? "Active rules run on support ticket events, task reminders, and meeting status changes."
                 : "All rules are paused. Individual on/off settings are kept, but nothing will trigger until you turn this back on."}
             </p>
           </div>
@@ -291,7 +291,7 @@ export function AutomationRulesPanel() {
           </div>
           <h4 className="text-sm font-semibold">No automation rules yet</h4>
           <p className="mt-1.5 max-w-md text-xs text-muted-foreground">
-            Create rules to notify customers by email or WhatsApp when tickets change, or when bookings are
+            Create rules to notify customers by email or WhatsApp when tickets change, or when meetings are
             requested or approved.
           </p>
           <Button onClick={openCreate} size="sm" className="mt-4 gap-1 h-7 px-2.5 text-xs bg-primary">
@@ -301,7 +301,7 @@ export function AutomationRulesPanel() {
       ) : (
         <div className="space-y-5">
           {renderRulesSection(
-            "Bookings",
+            "Meetings",
             "Portal call requests and approval / status emails to executives and guests.",
             <CalendarDays className="h-3.5 w-3.5" />,
             bookingRules,

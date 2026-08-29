@@ -5,6 +5,7 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import { useAutomationStore } from "@/stores/useAutomationStore";
 import { useCrmAutomationStore } from "@/stores/useCrmAutomationStore";
 import { crmSettingsSnapshot, useCrmSettingsStore } from "@/stores/useCrmSettingsStore";
+import { crmMasterSnapshot, useCrmMasterStore } from "@/stores/useCrmMasterStore";
 import { useMasterStore } from "@/stores/useMasterStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import type { AutomationLog } from "@/types/automation";
@@ -108,6 +109,12 @@ function persistCrmAutomationConfig() {
   );
 }
 
+/** Force pending CRM master config to SQLite now. */
+export function flushCrmMasterConfigPersistence() {
+  if (!canPersistAppConfig()) return;
+  void setAppConfig({ data: { key: "crm-master", value: crmMasterSnapshot() } });
+}
+
 /** Force pending automation config (including logs) to SQLite now. */
 export function flushAutomationConfigPersistence() {
   if (!canPersistAppConfig()) return;
@@ -148,6 +155,13 @@ export function wireConfigPersistence() {
     if (!canPersistAppConfig()) return;
     serverSyncDebounced("crm-settings-config", 1000, () =>
       setAppConfig({ data: { key: "crm-settings", value: crmSettingsSnapshot() } }),
+    );
+  });
+
+  useCrmMasterStore.subscribe(() => {
+    if (!canPersistAppConfig()) return;
+    serverSyncDebounced("crm-master-config", 1000, () =>
+      setAppConfig({ data: { key: "crm-master", value: crmMasterSnapshot() } }),
     );
   });
 

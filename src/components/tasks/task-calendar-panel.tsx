@@ -514,7 +514,7 @@ function TaskScheduleRow({
               <span className="text-[10px] text-muted-foreground">{assigneeLabel}</span>
             ) : null}
             {task.source === "booking" ? (
-              <span className="text-[10px] text-primary">Booking</span>
+              <span className="text-[10px] text-primary">Meeting</span>
             ) : null}
           </div>
         ) : null}
