@@ -212,20 +212,15 @@ function FieldError({ message }: { message?: string }) {
 
 function Section({
   title,
-  description,
   children,
 }: {
   title: string;
-  description?: string;
   children: React.ReactNode;
 }) {
   return (
     <section className="rounded-xl border border-border/70 bg-card/40 p-3.5 sm:p-4">
       <div className="mb-3">
         <h3 className="text-xs font-semibold tracking-wide text-foreground">{title}</h3>
-        {description ? (
-          <p className="mt-0.5 text-[11px] text-muted-foreground">{description}</p>
-        ) : null}
       </div>
       {children}
     </section>
@@ -308,7 +303,7 @@ export function CrmAccountFormFields({
 
   return (
     <div className="grid gap-3.5">
-      <Section title="Account" description="Basic identity for this CRM customer.">
+      <Section title="Account">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <Label required>Account name</Label>
@@ -361,7 +356,7 @@ export function CrmAccountFormFields({
         </div>
       </Section>
 
-      <Section title="Location" description="Type a city to auto-fill state, country, and region.">
+      <Section title="Location">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <Label required>City</Label>
@@ -409,7 +404,7 @@ export function CrmAccountFormFields({
         </div>
       </Section>
 
-      <Section title="Owner" description="Primary account owner details.">
+      <Section title="Owner">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="sm:col-span-3 md:col-span-1">
             <Label required>Owner name</Label>
@@ -440,7 +435,7 @@ export function CrmAccountFormFields({
         </div>
       </Section>
 
-      <Section title="Point of contact" description="Day-to-day POC for onboarding and support.">
+      <Section title="Point of contact">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div>
             <Label required>POC name</Label>
@@ -468,7 +463,7 @@ export function CrmAccountFormFields({
         </div>
       </Section>
 
-      <Section title="Internal team" description="Assign CRM managers for this account.">
+      <Section title="Internal team">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div>
             <Label required>Sales manager</Label>
@@ -519,15 +514,12 @@ export function CrmAccountFormFields({
         ) : null}
       </Section>
 
-      <Section title="Commercial" description="License seats, deal value, installments, and contract dates.">
+      <Section title="Commercial">
         <CrmAccountCommercialFields form={form} />
       </Section>
 
       {showModulePicker && selectedModules && onSelectedModulesChange ? (
-        <Section
-          title="Modules"
-          description="Select the CRM products purchased for this client. Integrations can be configured later from the account hub."
-        >
+        <Section title="Modules">
           <CrmAccountProductModulesPicker
             selected={selectedModules}
             onChange={onSelectedModulesChange}

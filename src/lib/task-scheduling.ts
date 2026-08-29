@@ -18,6 +18,47 @@ export function formatHm(totalMinutes: number): string {
   return `${pad(h)}:${pad(m)}`;
 }
 
+/** Local calendar date as YYYY-MM-DD. */
+export function todayYmd(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** Earliest selectable HH:mm when scheduling on today; undefined for future dates. */
+export function minSelectableTimeForDate(dateYmd: string): string | undefined {
+  const date = dateYmd.slice(0, 10);
+  if (date !== todayYmd()) return undefined;
+  const now = new Date();
+  const mins = now.getHours() * 60 + now.getMinutes();
+  const snapped = Math.min(23 * 60 + 55, Math.ceil(mins / 5) * 5);
+  return formatHm(snapped);
+}
+
+export function isPastDateYmd(dateYmd: string): boolean {
+  return dateYmd.slice(0, 10) < todayYmd();
+}
+
+export function isTimeBeforeMin(time: string, min: string): boolean {
+  return parseHm(time.slice(0, 5)) < parseHm(min.slice(0, 5));
+}
+
+export function maxTimeHm(a?: string, b?: string): string | undefined {
+  if (!a) return b;
+  if (!b) return a;
+  return parseHm(a) >= parseHm(b) ? a.slice(0, 5) : b.slice(0, 5);
+}
+
+export function minEndTimeForSchedule(input: {
+  dueDate: string;
+  startTime?: string;
+}): string | undefined {
+  const startMin = input.startTime?.trim()
+    ? formatHm(parseHm(input.startTime.slice(0, 5)) + 5)
+    : undefined;
+  const todayMin = minSelectableTimeForDate(input.dueDate);
+  return maxTimeHm(startMin, todayMin);
+}
+
 /** Build wall-clock ISO range from date + times. */
 export function buildTaskScheduleWindow(input: {
   dueDate: string;

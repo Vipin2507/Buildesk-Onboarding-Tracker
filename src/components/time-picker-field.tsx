@@ -3,12 +3,12 @@ import { Clock, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { formatTimeRange12h } from "@/lib/task-scheduling";
+import { formatTimeRange12h, parseHm as parseHmMinutes } from "@/lib/task-scheduling";
 import { cn } from "@/lib/utils";
 
 const MINUTE_OPTIONS = Array.from({ length: 12 }, (_, i) => i * 5);
 
-function parseHm(value: string): { hour24: number; minute: number } | null {
+function parseHmParts(value: string): { hour24: number; minute: number } | null {
   const match = /^(\d{1,2}):(\d{2})$/.exec(value.slice(0, 5));
   if (!match) return null;
   const hour24 = Number(match[1]);
@@ -41,24 +41,60 @@ type TimePickerFieldProps = {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  /** Earliest selectable time (HH:mm). */
+  min?: string;
   className?: string;
   modal?: boolean;
   compact?: boolean;
   disabled?: boolean;
 };
 
+function minMinutes(min?: string): number | undefined {
+  if (!min) return undefined;
+  return parseHmMinutes(min.slice(0, 5));
+}
+
+function hour12HasValidTime(hour12: number, min?: string): boolean {
+  if (!minMinutes(min)) return true;
+  return (["AM", "PM"] as const).some((period) =>
+    MINUTE_OPTIONS.some((m) => !isBeforeMin(to24h(hour12, period), m, min)),
+  );
+}
+
+function periodHasValidTime(hour12: number, nextPeriod: "AM" | "PM", min?: string): boolean {
+  if (!minMinutes(min)) return true;
+  return MINUTE_OPTIONS.some((m) => !isBeforeMin(to24h(hour12, nextPeriod), m, min));
+}
+
+function isBeforeMin(hour24: number, minute: number, min?: string): boolean {
+  const floor = minMinutes(min);
+  if (floor === undefined) return false;
+  return hour24 * 60 + minute < floor;
+}
+
+function clampToMin(hour24: number, minute: number, min?: string): { hour24: number; minute: number } {
+  const floor = minMinutes(min);
+  if (floor === undefined) return { hour24, minute };
+  let total = hour24 * 60 + minute;
+  if (total < floor) {
+    total = Math.min(23 * 60 + 55, Math.ceil(floor / 5) * 5);
+  }
+  return { hour24: Math.floor(total / 60) % 24, minute: total % 60 };
+}
+
 export function TimePickerField({
   id,
   value,
   onChange,
   placeholder = "Pick time",
+  min,
   className,
   modal = false,
   compact = false,
   disabled = false,
 }: TimePickerFieldProps) {
   const [open, setOpen] = useState(false);
-  const parsed = useMemo(() => parseHm(value), [value]);
+  const parsed = useMemo(() => parseHmParts(value), [value]);
   const [hour12, setHour12] = useState(parsed ? to12hParts(parsed.hour24).hour12 : 9);
   const [minute, setMinute] = useState(parsed ? snapMinute(parsed.minute) : 0);
   const [period, setPeriod] = useState<"AM" | "PM">(
@@ -76,8 +112,13 @@ export function TimePickerField({
   const display = value ? formatTimeRange12h(value) : "";
 
   function commit(nextHour12: number, nextMinute: number, nextPeriod: "AM" | "PM") {
-    const hour24 = to24h(nextHour12, nextPeriod);
-    onChange(toHm(hour24, nextMinute));
+    let hour24 = to24h(nextHour12, nextPeriod);
+    let minute = nextMinute;
+    ({ hour24, minute } = clampToMin(hour24, minute, min));
+    setHour12(to12hParts(hour24).hour12);
+    setMinute(snapMinute(minute));
+    setPeriod(to12hParts(hour24).period);
+    onChange(toHm(hour24, snapMinute(minute)));
   }
 
   const selectClass = cn(
@@ -151,11 +192,14 @@ export function TimePickerField({
                 commit(next, minute, period);
               }}
             >
-              {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
-                <option key={h} value={h}>
-                  {h}
-                </option>
-              ))}
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => {
+                const hourDisabled = !hour12HasValidTime(h, min);
+                return (
+                  <option key={h} value={h} disabled={hourDisabled}>
+                    {h}
+                  </option>
+                );
+              })}
             </select>
             <span className="text-sm font-medium text-muted-foreground">:</span>
             <select
@@ -167,11 +211,14 @@ export function TimePickerField({
                 commit(hour12, next, period);
               }}
             >
-              {MINUTE_OPTIONS.map((m) => (
-                <option key={m} value={m}>
-                  {String(m).padStart(2, "0")}
-                </option>
-              ))}
+              {MINUTE_OPTIONS.map((m) => {
+                const minuteDisabled = isBeforeMin(to24h(hour12, period), m, min);
+                return (
+                  <option key={m} value={m} disabled={minuteDisabled}>
+                    {String(m).padStart(2, "0")}
+                  </option>
+                );
+              })}
             </select>
             <select
               className={selectClass}
@@ -182,8 +229,12 @@ export function TimePickerField({
                 commit(hour12, minute, next);
               }}
             >
-              <option value="AM">AM</option>
-              <option value="PM">PM</option>
+              <option value="AM" disabled={!periodHasValidTime(hour12, "AM", min)}>
+                AM
+              </option>
+              <option value="PM" disabled={!periodHasValidTime(hour12, "PM", min)}>
+                PM
+              </option>
             </select>
           </div>
           <div className="mt-2 flex gap-2">

@@ -14,6 +14,11 @@ import {
   buildTaskScheduleWindow,
   calcDurationFromTimes,
   calcEndTimeFromDuration,
+  isPastDateYmd,
+  isTimeBeforeMin,
+  minEndTimeForSchedule,
+  minSelectableTimeForDate,
+  todayYmd,
 } from "@/lib/task-scheduling";
 import { cn } from "@/lib/utils";
 import { checkErpTaskScheduleConflicts, checkTaskScheduleConflicts } from "@/lib/api";
@@ -114,6 +119,22 @@ export function useTaskFormState(props: Props) {
     if (props.companyId) setCompanyId(props.companyId);
   }, [props.companyId]);
 
+  function onDueDateChange(next: string) {
+    setDueDate(next);
+    if (props.editing || !next) return;
+    if (isPastDateYmd(next)) {
+      setDueDate("");
+      return;
+    }
+    if (startTime) {
+      const min = minSelectableTimeForDate(next);
+      if (min && isTimeBeforeMin(startTime, min)) {
+        setStartTime("");
+        setEndTime("");
+      }
+    }
+  }
+
   function onStartTimeChange(next: string) {
     setStartTime(next);
     if (dueDate && next && durationMinutes > 0) {
@@ -137,7 +158,23 @@ export function useTaskFormState(props: Props) {
   }
 
   async function validateSchedule(): Promise<boolean> {
+    if (!props.editing && dueDate && isPastDateYmd(dueDate)) {
+      toast.error("Due date cannot be in the past");
+      return false;
+    }
     if (!taskType || !dueDate || !startTime) return true;
+    const todayMin = !props.editing ? minSelectableTimeForDate(dueDate) : undefined;
+    if (todayMin && isTimeBeforeMin(startTime, todayMin)) {
+      toast.error("Start time cannot be in the past");
+      return false;
+    }
+    if (!props.editing && endTime) {
+      const endMin = minEndTimeForSchedule({ dueDate, startTime });
+      if (endMin && isTimeBeforeMin(endTime, endMin)) {
+        toast.error("End time cannot be in the past");
+        return false;
+      }
+    }
     const window = buildTaskScheduleWindow({
       dueDate,
       startTime,
@@ -193,7 +230,7 @@ export function useTaskFormState(props: Props) {
     description,
     setDescription,
     dueDate,
-    setDueDate,
+    setDueDate: onDueDateChange,
     taskType,
     setTaskType,
     startTime,
@@ -253,6 +290,12 @@ export function TaskFormFields(props: Props & ReturnType<typeof useTaskFormState
   const scheduled = Boolean(taskType);
   const readOnlyBooking = editing?.source === "booking";
   const showMarkCompleteOnCreate = !editing && Boolean(onMarkCompleteOnCreateChange);
+  const blockPastSchedule = !editing;
+  const startTimeMin = blockPastSchedule && dueDate ? minSelectableTimeForDate(dueDate) : undefined;
+  const endTimeMin =
+    blockPastSchedule && dueDate
+      ? minEndTimeForSchedule({ dueDate, startTime: startTime || undefined })
+      : undefined;
 
   return (
     <div className="space-y-3">
@@ -322,7 +365,8 @@ export function TaskFormFields(props: Props & ReturnType<typeof useTaskFormState
             value={dueDate}
             onChange={setDueDate}
             modal
-            yearsBack={1}
+            min={blockPastSchedule ? todayYmd() : undefined}
+            yearsBack={blockPastSchedule ? 0 : 1}
             yearsForward={3}
             disabled={readOnlyBooking}
           />
@@ -338,6 +382,7 @@ export function TaskFormFields(props: Props & ReturnType<typeof useTaskFormState
                 <TimePickerField
                   value={startTime}
                   onChange={onStartTimeChange}
+                  min={startTimeMin}
                   modal
                   compact
                   disabled={readOnlyBooking}
@@ -350,6 +395,7 @@ export function TaskFormFields(props: Props & ReturnType<typeof useTaskFormState
                 <TimePickerField
                   value={endTime}
                   onChange={onEndTimeChange}
+                  min={endTimeMin}
                   modal
                   compact
                   disabled={readOnlyBooking}

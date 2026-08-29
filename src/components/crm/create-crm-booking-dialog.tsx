@@ -13,7 +13,9 @@ import {
 import { DatePickerField } from "@/components/date-picker-field";
 import { EntityFormModal } from "@/components/entity-form-modal";
 import { Button } from "@/components/ui/button";
+import { browserWallClockIso } from "@/lib/booking-slots";
 import { resolveCrmSalesManagerDefaults } from "@/lib/crm-sales-manager-defaults";
+import { todayYmd } from "@/lib/task-scheduling";
 import { crmTaskAssigneeUsers } from "@/lib/task-defaults";
 import { cn, isValidEmail } from "@/lib/utils";
 import { useBookingStore } from "@/stores/useBookingStore";
@@ -27,12 +29,6 @@ function formatSlotLabel(startsAt: string) {
   const ampm = h >= 12 ? "PM" : "AM";
   const hour = ((h + 11) % 12) + 1;
   return `${hour}:${String(m).padStart(2, "0")} ${ampm}`;
-}
-
-function todayYmd() {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 function accountGuestDefaults(account: CrmAccount | undefined) {
@@ -184,9 +180,10 @@ export function CreateCrmBookingDialog({
     void listSlotsForEvent(eventTypeId, date, date, effectiveHostUserId)
       .then((rows) => {
         if (cancelled) return;
-        setSlots(rows);
+        const future = rows.filter((slot) => slot.startsAt >= browserWallClockIso());
+        setSlots(future);
         setSelectedSlot((prev) =>
-          prev && rows.some((s) => s.startsAt === prev.startsAt) ? prev : null,
+          prev && future.some((s) => s.startsAt === prev.startsAt) ? prev : null,
         );
       })
       .catch((err) => {
@@ -215,6 +212,10 @@ export function CreateCrmBookingDialog({
     }
     if (!date || !selectedSlot) {
       toast.error("Choose a date and time slot");
+      return;
+    }
+    if (selectedSlot.startsAt < browserWallClockIso()) {
+      toast.error("Choose a future time slot");
       return;
     }
     if (!guestName.trim()) {
@@ -308,6 +309,8 @@ export function CreateCrmBookingDialog({
               setSelectedSlot(null);
             }}
             min={todayYmd()}
+            yearsBack={0}
+            yearsForward={1}
             modal
             className={ticketFieldClass}
           />
