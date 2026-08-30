@@ -90,7 +90,7 @@ export function DataTable<T>({
 
   const filtered = useMemo(() => {
     let rows = data;
-    if (!hideSearch && search && searchKeys) {
+    if (search && searchKeys) {
       const q = search.toLowerCase();
       rows = rows.filter((row) =>
         searchKeys.some((k) => String(row[k] ?? "").toLowerCase().includes(q)),
@@ -114,7 +114,7 @@ export function DataTable<T>({
       }
     }
     return rows;
-  }, [data, search, searchKeys, sortKey, sortDir, columns, hideSearch]);
+  }, [data, search, searchKeys, sortKey, sortDir, columns]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages - 1);
