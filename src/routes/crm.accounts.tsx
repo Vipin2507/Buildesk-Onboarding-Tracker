@@ -4,14 +4,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
 import {
   ArrowLeftRight,
-  Building2,
-  CheckCircle2,
   CalendarRange,
-  ClipboardList,
   FileSpreadsheet,
   Plus,
   Search,
-  TrendingUp,
   Upload,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -78,7 +74,55 @@ const STATUS_CHIPS = [
   { id: "suspended", label: "Suspended", status: "suspended" as const },
   { id: "inactive", label: "Inactive", status: "inactive" as const },
   { id: "closed", label: "Closed", status: "closed" as const },
+  { id: "critical", label: "Critical", status: null },
 ] as const;
+
+type AccountFilterPillId = (typeof STATUS_CHIPS)[number]["id"];
+
+const FILTER_PILL_TONE: Record<
+  string,
+  { base: string; active: string }
+> = {
+  muted: {
+    base: "border-border bg-muted/40 text-muted-foreground hover:bg-muted/70",
+    active: "border-border bg-muted text-foreground ring-1 ring-border",
+  },
+  warning: {
+    base: "border-warning/30 bg-warning/10 text-warning hover:bg-warning/15 dark:text-warning-foreground",
+    active:
+      "border-warning/40 bg-warning/15 text-warning ring-1 ring-warning/30 dark:text-warning-foreground",
+  },
+  success: {
+    base: "border-success/30 bg-success/10 text-success hover:bg-success/15 dark:text-success",
+    active: "border-success/40 bg-success/15 text-success ring-1 ring-success/30 dark:text-success",
+  },
+  info: {
+    base: "border-primary/30 bg-primary/10 text-primary hover:bg-primary/15",
+    active: "border-primary/40 bg-primary/15 text-primary ring-1 ring-primary/30",
+  },
+  danger: {
+    base: "border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/15",
+    active: "border-destructive/40 bg-destructive/15 text-destructive ring-1 ring-destructive/30",
+  },
+};
+
+function filterPillTone(id: AccountFilterPillId): keyof typeof FILTER_PILL_TONE {
+  if (id === "onboarding") return "warning";
+  if (id === "live") return "success";
+  if (id === "critical") return "danger";
+  if (id === "active") return "info";
+  return "muted";
+}
+
+function isAccountFilterPillActive(
+  id: AccountFilterPillId,
+  statusFilter: string,
+  kpiFilter: AccountKpiFilter,
+) {
+  if (id === "critical") return kpiFilter === "critical";
+  if (id === "all") return statusFilter === "all" && kpiFilter === "all";
+  return statusFilter === id && kpiFilter === "all";
+}
 
 function statusTone(status: CrmAccount["status"]) {
   if (status === "live") return "success" as const;
@@ -298,7 +342,13 @@ function CrmAccountsPage() {
     ],
   );
 
-  /** Toolbar filters only — KPI cards update from this set (KPI chip applied separately). */
+  /** Rows after toolbar filters — used for pill counts (status chip applied separately). */
+  const toolbarScopedRows = useMemo(
+    () => rows.filter((r) => matchesAccountListFilters(r, listFilters)),
+    [rows, listFilters],
+  );
+
+  /** Toolbar filters + status tab — KPI pill applied separately. */
   const scopedRows = useMemo(
     () =>
       rows.filter((r) =>
@@ -307,15 +357,35 @@ function CrmAccountsPage() {
     [rows, listFilters, statusFilter],
   );
 
-  const kpiStats = useMemo(() => {
-    const onboarding = scopedRows.filter((r) => matchesAccountKpi(r, "onboarding")).length;
-    const live = scopedRows.filter((r) => matchesAccountKpi(r, "live")).length;
-    const critical = scopedRows.filter((r) => matchesAccountKpi(r, "critical")).length;
-    const avg = scopedRows.length
-      ? Math.round(scopedRows.reduce((sum, r) => sum + r.progress, 0) / scopedRows.length)
-      : 0;
-    return { total: scopedRows.length, onboarding, live, critical, avg };
-  }, [scopedRows]);
+  const avgProgress = useMemo(() => {
+    if (!toolbarScopedRows.length) return 0;
+    return Math.round(
+      toolbarScopedRows.reduce((sum, r) => sum + r.progress, 0) / toolbarScopedRows.length,
+    );
+  }, [toolbarScopedRows]);
+
+  function accountFilterPillCount(id: AccountFilterPillId) {
+    if (id === "all") return toolbarScopedRows.length;
+    if (id === "critical") {
+      return toolbarScopedRows.filter((r) => matchesAccountKpi(r, "critical")).length;
+    }
+    return toolbarScopedRows.filter((r) => r.status === id).length;
+  }
+
+  function selectAccountFilterPill(id: AccountFilterPillId) {
+    if (id === "critical") {
+      setStatusFilter("all");
+      setKpiFilter("critical");
+      return;
+    }
+    if (id === "all") {
+      setStatusFilter("all");
+      setKpiFilter("all");
+      return;
+    }
+    setStatusFilter(id);
+    setKpiFilter("all");
+  }
 
   const filtered = useMemo(() => {
     return sortCrmAccountsByStartDateDesc(
@@ -339,54 +409,6 @@ function CrmAccountsPage() {
     Boolean(dateTo),
     kpiFilter !== "all",
   ].filter(Boolean).length;
-
-  const kpiCards = [
-    {
-      id: "all",
-      label: "Total",
-      value: kpiStats.total,
-      icon: Building2,
-      onClick: () => setKpiFilter("all"),
-      active: kpiFilter === "all",
-    },
-    {
-      id: "onboarding",
-      label: "Onboarding",
-      value: kpiStats.onboarding,
-      icon: ClipboardList,
-      tone: "text-amber-600 dark:text-amber-400",
-      onClick: () => setKpiFilter("onboarding"),
-      active: kpiFilter === "onboarding",
-    },
-    {
-      id: "live",
-      label: "Live",
-      value: kpiStats.live,
-      icon: CheckCircle2,
-      tone: "text-emerald-600 dark:text-emerald-400",
-      onClick: () => setKpiFilter("live"),
-      active: kpiFilter === "live",
-    },
-    {
-      id: "critical",
-      label: "Critical",
-      value: kpiStats.critical,
-      icon: TrendingUp,
-      tone: "text-destructive",
-      onClick: () => setKpiFilter("critical"),
-      active: kpiFilter === "critical",
-    },
-    {
-      id: "avg",
-      label: "Avg %",
-      value: kpiStats.avg,
-    },
-  ];
-
-  const statusTabs = STATUS_CHIPS.map((c) => ({
-    id: c.id,
-    label: c.label,
-  }));
 
   function applyFilters() {
     tableRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -574,64 +596,39 @@ function CrmAccountsPage() {
           </div>
         </div>
 
-        <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
-          <div className="flex flex-wrap items-end gap-5 sm:gap-6">
-            {kpiCards.map((k) => {
-              const clickable = Boolean(k.onClick);
-              const Wrapper = clickable ? "button" : "div";
-              return (
-                <Wrapper
-                  key={k.id}
-                  type={clickable ? "button" : undefined}
-                  onClick={k.onClick}
-                  className={cn(
-                    "min-w-0 text-left",
-                    clickable &&
-                      "cursor-pointer rounded-md px-1 py-0.5 transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-                    k.active && "rounded-md bg-muted/80 ring-1 ring-border",
-                  )}
-                >
-                  <div className="text-[11px] text-muted-foreground">{k.label}</div>
-                  <div
-                    className={cn(
-                      "text-base font-medium tabular-nums leading-tight",
-                      k.tone,
-                      k.active && !k.tone && "text-primary",
-                    )}
-                  >
-                    {k.value}
-                  </div>
-                </Wrapper>
-              );
-            })}
-          </div>
-
-          <nav
-            role="tablist"
-            aria-label="Account status"
-            className="flex max-w-full gap-0.5 overflow-x-auto overscroll-x-contain whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          >
-            {statusTabs.map((tab) => {
-              const active = statusFilter === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => setStatusFilter(tab.id)}
-                  className={cn(
-                    "shrink-0 snap-start rounded-md px-2.5 py-1 text-xs transition-colors",
-                    active
-                      ? "bg-muted font-medium text-foreground"
-                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                  )}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
-          </nav>
+        <div
+          role="tablist"
+          aria-label="Account filters"
+          className="mt-2 flex flex-wrap items-center gap-1.5 overflow-x-auto overscroll-x-contain pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {STATUS_CHIPS.map((chip) => {
+            const tone = filterPillTone(chip.id);
+            const active = isAccountFilterPillActive(chip.id, statusFilter, kpiFilter);
+            const styles = FILTER_PILL_TONE[tone]!;
+            const count = accountFilterPillCount(chip.id);
+            return (
+              <button
+                key={chip.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => selectAccountFilterPill(chip.id)}
+                className={cn(
+                  "inline-flex shrink-0 snap-start items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                  active ? styles.active : styles.base,
+                )}
+              >
+                <span>{chip.label}</span>
+                <span className={cn("tabular-nums", active ? "opacity-90" : "opacity-70")}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+          <span className="ml-auto shrink-0 rounded-md border border-border bg-muted/30 px-2.5 py-1 text-xs text-muted-foreground">
+            Avg{" "}
+            <span className="font-medium tabular-nums text-foreground">{avgProgress}%</span>
+          </span>
         </div>
       </div>
 
@@ -832,7 +829,7 @@ function CrmAccountsPage() {
           <div className="px-3 sm:px-4 lg:px-5">
             <EmptyState
               title="No matches"
-              description="Try another KPI card, clear filters, or adjust your search."
+              description="Try another filter, clear filters, or adjust your search."
               actionLabel="Clear filters"
               onAction={clearFilters}
             />
