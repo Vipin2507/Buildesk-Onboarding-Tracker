@@ -63,10 +63,15 @@ export function PageHeader({
 export function PageWrap({
   children,
   compact = true,
+  flushTop = false,
+  className,
 }: {
   children: ReactNode;
   /** Dense page padding (default). */
   compact?: boolean;
+  /** Remove top padding so content sits flush under the top bar. */
+  flushTop?: boolean;
+  className?: string;
 }) {
   return (
     <motion.div
@@ -76,8 +81,13 @@ export function PageWrap({
       className={cn(
         "min-w-0 max-w-full overflow-x-hidden",
         compact
-          ? "p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4 lg:p-5"
-          : "p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:p-6 lg:p-8",
+          ? flushTop
+            ? "px-3 pt-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-4 lg:px-5"
+            : "p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4 lg:p-5"
+          : flushTop
+            ? "px-4 pt-0 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6 lg:px-8"
+            : "p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:p-6 lg:p-8",
+        className,
       )}
     >
       {children}

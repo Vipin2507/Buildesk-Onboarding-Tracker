@@ -543,8 +543,8 @@ function CrmAccountsPage() {
   const unassignedSupportManager2Count = rows.filter((r) => !r.supportManager2?.trim()).length;
 
   return (
-    <PageWrap compact>
-      <div className="mb-0 border-b border-border py-2">
+    <PageWrap compact flushTop>
+      <div className="mb-0 border-b border-border pb-2 pt-1">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0">
             <h1 className="text-base font-medium tracking-tight">CRM Accounts</h1>
