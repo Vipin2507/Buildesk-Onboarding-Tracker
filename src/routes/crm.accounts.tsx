@@ -635,28 +635,30 @@ function CrmAccountsPage() {
         </div>
       </div>
 
-      <DesignTicketFilterBar
-        variant="inline"
-        compact
-        className="xl:grid-cols-4"
-        activeFilterCount={activeFilterCount}
-        onClear={clearFilters}
-        onApply={applyFilters}
-        resultCount={filtered.length}
-        resultLabel={filtered.length === 1 ? "account" : "accounts"}
-        trailing={
-          <div className="relative min-w-[140px] flex-1 sm:max-w-xs">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={tableSearch}
-              onChange={(e) => setTableSearch(e.target.value)}
-              placeholder="Search accounts…"
-              aria-label="Search accounts"
-              className="h-8 w-full rounded-md border border-input bg-background pl-8 pr-3 text-xs outline-none focus:ring-2 focus:ring-ring/40"
-            />
-          </div>
-        }
-      >
+      <div className="-mx-3 sm:-mx-4 lg:-mx-5">
+        <div className="px-3 sm:px-4 lg:px-5">
+          <DesignTicketFilterBar
+            variant="inline"
+            compact
+            className="xl:grid-cols-4"
+            activeFilterCount={activeFilterCount}
+            onClear={clearFilters}
+            onApply={applyFilters}
+            resultCount={filtered.length}
+            resultLabel={filtered.length === 1 ? "account" : "accounts"}
+            trailing={
+              <div className="relative min-w-[140px] flex-1 sm:max-w-xs">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={tableSearch}
+                  onChange={(e) => setTableSearch(e.target.value)}
+                  placeholder="Search accounts…"
+                  aria-label="Search accounts"
+                  className="h-8 w-full rounded-md border border-input bg-background pl-8 pr-3 text-xs outline-none focus:ring-2 focus:ring-ring/40"
+                />
+              </div>
+            }
+          >
         <DesignTicketFilterField label="Type" compact>
           <DesignTicketSelect
             compact
@@ -813,31 +815,36 @@ function CrmAccountsPage() {
           onChange={setDateTo}
           placeholder="To"
         />
-      </DesignTicketFilterBar>
+          </DesignTicketFilterBar>
+        </div>
 
-      <div ref={tableRef}>
+      <div ref={tableRef} className="min-w-0">
         {rows.length === 0 ? (
-          <EmptyState
-            title="No CRM accounts yet"
-            description="Create your first CRM customer account to start onboarding."
-            actionLabel="+ Add account"
-            onAction={openCreate}
-          />
+          <div className="px-3 sm:px-4 lg:px-5">
+            <EmptyState
+              title="No CRM accounts yet"
+              description="Create your first CRM customer account to start onboarding."
+              actionLabel="+ Add account"
+              onAction={openCreate}
+            />
+          </div>
         ) : filtered.length === 0 ? (
-          <EmptyState
-            title="No matches"
-            description="Try another KPI card, clear filters, or adjust your search."
-            actionLabel="Clear filters"
-            onAction={clearFilters}
-          />
+          <div className="px-3 sm:px-4 lg:px-5">
+            <EmptyState
+              title="No matches"
+              description="Try another KPI card, clear filters, or adjust your search."
+              actionLabel="Clear filters"
+              onAction={clearFilters}
+            />
+          </div>
         ) : (
           <motion.div
-            initial={{ opacity: 0, y: 6 }}
+            initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-            className="card-soft overflow-hidden p-3 pt-2"
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
           >
             <DataTable
+              flush
               data={filtered}
               initialSortKey="startDate"
               initialSortDir="desc"
@@ -1014,6 +1021,7 @@ function CrmAccountsPage() {
               />
             </motion.div>
           )}
+      </div>
       </div>
 
       <EntityFormModal

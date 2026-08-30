@@ -47,6 +47,7 @@ export function DataTable<T>({
   initialSortDir = "asc",
   expandedRowId = null,
   renderExpandedRow,
+  flush = false,
 }: {
   data: T[];
   columns: {
@@ -73,6 +74,8 @@ export function DataTable<T>({
   /** When set, renders an expanded panel directly beneath the matching row. */
   expandedRowId?: string | null;
   renderExpandedRow?: (row: T) => ReactNode;
+  /** Edge-to-edge table — no side border/radius (for dense list pages). */
+  flush?: boolean;
 }) {
   const [internalSearch, setInternalSearch] = useState("");
   const search = searchQuery ?? internalSearch;
@@ -277,7 +280,12 @@ export function DataTable<T>({
         )}
       </div>
 
-      <div className="hidden overflow-hidden rounded-lg border md:block">
+      <div
+        className={cn(
+          "hidden overflow-hidden md:block",
+          flush ? "rounded-none border-x-0 border-t border-b-0" : "rounded-lg border",
+        )}
+      >
         <div className="overflow-x-auto">
           <table className={cn("w-full", tableText)}>
             <thead className={cn("bg-muted/60 text-muted-foreground", headText)}>
