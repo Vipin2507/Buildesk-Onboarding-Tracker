@@ -310,6 +310,8 @@ export function DesignTicketFilterBar({
   children,
   className,
   compact,
+  variant = "card",
+  trailing,
   activeFilterCount = 0,
   onClear,
   onApply,
@@ -321,6 +323,9 @@ export function DesignTicketFilterBar({
   children: ReactNode;
   className?: string;
   compact?: boolean;
+  /** Card wrapper (default) or borderless inline row for dense list headers */
+  variant?: "card" | "inline";
+  trailing?: ReactNode;
   activeFilterCount?: number;
   onClear?: () => void;
   onApply?: () => void;
@@ -330,44 +335,48 @@ export function DesignTicketFilterBar({
   defaultFiltersOpen?: boolean;
 }) {
   const [filtersOpen, setFiltersOpen] = useState(defaultFiltersOpen);
+  const inline = variant === "inline";
 
   return (
     <motion.div
       variants={ticketSectionVariants}
       initial="hidden"
       animate="show"
-      className={cn("card-soft mb-3", compact ? "p-2.5" : "p-3 sm:p-4")}
+      className={cn(
+        inline ? "mb-0 border-b border-border py-2" : "card-soft mb-3",
+        !inline && (compact ? "p-2.5" : "p-3 sm:p-4"),
+      )}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className={cn(
-            "gap-1.5 border-input bg-card dark:bg-muted/40 dark:hover:bg-muted/55",
-            compact ? "h-8 text-xs" : "h-9",
-            filtersOpen && "border-primary/40 bg-primary/10 text-primary dark:bg-primary/15",
-          )}
-          aria-expanded={filtersOpen}
-          onClick={() => setFiltersOpen((open) => !open)}
-        >
-          <ListFilter className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
-          Filters
-          {activeFilterCount > 0 ? (
-            <span className="rounded-md bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-              {activeFilterCount}
-            </span>
-          ) : null}
-          <ChevronDown
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
             className={cn(
-              "opacity-70 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-              compact ? "h-3 w-3" : "h-3.5 w-3.5",
-              filtersOpen && "rotate-180",
+              "gap-1.5 border-input bg-card dark:bg-muted/40 dark:hover:bg-muted/55",
+              compact || inline ? "h-8 text-xs" : "h-9",
+              filtersOpen && "border-primary/40 bg-primary/10 text-primary dark:bg-primary/15",
             )}
-          />
-        </Button>
+            aria-expanded={filtersOpen}
+            onClick={() => setFiltersOpen((open) => !open)}
+          >
+            <ListFilter className={compact || inline ? "h-3.5 w-3.5" : "h-4 w-4"} />
+            Filters
+            {activeFilterCount > 0 ? (
+              <span className="rounded-md bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                {activeFilterCount}
+              </span>
+            ) : null}
+            <ChevronDown
+              className={cn(
+                "opacity-70 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                compact || inline ? "h-3 w-3" : "h-3.5 w-3.5",
+                filtersOpen && "rotate-180",
+              )}
+            />
+          </Button>
 
-        <div className="flex flex-wrap items-center gap-1.5">
           <AnimatePresence>
             {activeFilterCount > 0 && onClear ? (
               <motion.div
@@ -382,7 +391,7 @@ export function DesignTicketFilterBar({
                   size="sm"
                   className={cn(
                     "gap-1.5 text-muted-foreground hover:text-foreground",
-                    compact ? "h-8 text-xs" : "h-9",
+                    compact || inline ? "h-8 text-xs" : "h-9",
                   )}
                   onClick={onClear}
                 >
@@ -392,6 +401,15 @@ export function DesignTicketFilterBar({
               </motion.div>
             ) : null}
           </AnimatePresence>
+        </div>
+
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          {trailing}
+          {typeof resultCount === "number" && inline ? (
+            <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+              {resultCount} {resultLabel}
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -435,7 +453,7 @@ export function DesignTicketFilterBar({
         </div>
       </div>
 
-      {typeof resultCount === "number" ? (
+      {typeof resultCount === "number" && !inline ? (
         <div className="mt-2.5 flex items-center border-t border-border/70 pt-2 text-[11px] text-muted-foreground">
           <motion.span
             key={resultCount}

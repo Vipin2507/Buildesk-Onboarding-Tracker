@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, ChevronRight, Search } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,8 @@ export function DataTable<T>({
   columns,
   searchKeys,
   hideSearch = false,
+  searchQuery,
+  onSearchQueryChange,
   pageSize = 10,
   onRowClick,
   emptyState,
@@ -56,6 +58,9 @@ export function DataTable<T>({
   searchKeys?: (keyof T)[];
   /** When parent toolbar owns search. */
   hideSearch?: boolean;
+  /** Controlled search (optional — falls back to internal state). */
+  searchQuery?: string;
+  onSearchQueryChange?: (value: string) => void;
   pageSize?: number;
   onRowClick?: (row: T) => void;
   emptyState?: ReactNode;
@@ -69,10 +74,16 @@ export function DataTable<T>({
   expandedRowId?: string | null;
   renderExpandedRow?: (row: T) => ReactNode;
 }) {
-  const [search, setSearch] = useState("");
+  const [internalSearch, setInternalSearch] = useState("");
+  const search = searchQuery ?? internalSearch;
+  const setSearch = onSearchQueryChange ?? setInternalSearch;
   const [sortKey, setSortKey] = useState<string | null>(initialSortKey);
   const [sortDir, setSortDir] = useState<"asc" | "desc">(initialSortDir);
   const [page, setPage] = useState(0);
+
+  useEffect(() => {
+    setPage(0);
+  }, [search]);
 
   const filtered = useMemo(() => {
     let rows = data;

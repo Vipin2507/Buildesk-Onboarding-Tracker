@@ -5,7 +5,7 @@ const styles: Record<StatusKey, string> = {
   not_started: "bg-muted text-muted-foreground border-border",
   in_progress: "bg-warning/15 text-warning border-warning/30 dark:text-warning-foreground",
   review: "bg-primary/15 text-primary border-primary/30",
-  completed: "bg-success/15 text-success border-success/30",
+  completed: "bg-success/15 text-success border-success/30 dark:text-success",
   on_hold: "bg-destructive/15 text-destructive border-destructive/30",
 };
 
@@ -13,13 +13,13 @@ export function StatusPill({ status, className }: { status: StatusKey; className
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium",
+        "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium",
         styles[status],
         className,
       )}
     >
       <span
-        className={cn("h-1.5 w-1.5 rounded-full", {
+        className={cn("h-1.5 w-1.5 rounded-sm", {
           "bg-muted-foreground": status === "not_started",
           "bg-warning": status === "in_progress",
           "bg-primary": status === "review",
@@ -55,7 +55,7 @@ export function Pill({
     <span
       title={title}
       className={cn(
-        "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium",
+        "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-2 py-0.5 text-xs font-medium",
         tones[tone],
         className,
       )}

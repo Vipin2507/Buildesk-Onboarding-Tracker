@@ -10,6 +10,7 @@ import {
   ClipboardList,
   FileSpreadsheet,
   Plus,
+  Search,
   TrendingUp,
   Upload,
 } from "lucide-react";
@@ -35,13 +36,7 @@ import {
   DesignTicketFilterField,
   DesignTicketSelect,
 } from "@/components/design-ticket/design-ticket-fields";
-import {
-  DesignTicketFilterBar,
-  DesignTicketKpiGrid,
-  DesignTicketPageHeader,
-  DesignTicketSection,
-  DesignTicketTabNav,
-} from "@/components/design-ticket/design-ticket-shared";
+import { DesignTicketFilterBar } from "@/components/design-ticket/design-ticket-shared";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDeleteDialog, EntityFormModal } from "@/components/entity-form-modal";
@@ -51,7 +46,7 @@ import { ProgressBar } from "@/components/progress-bar";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { CRM_STAGE_LABELS } from "@/data/crm-onboarding-defaults";
-import { formatDate } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import {
   useAuthStore,
   useCompanyPortalStore,
@@ -88,8 +83,9 @@ const STATUS_CHIPS = [
 function statusTone(status: CrmAccount["status"]) {
   if (status === "live") return "success" as const;
   if (status === "onboarding") return "warning" as const;
-  if (status === "suspended") return "warning" as const;
-  if (status === "inactive" || status === "closed") return "danger" as const;
+  if (status === "suspended" || status === "inactive" || status === "closed") {
+    return "muted" as const;
+  }
   return "info" as const;
 }
 
@@ -172,19 +168,6 @@ function matchesAccountListFilters(row: CrmAccountRow, f: AccountListFilters) {
   return true;
 }
 
-function accountKpiFilterLabel(filter: AccountKpiFilter) {
-  switch (filter) {
-    case "onboarding":
-      return "Onboarding accounts";
-    case "live":
-      return "Live accounts";
-    case "critical":
-      return "Critical / overdue";
-    default:
-      return "All accounts";
-  }
-}
-
 function CrmAccountsLayout() {
   const childMatches = useChildMatches();
   if (childMatches.length > 0) return <Outlet />;
@@ -218,6 +201,7 @@ function CrmAccountsPage() {
   const [providerFilter, setProviderFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [tableSearch, setTableSearch] = useState("");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -323,21 +307,6 @@ function CrmAccountsPage() {
     [rows, listFilters, statusFilter],
   );
 
-  /** Status tabs ignore the status chip so counts stay a breakdown of other filters. */
-  const statusScopeRows = useMemo(
-    () => rows.filter((r) => matchesAccountListFilters(r, listFilters)),
-    [rows, listFilters],
-  );
-
-  const statusCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: statusScopeRows.length };
-    for (const chip of STATUS_CHIPS) {
-      if (!chip.status) continue;
-      counts[chip.id] = statusScopeRows.filter((r) => r.status === chip.status).length;
-    }
-    return counts;
-  }, [statusScopeRows]);
-
   const kpiStats = useMemo(() => {
     const onboarding = scopedRows.filter((r) => matchesAccountKpi(r, "onboarding")).length;
     const live = scopedRows.filter((r) => matchesAccountKpi(r, "live")).length;
@@ -416,7 +385,7 @@ function CrmAccountsPage() {
 
   const statusTabs = STATUS_CHIPS.map((c) => ({
     id: c.id,
-    label: `${c.label} (${statusCounts[c.id] ?? 0})`,
+    label: c.label,
   }));
 
   function applyFilters() {
@@ -438,6 +407,7 @@ function CrmAccountsPage() {
     setProviderFilter("all");
     setDateFrom("");
     setDateTo("");
+    setTableSearch("");
   }
 
   function openCreate() {
@@ -552,16 +522,19 @@ function CrmAccountsPage() {
 
   return (
     <PageWrap compact>
-      <DesignTicketPageHeader
-        compact
-        title="CRM Accounts"
-        subtitle="Customer accounts for CRM onboarding — progress, health, and go-live."
-        actions={
+      <div className="mb-0 border-b border-border py-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h1 className="text-base font-medium tracking-tight">CRM Accounts</h1>
+            <p className="text-xs text-muted-foreground">
+              {filtered.length} {filtered.length === 1 ? "account" : "accounts"}
+            </p>
+          </div>
           <div className="flex flex-wrap items-center gap-1.5">
             <Button
               size="sm"
-              variant="outline"
-              className="h-8 gap-1 text-xs"
+              variant="ghost"
+              className="h-8 gap-1 px-3 text-xs"
               onClick={() => setTransferOpen(true)}
             >
               <ArrowLeftRight className="h-3.5 w-3.5" />
@@ -569,8 +542,8 @@ function CrmAccountsPage() {
             </Button>
             <Button
               size="sm"
-              variant="outline"
-              className="h-8 gap-1 text-xs"
+              variant="ghost"
+              className="h-8 gap-1 px-3 text-xs"
               onClick={() => setBulkUpdateOpen(true)}
             >
               <FileSpreadsheet className="h-3.5 w-3.5" />
@@ -578,8 +551,8 @@ function CrmAccountsPage() {
             </Button>
             <Button
               size="sm"
-              variant="outline"
-              className="h-8 gap-1 text-xs"
+              variant="ghost"
+              className="h-8 gap-1 px-3 text-xs"
               onClick={() => setDateBulkOpen(true)}
             >
               <CalendarRange className="h-3.5 w-3.5" />
@@ -587,33 +560,83 @@ function CrmAccountsPage() {
             </Button>
             <Button
               size="sm"
-              variant="outline"
-              className="h-8 gap-1 text-xs"
+              variant="ghost"
+              className="h-8 gap-1 px-3 text-xs"
               onClick={() => setBulkOpen(true)}
             >
               <Upload className="h-3.5 w-3.5" />
               Bulk upload
             </Button>
-            <Button size="sm" className="h-8 gap-1 bg-primary text-xs" onClick={openCreate}>
+            <Button size="sm" className="h-8 gap-1 bg-primary px-3 text-xs" onClick={openCreate}>
               <Plus className="h-3.5 w-3.5" />
               Add account
             </Button>
           </div>
-        }
-      />
+        </div>
 
-      <div className="mb-3 min-w-0">
-        <DesignTicketKpiGrid items={kpiCards} columns={5} size="compact" />
+        <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
+          <div className="flex flex-wrap items-end gap-5 sm:gap-6">
+            {kpiCards.map((k) => {
+              const clickable = Boolean(k.onClick);
+              const Wrapper = clickable ? "button" : "div";
+              return (
+                <Wrapper
+                  key={k.id}
+                  type={clickable ? "button" : undefined}
+                  onClick={k.onClick}
+                  className={cn(
+                    "min-w-0 text-left",
+                    clickable &&
+                      "cursor-pointer rounded-md px-1 py-0.5 transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                    k.active && "rounded-md bg-muted/80 ring-1 ring-border",
+                  )}
+                >
+                  <div className="text-[11px] text-muted-foreground">{k.label}</div>
+                  <div
+                    className={cn(
+                      "text-base font-medium tabular-nums leading-tight",
+                      k.tone,
+                      k.active && !k.tone && "text-primary",
+                    )}
+                  >
+                    {k.value}
+                  </div>
+                </Wrapper>
+              );
+            })}
+          </div>
+
+          <nav
+            role="tablist"
+            aria-label="Account status"
+            className="flex max-w-full gap-0.5 overflow-x-auto overscroll-x-contain whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {statusTabs.map((tab) => {
+              const active = statusFilter === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setStatusFilter(tab.id)}
+                  className={cn(
+                    "shrink-0 snap-start rounded-md px-2.5 py-1 text-xs transition-colors",
+                    active
+                      ? "bg-muted font-medium text-foreground"
+                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                  )}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
       </div>
 
-      <DesignTicketTabNav
-        compact
-        tabs={statusTabs}
-        activeId={statusFilter}
-        onChange={setStatusFilter}
-      />
-
       <DesignTicketFilterBar
+        variant="inline"
         compact
         className="xl:grid-cols-4"
         activeFilterCount={activeFilterCount}
@@ -621,6 +644,18 @@ function CrmAccountsPage() {
         onApply={applyFilters}
         resultCount={filtered.length}
         resultLabel={filtered.length === 1 ? "account" : "accounts"}
+        trailing={
+          <div className="relative min-w-[140px] flex-1 sm:max-w-xs">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={tableSearch}
+              onChange={(e) => setTableSearch(e.target.value)}
+              placeholder="Search accounts…"
+              aria-label="Search accounts"
+              className="h-8 w-full rounded-md border border-input bg-background pl-8 pr-3 text-xs outline-none focus:ring-2 focus:ring-ring/40"
+            />
+          </div>
+        }
       >
         <DesignTicketFilterField label="Type" compact>
           <DesignTicketSelect
@@ -781,34 +816,36 @@ function CrmAccountsPage() {
       </DesignTicketFilterBar>
 
       <div ref={tableRef}>
-        <DesignTicketSection title={accountKpiFilterLabel(kpiFilter)} delay={0.06} compact>
-          {rows.length === 0 ? (
-            <EmptyState
-              title="No CRM accounts yet"
-              description="Create your first CRM customer account to start onboarding."
-              actionLabel="+ Add account"
-              onAction={openCreate}
-            />
-          ) : filtered.length === 0 ? (
-            <EmptyState
-              title="No matches"
-              description="Try another KPI card, clear filters, or adjust your search."
-              actionLabel="Clear filters"
-              onAction={clearFilters}
-            />
-          ) : (
-            <motion.div
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-              className="card-soft overflow-hidden p-3"
-            >
-              <DataTable
-                data={filtered}
-                initialSortKey="startDate"
-                initialSortDir="desc"
-                getRowId={(r) => r.id}
-                searchKeys={[
+        {rows.length === 0 ? (
+          <EmptyState
+            title="No CRM accounts yet"
+            description="Create your first CRM customer account to start onboarding."
+            actionLabel="+ Add account"
+            onAction={openCreate}
+          />
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            title="No matches"
+            description="Try another KPI card, clear filters, or adjust your search."
+            actionLabel="Clear filters"
+            onAction={clearFilters}
+          />
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            className="card-soft overflow-hidden p-3 pt-2"
+          >
+            <DataTable
+              data={filtered}
+              initialSortKey="startDate"
+              initialSortDir="desc"
+              getRowId={(r) => r.id}
+              hideSearch
+              searchQuery={tableSearch}
+              onSearchQueryChange={setTableSearch}
+              searchKeys={[
                   "name",
                   "userId",
                   "city",
@@ -977,7 +1014,6 @@ function CrmAccountsPage() {
               />
             </motion.div>
           )}
-        </DesignTicketSection>
       </div>
 
       <EntityFormModal
