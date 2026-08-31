@@ -465,7 +465,6 @@ const commercialPatchInput = z.object({
       startDate: true,
       endDate: true,
       planExpiry: true,
-      renewedAt: true,
       amountWithGst: true,
       taxableAmount: true,
       gstAmount: true,
@@ -473,6 +472,9 @@ const commercialPatchInput = z.object({
       commercialStatus: true,
       installmentCount: true,
       cancelledOn: true,
+    })
+    .extend({
+      renewedAt: z.string().optional().nullable(),
     })
     .partial(),
 });

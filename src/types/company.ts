@@ -18,13 +18,13 @@ export const COMPANY_PLANS: CompanyPlan[] = ["Annual", "Half-Yearly", "AMC"];
 /** Commercial subscription status from bulk-import sheet. */
 export type CompanyCommercialStatus = "Live" | "Unpaid" | "Canceled" | "Expired" | "Future";
 
-export const COMPANY_COMMERCIAL_STATUSES: CompanyCommercialStatus[] = [
+export const COMPANY_COMMERCIAL_STATUSES = [
   "Live",
   "Unpaid",
   "Canceled",
   "Expired",
   "Future",
-];
+] as const satisfies readonly CompanyCommercialStatus[];
 
 /** Full plan label from commercial bulk-import sheet. */
 export type CompanyCommercialPlanName =
@@ -32,11 +32,11 @@ export type CompanyCommercialPlanName =
   | "Buildesk Post Sales Annual License Plan"
   | "Buildesk Sales & Post Sales Module Annual Plan";
 
-export const COMPANY_COMMERCIAL_PLAN_NAMES: CompanyCommercialPlanName[] = [
+export const COMPANY_COMMERCIAL_PLAN_NAMES = [
   "Post Sales Annual License Plan",
   "Buildesk Post Sales Annual License Plan",
   "Buildesk Sales & Post Sales Module Annual Plan",
-];
+] as const satisfies readonly CompanyCommercialPlanName[];
 
 /** Payment status from commercial bulk-import sheet. */
 export type CompanyPaymentStatus =
@@ -46,13 +46,13 @@ export type CompanyPaymentStatus =
   | "Pending"
   | "Part payment subscription";
 
-export const COMPANY_PAYMENT_STATUSES: CompanyPaymentStatus[] = [
+export const COMPANY_PAYMENT_STATUSES = [
   "NA",
   "Fully paid",
   "Partially paid",
   "Pending",
   "Part payment subscription",
-];
+] as const satisfies readonly CompanyPaymentStatus[];
 
 export const COMPANY_REGIONS: CompanyRegion[] = ["NCR", "South", "West", "Rest of India"];
 export const COMPANY_TYPES: CompanyType[] = [

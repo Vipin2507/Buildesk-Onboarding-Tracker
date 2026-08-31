@@ -1,7 +1,15 @@
 import { asc, desc, eq } from "drizzle-orm";
 
 import type { Company, CompanyModule, ModuleKey, PostSalesProject, PostSalesStep, Project } from "@/types";
-import { migrateLegacyPlan } from "@/types/company";
+import {
+  COMPANY_COMMERCIAL_PLAN_NAMES,
+  COMPANY_COMMERCIAL_STATUSES,
+  COMPANY_PAYMENT_STATUSES,
+  migrateLegacyPlan,
+  type CompanyCommercialPlanName,
+  type CompanyCommercialStatus,
+  type CompanyPaymentStatus,
+} from "@/types/company";
 import { isCrmAccountCompanyStub } from "@/lib/design-ticket-portal";
 import { normalizeCompanyModules } from "@/data/module-catalog";
 import { getDb } from "@/server/db/client";
@@ -31,6 +39,27 @@ export function mapCompany(row: typeof t.companies.$inferSelect, modules: Compan
     return Number.isFinite(n) ? n : undefined;
   };
 
+  const commercialStatus = (v: string | null | undefined): CompanyCommercialStatus | undefined => {
+    if (!v) return undefined;
+    return (COMPANY_COMMERCIAL_STATUSES as readonly string[]).includes(v)
+      ? (v as CompanyCommercialStatus)
+      : undefined;
+  };
+
+  const paymentStatus = (v: string | null | undefined): CompanyPaymentStatus | undefined => {
+    if (!v) return undefined;
+    return (COMPANY_PAYMENT_STATUSES as readonly string[]).includes(v)
+      ? (v as CompanyPaymentStatus)
+      : undefined;
+  };
+
+  const planName = (v: string | null | undefined): CompanyCommercialPlanName | undefined => {
+    if (!v) return undefined;
+    return (COMPANY_COMMERCIAL_PLAN_NAMES as readonly string[]).includes(v)
+      ? (v as CompanyCommercialPlanName)
+      : undefined;
+  };
+
   return {
     id: row.id,
     name: row.name,
@@ -57,7 +86,7 @@ export function mapCompany(row: typeof t.companies.$inferSelect, modules: Compan
     goLiveTarget: row.goLiveTarget,
     planExpiry: row.planExpiry,
     plan: migrateLegacyPlan(row.plan),
-    planName: (row.planName as Company["planName"]) ?? undefined,
+    planName: planName(row.planName),
     health: row.health as Company["health"],
     renewedAt: row.renewedAt ?? undefined,
     companyType: (row.companyType as Company["companyType"]) ?? undefined,
@@ -76,8 +105,8 @@ export function mapCompany(row: typeof t.companies.$inferSelect, modules: Compan
     amountWithGst: num(row.amountWithGst),
     taxableAmount: num(row.taxableAmount),
     gstAmount: num(row.gstAmount),
-    paymentStatus: row.paymentStatus ?? undefined,
-    commercialStatus: row.commercialStatus ?? undefined,
+    paymentStatus: paymentStatus(row.paymentStatus),
+    commercialStatus: commercialStatus(row.commercialStatus),
     installmentCount: row.installmentCount ?? undefined,
     cancelledOn: row.cancelledOn ?? undefined,
     createdAt: row.createdAt,
