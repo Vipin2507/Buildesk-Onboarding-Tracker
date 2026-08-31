@@ -179,8 +179,8 @@ function cellStr(value: unknown): string {
 function parseNumber(value: unknown): number | null {
   if (value == null || value === "") return null;
   if (typeof value === "number" && Number.isFinite(value)) return value;
-  const raw = String(value).replace(/[,₹$]/g, "").trim();
-  if (!raw) return null;
+  const raw = String(value).replace(/[^\d.-]/g, "").trim();
+  if (!raw || raw === "-" || raw === ".") return null;
   const n = Number(raw);
   return Number.isFinite(n) ? n : null;
 }
@@ -242,11 +242,17 @@ function legacyPlanFromCommercialPlan(_planName: CompanyCommercialPlanName): Com
   return "Annual";
 }
 
+function isEmptyCommercialCell(raw: string): boolean {
+  if (!raw.trim()) return true;
+  const key = normKey(raw);
+  return !key || key === "na" || key === "nil" || key === "none";
+}
+
 function parseInstallmentPending(raw: string, parsedNumber: number | null): {
   pendingAmount: number | null;
   installmentCount: number | null;
 } {
-  if (!raw.trim()) return { pendingAmount: null, installmentCount: null };
+  if (isEmptyCommercialCell(raw)) return { pendingAmount: null, installmentCount: null };
 
   const slash = raw.match(/^(\d+)\s*\/\s*([\d,.]+)$/);
   if (slash) {
@@ -378,7 +384,12 @@ export async function parseCompanyCommercialImportFile(
     }
     if (taxableRaw && taxableAmount == null) parseErrors.push(`Invalid Taxable: ${taxableRaw}`);
     if (gstRaw && gstAmount == null) parseErrors.push(`Invalid GST: ${gstRaw}`);
-    if (installmentPendingRaw && pendingAmount == null && installmentCount == null) {
+    if (
+      installmentPendingRaw &&
+      !isEmptyCommercialCell(installmentPendingRaw) &&
+      pendingAmount == null &&
+      installmentCount == null
+    ) {
       parseErrors.push(`Invalid Installment/Pending payment: ${installmentPendingRaw}`);
     }
     if (cellStr(startDateRaw) && !startDate) {
@@ -544,11 +555,13 @@ export function buildCompanyCommercialImportPlan(
     const existing = matches[0]!;
     const dealBase =
       raw.totalDealValue ?? raw.amountWithGst ?? existing.dealSize ?? existing.totalCost;
+    const pendingAmount =
+      raw.pendingAmount ?? (raw.paymentStatus === "Fully paid" ? 0 : null);
     let paymentReceived: number | null = null;
-    if (raw.pendingAmount != null && dealBase != null) {
-      paymentReceived = roundMoney(Math.max(0, dealBase - raw.pendingAmount));
-    } else if (raw.amountWithGst != null && raw.pendingAmount != null) {
-      paymentReceived = roundMoney(Math.max(0, raw.amountWithGst - raw.pendingAmount));
+    if (pendingAmount != null && dealBase != null) {
+      paymentReceived = roundMoney(Math.max(0, dealBase - pendingAmount));
+    } else if (raw.amountWithGst != null && pendingAmount != null) {
+      paymentReceived = roundMoney(Math.max(0, raw.amountWithGst - pendingAmount));
     }
 
     update += 1;
@@ -556,6 +569,7 @@ export function buildCompanyCommercialImportPlan(
       rowNumber: raw.rowNumber,
       name: raw.name,
       ...base,
+      pendingAmount,
       totalCost: raw.totalDealValue ?? raw.amountWithGst,
       paymentReceived,
       renewedAt: null,

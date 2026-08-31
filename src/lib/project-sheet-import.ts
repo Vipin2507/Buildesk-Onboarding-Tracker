@@ -84,6 +84,37 @@ export function normalizeImportDate(value: unknown): string | null {
   const raw = String(value).trim();
   if (!raw) return null;
 
+  const dMonY = raw.match(/^(\d{1,2})[-/\s]+([A-Za-z]{3,9})[-/\s]+(\d{2,4})$/);
+  if (dMonY) {
+    const day = Number(dMonY[1]);
+    const mon = parseMonthToken(dMonY[2]!);
+    const yRaw = Number(dMonY[3]);
+    const y = yRaw < 100 ? 2000 + yRaw : yRaw;
+    if (mon != null && validYmd(y, mon + 1, day)) {
+      return `${y}-${pad(mon + 1)}-${pad(day)}`;
+    }
+  }
+
+  const monD = raw.match(/^([A-Za-z]{3,9})[-/\s]+(\d{1,2})[-/\s,]+(\d{4})$/);
+  if (monD) {
+    const mon = parseMonthToken(monD[1]!);
+    const day = Number(monD[2]);
+    const y = Number(monD[3]);
+    if (mon != null && validYmd(y, mon + 1, day)) {
+      return `${y}-${pad(mon + 1)}-${pad(day)}`;
+    }
+  }
+
+  const dMonYSpaced = raw.match(/^(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})$/);
+  if (dMonYSpaced) {
+    const day = Number(dMonYSpaced[1]);
+    const mon = parseMonthToken(dMonYSpaced[2]!);
+    const y = Number(dMonYSpaced[3]);
+    if (mon != null && validYmd(y, mon + 1, day)) {
+      return `${y}-${pad(mon + 1)}-${pad(day)}`;
+    }
+  }
+
   // Already ISO / YYYY-MM-DD
   const iso = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (iso) {
@@ -123,6 +154,27 @@ export function normalizeImportDate(value: unknown): string | null {
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
+}
+
+const MONTH_TOKENS = [
+  "jan",
+  "feb",
+  "mar",
+  "apr",
+  "may",
+  "jun",
+  "jul",
+  "aug",
+  "sep",
+  "oct",
+  "nov",
+  "dec",
+] as const;
+
+function parseMonthToken(value: string): number | null {
+  const token = value.trim().toLowerCase().slice(0, 3);
+  const idx = MONTH_TOKENS.indexOf(token as (typeof MONTH_TOKENS)[number]);
+  return idx >= 0 ? idx : null;
 }
 
 function toYmd(d: Date) {
