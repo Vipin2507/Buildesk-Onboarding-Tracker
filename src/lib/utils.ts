@@ -41,3 +41,13 @@ export function formatDateTime(value?: string | null) {
     minute: "2-digit",
   });
 }
+
+/** Indian Rupee display for commercial amounts. */
+export function formatInr(value?: number | null) {
+  if (value == null || Number.isNaN(value)) return "—";
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(value);
+}

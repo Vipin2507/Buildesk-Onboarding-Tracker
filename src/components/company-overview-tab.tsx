@@ -23,9 +23,9 @@ import { StatusPill, Pill } from "@/components/status-pill";
 import { usePermissions } from "@/hooks/use-permissions";
 import { assignableManagerUsers, resolveAssigneeName } from "@/lib/managers";
 import { useCompanyStore, useEmployeeStore, useUserStore } from "@/stores";
-import type { Company, CompanyHealth, CompanyPlan, CompanyRegion, StatusKey } from "@/types";
+import type { Company, CompanyCommercialStatus, CompanyHealth, CompanyPlan, CompanyRegion, StatusKey } from "@/types";
 import { COMPANY_REGIONS, STATUS_LABEL } from "@/types";
-import { cn } from "@/lib/utils";
+import { cn, formatDate, formatInr } from "@/lib/utils";
 
 const detailSchema = z.object({
   name: z.string().min(2, "Name is required"),
@@ -83,6 +83,35 @@ function inputClass(error?: boolean) {
     "mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40",
     error && "border-destructive",
   );
+}
+
+function commercialStatusTone(status: CompanyCommercialStatus): "success" | "warning" | "danger" | "muted" {
+  switch (status) {
+    case "Live":
+      return "success";
+    case "Unpaid":
+    case "Future":
+      return "warning";
+    case "Canceled":
+    case "Expired":
+      return "danger";
+    default:
+      return "muted";
+  }
+}
+
+function paymentStatusTone(status: string): "success" | "warning" | "danger" | "muted" {
+  switch (status) {
+    case "Fully paid":
+      return "success";
+    case "Partially paid":
+    case "Part payment subscription":
+      return "warning";
+    case "Pending":
+      return "danger";
+    default:
+      return "muted";
+  }
 }
 
 export function CompanyOverviewTab({ company }: { company: Company }) {
@@ -375,18 +404,55 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
             <Field label="Sales Agent" icon={UserCog}>{salesAgentName ?? "—"}</Field>
           </Section>
 
-          <Section title="Commercial">
-            <Field label="Plan" icon={CreditCard}>
+          <Section title="Commercial" className="md:col-span-2">
+            <Field label="Subscription Status">
+              {company.commercialStatus ? (
+                <Pill tone={commercialStatusTone(company.commercialStatus)}>
+                  {company.commercialStatus}
+                </Pill>
+              ) : (
+                "—"
+              )}
+            </Field>
+            <Field label="Plan Name" icon={CreditCard}>
+              {company.planName || "—"}
+            </Field>
+            <Field label="Plan Tier">
               <Pill tone="accent">{company.plan}</Pill>
             </Field>
-            <Field label="Billing Info">{company.billingInfo || `${company.plan} plan`}</Field>
-            <Field label="Start Date" icon={Calendar}>{company.startDate || company.agreementDate}</Field>
-            <Field label="Agreement Date" icon={Calendar}>{company.agreementDate}</Field>
-            <Field label="Go-Live Target" icon={Calendar}>{company.goLiveTarget}</Field>
-            <Field label="Plan Expiry" icon={Calendar}>{company.planExpiry}</Field>
-            {company.renewedAt && (
-              <Field label="Last Renewed">{new Date(company.renewedAt).toLocaleDateString()}</Field>
-            )}
+            <Field label="Users / Quantity">
+              {company.usersPurchased != null ? company.usersPurchased : "—"}
+            </Field>
+            <Field label="Deal Value">{formatInr(company.dealSize)}</Field>
+            <Field label="Amount with GST">{formatInr(company.amountWithGst)}</Field>
+            <Field label="Taxable">{formatInr(company.taxableAmount)}</Field>
+            <Field label="GST Amount">{formatInr(company.gstAmount)}</Field>
+            <Field label="Payment Status">
+              {company.paymentStatus ? (
+                <Pill tone={paymentStatusTone(company.paymentStatus)}>{company.paymentStatus}</Pill>
+              ) : (
+                "—"
+              )}
+            </Field>
+            <Field label="Payment Received">{formatInr(company.paymentReceived)}</Field>
+            <Field label="Pending Amount">{formatInr(company.pendingAmount)}</Field>
+            <Field label="Installments">
+              {company.installmentCount != null ? company.installmentCount : "—"}
+            </Field>
+            <Field label="Start Date" icon={Calendar}>
+              {formatDate(company.startDate || company.agreementDate)}
+            </Field>
+            <Field label="End Date" icon={Calendar}>{formatDate(company.endDate)}</Field>
+            <Field label="Plan Expiry" icon={Calendar}>{formatDate(company.planExpiry)}</Field>
+            <Field label="Agreement Date" icon={Calendar}>{formatDate(company.agreementDate)}</Field>
+            <Field label="Go-Live Target" icon={Calendar}>{formatDate(company.goLiveTarget)}</Field>
+            <Field label="Cancelled On" icon={Calendar}>{formatDate(company.cancelledOn)}</Field>
+            <Field label="Billing Info" className="sm:col-span-2">
+              {company.billingInfo || `${company.plan} plan`}
+            </Field>
+            {company.renewedAt ? (
+              <Field label="Last Renewed">{formatDate(company.renewedAt)}</Field>
+            ) : null}
           </Section>
         </div>
       )}
@@ -394,11 +460,19 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+  className,
+}: {
+  title: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <section className="card-soft space-y-2 p-3 md:col-span-1">
+    <section className={cn("card-soft space-y-2 p-3 md:col-span-1", className)}>
       <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{title}</h4>
-      <div className="grid gap-2.5 sm:grid-cols-2">{children}</div>
+      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">{children}</div>
     </section>
   );
 }
