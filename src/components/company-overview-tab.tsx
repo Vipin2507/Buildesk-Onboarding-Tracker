@@ -73,6 +73,8 @@ const detailSchema = z.object({
   paymentStatus: z.union([z.enum(COMPANY_PAYMENT_STATUSES), z.literal("")]).optional(),
   paymentReceived: z.string().optional(),
   pendingAmount: z.string().optional(),
+  installmentAmount: z.string().optional(),
+  installmentDueDate: z.string().optional(),
   installmentCount: z.string().optional(),
   startDate: z.string().min(1),
   endDate: z.string().optional(),
@@ -201,6 +203,8 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
         gstAmount: parseOptionalNumber(data.gstAmount),
         paymentReceived: parseOptionalNumber(data.paymentReceived),
         pendingAmount: parseOptionalNumber(data.pendingAmount),
+        installmentAmount: parseOptionalNumber(data.installmentAmount),
+        installmentDueDate: data.installmentDueDate || undefined,
         installmentCount: parseOptionalInt(data.installmentCount),
       });
       toast.success("Company details saved");
@@ -437,6 +441,14 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
               <input type="number" min={0} step={1} {...form.register("paymentReceived")} className={inputClass()} />
             </label>
             <label className="block text-xs font-medium">
+              Installment Amount
+              <input type="number" min={0} step={1} {...form.register("installmentAmount")} className={inputClass()} />
+            </label>
+            <label className="block text-xs font-medium">
+              Installment Due Date
+              <input type="date" {...form.register("installmentDueDate")} className={inputClass()} />
+            </label>
+            <label className="block text-xs font-medium">
               Pending Amount
               <input type="number" min={0} step={1} {...form.register("pendingAmount")} className={inputClass()} />
             </label>
@@ -555,6 +567,10 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
               )}
             </Field>
             <Field label="Payment Received">{formatInr(company.paymentReceived)}</Field>
+            <Field label="Installment Amount">{formatInr(company.installmentAmount)}</Field>
+            <Field label="Installment Due Date" icon={Calendar}>
+              {formatDate(company.installmentDueDate)}
+            </Field>
             <Field label="Pending Amount">{formatInr(company.pendingAmount)}</Field>
             <Field label="Installments">
               {company.installmentCount != null ? company.installmentCount : "—"}
@@ -629,6 +645,8 @@ function toFormValues(company: Company): DetailForm {
     paymentStatus: company.paymentStatus ?? "",
     paymentReceived: company.paymentReceived != null ? String(company.paymentReceived) : "",
     pendingAmount: company.pendingAmount != null ? String(company.pendingAmount) : "",
+    installmentAmount: company.installmentAmount != null ? String(company.installmentAmount) : "",
+    installmentDueDate: company.installmentDueDate ?? "",
     installmentCount: company.installmentCount != null ? String(company.installmentCount) : "",
     startDate: company.startDate || company.agreementDate,
     endDate: company.endDate ?? "",

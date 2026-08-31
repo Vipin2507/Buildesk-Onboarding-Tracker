@@ -95,6 +95,8 @@ export const companies = sqliteTable("companies", {
   paymentStatus: text("payment_status"),
   commercialStatus: text("commercial_status"),
   installmentCount: integer("installment_count"),
+  installmentAmount: text("installment_amount"),
+  installmentDueDate: text("installment_due_date"),
   cancelledOn: text("cancelled_on"),
   ...timestamps,
 });

@@ -108,6 +108,8 @@ export function mapCompany(row: typeof t.companies.$inferSelect, modules: Compan
     paymentStatus: paymentStatus(row.paymentStatus),
     commercialStatus: commercialStatus(row.commercialStatus),
     installmentCount: row.installmentCount ?? undefined,
+    installmentAmount: num(row.installmentAmount),
+    installmentDueDate: row.installmentDueDate ?? undefined,
     cancelledOn: row.cancelledOn ?? undefined,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

@@ -254,6 +254,8 @@ const EXTRA_COLUMNS = [
   { table: "companies", name: "payment_status", ddl: "TEXT" },
   { table: "companies", name: "commercial_status", ddl: "TEXT" },
   { table: "companies", name: "installment_count", ddl: "INTEGER" },
+  { table: "companies", name: "installment_amount", ddl: "TEXT" },
+  { table: "companies", name: "installment_due_date", ddl: "TEXT" },
   { table: "companies", name: "cancelled_on", ddl: "TEXT" },
   { table: "companies", name: "plan_name", ddl: "TEXT" },
   { table: "users", name: "product_scope", ddl: "TEXT NOT NULL DEFAULT 'erp'" },

@@ -26,7 +26,8 @@ export const COMPANY_COMMERCIAL_IMPORT_HEADERS = [
   "GST",
   "Plan Name",
   "Payment status",
-  "Installment/Pending payment",
+  "Installment amount",
+  "Due date",
   "Start date",
   "End date/ Renewal date",
   "Cancelled On",
@@ -44,14 +45,15 @@ const HEADER_ALIASES: Record<CompanyCommercialImportHeader, string[]> = {
   GST: ["gst", "gstamount", "taxamount", "tax"],
   "Plan Name": ["planname", "plan", "subscriptionplan"],
   "Payment status": ["paymentstatus", "payment", "paidstatus"],
-  "Installment/Pending payment": [
-    "installmentpendingpayment",
+  "Installment amount": [
+    "installmentamount",
     "installment",
     "pendingpayment",
     "pendingamount",
     "pending",
-    "installmentcount",
+    "installmentpendingpayment",
   ],
+  "Due date": ["duedate", "installmentduedate", "paymentduedate", "nextduedate"],
   "Start date": ["startdate", "start", "fromdate", "contractstart"],
   "End date/ Renewal date": [
     "enddaterenewaldate",
@@ -75,7 +77,8 @@ export type CompanyCommercialImportRawRow = {
   gstRaw: string;
   planNameRaw: string;
   paymentStatusRaw: string;
-  installmentPendingRaw: string;
+  installmentAmountRaw: string;
+  dueDateRaw: string;
   startDateRaw: string;
   endDateRaw: string;
   cancelledOnRaw: string;
@@ -84,8 +87,8 @@ export type CompanyCommercialImportRawRow = {
   amountWithGst: number | null;
   taxableAmount: number | null;
   gstAmount: number | null;
-  pendingAmount: number | null;
-  installmentCount: number | null;
+  installmentAmount: number | null;
+  installmentDueDate: string | null;
   startDate: string | null;
   endDate: string | null;
   cancelledOn: string | null;
@@ -108,6 +111,8 @@ export type CompanyCommercialImportPlanRow = {
   taxableAmount: number | null;
   gstAmount: number | null;
   paymentStatus: CompanyPaymentStatus | null;
+  installmentAmount: number | null;
+  installmentDueDate: string | null;
   pendingAmount: number | null;
   paymentReceived: number | null;
   installmentCount: number | null;
@@ -159,6 +164,8 @@ export type CompanyCommercialPatch = Partial<
     | "paymentStatus"
     | "commercialStatus"
     | "installmentCount"
+    | "installmentAmount"
+    | "installmentDueDate"
     | "cancelledOn"
   >
 >;
@@ -253,30 +260,9 @@ function isEmptyCommercialCell(raw: string): boolean {
   return !key || key === "na" || key === "nil" || key === "none";
 }
 
-function parseInstallmentPending(raw: string, parsedNumber: number | null): {
-  pendingAmount: number | null;
-  installmentCount: number | null;
-} {
-  if (isEmptyCommercialCell(raw)) return { pendingAmount: null, installmentCount: null };
-
-  const slash = raw.match(/^(\d+)\s*\/\s*([\d,.]+)$/);
-  if (slash) {
-    const count = Number(slash[1]);
-    const pending = parseNumber(slash[2]);
-    return {
-      installmentCount: Number.isFinite(count) && count > 0 ? Math.round(count) : null,
-      pendingAmount: pending,
-    };
-  }
-
-  if (parsedNumber != null) {
-    if (Number.isInteger(parsedNumber) && parsedNumber > 0 && parsedNumber <= 60 && !raw.includes(".")) {
-      return { installmentCount: Math.round(parsedNumber), pendingAmount: null };
-    }
-    return { pendingAmount: parsedNumber, installmentCount: null };
-  }
-
-  return { pendingAmount: null, installmentCount: null };
+function parseInstallmentAmount(raw: string): number | null {
+  if (isEmptyCommercialCell(raw)) return null;
+  return parseNumber(raw);
 }
 
 export function downloadCompanyCommercialImportTemplate() {
@@ -291,7 +277,8 @@ export function downloadCompanyCommercialImportTemplate() {
       GST: 153000,
       "Plan Name": "Buildesk Post Sales Annual License Plan",
       "Payment status": "Partially paid",
-      "Installment/Pending payment": 350000,
+      "Installment amount": 350000,
+      "Due date": "2026-02-15",
       "Start date": "2026-01-15",
       "End date/ Renewal date": "2027-01-14",
       "Cancelled On": "",
@@ -340,7 +327,8 @@ export async function parseCompanyCommercialImportFile(
     const gstRaw = cellStr(row[mapped.GST ?? ""]);
     const planNameRaw = cellStr(row[mapped["Plan Name"] ?? ""]);
     const paymentStatusRaw = cellStr(row[mapped["Payment status"] ?? ""]);
-    const installmentPendingRaw = cellStr(row[mapped["Installment/Pending payment"] ?? ""]);
+    const installmentAmountRaw = cellStr(row[mapped["Installment amount"] ?? ""]);
+    const dueDateRaw = row[mapped["Due date"] ?? ""];
     const startDateRaw = row[mapped["Start date"] ?? ""];
     const endDateRaw = row[mapped["End date/ Renewal date"] ?? ""];
     const cancelledOnRaw = row[mapped["Cancelled On"] ?? ""];
@@ -350,11 +338,8 @@ export async function parseCompanyCommercialImportFile(
     const amountWithGst = parseNumber(amountWithGstRaw);
     const taxableAmount = parseNumber(taxableRaw);
     const gstAmount = parseNumber(gstRaw);
-    const installmentParsed = parseNumber(installmentPendingRaw);
-    const { pendingAmount, installmentCount } = parseInstallmentPending(
-      installmentPendingRaw,
-      installmentParsed,
-    );
+    const installmentAmount = parseInstallmentAmount(installmentAmountRaw);
+    const installmentDueDate = normalizeImportDate(dueDateRaw);
     const startDate = normalizeImportDate(startDateRaw);
     const endDate = normalizeImportDate(endDateRaw);
     const cancelledOn = normalizeImportDate(cancelledOnRaw);
@@ -389,13 +374,11 @@ export async function parseCompanyCommercialImportFile(
     }
     if (taxableRaw && taxableAmount == null) parseErrors.push(`Invalid Taxable: ${taxableRaw}`);
     if (gstRaw && gstAmount == null) parseErrors.push(`Invalid GST: ${gstRaw}`);
-    if (
-      installmentPendingRaw &&
-      !isEmptyCommercialCell(installmentPendingRaw) &&
-      pendingAmount == null &&
-      installmentCount == null
-    ) {
-      parseErrors.push(`Invalid Installment/Pending payment: ${installmentPendingRaw}`);
+    if (installmentAmountRaw && !isEmptyCommercialCell(installmentAmountRaw) && installmentAmount == null) {
+      parseErrors.push(`Invalid Installment amount: ${installmentAmountRaw}`);
+    }
+    if (cellStr(dueDateRaw) && !installmentDueDate) {
+      parseErrors.push(`Invalid Due date: ${cellStr(dueDateRaw)}`);
     }
     if (cellStr(startDateRaw) && !startDate) {
       parseErrors.push(`Invalid Start date: ${cellStr(startDateRaw)}`);
@@ -418,7 +401,8 @@ export async function parseCompanyCommercialImportFile(
       gstRaw,
       planNameRaw,
       paymentStatusRaw,
-      installmentPendingRaw,
+      installmentAmountRaw,
+      dueDateRaw: cellStr(dueDateRaw),
       startDateRaw: cellStr(startDateRaw),
       endDateRaw: cellStr(endDateRaw),
       cancelledOnRaw: cellStr(cancelledOnRaw),
@@ -427,8 +411,8 @@ export async function parseCompanyCommercialImportFile(
       amountWithGst,
       taxableAmount,
       gstAmount,
-      pendingAmount,
-      installmentCount,
+      installmentAmount,
+      installmentDueDate,
       startDate,
       endDate,
       cancelledOn,
@@ -454,8 +438,10 @@ function commercialFieldsFromRaw(raw: CompanyCommercialImportRawRow) {
     taxableAmount: raw.taxableAmount,
     gstAmount: raw.gstAmount,
     paymentStatus: raw.paymentStatus,
-    pendingAmount: raw.pendingAmount,
-    installmentCount: raw.installmentCount,
+    installmentAmount: raw.installmentAmount,
+    installmentDueDate: raw.installmentDueDate,
+    pendingAmount: raw.installmentAmount,
+    installmentCount: raw.installmentAmount != null ? 1 : null,
     startDate: raw.startDate,
     endDate: raw.endDate,
     planExpiry: raw.endDate,
@@ -470,7 +456,8 @@ function buildUpdateRow(
 ): CompanyCommercialImportPlanRow {
   const dealBase =
     raw.totalDealValue ?? raw.amountWithGst ?? existing.dealSize ?? existing.totalCost;
-  const pendingAmount = raw.pendingAmount ?? (raw.paymentStatus === "Fully paid" ? 0 : null);
+  const pendingAmount =
+    raw.installmentAmount ?? (raw.paymentStatus === "Fully paid" ? 0 : null);
   let paymentReceived: number | null = null;
   if (pendingAmount != null && dealBase != null) {
     paymentReceived = roundMoney(Math.max(0, dealBase - pendingAmount));
@@ -603,6 +590,8 @@ export function buildCompanyCommercialImportPlan(
         pendingAmount: null,
         paymentReceived: null,
         installmentCount: null,
+        installmentAmount: null,
+        installmentDueDate: null,
         startDate: null,
         endDate: null,
         planExpiry: null,
@@ -702,6 +691,8 @@ export function mergeCompanyCommercialImportRow(
   if (row.pendingAmount != null) patch.pendingAmount = row.pendingAmount;
   if (row.paymentReceived != null) patch.paymentReceived = row.paymentReceived;
   if (row.installmentCount != null) patch.installmentCount = row.installmentCount;
+  if (row.installmentAmount != null) patch.installmentAmount = row.installmentAmount;
+  if (row.installmentDueDate) patch.installmentDueDate = row.installmentDueDate;
   if (row.startDate) patch.startDate = row.startDate;
   if (row.endDate) {
     patch.endDate = row.endDate;

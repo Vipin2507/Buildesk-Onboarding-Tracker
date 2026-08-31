@@ -20,7 +20,7 @@ import {
   type CompanyCommercialImportPlan,
   type CompanyCommercialPickOverrides,
 } from "@/lib/company-sheet-import";
-import { cn, formatInr } from "@/lib/utils";
+import { cn, formatDate, formatInr } from "@/lib/utils";
 import { useCompanyStore } from "@/stores";
 
 const UNSET_PICK = "__unset__";
@@ -265,7 +265,8 @@ export function CompanyCommercialBulkUpdateModal({
                       <th className="px-2 py-2">Sheet name</th>
                       <th className="min-w-[14rem] px-2 py-2">ERP company</th>
                       <th className="px-2 py-2">Deal</th>
-                      <th className="px-2 py-2">Pending</th>
+                      <th className="px-2 py-2">Installment</th>
+                      <th className="px-2 py-2">Due date</th>
                       <th className="px-2 py-2">Plan</th>
                       <th className="px-2 py-2">Status</th>
                       <th className="px-2 py-2">Payment</th>
@@ -300,8 +301,9 @@ export function CompanyCommercialBulkUpdateModal({
                           {row.dealSize != null ? formatInr(row.dealSize) : "—"}
                         </td>
                         <td className="px-2 py-2 tabular-nums">
-                          {row.pendingAmount != null ? formatInr(row.pendingAmount) : "—"}
+                          {row.installmentAmount != null ? formatInr(row.installmentAmount) : "—"}
                         </td>
+                        <td className="px-2 py-2">{formatDate(row.installmentDueDate)}</td>
                         <td className="px-2 py-2">{row.planName ?? "—"}</td>
                         <td className="px-2 py-2">{row.commercialStatus ?? "—"}</td>
                         <td className="px-2 py-2">{row.paymentStatus ?? "—"}</td>

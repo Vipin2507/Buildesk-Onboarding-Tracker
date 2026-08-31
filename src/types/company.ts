@@ -133,6 +133,8 @@ export type Company = Timestamps & {
   /** Subscription status from commercial sheet (Live, Unpaid, Canceled, etc.) */
   commercialStatus?: CompanyCommercialStatus;
   installmentCount?: number;
+  installmentAmount?: number;
+  installmentDueDate?: string;
   cancelledOn?: string;
 };
 

@@ -198,6 +198,8 @@ const companyInput = z.object({
   paymentStatus: z.enum(COMPANY_PAYMENT_STATUSES).optional().nullable(),
   commercialStatus: z.enum(COMPANY_COMMERCIAL_STATUSES).optional().nullable(),
   installmentCount: optionalNumber,
+  installmentAmount: optionalNumber,
+  installmentDueDate: z.string().optional().nullable(),
   cancelledOn: z.string().optional().nullable(),
   paymentHistory: z
     .array(
@@ -290,6 +292,8 @@ export const createCompany = createServerFn({ method: "POST" })
       paymentStatus: data.paymentStatus || null,
       commercialStatus: data.commercialStatus || null,
       installmentCount: data.installmentCount ?? null,
+      installmentAmount: data.installmentAmount != null ? String(data.installmentAmount) : null,
+      installmentDueDate: data.installmentDueDate || null,
       cancelledOn: data.cancelledOn || null,
       paymentHistoryJson: data.paymentHistory ? JSON.stringify(data.paymentHistory) : null,
       updatedAt: now,
@@ -366,6 +370,7 @@ export const updateCompany = createServerFn({ method: "POST" })
       amountWithGst,
       taxableAmount,
       gstAmount,
+      installmentAmount,
       ...scalarRest
     } = rest as typeof rest & {
       additionalSupportContactIds?: string[] | null;
@@ -377,6 +382,7 @@ export const updateCompany = createServerFn({ method: "POST" })
       amountWithGst?: number | null;
       taxableAmount?: number | null;
       gstAmount?: number | null;
+      installmentAmount?: number | null;
     };
     const set: Record<string, unknown> = { ...scalarRest, updatedAt: nowIso() };
     if (isCrmAccountCompanyStub(existing.billingInfo) && scalarRest.billingInfo === undefined) {
@@ -407,6 +413,9 @@ export const updateCompany = createServerFn({ method: "POST" })
     }
     if (gstAmount !== undefined) {
       set.gstAmount = gstAmount != null ? String(gstAmount) : null;
+    }
+    if (installmentAmount !== undefined) {
+      set.installmentAmount = installmentAmount != null ? String(installmentAmount) : null;
     }
     db.update(t.companies)
       .set(set)
@@ -471,6 +480,8 @@ const commercialPatchInput = z.object({
       paymentStatus: true,
       commercialStatus: true,
       installmentCount: true,
+      installmentAmount: true,
+      installmentDueDate: true,
       cancelledOn: true,
     })
     .extend({
@@ -493,7 +504,7 @@ export const updateCompaniesCommercialBatch = createServerFn({ method: "POST" })
       const existing = loadCompany(row.id);
       if (!existing) continue;
 
-      const { dealSize, totalCost, paymentReceived, pendingAmount, amountWithGst, taxableAmount, gstAmount, ...scalarRest } =
+      const { dealSize, totalCost, paymentReceived, pendingAmount, amountWithGst, taxableAmount, gstAmount, installmentAmount, ...scalarRest } =
         row.patch;
       const set: Record<string, unknown> = { ...scalarRest, updatedAt: now };
       if (dealSize !== undefined) set.dealSize = dealSize != null ? String(dealSize) : null;
@@ -511,6 +522,9 @@ export const updateCompaniesCommercialBatch = createServerFn({ method: "POST" })
         set.taxableAmount = taxableAmount != null ? String(taxableAmount) : null;
       }
       if (gstAmount !== undefined) set.gstAmount = gstAmount != null ? String(gstAmount) : null;
+      if (installmentAmount !== undefined) {
+        set.installmentAmount = installmentAmount != null ? String(installmentAmount) : null;
+      }
 
       db.update(t.companies).set(set).where(eq(t.companies.id, row.id)).run();
       updated += 1;
