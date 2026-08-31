@@ -23,8 +23,23 @@ import { StatusPill, Pill } from "@/components/status-pill";
 import { usePermissions } from "@/hooks/use-permissions";
 import { assignableManagerUsers, resolveAssigneeName } from "@/lib/managers";
 import { useCompanyStore, useEmployeeStore, useUserStore } from "@/stores";
-import type { Company, CompanyCommercialStatus, CompanyHealth, CompanyPlan, CompanyRegion, StatusKey } from "@/types";
-import { COMPANY_REGIONS, STATUS_LABEL } from "@/types";
+import type {
+  Company,
+  CompanyCommercialPlanName,
+  CompanyCommercialStatus,
+  CompanyHealth,
+  CompanyPaymentStatus,
+  CompanyPlan,
+  CompanyRegion,
+  StatusKey,
+} from "@/types";
+import {
+  COMPANY_COMMERCIAL_PLAN_NAMES,
+  COMPANY_COMMERCIAL_STATUSES,
+  COMPANY_PAYMENT_STATUSES,
+  COMPANY_REGIONS,
+  STATUS_LABEL,
+} from "@/types";
 import { cn, formatDate, formatInr } from "@/lib/utils";
 
 const detailSchema = z.object({
@@ -46,12 +61,25 @@ const detailSchema = z.object({
   csmId: z.string().min(1),
   salesAgentId: z.string().optional(),
   plan: z.enum(["Annual", "Half-Yearly", "AMC"]),
+  planName: z.union([z.enum(COMPANY_COMMERCIAL_PLAN_NAMES), z.literal("")]).optional(),
   health: z.enum(["Healthy", "Moderate", "Critical"]),
   status: z.enum(["not_started", "in_progress", "review", "completed", "on_hold"]),
+  commercialStatus: z.union([z.enum(COMPANY_COMMERCIAL_STATUSES), z.literal("")]).optional(),
+  usersPurchased: z.string().optional(),
+  dealSize: z.string().optional(),
+  amountWithGst: z.string().optional(),
+  taxableAmount: z.string().optional(),
+  gstAmount: z.string().optional(),
+  paymentStatus: z.union([z.enum(COMPANY_PAYMENT_STATUSES), z.literal("")]).optional(),
+  paymentReceived: z.string().optional(),
+  pendingAmount: z.string().optional(),
+  installmentCount: z.string().optional(),
   startDate: z.string().min(1),
+  endDate: z.string().optional(),
   agreementDate: z.string().min(1),
   goLiveTarget: z.string().min(1),
   planExpiry: z.string().min(1),
+  cancelledOn: z.string().optional(),
 });
 
 type DetailForm = z.infer<typeof detailSchema>;
@@ -114,6 +142,17 @@ function paymentStatusTone(status: string): "success" | "warning" | "danger" | "
   }
 }
 
+function parseOptionalNumber(value?: string) {
+  if (!value?.trim()) return undefined;
+  const n = Number(value.replace(/[^\d.-]/g, ""));
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function parseOptionalInt(value?: string) {
+  const n = parseOptionalNumber(value);
+  return n != null ? Math.max(0, Math.round(n)) : undefined;
+}
+
 export function CompanyOverviewTab({ company }: { company: Company }) {
   const updateCompany = useCompanyStore((s) => s.updateCompany);
   const employees = useEmployeeStore((s) => s.employees);
@@ -147,8 +186,22 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
         billingInfo: data.billingInfo || undefined,
         salesAgentId: data.salesAgentId || undefined,
         plan: data.plan as CompanyPlan,
+        planName: (data.planName || undefined) as CompanyCommercialPlanName | undefined,
         health: data.health as CompanyHealth,
         status: data.status as StatusKey,
+        commercialStatus: (data.commercialStatus || undefined) as CompanyCommercialStatus | undefined,
+        paymentStatus: (data.paymentStatus || undefined) as CompanyPaymentStatus | undefined,
+        endDate: data.endDate || undefined,
+        cancelledOn: data.cancelledOn || undefined,
+        usersPurchased: parseOptionalInt(data.usersPurchased),
+        dealSize: parseOptionalNumber(data.dealSize),
+        totalCost: parseOptionalNumber(data.dealSize) ?? company.totalCost,
+        amountWithGst: parseOptionalNumber(data.amountWithGst),
+        taxableAmount: parseOptionalNumber(data.taxableAmount),
+        gstAmount: parseOptionalNumber(data.gstAmount),
+        paymentReceived: parseOptionalNumber(data.paymentReceived),
+        pendingAmount: parseOptionalNumber(data.pendingAmount),
+        installmentCount: parseOptionalInt(data.installmentCount),
       });
       toast.success("Company details saved");
       setEditing(false);
@@ -323,9 +376,27 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
             </label>
           </Section>
 
-          <Section title="Commercial">
+          <Section title="Commercial" className="md:col-span-2">
             <label className="block text-xs font-medium">
-              Plan
+              Subscription Status
+              <select {...form.register("commercialStatus")} className={inputClass()}>
+                <option value="">—</option>
+                {COMPANY_COMMERCIAL_STATUSES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-xs font-medium">
+              Plan Name
+              <select {...form.register("planName")} className={inputClass()}>
+                <option value="">—</option>
+                {COMPANY_COMMERCIAL_PLAN_NAMES.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-xs font-medium">
+              Plan Tier
               <select {...form.register("plan")} className={inputClass()}>
                 {(["Annual", "Half-Yearly", "AMC"] as const).map((p) => (
                   <option key={p} value={p}>{p}</option>
@@ -333,12 +404,57 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
               </select>
             </label>
             <label className="block text-xs font-medium">
-              Billing Info
-              <input {...form.register("billingInfo")} className={inputClass()} />
+              Users / Quantity
+              <input type="number" min={0} step={1} {...form.register("usersPurchased")} className={inputClass()} />
+            </label>
+            <label className="block text-xs font-medium">
+              Deal Value
+              <input type="number" min={0} step={1} {...form.register("dealSize")} className={inputClass()} />
+            </label>
+            <label className="block text-xs font-medium">
+              Amount with GST
+              <input type="number" min={0} step={1} {...form.register("amountWithGst")} className={inputClass()} />
+            </label>
+            <label className="block text-xs font-medium">
+              Taxable
+              <input type="number" min={0} step={1} {...form.register("taxableAmount")} className={inputClass()} />
+            </label>
+            <label className="block text-xs font-medium">
+              GST Amount
+              <input type="number" min={0} step={1} {...form.register("gstAmount")} className={inputClass()} />
+            </label>
+            <label className="block text-xs font-medium">
+              Payment Status
+              <select {...form.register("paymentStatus")} className={inputClass()}>
+                <option value="">—</option>
+                {COMPANY_PAYMENT_STATUSES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-xs font-medium">
+              Payment Received
+              <input type="number" min={0} step={1} {...form.register("paymentReceived")} className={inputClass()} />
+            </label>
+            <label className="block text-xs font-medium">
+              Pending Amount
+              <input type="number" min={0} step={1} {...form.register("pendingAmount")} className={inputClass()} />
+            </label>
+            <label className="block text-xs font-medium">
+              Installments
+              <input type="number" min={0} step={1} {...form.register("installmentCount")} className={inputClass()} />
             </label>
             <label className="block text-xs font-medium">
               Start Date
               <input type="date" {...form.register("startDate")} className={inputClass()} />
+            </label>
+            <label className="block text-xs font-medium">
+              End Date
+              <input type="date" {...form.register("endDate")} className={inputClass()} />
+            </label>
+            <label className="block text-xs font-medium">
+              Plan Expiry
+              <input type="date" {...form.register("planExpiry")} className={inputClass()} />
             </label>
             <label className="block text-xs font-medium">
               Agreement Date
@@ -349,8 +465,12 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
               <input type="date" {...form.register("goLiveTarget")} className={inputClass()} />
             </label>
             <label className="block text-xs font-medium">
-              Plan Expiry
-              <input type="date" {...form.register("planExpiry")} className={inputClass()} />
+              Cancelled On
+              <input type="date" {...form.register("cancelledOn")} className={inputClass()} />
+            </label>
+            <label className="block text-xs font-medium sm:col-span-2 lg:col-span-3">
+              Billing Info
+              <input {...form.register("billingInfo")} className={inputClass()} />
             </label>
           </Section>
         </form>
@@ -497,11 +617,24 @@ function toFormValues(company: Company): DetailForm {
     csmId: company.csmId,
     salesAgentId: company.salesAgentId ?? "",
     plan: company.plan,
+    planName: company.planName ?? "",
     health: company.health,
     status: company.status,
+    commercialStatus: company.commercialStatus ?? "",
+    usersPurchased: company.usersPurchased != null ? String(company.usersPurchased) : "",
+    dealSize: company.dealSize != null ? String(company.dealSize) : "",
+    amountWithGst: company.amountWithGst != null ? String(company.amountWithGst) : "",
+    taxableAmount: company.taxableAmount != null ? String(company.taxableAmount) : "",
+    gstAmount: company.gstAmount != null ? String(company.gstAmount) : "",
+    paymentStatus: company.paymentStatus ?? "",
+    paymentReceived: company.paymentReceived != null ? String(company.paymentReceived) : "",
+    pendingAmount: company.pendingAmount != null ? String(company.pendingAmount) : "",
+    installmentCount: company.installmentCount != null ? String(company.installmentCount) : "",
     startDate: company.startDate || company.agreementDate,
+    endDate: company.endDate ?? "",
     agreementDate: company.agreementDate,
     goLiveTarget: company.goLiveTarget,
     planExpiry: company.planExpiry,
+    cancelledOn: company.cancelledOn ?? "",
   };
 }
