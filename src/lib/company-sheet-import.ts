@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
 
 import { roundMoney } from "@/lib/crm-account-commercial";
-import { normalizeImportDate } from "@/lib/project-sheet-import";
+import { isEmptyImportDateValue, normalizeImportDate } from "@/lib/project-sheet-import";
 import type {
   Company,
   CompanyCommercialPlanName,
@@ -377,7 +377,7 @@ export async function parseCompanyCommercialImportFile(
     if (installmentAmountRaw && !isEmptyCommercialCell(installmentAmountRaw) && installmentAmount == null) {
       parseErrors.push(`Invalid Installment amount: ${installmentAmountRaw}`);
     }
-    if (cellStr(dueDateRaw) && !installmentDueDate) {
+    if (!isEmptyImportDateValue(dueDateRaw) && !installmentDueDate && !/[&|,]/.test(cellStr(dueDateRaw))) {
       parseErrors.push(`Invalid Due date: ${cellStr(dueDateRaw)}`);
     }
     if (cellStr(startDateRaw) && !startDate) {
@@ -386,7 +386,7 @@ export async function parseCompanyCommercialImportFile(
     if (cellStr(endDateRaw) && !endDate) {
       parseErrors.push(`Invalid End date/ Renewal date: ${cellStr(endDateRaw)}`);
     }
-    if (cellStr(cancelledOnRaw) && !cancelledOn) {
+    if (!isEmptyImportDateValue(cancelledOnRaw) && !cancelledOn) {
       parseErrors.push(`Invalid Cancelled On: ${cellStr(cancelledOnRaw)}`);
     }
 

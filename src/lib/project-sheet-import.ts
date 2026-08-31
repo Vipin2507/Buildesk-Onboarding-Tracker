@@ -65,8 +65,33 @@ function cellStr(value: unknown): string {
 }
 
 /** Normalize spreadsheet dates to YYYY-MM-DD. */
+function expandYear(yRaw: number): number {
+  return yRaw < 100 ? 2000 + yRaw : yRaw;
+}
+
+function normalizeDateText(value: unknown): string {
+  return String(value)
+    .replace(/\u00a0/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+/** True when a sheet date cell is intentionally blank (-, NA, empty, etc.). */
+export function isEmptyImportDateValue(value: unknown): boolean {
+  if (value == null || value === "") return true;
+  if (value instanceof Date) return false;
+  if (typeof value === "number" && Number.isFinite(value)) return false;
+  const raw = normalizeDateText(value).toLowerCase();
+  if (!raw) return true;
+  if (/^[-–—./\\]+$/.test(raw)) return true;
+  if (raw === "na" || raw === "n/a" || raw === "nil" || raw === "none" || raw === "tbd") {
+    return true;
+  }
+  return false;
+}
+
 export function normalizeImportDate(value: unknown): string | null {
-  if (value == null || value === "") return null;
+  if (isEmptyImportDateValue(value)) return null;
 
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
     return toYmd(value);
@@ -77,45 +102,47 @@ export function normalizeImportDate(value: unknown): string | null {
     const epoch = Date.UTC(1899, 11, 30);
     const ms = epoch + value * 86400000;
     const d = new Date(ms);
-    if (!Number.isNaN(d.getTime())) return toYmd(d);
+    if (!Number.isNaN(d.getTime())) {
+      return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+    }
     return null;
   }
 
-  const raw = String(value).trim();
+  const raw = normalizeDateText(value);
   if (!raw) return null;
 
-  const dMonY = raw.match(/^(\d{1,2})[-/\s]+([A-Za-z]{3,9})[-/\s]+(\d{2,4})$/);
+  const ymdFromParts = (day: number, monthIndex: number, year: number) => {
+    const y = expandYear(year);
+    if (monthIndex < 0 || !validYmd(y, monthIndex + 1, day)) return null;
+    return `${y}-${pad(monthIndex + 1)}-${pad(day)}`;
+  };
+
+  const dMonY = raw.match(/^(\d{1,2})[-/\s]+([A-Za-z]{3,12})[-/\s]+(\d{2,4})$/i);
   if (dMonY) {
-    const day = Number(dMonY[1]);
-    const mon = parseMonthToken(dMonY[2]!);
-    const yRaw = Number(dMonY[3]);
-    const y = yRaw < 100 ? 2000 + yRaw : yRaw;
-    if (mon != null && validYmd(y, mon + 1, day)) {
-      return `${y}-${pad(mon + 1)}-${pad(day)}`;
-    }
+    const hit = ymdFromParts(Number(dMonY[1]), parseMonthToken(dMonY[2]!) ?? -1, Number(dMonY[3]));
+    if (hit) return hit;
   }
 
-  const monD = raw.match(/^([A-Za-z]{3,9})[-/\s]+(\d{1,2})[-/\s,]+(\d{4})$/);
+  const monD = raw.match(/^([A-Za-z]{3,12})[-/\s]+(\d{1,2})(?:[,/-]\s*|\s+)(\d{2,4})$/i);
   if (monD) {
     const mon = parseMonthToken(monD[1]!);
-    const day = Number(monD[2]);
-    const y = Number(monD[3]);
-    if (mon != null && validYmd(y, mon + 1, day)) {
-      return `${y}-${pad(mon + 1)}-${pad(day)}`;
+    if (mon != null) {
+      const hit = ymdFromParts(Number(monD[2]), mon, Number(monD[3]));
+      if (hit) return hit;
     }
   }
 
-  const dMonYSpaced = raw.match(/^(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})$/);
+  const dMonYSpaced = raw.match(/^(\d{1,2})\s+([A-Za-z]{3,12})\s+(\d{2,4})$/i);
   if (dMonYSpaced) {
-    const day = Number(dMonYSpaced[1]);
-    const mon = parseMonthToken(dMonYSpaced[2]!);
-    const y = Number(dMonYSpaced[3]);
-    if (mon != null && validYmd(y, mon + 1, day)) {
-      return `${y}-${pad(mon + 1)}-${pad(day)}`;
-    }
+    const hit = ymdFromParts(
+      Number(dMonYSpaced[1]),
+      parseMonthToken(dMonYSpaced[2]!) ?? -1,
+      Number(dMonYSpaced[3]),
+    );
+    if (hit) return hit;
   }
 
-  // Already ISO / YYYY-MM-DD
+  // Already ISO / YYYY-MM-DD (optional time suffix)
   const iso = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (iso) {
     const y = Number(iso[1]);
@@ -125,23 +152,21 @@ export function normalizeImportDate(value: unknown): string | null {
   }
 
   // DD/MM/YYYY or DD-MM-YYYY (common in India sheets)
-  const dmy = raw.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/);
+  const dmy = raw.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})$/);
   if (dmy) {
     const day = Number(dmy[1]);
     const m = Number(dmy[2]);
-    const y = Number(dmy[3]);
+    const y = expandYear(Number(dmy[3]));
     if (validYmd(y, m, day)) return `${y}-${pad(m)}-${pad(day)}`;
   }
 
-  // MM/DD/YYYY when day > 12 is impossible for DMY — already handled; try US if first > 12
-  const mdy = raw.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/);
+  // MM/DD/YYYY when day > 12
+  const mdy = raw.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})$/);
   if (mdy) {
     const m = Number(mdy[1]);
     const day = Number(mdy[2]);
-    const y = Number(mdy[3]);
-    if (m > 12 && day <= 12 && validYmd(y, day, m)) {
-      // swapped interpretation already tried as DMY
-    } else if (day > 12 && m <= 12 && validYmd(y, m, day)) {
+    const y = expandYear(Number(mdy[3]));
+    if (day > 12 && m <= 12 && validYmd(y, m, day)) {
       return `${y}-${pad(m)}-${pad(day)}`;
     }
   }
@@ -156,25 +181,32 @@ function pad(n: number) {
   return String(n).padStart(2, "0");
 }
 
-const MONTH_TOKENS = [
-  "jan",
-  "feb",
-  "mar",
-  "apr",
-  "may",
-  "jun",
-  "jul",
-  "aug",
-  "sep",
-  "oct",
-  "nov",
-  "dec",
-] as const;
-
 function parseMonthToken(value: string): number | null {
-  const token = value.trim().toLowerCase().slice(0, 3);
-  const idx = MONTH_TOKENS.indexOf(token as (typeof MONTH_TOKENS)[number]);
-  return idx >= 0 ? idx : null;
+  const cleaned = value.trim().toLowerCase().replace(/[^a-z]/g, "");
+  if (!cleaned) return null;
+
+  const aliases: string[][] = [
+    ["jan", "january"],
+    ["feb", "february"],
+    ["mar", "march"],
+    ["apr", "april"],
+    ["may"],
+    ["jun", "june"],
+    ["jul", "july"],
+    ["aug", "august"],
+    ["sep", "sept", "september"],
+    ["oct", "october"],
+    ["nov", "november"],
+    ["dec", "december"],
+  ];
+
+  for (let i = 0; i < aliases.length; i++) {
+    if (aliases[i]!.some((alias) => cleaned === alias || cleaned.startsWith(alias))) {
+      return i;
+    }
+  }
+
+  return null;
 }
 
 function toYmd(d: Date) {
