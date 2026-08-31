@@ -116,11 +116,15 @@ export type CompanyCommercialImportPlanRow = {
   planExpiry: string | null;
   renewedAt: string | null;
   cancelledOn: string | null;
-  action: "update" | "skip" | "error";
+  action: "update" | "skip" | "error" | "pick";
+  needsCompanyPick?: boolean;
   existingId?: string;
   existingName?: string;
   message: string;
 };
+
+/** Manual ERP company selection for unmatched sheet rows — rowNumber → company id, or "" to skip. */
+export type CompanyCommercialPickOverrides = Record<number, string>;
 
 export type CompanyCommercialImportPlan = {
   rows: CompanyCommercialImportPlanRow[];
@@ -130,6 +134,7 @@ export type CompanyCommercialImportPlan = {
     notFound: number;
     error: number;
     ambiguous: number;
+    needsCompanyPick: number;
   };
 };
 
@@ -458,11 +463,96 @@ function commercialFieldsFromRaw(raw: CompanyCommercialImportRawRow) {
   };
 }
 
+function buildUpdateRow(
+  raw: CompanyCommercialImportRawRow,
+  existing: Company,
+  base: ReturnType<typeof commercialFieldsFromRaw>,
+): CompanyCommercialImportPlanRow {
+  const dealBase =
+    raw.totalDealValue ?? raw.amountWithGst ?? existing.dealSize ?? existing.totalCost;
+  const pendingAmount = raw.pendingAmount ?? (raw.paymentStatus === "Fully paid" ? 0 : null);
+  let paymentReceived: number | null = null;
+  if (pendingAmount != null && dealBase != null) {
+    paymentReceived = roundMoney(Math.max(0, dealBase - pendingAmount));
+  } else if (raw.amountWithGst != null && pendingAmount != null) {
+    paymentReceived = roundMoney(Math.max(0, raw.amountWithGst - pendingAmount));
+  }
+
+  return {
+    rowNumber: raw.rowNumber,
+    name: raw.name,
+    ...base,
+    pendingAmount,
+    totalCost: raw.totalDealValue ?? raw.amountWithGst,
+    paymentReceived,
+    renewedAt: null,
+    action: "update",
+    existingId: existing.id,
+    existingName: existing.name,
+    message: `Update ${existing.name}`,
+  };
+}
+
+function resolveManualCompanyPick(
+  raw: CompanyCommercialImportRawRow,
+  base: ReturnType<typeof commercialFieldsFromRaw>,
+  companiesById: Map<string, Company>,
+  companyPicks: CompanyCommercialPickOverrides,
+):
+  | { kind: "update"; row: CompanyCommercialImportPlanRow }
+  | { kind: "skip"; row: CompanyCommercialImportPlanRow }
+  | null {
+  if (!(raw.rowNumber in companyPicks)) return null;
+
+  const pick = companyPicks[raw.rowNumber]!;
+  if (!pick) {
+    return {
+      kind: "skip",
+      row: {
+        rowNumber: raw.rowNumber,
+        name: raw.name,
+        ...base,
+        paymentReceived: null,
+        renewedAt: null,
+        action: "skip",
+        message: "Skipped manually",
+      },
+    };
+  }
+
+  const existing = companiesById.get(pick);
+  if (!existing) return null;
+
+  return {
+    kind: "update",
+    row: buildUpdateRow(raw, existing, base),
+  };
+}
+
+function buildPickRow(
+  raw: CompanyCommercialImportRawRow,
+  base: ReturnType<typeof commercialFieldsFromRaw>,
+  message: string,
+): CompanyCommercialImportPlanRow {
+  return {
+    rowNumber: raw.rowNumber,
+    name: raw.name,
+    ...base,
+    paymentReceived: null,
+    renewedAt: null,
+    action: "pick",
+    needsCompanyPick: true,
+    message,
+  };
+}
+
 export function buildCompanyCommercialImportPlan(
   rawRows: CompanyCommercialImportRawRow[],
   companies: Company[],
+  companyPicks: CompanyCommercialPickOverrides = {},
 ): CompanyCommercialImportPlan {
   const byName = new Map<string, Company[]>();
+  const companiesById = new Map(companies.map((c) => [c.id, c]));
   for (const company of companies) {
     const key = normalizeCompanyName(company.name);
     const list = byName.get(key) ?? [];
@@ -476,6 +566,7 @@ export function buildCompanyCommercialImportPlan(
   let notFound = 0;
   let error = 0;
   let ambiguous = 0;
+  let needsCompanyPick = 0;
 
   for (const raw of rawRows) {
     const base = commercialFieldsFromRaw(raw);
@@ -525,64 +616,62 @@ export function buildCompanyCommercialImportPlan(
 
     const matches = byName.get(normalizeCompanyName(raw.name)) ?? [];
     if (matches.length === 0) {
+      const manual = resolveManualCompanyPick(raw, base, companiesById, companyPicks);
+      if (manual?.kind === "update") {
+        update += 1;
+        rows.push(manual.row);
+        continue;
+      }
+      if (manual?.kind === "skip") {
+        skip += 1;
+        rows.push(manual.row);
+        continue;
+      }
+
       notFound += 1;
-      rows.push({
-        rowNumber: raw.rowNumber,
-        name: raw.name,
-        ...base,
-        paymentReceived: null,
-        renewedAt: null,
-        action: "skip",
-        message: `Company “${raw.name}” not found in ERP list`,
-      });
+      needsCompanyPick += 1;
+      rows.push(
+        buildPickRow(
+          raw,
+          base,
+          `Company “${raw.name}” not found — pick an ERP company or skip`,
+        ),
+      );
       continue;
     }
 
     if (matches.length > 1) {
+      const manual = resolveManualCompanyPick(raw, base, companiesById, companyPicks);
+      if (manual?.kind === "update") {
+        update += 1;
+        rows.push(manual.row);
+        continue;
+      }
+      if (manual?.kind === "skip") {
+        skip += 1;
+        rows.push(manual.row);
+        continue;
+      }
+
       ambiguous += 1;
-      rows.push({
-        rowNumber: raw.rowNumber,
-        name: raw.name,
-        ...base,
-        paymentReceived: null,
-        renewedAt: null,
-        action: "error",
-        message: `Multiple companies match “${raw.name}” (${matches.length}) — rename duplicates first`,
-      });
+      needsCompanyPick += 1;
+      rows.push(
+        buildPickRow(
+          raw,
+          base,
+          `Multiple companies match “${raw.name}” (${matches.length}) — pick the correct one or skip`,
+        ),
+      );
       continue;
     }
 
-    const existing = matches[0]!;
-    const dealBase =
-      raw.totalDealValue ?? raw.amountWithGst ?? existing.dealSize ?? existing.totalCost;
-    const pendingAmount =
-      raw.pendingAmount ?? (raw.paymentStatus === "Fully paid" ? 0 : null);
-    let paymentReceived: number | null = null;
-    if (pendingAmount != null && dealBase != null) {
-      paymentReceived = roundMoney(Math.max(0, dealBase - pendingAmount));
-    } else if (raw.amountWithGst != null && pendingAmount != null) {
-      paymentReceived = roundMoney(Math.max(0, raw.amountWithGst - pendingAmount));
-    }
-
     update += 1;
-    rows.push({
-      rowNumber: raw.rowNumber,
-      name: raw.name,
-      ...base,
-      pendingAmount,
-      totalCost: raw.totalDealValue ?? raw.amountWithGst,
-      paymentReceived,
-      renewedAt: null,
-      action: "update",
-      existingId: existing.id,
-      existingName: existing.name,
-      message: `Update ${existing.name}`,
-    });
+    rows.push(buildUpdateRow(raw, matches[0]!, base));
   }
 
   return {
     rows,
-    summary: { update, skip, notFound, error, ambiguous },
+    summary: { update, skip, notFound, error, ambiguous, needsCompanyPick },
   };
 }
 
