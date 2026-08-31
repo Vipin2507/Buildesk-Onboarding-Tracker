@@ -10,6 +10,7 @@ import {
   Trash2,
   UserRound,
   FileSpreadsheet,
+  Download,
   TrendingUp,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -52,6 +53,7 @@ import { isCompanyModulesAllLive } from "@/lib/module-progress";
 import { assignableManagerUsers, resolveAssigneeLabel } from "@/lib/managers";
 import type { Company, ModuleKey, User } from "@/types";
 import { COMPANY_REGIONS, COMPANY_TYPES } from "@/types";
+import { downloadCompaniesExport } from "@/lib/company-sheet-export";
 import { cn, formatDate } from "@/lib/utils";
 
 const FIELD_LABELS: Record<string, string> = {
@@ -548,6 +550,29 @@ function CompaniesListPage() {
     setDateTo("");
   }
 
+  const projectCountByCompanyId = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const project of allProjects) {
+      counts.set(project.companyId, (counts.get(project.companyId) ?? 0) + 1);
+    }
+    return counts;
+  }, [allProjects]);
+
+  function exportFilteredCompanies() {
+    if (filtered.length === 0) {
+      toast.error("No companies to export", {
+        description: "Adjust filters or clear them to include companies in the export.",
+      });
+      return;
+    }
+    downloadCompaniesExport(filtered, {
+      users,
+      employees,
+      projectCountByCompanyId,
+    });
+    toast.success(`Exported ${filtered.length} ${filtered.length === 1 ? "company" : "companies"}`);
+  }
+
   function openCreate() {
     setEditing(null);
     form.reset(defaultCompanyFormValues(users));
@@ -667,27 +692,39 @@ function CompaniesListPage() {
         title="Companies"
         subtitle="Client onboarding portfolio — track progress, modules, and go-live status."
         actions={
-          canManageCompanies ? (
-            <div className="flex flex-wrap gap-1.5">
-              <Button size="sm" variant="outline" className="gap-1" onClick={() => setImportOpen(true)}>
-                <FileSpreadsheet className="h-3.5 w-3.5" />
-                Import
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1"
-                onClick={() => setCommercialUpdateOpen(true)}
-              >
-                <FileSpreadsheet className="h-3.5 w-3.5" />
-                Update commercial
-              </Button>
-              <Button size="sm" className="gap-1 bg-primary" onClick={openCreate}>
-                <Plus className="h-3.5 w-3.5" />
-                Add Company
-              </Button>
-            </div>
-          ) : undefined
+          <div className="flex flex-wrap gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1"
+              onClick={exportFilteredCompanies}
+              disabled={filtered.length === 0}
+            >
+              <Download className="h-3.5 w-3.5" />
+              Export
+            </Button>
+            {canManageCompanies ? (
+              <>
+                <Button size="sm" variant="outline" className="gap-1" onClick={() => setImportOpen(true)}>
+                  <FileSpreadsheet className="h-3.5 w-3.5" />
+                  Import
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1"
+                  onClick={() => setCommercialUpdateOpen(true)}
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5" />
+                  Update commercial
+                </Button>
+                <Button size="sm" className="gap-1 bg-primary" onClick={openCreate}>
+                  <Plus className="h-3.5 w-3.5" />
+                  Add Company
+                </Button>
+              </>
+            ) : null}
+          </div>
         }
       />
 
