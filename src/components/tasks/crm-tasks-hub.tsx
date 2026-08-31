@@ -200,6 +200,7 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
     defaultAssigneeIds,
     editing,
     companyId: createAccountId,
+    markCompleteOnCreate,
   });
 
   function canManageTask(task?: FollowUpTask) {

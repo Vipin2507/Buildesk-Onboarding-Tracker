@@ -104,6 +104,8 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
     defaultAssigneeIds,
     editing,
     companyId: accountId,
+    markCompleteOnCreate,
+    productScope: "crm",
   });
 
   const openCount = accountTasks.filter((t) => OPEN_STATUSES.includes(t.status)).length;

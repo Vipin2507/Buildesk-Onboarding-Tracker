@@ -59,6 +59,10 @@ const fieldClass = cn(ticketFieldClass, "h-8 text-xs");
 const selectClass = cn(ticketSelectClass, "h-8 text-xs");
 const areaClass = cn(ticketTextareaClass, "min-h-[72px] text-xs");
 
+function allowPastSchedule(props: Pick<Props, "editing" | "markCompleteOnCreate">) {
+  return Boolean(!props.editing && props.markCompleteOnCreate);
+}
+
 export function useTaskFormState(props: Props) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -121,7 +125,7 @@ export function useTaskFormState(props: Props) {
 
   function onDueDateChange(next: string) {
     setDueDate(next);
-    if (props.editing || !next) return;
+    if (props.editing || !next || allowPastSchedule(props)) return;
     if (isPastDateYmd(next)) {
       setDueDate("");
       return;
@@ -158,17 +162,18 @@ export function useTaskFormState(props: Props) {
   }
 
   async function validateSchedule(): Promise<boolean> {
-    if (!props.editing && dueDate && isPastDateYmd(dueDate)) {
+    const allowPast = allowPastSchedule(props);
+    if (!props.editing && !allowPast && dueDate && isPastDateYmd(dueDate)) {
       toast.error("Due date cannot be in the past");
       return false;
     }
     if (!taskType || !dueDate || !startTime) return true;
-    const todayMin = !props.editing ? minSelectableTimeForDate(dueDate) : undefined;
+    const todayMin = !props.editing && !allowPast ? minSelectableTimeForDate(dueDate) : undefined;
     if (todayMin && isTimeBeforeMin(startTime, todayMin)) {
       toast.error("Start time cannot be in the past");
       return false;
     }
-    if (!props.editing && endTime) {
+    if (!props.editing && !allowPast && endTime) {
       const endMin = minEndTimeForSchedule({ dueDate, startTime });
       if (endMin && isTimeBeforeMin(endTime, endMin)) {
         toast.error("End time cannot be in the past");
@@ -290,7 +295,8 @@ export function TaskFormFields(props: Props & ReturnType<typeof useTaskFormState
   const scheduled = Boolean(taskType);
   const readOnlyBooking = editing?.source === "booking";
   const showMarkCompleteOnCreate = !editing && Boolean(onMarkCompleteOnCreateChange);
-  const blockPastSchedule = !editing;
+  const allowPast = allowPastSchedule({ editing, markCompleteOnCreate });
+  const blockPastSchedule = !editing && !allowPast;
   const startTimeMin = blockPastSchedule && dueDate ? minSelectableTimeForDate(dueDate) : undefined;
   const endTimeMin =
     blockPastSchedule && dueDate
@@ -366,7 +372,7 @@ export function TaskFormFields(props: Props & ReturnType<typeof useTaskFormState
             onChange={setDueDate}
             modal
             min={blockPastSchedule ? todayYmd() : undefined}
-            yearsBack={blockPastSchedule ? 0 : 1}
+            yearsBack={allowPast ? 5 : blockPastSchedule ? 0 : 1}
             yearsForward={3}
             disabled={readOnlyBooking}
           />
@@ -441,7 +447,13 @@ export function TaskFormFields(props: Props & ReturnType<typeof useTaskFormState
             type="checkbox"
             className="h-3.5 w-3.5 rounded border-input accent-primary"
             checked={markCompleteOnCreate ?? false}
-            onChange={(e) => onMarkCompleteOnCreateChange?.(e.target.checked)}
+            onChange={(e) => {
+              const checked = e.target.checked;
+              onMarkCompleteOnCreateChange?.(checked);
+              if (!checked && dueDate && isPastDateYmd(dueDate)) {
+                setDueDate("");
+              }
+            }}
           />
           <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground" />
           <span>Mark as complete when creating</span>

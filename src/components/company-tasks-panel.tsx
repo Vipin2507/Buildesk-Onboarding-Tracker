@@ -59,6 +59,8 @@ export function CompanyTasksPanel({ companyId }: { companyId: string }) {
     defaultAssigneeIds,
     editing,
     companyId,
+    markCompleteOnCreate,
+    productScope: "erp",
   });
 
   const openCount = companyTasks.filter((t) =>

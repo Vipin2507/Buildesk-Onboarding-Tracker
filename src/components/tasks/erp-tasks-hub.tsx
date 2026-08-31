@@ -184,6 +184,7 @@ export function ErpTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
     defaultAssigneeIds,
     editing,
     companyId: createCompanyId,
+    markCompleteOnCreate,
   });
 
   const canManage = isAdmin || can("manageTasks");
