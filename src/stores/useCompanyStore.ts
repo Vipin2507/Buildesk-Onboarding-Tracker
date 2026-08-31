@@ -9,6 +9,7 @@ import {
   deleteCompany as apiDeleteCompany,
   renewCompany as apiRenewCompany,
   listCompanies,
+  updateCompaniesCommercialBatch as apiUpdateCompaniesCommercialBatch,
 } from "@/lib/api";
 import { serverSync, serverSyncTrackedWithRollback, serverSyncWithRollback } from "@/lib/sync";
 import { useCompanyPortalStore } from "./useCompanyPortalStore";
@@ -18,6 +19,9 @@ type CompanyState = {
   addCompany: (data: Omit<Company, "id" | "createdAt" | "updatedAt">) => Promise<Company>;
   refreshCompaniesFromServer: () => Promise<Company[]>;
   updateCompany: (id: string, data: Partial<Company>) => void;
+  updateCompaniesCommercialBatch: (
+    updates: { id: string; patch: Partial<Company> }[],
+  ) => Promise<number>;
   deleteCompany: (id: string) => Company | undefined;
   getById: (id: string) => Company | undefined;
   transferManager: (companyId: string, managerId: string, who: string) => void;
@@ -161,6 +165,41 @@ export const useCompanyStore = createStore<CompanyState>((set, get) => ({
           }));
         },
       );
+    }
+  },
+
+  updateCompaniesCommercialBatch: async (updates) => {
+    if (updates.length === 0) return 0;
+    const previous = get().companies;
+    const byId = new Map(previous.map((c) => [c.id, c]));
+    const now = nowIso();
+
+    for (const row of updates) {
+      const existing = byId.get(row.id);
+      if (!existing) continue;
+      byId.set(row.id, touch({ ...existing, ...row.patch, updatedAt: now }));
+    }
+
+    set({ companies: [...byId.values()] });
+    try {
+      const res = await apiUpdateCompaniesCommercialBatch({
+        data: {
+          updates: updates.map((row) => ({
+            id: row.id,
+            patch: row.patch,
+          })),
+        },
+      });
+      set({ companies: res.companies });
+      logActivity({
+        who: "You",
+        what: `Bulk updated commercial data for ${res.updated} companies`,
+        kind: "info",
+      });
+      return res.updated;
+    } catch (err) {
+      set({ companies: previous });
+      throw err instanceof Error ? err : new Error("Failed to bulk update companies");
     }
   },
 

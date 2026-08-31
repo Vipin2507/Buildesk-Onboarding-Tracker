@@ -14,6 +14,46 @@ export type CompanyType =
   | "Agent";
 
 export const COMPANY_PLANS: CompanyPlan[] = ["Annual", "Half-Yearly", "AMC"];
+
+/** Commercial subscription status from bulk-import sheet. */
+export type CompanyCommercialStatus = "Live" | "Unpaid" | "Canceled" | "Expired" | "Future";
+
+export const COMPANY_COMMERCIAL_STATUSES: CompanyCommercialStatus[] = [
+  "Live",
+  "Unpaid",
+  "Canceled",
+  "Expired",
+  "Future",
+];
+
+/** Full plan label from commercial bulk-import sheet. */
+export type CompanyCommercialPlanName =
+  | "Post Sales Annual License Plan"
+  | "Buildesk Post Sales Annual License Plan"
+  | "Buildesk Sales & Post Sales Module Annual Plan";
+
+export const COMPANY_COMMERCIAL_PLAN_NAMES: CompanyCommercialPlanName[] = [
+  "Post Sales Annual License Plan",
+  "Buildesk Post Sales Annual License Plan",
+  "Buildesk Sales & Post Sales Module Annual Plan",
+];
+
+/** Payment status from commercial bulk-import sheet. */
+export type CompanyPaymentStatus =
+  | "NA"
+  | "Fully paid"
+  | "Partially paid"
+  | "Pending"
+  | "Part payment subscription";
+
+export const COMPANY_PAYMENT_STATUSES: CompanyPaymentStatus[] = [
+  "NA",
+  "Fully paid",
+  "Partially paid",
+  "Pending",
+  "Part payment subscription",
+];
+
 export const COMPANY_REGIONS: CompanyRegion[] = ["NCR", "South", "West", "Rest of India"];
 export const COMPANY_TYPES: CompanyType[] = [
   "Real Estate Developer",
@@ -67,6 +107,8 @@ export type Company = Timestamps & {
   goLiveTarget: string;
   planExpiry: string;
   plan: CompanyPlan;
+  /** Full commercial plan label from sheet (distinct from legacy plan tier). */
+  planName?: CompanyCommercialPlanName;
   health: CompanyHealth;
   renewedAt?: string;
 
@@ -84,6 +126,14 @@ export type Company = Timestamps & {
   pendingAmount?: number;
   endDate?: string;
   paymentHistory?: CompanyPaymentHistoryEntry[];
+  amountWithGst?: number;
+  taxableAmount?: number;
+  gstAmount?: number;
+  paymentStatus?: CompanyPaymentStatus;
+  /** Subscription status from commercial sheet (Live, Unpaid, Canceled, etc.) */
+  commercialStatus?: CompanyCommercialStatus;
+  installmentCount?: number;
+  cancelledOn?: string;
 };
 
 export type OtherCharge = Timestamps & {

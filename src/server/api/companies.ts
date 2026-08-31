@@ -10,6 +10,11 @@ import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { loadCompanies, loadCompany, logActivity } from "@/server/api/mappers";
 import type { ModuleKey } from "@/types";
+import {
+  COMPANY_COMMERCIAL_PLAN_NAMES,
+  COMPANY_COMMERCIAL_STATUSES,
+  COMPANY_PAYMENT_STATUSES,
+} from "@/types/company";
 
 type ModuleUpsertRow = {
   moduleKey: string;
@@ -170,6 +175,7 @@ const companyInput = z.object({
   goLiveTarget: z.string(),
   planExpiry: z.string(),
   plan: z.enum(["Annual", "Half-Yearly", "AMC"]),
+  planName: z.enum(COMPANY_COMMERCIAL_PLAN_NAMES).optional().nullable(),
   health: z.enum(["Healthy", "Moderate", "Critical"]),
   companyType: z
     .enum(["Real Estate Developer", "Channel Partner", "Broker", "Mandate", "CT", "Agent"])
@@ -186,6 +192,13 @@ const companyInput = z.object({
   paymentReceived: optionalNumber,
   pendingAmount: optionalNumber,
   endDate: z.string().optional().nullable(),
+  amountWithGst: optionalNumber,
+  taxableAmount: optionalNumber,
+  gstAmount: optionalNumber,
+  paymentStatus: z.enum(COMPANY_PAYMENT_STATUSES).optional().nullable(),
+  commercialStatus: z.enum(COMPANY_COMMERCIAL_STATUSES).optional().nullable(),
+  installmentCount: optionalNumber,
+  cancelledOn: z.string().optional().nullable(),
   paymentHistory: z
     .array(
       z.object({
@@ -255,6 +268,7 @@ export const createCompany = createServerFn({ method: "POST" })
       goLiveTarget: data.goLiveTarget,
       planExpiry: data.planExpiry,
       plan: data.plan,
+      planName: data.planName || null,
       health: data.health,
       companyType: data.companyType || null,
       state: data.state || null,
@@ -270,6 +284,13 @@ export const createCompany = createServerFn({ method: "POST" })
       paymentReceived: data.paymentReceived != null ? String(data.paymentReceived) : null,
       pendingAmount: data.pendingAmount != null ? String(data.pendingAmount) : null,
       endDate: data.endDate || null,
+      amountWithGst: data.amountWithGst != null ? String(data.amountWithGst) : null,
+      taxableAmount: data.taxableAmount != null ? String(data.taxableAmount) : null,
+      gstAmount: data.gstAmount != null ? String(data.gstAmount) : null,
+      paymentStatus: data.paymentStatus || null,
+      commercialStatus: data.commercialStatus || null,
+      installmentCount: data.installmentCount ?? null,
+      cancelledOn: data.cancelledOn || null,
       paymentHistoryJson: data.paymentHistory ? JSON.stringify(data.paymentHistory) : null,
       updatedAt: now,
     };
@@ -342,6 +363,9 @@ export const updateCompany = createServerFn({ method: "POST" })
       totalCost,
       paymentReceived,
       pendingAmount,
+      amountWithGst,
+      taxableAmount,
+      gstAmount,
       ...scalarRest
     } = rest as typeof rest & {
       additionalSupportContactIds?: string[] | null;
@@ -350,6 +374,9 @@ export const updateCompany = createServerFn({ method: "POST" })
       totalCost?: number | null;
       paymentReceived?: number | null;
       pendingAmount?: number | null;
+      amountWithGst?: number | null;
+      taxableAmount?: number | null;
+      gstAmount?: number | null;
     };
     const set: Record<string, unknown> = { ...scalarRest, updatedAt: nowIso() };
     if (isCrmAccountCompanyStub(existing.billingInfo) && scalarRest.billingInfo === undefined) {
@@ -371,6 +398,15 @@ export const updateCompany = createServerFn({ method: "POST" })
     }
     if (pendingAmount !== undefined) {
       set.pendingAmount = pendingAmount != null ? String(pendingAmount) : null;
+    }
+    if (amountWithGst !== undefined) {
+      set.amountWithGst = amountWithGst != null ? String(amountWithGst) : null;
+    }
+    if (taxableAmount !== undefined) {
+      set.taxableAmount = taxableAmount != null ? String(taxableAmount) : null;
+    }
+    if (gstAmount !== undefined) {
+      set.gstAmount = gstAmount != null ? String(gstAmount) : null;
     }
     db.update(t.companies)
       .set(set)
@@ -412,4 +448,76 @@ export const renewCompany = createServerFn({ method: "POST" })
       .run();
     logActivity({ who: user.name, what: `Renewed ${existing.name}`, kind: "success", companyId: data.id });
     return loadCompany(data.id)!;
+  });
+
+const commercialPatchInput = z.object({
+  id: z.string(),
+  patch: companyInput
+    .pick({
+      status: true,
+      plan: true,
+      planName: true,
+      usersPurchased: true,
+      dealSize: true,
+      totalCost: true,
+      paymentReceived: true,
+      pendingAmount: true,
+      startDate: true,
+      endDate: true,
+      planExpiry: true,
+      renewedAt: true,
+      amountWithGst: true,
+      taxableAmount: true,
+      gstAmount: true,
+      paymentStatus: true,
+      commercialStatus: true,
+      installmentCount: true,
+      cancelledOn: true,
+    })
+    .partial(),
+});
+
+export const updateCompaniesCommercialBatch = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ updates: z.array(commercialPatchInput).min(1).max(500) }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const user = requirePermission("manageCompanies");
+    const db = getDb();
+    const now = nowIso();
+    let updated = 0;
+
+    for (const row of data.updates) {
+      const existing = loadCompany(row.id);
+      if (!existing) continue;
+
+      const { dealSize, totalCost, paymentReceived, pendingAmount, amountWithGst, taxableAmount, gstAmount, ...scalarRest } =
+        row.patch;
+      const set: Record<string, unknown> = { ...scalarRest, updatedAt: now };
+      if (dealSize !== undefined) set.dealSize = dealSize != null ? String(dealSize) : null;
+      if (totalCost !== undefined) set.totalCost = totalCost != null ? String(totalCost) : null;
+      if (paymentReceived !== undefined) {
+        set.paymentReceived = paymentReceived != null ? String(paymentReceived) : null;
+      }
+      if (pendingAmount !== undefined) {
+        set.pendingAmount = pendingAmount != null ? String(pendingAmount) : null;
+      }
+      if (amountWithGst !== undefined) {
+        set.amountWithGst = amountWithGst != null ? String(amountWithGst) : null;
+      }
+      if (taxableAmount !== undefined) {
+        set.taxableAmount = taxableAmount != null ? String(taxableAmount) : null;
+      }
+      if (gstAmount !== undefined) set.gstAmount = gstAmount != null ? String(gstAmount) : null;
+
+      db.update(t.companies).set(set).where(eq(t.companies.id, row.id)).run();
+      updated += 1;
+    }
+
+    logActivity({
+      who: user.name,
+      what: `Bulk updated commercial data for ${updated} companies`,
+      kind: "info",
+    });
+    return { updated, companies: loadCompanies() };
   });

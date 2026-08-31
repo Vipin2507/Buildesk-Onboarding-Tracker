@@ -37,6 +37,7 @@ import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDeleteDialog, EntityFormModal } from "@/components/entity-form-modal";
 import { ProjectImportModal } from "@/components/project-import-modal";
+import { CompanyCommercialBulkUpdateModal } from "@/components/companies/company-commercial-bulk-update-modal";
 import { inDateRange } from "@/components/list-toolbar";
 import { usePermissions } from "@/hooks/use-permissions";
 import { MODULE_CATALOG, createCompanyModules, normalizeCompanyModules } from "@/data/module-catalog";
@@ -269,6 +270,7 @@ function CompaniesListPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [commercialUpdateOpen, setCommercialUpdateOpen] = useState(false);
   const [assignManagerId, setAssignManagerId] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [editing, setEditing] = useState<Company | null>(null);
@@ -670,6 +672,15 @@ function CompaniesListPage() {
               <Button size="sm" variant="outline" className="gap-1" onClick={() => setImportOpen(true)}>
                 <FileSpreadsheet className="h-3.5 w-3.5" />
                 Import
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1"
+                onClick={() => setCommercialUpdateOpen(true)}
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                Update commercial
               </Button>
               <Button size="sm" className="gap-1 bg-primary" onClick={openCreate}>
                 <Plus className="h-3.5 w-3.5" />
@@ -1308,6 +1319,11 @@ function CompaniesListPage() {
             description: "Filter is set to Unassigned — select rows and assign a manager.",
           });
         }}
+      />
+
+      <CompanyCommercialBulkUpdateModal
+        open={commercialUpdateOpen}
+        onOpenChange={setCommercialUpdateOpen}
       />
     </PageWrap>
   );

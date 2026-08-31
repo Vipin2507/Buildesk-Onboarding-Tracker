@@ -73,6 +73,7 @@ export const companies = sqliteTable("companies", {
   goLiveTarget: text("go_live_target").notNull(),
   planExpiry: text("plan_expiry").notNull(),
   plan: text("plan").notNull(),
+  planName: text("plan_name"),
   health: text("health").notNull(),
   renewedAt: text("renewed_at"),
   companyType: text("company_type"),
@@ -88,6 +89,13 @@ export const companies = sqliteTable("companies", {
   pendingAmount: text("pending_amount"),
   endDate: text("end_date"),
   paymentHistoryJson: text("payment_history_json"),
+  amountWithGst: text("amount_with_gst"),
+  taxableAmount: text("taxable_amount"),
+  gstAmount: text("gst_amount"),
+  paymentStatus: text("payment_status"),
+  commercialStatus: text("commercial_status"),
+  installmentCount: integer("installment_count"),
+  cancelledOn: text("cancelled_on"),
   ...timestamps,
 });
 

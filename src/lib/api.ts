@@ -14,6 +14,7 @@ export {
   updateCompany,
   deleteCompany,
   renewCompany,
+  updateCompaniesCommercialBatch,
 } from "@/server/api/companies";
 
 export {
