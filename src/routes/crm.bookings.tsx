@@ -46,6 +46,7 @@ import {
   parseCrmBookingsTab,
   type CrmBookingsTabId,
 } from "@/lib/crm-route-search";
+import { filterCrmAccountsForUser, canCreateCrmMeeting } from "@/lib/crm-account-access";
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/stores/useAuthStore";
 import { useBookingStore } from "@/stores/useBookingStore";
@@ -173,6 +174,12 @@ function CrmBookingsPage() {
 
   const accounts = useCrmAccountStore((s) => s.accounts);
   const users = useUserStore((s) => s.users);
+
+  const visibleAccounts = useMemo(
+    () => filterCrmAccountsForUser(accounts, user),
+    [accounts, user],
+  );
+  const canCreateMeeting = canCreateCrmMeeting(user);
 
   const [noteById, setNoteById] = useState<Record<string, string>>({});
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -511,19 +518,22 @@ function CrmBookingsPage() {
         title="Meetings"
         subtitle="Review portal call requests, manage schedules, and set availability."
         actions={
-          <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setCreateOpen(true)}>
-            <Plus className="h-3.5 w-3.5" />
-            Create meeting
-          </Button>
+          canCreateMeeting ? (
+            <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setCreateOpen(true)}>
+              <Plus className="h-3.5 w-3.5" />
+              Create meeting
+            </Button>
+          ) : undefined
         }
       />
 
       <CreateCrmBookingDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
-        accounts={accounts}
+        accounts={visibleAccounts}
         users={users}
         currentUserId={user?.id}
+        currentUserName={user?.name}
         isAdmin={isAdmin}
         onCreated={() => void refreshStaff()}
       />
@@ -620,7 +630,7 @@ function CrmBookingsPage() {
                     onChange: setAccountFilter,
                     options: [
                       { value: "all", label: "All accounts" },
-                      ...accounts.map((a) => ({ value: a.id, label: a.name })),
+                      ...visibleAccounts.map((a) => ({ value: a.id, label: a.name })),
                     ],
                   },
                   ...(isAdmin

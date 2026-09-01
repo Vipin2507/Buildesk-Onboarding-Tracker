@@ -59,6 +59,7 @@ export function CreateCrmBookingDialog({
   accounts,
   users,
   currentUserId,
+  currentUserName,
   isAdmin,
   onCreated,
 }: {
@@ -67,6 +68,7 @@ export function CreateCrmBookingDialog({
   accounts: CrmAccount[];
   users: User[];
   currentUserId?: string;
+  currentUserName?: string;
   isAdmin: boolean;
   onCreated?: () => void;
 }) {
@@ -263,19 +265,25 @@ export function CreateCrmBookingDialog({
       onOpenChange={onOpenChange}
       title="Create meeting"
       submitLabel={saving ? "Creating…" : "Create meeting"}
-      submitDisabled={saving || bootstrapping}
+      submitDisabled={saving || bootstrapping || sortedAccounts.length === 0}
       contentClassName="max-w-xl"
       onSubmit={() => void submit()}
     >
       <div className="grid gap-4">
         <DesignTicketFormField label="Account" required>
-          <DesignTicketSearchableSelect
-            value={companyId}
-            placeholder="Search account..."
-            emptyLabel="No accounts found"
-            options={sortedAccounts.map((a) => ({ value: a.id, label: a.name }))}
-            onChange={setCompanyId}
-          />
+          {sortedAccounts.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No accounts available — you can only create meetings for accounts assigned to you.
+            </p>
+          ) : (
+            <DesignTicketSearchableSelect
+              value={companyId}
+              placeholder="Search account..."
+              emptyLabel="No accounts found"
+              options={sortedAccounts.map((a) => ({ value: a.id, label: a.name }))}
+              onChange={setCompanyId}
+            />
+          )}
         </DesignTicketFormField>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -298,7 +306,13 @@ export function CreateCrmBookingDialog({
                 onChange={setHostUserId}
               />
             </DesignTicketFormField>
-          ) : null}
+          ) : (
+            <DesignTicketFormField label="Executive">
+              <div className={cn(ticketFieldClass, "flex h-8 items-center bg-muted/30 px-3 text-xs")}>
+                {currentUserName?.trim() || "You"} · assigned to this meeting
+              </div>
+            </DesignTicketFormField>
+          )}
         </div>
 
         <DesignTicketFormField label="Date" required>

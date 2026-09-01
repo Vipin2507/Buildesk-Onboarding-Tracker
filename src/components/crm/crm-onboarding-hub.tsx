@@ -32,6 +32,7 @@ import {
   type CrmAccountFormValues,
 } from "@/components/crm/crm-account-form";
 import { CrmAccountModulesOverview } from "@/components/crm/crm-account-modules-overview";
+import { CrmAccountModulesTab } from "@/components/crm/crm-account-modules-tab";
 import { CrmAccountPortalPanel } from "@/components/crm/crm-account-portal-panel";
 import { CrmAccountTasksPanel } from "@/components/crm/crm-account-tasks-panel";
 import { CrmGoLiveChecklist } from "@/components/crm/crm-go-live-checklist";
@@ -93,6 +94,7 @@ const OPEN_TASK_STATUSES: FollowUpTaskStatus[] = ["open", "in_progress", "blocke
 
 const TABS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "modules", label: "Modules", icon: Package },
   { id: "integrations", label: "Integrations", icon: Link2 },
   { id: "masters", label: "Masters", icon: ClipboardList },
   { id: "migration", label: "Migration", icon: Upload },
@@ -232,8 +234,8 @@ export function CrmOnboardingHub({
             onClick: () => {
               if (k.id === "tickets") setTab("tickets");
               else if (k.id === "tasks") setTab("tasks");
+              else if (k.id === "modules") setTab("modules");
               else if (k.id === "integrations") setTab("integrations");
-              else if (k.id === "modules") setTab("dashboard");
               else if (k.id === "pending") setTab("masters");
               else setTab("dashboard");
             },
@@ -241,7 +243,7 @@ export function CrmOnboardingHub({
               (k.id === "tickets" && tab === "tickets") ||
               (k.id === "tasks" && tab === "tasks") ||
               (k.id === "integrations" && tab === "integrations") ||
-              (k.id === "modules" && tab === "dashboard") ||
+              (k.id === "modules" && tab === "modules") ||
               (k.id === "pending" && tab === "masters") ||
               (k.id === "progress" && tab === "dashboard"),
           }))}
@@ -268,8 +270,10 @@ export function CrmOnboardingHub({
               openTickets={openTickets}
               isLive={isLive}
               onOpenTasks={() => setTab("tasks")}
+              onOpenModules={() => setTab("modules")}
             />
           ) : null}
+          {tab === "modules" ? <CrmAccountModulesTab companyId={accountId} /> : null}
           {tab === "integrations" ? <IntegrationsTab companyId={accountId} /> : null}
           {tab === "masters" ? <MastersTab companyId={accountId} /> : null}
           {tab === "migration" ? <MigrationTab companyId={accountId} /> : null}
@@ -321,6 +325,7 @@ function DashboardTab({
   openTickets,
   isLive,
   onOpenTasks,
+  onOpenModules,
 }: {
   accountId: string;
   accountName: string;
@@ -329,6 +334,7 @@ function DashboardTab({
   openTickets: number;
   isLive: boolean;
   onOpenTasks: () => void;
+  onOpenModules: () => void;
 }) {
   const account = useCrmAccountStore((s) => s.accounts.find((a) => a.id === accountId))!;
   const updateAccount = useCrmAccountStore((s) => s.updateAccount);
@@ -444,10 +450,18 @@ function DashboardTab({
         <StatCard label="Data upload" value={`${migPct}%`} bar={migPct} />
       </div>
 
-      <DesignTicketSection compact title="Modules & integrations">
+      <DesignTicketSection
+        compact
+        title="Modules & integrations"
+        action={
+          <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={onOpenModules}>
+            Manage modules
+          </Button>
+        }
+      >
         <CrmAccountModulesOverview
           modules={record.productModules}
-          emptyModulesHint="No modules selected for this account."
+          emptyModulesHint="No modules selected — open the Modules tab to subscribe."
           emptyIntegrationsHint="No integrations selected — open the Integrations tab to configure."
         />
       </DesignTicketSection>
@@ -608,7 +622,7 @@ function IntegrationsTab({ companyId }: { companyId: string }) {
       >
         <p className="mb-2 text-[10px] text-muted-foreground">
           Channel and lead integrations. Select a provider where required, then complete workflow
-          steps. Core modules are chosen at account creation and shown on the dashboard.
+          steps. Core modules are managed on the Modules tab.
         </p>
 
         {enabled.length === 0 ? (

@@ -10,6 +10,7 @@ import {
   serializeAdditionalGuestEmails,
 } from "@/lib/booking-guest-emails";
 import { computeOpenSlots, localWallClockIso } from "@/lib/booking-slots";
+import { canViewCrmAccount } from "@/lib/crm-account-access";
 import { isAdminRoleKey } from "@/lib/permissions";
 import { resolveUserWorkEmail } from "@/lib/user-email";
 import { dispatchServerBookingCreatedEmail, dispatchServerBookingStatusChangedEmail, isBookingSlotInPast } from "@/server/crm-booking-automation";
@@ -858,6 +859,19 @@ export const createCrmBooking = createServerFn({ method: "POST" })
       .where(eq(t.crmAccounts.id, data.companyId))
       .get();
     if (!account) throw new ApiError(404, "Account not found");
+    if (
+      !canViewCrmAccount(
+        {
+          salesManagerName: account.salesManagerName ?? undefined,
+          supportManager1: account.supportManager1 ?? undefined,
+          supportManager2: account.supportManager2 ?? undefined,
+          accountManagerName: account.accountManagerName ?? undefined,
+        },
+        user,
+      )
+    ) {
+      throw new ApiError(403, "Not allowed to create meetings for this account");
+    }
 
     const row = db
       .select()

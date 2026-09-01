@@ -84,3 +84,12 @@ export function filterCrmAccountsForUser<T extends CrmAccountAssignmentFields>(
   if (isAdminRoleKey(user.role)) return accounts;
   return accounts.filter((a) => isCrmAccountAssignedToUser(a, user.name));
 }
+
+/** Admins and active CRM executives can create meetings from the Meetings tab. */
+export function canCreateCrmMeeting(
+  user: { role?: string; productScope?: string; active?: boolean } | null | undefined,
+) {
+  if (!user || user.active === false) return false;
+  if (isAdminRoleKey(user.role)) return true;
+  return user.productScope === "crm";
+}
