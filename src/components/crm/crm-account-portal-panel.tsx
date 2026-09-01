@@ -21,8 +21,10 @@ import { Input } from "@/components/ui/input";
 import { copyTextToClipboard, selectInputText } from "@/lib/copy-to-clipboard";
 import {
   portalCreatePath,
+  portalDashboardPath,
   portalPublicCreateUrl,
   portalPublicDashboardUrl,
+  normalizePortalSlug,
 } from "@/lib/design-ticket-portal";
 import { formatDate } from "@/lib/utils";
 import {
@@ -39,10 +41,13 @@ export function CrmAccountPortalPanel({ accountId }: { accountId: string }) {
   const portal = useCompanyPortalStore((s) => s.getByCompanyId(accountId));
   const generateAccess = useCompanyPortalStore((s) => s.generateAccessForCompany);
   const regenerateSlug = useCompanyPortalStore((s) => s.regenerateSlug);
+  const updateSlug = useCompanyPortalStore((s) => s.updateSlug);
   const tickets = useDesignTicketsForCompany(accountId);
   const stats = useDesignTicketStats(accountId);
   const deleteTicket = useDesignTicketStore((s) => s.deleteTicket);
   const [regenOpen, setRegenOpen] = useState(false);
+  const [slugOpen, setSlugOpen] = useState(false);
+  const [apiKeyDraft, setApiKeyDraft] = useState("");
 
   useEffect(() => {
     if (!account) return;
@@ -54,8 +59,13 @@ export function CrmAccountPortalPanel({ accountId }: { accountId: string }) {
     });
   }, [account, generateAccess]);
 
+  useEffect(() => {
+    if (portal?.slug) setApiKeyDraft(portal.slug);
+  }, [portal?.slug]);
+
   const publicUrl = portal ? portalPublicCreateUrl(portal.slug) : "";
   const previewUrl = portal ? portalPublicDashboardUrl(portal.slug) : "";
+  const slugPreview = apiKeyDraft.trim() ? normalizePortalSlug(apiKeyDraft) : "";
 
   const enriched = useMemo(
     () => tickets.map((t) => ({ ...t })),
@@ -151,6 +161,47 @@ export function CrmAccountPortalPanel({ accountId }: { accountId: string }) {
         </p>
       </motion.div>
 
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: TICKET_EASE, delay: 0.04 }}
+        className="card-soft space-y-2 p-3"
+      >
+        <div className="text-xs font-semibold">Portal API key</div>
+        <p className="text-[10px] text-muted-foreground">
+          Set a custom slug for this account&apos;s portal URL. Current slug:{" "}
+          <code className="rounded bg-muted px-1">{portal.slug}</code>
+        </p>
+        <label className="block text-[10px] text-muted-foreground">
+          API key
+          <Input
+            value={apiKeyDraft}
+            onChange={(e) => setApiKeyDraft(e.target.value)}
+            placeholder="e.g. capital-infra or 126371"
+            className="mt-1 h-8 font-mono text-xs"
+          />
+        </label>
+        {slugPreview ? (
+          <p className="text-[10px] text-muted-foreground">
+            Portal path:{" "}
+            <code className="rounded bg-muted px-1">{portalDashboardPath(slugPreview)}</code>
+            {slugPreview !== portal.slug ? (
+              <span className="ml-1 text-warning-foreground">· old links will stop working</span>
+            ) : null}
+          </p>
+        ) : null}
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-8 text-xs"
+          disabled={!apiKeyDraft.trim() || slugPreview === portal.slug}
+          onClick={() => setSlugOpen(true)}
+        >
+          Update portal slug
+        </Button>
+      </motion.div>
+
       <DesignTicketKpiGrid items={kpiCards} columns={4} size="compact" />
 
       <DesignTicketSection
@@ -226,6 +277,28 @@ export function CrmAccountPortalPanel({ accountId }: { accountId: string }) {
         </Link>
         .
       </p>
+
+      <ConfirmDeleteDialog
+        open={slugOpen}
+        onOpenChange={setSlugOpen}
+        title="Update portal slug?"
+        description={`The portal URL will change to use "${slugPreview}". Any previously shared links will stop working.`}
+        confirmLabel="Update slug"
+        confirmTone="default"
+        onConfirm={() => {
+          const result = updateSlug(accountId, apiKeyDraft);
+          if (!result.ok) {
+            toast.error(result.error);
+            return;
+          }
+          if (result.unchanged) {
+            toast.info("Portal slug unchanged");
+          } else {
+            toast.success(`Portal slug updated to ${result.slug}`);
+          }
+          setSlugOpen(false);
+        }}
+      />
 
       <ConfirmDeleteDialog
         open={regenOpen}

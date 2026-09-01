@@ -5,6 +5,8 @@ import { z } from "zod";
 import {
   CRM_ACCOUNT_COMPANY_MARKER,
   generatePortalSlug,
+  isValidPortalSlug,
+  normalizePortalSlug,
 } from "@/lib/design-ticket-portal";
 import { ApiError, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
@@ -221,6 +223,45 @@ export const regenerateCompanyPortalSlug = createServerFn({ method: "POST" })
     const slug = generatePortalSlug(otherSlugs);
     const now = nowIso();
 
+    db.update(t.companyPortalAccess)
+      .set({ slug, updatedAt: now })
+      .where(eq(t.companyPortalAccess.companyId, data.companyId))
+      .run();
+
+    return mapPortalRow({ ...current, slug, updatedAt: now });
+  });
+
+export const updateCompanyPortalSlug = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ companyId: z.string(), slug: z.string().min(1) }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    requireUser();
+    const slug = normalizePortalSlug(data.slug);
+    if (!slug) throw new ApiError(400, "Portal API key is required");
+    if (!isValidPortalSlug(slug)) {
+      throw new ApiError(400, "Portal API key must be 3–48 characters (letters, numbers, hyphens)");
+    }
+
+    const db = getDb();
+    const current = db
+      .select()
+      .from(t.companyPortalAccess)
+      .where(eq(t.companyPortalAccess.companyId, data.companyId))
+      .get();
+    if (!current) throw new ApiError(404, "Portal not found");
+    if (current.slug === slug) return mapPortalRow(current);
+
+    const taken = db
+      .select({ companyId: t.companyPortalAccess.companyId })
+      .from(t.companyPortalAccess)
+      .where(eq(t.companyPortalAccess.slug, slug))
+      .get();
+    if (taken && taken.companyId !== data.companyId) {
+      throw new ApiError(409, "This portal API key is already in use");
+    }
+
+    const now = nowIso();
     db.update(t.companyPortalAccess)
       .set({ slug, updatedAt: now })
       .where(eq(t.companyPortalAccess.companyId, data.companyId))

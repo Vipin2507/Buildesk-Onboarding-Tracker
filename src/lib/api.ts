@@ -165,6 +165,7 @@ export {
   ensureCompanyPortals,
   upsertCompanyPortalAccess,
   regenerateCompanyPortalSlug,
+  updateCompanyPortalSlug,
   setCompanyPortalActive,
   updateCompanyPortalContact,
 } from "@/server/api/portal";

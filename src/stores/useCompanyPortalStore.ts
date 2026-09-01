@@ -5,9 +5,10 @@ import {
   regenerateCompanyPortalSlug,
   setCompanyPortalActive,
   updateCompanyPortalContact,
+  updateCompanyPortalSlug,
   upsertCompanyPortalAccess,
 } from "@/lib/api";
-import { generatePortalSlug, normalizePortalSlug } from "@/lib/design-ticket-portal";
+import { generatePortalSlug, isValidPortalSlug, normalizePortalSlug } from "@/lib/design-ticket-portal";
 import { serverSync } from "@/lib/sync";
 import { createPersistedStore, touch } from "./persist";
 
@@ -21,6 +22,10 @@ type CompanyPortalState = {
   ) => CompanyPortalAccess;
   ensureAllCompanies: (companies: Company[]) => void;
   regenerateSlug: (companyId: string) => string | undefined;
+  updateSlug: (
+    companyId: string,
+    slugInput: string,
+  ) => { ok: true; slug: string; unchanged?: boolean } | { ok: false; error: string };
   setActive: (companyId: string, isActive: boolean) => void;
   updateContact: (
     companyId: string,
@@ -121,6 +126,34 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
         return remote;
       });
       return slug;
+    },
+
+    updateSlug: (companyId, slugInput) => {
+      const current = get().getByCompanyId(companyId);
+      if (!current) return { ok: false, error: "Portal not found" };
+
+      const slug = normalizePortalSlug(slugInput);
+      if (!slug) return { ok: false, error: "Portal API key is required" };
+      if (!isValidPortalSlug(slug)) {
+        return {
+          ok: false,
+          error: "Portal API key must be 3–48 characters (letters, numbers, hyphens)",
+        };
+      }
+      const taken = get().access.find((a) => a.slug === slug && a.companyId !== companyId);
+      if (taken) return { ok: false, error: "This portal API key is already in use" };
+      if (slug === current.slug) return { ok: true, slug, unchanged: true };
+
+      const updated = touch({ ...current, slug });
+      set((s) => ({
+        access: s.access.map((a) => (a.companyId === companyId ? updated : a)),
+      }));
+      serverSync("update portal slug", async () => {
+        const remote = await updateCompanyPortalSlug({ data: { companyId, slug: slugInput } });
+        get().mergeAccess(remote);
+        return remote;
+      });
+      return { ok: true, slug };
     },
 
     setActive: (companyId, isActive) => {
