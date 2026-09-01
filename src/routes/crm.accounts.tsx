@@ -17,8 +17,6 @@ import { CrmAccountBulkUploadModal } from "@/components/crm/crm-account-bulk-upl
 import { CrmAccountClientTransferModal } from "@/components/crm/crm-account-client-transfer-modal";
 import { CrmAccountDateBulkUploadModal } from "@/components/crm/crm-account-date-bulk-upload-modal";
 import { CrmAccountGoLiveActions } from "@/components/crm/crm-account-go-live-actions";
-import { CrmAccountModulesCell } from "@/components/crm/crm-account-modules-cell";
-import { CrmAccountProvidersCell } from "@/components/crm/crm-account-providers-cell";
 import {
   CrmAccountFormFields,
   crmAccountSchema,
@@ -839,9 +837,9 @@ function CrmAccountsPage() {
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            className="card-soft overflow-hidden [&_tbody_tr]:bg-card [&_thead]:bg-card"
           >
             <DataTable
-              flush
               data={filtered}
               initialSortKey="startDate"
               initialSortDir="desc"
@@ -940,18 +938,6 @@ function CrmAccountsPage() {
                     render: (r) => (
                       <span className="text-xs">{r.salesManagerName || "—"}</span>
                     ),
-                  },
-                  {
-                    key: "subscribedModules",
-                    header: "Modules & integrations",
-                    render: (r) => (
-                      <CrmAccountModulesCell subscribed={r.subscribedModules} />
-                    ),
-                  },
-                  {
-                    key: "providers",
-                    header: "Providers",
-                    render: (r) => <CrmAccountProvidersCell providers={r.providers} />,
                   },
                   {
                     key: "startDate",

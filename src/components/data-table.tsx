@@ -306,7 +306,7 @@ export function DataTable<T>({
                     key={col.key}
                     className={cn(
                       headPad,
-                      "text-left font-medium",
+                      "whitespace-nowrap text-left font-medium",
                       col.sortable && "cursor-pointer select-none",
                     )}
                     onClick={() => {
@@ -331,7 +331,9 @@ export function DataTable<T>({
                     </span>
                   </th>
                 ))}
-                {actions && <th className={cn(headPad, "text-right font-medium")}>Actions</th>}
+                {actions && (
+                  <th className={cn(headPad, "whitespace-nowrap text-right font-medium")}>Actions</th>
+                )}
               </tr>
             </thead>
             <tbody>
