@@ -77,34 +77,17 @@ const STATUS_CHIPS = [
 
 type AccountFilterPillId = (typeof STATUS_CHIPS)[number]["id"];
 
-const FILTER_PILL_TONE: Record<
-  string,
-  { base: string; active: string }
-> = {
-  muted: {
-    base: "border-border bg-muted/40 text-muted-foreground hover:bg-muted/70",
-    active: "border-border bg-muted text-foreground ring-1 ring-border",
-  },
-  warning: {
-    base: "border-warning/30 bg-warning/10 text-warning hover:bg-warning/15 dark:text-warning-foreground",
-    active:
-      "border-warning/40 bg-warning/15 text-warning ring-1 ring-warning/30 dark:text-warning-foreground",
-  },
-  success: {
-    base: "border-success/30 bg-success/10 text-success hover:bg-success/15 dark:text-success",
-    active: "border-success/40 bg-success/15 text-success ring-1 ring-success/30 dark:text-success",
-  },
-  info: {
-    base: "border-primary/30 bg-primary/10 text-primary hover:bg-primary/15",
-    active: "border-primary/40 bg-primary/15 text-primary ring-1 ring-primary/30",
-  },
-  danger: {
-    base: "border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/15",
-    active: "border-destructive/40 bg-destructive/15 text-destructive ring-1 ring-destructive/30",
-  },
+type AccountFilterTone = "muted" | "warning" | "success" | "info" | "danger";
+
+const FILTER_BOX_COUNT_TONE: Record<AccountFilterTone, string> = {
+  muted: "text-foreground",
+  warning: "text-amber-600 dark:text-amber-400",
+  success: "text-emerald-600 dark:text-emerald-400",
+  info: "text-primary",
+  danger: "text-destructive",
 };
 
-function filterPillTone(id: AccountFilterPillId): keyof typeof FILTER_PILL_TONE {
+function filterPillTone(id: AccountFilterPillId): AccountFilterTone {
   if (id === "onboarding") return "warning";
   if (id === "live") return "success";
   if (id === "critical") return "danger";
@@ -594,39 +577,54 @@ function CrmAccountsPage() {
           </div>
         </div>
 
-        <div
-          role="tablist"
-          aria-label="Account filters"
-          className="mt-2 flex flex-wrap items-center gap-1.5 overflow-x-auto overscroll-x-contain pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-          {STATUS_CHIPS.map((chip) => {
-            const tone = filterPillTone(chip.id);
-            const active = isAccountFilterPillActive(chip.id, statusFilter, kpiFilter);
-            const styles = FILTER_PILL_TONE[tone]!;
-            const count = accountFilterPillCount(chip.id);
-            return (
-              <button
-                key={chip.id}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => selectAccountFilterPill(chip.id)}
-                className={cn(
-                  "inline-flex shrink-0 snap-start items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
-                  active ? styles.active : styles.base,
-                )}
-              >
-                <span>{chip.label}</span>
-                <span className={cn("tabular-nums", active ? "opacity-90" : "opacity-70")}>
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-          <span className="ml-auto shrink-0 rounded-md border border-border bg-muted/30 px-2.5 py-1 text-xs text-muted-foreground">
-            Avg{" "}
-            <span className="font-medium tabular-nums text-foreground">{avgProgress}%</span>
-          </span>
+        <div className="mt-2 flex flex-col gap-2 lg:flex-row lg:items-stretch">
+          <div
+            role="tablist"
+            aria-label="Account filters"
+            className="grid min-w-0 flex-1 grid-cols-2 gap-1.5 sm:grid-cols-4 xl:grid-cols-8"
+          >
+            {STATUS_CHIPS.map((chip) => {
+              const tone = filterPillTone(chip.id);
+              const active = isAccountFilterPillActive(chip.id, statusFilter, kpiFilter);
+              const count = accountFilterPillCount(chip.id);
+              return (
+                <button
+                  key={chip.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => selectAccountFilterPill(chip.id)}
+                  className={cn(
+                    "flex min-w-0 flex-col rounded-lg border bg-card px-2.5 py-2 text-left shadow-sm transition-all",
+                    "hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                    active
+                      ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"
+                      : "border-border/80",
+                  )}
+                >
+                  <span className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {chip.label}
+                  </span>
+                  <span
+                    className={cn(
+                      "mt-1 text-lg font-semibold tabular-nums leading-none",
+                      FILTER_BOX_COUNT_TONE[tone],
+                    )}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex shrink-0 flex-col justify-center rounded-lg border border-border/80 bg-card px-3 py-2 shadow-sm lg:min-w-[5.5rem]">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Avg
+            </span>
+            <span className="mt-1 text-lg font-semibold tabular-nums leading-none text-foreground">
+              {avgProgress}%
+            </span>
+          </div>
         </div>
       </div>
 
