@@ -26,7 +26,6 @@ export function CrmModuleWorkflowSteps({
   moduleLabel,
   steps,
   progress,
-  provider,
   className,
 }: Props) {
   const setStepDate = useCrmOnboardingStore((s) => s.setModuleWorkflowStepDate);
