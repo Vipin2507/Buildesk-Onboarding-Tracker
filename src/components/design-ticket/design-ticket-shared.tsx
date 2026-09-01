@@ -265,7 +265,7 @@ export function DesignTicketTabNav({
   onChange,
   compact,
 }: {
-  tabs: { id: string; label: string; icon?: LucideIcon }[];
+  tabs: { id: string; label: string; icon?: LucideIcon; badge?: number }[];
   activeId: string;
   onChange: (id: string) => void;
   compact?: boolean;
@@ -298,6 +298,16 @@ export function DesignTicketTabNav({
           >
             {Icon ? <Icon className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} /> : null}
             <span className="whitespace-nowrap">{tab.label}</span>
+            {tab.badge != null && tab.badge > 0 ? (
+              <span
+                className={cn(
+                  "inline-flex min-w-[1.125rem] items-center justify-center rounded-full bg-warning px-1.5 py-px text-[10px] font-semibold tabular-nums leading-none text-warning-foreground",
+                  compact ? "h-4" : "h-[1.125rem]",
+                )}
+              >
+                {tab.badge > 99 ? "99+" : tab.badge}
+              </span>
+            ) : null}
           </button>
         );
       })}

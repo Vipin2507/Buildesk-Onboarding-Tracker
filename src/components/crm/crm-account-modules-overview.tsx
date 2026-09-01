@@ -3,59 +3,61 @@ import { Link2, Package } from "lucide-react";
 import { ProgressBar } from "@/components/progress-bar";
 import { Pill } from "@/components/status-pill";
 import {
-  calcModuleWorkflowProgress,
+  calcProductModuleProgress,
   isCrmIntegrationModule,
 } from "@/data/crm-onboarding-defaults";
 import { cn } from "@/lib/utils";
-import type { CrmProductModule } from "@/types/crm-onboarding";
+import type { CrmOnboardingRecord, CrmProductModule } from "@/types/crm-onboarding";
 
-function CoreModuleCard({ module: m }: { module: CrmProductModule }) {
-  return (
-    <div className="card-soft flex items-center gap-2 p-3">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-        <Package className="h-4 w-4" />
-      </div>
-      <div className="min-w-0 text-sm font-semibold leading-snug">{m.label}</div>
-    </div>
-  );
-}
-
-function IntegrationModuleCard({ module: m }: { module: CrmProductModule }) {
-  const pct = calcModuleWorkflowProgress(m);
+function ModuleProgressCard({
+  module: m,
+  record,
+}: {
+  module: CrmProductModule;
+  record: CrmOnboardingRecord;
+}) {
+  const pct = calcProductModuleProgress(m, record);
+  const isSalesCrm = m.key === "sales-crm";
   const steps = m.workflow ?? [];
+  const stepHint = isSalesCrm
+    ? "Masters · Migration · Training · Reports"
+    : steps.length > 0
+      ? `${steps.filter((s) => s.done).length}/${steps.length} workflow steps complete`
+      : "Subscribed";
 
   return (
     <div className="card-soft flex flex-col gap-2 p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="text-sm font-semibold leading-snug">{m.label}</div>
-          <div className="mt-1 text-xs text-muted-foreground">
-            Provider:{" "}
-            <span className="font-medium text-foreground">{m.provider?.trim() || "Not set"}</span>
-          </div>
+          {!isSalesCrm && m.provider?.trim() ? (
+            <div className="mt-1 text-xs text-muted-foreground">
+              Provider: <span className="font-medium text-foreground">{m.provider}</span>
+            </div>
+          ) : null}
         </div>
         <Pill tone={pct >= 100 ? "success" : pct > 0 ? "info" : "muted"} className="shrink-0 text-[10px]">
           {pct}%
         </Pill>
       </div>
       <ProgressBar value={pct} className="h-1.5" />
-      <div className="text-[10px] text-muted-foreground">
-        {steps.filter((s) => s.done).length}/{steps.length} workflow steps complete
-      </div>
+      <div className="text-[10px] text-muted-foreground">{stepHint}</div>
     </div>
   );
 }
 
 type Props = {
   modules: CrmProductModule[];
+  record: CrmOnboardingRecord;
   emptyModulesHint?: string;
   emptyIntegrationsHint?: string;
   className?: string;
 };
 
-/** Dashboard overview — core modules are display-only; integrations show setup progress. */
+/** Dashboard overview — progress per subscribed module. */
 export function CrmAccountModulesOverview({
   modules,
+  record,
   emptyModulesHint = "None selected yet.",
   emptyIntegrationsHint = "None selected yet.",
   className,
@@ -77,7 +79,7 @@ export function CrmAccountModulesOverview({
         ) : (
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {core.map((m) => (
-              <CoreModuleCard key={m.key} module={m} />
+              <ModuleProgressCard key={m.key} module={m} record={record} />
             ))}
           </div>
         )}
@@ -94,7 +96,7 @@ export function CrmAccountModulesOverview({
         ) : (
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {integrations.map((m) => (
-              <IntegrationModuleCard key={m.key} module={m} />
+              <ModuleProgressCard key={m.key} module={m} record={record} />
             ))}
           </div>
         )}

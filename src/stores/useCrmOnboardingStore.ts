@@ -30,6 +30,10 @@ import {
   mergeCrmProductModules,
   mergeCrmReportChecklist,
   mergeCrmTrainingSessions,
+  mergeModuleWorkflow,
+  moduleHasWorkflow,
+  moduleRequiresProvider,
+  needsModuleWorkflowUpgrade,
   needsProductModulesUpgrade,
   normalizeCrmMasterChecklist,
   syncGoLiveChecklistFromTabs,
@@ -442,8 +446,22 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
         changed = true;
       }
       const afterModules = get().getByCompanyId(companyId)!;
+      if (afterModules.productModules.some(needsModuleWorkflowUpgrade)) {
+        set((s) => ({
+          records: updateRecord(s.records, companyId, (r) => ({
+            ...r,
+            productModules: r.productModules.map((m) =>
+              needsModuleWorkflowUpgrade(m)
+                ? { ...m, workflow: mergeModuleWorkflow(m.workflow, m.key) }
+                : m,
+            ),
+          })),
+        }));
+        changed = true;
+      }
+      const afterWorkflow = get().getByCompanyId(companyId)!;
       if (
-        !afterModules.masterProjects ||
+        !afterWorkflow.masterProjects ||
         !afterModules.masterSources ||
         !afterModules.masterStatuses ||
         !afterModules.masterFollowUps ||
@@ -495,14 +513,20 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
         ...r,
         productModules: r.productModules.map((m) => {
           if (m.key !== key) return m;
+          if (!enabled) {
+            return { ...m, enabled: false };
+          }
           const integration = isCrmIntegrationModule(key);
-          const workflow =
-            enabled && integration && (!m.workflow || m.workflow.length === 0)
-              ? defaultModuleWorkflow(key)
-              : integration
-                ? m.workflow
-                : undefined;
-          return { ...m, enabled, workflow, provider: integration ? m.provider : undefined };
+          const workflow = moduleHasWorkflow(key)
+            ? mergeModuleWorkflow(m.workflow, key) ?? defaultModuleWorkflow(key)
+            : undefined;
+          return {
+            ...m,
+            enabled: true,
+            workflow,
+            provider:
+              integration || moduleRequiresProvider(key) ? m.provider : undefined,
+          };
         }),
       })),
     }));

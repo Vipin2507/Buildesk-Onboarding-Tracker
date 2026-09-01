@@ -71,11 +71,97 @@ const INTEGRATION_MODULE_WORKFLOW: { key: string; label: string }[] = [
   { key: "go_live", label: "Go-Live" },
 ];
 
+/** Core product module onboarding steps (Sales CRM uses Masters / Migration / Training / Reports tabs). */
+export const CORE_MODULE_WORKFLOWS: Partial<
+  Record<CrmProductModuleKey, { key: string; label: string }[]>
+> = {
+  "sim-call-recording": [
+    { key: "client_activated", label: "Client Activated from Super Admin" },
+    { key: "user_count", label: "No Of user" },
+    { key: "activated_for_user", label: "Activated for User" },
+    { key: "dialer_installed", label: "Buildesk Dialer Installed" },
+    { key: "training_provided", label: "Training Provided" },
+    { key: "live", label: "Live" },
+    { key: "remarks", label: "Remarks" },
+  ],
+  "cp-application": [
+    { key: "white_labelled", label: "White Labelled (Yes / No)" },
+    { key: "logo_received", label: "Logo Received or Not" },
+    { key: "logo_upload", label: "Logo Upload" },
+    { key: "logo_to_dev", label: "Provided Logo to Developer Team" },
+    { key: "apk_received", label: "APK Received" },
+    { key: "cp_training", label: "CP App Training Provided" },
+    { key: "live", label: "Live" },
+    { key: "remarks", label: "Remarks" },
+  ],
+  "reception-application": [
+    {
+      key: "project_budget_form",
+      label: "Project, Budget & Reception Form created and allocated to Agent",
+    },
+    { key: "training_reception_admin", label: "Reception App Training — Admin" },
+    { key: "training_reception_user", label: "Reception App Training — User" },
+    { key: "training_dashboard_admin", label: "Reception App Dashboard — Admin" },
+    { key: "training_dashboard_user", label: "Reception App Dashboard — User" },
+    { key: "live", label: "Live" },
+    { key: "remarks", label: "Remarks" },
+  ],
+  "ai-call-analysis": [
+    { key: "training_provided", label: "Training Provided" },
+    { key: "live", label: "Live" },
+    { key: "remarks", label: "Remarks" },
+  ],
+  "auto-dialer": [
+    { key: "admin_training", label: "Admin Training" },
+    { key: "user_training", label: "User Training" },
+  ],
+};
+
+export function getModuleWorkflowTemplate(
+  key: CrmProductModuleKey,
+): { key: string; label: string }[] | undefined {
+  if (key === "sales-crm") return undefined;
+  if (isCrmIntegrationModule(key)) return INTEGRATION_MODULE_WORKFLOW;
+  return CORE_MODULE_WORKFLOWS[key] ?? GENERIC_MODULE_WORKFLOW;
+}
+
+export function moduleHasWorkflow(key: CrmProductModuleKey): boolean {
+  return key !== "sales-crm" && Boolean(getModuleWorkflowTemplate(key)?.length);
+}
+
 export function defaultModuleWorkflow(key: CrmProductModuleKey): CrmModuleWorkflowStep[] {
-  const template = moduleRequiresProvider(key)
-    ? INTEGRATION_MODULE_WORKFLOW
-    : GENERIC_MODULE_WORKFLOW;
+  const template = getModuleWorkflowTemplate(key) ?? GENERIC_MODULE_WORKFLOW;
   return template.map((s) => ({ key: s.key, label: s.label, done: false }));
+}
+
+/** Preserve completion state when workflow templates gain new steps. */
+export function mergeModuleWorkflow(
+  existing: CrmModuleWorkflowStep[] | undefined,
+  key: CrmProductModuleKey,
+): CrmModuleWorkflowStep[] | undefined {
+  if (key === "sales-crm") return undefined;
+  const template = getModuleWorkflowTemplate(key);
+  if (!template) return existing;
+  const byKey = new Map((existing ?? []).map((s) => [s.key, s]));
+  return template.map((def) => {
+    const prev = byKey.get(def.key);
+    if (prev) {
+      return { ...prev, label: def.label };
+    }
+    return { key: def.key, label: def.label, done: false };
+  });
+}
+
+export function needsModuleWorkflowUpgrade(module: CrmProductModule): boolean {
+  if (!module.enabled || module.key === "sales-crm") return false;
+  const template = getModuleWorkflowTemplate(module.key);
+  if (!template?.length) return false;
+  if (!module.workflow?.length) return true;
+  const templateKeys = new Set(template.map((s) => s.key));
+  const existingKeys = new Set(module.workflow.map((s) => s.key));
+  if (template.some((s) => !existingKeys.has(s.key))) return true;
+  if (module.workflow.some((s) => !templateKeys.has(s.key))) return true;
+  return template.some((s, i) => module.workflow?.[i]?.key !== s.key);
 }
 
 export function calcModuleWorkflowProgress(module: CrmProductModule): number {
@@ -226,7 +312,7 @@ export const CRM_CORE_MODULES: { key: CrmProductModuleKey; label: string }[] = [
   { key: "sales-crm", label: "Sales CRM" },
   { key: "cp-application", label: "CP Application" },
   { key: "reception-application", label: "Reception Application" },
-  { key: "sim-call-recording", label: "Sim Based Call Recording" },
+  { key: "sim-call-recording", label: "Sim Based Calling" },
   { key: "ai-call-analysis", label: "AI Call Analysis" },
   { key: "waha", label: "WAHA" },
   { key: "auto-dialer", label: "Auto Dialer" },
@@ -893,51 +979,62 @@ export function createCrmOnboardingRecord(
   };
 }
 
-/** Weighted completion across CRM onboarding sections (0–100). */
-export function calcCrmOnboardingProgress(record: CrmOnboardingRecord): number {
-  const sections: number[] = [];
+export function isSalesCrmModuleEnabled(record: CrmOnboardingRecord): boolean {
+  return record.productModules.some((m) => m.key === "sales-crm" && m.enabled);
+}
 
-  const enabledMods = record.productModules.filter((m) => m.enabled).length;
-  sections.push(record.productModules.length ? Math.round((enabledMods / record.productModules.length) * 100) : 0);
-
-  const mastersPct = calcChecklistProgress(record.masterChecklist);
-  sections.push(mastersPct);
-
-  const migPct = calcChecklistProgress(record.migrationChecklist);
-  sections.push(migPct);
-
-  const trainApplicable = record.trainingSessions.filter((s) => !s.notApplicable);
-  const trainDone = trainApplicable.filter((s) => s.completed || (s.sessionCount ?? 0) > 0).length;
-  sections.push(
-    trainApplicable.length ? Math.round((trainDone / trainApplicable.length) * 100) : 0,
-  );
-
-  const reportApplicable = record.reportChecklist.filter((r) => !r.notApplicable);
-  const reportsDone = reportApplicable.filter((r) => r.status === "explained").length;
-  sections.push(
-    reportApplicable.length ? Math.round((reportsDone / reportApplicable.length) * 100) : 0,
-  );
-
-  const goLiveDone = record.goLiveChecklist.filter((g) => isCrmGoLiveItemComplete(g)).length;
-  sections.push(
-    record.goLiveChecklist.length
-      ? Math.round((goLiveDone / record.goLiveChecklist.length) * 100)
-      : 0,
-  );
-
-  if (sections.length === 0) return 0;
+/** Sales CRM progress from Masters, Migration, Training, and Reports tabs. */
+export function calcSalesCrmModuleProgress(record: CrmOnboardingRecord): number {
+  const sections = [
+    calcChecklistProgress(record.masterChecklist),
+    calcChecklistProgress(record.migrationChecklist),
+    calcTrainingTabProgress(record),
+    calcReportsTabProgress(record),
+  ];
   return Math.round(sections.reduce((a, b) => a + b, 0) / sections.length);
 }
 
+/** Progress for a single subscribed module (0 when disabled). */
+export function calcProductModuleProgress(
+  module: CrmProductModule,
+  record: CrmOnboardingRecord,
+): number {
+  if (!module.enabled) return 0;
+  if (module.key === "sales-crm") {
+    return calcSalesCrmModuleProgress(record);
+  }
+  return calcModuleWorkflowProgress(module);
+}
+
+/** Overall account progress — average of all enabled modules. */
+export function calcCrmOnboardingProgress(record: CrmOnboardingRecord): number {
+  const enabled = record.productModules.filter((m) => m.enabled);
+  if (enabled.length === 0) return 0;
+  const sum = enabled.reduce((acc, m) => acc + calcProductModuleProgress(m, record), 0);
+  return Math.round(sum / enabled.length);
+}
+
 export function crmPendingActivityCount(record: CrmOnboardingRecord): number {
-  return (
-    record.masterChecklist.filter((m) => !isChecklistItemComplete(m)).length +
-    record.migrationChecklist.filter((m) => !isChecklistItemComplete(m)).length +
-    record.trainingSessions.filter((s) => !s.notApplicable && !s.completed && !(s.sessionCount > 0))
-      .length +
-    record.reportChecklist.filter((r) => !r.notApplicable && r.status !== "explained").length +
-    record.goLiveChecklist.filter((g) => !isCrmGoLiveItemComplete(g)).length
-  );
+  let count = 0;
+
+  if (isSalesCrmModuleEnabled(record)) {
+    count +=
+      record.masterChecklist.filter((m) => !isChecklistItemComplete(m)).length +
+      record.migrationChecklist.filter((m) => !isChecklistItemComplete(m)).length +
+      record.trainingSessions.filter(
+        (s) => !s.notApplicable && !s.completed && !(s.sessionCount > 0),
+      ).length +
+      record.reportChecklist.filter((r) => !r.notApplicable && r.status !== "explained").length;
+  }
+
+  count += record.productModules
+    .filter((m) => m.enabled && moduleHasWorkflow(m.key))
+    .flatMap((m) => m.workflow ?? [])
+    .filter((s) => !s.done).length;
+
+  count += record.goLiveChecklist.filter((g) => !isCrmGoLiveItemComplete(g)).length;
+
+  return count;
 }
 
 export function crmGoLiveReady(record: CrmOnboardingRecord): boolean {

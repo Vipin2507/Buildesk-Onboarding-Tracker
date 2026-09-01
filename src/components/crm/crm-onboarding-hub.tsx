@@ -19,6 +19,7 @@ import {
   Ticket,
   TrendingUp,
   Upload,
+  Calendar,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -31,8 +32,10 @@ import {
   normalizeCrmAccountForm,
   type CrmAccountFormValues,
 } from "@/components/crm/crm-account-form";
+import { CrmAccountMeetingsPanel } from "@/components/crm/crm-account-meetings-panel";
 import { CrmAccountModulesOverview } from "@/components/crm/crm-account-modules-overview";
 import { CrmAccountModulesTab } from "@/components/crm/crm-account-modules-tab";
+import { CrmModuleProviderSelect } from "@/components/crm/crm-module-provider-select";
 import { CrmAccountPortalPanel } from "@/components/crm/crm-account-portal-panel";
 import { CrmAccountTasksPanel } from "@/components/crm/crm-account-tasks-panel";
 import { CrmGoLiveChecklist } from "@/components/crm/crm-go-live-checklist";
@@ -64,23 +67,22 @@ import {
   calcModuleWorkflowProgress,
   crmPendingActivityCount,
   isCrmIntegrationModule,
+  isSalesCrmModuleEnabled,
   moduleRequiresProvider,
 } from "@/data/crm-onboarding-defaults";
 import { calcChecklistProgress } from "@/lib/checklist";
-import {
-  CRM_PROVIDER_OTHER,
-  isCustomCrmProvider,
-  useCrmProviderOptions,
-} from "@/lib/crm-providers";
 import { cn, formatDate } from "@/lib/utils";
 import { isTicketOpen } from "@/lib/tickets";
 import {
   useAuthStore,
+  useBookingStore,
   useCrmAccountStore,
   useCrmOnboardingStore,
   useCrmTaskStore,
+  useDesignTicketStats,
   useTicketStore,
 } from "@/stores";
+
 import type {
   CrmCommChannel,
   CrmProductModuleKey,
@@ -102,6 +104,7 @@ const TABS = [
   { id: "reports", label: "Reports", icon: TrendingUp },
   { id: "golive", label: "Go-Live", icon: Rocket },
   { id: "tasks", label: "Tasks", icon: CheckSquare },
+  { id: "meetings", label: "Meetings", icon: Calendar },
   { id: "tickets", label: "Tickets", icon: Ticket },
   { id: "comms", label: "Comms", icon: MessageSquare },
 ] as const;
@@ -141,6 +144,10 @@ export function CrmOnboardingHub({
   const record = useCrmOnboardingStore((s) => s.getByCompanyId(accountId));
   const tickets = useTicketStore((s) => s.tickets);
   const tasks = useCrmTaskStore((s) => s.tasks);
+  const designTicketStats = useDesignTicketStats(accountId);
+  const pendingMeetings = useBookingStore(
+    (s) => s.appointments.filter((a) => a.companyId === accountId && a.status === "pending").length,
+  );
   const currentUser = useAuthStore((s) => s.user);
 
   const [internalTab, setInternalTab] = useState<TabId>("dashboard");
@@ -158,10 +165,46 @@ export function CrmOnboardingHub({
   const liveRecord = record ?? ensureForCompany(accountId, account?.companyType);
   const pct = calcCrmOnboardingProgress(liveRecord);
   const pending = crmPendingActivityCount(liveRecord);
+  const salesCrmEnabled = isSalesCrmModuleEnabled(liveRecord);
+  const visibleTabs = useMemo(
+    () =>
+      TABS.filter((t) => {
+        if (t.id === "masters" || t.id === "migration" || t.id === "training" || t.id === "reports") {
+          return salesCrmEnabled;
+        }
+        return true;
+      }),
+    [salesCrmEnabled],
+  );
+
+  useEffect(() => {
+    if (
+      !salesCrmEnabled &&
+      (tab === "masters" || tab === "migration" || tab === "training" || tab === "reports")
+    ) {
+      setTab("modules");
+    }
+  }, [salesCrmEnabled, tab, setTab]);
+
   const openTickets = tickets.filter((t) => t.companyId === accountId && isTicketOpen(t)).length;
   const openTasks = tasks.filter(
     (t) => t.companyId === accountId && OPEN_TASK_STATUSES.includes(t.status),
   ).length;
+  const pendingPortalTickets = designTicketStats.open + designTicketStats.inProgress;
+  const pendingTicketsTab = pendingPortalTickets + openTickets;
+
+  const visibleTabsWithBadges = useMemo(
+    () =>
+      visibleTabs.map((t) => {
+        let badge: number | undefined;
+        if (t.id === "tasks") badge = openTasks;
+        else if (t.id === "meetings") badge = pendingMeetings;
+        else if (t.id === "tickets") badge = pendingTicketsTab;
+        return { ...t, badge };
+      }),
+    [visibleTabs, openTasks, pendingMeetings, pendingTicketsTab],
+  );
+
   const isLive = account?.status === "live";
 
   const kpis = [
@@ -236,7 +279,7 @@ export function CrmOnboardingHub({
               else if (k.id === "tasks") setTab("tasks");
               else if (k.id === "modules") setTab("modules");
               else if (k.id === "integrations") setTab("integrations");
-              else if (k.id === "pending") setTab("masters");
+              else if (k.id === "pending") setTab(salesCrmEnabled ? "masters" : "modules");
               else setTab("dashboard");
             },
             active:
@@ -254,7 +297,7 @@ export function CrmOnboardingHub({
 
       <DesignTicketTabNav
         compact
-        tabs={TABS.map(({ id, label, icon }) => ({ id, label, icon }))}
+        tabs={visibleTabsWithBadges.map(({ id, label, icon, badge }) => ({ id, label, icon, badge }))}
         activeId={tab}
         onChange={(id) => setTab(id as TabId)}
       />
@@ -287,8 +330,9 @@ export function CrmOnboardingHub({
               who={currentUser?.name}
             />
           ) : null}
-          {tab === "tickets" ? <TicketsTab companyId={accountId} /> : null}
           {tab === "tasks" ? <CrmAccountTasksPanel accountId={accountId} /> : null}
+          {tab === "meetings" ? <MeetingsTab companyId={accountId} /> : null}
+          {tab === "tickets" ? <TicketsTab companyId={accountId} /> : null}
           {tab === "comms" ? <CommsTab companyId={accountId} /> : null}
         </motion.div>
       </AnimatePresence>
@@ -461,6 +505,7 @@ function DashboardTab({
       >
         <CrmAccountModulesOverview
           modules={record.productModules}
+          record={record}
           emptyModulesHint="No modules selected — open the Modules tab to subscribe."
           emptyIntegrationsHint="No integrations selected — open the Integrations tab to configure."
         />
@@ -488,77 +533,6 @@ function StatCard({ label, value, bar }: { label: string; value: string; bar?: n
       <div className="text-[10px] text-muted-foreground">{label}</div>
       <div className="mt-0.5 text-lg font-semibold tabular-nums">{value}</div>
       {bar != null ? <ProgressBar value={bar} className="mt-2 h-1.5" /> : null}
-    </div>
-  );
-}
-
-function ModuleProviderSelect({
-  companyId,
-  moduleKey,
-  moduleLabel,
-  provider,
-}: {
-  companyId: string;
-  moduleKey: CrmProductModuleKey;
-  moduleLabel: string;
-  provider?: string;
-}) {
-  const setModuleProvider = useCrmOnboardingStore((s) => s.setModuleProvider);
-  const options = useCrmProviderOptions(moduleKey);
-  const custom = isCustomCrmProvider(moduleKey, provider);
-  const [customDraft, setCustomDraft] = useState(custom ? (provider ?? "") : "");
-  const selectValue = custom ? CRM_PROVIDER_OTHER : (provider ?? "");
-
-  useEffect(() => {
-    setCustomDraft(isCustomCrmProvider(moduleKey, provider) ? (provider ?? "") : "");
-  }, [moduleKey, provider]);
-
-  return (
-    <div className="flex flex-col items-end gap-1">
-      <select
-        className={cn(ticketSelectClass, "h-7 w-40 text-[11px]")}
-        value={selectValue}
-        onChange={(e) => {
-          const value = e.target.value;
-          if (value === CRM_PROVIDER_OTHER) {
-            setCustomDraft(custom ? (provider ?? "") : "");
-            if (!custom) setModuleProvider(companyId, moduleKey, "");
-            return;
-          }
-          setCustomDraft("");
-          setModuleProvider(companyId, moduleKey, value);
-          if (value) toast.success(`${moduleLabel} → ${value}`);
-        }}
-      >
-        <option value="">Select provider</option>
-        {options.map((p) => (
-          <option key={p} value={p}>
-            {p}
-          </option>
-        ))}
-      </select>
-      {selectValue === CRM_PROVIDER_OTHER ? (
-        <input
-          className={cn(ticketFieldClass, "h-7 w-40 text-[11px]")}
-          placeholder="Provider name…"
-          value={customDraft}
-          onChange={(e) => setCustomDraft(e.target.value)}
-          onBlur={() => {
-            const next = customDraft.trim();
-            if (!next) {
-              setModuleProvider(companyId, moduleKey, "");
-              return;
-            }
-            setModuleProvider(companyId, moduleKey, next);
-            toast.success(`${moduleLabel} → ${next}`);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              (e.target as HTMLInputElement).blur();
-            }
-          }}
-        />
-      ) : null}
     </div>
   );
 }
@@ -662,7 +636,7 @@ function IntegrationsTab({ companyId }: { companyId: string }) {
                       </div>
                       <div className="flex items-center gap-2">
                         {requiresProvider ? (
-                          <ModuleProviderSelect
+                          <CrmModuleProviderSelect
                             companyId={companyId}
                             moduleKey={m.key}
                             moduleLabel={m.label}
@@ -876,6 +850,10 @@ function GoLiveTab({
       who={who}
     />
   );
+}
+
+function MeetingsTab({ companyId }: { companyId: string }) {
+  return <CrmAccountMeetingsPanel accountId={companyId} />;
 }
 
 function TicketsTab({ companyId }: { companyId: string }) {

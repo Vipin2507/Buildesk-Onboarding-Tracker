@@ -1,25 +1,167 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Package, Plus } from "lucide-react";
+import { Package } from "lucide-react";
 import { toast } from "sonner";
 
-import { CrmAccountProductModulesPicker } from "@/components/crm/crm-account-product-modules-picker";
+import { CrmModuleProviderSelect } from "@/components/crm/crm-module-provider-select";
+import { CrmModuleWorkflowSteps } from "@/components/crm/crm-module-workflow-steps";
 import {
   DesignTicketSection,
   TICKET_EASE,
 } from "@/components/design-ticket/design-ticket-shared";
-import { EntityFormModal } from "@/components/entity-form-modal";
+import { ProgressBar } from "@/components/progress-bar";
 import { Pill } from "@/components/status-pill";
-import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { isCrmCoreModule } from "@/data/crm-onboarding-defaults";
+import {
+  calcProductModuleProgress,
+  calcSalesCrmModuleProgress,
+  isCrmCoreModule,
+  moduleHasWorkflow,
+  moduleRequiresProvider,
+} from "@/data/crm-onboarding-defaults";
+import { calcChecklistProgress } from "@/lib/checklist";
 import { getCrmMasterProductModuleCatalog } from "@/stores/useCrmMasterStore";
 import { useCrmOnboardingStore } from "@/stores";
-import type { CrmProductModuleKey } from "@/types/crm-onboarding";
+import type { CrmOnboardingRecord, CrmProductModule, CrmProductModuleKey } from "@/types/crm-onboarding";
 
 type Props = {
   companyId: string;
 };
+
+function SalesCrmModuleCard({
+  module: m,
+  record,
+  onToggle,
+}: {
+  companyId: string;
+  module: CrmProductModule;
+  record: CrmOnboardingRecord;
+  onToggle: (enabled: boolean) => void;
+}) {
+  const pct = calcSalesCrmModuleProgress(record);
+  const sections = [
+    { label: "Masters", value: calcChecklistProgress(record.masterChecklist) },
+    { label: "Migration", value: calcChecklistProgress(record.migrationChecklist) },
+    {
+      label: "Training",
+      value: Math.round(
+        (() => {
+          const applicable = record.trainingSessions.filter((s) => !s.notApplicable);
+          if (applicable.length === 0) return 100;
+          const done = applicable.filter((s) => s.completed || (s.sessionCount ?? 0) > 0).length;
+          return (done / applicable.length) * 100;
+        })(),
+      ),
+    },
+    {
+      label: "Reports",
+      value: Math.round(
+        (() => {
+          const applicable = record.reportChecklist.filter((r) => !r.notApplicable);
+          if (applicable.length === 0) return 100;
+          const done = applicable.filter((r) => r.status === "explained").length;
+          return (done / applicable.length) * 100;
+        })(),
+      ),
+    },
+  ];
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -6 }}
+      transition={{ duration: 0.22, ease: TICKET_EASE }}
+      className="card-soft border-primary/30 bg-primary/5 p-2.5"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 text-xs font-medium">
+            <Package className="h-3.5 w-3.5 shrink-0 text-primary" />
+            {m.label}
+          </div>
+          <div className="mt-0.5 text-[10px] text-muted-foreground">
+            Track via Masters, Migration, Training & Reports tabs · {pct}%
+          </div>
+        </div>
+        <Switch size="sm" checked={m.enabled} onCheckedChange={(v) => onToggle(v === true)} />
+      </div>
+      <ProgressBar value={pct} className="mt-2 h-1.5" />
+      <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+        {sections.map((s) => (
+          <div key={s.label} className="rounded-md border bg-background/60 px-2 py-1.5">
+            <div className="flex items-center justify-between gap-2 text-[10px]">
+              <span className="text-muted-foreground">{s.label}</span>
+              <span className="font-medium tabular-nums">{s.value}%</span>
+            </div>
+            <ProgressBar value={s.value} className="mt-1 h-1" />
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+function CoreModuleWorkflowCard({
+  companyId,
+  module: m,
+  record,
+  onToggle,
+}: {
+  companyId: string;
+  module: CrmProductModule;
+  record: CrmOnboardingRecord;
+  onToggle: (enabled: boolean) => void;
+}) {
+  const pct = calcProductModuleProgress(m, record);
+  const steps = m.workflow ?? [];
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -6 }}
+      transition={{ duration: 0.22, ease: TICKET_EASE }}
+      className="card-soft border-primary/30 bg-primary/5 p-2.5"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 text-xs font-medium">
+            <Package className="h-3.5 w-3.5 shrink-0 text-primary" />
+            {m.label}
+            {moduleRequiresProvider(m.key) && !m.provider ? (
+              <Pill tone="warning" className="text-[10px]">
+                Provider pending
+              </Pill>
+            ) : null}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {moduleRequiresProvider(m.key) ? (
+            <CrmModuleProviderSelect
+              companyId={companyId}
+              moduleKey={m.key}
+              moduleLabel={m.label}
+              provider={m.provider}
+            />
+          ) : null}
+          <Switch size="sm" checked={m.enabled} onCheckedChange={(v) => onToggle(v === true)} />
+        </div>
+      </div>
+
+      <CrmModuleWorkflowSteps
+        companyId={companyId}
+        moduleKey={m.key}
+        moduleLabel={m.label}
+        steps={steps}
+        progress={pct}
+        className="mt-2"
+      />
+    </motion.div>
+  );
+}
 
 export function CrmAccountModulesTab({ companyId }: Props) {
   const record = useCrmOnboardingStore((s) => s.getByCompanyId(companyId))!;
@@ -35,79 +177,54 @@ export function CrmAccountModulesTab({ companyId }: Props) {
   const enabled = record.productModules.filter((m) => m.enabled && inScope(m.key));
   const available = record.productModules.filter((m) => !m.enabled && inScope(m.key));
 
-  const [addOpen, setAddOpen] = useState(false);
-  const [pickerSelected, setPickerSelected] = useState<CrmProductModuleKey[]>([]);
-
-  function openAddModule() {
-    setPickerSelected([]);
-    setAddOpen(true);
-  }
-
-  function confirmAddModules() {
-    const enabledKeys = new Set(enabled.map((m) => m.key));
-    const toAdd = pickerSelected.filter((key) => !enabledKeys.has(key));
-    if (toAdd.length === 0) {
-      toast.error("Select at least one module that is not already subscribed");
-      return;
-    }
-    for (const key of toAdd) {
-      setEnabled(companyId, key, true);
-    }
-    toast.success(`Added ${toAdd.length} module${toAdd.length === 1 ? "" : "s"}`);
-    setAddOpen(false);
+  function toggleModule(key: CrmProductModuleKey, label: string, enabled: boolean) {
+    setEnabled(companyId, key, enabled);
+    toast.success(enabled ? `${label} subscribed` : `${label} removed`);
   }
 
   return (
-    <>
-      <div className="space-y-2.5">
-        <DesignTicketSection
-          compact
-          title="Subscribed modules"
-          action={
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] tabular-nums text-muted-foreground">
-                {enabled.length} opted
-              </span>
-              {available.length > 0 ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 gap-1 text-xs"
-                  onClick={openAddModule}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Add module
-                </Button>
-              ) : null}
-            </div>
-          }
-        >
-          <p className="mb-2 text-[10px] text-muted-foreground">
-            Core CRM product modules for this account. Use Add module to opt in additional modules
-            after account creation.
-          </p>
+    <div className="space-y-2.5">
+      <DesignTicketSection
+        compact
+        title="Subscribed modules"
+        action={
+          <span className="text-[10px] tabular-nums text-muted-foreground">
+            {enabled.length} opted
+          </span>
+        }
+      >
+        <p className="mb-2 text-[10px] text-muted-foreground">
+          Core CRM product modules for this account. Complete each module&apos;s workflow steps to
+          track onboarding progress. Sales CRM uses the Masters, Migration, Training, and Reports
+          tabs.
+        </p>
 
-          {enabled.length === 0 ? (
-            <div className="rounded-lg border border-dashed px-3 py-8 text-center text-xs text-muted-foreground">
-              No modules subscribed yet.
-              {available.length > 0 ? (
-                <>
-                  {" "}
-                  <button
-                    type="button"
-                    className="font-medium text-primary hover:underline"
-                    onClick={openAddModule}
-                  >
-                    Add a module
-                  </button>{" "}
-                  to get started.
-                </>
-              ) : null}
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              <AnimatePresence initial={false}>
-                {enabled.map((m) => (
+        {enabled.length === 0 ? (
+          <div className="rounded-lg border border-dashed px-3 py-8 text-center text-xs text-muted-foreground">
+            No modules subscribed yet.
+            {available.length > 0 ? " Enable modules from Available modules below." : null}
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            <AnimatePresence initial={false}>
+              {enabled.map((m) =>
+                m.key === "sales-crm" ? (
+                  <SalesCrmModuleCard
+                    key={m.key}
+                    companyId={companyId}
+                    module={m}
+                    record={record}
+                    onToggle={(v) => toggleModule(m.key, m.label, v)}
+                  />
+                ) : moduleHasWorkflow(m.key) ? (
+                  <CoreModuleWorkflowCard
+                    key={m.key}
+                    companyId={companyId}
+                    module={m}
+                    record={record}
+                    onToggle={(v) => toggleModule(m.key, m.label, v)}
+                  />
+                ) : (
                   <motion.div
                     key={m.key}
                     layout
@@ -131,62 +248,42 @@ export function CrmAccountModulesTab({ companyId }: Props) {
                     <Switch
                       size="sm"
                       checked={m.enabled}
-                      onCheckedChange={(v) => {
-                        setEnabled(companyId, m.key, v === true);
-                        toast.success(v ? `${m.label} subscribed` : `${m.label} removed`);
-                      }}
+                      onCheckedChange={(v) => toggleModule(m.key, m.label, v === true)}
                     />
                   </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
-          )}
-        </DesignTicketSection>
+                ),
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+      </DesignTicketSection>
 
-        {available.length > 0 ? (
-          <DesignTicketSection compact title="Available modules">
-            <p className="mb-2 text-[10px] text-muted-foreground">
-              Toggle to subscribe this account to a module, or use Add module above.
-            </p>
-            <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
-              {available.map((m) => (
-                <label
-                  key={m.key}
-                  className="card-soft flex cursor-pointer items-center justify-between gap-2 p-2.5 text-xs transition-colors hover:bg-muted/20"
-                >
-                  <span className="min-w-0 truncate font-medium">{m.label}</span>
-                  <Switch
-                    size="sm"
-                    checked={m.enabled}
-                    onCheckedChange={(v) => {
-                      setEnabled(companyId, m.key, v === true);
-                      toast.success(v ? `${m.label} subscribed` : `${m.label} removed`);
-                    }}
-                  />
-                </label>
-              ))}
-            </div>
-          </DesignTicketSection>
-        ) : enabled.length > 0 ? (
-          <p className="text-center text-[11px] text-muted-foreground">
-            All catalog modules are subscribed for this account.
+      {available.length > 0 ? (
+        <DesignTicketSection compact title="Available modules">
+          <p className="mb-2 text-[10px] text-muted-foreground">
+            Toggle to subscribe this account to a module.
           </p>
-        ) : null}
-      </div>
-
-      <EntityFormModal
-        open={addOpen}
-        onOpenChange={setAddOpen}
-        title="Add modules"
-        submitLabel="Add selected"
-        onSubmit={confirmAddModules}
-        contentClassName="max-w-2xl"
-      >
-        <p className="mb-3 text-xs text-muted-foreground">
-          Select one or more modules to subscribe this account to.
+          <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+            {available.map((m) => (
+              <label
+                key={m.key}
+                className="card-soft flex cursor-pointer items-center justify-between gap-2 p-2.5 text-xs transition-colors hover:bg-muted/20"
+              >
+                <span className="min-w-0 truncate font-medium">{m.label}</span>
+                <Switch
+                  size="sm"
+                  checked={m.enabled}
+                  onCheckedChange={(v) => toggleModule(m.key, m.label, v === true)}
+                />
+              </label>
+            ))}
+          </div>
+        </DesignTicketSection>
+      ) : enabled.length > 0 ? (
+        <p className="text-center text-[11px] text-muted-foreground">
+          All catalog modules are subscribed for this account.
         </p>
-        <CrmAccountProductModulesPicker selected={pickerSelected} onChange={setPickerSelected} />
-      </EntityFormModal>
-    </>
+      ) : null}
+    </div>
   );
 }
