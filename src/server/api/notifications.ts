@@ -103,6 +103,7 @@ export function resolveNotificationRecipientIds(
         account.salesManagerName,
         account.supportManager1,
         account.supportManager2,
+        account.accountManagerName,
       ]) {
         if (!label?.trim()) continue;
         for (const u of users) {

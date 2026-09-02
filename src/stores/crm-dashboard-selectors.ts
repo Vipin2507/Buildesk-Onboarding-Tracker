@@ -28,6 +28,7 @@ import {
   useCrmOnboardingStore,
   useCrmTaskStore,
   useDesignTicketStore,
+  useCrmAccountQueryStore,
   useTicketStore,
   useUserStore,
 } from "@/stores";
@@ -134,6 +135,7 @@ export function useCrmDashboardOverview() {
   const subscriptionEvents = useCrmEventStore((s) => s.subscriptionEvents);
   const designTickets = useDesignTicketStore((s) => s.tickets);
   const bookingAppointments = useBookingStore((s) => s.appointments);
+  const accountQueries = useCrmAccountQueryStore((s) => s.allQueries);
 
   return useMemo(() => {
     // Admins see all; others only accounts where they are sales or support manager.
@@ -257,6 +259,7 @@ export function useCrmDashboardOverview() {
       tickets,
       followUpTasks,
       clientVisits,
+      accountQueries,
       users: users.map((u) => ({ id: u.id, name: u.name })),
     })
       .slice(0, 10)
@@ -273,6 +276,7 @@ export function useCrmDashboardOverview() {
       tickets,
       followUpTasks,
       clientVisits,
+      accountQueries,
       users: users.map((u) => ({ id: u.id, name: u.name })),
     });
 
@@ -463,6 +467,7 @@ export function useCrmDashboardOverview() {
     subscriptionEvents,
     followUpTasks,
     clientVisits,
+    accountQueries,
     users,
   ]);
 }

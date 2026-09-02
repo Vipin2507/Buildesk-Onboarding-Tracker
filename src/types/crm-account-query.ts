@@ -13,6 +13,23 @@ export type CrmAccountQueryAttachment = {
   url?: string;
   mimeType?: string;
   sizeBytes?: number;
+  storageKey?: string;
+};
+
+export type CrmAccountQuerySummary = {
+  id: string;
+  companyId: string;
+  accountName?: string;
+  title: string;
+  status: CrmAccountQueryStatus;
+  category?: CrmAccountQueryCategory;
+  createdByUserId: string;
+  createdByName: string;
+  messageCount: number;
+  lastMessagePreview?: string;
+  resolvedAt?: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type CrmAccountQueryMessage = {

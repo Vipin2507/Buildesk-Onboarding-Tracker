@@ -90,3 +90,17 @@ export function parseCrmAccountTab(value: unknown): CrmAccountTabId {
   }
   return "dashboard";
 }
+
+export const crmQueriesSearchSchema = z.object({
+  status: z.enum(["all", "open", "resolved", "archived"]).optional(),
+  queryId: z.string().optional(),
+});
+
+export type CrmQueriesSearch = z.infer<typeof crmQueriesSearchSchema>;
+
+export function parseCrmQueriesStatus(
+  value: unknown,
+): "all" | "open" | "resolved" | "archived" {
+  if (value === "open" || value === "resolved" || value === "archived") return value;
+  return "all";
+}

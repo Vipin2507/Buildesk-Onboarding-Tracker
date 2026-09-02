@@ -184,6 +184,7 @@ function QueryThread({
   query,
   currentUserId,
   onSend,
+  onUploadAttachment,
   onResolve,
   onReopen,
   onArchive,
@@ -195,6 +196,11 @@ function QueryThread({
     body: string,
     opts?: { messageType?: "text" | "image" | "voice"; attachments?: CrmAccountQueryAttachment[] },
   ) => Promise<void>;
+  onUploadAttachment: (
+    file: Blob,
+    fileName: string,
+    mimeType: string,
+  ) => Promise<CrmAccountQueryAttachment>;
   onResolve: () => void;
   onReopen: () => void;
   onArchive: () => void;
@@ -234,9 +240,11 @@ function QueryThread({
     if (!file || query.status === "archived") return;
     try {
       const dataUrl = await compressImageToDataUrl(file, { maxEdge: 960 });
+      const blob = await fetch(dataUrl).then((r) => r.blob());
+      const attachment = await onUploadAttachment(blob, file.name, file.type || "image/jpeg");
       await onSend(text.trim() || "Shared an image", {
         messageType: "image",
-        attachments: [{ name: file.name, url: dataUrl, mimeType: file.type }],
+        attachments: [attachment],
       });
       setText("");
     } catch (err) {
@@ -259,21 +267,17 @@ function QueryThread({
           const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
           streamRef.current?.getTracks().forEach((t) => t.stop());
           streamRef.current = null;
-          const reader = new FileReader();
-          reader.onload = () => {
-            void onSend(text.trim() || "Voice note", {
+          try {
+            const fileName = `voice-${Date.now()}.webm`;
+            const attachment = await onUploadAttachment(blob, fileName, blob.type || "audio/webm");
+            await onSend(text.trim() || "Voice note", {
               messageType: "voice",
-              attachments: [
-                {
-                  name: `voice-${Date.now()}.webm`,
-                  url: String(reader.result),
-                  mimeType: blob.type,
-                  sizeBytes: blob.size,
-                },
-              ],
-            }).then(() => setText(""));
-          };
-          reader.readAsDataURL(blob);
+              attachments: [attachment],
+            });
+            setText("");
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Could not send voice note");
+          }
         })();
       };
       recorderRef.current = recorder;
@@ -431,6 +435,7 @@ export function CrmAccountQueriesPanel({ accountId }: { accountId: string }) {
   const createQuery = useCrmAccountQueryStore((s) => s.createQuery);
   const addMessage = useCrmAccountQueryStore((s) => s.addMessage);
   const updateStatus = useCrmAccountQueryStore((s) => s.updateStatus);
+  const uploadAttachment = useCrmAccountQueryStore((s) => s.uploadAttachment);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -602,6 +607,9 @@ export function CrmAccountQueriesPanel({ accountId }: { accountId: string }) {
                 currentUserId={user?.id}
                 sending={sending}
                 onSend={(body, opts) => handleSend(selected.id, body, opts)}
+                onUploadAttachment={(file, fileName, mimeType) =>
+                  uploadAttachment(selected.id, file, fileName, mimeType)
+                }
                 onResolve={() =>
                   void updateStatus(selected.id, "resolved")
                     .then(() => toast.success("Query resolved"))

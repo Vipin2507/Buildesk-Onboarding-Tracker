@@ -1,4 +1,5 @@
 import {
+  HelpCircle,
   LayoutDashboard,
   Building2,
   Calendar,
@@ -19,6 +20,7 @@ export const CRM_NAV: NavItem[] = [
   { to: "/crm/accounts", label: "Accounts", icon: Building2 },
   { to: "/crm/bookings", label: "Meetings", icon: Calendar },
   { to: "/crm/tasks", label: "Tasks", icon: CheckSquare },
+  { to: "/crm/queries", label: "Account queries", icon: HelpCircle },
   { to: "/crm/activity", label: "Activity history", icon: History },
   { to: "/crm/support", label: "Support Desk", icon: LifeBuoy },
   { to: "/crm/tickets", label: "Ticket Tracking", icon: MessageSquareText },

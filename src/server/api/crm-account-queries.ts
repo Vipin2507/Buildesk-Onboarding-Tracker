@@ -3,15 +3,25 @@ import { asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { canViewCrmAccount } from "@/lib/crm-account-access";
+import { isAdminRoleKey } from "@/lib/permissions";
+import {
+  insertNotificationsForUserIds,
+  resolveNotificationRecipientIds,
+} from "@/server/api/notifications";
 import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
+import {
+  decodeUploadPayload,
+  saveCrmQueryUpload,
+} from "@/server/lib/crm-query-file-storage";
 import type {
   CrmAccountQuery,
   CrmAccountQueryAttachment,
   CrmAccountQueryMessage,
   CrmAccountQueryMessageType,
   CrmAccountQueryStatus,
+  CrmAccountQuerySummary,
 } from "@/types/crm-account-query";
 
 const attachmentSchema = z.object({
@@ -19,6 +29,7 @@ const attachmentSchema = z.object({
   url: z.string().optional(),
   mimeType: z.string().optional(),
   sizeBytes: z.number().optional(),
+  storageKey: z.string().optional(),
 });
 
 function parseAttachments(json: string | null | undefined): CrmAccountQueryAttachment[] | undefined {
@@ -129,6 +140,86 @@ function loadQueriesForCompany(db: ReturnType<typeof getDb>, companyId: string):
   });
 }
 
+function lastMessagePreview(messages: CrmAccountQueryMessage[]) {
+  const last = messages[messages.length - 1];
+  if (!last) return undefined;
+  if (last.messageType === "system") return last.body;
+  if (last.messageType === "image") return "Image attachment";
+  if (last.messageType === "voice") return "Voice note";
+  return last.body.slice(0, 120);
+}
+
+function mapQuerySummary(
+  row: typeof t.crmAccountQueries.$inferSelect,
+  messages: typeof t.crmAccountQueryMessages.$inferSelect[],
+  accountName?: string,
+): CrmAccountQuerySummary {
+  const mappedMessages = messages.map(mapMessage);
+  return {
+    id: row.id,
+    companyId: row.companyId,
+    accountName,
+    title: row.title,
+    status: row.status as CrmAccountQueryStatus,
+    category: (row.category as CrmAccountQuerySummary["category"]) ?? undefined,
+    createdByUserId: row.createdByUserId,
+    createdByName: row.createdByName,
+    messageCount: mappedMessages.length,
+    lastMessagePreview: lastMessagePreview(mappedMessages),
+    resolvedAt: row.resolvedAt ?? undefined,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function notifyAccountQueryParticipants(
+  db: ReturnType<typeof getDb>,
+  opts: {
+    companyId: string;
+    queryId: string;
+    title: string;
+    body: string;
+    excludeUserId: string;
+    kind?: "info" | "success" | "warning";
+  },
+) {
+  const recipientIds = resolveNotificationRecipientIds(db, {
+    companyId: opts.companyId,
+    productScope: "crm",
+  }).filter((id) => id !== opts.excludeUserId);
+
+  const users = db.select().from(t.users).all();
+  const enabledIds = recipientIds.filter((id) => {
+    const user = users.find((u) => u.id === id);
+    return user?.active !== false && user?.notifyInApp !== false;
+  });
+
+  if (!enabledIds.length) return;
+
+  insertNotificationsForUserIds(db, enabledIds, {
+    title: opts.title,
+    body: opts.body,
+    href: `/crm/accounts/${opts.companyId}?tab=queries`,
+    companyId: opts.companyId,
+    ticketId: opts.queryId,
+    kind: opts.kind ?? "info",
+  });
+}
+
+function loadAccessibleAccountMap(
+  db: ReturnType<typeof getDb>,
+  user: { id: string; name: string; role: string },
+) {
+  const rows = db.select().from(t.crmAccounts).all();
+  const map = new Map<string, { id: string; name: string }>();
+  for (const row of rows) {
+    if (isAdminRoleKey(user.role) || canViewCrmAccount(accountAccessFields(row), user)) {
+      map.set(row.id, { id: row.id, name: row.name });
+    }
+  }
+  return map;
+}
+
 const createQuerySchema = z.object({
   companyId: z.string().min(1),
   title: z.string().min(1).max(200),
@@ -148,6 +239,77 @@ const updateStatusSchema = z.object({
   queryId: z.string().min(1),
   status: z.enum(["open", "resolved", "archived"]),
 });
+
+export const listAllCrmAccountQueries = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        status: z.enum(["all", "open", "resolved", "archived"]).optional(),
+      })
+      .optional()
+      .parse(data ?? {}),
+  )
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    const db = getDb();
+    const accountMap = loadAccessibleAccountMap(db, user);
+    const rows = db
+      .select()
+      .from(t.crmAccountQueries)
+      .orderBy(desc(t.crmAccountQueries.updatedAt))
+      .all()
+      .filter((row) => accountMap.has(row.companyId));
+
+    return rows
+      .filter((row) => !data?.status || data.status === "all" || row.status === data.status)
+      .map((row) => {
+        const messages = db
+          .select()
+          .from(t.crmAccountQueryMessages)
+          .where(eq(t.crmAccountQueryMessages.queryId, row.id))
+          .orderBy(asc(t.crmAccountQueryMessages.createdAt))
+          .all();
+        return mapQuerySummary(row, messages, accountMap.get(row.companyId)?.name);
+      });
+  });
+
+export const uploadCrmQueryAttachment = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        queryId: z.string().min(1),
+        fileName: z.string().min(1),
+        mimeType: z.string().min(1),
+        dataBase64: z.string().min(1),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    const db = getDb();
+    const query = loadQuery(db, data.queryId);
+    if (!query) throw new ApiError(404, "Query not found");
+    assertCanAccessCompany(user, query.companyId);
+    if (query.status === "archived") {
+      throw new ApiError(400, "Cannot upload to an archived query");
+    }
+
+    const buffer = decodeUploadPayload(data.dataBase64);
+    const saved = saveCrmQueryUpload({
+      queryId: data.queryId,
+      fileName: data.fileName,
+      mimeType: data.mimeType,
+      buffer,
+    });
+
+    return {
+      name: data.fileName,
+      url: saved.url,
+      mimeType: data.mimeType,
+      sizeBytes: buffer.length,
+      storageKey: saved.storageKey,
+    } satisfies CrmAccountQueryAttachment;
+  });
 
 export const listCrmAccountQueries = createServerFn({ method: "GET" })
   .inputValidator((data: unknown) => z.object({ companyId: z.string().min(1) }).parse(data))
@@ -173,7 +335,7 @@ export const createCrmAccountQuery = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => createQuerySchema.parse(data))
   .handler(async ({ data }) => {
     const user = requireUser();
-    assertCanAccessCompany(user, data.companyId);
+    const account = assertCanAccessCompany(user, data.companyId);
     const db = getDb();
     const now = nowIso();
     const id = newId();
@@ -210,6 +372,14 @@ export const createCrmAccountQuery = createServerFn({ method: "POST" })
         })
         .run();
     }
+
+    notifyAccountQueryParticipants(db, {
+      companyId: data.companyId,
+      queryId: id,
+      title: `New account query · ${account.name}`,
+      body: data.title.trim(),
+      excludeUserId: user.id,
+    });
 
     return loadQuery(db, id)!;
   });
@@ -269,6 +439,14 @@ export const addCrmAccountQueryMessage = createServerFn({ method: "POST" })
       .where(eq(t.crmAccountQueries.id, data.queryId))
       .run();
 
+    notifyAccountQueryParticipants(db, {
+      companyId: existing.companyId,
+      queryId: data.queryId,
+      title: `Reply on ${existing.title}`,
+      body: `${user.name}: ${data.body.trim().slice(0, 120)}`,
+      excludeUserId: user.id,
+    });
+
     return loadQuery(db, data.queryId)!;
   });
 
@@ -313,6 +491,15 @@ export const updateCrmAccountQueryStatus = createServerFn({ method: "POST" })
         createdAt: now,
       })
       .run();
+
+    notifyAccountQueryParticipants(db, {
+      companyId: existing.companyId,
+      queryId: data.queryId,
+      title: `${existing.title} · ${data.status}`,
+      body: `${user.name} ${statusLabel} this query`,
+      excludeUserId: user.id,
+      kind: data.status === "resolved" ? "success" : "info",
+    });
 
     return loadQuery(db, data.queryId)!;
   });

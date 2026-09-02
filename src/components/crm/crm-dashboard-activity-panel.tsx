@@ -44,6 +44,7 @@ const ACTIVITY_FILTER_CHIPS = [
   { id: "module", label: CRM_ACTIVITY_CATEGORY_LABEL.module },
   { id: "support", label: CRM_ACTIVITY_CATEGORY_LABEL.support },
   { id: "ticket", label: CRM_ACTIVITY_CATEGORY_LABEL.ticket },
+  { id: "query", label: CRM_ACTIVITY_CATEGORY_LABEL.query },
 ] as const satisfies ReadonlyArray<{ id: CrmActivityCategory; label: string }>;
 
 type ActivityFilterTone = "muted" | "warning" | "success" | "info" | "danger";
@@ -61,6 +62,7 @@ function activityFilterChipTone(id: CrmActivityCategory): ActivityFilterTone {
   if (id === "visit") return "success";
   if (id === "booking") return "warning";
   if (id === "ticket" || id === "support") return "danger";
+  if (id === "query") return "warning";
   return "muted";
 }
 

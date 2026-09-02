@@ -25,7 +25,8 @@ export type CrmActivityCategory =
   | "ticket"
   | "communication"
   | "follow_up"
-  | "visit";
+  | "visit"
+  | "query";
 
 export type CrmActivityItem = {
   id: string;
@@ -84,7 +85,8 @@ export type CrmActivityDestination =
   | { kind: "support-ticket"; ticketId: string }
   | { kind: "bookings" }
   | { kind: "tasks"; taskId?: string }
-  | { kind: "visits" };
+  | { kind: "visits" }
+  | { kind: "queries" };
 
 export function crmActivityTrackerStageLabel(stage: CrmImplementationStage | string): string {
   if (stage === "customer_success") return "Go Live";
@@ -113,6 +115,7 @@ export function crmActivityOpenLabel(
     module: "Open modules",
     tracker: "Open tracker",
     account: "Open account",
+    query: "Open queries",
   };
   return labels[category];
 }
@@ -133,6 +136,8 @@ export function crmActivityAccountTabForCategory(
       return "tickets";
     case "communication":
       return "comms";
+    case "query":
+      return "queries";
     case "module":
       return crmActivityTabForModule(moduleKey);
     case "tracker":
@@ -144,7 +149,7 @@ export function crmActivityAccountTabForCategory(
 }
 
 function parseActivityEntityId(id: string): string | undefined {
-  const match = /^(?:followup|visit|ticket|support|booking|crm-event|sub-event|comm)-(.+)$/.exec(id);
+  const match = /^(?:followup|visit|ticket|support|booking|crm-event|sub-event|comm|query)-(.+)$/.exec(id);
   return match?.[1];
 }
 
@@ -171,6 +176,10 @@ export function resolveCrmActivityDestination(
       return item.accountId
         ? { kind: "account", accountId: item.accountId, tab: "comms" }
         : null;
+    case "query":
+      return item.accountId
+        ? { kind: "account", accountId: item.accountId, tab: "queries" }
+        : { kind: "queries" };
     case "module":
       return item.accountId
         ? {
@@ -326,6 +335,7 @@ export const CRM_ACTIVITY_CATEGORY_LABEL: Record<
   communication: "Communications",
   follow_up: "Follow-up",
   visit: "Site visit",
+  query: "Account query",
 };
 
 export const CRM_ACTIVITY_STATUS_LABEL: Record<ActivityKind, string> = {
@@ -418,6 +428,16 @@ export function buildCrmActivityFeed(input: {
   tickets: Ticket[];
   followUpTasks?: FollowUpTask[];
   clientVisits?: ClientVisit[];
+  accountQueries?: {
+    id: string;
+    companyId: string;
+    title: string;
+    status: string;
+    createdByName: string;
+    updatedAt: string;
+    createdAt: string;
+    lastMessagePreview?: string;
+  }[];
   users?: { id: string; name: string }[];
 }): CrmActivityItem[] {
   const accountById = new Map(input.accounts.map((a) => [a.id, a]));
@@ -617,6 +637,34 @@ export function buildCrmActivityFeed(input: {
           leadContact: visit.contactName,
           remarks: visit.remarks || visit.outcome || visit.notes || visit.purpose,
           nextFollowUp: visit.nextFollowUpDate,
+        },
+        account,
+      ),
+    );
+  }
+
+  for (const query of input.accountQueries ?? []) {
+    if (!input.accountIds.has(query.companyId)) continue;
+    const account = accountById.get(query.companyId);
+    const accountName = nameById.get(query.companyId) ?? "Account";
+    events.push(
+      withAccountContext(
+        {
+          id: `query-${query.id}`,
+          what: query.title,
+          who: query.createdByName,
+          executive: query.createdByName,
+          createdAt: query.updatedAt || query.createdAt,
+          kind:
+            query.status === "resolved"
+              ? "success"
+              : query.status === "open"
+                ? "warning"
+                : "info",
+          category: "query",
+          accountId: query.companyId,
+          accountName,
+          remarks: query.lastMessagePreview ?? query.title,
         },
         account,
       ),
@@ -862,6 +910,7 @@ export function countCrmActivityByCategory(items: CrmActivityItem[]) {
     communication: 0,
     follow_up: 0,
     visit: 0,
+    query: 0,
   };
   for (const item of items) counts[item.category] += 1;
   return counts;

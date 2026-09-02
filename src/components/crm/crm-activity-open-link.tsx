@@ -91,6 +91,17 @@ export function CrmActivityOpenLink({ item, compact = false, onNavigate }: Props
     );
   }
 
+  if (destination.kind === "queries") {
+    return (
+      <Button size="sm" variant="outline" className={className} asChild onClick={onNavigate}>
+        <Link to="/crm/queries">
+          {label}
+          <ArrowRight className="h-3 w-3" />
+        </Link>
+      </Button>
+    );
+  }
+
   return (
     <Button size="sm" variant="outline" className={className} asChild onClick={onNavigate}>
       <Link to="/client-visits">

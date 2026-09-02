@@ -44,6 +44,7 @@ import { Route as CrmTicketsRouteImport } from './routes/crm.tickets'
 import { Route as CrmTasksRouteImport } from './routes/crm.tasks'
 import { Route as CrmSupportRouteImport } from './routes/crm.support'
 import { Route as CrmSettingsRouteImport } from './routes/crm.settings'
+import { Route as CrmQueriesRouteImport } from './routes/crm.queries'
 import { Route as CrmMasterRouteImport } from './routes/crm.master'
 import { Route as CrmLiveChatRouteImport } from './routes/crm.live-chat'
 import { Route as CrmBookingsRouteImport } from './routes/crm.bookings'
@@ -242,6 +243,11 @@ const CrmSettingsRoute = CrmSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => CrmRoute,
 } as any)
+const CrmQueriesRoute = CrmQueriesRouteImport.update({
+  id: '/queries',
+  path: '/queries',
+  getParentRoute: () => CrmRoute,
+} as any)
 const CrmMasterRoute = CrmMasterRouteImport.update({
   id: '/master',
   path: '/master',
@@ -390,6 +396,7 @@ export interface FileRoutesByFullPath {
   '/crm/bookings': typeof CrmBookingsRoute
   '/crm/live-chat': typeof CrmLiveChatRoute
   '/crm/master': typeof CrmMasterRoute
+  '/crm/queries': typeof CrmQueriesRoute
   '/crm/settings': typeof CrmSettingsRoute
   '/crm/support': typeof CrmSupportRouteWithChildren
   '/crm/tasks': typeof CrmTasksRoute
@@ -448,6 +455,7 @@ export interface FileRoutesByTo {
   '/crm/bookings': typeof CrmBookingsRoute
   '/crm/live-chat': typeof CrmLiveChatRoute
   '/crm/master': typeof CrmMasterRoute
+  '/crm/queries': typeof CrmQueriesRoute
   '/crm/settings': typeof CrmSettingsRoute
   '/crm/support': typeof CrmSupportRouteWithChildren
   '/crm/tasks': typeof CrmTasksRoute
@@ -507,6 +515,7 @@ export interface FileRoutesById {
   '/crm/bookings': typeof CrmBookingsRoute
   '/crm/live-chat': typeof CrmLiveChatRoute
   '/crm/master': typeof CrmMasterRoute
+  '/crm/queries': typeof CrmQueriesRoute
   '/crm/settings': typeof CrmSettingsRoute
   '/crm/support': typeof CrmSupportRouteWithChildren
   '/crm/tasks': typeof CrmTasksRoute
@@ -568,6 +577,7 @@ export interface FileRouteTypes {
     | '/crm/bookings'
     | '/crm/live-chat'
     | '/crm/master'
+    | '/crm/queries'
     | '/crm/settings'
     | '/crm/support'
     | '/crm/tasks'
@@ -626,6 +636,7 @@ export interface FileRouteTypes {
     | '/crm/bookings'
     | '/crm/live-chat'
     | '/crm/master'
+    | '/crm/queries'
     | '/crm/settings'
     | '/crm/support'
     | '/crm/tasks'
@@ -684,6 +695,7 @@ export interface FileRouteTypes {
     | '/crm/bookings'
     | '/crm/live-chat'
     | '/crm/master'
+    | '/crm/queries'
     | '/crm/settings'
     | '/crm/support'
     | '/crm/tasks'
@@ -988,6 +1000,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CrmSettingsRouteImport
       parentRoute: typeof CrmRoute
     }
+    '/crm/queries': {
+      id: '/crm/queries'
+      path: '/queries'
+      fullPath: '/crm/queries'
+      preLoaderRoute: typeof CrmQueriesRouteImport
+      parentRoute: typeof CrmRoute
+    }
     '/crm/master': {
       id: '/crm/master'
       path: '/master'
@@ -1217,6 +1236,7 @@ interface CrmRouteChildren {
   CrmBookingsRoute: typeof CrmBookingsRoute
   CrmLiveChatRoute: typeof CrmLiveChatRoute
   CrmMasterRoute: typeof CrmMasterRoute
+  CrmQueriesRoute: typeof CrmQueriesRoute
   CrmSettingsRoute: typeof CrmSettingsRoute
   CrmSupportRoute: typeof CrmSupportRouteWithChildren
   CrmTasksRoute: typeof CrmTasksRoute
@@ -1231,6 +1251,7 @@ const CrmRouteChildren: CrmRouteChildren = {
   CrmBookingsRoute: CrmBookingsRoute,
   CrmLiveChatRoute: CrmLiveChatRoute,
   CrmMasterRoute: CrmMasterRoute,
+  CrmQueriesRoute: CrmQueriesRoute,
   CrmSettingsRoute: CrmSettingsRoute,
   CrmSupportRoute: CrmSupportRouteWithChildren,
   CrmTasksRoute: CrmTasksRoute,

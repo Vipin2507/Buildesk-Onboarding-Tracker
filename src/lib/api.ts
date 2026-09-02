@@ -230,10 +230,12 @@ export {
 
 export {
   listCrmAccountQueries,
+  listAllCrmAccountQueries,
   getCrmAccountQuery,
   createCrmAccountQuery,
   addCrmAccountQueryMessage,
   updateCrmAccountQueryStatus,
+  uploadCrmQueryAttachment,
 } from "@/server/api/crm-account-queries";
 
 export {

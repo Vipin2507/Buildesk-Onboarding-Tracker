@@ -1,12 +1,13 @@
 import { useEffect } from "react";
 
-import { listBookingAppointments, listCrmEvents, listDesignTickets, listModuleSubscriptionEvents, listNotifications } from "@/lib/api";
+import { listBookingAppointments, listCrmEvents, listDesignTickets, listModuleSubscriptionEvents, listNotifications, listAllCrmAccountQueries } from "@/lib/api";
 import { useTaskTimeStatusSync } from "@/hooks/use-task-time-status";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useNotificationStore } from "@/stores/useNotificationStore";
 import { useBookingStore } from "@/stores/useBookingStore";
 import { useCrmEventStore } from "@/stores/useCrmEventStore";
 import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
+import { useCrmAccountQueryStore } from "@/stores/useCrmAccountQueryStore";
 
 const POLL_MS = 15_000;
 
@@ -19,6 +20,7 @@ export function CrmDashboardBootstrap() {
   const setSubscriptionEvents = useCrmEventStore((s) => s.setSubscriptionEvents);
   const hydrateTickets = useDesignTicketStore((s) => s.hydrateTickets);
   const hydrateAppointments = useBookingStore((s) => s.hydrateAppointments);
+  const hydrateAllQueries = useCrmAccountQueryStore((s) => s.hydrateAllQueries);
 
   useEffect(() => {
     if (!user) return;
@@ -26,12 +28,13 @@ export function CrmDashboardBootstrap() {
 
     async function sync() {
       try {
-        const [events, subscriptionEvents, tickets, appointments, notifications] = await Promise.all([
+        const [events, subscriptionEvents, tickets, appointments, notifications, queries] = await Promise.all([
           listCrmEvents({ data: { limit: 200 } }).catch(() => []),
           listModuleSubscriptionEvents({ data: {} }).catch(() => []),
           listDesignTickets({ data: {} }).catch(() => []),
           listBookingAppointments({ data: {} }).catch(() => []),
           listNotifications({ data: { limit: 80 } }).catch(() => []),
+          listAllCrmAccountQueries({ data: {} }).catch(() => []),
         ]);
         if (cancelled) return;
         setEvents(events);
@@ -39,6 +42,7 @@ export function CrmDashboardBootstrap() {
         hydrateTickets(tickets);
         hydrateAppointments(appointments);
         hydrateNotifications(notifications);
+        hydrateAllQueries(queries);
       } catch (e) {
         console.warn("[crm dashboard bootstrap]", e);
       }
@@ -50,7 +54,7 @@ export function CrmDashboardBootstrap() {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [hydrateAppointments, hydrateNotifications, hydrateTickets, setEvents, setSubscriptionEvents, user]);
+  }, [hydrateAllQueries, hydrateAppointments, hydrateNotifications, hydrateTickets, setEvents, setSubscriptionEvents, user]);
 
   return null;
 }

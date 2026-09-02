@@ -2,6 +2,7 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { handleCrmQueryFileRequest } from "./server/lib/crm-query-file-storage";
 import { startCrmReminderScheduler } from "./server/crm-reminder-scheduler";
 
 startCrmReminderScheduler();
@@ -50,6 +51,11 @@ function isH3SwallowedErrorBody(body: string): boolean {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const url = new URL(request.url);
+      if (url.pathname.startsWith("/api/crm-query-files/")) {
+        return handleCrmQueryFileRequest(request);
+      }
+
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);
