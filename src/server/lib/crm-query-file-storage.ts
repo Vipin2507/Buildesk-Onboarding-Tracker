@@ -7,10 +7,11 @@ import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { and, eq, gt } from "drizzle-orm";
 import { getProjectRoot } from "@/server/db/resolve-db-path";
+import { CRM_QUERY_MAX_UPLOAD_BYTES } from "@/lib/crm-query-attachments";
 
 const SESSION_COOKIE = "buildesk_session";
 
-const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = CRM_QUERY_MAX_UPLOAD_BYTES;
 
 function uploadsRoot() {
   return path.join(getProjectRoot(), "data", "uploads", "crm-queries");

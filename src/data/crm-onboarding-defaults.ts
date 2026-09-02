@@ -34,9 +34,6 @@ export const CRM_MODULE_PROVIDERS: Partial<Record<CrmProductModuleKey, string[]>
   "99acres-integration": ["99acres API", "Manual Sync"],
   "magicbricks-integration": ["MagicBricks API", "Manual Sync"],
   "housing-integration": ["Housing API", "Manual Sync"],
-  "sim-call-recording": ["Knowlarity", "Exotel", "MyOperator", "Servetel", "Ozonetel", "Custom SIM Gateway"],
-  waha: ["WAHA Self-hosted", "WAHA Cloud", "Custom"],
-  "auto-dialer": ["Exotel", "Knowlarity", "Ozonetel", "Servetel", "MyOperator"],
 };
 
 export function moduleRequiresProvider(key: CrmProductModuleKey): boolean {

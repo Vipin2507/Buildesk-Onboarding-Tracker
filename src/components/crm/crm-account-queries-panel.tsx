@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Archive,
   CheckCircle2,
-  ImagePlus,
   Mic,
   MicOff,
   Paperclip,
@@ -22,8 +21,27 @@ import { EntityFormModal } from "@/components/entity-form-modal";
 import { EmptyState } from "@/components/empty-state";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
+import {
+  CRM_QUERY_MAX_UPLOAD_BYTES,
+  crmQueryAttachmentPreviewLabel,
+  crmQueryDefaultAttachmentBody,
+  crmQueryMessageTypeForMime,
+  formatCrmQueryFileSize,
+  isCrmQueryAudioMime,
+  isCrmQueryImageMime,
+  isCrmQueryVideoMime,
+} from "@/lib/crm-query-attachments";
 import { compressImageToDataUrl } from "@/lib/compress-image";
 import { crmAccountTeamAssigneeUsers } from "@/lib/crm-account-access";
+import {
+  applyCrmQueryMention,
+  filterCrmQueryMentionCandidates,
+  getCrmQueryMentionContext,
+  splitCrmQueryMessageMentions,
+  type CrmQueryMentionCandidate,
+} from "@/lib/crm-query-mentions";
+import { useCrmQueryLiveSync } from "@/hooks/use-crm-query-live-sync";
+import { isAdminRoleKey } from "@/lib/permissions";
 import { cn, formatDate, formatTime } from "@/lib/utils";
 import {
   useAuthStore,
@@ -38,6 +56,7 @@ import {
   type CrmAccountQueryAttachment,
   type CrmAccountQueryCategory,
   type CrmAccountQueryMessage,
+  type CrmAccountQueryTypingUser,
 } from "@/types/crm-account-query";
 
 function statusTone(status: CrmAccountQuery["status"]) {
@@ -50,9 +69,8 @@ function lastMessagePreview(query: CrmAccountQuery) {
   const last = query.messages[query.messages.length - 1];
   if (!last) return "No messages yet";
   if (last.messageType === "system") return last.body;
-  if (last.messageType === "image") return "Image";
-  if (last.messageType === "voice") return "Voice note";
-  return last.body.slice(0, 60);
+  if (last.messageType === "text") return last.body.slice(0, 60);
+  return crmQueryAttachmentPreviewLabel(last.messageType, last.attachments?.[0]);
 }
 
 function AutoGrowTextarea({
@@ -61,16 +79,24 @@ function AutoGrowTextarea({
   placeholder,
   disabled,
   onSubmit,
+  onPaste,
   className,
+  mentionCandidates,
+  currentUserId,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   disabled?: boolean;
   onSubmit?: () => void;
+  onPaste?: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void;
   className?: string;
+  mentionCandidates?: CrmQueryMentionCandidate[];
+  currentUserId?: string;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const [cursor, setCursor] = useState(0);
+  const [mentionIndex, setMentionIndex] = useState(0);
 
   useEffect(() => {
     const el = ref.current;
@@ -79,25 +105,209 @@ function AutoGrowTextarea({
     el.style.height = `${Math.min(el.scrollHeight, 96)}px`;
   }, [value]);
 
+  const mentionContext = useMemo(
+    () => (mentionCandidates?.length ? getCrmQueryMentionContext(value, cursor) : null),
+    [mentionCandidates, value, cursor],
+  );
+
+  const filteredMentions = useMemo(
+    () =>
+      mentionContext && mentionCandidates
+        ? filterCrmQueryMentionCandidates(mentionCandidates, mentionContext.query, currentUserId)
+        : [],
+    [mentionContext, mentionCandidates, currentUserId],
+  );
+
+  const mentionOpen = Boolean(mentionContext && filteredMentions.length);
+
+  useEffect(() => {
+    setMentionIndex(0);
+  }, [mentionContext?.query, filteredMentions.length]);
+
+  function syncCursor() {
+    const el = ref.current;
+    if (el) setCursor(el.selectionStart ?? value.length);
+  }
+
+  function selectMention(user: CrmQueryMentionCandidate) {
+    if (!mentionContext) return;
+    const { value: next, cursor: nextCursor } = applyCrmQueryMention(
+      value,
+      mentionContext.start,
+      cursor,
+      user.name,
+    );
+    onChange(next);
+    setCursor(nextCursor);
+    requestAnimationFrame(() => {
+      const el = ref.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(nextCursor, nextCursor);
+    });
+  }
+
   return (
-    <textarea
-      ref={ref}
-      rows={1}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      disabled={disabled}
-      className={cn(
-        "min-h-8 max-h-24 w-full resize-none overflow-y-auto rounded-md border border-input bg-background px-2.5 py-1.5 text-xs leading-5 outline-none focus:ring-2 focus:ring-ring/40",
-        className,
+    <div className="relative">
+      {mentionOpen ? (
+        <div className="absolute bottom-full left-0 z-20 mb-1 max-h-40 w-full min-w-[12rem] overflow-y-auto rounded-md border bg-popover py-1 shadow-md">
+          {filteredMentions.map((user, index) => (
+            <button
+              key={user.id}
+              type="button"
+              className={cn(
+                "flex w-full items-center px-2.5 py-1.5 text-left text-xs hover:bg-muted",
+                index === mentionIndex && "bg-muted",
+              )}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                selectMention(user);
+              }}
+            >
+              <span className="font-medium">{user.name}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <textarea
+        ref={ref}
+        rows={1}
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setCursor(e.target.selectionStart ?? e.target.value.length);
+        }}
+        onClick={syncCursor}
+        onKeyUp={syncCursor}
+        placeholder={placeholder}
+        disabled={disabled}
+        className={cn(
+          "min-h-8 max-h-24 w-full resize-none overflow-y-auto rounded-md border border-input bg-background px-2.5 py-1.5 text-xs leading-5 outline-none focus:ring-2 focus:ring-ring/40",
+          className,
+        )}
+        onKeyDown={(e) => {
+          if (mentionOpen) {
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              setMentionIndex((i) => Math.min(i + 1, filteredMentions.length - 1));
+              return;
+            }
+            if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setMentionIndex((i) => Math.max(i - 1, 0));
+              return;
+            }
+            if (e.key === "Enter" || e.key === "Tab") {
+              e.preventDefault();
+              const picked = filteredMentions[mentionIndex];
+              if (picked) selectMention(picked);
+              return;
+            }
+            if (e.key === "Escape") {
+              e.preventDefault();
+              return;
+            }
+          }
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            onSubmit?.();
+          }
+        }}
+        onPaste={onPaste}
+      />
+    </div>
+  );
+}
+
+function MessageBodyWithMentions({ body, isSelf }: { body: string; isSelf: boolean }) {
+  const parts = splitCrmQueryMessageMentions(body);
+  return (
+    <p className="whitespace-pre-wrap break-words leading-snug">
+      {parts.map((part, index) =>
+        part.type === "mention" ? (
+          <span
+            key={index}
+            className={cn(
+              "font-semibold",
+              isSelf ? "text-primary-foreground underline decoration-primary-foreground/40" : "text-primary",
+            )}
+          >
+            @{part.text}
+          </span>
+        ) : (
+          <span key={index}>{part.text}</span>
+        ),
       )}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" && !e.shiftKey) {
-          e.preventDefault();
-          onSubmit?.();
-        }
-      }}
-    />
+    </p>
+  );
+}
+
+function QueryMessageAttachment({
+  attachment,
+  messageType,
+  isSelf,
+}: {
+  attachment: CrmAccountQueryAttachment;
+  messageType: CrmAccountQueryMessage["messageType"];
+  isSelf: boolean;
+}) {
+  if (!attachment.url) return null;
+
+  const mime = attachment.mimeType ?? "";
+  const showImage =
+    messageType === "image" || isCrmQueryImageMime(mime);
+  const showVideo = isCrmQueryVideoMime(mime);
+  const showAudio =
+    messageType === "voice" || isCrmQueryAudioMime(mime);
+
+  if (showImage && !showVideo) {
+    return (
+      <a href={attachment.url} target="_blank" rel="noreferrer" className="block">
+        <img
+          src={attachment.url}
+          alt={attachment.name || "Attachment"}
+          className="max-h-36 rounded-md object-contain"
+        />
+      </a>
+    );
+  }
+
+  if (showVideo) {
+    return (
+      <video
+        controls
+        className="max-h-48 w-full max-w-xs rounded-md bg-black/10"
+        src={attachment.url}
+      >
+        <track kind="captions" />
+      </video>
+    );
+  }
+
+  if (showAudio) {
+    return (
+      <audio controls className="w-full max-w-xs" src={attachment.url}>
+        <track kind="captions" />
+      </audio>
+    );
+  }
+
+  const sizeLabel = formatCrmQueryFileSize(attachment.sizeBytes);
+  return (
+    <a
+      href={attachment.url}
+      target="_blank"
+      rel="noreferrer"
+      download={attachment.name}
+      className={cn(
+        "mt-0.5 inline-flex max-w-full items-center gap-1.5 truncate rounded-md px-2 py-1 text-xs underline-offset-2 hover:underline",
+        isSelf ? "bg-primary-foreground/15" : "bg-muted",
+      )}
+    >
+      <Paperclip className="h-3.5 w-3.5 shrink-0" />
+      <span className="truncate">{attachment.name || "Download file"}</span>
+      {sizeLabel ? <span className="shrink-0 opacity-70">({sizeLabel})</span> : null}
+    </a>
   );
 }
 
@@ -139,43 +349,43 @@ function MessageBubble({
           <span>{formatTime(msg.createdAt)}</span>
         </div>
 
-        {msg.messageType === "image" && msg.attachments?.[0]?.url ? (
-          <a href={msg.attachments[0].url} target="_blank" rel="noreferrer">
-            <img
-              src={msg.attachments[0].url}
-              alt={msg.attachments[0].name || "Attachment"}
-              className="max-h-36 rounded-md object-contain"
-            />
-          </a>
+        {msg.attachments?.[0] ? (
+          <QueryMessageAttachment
+            attachment={msg.attachments[0]}
+            messageType={msg.messageType}
+            isSelf={isSelf}
+          />
         ) : null}
 
-        {msg.messageType === "voice" && msg.attachments?.[0]?.url ? (
-          <audio controls className="w-full max-w-xs" src={msg.attachments[0].url}>
-            <track kind="captions" />
-          </audio>
-        ) : null}
-
-        {msg.body.trim() ? (
-          <p className="whitespace-pre-wrap break-words leading-snug">{msg.body}</p>
-        ) : null}
-
-        {msg.messageType === "text" && msg.attachments?.length ? (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {msg.attachments.map((file) => (
-              <span
-                key={file.name}
-                className={cn(
-                  "inline-flex max-w-full items-center gap-1 truncate rounded-md px-2 py-0.5 text-xs",
-                  isSelf ? "bg-primary-foreground/15" : "bg-muted",
-                )}
-              >
-                <Paperclip className="h-3 w-3 shrink-0" />
-                {file.name}
-              </span>
-            ))}
-          </div>
-        ) : null}
+        {msg.body.trim() ? <MessageBodyWithMentions body={msg.body} isSelf={isSelf} /> : null}
       </div>
+    </div>
+  );
+}
+
+function TypingIndicator({ users }: { users: CrmAccountQueryTypingUser[] }) {
+  if (!users.length) return null;
+
+  const names = users.map((u) => u.userName);
+  const label =
+    names.length === 1
+      ? `${names[0]} is typing`
+      : names.length === 2
+        ? `${names[0]} and ${names[1]} are typing`
+        : `${names.length} people are typing`;
+
+  return (
+    <div className="flex items-center gap-2 px-1 py-1">
+      <div className="flex items-center gap-0.5 rounded-full bg-muted px-2 py-1.5">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/80"
+            style={{ animationDelay: `${i * 140}ms`, animationDuration: "0.9s" }}
+          />
+        ))}
+      </div>
+      <span className="text-[10px] text-muted-foreground">{label}</span>
     </div>
   );
 }
@@ -183,8 +393,11 @@ function MessageBubble({
 function QueryThread({
   query,
   currentUserId,
+  typingUsers,
+  mentionCandidates,
   onSend,
   onUploadAttachment,
+  onSetTyping,
   onResolve,
   onReopen,
   onArchive,
@@ -192,15 +405,21 @@ function QueryThread({
 }: {
   query: CrmAccountQuery;
   currentUserId?: string;
+  typingUsers: CrmAccountQueryTypingUser[];
+  mentionCandidates: CrmQueryMentionCandidate[];
   onSend: (
     body: string,
-    opts?: { messageType?: "text" | "image" | "voice"; attachments?: CrmAccountQueryAttachment[] },
+    opts?: {
+      messageType?: "text" | "image" | "voice" | "file";
+      attachments?: CrmAccountQueryAttachment[];
+    },
   ) => Promise<void>;
   onUploadAttachment: (
     file: Blob,
     fileName: string,
     mimeType: string,
   ) => Promise<CrmAccountQueryAttachment>;
+  onSetTyping: (typing: boolean) => void;
   onResolve: () => void;
   onReopen: () => void;
   onArchive: () => void;
@@ -218,37 +437,98 @@ function QueryThread({
     [query.messages],
   );
 
+  const composerDisabled = sending || query.status === "archived";
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [query.messages.length]);
+  }, [query.messages.length, typingUsers.length]);
 
   useEffect(() => {
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
+      onSetTyping(false);
     };
-  }, []);
+  }, [onSetTyping]);
+
+  useEffect(() => {
+    if (composerDisabled || !text.trim()) {
+      onSetTyping(false);
+      return;
+    }
+    onSetTyping(true);
+    const heartbeat = window.setInterval(() => onSetTyping(true), 2_000);
+    return () => {
+      window.clearInterval(heartbeat);
+      onSetTyping(false);
+    };
+  }, [composerDisabled, onSetTyping, text]);
 
   async function handleSendText() {
     if (!text.trim() || sending || query.status === "archived") return;
+    onSetTyping(false);
     await onSend(text.trim(), { messageType: "text" });
     setText("");
   }
 
-  async function handlePickImage(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file || query.status === "archived") return;
+  async function sendMediaFile(file: File) {
+    if (query.status === "archived" || sending) return;
+    if (file.size > CRM_QUERY_MAX_UPLOAD_BYTES) {
+      toast.error(`File exceeds ${CRM_QUERY_MAX_UPLOAD_BYTES / (1024 * 1024)}MB limit`);
+      return;
+    }
+
     try {
-      const dataUrl = await compressImageToDataUrl(file, { maxEdge: 960 });
-      const blob = await fetch(dataUrl).then((r) => r.blob());
-      const attachment = await onUploadAttachment(blob, file.name, file.type || "image/jpeg");
-      await onSend(text.trim() || "Shared an image", {
-        messageType: "image",
+      const mimeType = file.type || "application/octet-stream";
+      const messageType = crmQueryMessageTypeForMime(mimeType);
+      let blob: Blob = file;
+      let uploadMime = mimeType;
+      let fileName = file.name?.trim() || `attachment-${Date.now()}`;
+
+      if (messageType === "image") {
+        const dataUrl = await compressImageToDataUrl(file, { maxEdge: 960 });
+        blob = await fetch(dataUrl).then((r) => r.blob());
+        uploadMime = file.type || blob.type || "image/jpeg";
+        if (!fileName.includes(".")) fileName = `${fileName}.jpg`;
+      }
+
+      const attachment = await onUploadAttachment(blob, fileName, uploadMime);
+      onSetTyping(false);
+      await onSend(text.trim() || crmQueryDefaultAttachmentBody(fileName, uploadMime), {
+        messageType,
         attachments: [attachment],
       });
       setText("");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not attach image");
+      toast.error(err instanceof Error ? err.message : "Could not attach file");
+    }
+  }
+
+  async function handlePickFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || query.status === "archived") return;
+    await sendMediaFile(file);
+  }
+
+  function handlePasteMedia(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    if (composerDisabled || sending) return;
+
+    const clipboard = e.clipboardData;
+    if (!clipboard) return;
+
+    for (const item of clipboard.items) {
+      if (item.kind !== "file") continue;
+      const file = item.getAsFile();
+      if (!file) continue;
+      e.preventDefault();
+      void sendMediaFile(file);
+      return;
+    }
+
+    const pastedFile = clipboard.files[0];
+    if (pastedFile) {
+      e.preventDefault();
+      void sendMediaFile(pastedFile);
     }
   }
 
@@ -293,8 +573,6 @@ function QueryThread({
     recorderRef.current = null;
     setRecording(false);
   }
-
-  const composerDisabled = sending || query.status === "archived";
 
   return (
     <div className="flex h-[min(420px,calc(100dvh-280px))] min-h-[280px] flex-1 flex-col overflow-hidden rounded-lg border bg-card">
@@ -347,6 +625,7 @@ function QueryThread({
             <MessageBubble key={msg.id} msg={msg} isSelf={msg.authorUserId === currentUserId} />
           ))
         )}
+        <TypingIndicator users={typingUsers} />
         <div ref={bottomRef} />
       </div>
 
@@ -367,19 +646,25 @@ function QueryThread({
               <AutoGrowTextarea
                 value={text}
                 onChange={setText}
-                placeholder="Write a reply…"
+                placeholder="Write a reply… Use @ to mention"
                 disabled={composerDisabled}
                 onSubmit={() => void handleSendText()}
+                onPaste={handlePasteMedia}
+                mentionCandidates={mentionCandidates}
+                currentUserId={currentUserId}
               />
             </div>
-            <label className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md border bg-background hover:bg-muted">
-              <ImagePlus className="h-3.5 w-3.5" />
+            <label
+              className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md border bg-background hover:bg-muted"
+              title="Attach file"
+            >
+              <Paperclip className="h-3.5 w-3.5" />
               <input
                 type="file"
-                accept="image/*"
+                accept="*/*"
                 className="sr-only"
                 disabled={composerDisabled}
-                onChange={(e) => void handlePickImage(e)}
+                onChange={(e) => void handlePickFile(e)}
               />
             </label>
             {!recording ? (
@@ -442,6 +727,7 @@ export function CrmAccountQueriesPanel({
   const addMessage = useCrmAccountQueryStore((s) => s.addMessage);
   const updateStatus = useCrmAccountQueryStore((s) => s.updateStatus);
   const uploadAttachment = useCrmAccountQueryStore((s) => s.uploadAttachment);
+  const setQueryTyping = useCrmAccountQueryStore((s) => s.setQueryTyping);
 
   const [selectedId, setSelectedId] = useState<string | null>(initialQueryId ?? null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -466,12 +752,36 @@ export function CrmAccountQueriesPanel({
     [account, users],
   );
 
+  const mentionCandidates = useMemo(() => {
+    const map = new Map<string, CrmQueryMentionCandidate>();
+    for (const member of teamMembers) {
+      map.set(member.id, { id: member.id, name: member.name });
+    }
+    for (const u of users) {
+      if (u.active === false) continue;
+      if (!isAdminRoleKey(u.role)) continue;
+      if (u.productScope && u.productScope !== "crm") continue;
+      map.set(u.id, { id: u.id, name: u.name });
+    }
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [teamMembers, users]);
+
   const filteredQueries = useMemo(() => {
     if (statusFilter === "all") return queries;
     return queries.filter((q) => q.status === statusFilter);
   }, [queries, statusFilter]);
 
   const selected = selectedId ? queries.find((q) => q.id === selectedId) : filteredQueries[0];
+
+  const { typingUsers } = useCrmQueryLiveSync(selected?.id ?? null, Boolean(selected));
+
+  const handleSetTyping = useCallback(
+    (typing: boolean) => {
+      if (!selected) return;
+      void setQueryTyping(selected.id, typing);
+    },
+    [selected, setQueryTyping],
+  );
 
   useEffect(() => {
     if (!filteredQueries.length) {
@@ -513,7 +823,7 @@ export function CrmAccountQueriesPanel({
   async function handleSend(
     queryId: string,
     body: string,
-    opts?: { messageType?: "text" | "image" | "voice"; attachments?: CrmAccountQueryAttachment[] },
+    opts?: { messageType?: "text" | "image" | "voice" | "file"; attachments?: CrmAccountQueryAttachment[] },
   ) {
     setSending(true);
     try {
@@ -619,11 +929,14 @@ export function CrmAccountQueriesPanel({
                 key={selected.id}
                 query={selected}
                 currentUserId={user?.id}
+                typingUsers={typingUsers}
+                mentionCandidates={mentionCandidates}
                 sending={sending}
                 onSend={(body, opts) => handleSend(selected.id, body, opts)}
                 onUploadAttachment={(file, fileName, mimeType) =>
                   uploadAttachment(selected.id, file, fileName, mimeType)
                 }
+                onSetTyping={handleSetTyping}
                 onResolve={() =>
                   void updateStatus(selected.id, "resolved")
                     .then(() => toast.success("Query resolved"))
@@ -686,8 +999,10 @@ export function CrmAccountQueriesPanel({
           <AutoGrowTextarea
             value={createMessage}
             onChange={setCreateMessage}
-            placeholder="Describe your question for the account team…"
+            placeholder="Describe your question… Use @ to mention someone"
             className="mt-1"
+            mentionCandidates={mentionCandidates}
+            currentUserId={user?.id}
           />
         </label>
       </EntityFormModal>

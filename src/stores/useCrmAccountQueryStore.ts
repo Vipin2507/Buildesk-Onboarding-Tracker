@@ -3,6 +3,7 @@ import {
   createCrmAccountQuery,
   listAllCrmAccountQueries,
   listCrmAccountQueries,
+  setCrmAccountQueryTyping,
   updateCrmAccountQueryStatus,
   uploadCrmQueryAttachment,
 } from "@/lib/api";
@@ -14,6 +15,7 @@ import type {
   CrmAccountQueryStatus,
   CrmAccountQuerySummary,
 } from "@/types/crm-account-query";
+import { crmQueryAttachmentPreviewLabel } from "@/lib/crm-query-attachments";
 import { createStore } from "./persist";
 
 type CrmAccountQueryState = {
@@ -33,6 +35,7 @@ type CrmAccountQueryState = {
     fileName: string,
     mimeType: string,
   ) => Promise<CrmAccountQueryAttachment>;
+  setQueryTyping: (queryId: string, typing: boolean) => Promise<void>;
   createQuery: (input: {
     companyId: string;
     title: string;
@@ -57,10 +60,9 @@ function summaryFromQuery(query: CrmAccountQuery, accountName?: string): CrmAcco
   const last = query.messages[query.messages.length - 1];
   let lastMessagePreview: string | undefined;
   if (last) {
-    if (last.messageType === "system") lastMessagePreview = last.body;
-    else if (last.messageType === "image") lastMessagePreview = "Image attachment";
-    else if (last.messageType === "voice") lastMessagePreview = "Voice note";
-    else lastMessagePreview = last.body.slice(0, 120);
+    if (last.messageType === "text") lastMessagePreview = last.body.slice(0, 120);
+    else if (last.messageType === "system") lastMessagePreview = last.body;
+    else lastMessagePreview = crmQueryAttachmentPreviewLabel(last.messageType, last.attachments?.[0]);
   }
   return {
     id: query.id,
@@ -174,6 +176,14 @@ export const useCrmAccountQueryStore = createStore<CrmAccountQueryState>(
       return uploadCrmQueryAttachment({
         data: { queryId, fileName, mimeType, dataBase64 },
       });
+    },
+
+    setQueryTyping: async (queryId, typing) => {
+      try {
+        await setCrmAccountQueryTyping({ data: { queryId, typing } });
+      } catch {
+        /* ignore typing heartbeat failures */
+      }
     },
 
     createQuery: async (input) => {

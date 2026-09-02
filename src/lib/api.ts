@@ -232,6 +232,8 @@ export {
   listCrmAccountQueries,
   listAllCrmAccountQueries,
   getCrmAccountQuery,
+  syncCrmAccountQuery,
+  setCrmAccountQueryTyping,
   createCrmAccountQuery,
   addCrmAccountQueryMessage,
   updateCrmAccountQueryStatus,

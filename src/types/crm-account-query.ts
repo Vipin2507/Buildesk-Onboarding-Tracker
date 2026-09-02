@@ -16,6 +16,11 @@ export type CrmAccountQueryAttachment = {
   storageKey?: string;
 };
 
+export type CrmAccountQueryTypingUser = {
+  userId: string;
+  userName: string;
+};
+
 export type CrmAccountQuerySummary = {
   id: string;
   companyId: string;

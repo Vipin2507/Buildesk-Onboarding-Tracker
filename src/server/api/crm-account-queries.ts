@@ -3,6 +3,7 @@ import { asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { canViewCrmAccount } from "@/lib/crm-account-access";
+import { resolveCrmQueryMentionUserIds } from "@/lib/crm-query-mentions";
 import { isAdminRoleKey } from "@/lib/permissions";
 import {
   insertNotificationsForUserIds,
@@ -15,6 +16,10 @@ import {
   decodeUploadPayload,
   saveCrmQueryUpload,
 } from "@/server/lib/crm-query-file-storage";
+import {
+  getCrmQueryTypingUsers,
+  setCrmQueryTyping,
+} from "@/server/lib/crm-query-typing";
 import type {
   CrmAccountQuery,
   CrmAccountQueryAttachment,
@@ -146,6 +151,10 @@ function lastMessagePreview(messages: CrmAccountQueryMessage[]) {
   if (last.messageType === "system") return last.body;
   if (last.messageType === "image") return "Image attachment";
   if (last.messageType === "voice") return "Voice note";
+  if (last.messageType === "file") {
+    const name = last.attachments?.[0]?.name;
+    return name ? `File: ${name}` : "File attachment";
+  }
   return last.body.slice(0, 120);
 }
 
@@ -172,6 +181,54 @@ function mapQuerySummary(
   };
 }
 
+function loadMentionCandidatesForCompany(db: ReturnType<typeof getDb>, companyId: string) {
+  const recipientIds = resolveNotificationRecipientIds(db, {
+    companyId,
+    productScope: "crm",
+  });
+  const users = db.select().from(t.users).all();
+  return users
+    .filter((u) => recipientIds.includes(u.id) && u.active !== false)
+    .map((u) => ({ id: u.id, name: u.name }));
+}
+
+function notifyAccountQueryMentions(
+  db: ReturnType<typeof getDb>,
+  opts: {
+    companyId: string;
+    queryId: string;
+    queryTitle: string;
+    body: string;
+    authorName: string;
+    authorUserId: string;
+  },
+): string[] {
+  const candidates = loadMentionCandidatesForCompany(db, opts.companyId);
+  const mentionedIds = resolveCrmQueryMentionUserIds(opts.body, candidates).filter(
+    (id) => id !== opts.authorUserId,
+  );
+  if (!mentionedIds.length) return [];
+
+  const users = db.select().from(t.users).all();
+  const enabledIds = mentionedIds.filter((id) => {
+    const user = users.find((u) => u.id === id);
+    return user?.active !== false && user?.notifyInApp !== false;
+  });
+
+  if (enabledIds.length) {
+    insertNotificationsForUserIds(db, enabledIds, {
+      title: `${opts.authorName} mentioned you`,
+      body: `${opts.queryTitle}: ${opts.body.trim().slice(0, 120)}`,
+      href: `/crm/accounts/${opts.companyId}?tab=queries&queryId=${opts.queryId}`,
+      companyId: opts.companyId,
+      ticketId: opts.queryId,
+      kind: "warning",
+    });
+  }
+
+  return mentionedIds;
+}
+
 function notifyAccountQueryParticipants(
   db: ReturnType<typeof getDb>,
   opts: {
@@ -180,13 +237,15 @@ function notifyAccountQueryParticipants(
     title: string;
     body: string;
     excludeUserId: string;
+    alsoExcludeUserIds?: string[];
     kind?: "info" | "success" | "warning";
   },
 ) {
+  const extraExclude = new Set(opts.alsoExcludeUserIds ?? []);
   const recipientIds = resolveNotificationRecipientIds(db, {
     companyId: opts.companyId,
     productScope: "crm",
-  }).filter((id) => id !== opts.excludeUserId);
+  }).filter((id) => id !== opts.excludeUserId && !extraExclude.has(id));
 
   const users = db.select().from(t.users).all();
   const enabledIds = recipientIds.filter((id) => {
@@ -199,7 +258,7 @@ function notifyAccountQueryParticipants(
   insertNotificationsForUserIds(db, enabledIds, {
     title: opts.title,
     body: opts.body,
-    href: `/crm/accounts/${opts.companyId}?tab=queries`,
+    href: `/crm/accounts/${opts.companyId}?tab=queries&queryId=${opts.queryId}`,
     companyId: opts.companyId,
     ticketId: opts.queryId,
     kind: opts.kind ?? "info",
@@ -331,6 +390,54 @@ export const getCrmAccountQuery = createServerFn({ method: "GET" })
     return query;
   });
 
+export const syncCrmAccountQuery = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        queryId: z.string().min(1),
+        updatedAt: z.string().optional(),
+        messageCount: z.number().int().nonnegative().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    const db = getDb();
+    const query = loadQuery(db, data.queryId);
+    if (!query) throw new ApiError(404, "Query not found");
+    assertCanAccessCompany(user, query.companyId);
+
+    const changed =
+      !data.updatedAt ||
+      data.updatedAt !== query.updatedAt ||
+      (data.messageCount != null && data.messageCount !== query.messages.length);
+
+    return {
+      changed,
+      query: changed ? query : undefined,
+      typing: getCrmQueryTypingUsers(data.queryId, user.id),
+    };
+  });
+
+export const setCrmAccountQueryTyping = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        queryId: z.string().min(1),
+        typing: z.boolean(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    const db = getDb();
+    const query = loadQuery(db, data.queryId);
+    if (!query) throw new ApiError(404, "Query not found");
+    assertCanAccessCompany(user, query.companyId);
+    setCrmQueryTyping(data.queryId, user.id, user.name, data.typing);
+    return { ok: true as const };
+  });
+
 export const createCrmAccountQuery = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => createQuerySchema.parse(data))
   .handler(async ({ data }) => {
@@ -373,12 +480,24 @@ export const createCrmAccountQuery = createServerFn({ method: "POST" })
         .run();
     }
 
+    const mentionedIds = initialBody
+      ? notifyAccountQueryMentions(db, {
+          companyId: data.companyId,
+          queryId: id,
+          queryTitle: data.title.trim(),
+          body: initialBody,
+          authorName: user.name,
+          authorUserId: user.id,
+        })
+      : [];
+
     notifyAccountQueryParticipants(db, {
       companyId: data.companyId,
       queryId: id,
       title: `New account query · ${account.name}`,
       body: data.title.trim(),
       excludeUserId: user.id,
+      alsoExcludeUserIds: mentionedIds,
     });
 
     return loadQuery(db, id)!;
@@ -439,13 +558,25 @@ export const addCrmAccountQueryMessage = createServerFn({ method: "POST" })
       .where(eq(t.crmAccountQueries.id, data.queryId))
       .run();
 
+    const mentionedIds = notifyAccountQueryMentions(db, {
+      companyId: existing.companyId,
+      queryId: data.queryId,
+      queryTitle: existing.title,
+      body: data.body.trim(),
+      authorName: user.name,
+      authorUserId: user.id,
+    });
+
     notifyAccountQueryParticipants(db, {
       companyId: existing.companyId,
       queryId: data.queryId,
       title: `Reply on ${existing.title}`,
       body: `${user.name}: ${data.body.trim().slice(0, 120)}`,
       excludeUserId: user.id,
+      alsoExcludeUserIds: mentionedIds,
     });
+
+    setCrmQueryTyping(data.queryId, user.id, user.name, false);
 
     return loadQuery(db, data.queryId)!;
   });
