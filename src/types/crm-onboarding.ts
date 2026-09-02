@@ -55,11 +55,21 @@ export type CrmImplementationStage =
   | "ticket_support"
   | "customer_success";
 
+export type CrmModuleWorkflowStepKind = "date" | "yes_no" | "file" | "remarks";
+
 export type CrmModuleWorkflowStep = {
   key: string;
   label: string;
   done: boolean;
   completedAt?: string;
+  /** Step interaction type — defaults to date/checklist completion. */
+  kind?: CrmModuleWorkflowStepKind;
+  /** For yes/no steps: "yes" | "no". */
+  value?: string;
+  /** For file steps: uploaded file name. */
+  fileName?: string;
+  /** For remarks steps: executive comments. */
+  remarks?: string;
 };
 
 export type CrmProductModule = {

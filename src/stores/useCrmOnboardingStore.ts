@@ -8,6 +8,7 @@ import type {
   CrmImplementationStage,
   CrmMasterChecklistItem,
   CrmMigrationChecklistItem,
+  CrmModuleWorkflowStep,
   CrmOnboardingRecord,
   CrmProductModuleKey,
   CrmReportChecklistItem,
@@ -20,6 +21,9 @@ import {
   createCrmOnboardingRecord,
   CRM_GO_LIVE_CHECKLIST_LABELS,
   CRM_REPORT_CHECKLIST_LABELS,
+  CP_APPLICATION_NO_BRANCH_KEYS,
+  CP_APPLICATION_SHARED_STEP_KEYS,
+  CP_APPLICATION_YES_BRANCH_KEYS,
   defaultModuleWorkflow,
   defaultTrainingSessions,
   ensureMasterDataFields,
@@ -81,6 +85,12 @@ type CrmOnboardingState = {
     key: CrmProductModuleKey,
     stepKey: string,
     at: string,
+  ) => void;
+  patchModuleWorkflowStep: (
+    companyId: string,
+    key: CrmProductModuleKey,
+    stepKey: string,
+    patch: Partial<CrmModuleWorkflowStep>,
   ) => void;
   toggleMasterPhase: (
     companyId: string,
@@ -588,6 +598,68 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
           const workflow = (m.workflow ?? defaultModuleWorkflow(key)).map((step) =>
             step.key === stepKey ? { ...step, done: true, completedAt: at } : step,
           );
+          return { ...m, workflow };
+        }),
+      })),
+    }));
+  },
+
+  patchModuleWorkflowStep: (companyId, key, stepKey, patch) => {
+    get().ensureForCompany(companyId);
+    const today = nowIso().slice(0, 10);
+    set((s) => ({
+      records: updateRecord(s.records, companyId, (r) => ({
+        ...r,
+        productModules: r.productModules.map((m) => {
+          if (m.key !== key) return m;
+          let workflow = (m.workflow ?? defaultModuleWorkflow(key)).map((step) => {
+            if (step.key !== stepKey) return step;
+            const kind = patch.kind ?? step.kind ?? "date";
+            const next = { ...step, ...patch };
+            if (kind === "yes_no" && patch.value != null) {
+              next.done = true;
+              next.completedAt = next.completedAt ?? today;
+            }
+            if (kind === "file" && patch.fileName != null) {
+              next.done = Boolean(patch.fileName.trim());
+              next.completedAt = next.done ? next.completedAt ?? today : undefined;
+            }
+            if (kind === "remarks" && patch.remarks != null) {
+              next.remarks = patch.remarks;
+            }
+            return next;
+          });
+
+          if (key === "cp-application" && stepKey === "white_labelled" && patch.value) {
+            const branch = patch.value as "yes" | "no";
+            const resetKeys: string[] =
+              branch === "yes"
+                ? [...CP_APPLICATION_NO_BRANCH_KEYS, ...CP_APPLICATION_SHARED_STEP_KEYS]
+                : [...CP_APPLICATION_YES_BRANCH_KEYS, ...CP_APPLICATION_SHARED_STEP_KEYS];
+            workflow = workflow.map((step) => {
+              if (!resetKeys.includes(step.key)) return step;
+              return {
+                ...step,
+                done: false,
+                completedAt: undefined,
+                value: step.kind === "yes_no" ? undefined : step.value,
+                fileName: undefined,
+              };
+            });
+          }
+
+          if (key === "cp-application" && stepKey === "logo_received" && patch.value === "no") {
+            workflow = workflow.map((step) => {
+              if (step.key !== "logo_upload" && step.key !== "logo_to_dev") return step;
+              return {
+                ...step,
+                done: false,
+                completedAt: undefined,
+                fileName: undefined,
+              };
+            });
+          }
+
           return { ...m, workflow };
         }),
       })),

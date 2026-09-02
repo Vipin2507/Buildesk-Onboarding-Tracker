@@ -3,13 +3,11 @@ import { Link } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  Check,
   CheckSquare,
   ClipboardList,
   GraduationCap,
   LayoutDashboard,
   Link2,
-  Lock,
   MessageSquare,
   Package,
   Pencil,
@@ -36,6 +34,7 @@ import { CrmAccountMeetingsPanel } from "@/components/crm/crm-account-meetings-p
 import { CrmAccountModulesOverview } from "@/components/crm/crm-account-modules-overview";
 import { CrmAccountModulesTab } from "@/components/crm/crm-account-modules-tab";
 import { CrmModuleProviderSelect } from "@/components/crm/crm-module-provider-select";
+import { CrmModuleWorkflowSteps } from "@/components/crm/crm-module-workflow-steps";
 import { CrmAccountPortalPanel } from "@/components/crm/crm-account-portal-panel";
 import { CrmAccountTasksPanel } from "@/components/crm/crm-account-tasks-panel";
 import { CrmGoLiveChecklist } from "@/components/crm/crm-go-live-checklist";
@@ -540,40 +539,6 @@ function StatCard({ label, value, bar }: { label: string; value: string; bar?: n
 function IntegrationsTab({ companyId }: { companyId: string }) {
   const record = useCrmOnboardingStore((s) => s.getByCompanyId(companyId))!;
   const setEnabled = useCrmOnboardingStore((s) => s.setProductModuleEnabled);
-  const toggleStep = useCrmOnboardingStore((s) => s.toggleModuleWorkflowStep);
-  const setStepDate = useCrmOnboardingStore((s) => s.setModuleWorkflowStepDate);
-
-  const todayYmd = new Date().toISOString().slice(0, 10);
-  const [stepDialog, setStepDialog] = useState<{
-    moduleKey: CrmProductModuleKey;
-    stepKey: string;
-    moduleLabel: string;
-    stepLabel: string;
-    mode: "complete" | "edit";
-    canClear: boolean;
-  } | null>(null);
-  const [stepDateValue, setStepDateValue] = useState("");
-
-  function confirmStepDialog() {
-    if (!stepDialog || !stepDateValue) {
-      toast.error("Pick a date for this step");
-      return;
-    }
-    setStepDate(companyId, stepDialog.moduleKey, stepDialog.stepKey, stepDateValue);
-    toast.success(
-      stepDialog.mode === "edit"
-        ? `${stepDialog.stepLabel} date updated`
-        : `${stepDialog.stepLabel} completed`,
-    );
-    setStepDialog(null);
-  }
-
-  function clearStepDialog() {
-    if (!stepDialog) return;
-    toggleStep(companyId, stepDialog.moduleKey, stepDialog.stepKey, false);
-    toast.success(`${stepDialog.stepLabel} cleared`);
-    setStepDialog(null);
-  }
 
   const inScope = (key: CrmProductModuleKey) => isCrmIntegrationModule(key);
 
@@ -582,7 +547,6 @@ function IntegrationsTab({ companyId }: { companyId: string }) {
   const needsProvider = enabled.filter((m) => moduleRequiresProvider(m.key) && !m.provider).length;
 
   return (
-    <>
     <div className="space-y-2.5">
       <DesignTicketSection
         compact
@@ -630,9 +594,6 @@ function IntegrationsTab({ companyId }: { companyId: string }) {
                             </Pill>
                           ) : null}
                         </div>
-                        <div className="mt-0.5 text-[10px] text-muted-foreground">
-                          {steps.filter((s) => s.done).length}/{steps.length} steps · {pct}%
-                        </div>
                       </div>
                       <div className="flex items-center gap-2">
                         {requiresProvider ? (
@@ -654,80 +615,14 @@ function IntegrationsTab({ companyId }: { companyId: string }) {
                       </div>
                     </div>
 
-                    <ProgressBar value={pct} className="mt-2 h-1.5" />
-
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {steps.map((step, idx) => {
-                        const priorDone = steps.slice(0, idx).every((s) => s.done);
-                        const laterDone = steps.slice(idx + 1).some((s) => s.done);
-                        const isProviderStep =
-                          requiresProvider && step.key === "provider_selected";
-                        const locked = !step.done && !priorDone;
-                        return (
-                          <button
-                            key={step.key}
-                            type="button"
-                            disabled={(locked || isProviderStep) && !step.done}
-                            title={
-                              isProviderStep
-                                ? "Set via the provider selector above"
-                                : locked
-                                  ? "Complete prior steps first"
-                                  : step.completedAt
-                                    ? `Completed ${formatDate(step.completedAt)}`
-                                    : undefined
-                            }
-                            onClick={() => {
-                              if (isProviderStep) {
-                                toast.info("Select the provider above to complete this step");
-                                return;
-                              }
-                              if (locked) {
-                                toast.error("Complete prior steps first", {
-                                  description: "Steps unlock in order",
-                                });
-                                return;
-                              }
-                              setStepDialog({
-                                moduleKey: m.key,
-                                stepKey: step.key,
-                                moduleLabel: m.label,
-                                stepLabel: step.label,
-                                mode: step.done ? "edit" : "complete",
-                                canClear: step.done && !laterDone,
-                              });
-                              setStepDateValue(
-                                (step.completedAt ?? todayYmd).slice(0, 10),
-                              );
-                            }}
-                            className={cn(
-                              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
-                              step.done
-                                ? "border-success bg-success text-white"
-                                : locked
-                                  ? "cursor-not-allowed border-input bg-muted/40 text-muted-foreground opacity-60"
-                                  : "border-input bg-background hover:border-primary",
-                            )}
-                          >
-                            <span className="inline-flex h-3.5 w-3.5 items-center justify-center">
-                              {step.done ? (
-                                <Check className="h-3 w-3" />
-                              ) : locked ? (
-                                <Lock className="h-2.5 w-2.5" />
-                              ) : (
-                                <span className="text-[9px] tabular-nums">{idx + 1}</span>
-                              )}
-                            </span>
-                            <span className="truncate">{step.label}</span>
-                            {step.done && step.completedAt ? (
-                              <span className="text-[9px] font-normal opacity-90">
-                                {formatDate(step.completedAt)}
-                              </span>
-                            ) : null}
-                          </button>
-                        );
-                      })}
-                    </div>
+                    <CrmModuleWorkflowSteps
+                      companyId={companyId}
+                      moduleKey={m.key}
+                      moduleLabel={m.label}
+                      steps={steps}
+                      progress={pct}
+                      className="mt-2"
+                    />
                   </motion.div>
                 );
               })}
@@ -771,47 +666,6 @@ function IntegrationsTab({ companyId }: { companyId: string }) {
         )}
       </DesignTicketSection>
     </div>
-
-      <EntityFormModal
-        open={!!stepDialog}
-        onOpenChange={(open) => {
-          if (!open) setStepDialog(null);
-        }}
-        title={
-          stepDialog
-            ? stepDialog.mode === "edit"
-              ? `Edit "${stepDialog.stepLabel}" date`
-              : `Complete "${stepDialog.stepLabel}"`
-            : "Workflow step"
-        }
-        submitLabel={stepDialog?.mode === "edit" ? "Save date" : "Confirm"}
-        onSubmit={confirmStepDialog}
-      >
-        {stepDialog ? (
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              <span className="font-medium text-foreground">{stepDialog.moduleLabel}</span>
-              {" · "}
-              {stepDialog.stepLabel}
-            </p>
-            <label className="block text-xs font-medium">
-              Completion date
-              <DatePickerField
-                modal
-                className="mt-1"
-                value={stepDateValue}
-                onChange={(v) => setStepDateValue(v)}
-              />
-            </label>
-            {stepDialog.canClear ? (
-              <Button type="button" variant="outline" className="w-full" onClick={clearStepDialog}>
-                Clear step
-              </Button>
-            ) : null}
-          </div>
-        ) : null}
-      </EntityFormModal>
-    </>
   );
 }
 

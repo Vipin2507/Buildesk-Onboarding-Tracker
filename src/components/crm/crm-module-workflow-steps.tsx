@@ -2,11 +2,16 @@ import { useState } from "react";
 import { Check, Lock } from "lucide-react";
 import { toast } from "sonner";
 
+import { CrmModuleWorkflowRemarks } from "@/components/crm/crm-module-workflow-remarks";
 import { DatePickerField } from "@/components/date-picker-field";
 import { EntityFormModal } from "@/components/entity-form-modal";
 import { ProgressBar } from "@/components/progress-bar";
 import { Button } from "@/components/ui/button";
-import { moduleRequiresProvider } from "@/data/crm-onboarding-defaults";
+import {
+  getWorkflowProgressSteps,
+  isModuleWorkflowStepComplete,
+  moduleRequiresProvider,
+} from "@/data/crm-onboarding-defaults";
 import { cn, formatDate } from "@/lib/utils";
 import { useCrmOnboardingStore } from "@/stores";
 import type { CrmModuleWorkflowStep, CrmProductModuleKey } from "@/types/crm-onboarding";
@@ -33,6 +38,10 @@ export function CrmModuleWorkflowSteps({
 
   const todayYmd = new Date().toISOString().slice(0, 10);
   const requiresProvider = moduleRequiresProvider(moduleKey);
+  const progressSteps = getWorkflowProgressSteps(steps);
+  const remarksStep = steps.find((s) => s.kind === "remarks");
+  const doneCount = progressSteps.filter(isModuleWorkflowStepComplete).length;
+
   const [stepDialog, setStepDialog] = useState<{
     stepKey: string;
     stepLabel: string;
@@ -68,20 +77,21 @@ export function CrmModuleWorkflowSteps({
     <>
       <div className={className}>
         <div className="text-[10px] text-muted-foreground">
-          {steps.filter((s) => s.done).length}/{steps.length} steps · {progress}%
+          {doneCount}/{progressSteps.length} steps · {progress}%
         </div>
         <ProgressBar value={progress} className="mt-1.5 h-1.5" />
         <div className="mt-2 flex flex-wrap gap-1.5">
-          {steps.map((step, idx) => {
-            const priorDone = steps.slice(0, idx).every((s) => s.done);
-            const laterDone = steps.slice(idx + 1).some((s) => s.done);
+          {progressSteps.map((step, idx) => {
+            const priorDone = progressSteps.slice(0, idx).every(isModuleWorkflowStepComplete);
+            const laterDone = progressSteps.slice(idx + 1).some(isModuleWorkflowStepComplete);
             const isProviderStep = requiresProvider && step.key === "provider_selected";
-            const locked = !step.done && !priorDone;
+            const complete = isModuleWorkflowStepComplete(step);
+            const locked = !complete && !priorDone;
             return (
               <button
                 key={step.key}
                 type="button"
-                disabled={(locked || isProviderStep) && !step.done}
+                disabled={(locked || isProviderStep) && !complete}
                 title={
                   isProviderStep
                     ? "Set via the provider selector above"
@@ -105,14 +115,14 @@ export function CrmModuleWorkflowSteps({
                   setStepDialog({
                     stepKey: step.key,
                     stepLabel: step.label,
-                    mode: step.done ? "edit" : "complete",
-                    canClear: step.done && !laterDone,
+                    mode: complete ? "edit" : "complete",
+                    canClear: complete && !laterDone,
                   });
                   setStepDateValue((step.completedAt ?? todayYmd).slice(0, 10));
                 }}
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
-                  step.done
+                  complete
                     ? "border-success bg-success text-white"
                     : locked
                       ? "cursor-not-allowed border-input bg-muted/40 text-muted-foreground opacity-60"
@@ -120,7 +130,7 @@ export function CrmModuleWorkflowSteps({
                 )}
               >
                 <span className="inline-flex h-3.5 w-3.5 items-center justify-center">
-                  {step.done ? (
+                  {complete ? (
                     <Check className="h-3 w-3" />
                   ) : locked ? (
                     <Lock className="h-2.5 w-2.5" />
@@ -129,7 +139,7 @@ export function CrmModuleWorkflowSteps({
                   )}
                 </span>
                 <span className="truncate">{step.label}</span>
-                {step.done && step.completedAt ? (
+                {complete && step.completedAt ? (
                   <span className="text-[9px] font-normal opacity-90">
                     {formatDate(step.completedAt)}
                   </span>
@@ -138,6 +148,16 @@ export function CrmModuleWorkflowSteps({
             );
           })}
         </div>
+
+        {remarksStep ? (
+          <div className="mt-3">
+            <CrmModuleWorkflowRemarks
+              companyId={companyId}
+              moduleKey={moduleKey}
+              step={remarksStep}
+            />
+          </div>
+        ) : null}
       </div>
 
       <EntityFormModal

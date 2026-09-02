@@ -11,6 +11,7 @@ import type {
   CrmMasterChecklistItem,
   CrmMigrationChecklistItem,
   CrmModuleWorkflowStep,
+  CrmModuleWorkflowStepKind,
   CrmOnboardingRecord,
   CrmProductModule,
   CrmProductModuleKey,
@@ -56,82 +57,189 @@ export function seedCrmModuleProviders(): Record<string, string[]> {
   return out;
 }
 
-const GENERIC_MODULE_WORKFLOW: { key: string; label: string }[] = [
-  { key: "requirement", label: "Requirement gathering" },
-  { key: "configuration", label: "Configuration" },
-  { key: "uat", label: "UAT / Testing" },
-  { key: "go_live", label: "Go-Live" },
+const GENERIC_MODULE_WORKFLOW: CrmModuleWorkflowStepDef[] = [
+  { key: "requirement", label: "Requirement gathering", kind: "date" },
+  { key: "configuration", label: "Configuration", kind: "date" },
+  { key: "uat", label: "UAT / Testing", kind: "date" },
+  { key: "go_live", label: "Go-Live", kind: "date" },
+  { key: "remarks", label: "Remarks", kind: "remarks" },
 ];
 
-const INTEGRATION_MODULE_WORKFLOW: { key: string; label: string }[] = [
-  { key: "provider_selected", label: "Provider selected" },
-  { key: "credentials", label: "API credentials collected" },
-  { key: "configure", label: "Configure & connect" },
-  { key: "test", label: "Test flow verified" },
-  { key: "go_live", label: "Go-Live" },
+const INTEGRATION_MODULE_WORKFLOW: CrmModuleWorkflowStepDef[] = [
+  { key: "provider_selected", label: "Provider selected", kind: "date" },
+  { key: "credentials", label: "API credentials collected", kind: "date" },
+  { key: "configure", label: "Configure & connect", kind: "date" },
+  { key: "test", label: "Test flow verified", kind: "date" },
+  { key: "go_live", label: "Go-Live", kind: "date" },
+  { key: "remarks", label: "Remarks", kind: "remarks" },
 ];
 
 /** Core product module onboarding steps (Sales CRM uses Masters / Migration / Training / Reports tabs). */
+export type CrmModuleWorkflowStepDef = {
+  key: string;
+  label: string;
+  kind?: CrmModuleWorkflowStepKind;
+  branch?: "yes" | "no";
+  /** Yes-branch steps shown only when logo was received. */
+  requiresLogoReceived?: boolean;
+};
+
 export const CORE_MODULE_WORKFLOWS: Partial<
-  Record<CrmProductModuleKey, { key: string; label: string }[]>
+  Record<CrmProductModuleKey, CrmModuleWorkflowStepDef[]>
 > = {
   "sim-call-recording": [
-    { key: "client_activated", label: "Client Activated from Super Admin" },
-    { key: "user_count", label: "No Of user" },
-    { key: "activated_for_user", label: "Activated for User" },
-    { key: "dialer_installed", label: "Buildesk Dialer Installed" },
-    { key: "training_provided", label: "Training Provided" },
-    { key: "live", label: "Live" },
-    { key: "remarks", label: "Remarks" },
+    { key: "client_activated", label: "Client Activated from Super Admin", kind: "date" },
+    { key: "user_count", label: "No Of user", kind: "date" },
+    { key: "activated_for_user", label: "Activated for User", kind: "date" },
+    { key: "dialer_installed", label: "Buildesk Dialer Installed", kind: "date" },
+    { key: "training_provided", label: "Training Provided", kind: "date" },
+    { key: "live", label: "Live", kind: "date" },
+    { key: "remarks", label: "Remarks", kind: "remarks" },
   ],
   "cp-application": [
-    { key: "white_labelled", label: "White Labelled (Yes / No)" },
-    { key: "logo_received", label: "Logo Received or Not" },
-    { key: "logo_upload", label: "Logo Upload" },
-    { key: "logo_to_dev", label: "Provided Logo to Developer Team" },
-    { key: "apk_received", label: "APK Received" },
-    { key: "cp_training", label: "CP App Training Provided" },
-    { key: "live", label: "Live" },
-    { key: "remarks", label: "Remarks" },
+    { key: "white_labelled", label: "White Labelled", kind: "yes_no" },
+    { key: "logo_received", label: "Logo Received or Not", kind: "yes_no", branch: "yes" },
+    { key: "logo_upload", label: "Logo Upload", kind: "file", branch: "yes", requiresLogoReceived: true },
+    {
+      key: "logo_to_dev",
+      label: "Provided Logo to Developer Team",
+      kind: "date",
+      branch: "yes",
+      requiresLogoReceived: true,
+    },
+    { key: "informed_dev", label: "Informed Developer for CP App", kind: "date", branch: "no" },
+    { key: "apk_received", label: "APK Received", kind: "date" },
+    { key: "cp_training", label: "CP App Training Provided", kind: "date" },
+    { key: "live", label: "Live", kind: "date" },
+    { key: "remarks", label: "Remarks", kind: "remarks" },
   ],
   "reception-application": [
     {
       key: "project_budget_form",
       label: "Project, Budget & Reception Form created and allocated to Agent",
+      kind: "date",
     },
-    { key: "training_reception_admin", label: "Reception App Training — Admin" },
-    { key: "training_reception_user", label: "Reception App Training — User" },
-    { key: "training_dashboard_admin", label: "Reception App Dashboard — Admin" },
-    { key: "training_dashboard_user", label: "Reception App Dashboard — User" },
-    { key: "live", label: "Live" },
-    { key: "remarks", label: "Remarks" },
+    { key: "training_reception_admin", label: "Reception App Training — Admin", kind: "date" },
+    { key: "training_reception_user", label: "Reception App Training — User", kind: "date" },
+    { key: "training_dashboard_admin", label: "Reception App Dashboard — Admin", kind: "date" },
+    { key: "training_dashboard_user", label: "Reception App Dashboard — User", kind: "date" },
+    { key: "live", label: "Live", kind: "date" },
+    { key: "remarks", label: "Remarks", kind: "remarks" },
   ],
   "ai-call-analysis": [
-    { key: "training_provided", label: "Training Provided" },
-    { key: "live", label: "Live" },
-    { key: "remarks", label: "Remarks" },
+    { key: "training_provided", label: "Training Provided", kind: "date" },
+    { key: "live", label: "Live", kind: "date" },
+    { key: "remarks", label: "Remarks", kind: "remarks" },
   ],
   "auto-dialer": [
-    { key: "admin_training", label: "Admin Training" },
-    { key: "user_training", label: "User Training" },
+    { key: "admin_training", label: "Admin Training", kind: "date" },
+    { key: "user_training", label: "User Training", kind: "date" },
+    { key: "remarks", label: "Remarks", kind: "remarks" },
   ],
 };
 
 export function getModuleWorkflowTemplate(
   key: CrmProductModuleKey,
-): { key: string; label: string }[] | undefined {
+): CrmModuleWorkflowStepDef[] | undefined {
   if (key === "sales-crm") return undefined;
   if (isCrmIntegrationModule(key)) return INTEGRATION_MODULE_WORKFLOW;
   return CORE_MODULE_WORKFLOWS[key] ?? GENERIC_MODULE_WORKFLOW;
 }
+
+/** Steps that count toward module completion (excludes free-text remarks). */
+export function getWorkflowProgressSteps(steps: CrmModuleWorkflowStep[]): CrmModuleWorkflowStep[] {
+  return steps.filter((s) => (s.kind ?? "date") !== "remarks");
+}
+
+function stepFromDef(def: CrmModuleWorkflowStepDef): CrmModuleWorkflowStep {
+  const kind = def.kind ?? "date";
+  return {
+    key: def.key,
+    label: def.label,
+    kind,
+    done: false,
+    remarks: kind === "remarks" ? "" : undefined,
+  };
+}
+
+export function getCpWhiteLabelAnswer(
+  steps: CrmModuleWorkflowStep[],
+): "yes" | "no" | undefined {
+  const value = steps.find((s) => s.key === "white_labelled")?.value;
+  if (value === "yes" || value === "no") return value;
+  return undefined;
+}
+
+function getCpLogoReceivedAnswer(steps: CrmModuleWorkflowStep[]): "yes" | "no" | undefined {
+  const value = steps.find((s) => s.key === "logo_received")?.value;
+  if (value === "yes" || value === "no") return value;
+  return undefined;
+}
+
+function cpStepDef(key: string): CrmModuleWorkflowStepDef | undefined {
+  return CORE_MODULE_WORKFLOWS["cp-application"]?.find((s) => s.key === key);
+}
+
+/** CP Application steps visible for the current white-label / logo branch. */
+export function getVisibleCpApplicationSteps(steps: CrmModuleWorkflowStep[]): CrmModuleWorkflowStep[] {
+  const whiteLabel = getCpWhiteLabelAnswer(steps);
+  const logoReceived = getCpLogoReceivedAnswer(steps);
+  const order = CORE_MODULE_WORKFLOWS["cp-application"]?.map((s) => s.key) ?? [];
+
+  return steps
+    .filter((step) => {
+      const def = cpStepDef(step.key);
+      if (!def) return false;
+      if (step.key === "white_labelled") return true;
+      if (!whiteLabel) return false;
+      if (def.branch === "yes" && whiteLabel !== "yes") return false;
+      if (def.branch === "no" && whiteLabel !== "no") return false;
+      if (def.requiresLogoReceived && logoReceived !== "yes") return false;
+      return true;
+    })
+    .sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
+}
+
+export function isModuleWorkflowStepComplete(step: CrmModuleWorkflowStep): boolean {
+  const kind = step.kind ?? "date";
+  if (kind === "yes_no") return step.value === "yes" || step.value === "no";
+  if (kind === "file") return Boolean(step.fileName?.trim());
+  if (kind === "remarks") return true;
+  return step.done;
+}
+
+export function calcCpApplicationWorkflowProgress(steps: CrmModuleWorkflowStep[]): number {
+  const visible = getVisibleCpApplicationSteps(steps).filter((s) => s.kind !== "remarks");
+  if (visible.length === 0) return 0;
+  const done = visible.filter(isModuleWorkflowStepComplete).length;
+  return Math.round((done / visible.length) * 100);
+}
+
+/** Keys cleared when white-label branch changes. */
+export const CP_APPLICATION_YES_BRANCH_KEYS = [
+  "logo_received",
+  "logo_upload",
+  "logo_to_dev",
+] as const;
+
+export const CP_APPLICATION_NO_BRANCH_KEYS = ["informed_dev"] as const;
+
+export const CP_APPLICATION_SHARED_STEP_KEYS = [
+  "apk_received",
+  "cp_training",
+  "live",
+] as const;
 
 export function moduleHasWorkflow(key: CrmProductModuleKey): boolean {
   return key !== "sales-crm" && Boolean(getModuleWorkflowTemplate(key)?.length);
 }
 
 export function defaultModuleWorkflow(key: CrmProductModuleKey): CrmModuleWorkflowStep[] {
-  const template = getModuleWorkflowTemplate(key) ?? GENERIC_MODULE_WORKFLOW;
-  return template.map((s) => ({ key: s.key, label: s.label, done: false }));
+  const template = getModuleWorkflowTemplate(key) ?? GENERIC_MODULE_WORKFLOW.map((s) => ({
+    ...s,
+    kind: "date" as const,
+  }));
+  return template.map(stepFromDef);
 }
 
 /** Preserve completion state when workflow templates gain new steps. */
@@ -146,9 +254,24 @@ export function mergeModuleWorkflow(
   return template.map((def) => {
     const prev = byKey.get(def.key);
     if (prev) {
-      return { ...prev, label: def.label };
+      const kind = def.kind ?? prev.kind ?? "date";
+      if (kind === "remarks") {
+        return {
+          ...prev,
+          label: def.label,
+          kind: "remarks",
+          remarks: prev.remarks ?? "",
+          done: false,
+          completedAt: undefined,
+        };
+      }
+      return {
+        ...prev,
+        label: def.label,
+        kind,
+      };
     }
-    return { key: def.key, label: def.label, done: false };
+    return stepFromDef(def);
   });
 }
 
@@ -167,7 +290,13 @@ export function needsModuleWorkflowUpgrade(module: CrmProductModule): boolean {
 export function calcModuleWorkflowProgress(module: CrmProductModule): number {
   const steps = module.workflow ?? [];
   if (steps.length === 0) return 0;
-  return Math.round((steps.filter((s) => s.done).length / steps.length) * 100);
+  if (module.key === "cp-application") {
+    return calcCpApplicationWorkflowProgress(steps);
+  }
+  const counted = getWorkflowProgressSteps(steps);
+  if (counted.length === 0) return 0;
+  const done = counted.filter(isModuleWorkflowStepComplete).length;
+  return Math.round((done / counted.length) * 100);
 }
 
 /** Enabled integration modules workflow completion (100 when none opted). */
@@ -1029,8 +1158,14 @@ export function crmPendingActivityCount(record: CrmOnboardingRecord): number {
 
   count += record.productModules
     .filter((m) => m.enabled && moduleHasWorkflow(m.key))
-    .flatMap((m) => m.workflow ?? [])
-    .filter((s) => !s.done).length;
+    .flatMap((m) => {
+      const steps = m.workflow ?? [];
+      if (m.key === "cp-application") {
+        return getVisibleCpApplicationSteps(steps).filter((s) => s.kind !== "remarks");
+      }
+      return getWorkflowProgressSteps(steps);
+    })
+    .filter((s) => !isModuleWorkflowStepComplete(s)).length;
 
   count += record.goLiveChecklist.filter((g) => !isCrmGoLiveItemComplete(g)).length;
 

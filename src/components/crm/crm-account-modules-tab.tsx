@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Package } from "lucide-react";
 import { toast } from "sonner";
 
+import { CrmCpApplicationWorkflow } from "@/components/crm/crm-cp-application-workflow";
 import { CrmModuleProviderSelect } from "@/components/crm/crm-module-provider-select";
 import { CrmModuleWorkflowSteps } from "@/components/crm/crm-module-workflow-steps";
 import {
@@ -151,14 +152,24 @@ function CoreModuleWorkflowCard({
         </div>
       </div>
 
-      <CrmModuleWorkflowSteps
-        companyId={companyId}
-        moduleKey={m.key}
-        moduleLabel={m.label}
-        steps={steps}
-        progress={pct}
-        className="mt-2"
-      />
+      {m.key === "cp-application" ? (
+        <CrmCpApplicationWorkflow
+          companyId={companyId}
+          moduleLabel={m.label}
+          steps={steps}
+          progress={pct}
+          className="mt-2"
+        />
+      ) : (
+        <CrmModuleWorkflowSteps
+          companyId={companyId}
+          moduleKey={m.key}
+          moduleLabel={m.label}
+          steps={steps}
+          progress={pct}
+          className="mt-2"
+        />
+      )}
     </motion.div>
   );
 }
