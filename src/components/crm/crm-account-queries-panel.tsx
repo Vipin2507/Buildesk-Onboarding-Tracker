@@ -478,10 +478,11 @@ export function CrmAccountQueriesPanel({ accountId }: { accountId: string }) {
       transition={{ duration: 0.28, ease: TICKET_EASE }}
       className="space-y-3"
     >
-      <DesignTicketSection
-        title="Account queries"
-        description="Internal discussion for admins and the account team. Sales manager, support managers, and account executives on this account can participate."
-      >
+      <DesignTicketSection title="Account queries">
+        <p className="mb-3 text-xs text-muted-foreground">
+          Internal discussion for admins and the account team. Sales manager, support managers,
+          and account executives on this account can participate.
+        </p>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap gap-1">
             {(["all", "open", "resolved", "archived"] as const).map((id) => (
