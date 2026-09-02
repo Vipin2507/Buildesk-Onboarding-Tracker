@@ -1,29 +1,29 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Calendar,
   CalendarOff,
   Check,
   Clock,
-  History,
-  Inbox,
-  LayoutList,
   Mail,
   Phone,
   Plus,
+  Search,
   User,
   Video,
   X,
-  XCircle,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { DatePickerField } from "@/components/date-picker-field";
 import { DataTable } from "@/components/data-table";
 import {
-  DesignTicketKpiGrid,
-  DesignTicketPageHeader,
+  DesignTicketDateField,
+  DesignTicketFilterField,
+  DesignTicketSelect,
+} from "@/components/design-ticket/design-ticket-fields";
+import {
+  DesignTicketFilterBar,
   DesignTicketTabNav,
   TICKET_EASE,
 } from "@/components/design-ticket/design-ticket-shared";
@@ -32,7 +32,6 @@ import { WeeklyHoursEditor } from "@/components/crm/weekly-hours-editor";
 import { BookingBlocksPanel } from "@/components/crm/booking-blocks-panel";
 import { BookingGoogleCalendarPanel } from "@/components/crm/booking-google-calendar-panel";
 import { CreateCrmBookingDialog } from "@/components/crm/create-crm-booking-dialog";
-import { ListToolbar } from "@/components/list-toolbar";
 import { PageWrap } from "@/components/page-header";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
@@ -62,13 +61,19 @@ import {
 const EASE = TICKET_EASE;
 const POLL_MS = 15_000;
 
-const BOOKING_TABS = [
-  { id: "all", label: "All", icon: LayoutList },
-  { id: "pending", label: "Pending", icon: Inbox },
-  { id: "upcoming", label: "Upcoming", icon: Calendar },
-  { id: "past", label: "Past", icon: History },
-  { id: "closed", label: "Closed", icon: XCircle },
+const BOOKING_FILTER_CHIPS = [
+  { id: "all", label: "All" },
+  { id: "pending", label: "Pending" },
+  { id: "upcoming", label: "Upcoming" },
+  { id: "past", label: "Past" },
+  { id: "closed", label: "Closed" },
 ] as const;
+
+type BookingFilterChipId = (typeof BOOKING_FILTER_CHIPS)[number]["id"];
+
+const BOOKING_LIST_TAB_IDS = new Set<BookingFilterChipId>(
+  BOOKING_FILTER_CHIPS.map((chip) => chip.id),
+);
 
 const SETTINGS_TABS = [
   { id: "availability", label: "Availability", icon: Clock },
@@ -76,9 +81,97 @@ const SETTINGS_TABS = [
   { id: "calendar", label: "Calendar", icon: Video },
 ] as const;
 
-const TABS = [...BOOKING_TABS, ...SETTINGS_TABS] as const;
-
 type TabId = CrmBookingsTabId;
+
+type BookingFilterTone = "muted" | "warning" | "success" | "info" | "danger";
+
+const BOOKING_FILTER_BOX_COUNT_TONE: Record<BookingFilterTone, string> = {
+  muted: "text-foreground",
+  warning: "text-amber-600 dark:text-amber-400",
+  success: "text-emerald-600 dark:text-emerald-400",
+  info: "text-primary",
+  danger: "text-destructive",
+};
+
+function bookingFilterChipTone(id: BookingFilterChipId): BookingFilterTone {
+  if (id === "pending") return "warning";
+  if (id === "upcoming") return "info";
+  if (id === "closed") return "danger";
+  return "muted";
+}
+
+function matchesBookingTabFilter(
+  appointment: BookingAppointment,
+  tabId: BookingFilterChipId,
+  now: string,
+) {
+  if (tabId === "pending") return appointment.status === "pending";
+  if (tabId === "upcoming") {
+    return (
+      (appointment.status === "confirmed" || appointment.status === "postponed") &&
+      appointment.startsAt >= now
+    );
+  }
+  if (tabId === "past") {
+    return (
+      (appointment.status === "confirmed" ||
+        appointment.status === "completed" ||
+        appointment.status === "postponed") &&
+      appointment.startsAt < now
+    );
+  }
+  if (tabId === "closed") {
+    return CLOSED_STATUSES.includes(appointment.status) || appointment.status === "cancelled";
+  }
+  return true;
+}
+
+type BookingToolbarFilters = {
+  statusFilter: string;
+  accountFilter: string;
+  hostFilter: string;
+  callTypeFilter: string;
+  dateFrom: string;
+  dateTo: string;
+  tableSearch: string;
+};
+
+function matchesBookingToolbarFilters(
+  appointment: BookingAppointment,
+  filters: BookingToolbarFilters,
+  lookup: {
+    accountName: (id: string) => string;
+    hostName: (id: string) => string;
+    eventTitle: (id: string) => string;
+  },
+) {
+  if (filters.statusFilter !== "all" && appointment.status !== filters.statusFilter) {
+    return false;
+  }
+  if (filters.accountFilter !== "all" && appointment.companyId !== filters.accountFilter) {
+    return false;
+  }
+  if (filters.hostFilter !== "all" && appointment.hostUserId !== filters.hostFilter) {
+    return false;
+  }
+  if (filters.callTypeFilter !== "all" && appointment.eventTypeId !== filters.callTypeFilter) {
+    return false;
+  }
+  const day = appointment.startsAt.slice(0, 10);
+  if (filters.dateFrom && day < filters.dateFrom) return false;
+  if (filters.dateTo && day > filters.dateTo) return false;
+  const q = filters.tableSearch.trim().toLowerCase();
+  if (!q) return true;
+  return (
+    appointment.guestName.toLowerCase().includes(q) ||
+    appointment.guestEmail.toLowerCase().includes(q) ||
+    (appointment.guestPhone ?? "").toLowerCase().includes(q) ||
+    lookup.accountName(appointment.companyId).toLowerCase().includes(q) ||
+    lookup.hostName(appointment.hostUserId).toLowerCase().includes(q) ||
+    lookup.eventTitle(appointment.eventTypeId).toLowerCase().includes(q) ||
+    (appointment.notes ?? "").toLowerCase().includes(q)
+  );
+}
 
 const WEEKDAYS = [
   { id: 1, label: "Mon" },
@@ -198,7 +291,9 @@ function CrmBookingsPage() {
   const [addingBlock, setAddingBlock] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(false);
 
-  const [query, setQuery] = useState("");
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  const [tableSearch, setTableSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [accountFilter, setAccountFilter] = useState("all");
   const [hostFilter, setHostFilter] = useState("all");
@@ -285,82 +380,51 @@ function CrmBookingsPage() {
     [eventTypes],
   );
 
-  const tabFiltered = useMemo(() => {
-    return appointments.filter((a) => {
-      if (tab === "pending") return a.status === "pending";
-      if (tab === "upcoming") {
-        return (
-          (a.status === "confirmed" || a.status === "postponed") && a.startsAt >= now
-        );
-      }
-      if (tab === "past") {
-        return (
-          (a.status === "confirmed" || a.status === "completed" || a.status === "postponed") &&
-          a.startsAt < now
-        );
-      }
-      if (tab === "closed") return CLOSED_STATUSES.includes(a.status) || a.status === "cancelled";
-      return true;
-    });
-  }, [appointments, now, tab]);
+  const listFilters = useMemo(
+    () => ({
+      statusFilter,
+      accountFilter,
+      hostFilter,
+      callTypeFilter,
+      dateFrom,
+      dateTo,
+      tableSearch,
+    }),
+    [
+      statusFilter,
+      accountFilter,
+      hostFilter,
+      callTypeFilter,
+      dateFrom,
+      dateTo,
+      tableSearch,
+    ],
+  );
+
+  const filterLookup = useMemo(
+    () => ({ accountName, hostName, eventTitle }),
+    [accounts, users, eventTypes],
+  );
+
+  const toolbarScoped = useMemo(
+    () =>
+      appointments.filter((a) => matchesBookingToolbarFilters(a, listFilters, filterLookup)),
+    [appointments, listFilters, filterLookup],
+  );
+
+  const listTab = BOOKING_LIST_TAB_IDS.has(tab as BookingFilterChipId)
+    ? (tab as BookingFilterChipId)
+    : "pending";
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return tabFiltered
-      .filter((a) => {
-        if (statusFilter !== "all" && a.status !== statusFilter) return false;
-        if (accountFilter !== "all" && a.companyId !== accountFilter) return false;
-        if (hostFilter !== "all" && a.hostUserId !== hostFilter) return false;
-        if (callTypeFilter !== "all" && a.eventTypeId !== callTypeFilter) return false;
-        const day = a.startsAt.slice(0, 10);
-        if (dateFrom && day < dateFrom) return false;
-        if (dateTo && day > dateTo) return false;
-        if (!q) return true;
-        return (
-          a.guestName.toLowerCase().includes(q) ||
-          a.guestEmail.toLowerCase().includes(q) ||
-          (a.guestPhone ?? "").toLowerCase().includes(q) ||
-          accountName(a.companyId).toLowerCase().includes(q) ||
-          hostName(a.hostUserId).toLowerCase().includes(q) ||
-          eventTitle(a.eventTypeId).toLowerCase().includes(q) ||
-          (a.notes ?? "").toLowerCase().includes(q)
-        );
-      })
+    return toolbarScoped
+      .filter((a) => matchesBookingTabFilter(a, listTab, now))
       .sort((a, b) => b.startsAt.localeCompare(a.startsAt));
-  }, [
-    tabFiltered,
-    query,
-    statusFilter,
-    accountFilter,
-    hostFilter,
-    callTypeFilter,
-    dateFrom,
-    dateTo,
-    accounts,
-    users,
-    eventTypes,
-  ]);
+  }, [toolbarScoped, listTab, now]);
 
-  const pendingCount = useMemo(
-    () => appointments.filter((a) => a.status === "pending").length,
-    [appointments],
-  );
-  const upcomingCount = useMemo(
-    () =>
-      appointments.filter(
-        (a) =>
-          (a.status === "confirmed" || a.status === "postponed") && a.startsAt >= now,
-      ).length,
-    [appointments, now],
-  );
-  const myAvailability = useMemo(
-    () => availability.filter((a) => a.hostUserId === user?.id),
-    [availability, user?.id],
-  );
-  const myBlocks = useMemo(
-    () => blocks.filter((b) => b.hostUserId === user?.id).sort((a, b) => a.startsAt.localeCompare(b.startsAt)),
-    [blocks, user?.id],
-  );
+  function bookingFilterChipCount(id: BookingFilterChipId) {
+    return toolbarScoped.filter((a) => matchesBookingTabFilter(a, id, now)).length;
+  }
 
   const activeFilterCount = [
     statusFilter !== "all",
@@ -371,7 +435,22 @@ function CrmBookingsPage() {
     Boolean(dateTo),
   ].filter(Boolean).length;
 
-  const isListTab = BOOKING_TABS.some((t) => t.id === tab);
+  const isListTab = BOOKING_LIST_TAB_IDS.has(tab as BookingFilterChipId);
+
+  function applyFilters() {
+    tableRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  const myAvailability = useMemo(
+    () => availability.filter((a) => a.hostUserId === user?.id),
+    [availability, user?.id],
+  );
+  const myBlocks = useMemo(
+    () => blocks.filter((b) => b.hostUserId === user?.id).sort((a, b) => a.startsAt.localeCompare(b.startsAt)),
+    [blocks, user?.id],
+  );
+
+  const hoursSetCount = myAvailability.filter((a) => a.isActive).length;
 
   async function loadRescheduleSlots(appointmentId: string, date: string) {
     const appt = appointments.find((a) => a.id === appointmentId);
@@ -387,7 +466,7 @@ function CrmBookingsPage() {
   }
 
   function clearFilters() {
-    setQuery("");
+    setTableSearch("");
     setStatusFilter("all");
     setAccountFilter("all");
     setHostFilter("all");
@@ -512,20 +591,100 @@ function CrmBookingsPage() {
   }
 
   return (
-    <PageWrap compact>
-      <DesignTicketPageHeader
-        compact
-        title="Meetings"
-        subtitle="Review portal call requests, manage schedules, and set availability."
-        actions={
-          canCreateMeeting ? (
-            <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setCreateOpen(true)}>
-              <Plus className="h-3.5 w-3.5" />
-              Create meeting
-            </Button>
-          ) : undefined
-        }
-      />
+    <PageWrap compact flushTop>
+      <div className="mb-0 border-b border-border pb-2 pt-1">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h1 className="text-base font-medium tracking-tight">Meetings</h1>
+            <p className="text-xs text-muted-foreground">
+              {isListTab
+                ? `${filtered.length} ${filtered.length === 1 ? "meeting" : "meetings"}`
+                : "Manage availability, blocks, and calendar sync"}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {canCreateMeeting ? (
+              <Button
+                size="sm"
+                className="h-8 gap-1 bg-primary px-3 text-xs"
+                onClick={() => setCreateOpen(true)}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Create meeting
+              </Button>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="mt-2 flex flex-col gap-2 lg:flex-row lg:items-stretch">
+          <div
+            role="tablist"
+            aria-label="Meeting filters"
+            className="grid min-w-0 flex-1 grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-5"
+          >
+            {BOOKING_FILTER_CHIPS.map((chip) => {
+              const tone = bookingFilterChipTone(chip.id);
+              const active = isListTab && listTab === chip.id;
+              const count = bookingFilterChipCount(chip.id);
+              return (
+                <button
+                  key={chip.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => void navigate({ search: { tab: chip.id } })}
+                  className={cn(
+                    "flex min-w-0 flex-col rounded-lg border bg-card px-2.5 py-2 text-left shadow-sm transition-all",
+                    "hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                    active
+                      ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"
+                      : "border-border/80",
+                  )}
+                >
+                  <span className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {chip.label}
+                  </span>
+                  <span
+                    className={cn(
+                      "mt-1 text-lg font-semibold tabular-nums leading-none",
+                      BOOKING_FILTER_BOX_COUNT_TONE[tone],
+                    )}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={() => void navigate({ search: { tab: "availability" } })}
+            className={cn(
+              "flex shrink-0 flex-col justify-center rounded-lg border bg-card px-3 py-2 text-left shadow-sm transition-all lg:min-w-[5.5rem]",
+              "hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+              tab === "availability"
+                ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"
+                : "border-border/80",
+            )}
+          >
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Hours set
+            </span>
+            <span className="mt-1 text-lg font-semibold tabular-nums leading-none text-emerald-600 dark:text-emerald-400">
+              {hoursSetCount}
+            </span>
+          </button>
+        </div>
+
+        <div className="mt-2">
+          <DesignTicketTabNav
+            compact
+            tabs={SETTINGS_TABS.map(({ id, label, icon }) => ({ id, label, icon }))}
+            activeId={isListTab ? "" : tab}
+            onChange={(id) => void navigate({ search: { tab: id as TabId } })}
+          />
+        </div>
+      </div>
 
       <CreateCrmBookingDialog
         open={createOpen}
@@ -536,48 +695,6 @@ function CrmBookingsPage() {
         currentUserName={user?.name}
         isAdmin={isAdmin}
         onCreated={() => void refreshStaff()}
-      />
-
-      <DesignTicketKpiGrid
-        size="compact"
-        columns={4}
-        items={[
-          {
-            id: "pending",
-            label: "Pending",
-            value: pendingCount,
-            tone: "text-warning-foreground",
-            onClick: () => void navigate({ search: { tab: "pending" } }),
-          },
-          {
-            id: "upcoming",
-            label: "Upcoming",
-            value: upcomingCount,
-            tone: "text-info",
-            onClick: () => void navigate({ search: { tab: "upcoming" } }),
-          },
-          {
-            id: "all",
-            label: "Total",
-            value: appointments.length,
-            tone: "text-primary",
-            onClick: () => void navigate({ search: { tab: "all" } }),
-          },
-          {
-            id: "hours",
-            label: "Hours set",
-            value: myAvailability.filter((a) => a.isActive).length,
-            tone: "text-success",
-            onClick: () => void navigate({ search: { tab: "availability" } }),
-          },
-        ]}
-      />
-
-      <DesignTicketTabNav
-        compact
-        tabs={TABS.map(({ id, label, icon }) => ({ id, label, icon }))}
-        activeId={tab}
-        onChange={(id) => void navigate({ search: { tab: id as TabId } })}
       />
 
       <AnimatePresence mode="wait">
@@ -591,105 +708,150 @@ function CrmBookingsPage() {
         >
           {isListTab && (
             <>
-              <ListToolbar
-                search={query}
-                onSearchChange={setQuery}
-                searchPlaceholder="Search guest, account, executive, call type…"
-                resultCount={filtered.length}
-                resultLabel="meetings"
-                activeFilterCount={activeFilterCount}
-                onClear={activeFilterCount > 0 || query ? clearFilters : undefined}
-                dateRange={{
-                  from: dateFrom,
-                  to: dateTo,
-                  onFromChange: setDateFrom,
-                  onToChange: setDateTo,
-                }}
-                selects={[
-                  ...(tab === "all"
-                    ? [
-                        {
-                          id: "status",
-                          label: "Status",
-                          value: statusFilter,
-                          onChange: setStatusFilter,
-                          options: [
+              <div className="-mx-3 sm:-mx-4 lg:-mx-5">
+                <div className="px-3 sm:px-4 lg:px-5">
+                  <DesignTicketFilterBar
+                    variant="inline"
+                    compact
+                    className="xl:grid-cols-4"
+                    activeFilterCount={activeFilterCount}
+                    onClear={clearFilters}
+                    onApply={applyFilters}
+                    resultCount={filtered.length}
+                    resultLabel={filtered.length === 1 ? "meeting" : "meetings"}
+                    trailing={
+                      <div className="relative min-w-[140px] flex-1 sm:max-w-xs">
+                        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                        <input
+                          value={tableSearch}
+                          onChange={(e) => setTableSearch(e.target.value)}
+                          placeholder="Search guest, account, executive…"
+                          aria-label="Search meetings"
+                          className="h-8 w-full rounded-md border border-input bg-background pl-8 pr-3 text-xs outline-none focus:ring-2 focus:ring-ring/40"
+                        />
+                      </div>
+                    }
+                  >
+                    {listTab === "all" ? (
+                      <DesignTicketFilterField label="Status" compact>
+                        <DesignTicketSelect
+                          compact
+                          value={statusFilter}
+                          onChange={setStatusFilter}
+                          options={[
                             { value: "all", label: "All statuses" },
                             ...Object.entries(BOOKING_STATUS_LABEL).map(([value, label]) => ({
                               value,
                               label,
                             })),
-                          ],
-                        },
-                      ]
-                    : []),
-                  {
-                    id: "account",
-                    label: "Account",
-                    value: accountFilter,
-                    onChange: setAccountFilter,
-                    options: [
-                      { value: "all", label: "All accounts" },
-                      ...visibleAccounts.map((a) => ({ value: a.id, label: a.name })),
-                    ],
-                  },
-                  ...(isAdmin
-                    ? [
-                        {
-                          id: "host",
-                          label: "Executive",
-                          value: hostFilter,
-                          onChange: setHostFilter,
-                          options: [{ value: "all", label: "All executives" }, ...hostOptions],
-                        },
-                      ]
-                    : []),
-                  {
-                    id: "callType",
-                    label: "Call type",
-                    value: callTypeFilter,
-                    onChange: setCallTypeFilter,
-                    options: [{ value: "all", label: "All types" }, ...callTypeOptions],
-                  },
-                ]}
-              />
+                          ]}
+                        />
+                      </DesignTicketFilterField>
+                    ) : null}
+                    <DesignTicketFilterField label="Account" compact>
+                      <DesignTicketSelect
+                        compact
+                        value={accountFilter}
+                        onChange={setAccountFilter}
+                        options={[
+                          { value: "all", label: "All accounts" },
+                          ...visibleAccounts.map((a) => ({ value: a.id, label: a.name })),
+                        ]}
+                      />
+                    </DesignTicketFilterField>
+                    {isAdmin ? (
+                      <DesignTicketFilterField label="Executive" compact>
+                        <DesignTicketSelect
+                          compact
+                          value={hostFilter}
+                          onChange={setHostFilter}
+                          options={[
+                            { value: "all", label: "All executives" },
+                            ...hostOptions,
+                          ]}
+                        />
+                      </DesignTicketFilterField>
+                    ) : null}
+                    <DesignTicketFilterField label="Call type" compact>
+                      <DesignTicketSelect
+                        compact
+                        value={callTypeFilter}
+                        onChange={setCallTypeFilter}
+                        options={[
+                          { value: "all", label: "All types" },
+                          ...callTypeOptions,
+                        ]}
+                      />
+                    </DesignTicketFilterField>
+                    <DesignTicketDateField
+                      compact
+                      label="From"
+                      value={dateFrom}
+                      onChange={setDateFrom}
+                      placeholder="From"
+                    />
+                    <DesignTicketDateField
+                      compact
+                      label="To"
+                      value={dateTo}
+                      onChange={setDateTo}
+                      placeholder="To"
+                    />
+                  </DesignTicketFilterBar>
+                </div>
 
-              {filtered.length === 0 ? (
-                <EmptyState
-                  title={
-                    tab === "pending"
-                      ? "No pending requests"
-                      : tab === "upcoming"
-                        ? "No upcoming calls"
-                        : "No meetings match your filters"
-                  }
-                  description={
-                    tab === "pending"
-                      ? "Portal meeting requests appear here and in your notification bell."
-                      : "Try clearing filters or check another tab."
-                  }
-                />
-              ) : (
-                <div className="space-y-2">
-                  <DataTable
-                    data={filtered}
-                    hideSearch
-                    pageSize={12}
-                    getRowId={(a) => a.id}
-                    onRowClick={(a) => {
-                      if (expandedId === a.id) {
-                        setExpandedId(null);
-                        return;
-                      }
-                      setExpandedId(a.id);
-                      if (
-                        (a.status === "confirmed" || a.status === "postponed") &&
-                        a.startsAt >= now
-                      ) {
-                        void loadRescheduleSlots(a.id, a.startsAt.slice(0, 10));
-                      }
-                    }}
-                    columns={[
+                <div ref={tableRef} className="min-w-0">
+                  {filtered.length === 0 ? (
+                    <div className="px-3 sm:px-4 lg:px-5">
+                      <EmptyState
+                        title={
+                          listTab === "pending"
+                            ? "No pending requests"
+                            : listTab === "upcoming"
+                              ? "No upcoming calls"
+                              : "No meetings match your filters"
+                        }
+                        description={
+                          listTab === "pending"
+                            ? "Portal meeting requests appear here and in your notification bell."
+                            : "Try clearing filters or check another tab."
+                        }
+                        actionLabel={
+                          activeFilterCount > 0 || tableSearch ? "Clear filters" : undefined
+                        }
+                        onAction={
+                          activeFilterCount > 0 || tableSearch ? clearFilters : undefined
+                        }
+                      />
+                    </div>
+                  ) : (
+                    <motion.div
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                      className="space-y-2 bg-card [&_tbody_tr]:bg-card [&_thead]:bg-card"
+                    >
+                      <DataTable
+                        flush
+                        density="compact"
+                        data={filtered}
+                        hideSearch
+                        pageSize={12}
+                        getRowId={(a) => a.id}
+                        onRowClick={(a) => {
+                          if (expandedId === a.id) {
+                            setExpandedId(null);
+                            return;
+                          }
+                          setExpandedId(a.id);
+                          if (
+                            (a.status === "confirmed" || a.status === "postponed") &&
+                            a.startsAt >= now
+                          ) {
+                            void loadRescheduleSlots(a.id, a.startsAt.slice(0, 10));
+                          }
+                        }}
+                        columns={[
                       {
                         key: "guestName",
                         header: "Guest",
@@ -856,8 +1018,10 @@ function CrmBookingsPage() {
                       />
                     ) : null,
                   )}
+                    </motion.div>
+                  )}
                 </div>
-              )}
+              </div>
             </>
           )}
 
