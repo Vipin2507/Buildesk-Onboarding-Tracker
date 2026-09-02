@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ButtonHTMLAttributes } from "react";
 import { motion } from "framer-motion";
 import {
   Archive,
@@ -67,6 +67,21 @@ function statusTone(status: CrmAccountQuery["status"]) {
   return "muted" as const;
 }
 
+const COMPOSER_ICON_BTN =
+  "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border p-0 transition-colors disabled:pointer-events-none disabled:opacity-50";
+
+function ComposerIconButton({
+  children,
+  className,
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button type="button" className={cn(COMPOSER_ICON_BTN, className)} {...props}>
+      {children}
+    </button>
+  );
+}
+
 function lastMessagePreview(query: CrmAccountQuery) {
   const last = query.messages[query.messages.length - 1];
   if (!last) return "No messages yet";
@@ -104,7 +119,7 @@ function AutoGrowTextarea({
     const el = ref.current;
     if (!el) return;
     el.style.height = "0px";
-    el.style.height = `${Math.min(el.scrollHeight, 96)}px`;
+    el.style.height = `${Math.max(32, Math.min(el.scrollHeight, 96))}px`;
   }, [value]);
 
   const mentionContext = useMemo(
@@ -184,7 +199,7 @@ function AutoGrowTextarea({
         placeholder={placeholder}
         disabled={disabled}
         className={cn(
-          "min-h-8 max-h-24 w-full resize-none overflow-y-auto rounded-md border border-input bg-background px-2.5 py-1.5 text-xs leading-5 outline-none focus:ring-2 focus:ring-ring/40",
+          "min-h-8 max-h-24 w-full resize-none overflow-y-auto border-0 bg-transparent px-1.5 py-1 text-xs leading-5 outline-none focus:ring-0",
           className,
         )}
         onKeyDown={(e) => {
@@ -688,7 +703,7 @@ function QueryThread({
           {uploadingAttachment ? (
             <p className="mb-1.5 text-[10px] text-muted-foreground">Uploading attachment…</p>
           ) : null}
-          <div className="flex gap-1.5">
+          <div className="flex items-end gap-1.5 rounded-md border border-input bg-background px-1.5 py-1 focus-within:ring-2 focus-within:ring-ring/40">
             <div className="min-w-0 flex-1">
               <AutoGrowTextarea
                 value={text}
@@ -701,7 +716,7 @@ function QueryThread({
                 currentUserId={currentUserId}
               />
             </div>
-            <div className="flex shrink-0 items-center gap-1.5 self-end">
+            <div className="flex shrink-0 items-center gap-1.5">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -710,48 +725,40 @@ function QueryThread({
                 disabled={composerDisabled}
                 onChange={(e) => void handlePickFile(e)}
               />
-              <Button
-                type="button"
-                variant="outline"
-                className="size-8 shrink-0 p-0 shadow-none"
+              <ComposerIconButton
+                className="border-input bg-background hover:bg-muted"
                 disabled={composerDisabled}
                 onClick={() => fileInputRef.current?.click()}
                 title="Attach file"
               >
                 <Paperclip className="h-3.5 w-3.5" />
-              </Button>
+              </ComposerIconButton>
               {!recording ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="size-8 shrink-0 p-0 shadow-none"
+                <ComposerIconButton
+                  className="border-input bg-background hover:bg-muted"
                   disabled={composerDisabled}
                   onClick={() => void startRecording()}
                   title="Record voice note"
                 >
                   <Mic className="h-3.5 w-3.5" />
-                </Button>
+                </ComposerIconButton>
               ) : (
-                <Button
-                  type="button"
-                  variant="destructive"
-                  className="size-8 shrink-0 p-0 shadow-none"
+                <ComposerIconButton
+                  className="border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   onClick={stopRecording}
                   title="Stop recording"
                 >
                   <Square className="h-3 w-3" />
-                </Button>
+                </ComposerIconButton>
               )}
-              <Button
-                type="button"
-                variant="default"
-                className="size-8 shrink-0 p-0 shadow-none"
+              <ComposerIconButton
+                className="border-transparent bg-primary text-primary-foreground hover:bg-primary/90"
                 disabled={composerDisabled || (!text.trim() && !pendingAttachment)}
                 onClick={() => void handleSendText()}
                 title="Send message"
               >
                 <Send className="h-3.5 w-3.5" />
-              </Button>
+              </ComposerIconButton>
             </div>
           </div>
           {recording ? (
