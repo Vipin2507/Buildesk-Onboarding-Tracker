@@ -10,6 +10,7 @@ import {
   RotateCcw,
   Send,
   Square,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -427,6 +428,13 @@ function QueryThread({
 }) {
   const [text, setText] = useState("");
   const [recording, setRecording] = useState(false);
+  const [pendingAttachment, setPendingAttachment] = useState<{
+    attachment: CrmAccountQueryAttachment;
+    messageType: "image" | "voice" | "file";
+    fileName: string;
+    mimeType: string;
+  } | null>(null);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -437,7 +445,7 @@ function QueryThread({
     [query.messages],
   );
 
-  const composerDisabled = sending || query.status === "archived";
+  const composerDisabled = sending || uploadingAttachment || query.status === "archived";
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -464,42 +472,58 @@ function QueryThread({
   }, [composerDisabled, onSetTyping, text]);
 
   async function handleSendText() {
-    if (!text.trim() || sending || query.status === "archived") return;
+    const body = text.trim();
+    if ((!body && !pendingAttachment) || sending || query.status === "archived") return;
     onSetTyping(false);
-    await onSend(text.trim(), { messageType: "text" });
+
+    if (pendingAttachment) {
+      await onSend(
+        body || crmQueryDefaultAttachmentBody(pendingAttachment.fileName, pendingAttachment.mimeType),
+        {
+          messageType: pendingAttachment.messageType,
+          attachments: [pendingAttachment.attachment],
+        },
+      );
+      setPendingAttachment(null);
+    } else {
+      await onSend(body, { messageType: "text" });
+    }
     setText("");
   }
 
-  async function sendMediaFile(file: File) {
-    if (query.status === "archived" || sending) return;
+  async function prepareMediaFile(file: File) {
     if (file.size > CRM_QUERY_MAX_UPLOAD_BYTES) {
-      toast.error(`File exceeds ${CRM_QUERY_MAX_UPLOAD_BYTES / (1024 * 1024)}MB limit`);
-      return;
+      throw new Error(`File exceeds ${CRM_QUERY_MAX_UPLOAD_BYTES / (1024 * 1024)}MB limit`);
     }
 
+    const mimeType = file.type || "application/octet-stream";
+    const messageType = crmQueryMessageTypeForMime(mimeType);
+    let blob: Blob = file;
+    let uploadMime = mimeType;
+    let fileName = file.name?.trim() || `attachment-${Date.now()}`;
+
+    if (messageType === "image") {
+      const dataUrl = await compressImageToDataUrl(file, { maxEdge: 960 });
+      blob = await fetch(dataUrl).then((r) => r.blob());
+      uploadMime = file.type || blob.type || "image/jpeg";
+      if (!fileName.includes(".")) fileName = `${fileName}.jpg`;
+    }
+
+    const attachment = await onUploadAttachment(blob, fileName, uploadMime);
+    return { attachment, messageType, fileName, mimeType: uploadMime };
+  }
+
+  async function stageMediaFile(file: File) {
+    if (query.status === "archived" || sending || uploadingAttachment) return;
+
+    setUploadingAttachment(true);
     try {
-      const mimeType = file.type || "application/octet-stream";
-      const messageType = crmQueryMessageTypeForMime(mimeType);
-      let blob: Blob = file;
-      let uploadMime = mimeType;
-      let fileName = file.name?.trim() || `attachment-${Date.now()}`;
-
-      if (messageType === "image") {
-        const dataUrl = await compressImageToDataUrl(file, { maxEdge: 960 });
-        blob = await fetch(dataUrl).then((r) => r.blob());
-        uploadMime = file.type || blob.type || "image/jpeg";
-        if (!fileName.includes(".")) fileName = `${fileName}.jpg`;
-      }
-
-      const attachment = await onUploadAttachment(blob, fileName, uploadMime);
-      onSetTyping(false);
-      await onSend(text.trim() || crmQueryDefaultAttachmentBody(fileName, uploadMime), {
-        messageType,
-        attachments: [attachment],
-      });
-      setText("");
+      const prepared = await prepareMediaFile(file);
+      setPendingAttachment(prepared);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not attach file");
+    } finally {
+      setUploadingAttachment(false);
     }
   }
 
@@ -507,7 +531,7 @@ function QueryThread({
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file || query.status === "archived") return;
-    await sendMediaFile(file);
+    await stageMediaFile(file);
   }
 
   function handlePasteMedia(e: React.ClipboardEvent<HTMLTextAreaElement>) {
@@ -516,20 +540,22 @@ function QueryThread({
     const clipboard = e.clipboardData;
     if (!clipboard) return;
 
+    const plainText = clipboard.getData("text/plain");
+    const files: File[] = [];
+
     for (const item of clipboard.items) {
       if (item.kind !== "file") continue;
       const file = item.getAsFile();
-      if (!file) continue;
-      e.preventDefault();
-      void sendMediaFile(file);
-      return;
+      if (file) files.push(file);
     }
 
-    const pastedFile = clipboard.files[0];
-    if (pastedFile) {
-      e.preventDefault();
-      void sendMediaFile(pastedFile);
-    }
+    if (files.length === 0) return;
+
+    // Let native paste handle copied text; only stage explicit file/image pastes.
+    if (plainText.trim().length > 0) return;
+
+    e.preventDefault();
+    void stageMediaFile(files[0]!);
   }
 
   async function startRecording() {
@@ -641,6 +667,25 @@ function QueryThread({
         </div>
       ) : (
         <div className="shrink-0 border-t p-2">
+          {pendingAttachment ? (
+            <div className="mb-1.5 flex items-center gap-1.5 rounded-md border bg-muted/40 px-2 py-1">
+              <Paperclip className="h-3 w-3 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1 truncate text-[10px]">
+                {pendingAttachment.fileName}
+              </span>
+              <button
+                type="button"
+                className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                onClick={() => setPendingAttachment(null)}
+                title="Remove attachment"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ) : null}
+          {uploadingAttachment ? (
+            <p className="mb-1.5 text-[10px] text-muted-foreground">Uploading attachment…</p>
+          ) : null}
           <div className="flex items-end gap-1.5">
             <div className="min-w-0 flex-1">
               <AutoGrowTextarea
@@ -700,7 +745,7 @@ function QueryThread({
                 type="button"
                 size="icon"
                 className="size-8"
-                disabled={composerDisabled || !text.trim()}
+                disabled={composerDisabled || (!text.trim() && !pendingAttachment)}
                 onClick={() => void handleSendText()}
               >
                 <Send className="h-3.5 w-3.5" />
