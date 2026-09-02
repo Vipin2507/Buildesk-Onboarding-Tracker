@@ -1050,5 +1050,40 @@ if (tableExists("follow_up_tasks") && existingColumns("follow_up_tasks").has("pr
   }
 }
 
+if (!tableExists("crm_account_queries")) {
+  sqlite.exec(`
+    CREATE TABLE crm_account_queries (
+      id TEXT PRIMARY KEY NOT NULL,
+      company_id TEXT NOT NULL REFERENCES crm_accounts(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      category TEXT,
+      created_by_user_id TEXT NOT NULL,
+      created_by_name TEXT NOT NULL,
+      resolved_at TEXT,
+      resolved_by_user_id TEXT,
+      resolved_by_name TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS crm_account_queries_company_idx ON crm_account_queries(company_id);
+    CREATE INDEX IF NOT EXISTS crm_account_queries_status_idx ON crm_account_queries(status);
+    CREATE INDEX IF NOT EXISTS crm_account_queries_updated_idx ON crm_account_queries(updated_at);
+
+    CREATE TABLE crm_account_query_messages (
+      id TEXT PRIMARY KEY NOT NULL,
+      query_id TEXT NOT NULL REFERENCES crm_account_queries(id) ON DELETE CASCADE,
+      author_user_id TEXT NOT NULL,
+      author_name TEXT NOT NULL,
+      message_type TEXT NOT NULL DEFAULT 'text',
+      body TEXT NOT NULL,
+      attachments_json TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS crm_account_query_messages_query_idx ON crm_account_query_messages(query_id);
+  `);
+  console.log("+ CREATE TABLE crm_account_queries + crm_account_query_messages");
+}
+
 sqlite.close();
 console.log("db:ensure complete");

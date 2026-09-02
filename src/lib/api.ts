@@ -229,6 +229,14 @@ export {
 } from "@/server/api/push";
 
 export {
+  listCrmAccountQueries,
+  getCrmAccountQuery,
+  createCrmAccountQuery,
+  addCrmAccountQueryMessage,
+  updateCrmAccountQueryStatus,
+} from "@/server/api/crm-account-queries";
+
+export {
   getGoogleCalendarConnectionStatus,
   getGoogleCalendarAuthUrl,
   disconnectGoogleCalendarConnection,

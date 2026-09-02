@@ -48,7 +48,7 @@ export function crmAccountTeamAssigneeUsers<
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** True when the user is sales manager or support manager 1/2 on the account. */
+/** True when the user is on the account team (sales, support, or account executive). */
 export function isCrmAccountAssignedToUser(
   account: CrmAccountAssignmentFields,
   userName: string | undefined,
@@ -56,7 +56,8 @@ export function isCrmAccountAssignedToUser(
   return (
     crmSalesManagerNamesMatch(account.salesManagerName, userName) ||
     crmSalesManagerNamesMatch(account.supportManager1, userName) ||
-    crmSalesManagerNamesMatch(account.supportManager2, userName)
+    crmSalesManagerNamesMatch(account.supportManager2, userName) ||
+    crmSalesManagerNamesMatch(account.accountManagerName, userName)
   );
 }
 

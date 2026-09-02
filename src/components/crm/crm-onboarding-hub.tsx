@@ -6,6 +6,7 @@ import {
   CheckSquare,
   ClipboardList,
   GraduationCap,
+  HelpCircle,
   LayoutDashboard,
   Link2,
   MessageSquare,
@@ -30,6 +31,7 @@ import {
   normalizeCrmAccountForm,
   type CrmAccountFormValues,
 } from "@/components/crm/crm-account-form";
+import { CrmAccountQueriesPanel } from "@/components/crm/crm-account-queries-panel";
 import { CrmAccountMeetingsPanel } from "@/components/crm/crm-account-meetings-panel";
 import { CrmAccountModulesOverview } from "@/components/crm/crm-account-modules-overview";
 import { CrmAccountModulesTab } from "@/components/crm/crm-account-modules-tab";
@@ -75,6 +77,7 @@ import { isTicketOpen } from "@/lib/tickets";
 import {
   useAuthStore,
   useBookingStore,
+  useCrmAccountQueryStore,
   useCrmAccountStore,
   useCrmOnboardingStore,
   useCrmTaskStore,
@@ -105,6 +108,7 @@ const TABS = [
   { id: "tasks", label: "Tasks", icon: CheckSquare },
   { id: "meetings", label: "Meetings", icon: Calendar },
   { id: "tickets", label: "Tickets", icon: Ticket },
+  { id: "queries", label: "Queries", icon: HelpCircle },
   { id: "comms", label: "Comms", icon: MessageSquare },
 ] as const;
 
@@ -147,6 +151,8 @@ export function CrmOnboardingHub({
   const pendingMeetings = useBookingStore(
     (s) => s.appointments.filter((a) => a.companyId === accountId && a.status === "pending").length,
   );
+  const refreshAccountQueries = useCrmAccountQueryStore((s) => s.refreshCompanyQueries);
+  const openQueries = useCrmAccountQueryStore((s) => s.openCountForCompany(accountId));
   const currentUser = useAuthStore((s) => s.user);
 
   const [internalTab, setInternalTab] = useState<TabId>("dashboard");
@@ -160,6 +166,10 @@ export function CrmOnboardingHub({
   useEffect(() => {
     ensureForCompany(accountId, account?.companyType);
   }, [accountId, account?.companyType, ensureForCompany]);
+
+  useEffect(() => {
+    void refreshAccountQueries(accountId).catch(() => {});
+  }, [accountId, refreshAccountQueries]);
 
   const liveRecord = record ?? ensureForCompany(accountId, account?.companyType);
   const pct = calcCrmOnboardingProgress(liveRecord);
@@ -199,9 +209,10 @@ export function CrmOnboardingHub({
         if (t.id === "tasks") badge = openTasks;
         else if (t.id === "meetings") badge = pendingMeetings;
         else if (t.id === "tickets") badge = pendingTicketsTab;
+        else if (t.id === "queries") badge = openQueries;
         return { ...t, badge };
       }),
-    [visibleTabs, openTasks, pendingMeetings, pendingTicketsTab],
+    [visibleTabs, openTasks, pendingMeetings, pendingTicketsTab, openQueries],
   );
 
   const isLive = account?.status === "live";
@@ -332,6 +343,7 @@ export function CrmOnboardingHub({
           {tab === "tasks" ? <CrmAccountTasksPanel accountId={accountId} /> : null}
           {tab === "meetings" ? <MeetingsTab companyId={accountId} /> : null}
           {tab === "tickets" ? <TicketsTab companyId={accountId} /> : null}
+          {tab === "queries" ? <QueriesTab companyId={accountId} /> : null}
           {tab === "comms" ? <CommsTab companyId={accountId} /> : null}
         </motion.div>
       </AnimatePresence>
@@ -708,6 +720,10 @@ function GoLiveTab({
 
 function MeetingsTab({ companyId }: { companyId: string }) {
   return <CrmAccountMeetingsPanel accountId={companyId} />;
+}
+
+function QueriesTab({ companyId }: { companyId: string }) {
+  return <CrmAccountQueriesPanel accountId={companyId} />;
 }
 
 function TicketsTab({ companyId }: { companyId: string }) {

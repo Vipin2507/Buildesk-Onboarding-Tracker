@@ -983,3 +983,45 @@ export const userGoogleCalendar = sqliteTable("user_google_calendar", {
   connectedAt: text("connected_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
+
+/** Internal account query threads (staff-only discussion per CRM account). */
+export const crmAccountQueries = sqliteTable(
+  "crm_account_queries",
+  {
+    id: text("id").primaryKey(),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => crmAccounts.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    status: text("status").notNull().default("open"),
+    category: text("category"),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdByName: text("created_by_name").notNull(),
+    resolvedAt: text("resolved_at"),
+    resolvedByUserId: text("resolved_by_user_id"),
+    resolvedByName: text("resolved_by_name"),
+    ...timestamps,
+  },
+  (t) => [
+    index("crm_account_queries_company_idx").on(t.companyId),
+    index("crm_account_queries_status_idx").on(t.status),
+    index("crm_account_queries_updated_idx").on(t.updatedAt),
+  ],
+);
+
+export const crmAccountQueryMessages = sqliteTable(
+  "crm_account_query_messages",
+  {
+    id: text("id").primaryKey(),
+    queryId: text("query_id")
+      .notNull()
+      .references(() => crmAccountQueries.id, { onDelete: "cascade" }),
+    authorUserId: text("author_user_id").notNull(),
+    authorName: text("author_name").notNull(),
+    messageType: text("message_type").notNull().default("text"),
+    body: text("body").notNull(),
+    attachmentsJson: text("attachments_json"),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [index("crm_account_query_messages_query_idx").on(t.queryId)],
+);
