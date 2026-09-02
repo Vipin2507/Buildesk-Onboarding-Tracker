@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { ArrowRight, Search } from "lucide-react";
 import { toast } from "sonner";
@@ -37,10 +37,12 @@ type Props = {
 };
 
 export function CrmQueriesHub({ statusFilter, onStatusFilterChange, selectedQueryId }: Props) {
+  const navigate = useNavigate();
   const tableRef = useRef<HTMLDivElement>(null);
   const allQueries = useCrmAccountQueryStore((s) => s.allQueries);
   const loading = useCrmAccountQueryStore((s) => s.allQueriesLoading);
   const refreshAllQueries = useCrmAccountQueryStore((s) => s.refreshAllQueries);
+  const refreshCompanyQueries = useCrmAccountQueryStore((s) => s.refreshCompanyQueries);
 
   const [search, setSearch] = useState("");
 
@@ -198,15 +200,24 @@ export function CrmQueriesHub({ statusFilter, onStatusFilterChange, selectedQuer
               pageSize={25}
               getRowId={(row) => row.id}
               actions={(row) => (
-                <Button size="sm" variant="outline" className="h-7 gap-1 px-2 text-[10px]" asChild>
-                  <Link
-                    to="/crm/accounts/$accountId"
-                    params={{ accountId: row.companyId }}
-                    search={{ tab: "queries" }}
-                  >
-                    Open
-                    <ArrowRight className="h-3 w-3" />
-                  </Link>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 gap-1 px-2 text-[10px]"
+                  onClick={() => {
+                    void refreshCompanyQueries(row.companyId)
+                      .catch(() => {})
+                      .finally(() => {
+                        void navigate({
+                          to: "/crm/accounts/$accountId",
+                          params: { accountId: row.companyId },
+                          search: { tab: "queries", queryId: row.id },
+                        });
+                      });
+                  }}
+                >
+                  Open
+                  <ArrowRight className="h-3 w-3" />
                 </Button>
               )}
             />

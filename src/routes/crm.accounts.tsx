@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createFileRoute, Outlet, useChildMatches, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
 import {
@@ -194,8 +194,10 @@ function matchesAccountListFilters(row: CrmAccountRow, f: AccountListFilters) {
 }
 
 function CrmAccountsLayout() {
-  const childMatches = useChildMatches();
-  if (childMatches.length > 0) return <Outlet />;
+  const isDetail = useRouterState({
+    select: (s) => /^\/crm\/accounts\/[^/]+$/.test(s.location.pathname),
+  });
+  if (isDetail) return <Outlet />;
   return <CrmAccountsPage />;
 }
 

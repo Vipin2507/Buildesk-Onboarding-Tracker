@@ -425,7 +425,13 @@ function QueryThread({
   );
 }
 
-export function CrmAccountQueriesPanel({ accountId }: { accountId: string }) {
+export function CrmAccountQueriesPanel({
+  accountId,
+  initialQueryId,
+}: {
+  accountId: string;
+  initialQueryId?: string;
+}) {
   const user = useAuthStore((s) => s.user);
   const account = useCrmAccountStore((s) => s.getById(accountId));
   const users = useUserStore((s) => s.users);
@@ -437,13 +443,17 @@ export function CrmAccountQueriesPanel({ accountId }: { accountId: string }) {
   const updateStatus = useCrmAccountQueryStore((s) => s.updateStatus);
   const uploadAttachment = useCrmAccountQueryStore((s) => s.uploadAttachment);
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialQueryId ?? null);
   const [createOpen, setCreateOpen] = useState(false);
   const [createTitle, setCreateTitle] = useState("");
   const [createCategory, setCreateCategory] = useState<CrmAccountQueryCategory>("general");
   const [createMessage, setCreateMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | "open" | "resolved" | "archived">("all");
+
+  useEffect(() => {
+    if (initialQueryId) setSelectedId(initialQueryId);
+  }, [initialQueryId]);
 
   useEffect(() => {
     void refreshCompanyQueries(accountId).catch((err) => {
@@ -468,10 +478,14 @@ export function CrmAccountQueriesPanel({ accountId }: { accountId: string }) {
       setSelectedId(null);
       return;
     }
-    if (!selectedId || !filteredQueries.some((q) => q.id === selectedId)) {
-      setSelectedId(filteredQueries[0].id);
+    if (initialQueryId && filteredQueries.some((q) => q.id === initialQueryId)) {
+      setSelectedId(initialQueryId);
+      return;
     }
-  }, [filteredQueries, selectedId]);
+    if (!selectedId || !filteredQueries.some((q) => q.id === selectedId)) {
+      setSelectedId(filteredQueries[0]!.id);
+    }
+  }, [filteredQueries, initialQueryId, selectedId]);
 
   async function handleCreate() {
     if (!createTitle.trim()) {

@@ -80,6 +80,7 @@ export type CrmAccountTabId = (typeof CRM_ACCOUNT_TAB_IDS)[number];
 
 export const crmAccountSearchSchema = z.object({
   tab: z.enum(CRM_ACCOUNT_TAB_IDS).optional(),
+  queryId: z.string().optional(),
 });
 
 export type CrmAccountSearch = z.infer<typeof crmAccountSearchSchema>;

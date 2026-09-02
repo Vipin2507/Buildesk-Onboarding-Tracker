@@ -66,12 +66,15 @@ import {
   CRM_STAGE_LABELS,
   calcCrmOnboardingProgress,
   calcModuleWorkflowProgress,
+  createCrmOnboardingRecord,
   crmPendingActivityCount,
   isCrmIntegrationModule,
   isSalesCrmModuleEnabled,
   moduleRequiresProvider,
 } from "@/data/crm-onboarding-defaults";
 import { calcChecklistProgress } from "@/lib/checklist";
+import { resolveCrmMigrationCatalog } from "@/lib/crm-migration-catalog";
+import { resolveCrmTrainingCatalogForCompany } from "@/lib/crm-training-catalog";
 import { cn, formatDate } from "@/lib/utils";
 import { isTicketOpen } from "@/lib/tickets";
 import {
@@ -132,12 +135,14 @@ export function CrmOnboardingHub({
   progress,
   tab: controlledTab,
   onTabChange,
+  initialQueryId,
 }: {
   accountId: string;
   accountName: string;
   progress?: number;
   tab?: TabId;
   onTabChange?: (tab: TabId) => void;
+  initialQueryId?: string;
 }) {
   const account = useCrmAccountStore((s) => s.accounts.find((a) => a.id === accountId));
   const markLive = useCrmAccountStore((s) => s.markLive);
@@ -171,7 +176,15 @@ export function CrmOnboardingHub({
     void refreshAccountQueries(accountId).catch(() => {});
   }, [accountId, refreshAccountQueries]);
 
-  const liveRecord = record ?? ensureForCompany(accountId, account?.companyType);
+  const liveRecord = useMemo(() => {
+    if (record) return record;
+    return createCrmOnboardingRecord(
+      accountId,
+      account?.companyType,
+      resolveCrmMigrationCatalog(),
+      resolveCrmTrainingCatalogForCompany(account?.companyType),
+    );
+  }, [account?.companyType, accountId, record]);
   const pct = calcCrmOnboardingProgress(liveRecord);
   const pending = crmPendingActivityCount(liveRecord);
   const salesCrmEnabled = isSalesCrmModuleEnabled(liveRecord);
@@ -343,7 +356,9 @@ export function CrmOnboardingHub({
           {tab === "tasks" ? <CrmAccountTasksPanel accountId={accountId} /> : null}
           {tab === "meetings" ? <MeetingsTab companyId={accountId} /> : null}
           {tab === "tickets" ? <TicketsTab companyId={accountId} /> : null}
-          {tab === "queries" ? <QueriesTab companyId={accountId} /> : null}
+          {tab === "queries" ? (
+            <QueriesTab companyId={accountId} initialQueryId={initialQueryId} />
+          ) : null}
           {tab === "comms" ? <CommsTab companyId={accountId} /> : null}
         </motion.div>
       </AnimatePresence>
@@ -722,8 +737,14 @@ function MeetingsTab({ companyId }: { companyId: string }) {
   return <CrmAccountMeetingsPanel accountId={companyId} />;
 }
 
-function QueriesTab({ companyId }: { companyId: string }) {
-  return <CrmAccountQueriesPanel accountId={companyId} />;
+function QueriesTab({
+  companyId,
+  initialQueryId,
+}: {
+  companyId: string;
+  initialQueryId?: string;
+}) {
+  return <CrmAccountQueriesPanel accountId={companyId} initialQueryId={initialQueryId} />;
 }
 
 function TicketsTab({ companyId }: { companyId: string }) {

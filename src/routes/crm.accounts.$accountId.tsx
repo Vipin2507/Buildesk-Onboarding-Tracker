@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 
 import { CrmOnboardingHub } from "@/components/crm/crm-onboarding-hub";
 import { EntityNotFound } from "@/components/empty-state";
@@ -19,18 +20,23 @@ export const Route = createFileRoute("/crm/accounts/$accountId")({
 function CrmAccountDetailPage() {
   const navigate = useNavigate();
   const { accountId } = Route.useParams();
-  const { tab: tabParam } = Route.useSearch();
+  const { tab: tabParam, queryId } = Route.useSearch();
   const tab = parseCrmAccountTab(tabParam);
   const account = useCrmAccountStore((s) => s.getById(accountId));
+  const record = useCrmOnboardingStore((s) => s.getByCompanyId(accountId));
   const currentUser = useAuthStore((s) => s.user);
   const ensure = useCrmOnboardingStore((s) => s.ensureForCompany);
+
+  useEffect(() => {
+    if (!account) return;
+    ensure(accountId, account.companyType);
+  }, [account, accountId, ensure]);
 
   if (!account || !canViewCrmAccount(account, currentUser)) {
     return <EntityNotFound entity="CRM account" listPath="/crm/accounts" listLabel="Accounts" />;
   }
 
-  const record = ensure(accountId, account.companyType);
-  const progress = calcCrmOnboardingProgress(record);
+  const progress = record ? calcCrmOnboardingProgress(record) : 0;
 
   function setTab(next: CrmAccountTabId) {
     void navigate({
@@ -48,6 +54,7 @@ function CrmAccountDetailPage() {
       progress={progress}
       tab={tab}
       onTabChange={setTab}
+      initialQueryId={queryId}
     />
   );
 }
