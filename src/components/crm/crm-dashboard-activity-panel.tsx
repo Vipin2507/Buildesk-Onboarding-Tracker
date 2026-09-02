@@ -181,58 +181,56 @@ export function CrmDashboardActivityPanel({ items }: Props) {
           </div>
         </div>
 
-        <div className="mt-2 flex flex-col gap-2 lg:flex-row lg:items-stretch">
-          <div
-            role="tablist"
-            aria-label="Activity categories"
-            className="grid min-w-0 flex-1 grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-5"
-          >
-            {ACTIVITY_FILTER_CHIPS.map((chip) => {
-              const tone = activityFilterChipTone(chip.id);
-              const active = category === chip.id;
-              const count = activityFilterChipCount(chip.id);
-              return (
-                <button
-                  key={chip.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => setCategory(chip.id)}
+        <div
+          role="tablist"
+          aria-label="Activity categories"
+          className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6"
+        >
+          {ACTIVITY_FILTER_CHIPS.map((chip) => {
+            const tone = activityFilterChipTone(chip.id);
+            const active = category === chip.id;
+            const count = activityFilterChipCount(chip.id);
+            return (
+              <button
+                key={chip.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setCategory(chip.id)}
+                className={cn(
+                  "flex min-h-[3.25rem] min-w-0 flex-col justify-center rounded-lg border bg-card px-2.5 py-2 text-left shadow-sm transition-all",
+                  "hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                  active
+                    ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"
+                    : "border-border/80",
+                )}
+              >
+                <span className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  {chip.label}
+                </span>
+                <span
                   className={cn(
-                    "flex min-w-0 flex-col rounded-lg border bg-card px-2.5 py-2 text-left shadow-sm transition-all",
-                    "hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-                    active
-                      ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"
-                      : "border-border/80",
+                    "mt-1 text-lg font-semibold tabular-nums leading-none",
+                    ACTIVITY_FILTER_BOX_COUNT_TONE[tone],
                   )}
                 >
-                  <span className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                    {chip.label}
-                  </span>
-                  <span
-                    className={cn(
-                      "mt-1 text-lg font-semibold tabular-nums leading-none",
-                      ACTIVITY_FILTER_BOX_COUNT_TONE[tone],
-                    )}
-                  >
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
           <button
             type="button"
             onClick={showLast7Days}
             className={cn(
-              "flex shrink-0 flex-col justify-center rounded-lg border bg-card px-3 py-2 text-left shadow-sm transition-all lg:min-w-[5.5rem]",
+              "flex min-h-[3.25rem] min-w-0 flex-col justify-center rounded-lg border bg-card px-2.5 py-2 text-left shadow-sm transition-all",
               "hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
               dateRange === "7d" && !dateFrom && !dateTo
                 ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"
                 : "border-border/80",
             )}
           >
-            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            <span className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
               Last 7 days
             </span>
             <span className="mt-1 text-lg font-semibold tabular-nums leading-none text-primary">
