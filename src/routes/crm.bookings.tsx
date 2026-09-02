@@ -1,9 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  Calendar,
   CalendarOff,
   Check,
   Clock,
+  Inbox,
   Mail,
   Phone,
   Plus,
