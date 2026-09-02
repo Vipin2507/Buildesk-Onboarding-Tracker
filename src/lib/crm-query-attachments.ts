@@ -4,7 +4,7 @@ export const CRM_QUERY_MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
 export function crmQueryMessageTypeForMime(
   mimeType: string,
-): Exclude<CrmAccountQueryMessageType, "system"> {
+): Exclude<CrmAccountQueryMessageType, "system" | "text"> {
   const mime = mimeType.toLowerCase();
   if (mime.startsWith("image/")) return "image";
   if (mime.startsWith("audio/")) return "voice";
