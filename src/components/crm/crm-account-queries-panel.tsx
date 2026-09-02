@@ -654,49 +654,58 @@ function QueryThread({
                 currentUserId={currentUserId}
               />
             </div>
-            <label
-              className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md border bg-background hover:bg-muted"
-              title="Attach file"
-            >
-              <Paperclip className="h-3.5 w-3.5" />
-              <input
-                type="file"
-                accept="*/*"
-                className="sr-only"
-                disabled={composerDisabled}
-                onChange={(e) => void handlePickFile(e)}
-              />
-            </label>
-            {!recording ? (
+            <div className="flex shrink-0 items-center gap-1.5">
               <Button
                 type="button"
                 size="icon"
                 variant="outline"
-                className="h-8 w-8 shrink-0"
+                className="size-8"
                 disabled={composerDisabled}
-                onClick={() => void startRecording()}
+                asChild
               >
-                <Mic className="h-3.5 w-3.5" />
+                <label title="Attach file" className="cursor-pointer">
+                  <Paperclip className="h-3.5 w-3.5" />
+                  <input
+                    type="file"
+                    accept="*/*"
+                    className="sr-only"
+                    disabled={composerDisabled}
+                    onChange={(e) => void handlePickFile(e)}
+                  />
+                </label>
               </Button>
-            ) : (
+              {!recording ? (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  className="size-8"
+                  disabled={composerDisabled}
+                  onClick={() => void startRecording()}
+                >
+                  <Mic className="h-3.5 w-3.5" />
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="destructive"
+                  className="size-8"
+                  onClick={stopRecording}
+                >
+                  <Square className="h-3 w-3" />
+                </Button>
+              )}
               <Button
                 type="button"
                 size="icon"
-                variant="destructive"
-                className="h-8 w-8 shrink-0"
-                onClick={stopRecording}
+                className="size-8"
+                disabled={composerDisabled || !text.trim()}
+                onClick={() => void handleSendText()}
               >
-                <Square className="h-3 w-3" />
+                <Send className="h-3.5 w-3.5" />
               </Button>
-            )}
-            <Button
-              size="icon"
-              className="h-8 w-8 shrink-0"
-              disabled={composerDisabled || !text.trim()}
-              onClick={() => void handleSendText()}
-            >
-              <Send className="h-3.5 w-3.5" />
-            </Button>
+            </div>
           </div>
           {recording ? (
             <p className="mt-1 flex items-center gap-1 text-[10px] text-destructive">
