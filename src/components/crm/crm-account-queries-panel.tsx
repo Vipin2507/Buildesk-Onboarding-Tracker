@@ -17,7 +17,6 @@ import { toast } from "sonner";
 import {
   DesignTicketSection,
   TICKET_EASE,
-  ticketTextareaClass,
 } from "@/components/design-ticket/design-ticket-shared";
 import { EntityFormModal } from "@/components/entity-form-modal";
 import { EmptyState } from "@/components/empty-state";
@@ -51,9 +50,55 @@ function lastMessagePreview(query: CrmAccountQuery) {
   const last = query.messages[query.messages.length - 1];
   if (!last) return "No messages yet";
   if (last.messageType === "system") return last.body;
-  if (last.messageType === "image") return "📷 Image";
-  if (last.messageType === "voice") return "🎤 Voice note";
-  return last.body.slice(0, 80);
+  if (last.messageType === "image") return "Image";
+  if (last.messageType === "voice") return "Voice note";
+  return last.body.slice(0, 60);
+}
+
+function AutoGrowTextarea({
+  value,
+  onChange,
+  placeholder,
+  disabled,
+  onSubmit,
+  className,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  onSubmit?: () => void;
+  className?: string;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "0px";
+    el.style.height = `${Math.min(el.scrollHeight, 96)}px`;
+  }, [value]);
+
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      disabled={disabled}
+      className={cn(
+        "min-h-8 max-h-24 w-full resize-none overflow-y-auto rounded-md border border-input bg-background px-2.5 py-1.5 text-xs leading-5 outline-none focus:ring-2 focus:ring-ring/40",
+        className,
+      )}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          onSubmit?.();
+        }
+      }}
+    />
+  );
 }
 
 function MessageBubble({
@@ -65,10 +110,10 @@ function MessageBubble({
 }) {
   if (msg.messageType === "system") {
     return (
-      <div className="flex justify-center px-2 py-1">
-        <span className="rounded-full bg-muted px-3 py-1 text-center text-[11px] text-muted-foreground">
+      <div className="flex justify-center py-0.5">
+        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
           {msg.body}
-          <span className="ml-2 opacity-70">{formatTime(msg.createdAt)}</span>
+          <span className="ml-1.5 opacity-70">{formatTime(msg.createdAt)}</span>
         </span>
       </div>
     );
@@ -78,20 +123,20 @@ function MessageBubble({
     <div className={cn("flex", isSelf ? "justify-end" : "justify-start")}>
       <div
         className={cn(
-          "max-w-[min(100%,22rem)] rounded-2xl px-3.5 py-2.5 text-sm shadow-sm",
+          "max-w-[min(100%,18rem)] rounded-xl px-2.5 py-1.5 text-xs shadow-sm",
           isSelf
-            ? "rounded-br-md bg-primary text-primary-foreground"
-            : "rounded-bl-md border bg-card text-foreground",
+            ? "rounded-br-sm bg-primary text-primary-foreground"
+            : "rounded-bl-sm border bg-card text-foreground",
         )}
       >
         <div
           className={cn(
-            "mb-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]",
-            isSelf ? "text-primary-foreground/80" : "text-muted-foreground",
+            "mb-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0 text-[10px]",
+            isSelf ? "text-primary-foreground/75" : "text-muted-foreground",
           )}
         >
-          <span className="font-semibold">{msg.authorName}</span>
-          <span>{formatDate(msg.createdAt)} · {formatTime(msg.createdAt)}</span>
+          <span className="font-medium">{msg.authorName}</span>
+          <span>{formatTime(msg.createdAt)}</span>
         </div>
 
         {msg.messageType === "image" && msg.attachments?.[0]?.url ? (
@@ -99,7 +144,7 @@ function MessageBubble({
             <img
               src={msg.attachments[0].url}
               alt={msg.attachments[0].name || "Attachment"}
-              className="max-h-48 rounded-lg object-contain"
+              className="max-h-36 rounded-md object-contain"
             />
           </a>
         ) : null}
@@ -111,7 +156,7 @@ function MessageBubble({
         ) : null}
 
         {msg.body.trim() ? (
-          <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.body}</p>
+          <p className="whitespace-pre-wrap break-words leading-snug">{msg.body}</p>
         ) : null}
 
         {msg.messageType === "text" && msg.attachments?.length ? (
@@ -248,12 +293,12 @@ function QueryThread({
   const composerDisabled = sending || query.status === "archived";
 
   return (
-    <div className="flex min-h-[420px] flex-1 flex-col rounded-xl border bg-card">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2.5">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="truncate text-sm font-semibold">{query.title}</h3>
-            <Pill tone={statusTone(query.status)}>
+    <div className="flex h-[min(420px,calc(100dvh-280px))] min-h-[280px] flex-1 flex-col overflow-hidden rounded-lg border bg-card">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b px-2.5 py-1.5">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <h3 className="truncate text-xs font-semibold">{query.title}</h3>
+            <Pill tone={statusTone(query.status)} className="text-[9px]">
               {CRM_ACCOUNT_QUERY_STATUS_LABEL[query.status]}
             </Pill>
             {query.category ? (
@@ -262,25 +307,25 @@ function QueryThread({
               </span>
             ) : null}
           </div>
-          <p className="text-[10px] text-muted-foreground">
-            Started by {query.createdByName} · {formatDate(query.createdAt)}
+          <p className="truncate text-[10px] text-muted-foreground">
+            {query.createdByName} · {formatDate(query.createdAt)}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-1">
+        <div className="flex shrink-0 items-center gap-0.5">
           {query.status === "open" ? (
-            <Button size="sm" variant="outline" className="h-7 gap-1 px-2 text-[10px]" onClick={onResolve}>
+            <Button size="sm" variant="outline" className="h-6 gap-1 px-1.5 text-[10px]" onClick={onResolve}>
               <CheckCircle2 className="h-3 w-3" />
               Resolve
             </Button>
           ) : null}
           {query.status === "resolved" ? (
-            <Button size="sm" variant="outline" className="h-7 gap-1 px-2 text-[10px]" onClick={onReopen}>
+            <Button size="sm" variant="outline" className="h-6 gap-1 px-1.5 text-[10px]" onClick={onReopen}>
               <RotateCcw className="h-3 w-3" />
               Reopen
             </Button>
           ) : null}
           {query.status !== "archived" ? (
-            <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-[10px]" onClick={onArchive}>
+            <Button size="sm" variant="ghost" className="h-6 gap-1 px-1.5 text-[10px]" onClick={onArchive}>
               <Archive className="h-3 w-3" />
               Archive
             </Button>
@@ -288,9 +333,9 @@ function QueryThread({
         </div>
       </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto bg-muted/15 p-3 min-h-[240px] max-h-[min(52dvh,480px)]">
+      <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto bg-muted/10 p-2">
         {sorted.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
+          <p className="py-6 text-center text-xs text-muted-foreground">
             No messages yet. Start the discussion below.
           </p>
         ) : (
@@ -302,32 +347,28 @@ function QueryThread({
       </div>
 
       {query.status === "resolved" ? (
-        <div className="border-t bg-success/5 px-3 py-2 text-center text-xs text-success">
-          This query is resolved — reply to reopen the conversation.
+        <div className="shrink-0 border-t bg-success/5 px-2 py-1 text-center text-[10px] text-success">
+          Resolved — reply to reopen
         </div>
       ) : null}
 
       {query.status === "archived" ? (
-        <div className="border-t bg-muted/30 px-3 py-2 text-center text-xs text-muted-foreground">
-          This query is archived and read-only.
+        <div className="shrink-0 border-t bg-muted/30 px-2 py-1 text-center text-[10px] text-muted-foreground">
+          Archived — read only
         </div>
       ) : (
-        <div className="space-y-2 border-t p-3">
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Write a reply…"
-            disabled={composerDisabled}
-            className={cn(ticketTextareaClass, "min-h-[72px] text-xs")}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void handleSendText();
-              }
-            }}
-          />
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border bg-background hover:bg-muted">
+        <div className="shrink-0 border-t p-2">
+          <div className="flex items-end gap-1.5">
+            <div className="min-w-0 flex-1">
+              <AutoGrowTextarea
+                value={text}
+                onChange={setText}
+                placeholder="Write a reply…"
+                disabled={composerDisabled}
+                onSubmit={() => void handleSendText()}
+              />
+            </div>
+            <label className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md border bg-background hover:bg-muted">
               <ImagePlus className="h-3.5 w-3.5" />
               <input
                 type="file"
@@ -342,7 +383,7 @@ function QueryThread({
                 type="button"
                 size="icon"
                 variant="outline"
-                className="h-8 w-8"
+                className="h-8 w-8 shrink-0"
                 disabled={composerDisabled}
                 onClick={() => void startRecording()}
               >
@@ -353,28 +394,27 @@ function QueryThread({
                 type="button"
                 size="icon"
                 variant="destructive"
-                className="h-8 w-8"
+                className="h-8 w-8 shrink-0"
                 onClick={stopRecording}
               >
                 <Square className="h-3 w-3" />
               </Button>
             )}
-            {recording ? (
-              <span className="flex items-center gap-1 text-xs text-destructive">
-                <MicOff className="h-3.5 w-3.5" />
-                Recording… tap stop when done
-              </span>
-            ) : null}
             <Button
-              size="sm"
-              className="ml-auto h-8 gap-1 px-3 text-xs"
+              size="icon"
+              className="h-8 w-8 shrink-0"
               disabled={composerDisabled || !text.trim()}
               onClick={() => void handleSendText()}
             >
               <Send className="h-3.5 w-3.5" />
-              Send
             </Button>
           </div>
+          {recording ? (
+            <p className="mt-1 flex items-center gap-1 text-[10px] text-destructive">
+              <MicOff className="h-3 w-3" />
+              Recording… tap stop when done
+            </p>
+          ) : null}
         </div>
       )}
     </div>
@@ -473,48 +513,47 @@ export function CrmAccountQueriesPanel({ accountId }: { accountId: string }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.28, ease: TICKET_EASE }}
-      className="space-y-3"
+      transition={{ duration: 0.22, ease: TICKET_EASE }}
     >
-      <DesignTicketSection title="Account queries">
-        <p className="mb-3 text-xs text-muted-foreground">
-          Internal discussion for admins and the account team. Sales manager, support managers,
-          and account executives on this account can participate.
-        </p>
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap gap-1">
+      <DesignTicketSection
+        compact
+        title="Account queries"
+        action={
+          <Button size="sm" className="h-7 gap-1 px-2 text-xs" onClick={() => setCreateOpen(true)}>
+            <Plus className="h-3.5 w-3.5" />
+            New query
+          </Button>
+        }
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-1">
             {(["all", "open", "resolved", "archived"] as const).map((id) => (
               <button
                 key={id}
                 type="button"
                 onClick={() => setStatusFilter(id)}
                 className={cn(
-                  "rounded-md px-2.5 py-1 text-xs font-medium capitalize transition-colors",
+                  "rounded-md px-2 py-0.5 text-[11px] font-medium capitalize transition-colors",
                   statusFilter === id
                     ? "bg-primary text-primary-foreground"
-                    : "bg-muted/50 text-muted-foreground hover:bg-muted",
+                    : "text-muted-foreground hover:bg-muted",
                 )}
               >
                 {id}
               </button>
             ))}
           </div>
-          <Button size="sm" className="h-8 gap-1 text-xs" onClick={() => setCreateOpen(true)}>
-            <Plus className="h-3.5 w-3.5" />
-            New query
-          </Button>
+          {teamMembers.length > 0 ? (
+            <p className="text-[10px] text-muted-foreground">
+              {teamMembers.map((m) => m.name).join(", ")} · admins
+            </p>
+          ) : null}
         </div>
 
-        {teamMembers.length > 0 ? (
-          <p className="mb-3 text-[11px] text-muted-foreground">
-            Participants: {teamMembers.map((m) => m.name).join(", ")} · All admins
-          </p>
-        ) : null}
-
         {loading && queries.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">Loading queries…</p>
+          <p className="py-6 text-center text-xs text-muted-foreground">Loading queries…</p>
         ) : filteredQueries.length === 0 ? (
           <EmptyState
             title="No queries yet"
@@ -523,8 +562,8 @@ export function CrmAccountQueriesPanel({ accountId }: { accountId: string }) {
             onAction={() => setCreateOpen(true)}
           />
         ) : (
-          <div className="grid gap-3 lg:grid-cols-[minmax(220px,280px)_1fr]">
-            <div className="space-y-1.5 rounded-xl border bg-muted/10 p-2">
+          <div className="mt-2 grid min-h-0 gap-2 lg:grid-cols-[minmax(180px,220px)_1fr]">
+            <div className="max-h-[min(420px,calc(100dvh-280px))] space-y-1 overflow-y-auto rounded-lg border bg-muted/10 p-1">
               {filteredQueries.map((query) => {
                 const active = selected?.id === query.id;
                 return (
@@ -533,23 +572,23 @@ export function CrmAccountQueriesPanel({ accountId }: { accountId: string }) {
                     type="button"
                     onClick={() => setSelectedId(query.id)}
                     className={cn(
-                      "w-full rounded-lg border px-2.5 py-2 text-left transition-colors",
+                      "w-full rounded-md border px-2 py-1.5 text-left transition-colors",
                       active
                         ? "border-primary/40 bg-primary/5"
                         : "border-transparent bg-card hover:border-border/80",
                     )}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="line-clamp-2 text-xs font-medium">{query.title}</span>
-                      <Pill tone={statusTone(query.status)} className="shrink-0 text-[9px]">
+                    <div className="flex items-center justify-between gap-1.5">
+                      <span className="line-clamp-1 text-[11px] font-medium">{query.title}</span>
+                      <Pill tone={statusTone(query.status)} className="shrink-0 text-[8px]">
                         {CRM_ACCOUNT_QUERY_STATUS_LABEL[query.status]}
                       </Pill>
                     </div>
-                    <p className="mt-1 line-clamp-2 text-[10px] text-muted-foreground">
+                    <p className="line-clamp-1 text-[10px] text-muted-foreground">
                       {lastMessagePreview(query)}
                     </p>
-                    <p className="mt-1 text-[10px] tabular-nums text-muted-foreground">
-                      {formatDate(query.updatedAt)} · {query.messages.length} msg
+                    <p className="text-[9px] tabular-nums text-muted-foreground">
+                      {formatDate(query.updatedAt)} · {query.messages.length}
                     </p>
                   </button>
                 );
@@ -622,11 +661,11 @@ export function CrmAccountQueriesPanel({ accountId }: { accountId: string }) {
         </label>
         <label className="block text-xs font-medium">
           Initial message
-          <textarea
-            className={cn(ticketTextareaClass, "mt-1 min-h-[96px] text-sm")}
+          <AutoGrowTextarea
             value={createMessage}
-            onChange={(e) => setCreateMessage(e.target.value)}
+            onChange={setCreateMessage}
             placeholder="Describe your question for the account team…"
+            className="mt-1"
           />
         </label>
       </EntityFormModal>
