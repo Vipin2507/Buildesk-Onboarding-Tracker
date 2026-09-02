@@ -35,6 +35,8 @@ type Props = {
   embedded?: boolean;
   /** Hide day/week/month/list toggle — parent controls view via URL */
   hideViewToggle?: boolean;
+  /** Edge-to-edge compact table styling for embedded list views */
+  flush?: boolean;
   /** Where "Open" links go — CRM tasks use account IDs, not ERP company IDs */
   entityLinkTarget?: "company" | "crm";
 };
@@ -76,6 +78,7 @@ export function TaskCalendarPanel({
   renderTaskDetail,
   embedded = false,
   hideViewToggle = false,
+  flush = false,
   entityLinkTarget = "company",
 }: Props) {
   const [cursorDate, setCursorDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -234,6 +237,7 @@ export function TaskCalendarPanel({
           selectedTaskId={selectedTaskId}
           renderTaskDetail={renderTaskDetail}
           entityLinkTarget={entityLinkTarget}
+          flush={flush}
         />
       ) : null}
 
@@ -296,6 +300,7 @@ function TaskListTable({
   selectedTaskId,
   renderTaskDetail,
   entityLinkTarget = "company",
+  flush = false,
 }: {
   tasks: FollowUpTask[];
   users: User[];
@@ -304,13 +309,16 @@ function TaskListTable({
   selectedTaskId?: string;
   renderTaskDetail?: (task: FollowUpTask) => ReactNode;
   entityLinkTarget?: "company" | "crm";
+  flush?: boolean;
 }) {
   return (
-    <DataTable
-      data={tasks}
-      hideSearch
-      pageSize={20}
-      density="compact"
+    <div className={flush ? "bg-card [&_tbody_tr]:bg-card [&_thead]:bg-card" : undefined}>
+      <DataTable
+        flush={flush}
+        data={tasks}
+        hideSearch
+        pageSize={20}
+        density="compact"
       getRowId={(t) => t.id}
       onRowClick={onTaskClick}
       expandedRowId={selectedTaskId ?? null}
@@ -421,7 +429,8 @@ function TaskListTable({
           ),
         },
       ]}
-    />
+      />
+    </div>
   );
 }
 

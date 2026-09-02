@@ -1,27 +1,27 @@
 import {
-  AlertCircle,
   Ban,
   Calendar,
   CalendarDays,
   CheckCircle2,
   Clock,
   LayoutList,
-  Link2,
   Plus,
+  Search,
   Trash2,
-  User as UserIcon,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
-  DesignTicketKpiGrid,
-  DesignTicketPageHeader,
+  DesignTicketFilterField,
+  DesignTicketSelect,
+} from "@/components/design-ticket/design-ticket-fields";
+import {
+  DesignTicketFilterBar,
   DesignTicketTabNav,
   ticketSectionVariants,
 } from "@/components/design-ticket/design-ticket-shared";
 import { ConfirmDeleteDialog, EntityFormModal } from "@/components/entity-form-modal";
-import { ListToolbar } from "@/components/list-toolbar";
 import { PageWrap } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,21 +48,104 @@ import {
 } from "@/types";
 import { usePermissions } from "@/hooks/use-permissions";
 import type { CrmTasksTabId } from "@/lib/crm-route-search";
+import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 
 const OPEN_STATUSES: FollowUpTaskStatus[] = ["open", "in_progress", "blocked"];
 
-const TASK_TABS = [
-  { id: "all", label: "All tasks", icon: LayoutList },
-  { id: "my", label: "My tasks", icon: UserIcon },
-  { id: "open", label: "Open", icon: Clock },
-  { id: "today", label: "Due today", icon: CalendarDays },
-  { id: "overdue", label: "Overdue", icon: AlertCircle },
+const TASK_FILTER_CHIPS = [
+  { id: "all", label: "All" },
+  { id: "my", label: "My tasks" },
+  { id: "open", label: "Open" },
+  { id: "today", label: "Due today" },
+  { id: "overdue", label: "Overdue" },
+] as const;
+
+type TaskFilterChipId = (typeof TASK_FILTER_CHIPS)[number]["id"];
+
+const TASK_LIST_TAB_IDS = new Set<TaskFilterChipId>(
+  TASK_FILTER_CHIPS.map((chip) => chip.id),
+);
+
+const CALENDAR_VIEW_TABS = [
   { id: "list", label: "List view", icon: LayoutList },
   { id: "day", label: "Day", icon: Clock },
   { id: "week", label: "Week", icon: CalendarDays },
   { id: "month", label: "Month", icon: Calendar },
 ] as const;
+
+type TaskFilterTone = "muted" | "warning" | "success" | "info" | "danger";
+
+const TASK_FILTER_BOX_COUNT_TONE: Record<TaskFilterTone, string> = {
+  muted: "text-foreground",
+  warning: "text-amber-600 dark:text-amber-400",
+  success: "text-emerald-600 dark:text-emerald-400",
+  info: "text-primary",
+  danger: "text-destructive",
+};
+
+function taskFilterChipTone(id: TaskFilterChipId): TaskFilterTone {
+  if (id === "overdue") return "danger";
+  if (id === "today") return "warning";
+  if (id === "open") return "info";
+  if (id === "my") return "success";
+  return "muted";
+}
+
+function matchesTaskListTab(
+  task: FollowUpTask,
+  tabId: TaskFilterChipId,
+  today: string,
+  currentUserId?: string,
+) {
+  if (tabId === "my") {
+    return currentUserId ? resolveTaskAssigneeIds(task).includes(currentUserId) : false;
+  }
+  if (tabId === "open") return OPEN_STATUSES.includes(task.status);
+  if (tabId === "today") {
+    return OPEN_STATUSES.includes(task.status) && task.dueDate === today;
+  }
+  if (tabId === "overdue") {
+    return OPEN_STATUSES.includes(task.status) && Boolean(task.dueDate && task.dueDate < today);
+  }
+  return true;
+}
+
+type TaskToolbarFilters = {
+  accountFilter: string;
+  typeFilter: string;
+  statusFilter: string;
+  assigneeFilter: string;
+  sourceFilter: string;
+  tableSearch: string;
+};
+
+function matchesTaskToolbarFilters(
+  task: FollowUpTask,
+  filters: TaskToolbarFilters,
+  accountOptions: { id: string; name: string }[],
+) {
+  if (filters.accountFilter !== "all" && task.companyId !== filters.accountFilter) return false;
+  if (filters.typeFilter !== "all" && task.taskType !== filters.typeFilter) return false;
+  if (filters.statusFilter !== "all" && task.status !== filters.statusFilter) return false;
+  if (filters.sourceFilter !== "all" && (task.source ?? "manual") !== filters.sourceFilter) {
+    return false;
+  }
+  if (
+    filters.assigneeFilter !== "all" &&
+    !resolveTaskAssigneeIds(task).includes(filters.assigneeFilter)
+  ) {
+    return false;
+  }
+  const q = filters.tableSearch.trim().toLowerCase();
+  if (!q) return true;
+  const accountName = accountOptions.find((a) => a.id === task.companyId)?.name ?? "";
+  return (
+    task.title.toLowerCase().includes(q) ||
+    accountName.toLowerCase().includes(q) ||
+    (task.description ?? "").toLowerCase().includes(q)
+  );
+}
 
 function isCalendarTab(tab: CrmTasksTabId): tab is TaskCalendarView {
   return tab === "list" || tab === "day" || tab === "week" || tab === "month";
@@ -106,67 +189,56 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
 
   const today = new Date().toISOString().slice(0, 10);
 
-  const kpis = useMemo(() => {
-    const open = crmTasks.filter((t) => OPEN_STATUSES.includes(t.status)).length;
-    const dueToday = crmTasks.filter(
-      (t) => OPEN_STATUSES.includes(t.status) && t.dueDate === today,
-    ).length;
-    const overdue = crmTasks.filter(
-      (t) => OPEN_STATUSES.includes(t.status) && t.dueDate && t.dueDate < today,
-    ).length;
-    const fromBooking = crmTasks.filter((t) => t.source === "booking" && OPEN_STATUSES.includes(t.status)).length;
-    const myOpen = crmTasks.filter((t) => {
-      if (!OPEN_STATUSES.includes(t.status) || !currentUser?.id) return false;
-      return resolveTaskAssigneeIds(t).includes(currentUser.id);
-    }).length;
-    return { open, dueToday, overdue, fromBooking, myOpen, total: crmTasks.length };
-  }, [crmTasks, today, currentUser?.id]);
+  const tableRef = useRef<HTMLDivElement>(null);
 
-  const tabFiltered = useMemo(() => {
-    switch (tab) {
-      case "my":
-        return crmTasks.filter((t) =>
-          currentUser?.id ? resolveTaskAssigneeIds(t).includes(currentUser.id) : false,
-        );
-      case "open":
-        return crmTasks.filter((t) => OPEN_STATUSES.includes(t.status));
-      case "today":
-        return crmTasks.filter((t) => OPEN_STATUSES.includes(t.status) && t.dueDate === today);
-      case "overdue":
-        return crmTasks.filter(
-          (t) => OPEN_STATUSES.includes(t.status) && t.dueDate && t.dueDate < today,
-        );
-      default:
-        return crmTasks;
-    }
-  }, [crmTasks, tab, today, currentUser?.id]);
-
-  const [query, setQuery] = useState("");
+  const [tableSearch, setTableSearch] = useState("");
   const [accountFilter, setAccountFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [assigneeFilter, setAssigneeFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
 
+  const listFilters = useMemo(
+    () => ({
+      accountFilter,
+      typeFilter,
+      statusFilter,
+      assigneeFilter,
+      sourceFilter,
+      tableSearch,
+    }),
+    [accountFilter, typeFilter, statusFilter, assigneeFilter, sourceFilter, tableSearch],
+  );
+
+  const toolbarScoped = useMemo(
+    () => crmTasks.filter((task) => matchesTaskToolbarFilters(task, listFilters, accountOptions)),
+    [crmTasks, listFilters, accountOptions],
+  );
+
+  const isListFilterTab = TASK_LIST_TAB_IDS.has(tab as TaskFilterChipId);
+  const listTab = isListFilterTab ? (tab as TaskFilterChipId) : "all";
+
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return tabFiltered.filter((task) => {
-      if (accountFilter !== "all" && task.companyId !== accountFilter) return false;
-      if (typeFilter !== "all" && task.taskType !== typeFilter) return false;
-      if (statusFilter !== "all" && task.status !== statusFilter) return false;
-      if (sourceFilter !== "all" && (task.source ?? "manual") !== sourceFilter) return false;
-      if (assigneeFilter !== "all" && !resolveTaskAssigneeIds(task).includes(assigneeFilter)) {
-        return false;
-      }
-      if (!q) return true;
-      const accountName = accountOptions.find((a) => a.id === task.companyId)?.name ?? "";
-      return (
-        task.title.toLowerCase().includes(q) ||
-        accountName.toLowerCase().includes(q) ||
-        (task.description ?? "").toLowerCase().includes(q)
-      );
-    });
-  }, [tabFiltered, query, accountFilter, typeFilter, statusFilter, assigneeFilter, sourceFilter, accountOptions]);
+    return toolbarScoped.filter((task) =>
+      matchesTaskListTab(task, listTab, today, currentUser?.id),
+    );
+  }, [toolbarScoped, listTab, today, currentUser?.id]);
+
+  function taskFilterChipCount(id: TaskFilterChipId) {
+    return toolbarScoped.filter((task) =>
+      matchesTaskListTab(task, id, today, currentUser?.id),
+    ).length;
+  }
+
+  const fromMeetingCount = useMemo(
+    () =>
+      toolbarScoped.filter(
+        (task) => task.source === "booking" && OPEN_STATUSES.includes(task.status),
+      ).length,
+    [toolbarScoped],
+  );
+
+  const tabFiltered = useMemo(() => crmTasks, [crmTasks]);
 
   const selectedTask = selectedTaskId ? crmTasks.find((t) => t.id === selectedTaskId) : undefined;
   const editingAccount = selectedTask
@@ -288,6 +360,24 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
     sourceFilter !== "all",
   ].filter(Boolean).length;
 
+  function clearFilters() {
+    setTableSearch("");
+    setAccountFilter("all");
+    setTypeFilter("all");
+    setStatusFilter("all");
+    setAssigneeFilter("all");
+    setSourceFilter("all");
+  }
+
+  function applyFilters() {
+    tableRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function showFromMeetings() {
+    onTabChange("open");
+    setSourceFilter("booking");
+  }
+
   const assigneeOptions = useMemo(() => {
     const ids = new Set<string>();
     for (const task of crmTasks) {
@@ -349,171 +439,225 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
   }
 
   return (
-    <PageWrap>
-      <DesignTicketPageHeader
-        title="Tasks"
-        subtitle="Schedule, assign, and track follow-ups across CRM accounts"
-        actions={
-          canCreate ? (
-            <Button size="sm" className="gap-1.5" onClick={openCreate}>
-              <Plus className="h-4 w-4" />
-              Create task
-            </Button>
-          ) : null
-        }
-      />
+    <PageWrap compact flushTop>
+      <div className="mb-0 border-b border-border pb-2 pt-1">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h1 className="text-base font-medium tracking-tight">Tasks</h1>
+            <p className="text-xs text-muted-foreground">
+              {isListFilterTab
+                ? `${filtered.length} ${filtered.length === 1 ? "task" : "tasks"}`
+                : "Calendar views across CRM accounts"}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {canCreate ? (
+              <Button
+                size="sm"
+                className="h-8 gap-1 bg-primary px-3 text-xs"
+                onClick={openCreate}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Create task
+              </Button>
+            ) : null}
+          </div>
+        </div>
 
-      <DesignTicketKpiGrid
-        size="compact"
-        columns={6}
-        items={[
-          {
-            id: "open",
-            label: "Open",
-            value: kpis.open,
-            icon: Clock,
-            active: tab === "open",
-            onClick: () => onTabChange("open"),
-          },
-          {
-            id: "my",
-            label: "My tasks",
-            value: kpis.myOpen,
-            icon: UserIcon,
-            active: tab === "my",
-            onClick: () => onTabChange("my"),
-          },
-          {
-            id: "today",
-            label: "Due today",
-            value: kpis.dueToday,
-            icon: CalendarDays,
-            active: tab === "today",
-            onClick: () => onTabChange("today"),
-          },
-          {
-            id: "overdue",
-            label: "Overdue",
-            value: kpis.overdue,
-            icon: AlertCircle,
-            tone: kpis.overdue > 0 ? "text-destructive" : undefined,
-            active: tab === "overdue",
-            onClick: () => onTabChange("overdue"),
-          },
-          {
-            id: "booking",
-            label: "From meetings",
-            value: kpis.fromBooking,
-            icon: Link2,
-          },
-          {
-            id: "all",
-            label: "Total",
-            value: kpis.total,
-            icon: LayoutList,
-            active: tab === "all",
-            onClick: () => onTabChange("all"),
-          },
-        ]}
-      />
+        <div className="mt-2 flex flex-col gap-2 lg:flex-row lg:items-stretch">
+          <div
+            role="tablist"
+            aria-label="Task filters"
+            className="grid min-w-0 flex-1 grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-5"
+          >
+            {TASK_FILTER_CHIPS.map((chip) => {
+              const tone = taskFilterChipTone(chip.id);
+              const active = isListFilterTab && listTab === chip.id;
+              const count = taskFilterChipCount(chip.id);
+              return (
+                <button
+                  key={chip.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => onTabChange(chip.id)}
+                  className={cn(
+                    "flex min-w-0 flex-col rounded-lg border bg-card px-2.5 py-2 text-left shadow-sm transition-all",
+                    "hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                    active
+                      ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"
+                      : "border-border/80",
+                  )}
+                >
+                  <span className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {chip.label}
+                  </span>
+                  <span
+                    className={cn(
+                      "mt-1 text-lg font-semibold tabular-nums leading-none",
+                      TASK_FILTER_BOX_COUNT_TONE[tone],
+                    )}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={showFromMeetings}
+            className={cn(
+              "flex shrink-0 flex-col justify-center rounded-lg border bg-card px-3 py-2 text-left shadow-sm transition-all lg:min-w-[5.5rem]",
+              "hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+              isListFilterTab && listTab === "open" && sourceFilter === "booking"
+                ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"
+                : "border-border/80",
+            )}
+          >
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              From meetings
+            </span>
+            <span className="mt-1 text-lg font-semibold tabular-nums leading-none text-primary">
+              {fromMeetingCount}
+            </span>
+          </button>
+        </div>
 
-      <DesignTicketTabNav
-        compact
-        tabs={[...TASK_TABS]}
-        activeId={tab}
-        onChange={(id) => onTabChange(id as CrmTasksTabId)}
-      />
+        <div className="mt-2">
+          <DesignTicketTabNav
+            compact
+            tabs={CALENDAR_VIEW_TABS.map(({ id, label, icon }) => ({ id, label, icon }))}
+            activeId={isCalendarTab(tab) ? tab : ""}
+            onChange={(id) => onTabChange(id as CrmTasksTabId)}
+          />
+        </div>
+      </div>
 
       <motion.div variants={ticketSectionVariants} initial="hidden" animate="show" className="space-y-2.5">
-        {!isCalendarTab(tab) ? (
-          <ListToolbar
-            search={query}
-            onSearchChange={setQuery}
-            searchPlaceholder="Search tasks, accounts, descriptions…"
-            resultCount={filtered.length}
-            resultLabel="tasks"
-            activeFilterCount={activeFilterCount}
-            onClear={() => {
-              setQuery("");
-              setAccountFilter("all");
-              setTypeFilter("all");
-              setStatusFilter("all");
-              setAssigneeFilter("all");
-              setSourceFilter("all");
-            }}
-            selects={[
-              {
-                id: "account",
-                label: "Account",
-                value: accountFilter,
-                onChange: setAccountFilter,
-                options: [
-                  { value: "all", label: "All accounts" },
-                  ...accountOptions.map((a) => ({ value: a.id, label: a.name })),
-                ],
-              },
-              {
-                id: "type",
-                label: "Task type",
-                value: typeFilter,
-                onChange: setTypeFilter,
-                options: [
-                  { value: "all", label: "All types" },
-                  ...Object.entries(FOLLOW_UP_TASK_TYPE_LABEL).map(([value, label]) => ({
-                    value,
-                    label,
-                  })),
-                ],
-              },
-              {
-                id: "status",
-                label: "Status",
-                value: statusFilter,
-                onChange: setStatusFilter,
-                options: [
-                  { value: "all", label: "All statuses" },
-                  { value: "open", label: "Open" },
-                  { value: "in_progress", label: "In progress" },
-                  { value: "completed", label: "Completed" },
-                  { value: "cancelled", label: "Cancelled" },
-                ],
-              },
-              {
-                id: "assignee",
-                label: "Assignee",
-                value: assigneeFilter,
-                onChange: setAssigneeFilter,
-                options: assigneeOptions,
-              },
-              {
-                id: "source",
-                label: "Source",
-                value: sourceFilter,
-                onChange: setSourceFilter,
-                options: [
-                  { value: "all", label: "All sources" },
-                  { value: "manual", label: "Manual" },
-                  { value: "booking", label: "Meeting" },
-                ],
-              },
-            ]}
-          />
-        ) : null}
+        {isListFilterTab ? (
+          <div className="-mx-3 sm:-mx-4 lg:-mx-5">
+            <div className="px-3 sm:px-4 lg:px-5">
+              <DesignTicketFilterBar
+                variant="inline"
+                compact
+                className="xl:grid-cols-4"
+                activeFilterCount={activeFilterCount}
+                onClear={clearFilters}
+                onApply={applyFilters}
+                resultCount={filtered.length}
+                resultLabel={filtered.length === 1 ? "task" : "tasks"}
+                trailing={
+                  <div className="relative min-w-[140px] flex-1 sm:max-w-xs">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      value={tableSearch}
+                      onChange={(e) => setTableSearch(e.target.value)}
+                      placeholder="Search tasks, accounts…"
+                      aria-label="Search tasks"
+                      className="h-8 w-full rounded-md border border-input bg-background pl-8 pr-3 text-xs outline-none focus:ring-2 focus:ring-ring/40"
+                    />
+                  </div>
+                }
+              >
+                <DesignTicketFilterField label="Account" compact>
+                  <DesignTicketSelect
+                    compact
+                    value={accountFilter}
+                    onChange={setAccountFilter}
+                    options={[
+                      { value: "all", label: "All accounts" },
+                      ...accountOptions.map((a) => ({ value: a.id, label: a.name })),
+                    ]}
+                  />
+                </DesignTicketFilterField>
+                <DesignTicketFilterField label="Task type" compact>
+                  <DesignTicketSelect
+                    compact
+                    value={typeFilter}
+                    onChange={setTypeFilter}
+                    options={[
+                      { value: "all", label: "All types" },
+                      ...Object.entries(FOLLOW_UP_TASK_TYPE_LABEL).map(([value, label]) => ({
+                        value,
+                        label,
+                      })),
+                    ]}
+                  />
+                </DesignTicketFilterField>
+                <DesignTicketFilterField label="Status" compact>
+                  <DesignTicketSelect
+                    compact
+                    value={statusFilter}
+                    onChange={setStatusFilter}
+                    options={[
+                      { value: "all", label: "All statuses" },
+                      { value: "open", label: "Open" },
+                      { value: "in_progress", label: "In progress" },
+                      { value: "blocked", label: "Blocked" },
+                      { value: "completed", label: "Completed" },
+                      { value: "cancelled", label: "Cancelled" },
+                    ]}
+                  />
+                </DesignTicketFilterField>
+                <DesignTicketFilterField label="Assignee" compact>
+                  <DesignTicketSelect
+                    compact
+                    value={assigneeFilter}
+                    onChange={setAssigneeFilter}
+                    options={assigneeOptions}
+                  />
+                </DesignTicketFilterField>
+                <DesignTicketFilterField label="Source" compact>
+                  <DesignTicketSelect
+                    compact
+                    value={sourceFilter}
+                    onChange={setSourceFilter}
+                    options={[
+                      { value: "all", label: "All sources" },
+                      { value: "manual", label: "Manual" },
+                      { value: "booking", label: "Meeting" },
+                    ]}
+                  />
+                </DesignTicketFilterField>
+              </DesignTicketFilterBar>
+            </div>
 
-        <TaskCalendarPanel
-          tasks={isCalendarTab(tab) ? tabFiltered : filtered}
-          users={users}
-          companies={accountOptions}
-          view={calendarView}
-          onViewChange={(v) => onTabChange(v)}
-          onTaskClick={toggleTaskSelection}
-          selectedTaskId={selectedTaskId}
-          renderTaskDetail={renderTaskDetail}
-          canManage={canCreate}
-          embedded={!isCalendarTab(tab)}
-          hideViewToggle
-          entityLinkTarget="crm"
-        />
+            <div ref={tableRef} className="min-w-0">
+              <TaskCalendarPanel
+                tasks={filtered}
+                users={users}
+                companies={accountOptions}
+                view="list"
+                onViewChange={(v) => onTabChange(v)}
+                onTaskClick={toggleTaskSelection}
+                selectedTaskId={selectedTaskId}
+                renderTaskDetail={renderTaskDetail}
+                canManage={canCreate}
+                embedded
+                flush
+                hideViewToggle
+                entityLinkTarget="crm"
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="px-0">
+            <TaskCalendarPanel
+              tasks={tabFiltered}
+              users={users}
+              companies={accountOptions}
+              view={calendarView}
+              onViewChange={(v) => onTabChange(v)}
+              onTaskClick={toggleTaskSelection}
+              selectedTaskId={selectedTaskId}
+              renderTaskDetail={renderTaskDetail}
+              canManage={canCreate}
+              hideViewToggle
+              entityLinkTarget="crm"
+            />
+          </div>
+        )}
       </motion.div>
 
       <EntityFormModal
