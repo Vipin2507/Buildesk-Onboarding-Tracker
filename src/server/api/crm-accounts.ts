@@ -49,6 +49,7 @@ function mapRow(row: typeof t.crmAccounts.$inferSelect): CrmAccount {
     installments: parseInstallmentsJson(row.installmentsJson),
     healthScore: row.healthScore ?? undefined,
     status: status as CrmAccount["status"],
+    statusRemarks: row.statusRemarks ?? undefined,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -89,6 +90,7 @@ const accountInput = z.object({
   installmentsJson: z.string().optional().nullable(),
   healthScore: z.number().int().optional().nullable(),
   status: z.enum(["active", "onboarding", "live", "suspended", "inactive", "closed"]).optional(),
+  statusRemarks: z.string().optional().nullable(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });
@@ -134,6 +136,7 @@ function toRowValues(
     installmentsJson: data.installmentsJson ?? null,
     healthScore: data.healthScore ?? null,
     status: data.status ?? "onboarding",
+    statusRemarks: data.statusRemarks?.trim() || null,
     createdAt,
     updatedAt,
   };

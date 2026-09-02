@@ -160,6 +160,7 @@ export const crmAccounts = sqliteTable(
     installmentsJson: text("installments_json"),
     healthScore: integer("health_score"),
     status: text("status").notNull().default("onboarding"),
+    statusRemarks: text("status_remarks"),
     ...timestamps,
   },
   (t) => [
@@ -257,6 +258,7 @@ export const followUpTasks = sqliteTable(
     durationMinutes: integer("duration_minutes"),
     extraTimeMinutes: integer("extra_time_minutes").notNull().default(0),
     latestRemark: text("latest_remark"),
+    remarksJson: text("remarks_json"),
     assigneeUserId: text("assignee_user_id"),
     assigneeUserIdsJson: text("assignee_user_ids_json").notNull().default("[]"),
     createdByUserId: text("created_by_user_id"),

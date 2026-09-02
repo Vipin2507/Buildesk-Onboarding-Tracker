@@ -13,6 +13,9 @@ import {
 import { toast } from "sonner";
 
 import { ConfirmDeleteDialog } from "@/components/entity-form-modal";
+import {
+  CrmAccountStatusRemarksModal,
+} from "@/components/crm/crm-account-status-remarks-modal";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -88,14 +91,14 @@ export function CrmAccountGoLiveActions({
     onOpenGoLiveTab?.();
   }
 
-  function markSuspended() {
-    setAccountStatus(companyId, "suspended", who);
+  function markSuspended(remarks: string) {
+    setAccountStatus(companyId, "suspended", { who, statusRemarks: remarks });
     toast.success(`${accountName} marked Suspended`);
     setConfirmSuspended(false);
   }
 
-  function markInactive() {
-    setAccountStatus(companyId, "inactive", who);
+  function markInactive(remarks: string) {
+    setAccountStatus(companyId, "inactive", { who, statusRemarks: remarks });
     toast.success(`${accountName} marked Inactive`);
     setConfirmInactive(false);
   }
@@ -226,23 +229,23 @@ export function CrmAccountGoLiveActions({
         onConfirm={forceCompleteAccount}
       />
 
-      <ConfirmDeleteDialog
+      <CrmAccountStatusRemarksModal
         open={confirmSuspended}
         onOpenChange={setConfirmSuspended}
         title="Mark account suspended?"
         description={`${accountName} will be marked Suspended. Use when the client is temporarily paused but may resume onboarding later.`}
         confirmLabel="Mark Suspended"
-        confirmTone="default"
+        remarksPlaceholder="Why is this account being suspended?"
         onConfirm={markSuspended}
       />
 
-      <ConfirmDeleteDialog
+      <CrmAccountStatusRemarksModal
         open={confirmInactive}
         onOpenChange={setConfirmInactive}
         title="Mark account inactive?"
         description={`${accountName} will be marked Inactive. Use when the account should no longer be treated as active onboarding.`}
         confirmLabel="Mark Inactive"
-        confirmTone="destructive"
+        remarksPlaceholder="Why is this account being marked inactive?"
         onConfirm={markInactive}
       />
     </>

@@ -39,6 +39,8 @@ export type CrmAccount = Timestamps & {
   installments?: CrmAccountInstallment[];
   healthScore?: number;
   status: "active" | "onboarding" | "live" | "suspended" | "inactive" | "closed";
+  /** Reason noted when marking suspended or inactive */
+  statusRemarks?: string;
 };
 
 export type CrmAccountInstallment = {

@@ -18,6 +18,10 @@ import type {
 import { crmQueryAttachmentPreviewLabel } from "@/lib/crm-query-attachments";
 import { createStore } from "./persist";
 
+const EMPTY_COMPANY_QUERIES: CrmAccountQuery[] = [];
+
+export { EMPTY_COMPANY_QUERIES };
+
 type CrmAccountQueryState = {
   queriesByCompany: Record<string, CrmAccountQuery[]>;
   allQueries: CrmAccountQuerySummary[];
@@ -204,7 +208,7 @@ export const useCrmAccountQueryStore = createStore<CrmAccountQueryState>(
       return query;
     },
 
-    getByCompanyId: (companyId) => get().queriesByCompany[companyId] ?? [],
+    getByCompanyId: (companyId) => get().queriesByCompany[companyId] ?? EMPTY_COMPANY_QUERIES,
 
     getById: (queryId) => {
       for (const list of Object.values(get().queriesByCompany)) {
@@ -215,7 +219,8 @@ export const useCrmAccountQueryStore = createStore<CrmAccountQueryState>(
     },
 
     openCountForCompany: (companyId) =>
-      (get().queriesByCompany[companyId] ?? []).filter((q) => q.status === "open").length,
+      (get().queriesByCompany[companyId] ?? EMPTY_COMPANY_QUERIES).filter((q) => q.status === "open")
+        .length,
 
     openCountAll: () => get().allQueries.filter((q) => q.status === "open").length,
   }),

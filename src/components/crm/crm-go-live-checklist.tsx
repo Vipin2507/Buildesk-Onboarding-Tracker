@@ -9,6 +9,10 @@ import {
 } from "@/components/design-ticket/design-ticket-shared";
 import { DatePickerField } from "@/components/date-picker-field";
 import { ConfirmDeleteDialog, EntityFormModal } from "@/components/entity-form-modal";
+import {
+  CrmAccountStatusRemarksModal,
+  CrmAccountStatusRemarksNote,
+} from "@/components/crm/crm-account-status-remarks-modal";
 import { ProgressBar } from "@/components/progress-bar";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
@@ -174,14 +178,14 @@ export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who 
     setConfirmForce(false);
   }
 
-  function markSuspended() {
-    setAccountStatus(companyId, "suspended", who);
+  function markSuspended(remarks: string) {
+    setAccountStatus(companyId, "suspended", { who, statusRemarks: remarks });
     toast.success(`${accountName} marked Suspended`);
     setConfirmSuspended(false);
   }
 
-  function markInactive() {
-    setAccountStatus(companyId, "inactive", who);
+  function markInactive(remarks: string) {
+    setAccountStatus(companyId, "inactive", { who, statusRemarks: remarks });
     toast.success(`${accountName} marked Inactive`);
     setConfirmInactive(false);
   }
@@ -206,6 +210,11 @@ export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who 
             <div className="text-sm font-semibold">Go-Live & complete</div>
             <Pill tone={statusTone}>{statusLabel}</Pill>
           </div>
+          <CrmAccountStatusRemarksNote
+            status={accountStatus}
+            remarks={account?.statusRemarks}
+            className="mt-1"
+          />
           <p className="mt-1 text-[10px] text-muted-foreground">
             {isLive
               ? "This account is already live."
@@ -587,23 +596,23 @@ export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who 
         onConfirm={forceCompleteAccount}
       />
 
-      <ConfirmDeleteDialog
+      <CrmAccountStatusRemarksModal
         open={confirmSuspended}
         onOpenChange={setConfirmSuspended}
         title="Mark account suspended?"
         description={`${accountName} will be marked Suspended. Use when the client is temporarily paused but may resume onboarding later.`}
         confirmLabel="Mark Suspended"
-        confirmTone="default"
+        remarksPlaceholder="Why is this account being suspended?"
         onConfirm={markSuspended}
       />
 
-      <ConfirmDeleteDialog
+      <CrmAccountStatusRemarksModal
         open={confirmInactive}
         onOpenChange={setConfirmInactive}
         title="Mark account inactive?"
         description={`${accountName} will be marked Inactive. Use when the account should no longer be treated as active onboarding.`}
         confirmLabel="Mark Inactive"
-        confirmTone="destructive"
+        remarksPlaceholder="Why is this account being marked inactive?"
         onConfirm={markInactive}
       />
     </div>

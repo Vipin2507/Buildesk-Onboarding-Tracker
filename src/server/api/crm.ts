@@ -8,6 +8,7 @@ import {
   buildTaskScheduleWithExtra,
   formatScheduleConflictMessage,
 } from "@/lib/task-scheduling";
+import { appendTaskRemark } from "@/lib/task-remarks";
 import { requirePermission, loadServerRoles } from "@/server/auth/permissions";
 import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
@@ -684,6 +685,14 @@ export const updateFollowUpTask = createServerFn({ method: "POST" })
       });
     }
 
+    const remarkUpdate = remark?.trim()
+      ? appendTaskRemark(existing.remarksJson, existing.latestRemark, remark, {
+          authorName: user.name,
+          authorUserId: user.id,
+          createdAt: now,
+        })
+      : null;
+
     db.update(t.followUpTasks)
       .set({
         title: patch.title ?? existing.title,
@@ -699,7 +708,8 @@ export const updateFollowUpTask = createServerFn({ method: "POST" })
         endsAt: schedule.endsAt,
         durationMinutes: schedule.durationMinutes,
         extraTimeMinutes,
-        latestRemark: remark?.trim() ? remark.trim() : existing.latestRemark,
+        latestRemark: remarkUpdate?.latestRemark ?? existing.latestRemark,
+        remarksJson: remarkUpdate?.remarksJson ?? existing.remarksJson,
         assigneeUserId: primaryAssignee,
         assigneeUserIdsJson,
         completedAt,
@@ -758,12 +768,21 @@ export const completeFollowUpTask = createServerFn({ method: "POST" })
     assertCrmTaskRow(existing);
     assertCanManageFollowUpTask(user, existing.companyId);
     const now = nowIso();
+    const remarkUpdate = data.remark?.trim()
+      ? appendTaskRemark(existing.remarksJson, existing.latestRemark, data.remark, {
+          authorName: user.name,
+          authorUserId: user.id,
+          createdAt: now,
+        })
+      : null;
     db.update(t.followUpTasks)
       .set({
         status: "completed",
         progressPercent: 100,
         completedAt: now,
         completedByUserId: user.id,
+        latestRemark: remarkUpdate?.latestRemark ?? existing.latestRemark,
+        remarksJson: remarkUpdate?.remarksJson ?? existing.remarksJson,
         updatedAt: now,
       })
       .where(eq(t.followUpTasks.id, data.id))
@@ -823,8 +842,21 @@ export const cancelFollowUpTask = createServerFn({ method: "POST" })
     if (!existing) throw new ApiError(404, "Task not found");
     assertCrmTaskRow(existing);
     assertCanManageFollowUpTask(user, existing.companyId);
+    const now = nowIso();
+    const remarkUpdate = data.reason?.trim()
+      ? appendTaskRemark(existing.remarksJson, existing.latestRemark, data.reason, {
+          authorName: user.name,
+          authorUserId: user.id,
+          createdAt: now,
+        })
+      : null;
     db.update(t.followUpTasks)
-      .set({ status: "cancelled", updatedAt: nowIso() })
+      .set({
+        status: "cancelled",
+        latestRemark: remarkUpdate?.latestRemark ?? existing.latestRemark,
+        remarksJson: remarkUpdate?.remarksJson ?? existing.remarksJson,
+        updatedAt: now,
+      })
       .where(eq(t.followUpTasks.id, data.id))
       .run();
     writeCrmEvent({

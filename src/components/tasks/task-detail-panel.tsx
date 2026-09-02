@@ -13,6 +13,7 @@ import {
   resolveTaskExtraTimeMinutes,
   taskHasSchedule,
 } from "@/lib/task-scheduling";
+import { resolveTaskRemarks } from "@/lib/task-remarks";
 import { taskStatusTone } from "@/hooks/use-task-time-status";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import {
@@ -67,6 +68,9 @@ export function TaskDetailPanel({
   const scheduled = taskHasSchedule(task);
   const extraTime = resolveTaskExtraTimeMinutes(task);
   const canAct = canManage && task.status !== "completed" && task.status !== "cancelled";
+  const remarks = task.remarks?.length
+    ? task.remarks
+    : resolveTaskRemarks(undefined, task.latestRemark, task.updatedAt);
 
   function submitRemark() {
     const text = remarkDraft.trim();
@@ -139,10 +143,26 @@ export function TaskDetailPanel({
             </p>
           ) : null}
 
-          {task.latestRemark ? (
-            <p className="line-clamp-2 text-[11px] italic leading-snug text-muted-foreground">
-              Remark: {task.latestRemark}
-            </p>
+          {remarks.length ? (
+            <div className="space-y-1">
+              <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                Remarks
+              </div>
+              <div className="max-h-28 space-y-1 overflow-y-auto">
+                {remarks.map((item, index) => (
+                  <div
+                    key={`${item.createdAt}-${index}`}
+                    className="rounded-md bg-muted/40 px-2 py-1 text-[11px]"
+                  >
+                    <p className="leading-snug text-foreground/90">{item.text}</p>
+                    <p className="mt-0.5 text-[10px] text-muted-foreground">
+                      {item.authorName ? `${item.authorName} · ` : ""}
+                      {formatDateTime(item.createdAt)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
           ) : null}
 
           {canManage && onAddRemark ? (

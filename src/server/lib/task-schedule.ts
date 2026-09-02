@@ -7,6 +7,7 @@ import {
   scheduleRangesOverlap,
   type ScheduleConflict,
 } from "@/lib/task-scheduling";
+import { resolveTaskRemarks } from "@/lib/task-remarks";
 import { localWallClockIso } from "@/lib/booking-slots";
 import type { FollowUpTask, FollowUpTaskType } from "@/types";
 import { DEFAULT_BOOKING_TIMEZONE } from "@/types/booking";
@@ -29,6 +30,7 @@ export function parseAssigneeIdsJson(json: string | null | undefined): string[] 
 export function mapTaskRow(row: typeof t.followUpTasks.$inferSelect): FollowUpTask {
   const assigneeUserIds = parseAssigneeIdsJson(row.assigneeUserIdsJson);
   const primaryAssignee = row.assigneeUserId ?? assigneeUserIds[0];
+  const remarks = resolveTaskRemarks(row.remarksJson, row.latestRemark, row.updatedAt);
   return {
     id: row.id,
     companyId: row.companyId,
@@ -48,7 +50,8 @@ export function mapTaskRow(row: typeof t.followUpTasks.$inferSelect): FollowUpTa
     endsAt: row.endsAt ?? undefined,
     durationMinutes: row.durationMinutes ?? undefined,
     extraTimeMinutes: row.extraTimeMinutes ?? 0,
-    latestRemark: row.latestRemark ?? undefined,
+    latestRemark: remarks.at(-1)?.text ?? row.latestRemark ?? undefined,
+    remarks: remarks.length ? remarks : undefined,
     assigneeUserId: primaryAssignee ?? undefined,
     assigneeUserIds: assigneeUserIds.length ? assigneeUserIds : primaryAssignee ? [primaryAssignee] : [],
     createdByUserId: row.createdByUserId ?? undefined,

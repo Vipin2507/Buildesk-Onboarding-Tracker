@@ -8,6 +8,7 @@ import {
   deleteErpFollowUpTask as apiDelete,
   updateErpFollowUpTask as apiUpdate,
 } from "@/lib/api";
+import { appendTaskRemark, serializeTaskRemarks } from "@/lib/task-remarks";
 import { serverSyncWithRollback } from "@/lib/sync";
 
 type ErpTaskState = {
@@ -100,6 +101,15 @@ export const useErpTaskStore = createStore<ErpTaskState>((set, get) => ({
     const assigneeUserIds =
       patch.assigneeUserIds ??
       (patch.assigneeUserId ? [patch.assigneeUserId] : previous.assigneeUserIds);
+    const now = nowIso();
+    const remarkUpdate = remark?.trim()
+      ? appendTaskRemark(
+          previous.remarks?.length ? serializeTaskRemarks(previous.remarks) : undefined,
+          previous.latestRemark,
+          remark,
+          { createdAt: now },
+        )
+      : null;
     set((s) => ({
       tasks: s.tasks.map((t) =>
         t.id === id
@@ -108,10 +118,11 @@ export const useErpTaskStore = createStore<ErpTaskState>((set, get) => ({
               ...patch,
               assigneeUserIds,
               assigneeUserId: assigneeUserIds?.[0] ?? patch.assigneeUserId ?? t.assigneeUserId,
-              latestRemark: remark?.trim() ? remark.trim() : patch.latestRemark ?? t.latestRemark,
+              latestRemark: remarkUpdate?.latestRemark ?? patch.latestRemark ?? t.latestRemark,
+              remarks: remarkUpdate?.remarks ?? patch.remarks ?? t.remarks,
               completedAt:
                 patch.status === "completed"
-                  ? t.completedAt || nowIso()
+                  ? t.completedAt || now
                   : patch.status !== undefined
                     ? undefined
                     : t.completedAt,
@@ -150,6 +161,14 @@ export const useErpTaskStore = createStore<ErpTaskState>((set, get) => ({
     const previous = get().getById(id);
     if (!previous) return;
     const now = nowIso();
+    const remarkUpdate = remark?.trim()
+      ? appendTaskRemark(
+          previous.remarks?.length ? serializeTaskRemarks(previous.remarks) : undefined,
+          previous.latestRemark,
+          remark,
+          { createdAt: now },
+        )
+      : null;
     set((s) => ({
       tasks: s.tasks.map((t) =>
         t.id === id
@@ -158,6 +177,8 @@ export const useErpTaskStore = createStore<ErpTaskState>((set, get) => ({
               status: "completed",
               progressPercent: 100,
               completedAt: now,
+              latestRemark: remarkUpdate?.latestRemark ?? t.latestRemark,
+              remarks: remarkUpdate?.remarks ?? t.remarks,
             })
           : t,
       ),
@@ -183,8 +204,26 @@ export const useErpTaskStore = createStore<ErpTaskState>((set, get) => ({
   cancelTask: (id, reason) => {
     const previous = get().getById(id);
     if (!previous) return;
+    const now = nowIso();
+    const remarkUpdate = reason?.trim()
+      ? appendTaskRemark(
+          previous.remarks?.length ? serializeTaskRemarks(previous.remarks) : undefined,
+          previous.latestRemark,
+          reason,
+          { createdAt: now },
+        )
+      : null;
     set((s) => ({
-      tasks: s.tasks.map((t) => (t.id === id ? touch({ ...t, status: "cancelled" }) : t)),
+      tasks: s.tasks.map((t) =>
+        t.id === id
+          ? touch({
+              ...t,
+              status: "cancelled",
+              latestRemark: remarkUpdate?.latestRemark ?? t.latestRemark,
+              remarks: remarkUpdate?.remarks ?? t.remarks,
+            })
+          : t,
+      ),
     }));
     serverSyncWithRollback(
       "cancelErpFollowUpTask",

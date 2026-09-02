@@ -50,6 +50,7 @@ import {
   useCrmAccountStore,
   useUserStore,
 } from "@/stores";
+import { EMPTY_COMPANY_QUERIES } from "@/stores/useCrmAccountQueryStore";
 import {
   CRM_ACCOUNT_QUERY_CATEGORY_LABEL,
   CRM_ACCOUNT_QUERY_STATUS_LABEL,
@@ -436,6 +437,7 @@ function QueryThread({
   } | null>(null);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
@@ -686,7 +688,7 @@ function QueryThread({
           {uploadingAttachment ? (
             <p className="mb-1.5 text-[10px] text-muted-foreground">Uploading attachment…</p>
           ) : null}
-          <div className="flex items-end gap-1.5">
+          <div className="flex gap-1.5">
             <div className="min-w-0 flex-1">
               <AutoGrowTextarea
                 value={text}
@@ -699,54 +701,54 @@ function QueryThread({
                 currentUserId={currentUserId}
               />
             </div>
-            <div className="flex shrink-0 items-center gap-1.5">
+            <div className="flex shrink-0 items-center gap-1.5 self-end">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="*/*"
+                className="sr-only"
+                disabled={composerDisabled}
+                onChange={(e) => void handlePickFile(e)}
+              />
               <Button
                 type="button"
-                size="icon"
                 variant="outline"
-                className="size-8"
+                className="size-8 shrink-0 p-0 shadow-none"
                 disabled={composerDisabled}
-                asChild
+                onClick={() => fileInputRef.current?.click()}
+                title="Attach file"
               >
-                <label title="Attach file" className="cursor-pointer">
-                  <Paperclip className="h-3.5 w-3.5" />
-                  <input
-                    type="file"
-                    accept="*/*"
-                    className="sr-only"
-                    disabled={composerDisabled}
-                    onChange={(e) => void handlePickFile(e)}
-                  />
-                </label>
+                <Paperclip className="h-3.5 w-3.5" />
               </Button>
               {!recording ? (
                 <Button
                   type="button"
-                  size="icon"
                   variant="outline"
-                  className="size-8"
+                  className="size-8 shrink-0 p-0 shadow-none"
                   disabled={composerDisabled}
                   onClick={() => void startRecording()}
+                  title="Record voice note"
                 >
                   <Mic className="h-3.5 w-3.5" />
                 </Button>
               ) : (
                 <Button
                   type="button"
-                  size="icon"
                   variant="destructive"
-                  className="size-8"
+                  className="size-8 shrink-0 p-0 shadow-none"
                   onClick={stopRecording}
+                  title="Stop recording"
                 >
                   <Square className="h-3 w-3" />
                 </Button>
               )}
               <Button
                 type="button"
-                size="icon"
-                className="size-8"
+                variant="default"
+                className="size-8 shrink-0 p-0 shadow-none"
                 disabled={composerDisabled || (!text.trim() && !pendingAttachment)}
                 onClick={() => void handleSendText()}
+                title="Send message"
               >
                 <Send className="h-3.5 w-3.5" />
               </Button>
@@ -774,7 +776,8 @@ export function CrmAccountQueriesPanel({
   const user = useAuthStore((s) => s.user);
   const account = useCrmAccountStore((s) => s.getById(accountId));
   const users = useUserStore((s) => s.users);
-  const queries = useCrmAccountQueryStore((s) => s.getByCompanyId(accountId));
+  const queries =
+    useCrmAccountQueryStore((s) => s.queriesByCompany[accountId]) ?? EMPTY_COMPANY_QUERIES;
   const loading = useCrmAccountQueryStore((s) => s.loadingCompanyIds[accountId]);
   const refreshCompanyQueries = useCrmAccountQueryStore((s) => s.refreshCompanyQueries);
   const createQuery = useCrmAccountQueryStore((s) => s.createQuery);

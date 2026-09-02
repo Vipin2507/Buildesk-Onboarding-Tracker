@@ -3,7 +3,7 @@ import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-ro
 import { motion } from "framer-motion";
 import {
   ArrowRight,
-  Building2,
+  BriefcaseBusiness,
   Calendar,
   CalendarClock,
   CheckCircle2,
@@ -122,7 +122,7 @@ function CrmDashboardPage() {
     {
       label: "Accounts",
       value: kpis.totalAccounts,
-      icon: Building2,
+      icon: BriefcaseBusiness,
       tone: "bg-primary/10 text-primary",
       filter: { type: "accounts" as const, status: "all" as const },
     },

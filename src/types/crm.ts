@@ -95,6 +95,13 @@ export type FollowUpTaskSource = "manual" | "booking";
 
 export type TaskProductScope = "erp" | "crm";
 
+export type FollowUpTaskRemark = {
+  text: string;
+  authorName?: string;
+  authorUserId?: string;
+  createdAt: string;
+};
+
 export type FollowUpTask = Timestamps & {
   id: string;
   /** ERP company id or CRM account id depending on productScope. */
@@ -119,6 +126,8 @@ export type FollowUpTask = Timestamps & {
   extraTimeMinutes?: number;
   /** Most recent remark added from the task panel. */
   latestRemark?: string;
+  /** Full remark history (newest last). */
+  remarks?: FollowUpTaskRemark[];
   assigneeUserId?: string;
   assigneeUserIds?: string[];
   createdByUserId?: string;

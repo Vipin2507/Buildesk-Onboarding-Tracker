@@ -1,7 +1,7 @@
 import {
   HelpCircle,
   LayoutDashboard,
-  Building2,
+  BriefcaseBusiness,
   Calendar,
   CheckSquare,
   Database,
@@ -17,7 +17,7 @@ import type { NavItem } from "@/lib/nav";
 /** CRM product navigation — separate from ERP APP_NAV. */
 export const CRM_NAV: NavItem[] = [
   { to: "/crm", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { to: "/crm/accounts", label: "Accounts", icon: Building2 },
+  { to: "/crm/accounts", label: "Accounts", icon: BriefcaseBusiness },
   { to: "/crm/bookings", label: "Meetings", icon: Calendar },
   { to: "/crm/tasks", label: "Tasks", icon: CheckSquare },
   { to: "/crm/queries", label: "Account queries", icon: HelpCircle },

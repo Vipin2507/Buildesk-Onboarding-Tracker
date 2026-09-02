@@ -20,7 +20,11 @@ type CrmAccountState = {
   upsertAccountsBatch: (rows: CrmAccountInput[]) => CrmAccount[];
   updateAccount: (id: string, patch: Partial<CrmAccount>) => void;
   markLive: (id: string, who?: string) => void;
-  setAccountStatus: (id: string, status: CrmAccount["status"], who?: string) => void;
+  setAccountStatus: (
+    id: string,
+    status: CrmAccount["status"],
+    opts?: { who?: string; statusRemarks?: string },
+  ) => void;
   deleteAccount: (id: string) => CrmAccount | undefined;
 };
 
@@ -63,6 +67,7 @@ function toApiPayload(account: CrmAccount) {
         : null,
     healthScore: account.healthScore,
     status: account.status,
+    statusRemarks: account.statusRemarks ?? null,
     createdAt: account.createdAt,
     updatedAt: account.updatedAt,
   };
@@ -153,12 +158,20 @@ export const useCrmAccountStore = createStore<CrmAccountState>((set, get) => ({
     }
   },
 
-  setAccountStatus: (id, status, who) => {
+  setAccountStatus: (id, status, opts) => {
     const existing = get().getById(id);
     if (!existing || existing.status === status) return;
-    get().updateAccount(id, { status });
+
+    const patch: Partial<CrmAccount> = { status };
+    if (status === "suspended" || status === "inactive") {
+      patch.statusRemarks = opts?.statusRemarks?.trim() || undefined;
+    } else {
+      patch.statusRemarks = undefined;
+    }
+
+    get().updateAccount(id, patch);
     if (status === "live" && existing.status !== "live") {
-      notifyCrmGoLive(id, existing.name, who);
+      notifyCrmGoLive(id, existing.name, opts?.who);
     }
   },
 
