@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { ArrowRight, Search } from "lucide-react";
+import { ArrowRight, MessageSquarePlus, Search } from "lucide-react";
 import { toast } from "sonner";
 
+import { CrmCreateAccountQueryModal } from "@/components/crm/crm-create-account-query-modal";
 import { DataTable } from "@/components/data-table";
 import { DesignTicketFilterBar, TICKET_EASE } from "@/components/design-ticket/design-ticket-shared";
 import { EmptyState } from "@/components/empty-state";
@@ -17,8 +18,9 @@ import {
   type CrmAccountQueryStatus,
   type CrmAccountQuerySummary,
 } from "@/types/crm-account-query";
-import { useCrmAccountQueryStore } from "@/stores";
+import { useCrmAccountQueryStore, useAuthStore, useCrmAccountStore } from "@/stores";
 import { useSessionFilter } from "@/hooks/use-session-filter";
+import { filterCrmAccountsForUser } from "@/lib/crm-account-access";
 import { cn, formatDate, formatTime } from "@/lib/utils";
 
 const STATUS_FILTERS = ["all", "open", "resolved", "archived"] as const;
@@ -40,12 +42,23 @@ type Props = {
 export function CrmQueriesHub({ statusFilter, onStatusFilterChange, selectedQueryId }: Props) {
   const navigate = useNavigate();
   const tableRef = useRef<HTMLDivElement>(null);
+  const currentUser = useAuthStore((s) => s.user);
+  const accounts = useCrmAccountStore((s) => s.accounts);
   const allQueries = useCrmAccountQueryStore((s) => s.allQueries);
   const loading = useCrmAccountQueryStore((s) => s.allQueriesLoading);
   const refreshAllQueries = useCrmAccountQueryStore((s) => s.refreshAllQueries);
   const refreshCompanyQueries = useCrmAccountQueryStore((s) => s.refreshCompanyQueries);
 
+  const [createOpen, setCreateOpen] = useState(false);
   const [search, setSearch] = useSessionFilter<string>("crm.queries.search", "");
+
+  const accountOptions = useMemo(
+    () =>
+      filterCrmAccountsForUser(accounts, currentUser)
+        .map((a) => ({ id: a.id, name: a.name }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [accounts, currentUser],
+  );
 
   useEffect(() => {
     void refreshAllQueries("all").catch((err) => {
@@ -140,11 +153,22 @@ export function CrmQueriesHub({ statusFilter, onStatusFilterChange, selectedQuer
         className="space-y-3"
       >
         <div className="mb-0 border-b border-border pb-2 pt-1">
-          <div className="min-w-0">
-            <h1 className="text-base font-medium tracking-tight">Account queries</h1>
-            <p className="text-xs text-muted-foreground">
-              All internal discussions across your accounts
-            </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0">
+              <h1 className="text-base font-medium tracking-tight">Account queries</h1>
+              <p className="text-xs text-muted-foreground">
+                All internal discussions across your accounts
+              </p>
+            </div>
+            <Button
+              size="sm"
+              className="h-8 gap-1 bg-primary px-3 text-xs"
+              onClick={() => setCreateOpen(true)}
+              disabled={accountOptions.length === 0}
+            >
+              <MessageSquarePlus className="h-3.5 w-3.5" />
+              Create query
+            </Button>
           </div>
 
           <DesignTicketFilterBar className="mt-2">
@@ -189,6 +213,8 @@ export function CrmQueriesHub({ statusFilter, onStatusFilterChange, selectedQuer
                 ? "Internal account discussions will appear here."
                 : `No ${statusFilter} queries match your filters.`
             }
+            actionLabel="Create query"
+            onAction={() => setCreateOpen(true)}
           />
         ) : (
           <div ref={tableRef}>
@@ -225,6 +251,20 @@ export function CrmQueriesHub({ statusFilter, onStatusFilterChange, selectedQuer
           </div>
         )}
       </motion.div>
+
+      <CrmCreateAccountQueryModal
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        accounts={accountOptions}
+        onCreated={(_query, companyId) => {
+          void refreshAllQueries("all").catch(() => {});
+          void navigate({
+            to: "/crm/accounts/$accountId",
+            params: { accountId: companyId },
+            search: { tab: "queries", queryId: _query.id },
+          });
+        }}
+      />
     </PageWrap>
   );
 }

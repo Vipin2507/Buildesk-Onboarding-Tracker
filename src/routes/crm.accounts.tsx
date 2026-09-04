@@ -6,17 +6,13 @@ import {
   ArrowLeftRight,
   CalendarRange,
   FileSpreadsheet,
-  MessageSquarePlus,
   Plus,
   Search,
   Upload,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-
-import { CrmAccountBulkUploadModal } from "@/components/crm/crm-account-bulk-upload-modal";
 import { CrmAccountClientTransferModal } from "@/components/crm/crm-account-client-transfer-modal";
-import { CrmCreateAccountQueryModal } from "@/components/crm/crm-create-account-query-modal";
 import { CrmAccountDateBulkUploadModal } from "@/components/crm/crm-account-date-bulk-upload-modal";
 import { CrmAccountGoLiveActions } from "@/components/crm/crm-account-go-live-actions";
 import { CrmAccountModulesCell } from "@/components/crm/crm-account-modules-cell";
@@ -343,8 +339,6 @@ function CrmAccountsPage() {
   const [bulkUpdateOpen, setBulkUpdateOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [dateBulkOpen, setDateBulkOpen] = useState(false);
-  const [queryModalOpen, setQueryModalOpen] = useState(false);
-  const [queryAccountId, setQueryAccountId] = useState<string | undefined>();
   const [editing, setEditing] = useState<CrmAccount | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState<CrmAccountRow | null>(null);
@@ -532,11 +526,6 @@ function CrmAccountsPage() {
     setListFilters({ ...ACCOUNT_LIST_FILTER_DEFAULTS });
   }
 
-  function openCreateQuery(accountId?: string) {
-    setQueryAccountId(accountId);
-    setQueryModalOpen(true);
-  }
-
   function openCreate() {
     setEditing(null);
     setSelectedModules([]);
@@ -693,15 +682,6 @@ function CrmAccountsPage() {
             >
               <Upload className="h-3.5 w-3.5" />
               Bulk upload
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-8 gap-1 px-3 text-xs"
-              onClick={() => openCreateQuery()}
-            >
-              <MessageSquarePlus className="h-3.5 w-3.5" />
-              Create query
             </Button>
             <Button size="sm" className="h-8 gap-1 bg-primary px-3 text-xs" onClick={openCreate}>
               <Plus className="h-3.5 w-3.5" />
@@ -1171,7 +1151,13 @@ function CrmAccountsPage() {
                       })
                     }
                     onEdit={() => openEdit(r)}
-                    onCreateQuery={() => openCreateQuery(r.id)}
+                    onCreateQuery={() =>
+                      void navigate({
+                        to: "/crm/accounts/$accountId",
+                        params: { accountId: r.id },
+                        search: { tab: "queries" },
+                      })
+                    }
                     onDelete={() => {
                       setDeleting(r);
                       setDeleteOpen(true);
@@ -1221,23 +1207,6 @@ function CrmAccountsPage() {
         onTransferred={() => setSelectedIds(new Set())}
       />
       <CrmAccountDateBulkUploadModal open={dateBulkOpen} onOpenChange={setDateBulkOpen} />
-
-      <CrmCreateAccountQueryModal
-        open={queryModalOpen}
-        onOpenChange={(open) => {
-          setQueryModalOpen(open);
-          if (!open) setQueryAccountId(undefined);
-        }}
-        accounts={accounts.map((a) => ({ id: a.id, name: a.name }))}
-        defaultCompanyId={queryAccountId}
-        onCreated={(_query, companyId) => {
-          void navigate({
-            to: "/crm/accounts/$accountId",
-            params: { accountId: companyId },
-            search: { tab: "queries", queryId: _query.id },
-          });
-        }}
-      />
 
       <ConfirmDeleteDialog
         open={deleteOpen}
