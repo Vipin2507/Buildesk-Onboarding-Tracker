@@ -749,6 +749,7 @@ export function filterCrmActivityItems(
     supportManager1Filter?: string;
     supportManager2Filter?: string;
     executiveFilter?: string;
+    teamExecutiveFilter?: string;
     /** Staff user who performed the activity (partial match). */
     userQuery?: string;
     /** Account executive / account manager on the CRM account (partial match). */
@@ -770,6 +771,7 @@ export function filterCrmActivityItems(
   const supportManager1Filter = filters.supportManager1Filter ?? "all";
   const supportManager2Filter = filters.supportManager2Filter ?? "all";
   const executiveFilter = filters.executiveFilter ?? "all";
+  const teamExecutiveFilter = filters.teamExecutiveFilter ?? "all";
   const userQuery = filters.userQuery?.trim().toLowerCase();
   const accountExecutiveQuery = filters.accountExecutiveQuery?.trim().toLowerCase();
   const accountQuery = filters.accountQuery?.trim().toLowerCase();
@@ -808,6 +810,7 @@ export function filterCrmActivityItems(
     ) {
       return false;
     }
+    if (!matchesManagerField(item.teamExecutive, teamExecutiveFilter)) return false;
     if (userQuery) {
       const actor = (item.executive ?? item.who ?? "").toLowerCase();
       if (!actor.includes(userQuery)) return false;

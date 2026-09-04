@@ -420,30 +420,10 @@ export function CrmDashboardActivityPanel({ items }: Props) {
                   },
                   {
                     key: "executive",
-                    header: "User",
+                    header: "Performed by",
                     sortable: true,
                     render: (row) => (
                       <span className="text-xs">{crmActivityExecutiveDisplay(row)}</span>
-                    ),
-                  },
-                  {
-                    key: "teamExecutive",
-                    header: "Executive",
-                    sortable: true,
-                    render: (row) => (
-                      <span className="text-xs text-muted-foreground">
-                        {row.teamExecutive?.trim() || "—"}
-                      </span>
-                    ),
-                  },
-                  {
-                    key: "teamSalesManager",
-                    header: "Sales mgr",
-                    sortable: true,
-                    render: (row) => (
-                      <span className="text-xs text-muted-foreground">
-                        {row.teamSalesManager?.trim() || "—"}
-                      </span>
                     ),
                   },
                   {
