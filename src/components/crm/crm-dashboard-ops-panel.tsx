@@ -99,6 +99,9 @@ export function CrmDashboardOpsPanel({ tasks, queries, taskTotals, queryTotal }:
                       {task.overdue ? "Overdue" : task.dueToday ? "Today" : task.status.replace("_", " ")}
                     </Pill>
                   </div>
+                  <div className="mt-0.5 truncate text-[10px] text-muted-foreground">
+                    {task.assigneeLabel || "Unassigned"}
+                  </div>
                   <div className="mt-1 text-[10px] text-muted-foreground">
                     {task.dueDate ? `Due ${formatDate(task.dueDate)}` : "No due date"}
                     {" · "}

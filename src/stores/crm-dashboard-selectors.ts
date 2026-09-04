@@ -4,6 +4,7 @@ import {
   calcCrmOnboardingProgress,
   createCrmOnboardingRecord,
   CRM_PRODUCT_MODULES,
+  CRM_CORE_MODULES,
   CRM_STAGE_LABELS,
   crmGoLiveReady,
   ensureMasterDataFields,
@@ -19,6 +20,8 @@ import { isCrmAccountEnded } from "@/lib/crm-account-status";
 import { sortCrmAccountsByStartDateDesc } from "@/lib/crm-account-sort";
 import { resolveCrmMigrationCatalog } from "@/lib/crm-migration-catalog";
 import { resolveCrmTrainingCatalogForCompany } from "@/lib/crm-training-catalog";
+import { resolveAssigneeLabel } from "@/lib/managers";
+import { resolveTaskAssigneeIds } from "@/lib/task-scheduling";
 import { isDesignTicketActive } from "@/stores/design-ticket-selectors";
 import { isTicketOpen } from "@/lib/tickets";
 import {
@@ -95,6 +98,7 @@ export type CrmDashboardTaskItem = {
   priority: FollowUpTask["priority"];
   overdue: boolean;
   dueToday: boolean;
+  assigneeLabel: string;
 };
 
 export type CrmDashboardQueryItem = {
@@ -292,7 +296,7 @@ export function useCrmDashboardOverview() {
       Critical: rows.filter((r) => r.healthBucket === "Critical").length,
     };
 
-    const moduleAdoption = CRM_PRODUCT_MODULES.map((mod) => {
+    const moduleAdoption = CRM_CORE_MODULES.map((mod) => {
       let opted = 0;
       for (const account of accounts) {
         const record = recordFor(account, records);
@@ -382,6 +386,10 @@ export function useCrmDashboardOverview() {
         priority: task.priority,
         overdue: Boolean(task.dueDate && task.dueDate < today),
         dueToday: task.dueDate === today,
+        assigneeLabel: resolveTaskAssigneeIds(task)
+          .map((id) => resolveAssigneeLabel(id, users))
+          .filter(Boolean)
+          .join(", "),
       }));
 
     const recentOpenQueries: CrmDashboardQueryItem[] = [...scopedOpenQueries]
@@ -519,7 +527,7 @@ export function useCrmDashboardOverview() {
         case "modules":
           return {
             kind: "accounts" as const,
-            title: `Module · ${CRM_PRODUCT_MODULES.find((m) => m.key === filter.key)?.label ?? filter.key}`,
+            title: `Module · ${CRM_CORE_MODULES.find((m) => m.key === filter.key)?.label ?? CRM_PRODUCT_MODULES.find((m) => m.key === filter.key)?.label ?? filter.key}`,
             accounts: rows.filter((row) => {
               const record = recordFor(row, records);
               return record.productModules.some((m) => m.key === filter.key && m.enabled);
