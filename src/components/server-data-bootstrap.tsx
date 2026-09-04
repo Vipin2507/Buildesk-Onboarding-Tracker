@@ -374,22 +374,11 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
         }
         if (crmMaster && typeof crmMaster === "object" && Object.keys(crmMaster).length > 0) {
           hydrateCrmMasterFromServer(crmMaster as Record<string, unknown>);
-        } else {
-          const localCrmMaster = useCrmMasterStore.getState();
+        } else if (user.role === "Admin") {
+          // First-time setup: seed server from this admin's local master config.
+          const { crmMasterSnapshot } = await import("@/stores/useCrmMasterStore");
           await setAppConfig({
-            data: { key: "crm-master", value: {
-              platform: localCrmMaster.platform,
-              accountFields: localCrmMaster.accountFields,
-              projectFields: localCrmMaster.projectFields,
-              picklists: localCrmMaster.picklists,
-              modules: localCrmMaster.modules,
-              moduleProviders: localCrmMaster.moduleProviders,
-              migrationFields: localCrmMaster.migrationFields,
-              trainingFieldsDeveloper: localCrmMaster.trainingFieldsDeveloper,
-              trainingFieldsBroker: localCrmMaster.trainingFieldsBroker,
-              bookingCallTypes: localCrmMaster.bookingCallTypes,
-              bookingHostHours: localCrmMaster.bookingHostHours,
-            } },
+            data: { key: "crm-master", value: crmMasterSnapshot() },
           }).catch(() => {});
         }
         if (automation && typeof automation === "object" && Object.keys(automation).length > 0) {

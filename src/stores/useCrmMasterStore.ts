@@ -110,7 +110,7 @@ function normalizeModuleProviders(
   if (!existing || typeof existing !== "object") return seed;
   const out: Record<string, string[]> = { ...seed };
   for (const [key, values] of Object.entries(existing)) {
-    if (Array.isArray(values) && values.length > 0) {
+    if (Array.isArray(values)) {
       out[key] = values.map((v) => String(v).trim()).filter(Boolean);
     }
   }
@@ -242,6 +242,11 @@ export const useCrmMasterStore = createPersistedStore<CrmMasterState>(
           [moduleKey]: providers.map((p) => p.trim()).filter(Boolean),
         },
       }));
+      if (typeof window !== "undefined") {
+        void import("@/lib/config-persistence").then((m) =>
+          m.scheduleCrmMasterConfigPersistence(),
+        );
+      }
     },
 
     setMigrationFields: (fields) => {

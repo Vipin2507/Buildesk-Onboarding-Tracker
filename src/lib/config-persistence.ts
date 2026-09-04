@@ -109,9 +109,22 @@ function persistCrmAutomationConfig() {
   );
 }
 
+function persistCrmMasterConfig() {
+  if (!canPersistAppConfig()) return;
+  serverSyncDebounced("crm-master-config", 400, () =>
+    setAppConfig({ data: { key: "crm-master", value: crmMasterSnapshot() } }),
+  );
+}
+
+/** Debounced server sync after CRM master edits (providers, modules, fields, etc.). */
+export function scheduleCrmMasterConfigPersistence() {
+  persistCrmMasterConfig();
+}
+
 /** Force pending CRM master config to SQLite now. */
 export function flushCrmMasterConfigPersistence() {
   if (!canPersistAppConfig()) return;
+  flushServerSyncDebounced("crm-master-config");
   void setAppConfig({ data: { key: "crm-master", value: crmMasterSnapshot() } });
 }
 
@@ -159,13 +172,15 @@ export function wireConfigPersistence() {
   });
 
   useCrmMasterStore.subscribe(() => {
-    if (!canPersistAppConfig()) return;
-    serverSyncDebounced("crm-master-config", 1000, () =>
-      setAppConfig({ data: { key: "crm-master", value: crmMasterSnapshot() } }),
-    );
+    persistCrmMasterConfig();
   });
 
-  const flush = () => flushAutomationConfigPersistence();
+  const flush = () => {
+    flushAutomationConfigPersistence();
+    if (canPersistAppConfig()) {
+      flushServerSyncDebounced("crm-master-config");
+    }
+  };
   window.addEventListener("beforeunload", flush);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") flush();

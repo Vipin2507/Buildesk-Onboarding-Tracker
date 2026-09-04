@@ -89,6 +89,12 @@ function CrmMasterPage() {
   const user = useAuthStore((s) => s.user);
   const [section, setSection] = useState<SectionId>("overview");
 
+  useEffect(() => {
+    if (user?.role === "Admin") {
+      flushCrmMasterConfigPersistence();
+    }
+  }, [user?.role]);
+
   if (user?.role !== "Admin") {
     return (
       <PageWrap compact>

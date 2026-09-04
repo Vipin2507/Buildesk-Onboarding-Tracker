@@ -559,7 +559,12 @@ export const getAppConfig = createServerFn({ method: "GET" })
         .parse(data),
   )
   .handler(async ({ data }) => {
-    requireUser(["Admin"]);
+    // CRM master (providers, modules, picklists) is read by all roles for account onboarding UI.
+    if (data.key === "crm-master") {
+      requireUser();
+    } else {
+      requireUser(["Admin"]);
+    }
     const row = getDb().select().from(t.appConfig).where(eq(t.appConfig.key, data.key)).get();
     return row ? JSON.parse(row.valueJson) : {};
   });
