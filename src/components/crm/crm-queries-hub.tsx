@@ -45,7 +45,7 @@ export function CrmQueriesHub({ statusFilter, onStatusFilterChange, selectedQuer
   const refreshAllQueries = useCrmAccountQueryStore((s) => s.refreshAllQueries);
   const refreshCompanyQueries = useCrmAccountQueryStore((s) => s.refreshCompanyQueries);
 
-  const [search, setSearch] = useSessionFilter("crm.queries.search", "");
+  const [search, setSearch] = useSessionFilter<string>("crm.queries.search", "");
 
   useEffect(() => {
     void refreshAllQueries("all").catch((err) => {

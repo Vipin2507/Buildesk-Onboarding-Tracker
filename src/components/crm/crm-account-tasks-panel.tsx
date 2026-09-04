@@ -91,11 +91,11 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
   );
 
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useSessionFilter<"all" | FollowUpTaskStatus>(
+  const [statusFilter, setStatusFilter] = useSessionFilter<string>(
     `crm.account.${accountId}.tasks.status`,
     "all",
   );
-  const [typeFilter, setTypeFilter] = useSessionFilter<"all" | FollowUpTaskType>(
+  const [typeFilter, setTypeFilter] = useSessionFilter<string>(
     `crm.account.${accountId}.tasks.type`,
     "all",
   );
