@@ -3,12 +3,15 @@ import type { LucideIcon } from "lucide-react";
 import {
   AlarmClock,
   Calendar,
+  CheckSquare,
   ClipboardList,
   CloudUpload,
   GraduationCap,
   LifeBuoy,
   ListChecks,
+  MessageSquare,
   Radio,
+  Rocket,
   Ticket,
   TrendingUp,
   Upload,
@@ -42,6 +45,11 @@ type Props = {
   training: number;
   reports: number;
   tickets: number;
+  tasks?: number;
+  tasksOverdue?: number;
+  tasksDueToday?: number;
+  queries?: number;
+  goLive?: number;
   highPriority: number;
   bookings?: number;
   support?: number;
@@ -59,6 +67,11 @@ export function CrmDashboardPendingSummary({
   training,
   reports,
   tickets,
+  tasks = 0,
+  tasksOverdue = 0,
+  tasksDueToday = 0,
+  queries = 0,
+  goLive = 0,
   highPriority,
   bookings = 0,
   support = 0,
@@ -67,6 +80,41 @@ export function CrmDashboardPendingSummary({
   activeFilter,
 }: Props) {
   const chips: SummaryChip[] = [
+    {
+      id: "tasks-overdue",
+      label: "Overdue tasks",
+      value: tasksOverdue,
+      icon: AlarmClock,
+      tone: "border-destructive/30 bg-destructive/10 text-destructive",
+      urgent: tasksOverdue > 0,
+      filter: { type: "tasks_overdue" },
+    },
+    {
+      id: "tasks-today",
+      label: "Tasks today",
+      value: tasksDueToday,
+      icon: CheckSquare,
+      tone: "border-warning/30 bg-warning/10 text-warning-foreground",
+      urgent: tasksDueToday > 0,
+      filter: { type: "tasks_due_today" },
+    },
+    {
+      id: "queries",
+      label: "Open queries",
+      value: queries,
+      icon: MessageSquare,
+      tone: "border-info/30 bg-info/10 text-info",
+      urgent: queries > 0,
+      filter: { type: "queries" },
+    },
+    {
+      id: "tasks",
+      label: "Open tasks",
+      value: tasks,
+      icon: CheckSquare,
+      tone: "border-primary/30 bg-primary/10 text-primary",
+      filter: { type: "tasks" },
+    },
     {
       id: "bookings",
       label: "Pending meetings",
@@ -159,6 +207,15 @@ export function CrmDashboardPendingSummary({
       tone: "border-border bg-muted/40 text-foreground",
       filter: { type: "reports" },
     },
+    {
+      id: "golive",
+      label: "Go-live pending",
+      value: goLive,
+      icon: Rocket,
+      tone: "border-success/30 bg-success/10 text-success",
+      urgent: goLive > 0,
+      filter: { type: "golive" },
+    },
   ];
 
   const activeKey = crmDrillDownFilterKey(activeFilter);
@@ -192,6 +249,22 @@ export function CrmDashboardPendingSummary({
               onClick={() => {
                 if (chip.id === "bookings" && onNavigate) {
                   onNavigate("/crm/bookings", { tab: "pending" });
+                  return;
+                }
+                if (chip.id === "tasks" && onNavigate) {
+                  onNavigate("/crm/tasks", { tab: "open" });
+                  return;
+                }
+                if (chip.id === "tasks-overdue" && onNavigate) {
+                  onNavigate("/crm/tasks", { tab: "overdue" });
+                  return;
+                }
+                if (chip.id === "tasks-today" && onNavigate) {
+                  onNavigate("/crm/tasks", { tab: "today" });
+                  return;
+                }
+                if (chip.id === "queries" && onNavigate) {
+                  onNavigate("/crm/queries", { status: "open" });
                   return;
                 }
                 onOpen(chip.filter);

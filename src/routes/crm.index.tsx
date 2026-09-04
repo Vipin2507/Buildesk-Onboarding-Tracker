@@ -9,8 +9,10 @@ import {
   CheckCircle2,
   ClipboardList,
   LifeBuoy,
+  MessageSquare,
   Plus,
   Rocket,
+  CheckSquare,
   TrendingUp,
 } from "lucide-react";
 import {
@@ -28,6 +30,7 @@ import {
 
 import { CrmDashboardActivityFeed } from "@/components/crm/crm-dashboard-activity-feed";
 import { CrmDashboardDrillDownSheet } from "@/components/crm/crm-dashboard-drill-down";
+import { CrmDashboardOpsPanel } from "@/components/crm/crm-dashboard-ops-panel";
 import { CrmDashboardPendingSummary } from "@/components/crm/crm-dashboard-pending-summary";
 import { CrmDashboardWorkloadCard } from "@/components/crm/crm-dashboard-workload-card";
 import { DashboardKpiCard } from "@/components/dashboard/dashboard-kpi-card";
@@ -90,7 +93,8 @@ function CrmDashboardPage() {
     setActivePhase(undefined);
   }
 
-  const { kpis, pending, phaseStats, health, moduleAdoption, recentActivity, rows } = overview;
+  const { kpis, pending, phaseStats, health, moduleAdoption, recentActivity, recentOpenTasks, recentOpenQueries, rows } =
+    overview;
 
   const progressBuckets = useMemo(() => {
     const low = rows.filter((r) => r.progress < 40).length;
@@ -150,6 +154,33 @@ function CrmDashboardPage() {
   ];
 
   const opsKpis = [
+    {
+      label: "Open tasks",
+      value: kpis.openTasks,
+      icon: CheckSquare,
+      tone: "bg-primary/10 text-primary",
+      onClick: () => navigate({ to: "/crm/tasks", search: { tab: "open" } }),
+      activeKey: crmDrillDownFilterKey({ type: "tasks" }),
+      filter: { type: "tasks" as const },
+    },
+    {
+      label: "Overdue tasks",
+      value: kpis.overdueTasks,
+      icon: CalendarClock,
+      tone: "bg-destructive/10 text-destructive",
+      onClick: () => navigate({ to: "/crm/tasks", search: { tab: "overdue" } }),
+      activeKey: crmDrillDownFilterKey({ type: "tasks_overdue" }),
+      filter: { type: "tasks_overdue" as const },
+    },
+    {
+      label: "Open queries",
+      value: kpis.openQueries,
+      icon: MessageSquare,
+      tone: "bg-info/15 text-info",
+      onClick: () => navigate({ to: "/crm/queries", search: { status: "open" } }),
+      activeKey: crmDrillDownFilterKey({ type: "queries" }),
+      filter: { type: "queries" as const },
+    },
     {
       label: "Pending meetings",
       value: kpis.pendingBookings,
@@ -221,7 +252,7 @@ function CrmDashboardPage() {
       <DesignTicketPageHeader
         compact
         title="CRM Dashboard"
-        subtitle="Pending work and onboarding status across CRM accounts."
+        subtitle="Tasks, queries, bookings, and onboarding progress across your CRM portfolio."
         actions={
           <Button
             size="sm"
@@ -244,6 +275,11 @@ function CrmDashboardPage() {
           training={pending.training}
           reports={pending.reports}
           tickets={pending.tickets}
+          tasks={pending.tasks}
+          tasksOverdue={pending.tasksOverdue}
+          tasksDueToday={pending.tasksDueToday}
+          queries={pending.queries}
+          goLive={pending.goLive}
           highPriority={pending.highPriority}
           bookings={pending.bookings}
           support={pending.support}
@@ -268,7 +304,7 @@ function CrmDashboardPage() {
           ))}
         </div>
 
-        <div className="grid grid-cols-3 gap-1.5">
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-6">
           {opsKpis.map((k, i) => (
             <DashboardKpiCard
               key={k.label}
@@ -290,6 +326,17 @@ function CrmDashboardPage() {
             />
           ))}
         </div>
+
+        <CrmDashboardOpsPanel
+          tasks={recentOpenTasks}
+          queries={recentOpenQueries}
+          taskTotals={{
+            open: kpis.openTasks,
+            overdue: kpis.overdueTasks,
+            dueToday: kpis.dueTodayTasks,
+          }}
+          queryTotal={kpis.openQueries}
+        />
 
         <OnboardingPipelineSection
           compact

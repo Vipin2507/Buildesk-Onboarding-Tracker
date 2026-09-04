@@ -5,6 +5,7 @@ import {
   createCrmOnboardingRecord,
   CRM_PRODUCT_MODULES,
   CRM_STAGE_LABELS,
+  crmGoLiveReady,
   ensureMasterDataFields,
   isCrmIntegrationModule,
 } from "@/data/crm-onboarding-defaults";
@@ -34,6 +35,8 @@ import {
   useUserStore,
 } from "@/stores";
 import type { CrmAccount } from "@/types/crm-account";
+import type { CrmAccountQuerySummary } from "@/types/crm-account-query";
+import type { FollowUpTask } from "@/types/crm";
 import type { CrmImplementationStage, CrmOnboardingRecord } from "@/types/crm-onboarding";
 import type { CrmDashboardActivityItem } from "@/components/crm/crm-dashboard-activity-feed";
 import {
@@ -68,6 +71,11 @@ export type CrmDashboardDrillDownFilter =
   | { type: "training" }
   | { type: "reports" }
   | { type: "tickets" }
+  | { type: "tasks" }
+  | { type: "tasks_overdue" }
+  | { type: "tasks_due_today" }
+  | { type: "queries" }
+  | { type: "golive" }
   | { type: "overdue" }
   | { type: "priority"; level: "high" | "critical" }
   | { type: "health"; bucket: CrmHealthBucket }
@@ -77,6 +85,37 @@ export type CrmDashboardDrillDownFilter =
   | { type: "support" }
   | { type: "progress"; bucket: "low" | "mid" | "high" };
 
+export type CrmDashboardTaskItem = {
+  id: string;
+  title: string;
+  accountId: string;
+  accountName: string;
+  dueDate?: string;
+  status: FollowUpTask["status"];
+  priority: FollowUpTask["priority"];
+  overdue: boolean;
+  dueToday: boolean;
+};
+
+export type CrmDashboardQueryItem = {
+  id: string;
+  title: string;
+  accountId: string;
+  accountName: string;
+  updatedAt: string;
+  category?: string;
+};
+
+const OPEN_TASK_STATUSES = new Set<FollowUpTask["status"]>(["open", "in_progress", "blocked"]);
+
+function isOpenCrmTask(task: FollowUpTask) {
+  return task.productScope !== "erp" && OPEN_TASK_STATUSES.has(task.status);
+}
+
+function isOpenCrmQuery(query: CrmAccountQuerySummary) {
+  return query.status === "open";
+}
+
 export type CrmAccountRow = CrmAccount & {
   progress: number;
   stage: CrmImplementationStage;
@@ -84,6 +123,8 @@ export type CrmAccountRow = CrmAccount & {
   healthBucket: CrmHealthBucket;
   resolvedHealth: number;
   openTickets: number;
+  openTasks: number;
+  openQueries: number;
   pendingMasters: number;
   pendingMigrations: number;
   pendingTraining: number;
@@ -144,7 +185,19 @@ export function useCrmDashboardOverview() {
       filterCrmAccountsForUser(allAccounts, currentUser),
     );
     const accountIds = new Set(accounts.map((a) => a.id));
+    const accountNameById = new Map(accounts.map((a) => [a.id, a.name]));
     const today = todayYmd();
+
+    const scopedOpenTasks = followUpTasks.filter(
+      (task) => task.companyId && accountIds.has(task.companyId) && isOpenCrmTask(task),
+    );
+    const scopedOpenQueries = accountQueries.filter(
+      (query) => accountIds.has(query.companyId) && isOpenCrmQuery(query),
+    );
+    const overdueTasks = scopedOpenTasks.filter(
+      (task) => task.dueDate && task.dueDate < today,
+    );
+    const dueTodayTasks = scopedOpenTasks.filter((task) => task.dueDate === today);
 
     const rows: CrmAccountRow[] = accounts.map((account) => {
       const record = recordFor(account, records);
@@ -152,6 +205,8 @@ export function useCrmDashboardOverview() {
       const openTickets = tickets.filter(
         (t) => t.companyId === account.id && isTicketOpen(t),
       ).length;
+      const openTasks = scopedOpenTasks.filter((t) => t.companyId === account.id).length;
+      const openQueries = scopedOpenQueries.filter((q) => q.companyId === account.id).length;
       const isLive = account.status === "live";
       const resolvedHealth = resolveHealth(account, progress, isLive, openTickets);
       const overdue = Boolean(
@@ -169,6 +224,8 @@ export function useCrmDashboardOverview() {
         healthBucket: healthBucketOf(resolvedHealth),
         resolvedHealth,
         openTickets,
+        openTasks,
+        openQueries,
         pendingMasters: record.masterChecklist.filter(
           (m) => !m.notApplicable && !(m.collected && m.uploaded && m.live),
         ).length,
@@ -207,6 +264,15 @@ export function useCrmDashboardOverview() {
     const openTickets = tickets.filter(
       (t) => accountIds.has(t.companyId) && isTicketOpen(t),
     ).length;
+    const openTasksCount = scopedOpenTasks.length;
+    const openQueriesCount = scopedOpenQueries.length;
+    const overdueTasksCount = overdueTasks.length;
+    const dueTodayTasksCount = dueTodayTasks.length;
+    const goLivePending = rows.filter((row) => {
+      if (row.status === "live" || isCrmAccountEnded(row.status)) return false;
+      const record = recordFor(row, records);
+      return !crmGoLiveReady(record);
+    }).length;
 
     const pendingMigrations = rows.reduce((s, r) => s + r.pendingMigrations, 0);
     const pendingTraining = rows.reduce((s, r) => s + r.pendingTraining, 0);
@@ -295,6 +361,41 @@ export function useCrmDashboardOverview() {
       (t) => accountIds.has(t.companyId) && isDesignTicketActive(t.status),
     ).length;
 
+    const recentOpenTasks: CrmDashboardTaskItem[] = [...scopedOpenTasks]
+      .sort((a, b) => {
+        const aOverdue = a.dueDate && a.dueDate < today ? 0 : 1;
+        const bOverdue = b.dueDate && b.dueDate < today ? 0 : 1;
+        if (aOverdue !== bOverdue) return aOverdue - bOverdue;
+        const aDue = a.dueDate ?? "9999-12-31";
+        const bDue = b.dueDate ?? "9999-12-31";
+        if (aDue !== bDue) return aDue.localeCompare(bDue);
+        return b.updatedAt.localeCompare(a.updatedAt);
+      })
+      .slice(0, 6)
+      .map((task) => ({
+        id: task.id,
+        title: task.title,
+        accountId: task.companyId,
+        accountName: accountNameById.get(task.companyId) ?? "Account",
+        dueDate: task.dueDate,
+        status: task.status,
+        priority: task.priority,
+        overdue: Boolean(task.dueDate && task.dueDate < today),
+        dueToday: task.dueDate === today,
+      }));
+
+    const recentOpenQueries: CrmDashboardQueryItem[] = [...scopedOpenQueries]
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .slice(0, 6)
+      .map((query) => ({
+        id: query.id,
+        title: query.title,
+        accountId: query.companyId,
+        accountName: query.accountName ?? accountNameById.get(query.companyId) ?? "Account",
+        updatedAt: query.updatedAt,
+        category: query.category,
+      }));
+
     function resolveDrillDown(filter: CrmDashboardDrillDownFilter) {
       switch (filter.type) {
         case "accounts":
@@ -342,6 +443,48 @@ export function useCrmDashboardOverview() {
             kind: "accounts" as const,
             title: "Accounts with open tickets",
             accounts: rows.filter((r) => r.openTickets > 0),
+          };
+        case "tasks":
+          return {
+            kind: "accounts" as const,
+            title: "Accounts with open follow-up tasks",
+            accounts: rows.filter((r) => r.openTasks > 0),
+          };
+        case "tasks_overdue":
+          return {
+            kind: "accounts" as const,
+            title: "Accounts with overdue tasks",
+            accounts: rows.filter((row) =>
+              scopedOpenTasks.some(
+                (task) =>
+                  task.companyId === row.id && task.dueDate && task.dueDate < today,
+              ),
+            ),
+          };
+        case "tasks_due_today":
+          return {
+            kind: "accounts" as const,
+            title: "Accounts with tasks due today",
+            accounts: rows.filter((row) =>
+              scopedOpenTasks.some(
+                (task) => task.companyId === row.id && task.dueDate === today,
+              ),
+            ),
+          };
+        case "queries":
+          return {
+            kind: "accounts" as const,
+            title: "Accounts with open queries",
+            accounts: rows.filter((r) => r.openQueries > 0),
+          };
+        case "golive":
+          return {
+            kind: "accounts" as const,
+            title: "Go-live checklist pending",
+            accounts: rows.filter((row) => {
+              if (row.status === "live" || isCrmAccountEnded(row.status)) return false;
+              return !crmGoLiveReady(recordFor(row, records));
+            }),
           };
         case "overdue":
           return {
@@ -437,6 +580,11 @@ export function useCrmDashboardOverview() {
         pendingBookings,
         upcomingBookings,
         openSupportTickets,
+        openTasks: openTasksCount,
+        overdueTasks: overdueTasksCount,
+        dueTodayTasks: dueTodayTasksCount,
+        openQueries: openQueriesCount,
+        goLivePending,
       },
       pending: {
         overdue: overdueCount,
@@ -447,6 +595,11 @@ export function useCrmDashboardOverview() {
         training: pendingTraining,
         reports: pendingReports,
         tickets: openTickets,
+        tasks: openTasksCount,
+        tasksOverdue: overdueTasksCount,
+        tasksDueToday: dueTodayTasksCount,
+        queries: openQueriesCount,
+        goLive: goLivePending,
         highPriority,
         bookings: pendingBookings,
         support: openSupportTickets,
@@ -455,6 +608,8 @@ export function useCrmDashboardOverview() {
       moduleAdoption,
       stageMix,
       recentActivity,
+      recentOpenTasks,
+      recentOpenQueries,
       allActivity,
       resolveDrillDown,
     };

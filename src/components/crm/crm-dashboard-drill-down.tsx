@@ -109,6 +109,8 @@ export function CrmDashboardDrillDownSheet({ open, filter, data, onClose }: Prop
                   <div className="flex flex-wrap gap-x-2 gap-y-0.5">
                     <span>Health {a.resolvedHealth}</span>
                     {a.openTickets > 0 ? <span>· {a.openTickets} tickets</span> : null}
+                    {a.openTasks > 0 ? <span>· {a.openTasks} tasks</span> : null}
+                    {a.openQueries > 0 ? <span>· {a.openQueries} queries</span> : null}
                   </div>
                   <div className="truncate" title={a.salesManagerName || undefined}>
                     Sales: {a.salesManagerName || "—"}

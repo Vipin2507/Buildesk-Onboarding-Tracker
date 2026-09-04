@@ -2,12 +2,15 @@ import { motion } from "framer-motion";
 import {
   AlarmClock,
   Calendar,
+  CheckSquare,
   ClipboardList,
   CloudUpload,
   GraduationCap,
   LifeBuoy,
   ListChecks,
+  MessageSquare,
   Radio,
+  Rocket,
   Ticket,
   Upload,
 } from "lucide-react";
@@ -31,6 +34,10 @@ type Pending = {
   training: number;
   reports: number;
   tickets: number;
+  tasks: number;
+  tasksOverdue: number;
+  queries: number;
+  goLive: number;
   bookings: number;
   support: number;
 };
@@ -63,6 +70,41 @@ export function CrmDashboardWorkloadCard({
   activeFilter,
 }: Props) {
   const items: WorkItem[] = [
+    {
+      id: "tasks-overdue",
+      label: "Overdue tasks",
+      value: pending.tasksOverdue,
+      barClass: "bg-destructive",
+      icon: AlarmClock,
+      filter: { type: "tasks_overdue" },
+      navigateTo: { to: "/crm/tasks", search: { tab: "overdue" } },
+    },
+    {
+      id: "queries",
+      label: "Open queries",
+      value: pending.queries,
+      barClass: "bg-info",
+      icon: MessageSquare,
+      filter: { type: "queries" },
+      navigateTo: { to: "/crm/queries", search: { status: "open" } },
+    },
+    {
+      id: "tasks",
+      label: "Open tasks",
+      value: pending.tasks,
+      barClass: "bg-primary/80",
+      icon: CheckSquare,
+      filter: { type: "tasks" },
+      navigateTo: { to: "/crm/tasks", search: { tab: "open" } },
+    },
+    {
+      id: "golive",
+      label: "Go-live pending",
+      value: pending.goLive,
+      barClass: "bg-success/70",
+      icon: Rocket,
+      filter: { type: "golive" },
+    },
     {
       id: "bookings",
       label: "Pending meetings",
