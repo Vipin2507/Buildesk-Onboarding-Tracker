@@ -357,6 +357,7 @@ function DashboardTab({
   const account = useCrmAccountStore((s) => s.accounts.find((a) => a.id === accountId))!;
   const updateAccount = useCrmAccountStore((s) => s.updateAccount);
   const ensure = useCrmOnboardingStore((s) => s.ensureForCompany);
+  const setModuleEnabled = useCrmOnboardingStore((s) => s.setProductModuleEnabled);
   const record = useCrmOnboardingStore((s) => s.getByCompanyId(accountId))!;
   const [editing, setEditing] = useState(false);
 
@@ -470,7 +471,7 @@ function DashboardTab({
 
       <DesignTicketSection
         compact
-        title="Modules & integrations"
+        title="Modules"
         action={
           <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={onOpenModules}>
             Manage modules
@@ -482,6 +483,10 @@ function DashboardTab({
           modules={record.productModules}
           record={record}
           emptyModulesHint="No modules selected — open the Modules tab to subscribe."
+          onModuleOptOut={(key, label) => {
+            setModuleEnabled(accountId, key, false);
+            toast.success(`${label} opted out`);
+          }}
         />
       </DesignTicketSection>
 

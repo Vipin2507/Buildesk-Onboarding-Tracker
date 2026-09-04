@@ -28,10 +28,12 @@ function ModuleSummaryCard({
   companyId,
   module: m,
   record,
+  onOptOut,
 }: {
   companyId: string;
   module: CrmProductModule;
   record: CrmOnboardingRecord;
+  onOptOut: () => void;
 }) {
   const pct = calcProductModuleProgress(m, record);
   const ready = isModuleGoLiveReady(m, record);
@@ -41,32 +43,48 @@ function ModuleSummaryCard({
       : `${m.workflow?.filter((s) => s.done).length ?? 0}/${m.workflow?.length ?? 0} steps`;
 
   return (
-    <Link
-      to="/crm/accounts/$accountId/modules/$moduleKey"
-      params={{ accountId: companyId, moduleKey: m.key }}
+    <div
       className={cn(
-        "card-soft group block border p-3 transition-all",
-        "hover:border-primary/40 hover:bg-primary/[0.03] hover:shadow-sm",
+        "card-soft border p-3 transition-all",
         ready ? "border-success/30 bg-success/[0.03]" : "border-border",
       )}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 text-sm font-semibold">
-            <Package className="h-3.5 w-3.5 shrink-0 text-primary" />
-            <span className="truncate">{m.label}</span>
+      <Link
+        to="/crm/accounts/$accountId/modules/$moduleKey"
+        params={{ accountId: companyId, moduleKey: m.key }}
+        className="group block"
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 text-sm font-semibold">
+              <Package className="h-3.5 w-3.5 shrink-0 text-primary" />
+              <span className="truncate">{m.label}</span>
+            </div>
+            <p className="mt-1 line-clamp-2 text-[10px] text-muted-foreground">{hint}</p>
           </div>
-          <p className="mt-1 line-clamp-2 text-[10px] text-muted-foreground">{hint}</p>
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <Pill tone={ready ? "success" : pct > 0 ? "info" : "muted"} className="text-[9px]">
+              {ready ? "Ready" : `${pct}%`}
+            </Pill>
+            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+          </div>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          <Pill tone={ready ? "success" : pct > 0 ? "info" : "muted"} className="text-[9px]">
-            {ready ? "Ready" : `${pct}%`}
-          </Pill>
-          <ArrowRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
-        </div>
-      </div>
-      <ProgressBar value={pct} className="mt-2.5 h-1.5" />
-    </Link>
+        <ProgressBar value={pct} className="mt-2.5 h-1.5" />
+      </Link>
+      <label
+        className="mt-2.5 flex cursor-pointer items-center justify-between gap-2 border-t border-border/60 pt-2"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span className="text-[10px] font-medium text-muted-foreground">Opted in</span>
+        <Switch
+          size="sm"
+          checked
+          onCheckedChange={(v) => {
+            if (v !== true) onOptOut();
+          }}
+        />
+      </label>
+    </div>
   );
 }
 
@@ -82,7 +100,7 @@ export function CrmAccountModulesTab({ companyId }: Props) {
 
   function toggleModule(key: CrmProductModuleKey, label: string, next: boolean) {
     setEnabled(companyId, key, next);
-    toast.success(next ? `${label} subscribed` : `${label} removed`);
+    toast.success(next ? `${label} subscribed` : `${label} opted out`);
   }
 
   return (
@@ -118,7 +136,12 @@ export function CrmAccountModulesTab({ companyId }: Props) {
                   exit={{ opacity: 0, y: -6 }}
                   transition={{ duration: 0.22, ease: TICKET_EASE }}
                 >
-                  <ModuleSummaryCard companyId={companyId} module={m} record={record} />
+                  <ModuleSummaryCard
+                    companyId={companyId}
+                    module={m}
+                    record={record}
+                    onOptOut={() => toggleModule(m.key, m.label, false)}
+                  />
                 </motion.div>
               ))}
             </AnimatePresence>

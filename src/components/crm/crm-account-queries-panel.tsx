@@ -52,7 +52,9 @@ import {
 } from "@/stores";
 import { EMPTY_COMPANY_QUERIES } from "@/stores/useCrmAccountQueryStore";
 import {
+  CRM_ACCOUNT_QUERY_CATEGORIES,
   CRM_ACCOUNT_QUERY_CATEGORY_LABEL,
+  crmAccountQueryCategoryLabel,
   CRM_ACCOUNT_QUERY_STATUS_LABEL,
   type CrmAccountQuery,
   type CrmAccountQueryAttachment,
@@ -628,7 +630,7 @@ function QueryThread({
             </Pill>
             {query.category ? (
               <span className="text-[10px] text-muted-foreground">
-                {CRM_ACCOUNT_QUERY_CATEGORY_LABEL[query.category]}
+                {crmAccountQueryCategoryLabel(query.category)}
               </span>
             ) : null}
           </div>
@@ -796,7 +798,7 @@ export function CrmAccountQueriesPanel({
   const [selectedId, setSelectedId] = useState<string | null>(initialQueryId ?? null);
   const [createOpen, setCreateOpen] = useState(false);
   const [createTitle, setCreateTitle] = useState("");
-  const [createCategory, setCreateCategory] = useState<CrmAccountQueryCategory>("general");
+  const [createCategory, setCreateCategory] = useState<CrmAccountQueryCategory>("requirement");
   const [createMessage, setCreateMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | "open" | "resolved" | "archived">("all");
@@ -877,7 +879,7 @@ export function CrmAccountQueriesPanel({
       setCreateOpen(false);
       setCreateTitle("");
       setCreateMessage("");
-      setCreateCategory("general");
+      setCreateCategory("requirement");
       setSelectedId(created.id);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create query");
@@ -1051,9 +1053,9 @@ export function CrmAccountQueriesPanel({
             value={createCategory}
             onChange={(e) => setCreateCategory(e.target.value as CrmAccountQueryCategory)}
           >
-            {Object.entries(CRM_ACCOUNT_QUERY_CATEGORY_LABEL).map(([value, label]) => (
+            {CRM_ACCOUNT_QUERY_CATEGORIES.map((value) => (
               <option key={value} value={value}>
-                {label}
+                {CRM_ACCOUNT_QUERY_CATEGORY_LABEL[value]}
               </option>
             ))}
           </select>

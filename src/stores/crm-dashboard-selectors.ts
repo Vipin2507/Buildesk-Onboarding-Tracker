@@ -6,6 +6,7 @@ import {
   CRM_PRODUCT_MODULES,
   CRM_STAGE_LABELS,
   ensureMasterDataFields,
+  isCrmIntegrationModule,
 } from "@/data/crm-onboarding-defaults";
 import {
   getChecklistPhaseBucket,
@@ -185,7 +186,7 @@ export function useCrmDashboardOverview() {
           ),
         ),
         subscribedModules: record.productModules
-          .filter((m) => m.enabled)
+          .filter((m) => m.enabled && !isCrmIntegrationModule(m.key))
           .map((m) => ({ key: m.key, label: m.label })),
         overdue,
       };

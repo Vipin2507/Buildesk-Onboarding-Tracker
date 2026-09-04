@@ -12,7 +12,7 @@ import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  CRM_ACCOUNT_QUERY_CATEGORY_LABEL,
+  crmAccountQueryCategoryLabel,
   CRM_ACCOUNT_QUERY_STATUS_LABEL,
   type CrmAccountQueryStatus,
   type CrmAccountQuerySummary,
@@ -110,7 +110,7 @@ export function CrmQueriesHub({ statusFilter, onStatusFilterChange, selectedQuer
         key: "category",
         header: "Category",
         render: (row: CrmAccountQuerySummary) =>
-          row.category ? CRM_ACCOUNT_QUERY_CATEGORY_LABEL[row.category] : "—",
+          row.category ? crmAccountQueryCategoryLabel(row.category) : "—",
       },
       {
         key: "author",

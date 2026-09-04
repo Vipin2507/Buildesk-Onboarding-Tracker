@@ -1146,14 +1146,56 @@ export function calcProductModuleProgress(
   return calcModuleWorkflowProgress(module);
 }
 
-/** Overall account progress — average of enabled core modules (integrations roll into Sales CRM). */
+/** Each non–Sales CRM core module contributes this share of overall account progress. */
+export const CRM_OTHER_MODULE_PROGRESS_WEIGHT = 10;
+
+/** Weighted progress share (0–100) per enabled core module for overall account completion. */
+export function getCrmModuleProgressWeights(
+  enabledCoreModules: CrmProductModule[],
+): Map<CrmProductModuleKey, number> {
+  const weights = new Map<CrmProductModuleKey, number>();
+  const salesCrm = enabledCoreModules.find((m) => m.key === "sales-crm");
+  const others = enabledCoreModules.filter((m) => m.key !== "sales-crm");
+
+  if (salesCrm) {
+    weights.set(
+      "sales-crm",
+      Math.max(0, 100 - CRM_OTHER_MODULE_PROGRESS_WEIGHT * others.length),
+    );
+    for (const module of others) {
+      weights.set(module.key, CRM_OTHER_MODULE_PROGRESS_WEIGHT);
+    }
+    return weights;
+  }
+
+  if (enabledCoreModules.length === 0) return weights;
+
+  const equalWeight = 100 / enabledCoreModules.length;
+  for (const module of enabledCoreModules) {
+    weights.set(module.key, equalWeight);
+  }
+  return weights;
+}
+
+/**
+ * Overall account progress — weighted by opted modules.
+ * Sales CRM holds the remainder after 10% per other core module (e.g. 90% with one other, 80% with two).
+ * Integrations roll into Sales CRM progress, not overall weights.
+ */
 export function calcCrmOnboardingProgress(record: CrmOnboardingRecord): number {
   const enabled = record.productModules.filter(
     (m) => m.enabled && !isCrmIntegrationModule(m.key),
   );
   if (enabled.length === 0) return 0;
-  const sum = enabled.reduce((acc, m) => acc + calcProductModuleProgress(m, record), 0);
-  return Math.round(sum / enabled.length);
+
+  const weights = getCrmModuleProgressWeights(enabled);
+  const weighted = enabled.reduce((acc, module) => {
+    const weight = weights.get(module.key) ?? 0;
+    const progress = calcProductModuleProgress(module, record);
+    return acc + (progress * weight) / 100;
+  }, 0);
+
+  return Math.round(weighted);
 }
 
 export function crmPendingActivityCount(record: CrmOnboardingRecord): number {

@@ -1,6 +1,13 @@
 export type CrmAccountQueryStatus = "open" | "resolved" | "archived";
 
 export type CrmAccountQueryCategory =
+  | "bug"
+  | "suggestion"
+  | "feature"
+  | "requirement";
+
+/** @deprecated Stored on older queries — use crmAccountQueryCategoryLabel for display. */
+export type CrmAccountQueryCategoryLegacy =
   | "general"
   | "billing"
   | "technical"
@@ -64,12 +71,37 @@ export type CrmAccountQuery = {
   updatedAt: string;
 };
 
+export const CRM_ACCOUNT_QUERY_CATEGORIES: CrmAccountQueryCategory[] = [
+  "bug",
+  "suggestion",
+  "feature",
+  "requirement",
+];
+
 export const CRM_ACCOUNT_QUERY_CATEGORY_LABEL: Record<CrmAccountQueryCategory, string> = {
+  bug: "Bug",
+  suggestion: "Suggestion",
+  feature: "Feature",
+  requirement: "Requirement",
+};
+
+const CRM_ACCOUNT_QUERY_LEGACY_CATEGORY_LABEL: Record<CrmAccountQueryCategoryLegacy, string> = {
   general: "General",
   billing: "Billing",
   technical: "Technical",
   onboarding: "Onboarding",
 };
+
+export function crmAccountQueryCategoryLabel(category?: string): string {
+  if (!category) return "—";
+  if (category in CRM_ACCOUNT_QUERY_CATEGORY_LABEL) {
+    return CRM_ACCOUNT_QUERY_CATEGORY_LABEL[category as CrmAccountQueryCategory];
+  }
+  if (category in CRM_ACCOUNT_QUERY_LEGACY_CATEGORY_LABEL) {
+    return CRM_ACCOUNT_QUERY_LEGACY_CATEGORY_LABEL[category as CrmAccountQueryCategoryLegacy];
+  }
+  return category;
+}
 
 export const CRM_ACCOUNT_QUERY_STATUS_LABEL: Record<CrmAccountQueryStatus, string> = {
   open: "Open",

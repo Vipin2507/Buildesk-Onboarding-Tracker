@@ -282,7 +282,7 @@ function loadAccessibleAccountMap(
 const createQuerySchema = z.object({
   companyId: z.string().min(1),
   title: z.string().min(1).max(200),
-  category: z.enum(["general", "billing", "technical", "onboarding"]).optional(),
+  category: z.enum(["bug", "suggestion", "feature", "requirement"]).optional(),
   initialMessage: z.string().optional(),
   attachments: z.array(attachmentSchema).optional(),
 });
@@ -454,7 +454,7 @@ export const createCrmAccountQuery = createServerFn({ method: "POST" })
         companyId: data.companyId,
         title: data.title.trim(),
         status: "open",
-        category: data.category ?? "general",
+        category: data.category ?? "requirement",
         createdByUserId: user.id,
         createdByName: user.name,
         resolvedAt: null,

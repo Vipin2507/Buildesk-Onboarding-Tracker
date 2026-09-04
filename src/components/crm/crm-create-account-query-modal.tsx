@@ -4,7 +4,9 @@ import { toast } from "sonner";
 import { EntityFormModal } from "@/components/entity-form-modal";
 import { DesignTicketSelect } from "@/components/design-ticket/design-ticket-fields";
 import {
+  CRM_ACCOUNT_QUERY_CATEGORIES,
   CRM_ACCOUNT_QUERY_CATEGORY_LABEL,
+  crmAccountQueryCategoryLabel,
   type CrmAccountQuery,
   type CrmAccountQueryCategory,
 } from "@/types/crm-account-query";
@@ -33,7 +35,7 @@ export function CrmCreateAccountQueryModal({
 
   const [companyId, setCompanyId] = useState(defaultCompanyId ?? "");
   const [title, setTitle] = useState("");
-  const [category, setCategory] = useState<CrmAccountQueryCategory>("general");
+  const [category, setCategory] = useState<CrmAccountQueryCategory>("requirement");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -46,7 +48,7 @@ export function CrmCreateAccountQueryModal({
     if (!open) return;
     setCompanyId(defaultCompanyId ?? sortedAccounts[0]?.id ?? "");
     setTitle("");
-    setCategory("general");
+    setCategory("requirement");
     setMessage("");
   }, [open, defaultCompanyId, sortedAccounts]);
 
@@ -119,9 +121,9 @@ export function CrmCreateAccountQueryModal({
           value={category}
           onChange={(e) => setCategory(e.target.value as CrmAccountQueryCategory)}
         >
-          {Object.entries(CRM_ACCOUNT_QUERY_CATEGORY_LABEL).map(([value, label]) => (
+          {CRM_ACCOUNT_QUERY_CATEGORIES.map((value) => (
             <option key={value} value={value}>
-              {label}
+              {CRM_ACCOUNT_QUERY_CATEGORY_LABEL[value]}
             </option>
           ))}
         </select>

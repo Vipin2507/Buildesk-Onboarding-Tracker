@@ -3,6 +3,7 @@ import { ArrowRight, Package } from "lucide-react";
 
 import { ProgressBar } from "@/components/progress-bar";
 import { Pill } from "@/components/status-pill";
+import { Switch } from "@/components/ui/switch";
 import {
   calcIntegrationsTabProgress,
   calcProductModuleProgress,
@@ -10,16 +11,18 @@ import {
   isModuleGoLiveReady,
 } from "@/data/crm-onboarding-defaults";
 import { cn } from "@/lib/utils";
-import type { CrmOnboardingRecord, CrmProductModule } from "@/types/crm-onboarding";
+import type { CrmOnboardingRecord, CrmProductModule, CrmProductModuleKey } from "@/types/crm-onboarding";
 
 function ModuleProgressCard({
   companyId,
   module: m,
   record,
+  onOptOut,
 }: {
   companyId: string;
   module: CrmProductModule;
   record: CrmOnboardingRecord;
+  onOptOut?: () => void;
 }) {
   const pct = calcProductModuleProgress(m, record);
   const ready = isModuleGoLiveReady(m, record);
@@ -33,37 +36,55 @@ function ModuleProgressCard({
     : `${m.workflow?.filter((s) => s.done).length ?? 0}/${m.workflow?.length ?? 0} workflow steps complete`;
 
   return (
-    <Link
-      to="/crm/accounts/$accountId/modules/$moduleKey"
-      params={{ accountId: companyId, moduleKey: m.key }}
+    <div
       className={cn(
-        "card-soft group flex flex-col gap-2 border p-3 transition-all",
-        "hover:border-primary/40 hover:bg-primary/[0.03]",
+        "card-soft flex flex-col gap-2 border p-3 transition-all",
         ready && "border-success/30",
       )}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 text-sm font-semibold">
-            <Package className="h-3.5 w-3.5 shrink-0 text-primary" />
-            {m.label}
-          </div>
-          {!isSalesCrm && m.provider?.trim() ? (
-            <div className="mt-1 text-xs text-muted-foreground">
-              Provider: <span className="font-medium text-foreground">{m.provider}</span>
+      <Link
+        to="/crm/accounts/$accountId/modules/$moduleKey"
+        params={{ accountId: companyId, moduleKey: m.key }}
+        className="group block"
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 text-sm font-semibold">
+              <Package className="h-3.5 w-3.5 shrink-0 text-primary" />
+              {m.label}
             </div>
-          ) : null}
+            {!isSalesCrm && m.provider?.trim() ? (
+              <div className="mt-1 text-xs text-muted-foreground">
+                Provider: <span className="font-medium text-foreground">{m.provider}</span>
+              </div>
+            ) : null}
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <Pill tone={ready ? "success" : pct > 0 ? "info" : "muted"} className="text-[10px]">
+              {ready ? "Ready" : `${pct}%`}
+            </Pill>
+            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary" />
+          </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <Pill tone={ready ? "success" : pct > 0 ? "info" : "muted"} className="text-[10px]">
-            {ready ? "Ready" : `${pct}%`}
-          </Pill>
-          <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary" />
-        </div>
-      </div>
-      <ProgressBar value={pct} className="h-1.5" />
-      <div className="text-[10px] text-muted-foreground">{stepHint}</div>
-    </Link>
+        <ProgressBar value={pct} className="mt-2 h-1.5" />
+        <div className="mt-1 text-[10px] text-muted-foreground">{stepHint}</div>
+      </Link>
+      {onOptOut ? (
+        <label
+          className="flex cursor-pointer items-center justify-between gap-2 border-t border-border/60 pt-2"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <span className="text-[10px] font-medium text-muted-foreground">Opted in</span>
+          <Switch
+            size="sm"
+            checked
+            onCheckedChange={(v) => {
+              if (v !== true) onOptOut();
+            }}
+          />
+        </label>
+      ) : null}
+    </div>
   );
 }
 
@@ -82,7 +103,10 @@ export function CrmAccountModulesOverview({
   record,
   emptyModulesHint = "None selected yet.",
   className,
-}: Props) {
+  onModuleOptOut,
+}: Props & {
+  onModuleOptOut?: (key: CrmProductModuleKey, label: string) => void;
+}) {
   const core = modules.filter((m) => m.enabled && !isCrmIntegrationModule(m.key));
 
   return (
@@ -92,7 +116,15 @@ export function CrmAccountModulesOverview({
       ) : (
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {core.map((m) => (
-            <ModuleProgressCard key={m.key} companyId={companyId} module={m} record={record} />
+            <ModuleProgressCard
+              key={m.key}
+              companyId={companyId}
+              module={m}
+              record={record}
+              onOptOut={
+                onModuleOptOut ? () => onModuleOptOut(m.key, m.label) : undefined
+              }
+            />
           ))}
         </div>
       )}
