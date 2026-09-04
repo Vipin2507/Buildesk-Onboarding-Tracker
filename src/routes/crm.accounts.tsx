@@ -1034,10 +1034,12 @@ function CrmAccountsPage() {
                     header: "Location",
                     sortable: true,
                     render: (r) => (
-                      <span className="text-xs text-muted-foreground">
-                        {r.city}
-                        {r.region ? ` · ${r.region}` : ""}
-                      </span>
+                      <div className="min-w-0 text-xs text-muted-foreground">
+                        <div className="font-medium text-foreground">{r.city || "—"}</div>
+                        {r.region ? (
+                          <div className="truncate">{r.region}</div>
+                        ) : null}
+                      </div>
                     ),
                   },
                   {
