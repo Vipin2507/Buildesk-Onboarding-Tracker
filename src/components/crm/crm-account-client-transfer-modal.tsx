@@ -1,13 +1,15 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { EntityFormModal } from "@/components/entity-form-modal";
 import { DesignTicketSelect } from "@/components/design-ticket/design-ticket-fields";
 import { normalizeManagerName } from "@/lib/crm-account-sheet-import";
+import { cn } from "@/lib/utils";
 import { useCrmAccountStore, useUserStore } from "@/stores";
 import type { CrmAccount } from "@/types/crm-account";
 
 type TransferField = "salesManagerName" | "supportManager1" | "supportManager2";
+type TransferScope = "filtered" | "selected";
 
 const FIELD_OPTIONS: { value: TransferField; label: string }[] = [
   { value: "salesManagerName", label: "Sales Manager" },
@@ -27,17 +29,40 @@ const UNSET = "__unset__";
 export function CrmAccountClientTransferModal({
   open,
   onOpenChange,
+  scopedAccounts,
+  selectedAccountIds,
+  onTransferred,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Accounts matching the current list filters. */
+  scopedAccounts: CrmAccount[];
+  selectedAccountIds: Set<string>;
+  onTransferred?: () => void;
 }) {
-  const accounts = useCrmAccountStore((s) => s.accounts);
   const upsertAccountsBatch = useCrmAccountStore((s) => s.upsertAccountsBatch);
   const users = useUserStore((s) => s.users);
 
   const [field, setField] = useState<TransferField>("salesManagerName");
   const [fromName, setFromName] = useState(UNSET);
   const [toName, setToName] = useState(UNSET);
+  const [scope, setScope] = useState<TransferScope>("filtered");
+
+  const selectedInScope = useMemo(
+    () => scopedAccounts.filter((account) => selectedAccountIds.has(account.id)),
+    [scopedAccounts, selectedAccountIds],
+  );
+  const hasSelection = selectedInScope.length > 0;
+
+  useEffect(() => {
+    if (!open) return;
+    setScope(hasSelection ? "selected" : "filtered");
+  }, [open, hasSelection]);
+
+  const pool = useMemo(
+    () => (scope === "selected" && hasSelection ? selectedInScope : scopedAccounts),
+    [scope, hasSelection, selectedInScope, scopedAccounts],
+  );
 
   const crmUsers = useMemo(
     () =>
@@ -50,25 +75,26 @@ export function CrmAccountClientTransferModal({
 
   const fromOptions = useMemo(() => {
     const names = new Set<string>();
-    for (const account of accounts) {
+    for (const account of pool) {
       const value = account[field]?.trim();
       if (value) names.add(value);
     }
     return [...names].sort((a, b) => a.localeCompare(b));
-  }, [accounts, field]);
+  }, [pool, field]);
 
   const matching = useMemo(
     () =>
       fromName === UNSET
         ? []
-        : accounts.filter((account) => managerMatches(account[field], fromName)),
-    [accounts, field, fromName],
+        : pool.filter((account) => managerMatches(account[field], fromName)),
+    [pool, field, fromName],
   );
 
   function reset() {
     setField("salesManagerName");
     setFromName(UNSET);
     setToName(UNSET);
+    setScope("filtered");
   }
 
   function handleOpenChange(next: boolean) {
@@ -90,7 +116,7 @@ export function CrmAccountClientTransferModal({
       return;
     }
     if (matching.length === 0) {
-      toast.error("No accounts match the selected manager");
+      toast.error("No accounts match the selected manager in this scope");
       return;
     }
 
@@ -102,6 +128,7 @@ export function CrmAccountClientTransferModal({
     toast.success(
       `Transferred ${payloads.length} client${payloads.length === 1 ? "" : "s"} to ${toName.trim()}`,
     );
+    onTransferred?.();
     handleOpenChange(false);
   }
 
@@ -116,9 +143,62 @@ export function CrmAccountClientTransferModal({
     >
       <div className="grid gap-3">
         <p className="text-xs text-muted-foreground">
-          Reassign all CRM accounts from one manager to another. Matching is by the selected role
-          field on each account.
+          Reassign CRM accounts from one manager to another within your current list scope. Matching
+          is by the selected role field on each account.
         </p>
+
+        {scopedAccounts.length > 0 ? (
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Accounts to include</label>
+            {hasSelection ? (
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setScope("filtered")}
+                  className={cn(
+                    "rounded-lg border px-3 py-2 text-left text-xs transition-colors",
+                    scope === "filtered"
+                      ? "border-primary bg-primary/5"
+                      : "hover:bg-muted/50",
+                  )}
+                >
+                  <div className="font-medium">All filtered accounts</div>
+                  <div className="mt-0.5 text-muted-foreground">
+                    {scopedAccounts.length}{" "}
+                    {scopedAccounts.length === 1 ? "account" : "accounts"} in current filters
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScope("selected")}
+                  className={cn(
+                    "rounded-lg border px-3 py-2 text-left text-xs transition-colors",
+                    scope === "selected"
+                      ? "border-primary bg-primary/5"
+                      : "hover:bg-muted/50",
+                  )}
+                >
+                  <div className="font-medium">Selected accounts only</div>
+                  <div className="mt-0.5 text-muted-foreground">
+                    {selectedInScope.length} of {scopedAccounts.length} filtered{" "}
+                    {selectedInScope.length === 1 ? "account" : "accounts"}
+                  </div>
+                </button>
+              </div>
+            ) : (
+              <div className="rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                Using all{" "}
+                <span className="font-medium text-foreground">{scopedAccounts.length}</span>{" "}
+                {scopedAccounts.length === 1 ? "account" : "accounts"} from the current filters.
+                Select rows in the table to transfer a subset.
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
+            No accounts match the current filters. Adjust filters or clear them before transferring.
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Role</label>
@@ -171,6 +251,21 @@ export function CrmAccountClientTransferModal({
                   <span className="font-medium text-foreground">{toName}</span>
                 ) : (
                   "the selected manager"
+                )}
+                {scope === "selected" && hasSelection ? (
+                  <>
+                    {" "}
+                    within your{" "}
+                    <span className="font-medium text-foreground">{selectedInScope.length}</span>{" "}
+                    selected {selectedInScope.length === 1 ? "account" : "accounts"}
+                  </>
+                ) : (
+                  <>
+                    {" "}
+                    within the{" "}
+                    <span className="font-medium text-foreground">{pool.length}</span> filtered{" "}
+                    {pool.length === 1 ? "account" : "accounts"}
+                  </>
                 )}
                 .
               </>

@@ -20,7 +20,6 @@ import type { ChecklistPhase } from "@/types/onboarding";
 import {
   createCrmOnboardingRecord,
   CRM_GO_LIVE_CHECKLIST_LABELS,
-  CRM_REPORT_CHECKLIST_LABELS,
   CP_APPLICATION_NO_BRANCH_KEYS,
   CP_APPLICATION_SHARED_STEP_KEYS,
   CP_APPLICATION_YES_BRANCH_KEYS,
@@ -40,6 +39,7 @@ import {
   moduleRequiresProvider,
   needsModuleWorkflowUpgrade,
   needsMasterChecklistUpgrade,
+  needsReportChecklistUpgrade,
   needsProductModulesUpgrade,
   normalizeCrmMasterChecklist,
   syncGoLiveChecklistFromTabs,
@@ -296,16 +296,12 @@ function needsTrainingUpgrade(items: CrmTrainingSession[], companyType?: Company
   return false;
 }
 
-function needsReportMigration(items: CrmReportChecklistItem[]) {
-  if (items.some((i) => typeof i.explanationCount !== "number")) return true;
-  const existingKeys = new Set(items.map((i) => i.key));
-  return CRM_REPORT_CHECKLIST_LABELS.some((d) => !existingKeys.has(d.key));
-}
-
 function needsGoLiveUpgrade(items: CrmGoLiveChecklistItem[]) {
   const existingKeys = new Set(items.map((i) => i.key));
   if (CRM_GO_LIVE_CHECKLIST_LABELS.some((d) => !existingKeys.has(d.key))) return true;
-  return items.some((i) => i.category === undefined);
+  if (items.some((i) => i.category === undefined)) return true;
+  const byKey = new Map(items.map((i) => [i.key, i]));
+  return CRM_GO_LIVE_CHECKLIST_LABELS.some((def) => byKey.get(def.key)?.label !== def.label);
 }
 
 let hydratingCrmOnboarding = false;
@@ -445,7 +441,7 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
         changed = true;
       }
       const afterTrain = get().getByCompanyId(companyId)!;
-      if (needsReportMigration(afterTrain.reportChecklist)) {
+      if (needsReportChecklistUpgrade(afterTrain.reportChecklist)) {
         set((s) => ({
           records: updateRecord(s.records, companyId, (r) => ({
             ...r,

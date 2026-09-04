@@ -537,17 +537,6 @@ export const CRM_REPORT_CHECKLIST_LABELS: {
   { key: "attendance", label: "Attendance", category: "Operations" },
   { key: "tracking", label: "Tracking", category: "Operations" },
   { key: "communication_logs", label: "Communication Logs", category: "Operations" },
-  // Core sales reports
-  { key: "calling", label: "Calling Report", category: "Sales reports" },
-  { key: "followup", label: "Follow-up Report", category: "Sales reports" },
-  { key: "lead_distribution", label: "Lead Distribution Report", category: "Sales reports" },
-  { key: "site_visit", label: "Site Visit Report", category: "Sales reports" },
-  { key: "booking", label: "Booking Report", category: "Sales reports" },
-  { key: "collection", label: "Collection Report", category: "Sales reports" },
-  { key: "cp_performance", label: "CP Performance Report", category: "Sales reports" },
-  { key: "inventory", label: "Inventory Report", category: "Sales reports" },
-  { key: "sales_funnel", label: "Sales Funnel Report", category: "Sales reports" },
-  { key: "executive", label: "Executive Performance Report", category: "Sales reports" },
   { key: "manager_dashboard", label: "Manager Dashboard", category: "Dashboards" },
   { key: "owner_dashboard", label: "Owner Dashboard", category: "Dashboards" },
 ];
@@ -556,7 +545,6 @@ export const CRM_REPORT_CATEGORIES = [
   "Analysis",
   "Calls",
   "Operations",
-  "Sales reports",
   "Dashboards",
 ] as const;
 export const CRM_GO_LIVE_CHECKLIST_LABELS: {
@@ -569,7 +557,7 @@ export const CRM_GO_LIVE_CHECKLIST_LABELS: {
   { key: "integrations", label: "Integrations Completed", category: "Readiness" },
   { key: "training", label: "Training Completed", category: "Readiness" },
   { key: "reports", label: "Reports Explained", category: "Readiness" },
-  { key: "templates_tested", label: "Templates Tested", category: "Verification" },
+  { key: "templates_tested", label: "Offline Templates Tested", category: "Verification" },
   { key: "whatsapp_templates", label: "WhatsApp Templates Verified", category: "Verification" },
   { key: "sms_tested", label: "SMS Tested", category: "Verification" },
   { key: "email_templates", label: "Email Templates Tested", category: "Verification" },
@@ -587,6 +575,38 @@ export const CRM_GO_LIVE_CATEGORIES = [
   "Sign-off",
   "Handover",
 ] as const;
+
+/** Go-live verification rows shown only when the linked integration is opted in. */
+export const CRM_GO_LIVE_INTEGRATION_REQUIREMENTS: Partial<
+  Record<string, CrmProductModuleKey>
+> = {
+  whatsapp_templates: "whatsapp-integration",
+  sms_tested: "sms-integration",
+  email_templates: "email-integration",
+};
+
+export function isCrmIntegrationOptedIn(
+  record: CrmOnboardingRecord,
+  integrationKey: CrmProductModuleKey,
+): boolean {
+  return record.productModules.some((m) => m.key === integrationKey && m.enabled);
+}
+
+export function isCrmGoLiveItemVisible(
+  record: CrmOnboardingRecord,
+  itemKey: string,
+): boolean {
+  const requiredIntegration = CRM_GO_LIVE_INTEGRATION_REQUIREMENTS[itemKey];
+  if (!requiredIntegration) return true;
+  return isCrmIntegrationOptedIn(record, requiredIntegration);
+}
+
+export function getApplicableGoLiveChecklist(
+  record: CrmOnboardingRecord,
+): CrmGoLiveChecklistItem[] {
+  return record.goLiveChecklist.filter((item) => isCrmGoLiveItemVisible(record, item.key));
+}
+
 export const CRM_DEVELOPER_TRAINING: { key: string; label: string; category: string }[] = [
   { key: "admin", label: "Admin Training", category: "Admin" },
   { key: "sourcing_manager", label: "Sourcing Manager Training", category: "Sales roles" },
@@ -893,6 +913,20 @@ function defaultReportChecklist(): CrmReportChecklistItem[] {
     explanationLog: [],
     notApplicable: false,
   }));
+}
+
+/** Sync report checklist rows to the current catalog (drops removed keys, adds new ones). */
+export function needsReportChecklistUpgrade(
+  existing: CrmReportChecklistItem[] | undefined,
+  catalog: typeof CRM_REPORT_CHECKLIST_LABELS = CRM_REPORT_CHECKLIST_LABELS,
+): boolean {
+  if (!Array.isArray(existing)) return true;
+  if (existing.some((i) => typeof i.explanationCount !== "number")) return true;
+  const catalogKeys = new Set(catalog.map((d) => d.key));
+  if (existing.some((i) => !catalogKeys.has(i.key))) return true;
+  if (existing.length !== catalog.length) return true;
+  const byKey = new Map(existing.map((i) => [i.key, i]));
+  return catalog.some((def) => byKey.get(def.key)?.label !== def.label);
 }
 
 /** Merge catalog + normalize counters so new report types appear on existing accounts. */
@@ -1258,11 +1292,13 @@ export function crmPendingActivityCount(record: CrmOnboardingRecord): number {
     })
     .filter((s) => !isModuleWorkflowStepComplete(s)).length;
 
-  count += record.goLiveChecklist.filter((g) => !isCrmGoLiveItemComplete(g)).length;
+  count += getApplicableGoLiveChecklist(record).filter((g) => !isCrmGoLiveItemComplete(g)).length;
 
   return count;
 }
 
 export function crmGoLiveReady(record: CrmOnboardingRecord): boolean {
-  return record.goLiveChecklist.every((g) => isCrmGoLiveItemComplete(g));
+  const applicable = getApplicableGoLiveChecklist(record);
+  if (!applicable.length) return true;
+  return applicable.every((g) => isCrmGoLiveItemComplete(g));
 }

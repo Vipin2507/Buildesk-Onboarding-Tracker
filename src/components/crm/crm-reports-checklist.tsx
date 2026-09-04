@@ -90,11 +90,11 @@ export function CrmReportsChecklist({ companyId }: { companyId: string }) {
       filtered = filtered.filter((i) => matchesReportStatusFilter(i, statusFilter));
     }
     if (categoryFilter !== "all") {
-      filtered = filtered.filter((i) => (i.category ?? "Sales reports") === categoryFilter);
+      filtered = filtered.filter((i) => (i.category ?? "Analysis") === categoryFilter);
     }
     const map = new Map<string, CrmReportChecklistItem[]>();
     for (const item of filtered) {
-      const cat = item.category ?? "Sales reports";
+      const cat = item.category ?? "Analysis";
       const list = map.get(cat) ?? [];
       list.push(item);
       map.set(cat, list);
@@ -171,7 +171,7 @@ export function CrmReportsChecklist({ companyId }: { companyId: string }) {
             All ({items.length})
           </button>
           {CRM_REPORT_CATEGORIES.map((cat) => {
-            const count = items.filter((i) => (i.category ?? "Sales reports") === cat).length;
+            const count = items.filter((i) => (i.category ?? "Analysis") === cat).length;
             if (!count) return null;
             return (
               <button

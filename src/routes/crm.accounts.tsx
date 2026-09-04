@@ -349,6 +349,27 @@ function CrmAccountsPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState<CrmAccountRow | null>(null);
   const [selectedModules, setSelectedModules] = useState<CrmProductModuleKey[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+
+  const toggleSelection = useCallback((id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectionAll = useCallback((ids: string[], checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (checked) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  }, []);
 
   const form = useForm<CrmAccountFormValues>({
     resolver: zodResolver(crmAccountSchema),
@@ -924,6 +945,29 @@ function CrmAccountsPage() {
         </div>
 
       <div ref={tableRef} className="min-w-0">
+        {selectedIds.size > 0 ? (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mx-3 mb-2 flex flex-wrap items-center gap-1.5 rounded-lg border border-primary/25 bg-primary/5 px-2.5 py-1.5 sm:mx-4 lg:mx-5"
+          >
+            <span className="text-xs font-medium">
+              {selectedIds.size} {selectedIds.size === 1 ? "account" : "accounts"} selected
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1 text-xs"
+              onClick={() => setTransferOpen(true)}
+            >
+              <ArrowLeftRight className="h-3.5 w-3.5" />
+              Transfer selected
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setSelectedIds(new Set())}>
+              Clear
+            </Button>
+          </motion.div>
+        ) : null}
         {rows.length === 0 ? (
           <div className="px-3 sm:px-4 lg:px-5">
             <EmptyState
@@ -955,6 +999,11 @@ function CrmAccountsPage() {
               initialSortKey="startDate"
               initialSortDir="desc"
               getRowId={(r) => r.id}
+              selection={{
+                selectedIds,
+                onToggle: toggleSelection,
+                onToggleAll: toggleSelectionAll,
+              }}
               hideSearch
               searchQuery={tableSearch}
               onSearchQueryChange={setTableSearch}
@@ -1164,7 +1213,13 @@ function CrmAccountsPage() {
         onOpenChange={setBulkUpdateOpen}
         updatesOnly
       />
-      <CrmAccountClientTransferModal open={transferOpen} onOpenChange={setTransferOpen} />
+      <CrmAccountClientTransferModal
+        open={transferOpen}
+        onOpenChange={setTransferOpen}
+        scopedAccounts={filtered}
+        selectedAccountIds={selectedIds}
+        onTransferred={() => setSelectedIds(new Set())}
+      />
       <CrmAccountDateBulkUploadModal open={dateBulkOpen} onOpenChange={setDateBulkOpen} />
 
       <CrmCreateAccountQueryModal

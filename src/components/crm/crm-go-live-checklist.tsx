@@ -24,6 +24,7 @@ import {
 import {
   CRM_GO_LIVE_CATEGORIES,
   crmGoLiveReady,
+  getApplicableGoLiveChecklist,
   isCrmGoLiveItemComplete,
   isGoLiveTabSyncedItem,
 } from "@/data/crm-onboarding-defaults";
@@ -65,7 +66,7 @@ export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who 
   const completeAllGoLiveItems = useCrmOnboardingStore((s) => s.completeAllGoLiveItems);
   const updateTracker = useCrmOnboardingStore((s) => s.updateTracker);
 
-  const items = record.goLiveChecklist;
+  const items = useMemo(() => getApplicableGoLiveChecklist(record), [record]);
   const isLive = accountStatus === "live";
   const isSuspended = accountStatus === "suspended";
   const isInactive = accountStatus === "inactive";
