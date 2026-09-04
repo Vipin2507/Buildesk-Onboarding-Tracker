@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { CrmAccountBulkUploadModal } from "@/components/crm/crm-account-bulk-upload-modal";
 import { CrmAccountClientTransferModal } from "@/components/crm/crm-account-client-transfer-modal";
 import { CrmAccountDateBulkUploadModal } from "@/components/crm/crm-account-date-bulk-upload-modal";
 import { CrmAccountGoLiveActions } from "@/components/crm/crm-account-go-live-actions";
