@@ -199,7 +199,9 @@ function matchesAccountListFilters(row: CrmAccountRow, f: AccountListFilters) {
 
 function CrmAccountsLayout() {
   const isDetail = useRouterState({
-    select: (s) => /^\/crm\/accounts\/[^/]+$/.test(s.location.pathname),
+    select: (s) =>
+      s.location.pathname.startsWith("/crm/accounts/") &&
+      s.location.pathname !== "/crm/accounts",
   });
   if (isDetail) return <Outlet />;
   return <CrmAccountsPage />;

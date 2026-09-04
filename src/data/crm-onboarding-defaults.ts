@@ -1109,15 +1109,29 @@ export function isSalesCrmModuleEnabled(record: CrmOnboardingRecord): boolean {
   return record.productModules.some((m) => m.key === "sales-crm" && m.enabled);
 }
 
-/** Sales CRM progress from Masters, Migration, Training, and Reports tabs. */
+/** Sales CRM progress from Integrations, Masters, Migration, Training, and Reports. */
 export function calcSalesCrmModuleProgress(record: CrmOnboardingRecord): number {
+  if (!isSalesCrmModuleEnabled(record)) return 0;
   const sections = [
+    calcIntegrationsTabProgress(record),
     calcChecklistProgress(record.masterChecklist),
     calcChecklistProgress(record.migrationChecklist),
     calcTrainingTabProgress(record),
     calcReportsTabProgress(record),
   ];
   return Math.round(sections.reduce((a, b) => a + b, 0) / sections.length);
+}
+
+/** Whether a subscribed module has completed its onboarding workflow / sections. */
+export function isModuleGoLiveReady(
+  module: CrmProductModule,
+  record: CrmOnboardingRecord,
+): boolean {
+  if (!module.enabled) return false;
+  if (module.key === "sales-crm") {
+    return calcSalesCrmModuleProgress(record) >= 100;
+  }
+  return calcModuleWorkflowProgress(module) >= 100;
 }
 
 /** Progress for a single subscribed module (0 when disabled). */
@@ -1132,9 +1146,11 @@ export function calcProductModuleProgress(
   return calcModuleWorkflowProgress(module);
 }
 
-/** Overall account progress — average of all enabled modules. */
+/** Overall account progress — average of enabled core modules (integrations roll into Sales CRM). */
 export function calcCrmOnboardingProgress(record: CrmOnboardingRecord): number {
-  const enabled = record.productModules.filter((m) => m.enabled);
+  const enabled = record.productModules.filter(
+    (m) => m.enabled && !isCrmIntegrationModule(m.key),
+  );
   if (enabled.length === 0) return 0;
   const sum = enabled.reduce((acc, m) => acc + calcProductModuleProgress(m, record), 0);
   return Math.round(sum / enabled.length);

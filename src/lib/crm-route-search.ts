@@ -63,11 +63,6 @@ export function parseCrmTasksTab(value: unknown): CrmTasksTabId {
 export const CRM_ACCOUNT_TAB_IDS = [
   "dashboard",
   "modules",
-  "integrations",
-  "masters",
-  "migration",
-  "training",
-  "reports",
   "golive",
   "tasks",
   "meetings",
@@ -78,18 +73,55 @@ export const CRM_ACCOUNT_TAB_IDS = [
 
 export type CrmAccountTabId = (typeof CRM_ACCOUNT_TAB_IDS)[number];
 
+export const CRM_SALES_CRM_SECTION_IDS = [
+  "integrations",
+  "masters",
+  "migration",
+  "training",
+  "reports",
+  "golive",
+] as const;
+
+export type CrmSalesCrmSectionId = (typeof CRM_SALES_CRM_SECTION_IDS)[number];
+
+const LEGACY_ACCOUNT_TAB_IDS = [
+  "integrations",
+  "masters",
+  "migration",
+  "training",
+  "reports",
+] as const;
+
 export const crmAccountSearchSchema = z.object({
-  tab: z.enum(CRM_ACCOUNT_TAB_IDS).optional(),
+  tab: z
+    .enum([...CRM_ACCOUNT_TAB_IDS, ...LEGACY_ACCOUNT_TAB_IDS])
+    .optional(),
   queryId: z.string().optional(),
 });
 
 export type CrmAccountSearch = z.infer<typeof crmAccountSearchSchema>;
+
+export const crmAccountModuleSearchSchema = z.object({
+  section: z.enum(CRM_SALES_CRM_SECTION_IDS).optional(),
+});
+
+export type CrmAccountModuleSearch = z.infer<typeof crmAccountModuleSearchSchema>;
 
 export function parseCrmAccountTab(value: unknown): CrmAccountTabId {
   if (typeof value === "string" && CRM_ACCOUNT_TAB_IDS.includes(value as CrmAccountTabId)) {
     return value as CrmAccountTabId;
   }
   return "dashboard";
+}
+
+export function parseCrmSalesCrmSection(value: unknown): CrmSalesCrmSectionId {
+  if (
+    typeof value === "string" &&
+    CRM_SALES_CRM_SECTION_IDS.includes(value as CrmSalesCrmSectionId)
+  ) {
+    return value as CrmSalesCrmSectionId;
+  }
+  return "integrations";
 }
 
 export const crmQueriesSearchSchema = z.object({

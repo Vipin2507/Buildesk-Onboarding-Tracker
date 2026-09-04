@@ -63,9 +63,11 @@ import { Route as CrmTicketsLinksRouteImport } from './routes/crm.tickets.links'
 import { Route as CrmTicketsTicketIdRouteImport } from './routes/crm.tickets.$ticketId'
 import { Route as CrmSupportTicketIdRouteImport } from './routes/crm.support.$ticketId'
 import { Route as CrmAccountsAccountIdRouteImport } from './routes/crm.accounts.$accountId'
+import { Route as CrmAccountsAccountIdIndexRouteImport } from './routes/crm.accounts.$accountId.index'
 import { Route as PortalSlugTicketsTicketIdRouteImport } from './routes/portal.$slug.tickets.$ticketId'
 import { Route as CompaniesCompanyIdModulesModuleKeyRouteImport } from './routes/companies.$companyId.modules.$moduleKey'
 import { Route as AuthGoogleCalendarCallbackRouteImport } from './routes/auth.google.calendar.callback'
+import { Route as CrmAccountsAccountIdModulesModuleKeyRouteImport } from './routes/crm.accounts.$accountId.modules.$moduleKey'
 import { Route as CompaniesCompanyIdModulesPostSalesProjectsProjectIdRouteImport } from './routes/companies.$companyId.modules.post-sales.projects.$projectId'
 
 const VendorsRoute = VendorsRouteImport.update({
@@ -338,6 +340,12 @@ const CrmAccountsAccountIdRoute = CrmAccountsAccountIdRouteImport.update({
   path: '/$accountId',
   getParentRoute: () => CrmAccountsRoute,
 } as any)
+const CrmAccountsAccountIdIndexRoute =
+  CrmAccountsAccountIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => CrmAccountsAccountIdRoute,
+  } as any)
 const PortalSlugTicketsTicketIdRoute =
   PortalSlugTicketsTicketIdRouteImport.update({
     id: '/$ticketId',
@@ -355,6 +363,12 @@ const AuthGoogleCalendarCallbackRoute =
     id: '/auth/google/calendar/callback',
     path: '/auth/google/calendar/callback',
     getParentRoute: () => rootRouteImport,
+  } as any)
+const CrmAccountsAccountIdModulesModuleKeyRoute =
+  CrmAccountsAccountIdModulesModuleKeyRouteImport.update({
+    id: '/modules/$moduleKey',
+    path: '/modules/$moduleKey',
+    getParentRoute: () => CrmAccountsAccountIdRoute,
   } as any)
 const CompaniesCompanyIdModulesPostSalesProjectsProjectIdRoute =
   CompaniesCompanyIdModulesPostSalesProjectsProjectIdRouteImport.update({
@@ -407,7 +421,7 @@ export interface FileRoutesByFullPath {
   '/tickets/$ticketId': typeof TicketsTicketIdRoute
   '/tickets/links': typeof TicketsLinksRoute
   '/crm/': typeof CrmIndexRoute
-  '/crm/accounts/$accountId': typeof CrmAccountsAccountIdRoute
+  '/crm/accounts/$accountId': typeof CrmAccountsAccountIdRouteWithChildren
   '/crm/support/$ticketId': typeof CrmSupportTicketIdRoute
   '/crm/tickets/$ticketId': typeof CrmTicketsTicketIdRoute
   '/crm/tickets/links': typeof CrmTicketsLinksRoute
@@ -421,6 +435,8 @@ export interface FileRoutesByFullPath {
   '/auth/google/calendar/callback': typeof AuthGoogleCalendarCallbackRoute
   '/companies/$companyId/modules/$moduleKey': typeof CompaniesCompanyIdModulesModuleKeyRoute
   '/portal/$slug/tickets/$ticketId': typeof PortalSlugTicketsTicketIdRoute
+  '/crm/accounts/$accountId/': typeof CrmAccountsAccountIdIndexRoute
+  '/crm/accounts/$accountId/modules/$moduleKey': typeof CrmAccountsAccountIdModulesModuleKeyRoute
   '/companies/$companyId/modules/post-sales/projects/$projectId': typeof CompaniesCompanyIdModulesPostSalesProjectsProjectIdRoute
 }
 export interface FileRoutesByTo {
@@ -465,7 +481,6 @@ export interface FileRoutesByTo {
   '/tickets/$ticketId': typeof TicketsTicketIdRoute
   '/tickets/links': typeof TicketsLinksRoute
   '/crm': typeof CrmIndexRoute
-  '/crm/accounts/$accountId': typeof CrmAccountsAccountIdRoute
   '/crm/support/$ticketId': typeof CrmSupportTicketIdRoute
   '/crm/tickets/$ticketId': typeof CrmTicketsTicketIdRoute
   '/crm/tickets/links': typeof CrmTicketsLinksRoute
@@ -479,6 +494,8 @@ export interface FileRoutesByTo {
   '/auth/google/calendar/callback': typeof AuthGoogleCalendarCallbackRoute
   '/companies/$companyId/modules/$moduleKey': typeof CompaniesCompanyIdModulesModuleKeyRoute
   '/portal/$slug/tickets/$ticketId': typeof PortalSlugTicketsTicketIdRoute
+  '/crm/accounts/$accountId': typeof CrmAccountsAccountIdIndexRoute
+  '/crm/accounts/$accountId/modules/$moduleKey': typeof CrmAccountsAccountIdModulesModuleKeyRoute
   '/companies/$companyId/modules/post-sales/projects/$projectId': typeof CompaniesCompanyIdModulesPostSalesProjectsProjectIdRoute
 }
 export interface FileRoutesById {
@@ -526,7 +543,7 @@ export interface FileRoutesById {
   '/tickets/$ticketId': typeof TicketsTicketIdRoute
   '/tickets/links': typeof TicketsLinksRoute
   '/crm/': typeof CrmIndexRoute
-  '/crm/accounts/$accountId': typeof CrmAccountsAccountIdRoute
+  '/crm/accounts/$accountId': typeof CrmAccountsAccountIdRouteWithChildren
   '/crm/support/$ticketId': typeof CrmSupportTicketIdRoute
   '/crm/tickets/$ticketId': typeof CrmTicketsTicketIdRoute
   '/crm/tickets/links': typeof CrmTicketsLinksRoute
@@ -540,6 +557,8 @@ export interface FileRoutesById {
   '/auth/google/calendar/callback': typeof AuthGoogleCalendarCallbackRoute
   '/companies/$companyId/modules/$moduleKey': typeof CompaniesCompanyIdModulesModuleKeyRoute
   '/portal/$slug/tickets/$ticketId': typeof PortalSlugTicketsTicketIdRoute
+  '/crm/accounts/$accountId/': typeof CrmAccountsAccountIdIndexRoute
+  '/crm/accounts/$accountId/modules/$moduleKey': typeof CrmAccountsAccountIdModulesModuleKeyRoute
   '/companies/$companyId/modules/post-sales/projects/$projectId': typeof CompaniesCompanyIdModulesPostSalesProjectsProjectIdRoute
 }
 export interface FileRouteTypes {
@@ -602,6 +621,8 @@ export interface FileRouteTypes {
     | '/auth/google/calendar/callback'
     | '/companies/$companyId/modules/$moduleKey'
     | '/portal/$slug/tickets/$ticketId'
+    | '/crm/accounts/$accountId/'
+    | '/crm/accounts/$accountId/modules/$moduleKey'
     | '/companies/$companyId/modules/post-sales/projects/$projectId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -646,7 +667,6 @@ export interface FileRouteTypes {
     | '/tickets/$ticketId'
     | '/tickets/links'
     | '/crm'
-    | '/crm/accounts/$accountId'
     | '/crm/support/$ticketId'
     | '/crm/tickets/$ticketId'
     | '/crm/tickets/links'
@@ -660,6 +680,8 @@ export interface FileRouteTypes {
     | '/auth/google/calendar/callback'
     | '/companies/$companyId/modules/$moduleKey'
     | '/portal/$slug/tickets/$ticketId'
+    | '/crm/accounts/$accountId'
+    | '/crm/accounts/$accountId/modules/$moduleKey'
     | '/companies/$companyId/modules/post-sales/projects/$projectId'
   id:
     | '__root__'
@@ -720,6 +742,8 @@ export interface FileRouteTypes {
     | '/auth/google/calendar/callback'
     | '/companies/$companyId/modules/$moduleKey'
     | '/portal/$slug/tickets/$ticketId'
+    | '/crm/accounts/$accountId/'
+    | '/crm/accounts/$accountId/modules/$moduleKey'
     | '/companies/$companyId/modules/post-sales/projects/$projectId'
   fileRoutesById: FileRoutesById
 }
@@ -1133,6 +1157,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CrmAccountsAccountIdRouteImport
       parentRoute: typeof CrmAccountsRoute
     }
+    '/crm/accounts/$accountId/': {
+      id: '/crm/accounts/$accountId/'
+      path: '/'
+      fullPath: '/crm/accounts/$accountId/'
+      preLoaderRoute: typeof CrmAccountsAccountIdIndexRouteImport
+      parentRoute: typeof CrmAccountsAccountIdRoute
+    }
     '/portal/$slug/tickets/$ticketId': {
       id: '/portal/$slug/tickets/$ticketId'
       path: '/$ticketId'
@@ -1153,6 +1184,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/auth/google/calendar/callback'
       preLoaderRoute: typeof AuthGoogleCalendarCallbackRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/crm/accounts/$accountId/modules/$moduleKey': {
+      id: '/crm/accounts/$accountId/modules/$moduleKey'
+      path: '/modules/$moduleKey'
+      fullPath: '/crm/accounts/$accountId/modules/$moduleKey'
+      preLoaderRoute: typeof CrmAccountsAccountIdModulesModuleKeyRouteImport
+      parentRoute: typeof CrmAccountsAccountIdRoute
     }
     '/companies/$companyId/modules/post-sales/projects/$projectId': {
       id: '/companies/$companyId/modules/post-sales/projects/$projectId'
@@ -1191,12 +1229,26 @@ const CompaniesRouteWithChildren = CompaniesRoute._addFileChildren(
   CompaniesRouteChildren,
 )
 
+interface CrmAccountsAccountIdRouteChildren {
+  CrmAccountsAccountIdIndexRoute: typeof CrmAccountsAccountIdIndexRoute
+  CrmAccountsAccountIdModulesModuleKeyRoute: typeof CrmAccountsAccountIdModulesModuleKeyRoute
+}
+
+const CrmAccountsAccountIdRouteChildren: CrmAccountsAccountIdRouteChildren = {
+  CrmAccountsAccountIdIndexRoute: CrmAccountsAccountIdIndexRoute,
+  CrmAccountsAccountIdModulesModuleKeyRoute:
+    CrmAccountsAccountIdModulesModuleKeyRoute,
+}
+
+const CrmAccountsAccountIdRouteWithChildren =
+  CrmAccountsAccountIdRoute._addFileChildren(CrmAccountsAccountIdRouteChildren)
+
 interface CrmAccountsRouteChildren {
-  CrmAccountsAccountIdRoute: typeof CrmAccountsAccountIdRoute
+  CrmAccountsAccountIdRoute: typeof CrmAccountsAccountIdRouteWithChildren
 }
 
 const CrmAccountsRouteChildren: CrmAccountsRouteChildren = {
-  CrmAccountsAccountIdRoute: CrmAccountsAccountIdRoute,
+  CrmAccountsAccountIdRoute: CrmAccountsAccountIdRouteWithChildren,
 }
 
 const CrmAccountsRouteWithChildren = CrmAccountsRoute._addFileChildren(

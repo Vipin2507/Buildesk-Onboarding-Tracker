@@ -4,11 +4,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   CheckSquare,
-  ClipboardList,
-  GraduationCap,
   HelpCircle,
   LayoutDashboard,
-  Link2,
   MessageSquare,
   Package,
   Pencil,
@@ -17,7 +14,6 @@ import {
   Send,
   Ticket,
   TrendingUp,
-  Upload,
   Calendar,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -35,15 +31,9 @@ import { CrmAccountQueriesPanel } from "@/components/crm/crm-account-queries-pan
 import { CrmAccountMeetingsPanel } from "@/components/crm/crm-account-meetings-panel";
 import { CrmAccountModulesOverview } from "@/components/crm/crm-account-modules-overview";
 import { CrmAccountModulesTab } from "@/components/crm/crm-account-modules-tab";
-import { CrmModuleProviderSelect } from "@/components/crm/crm-module-provider-select";
-import { CrmModuleWorkflowSteps } from "@/components/crm/crm-module-workflow-steps";
 import { CrmAccountPortalPanel } from "@/components/crm/crm-account-portal-panel";
 import { CrmAccountTasksPanel } from "@/components/crm/crm-account-tasks-panel";
 import { CrmGoLiveChecklist } from "@/components/crm/crm-go-live-checklist";
-import { CrmMasterChecklistDetail } from "@/components/crm/crm-master-checklist-detail";
-import { CrmMigrationChecklistDetail } from "@/components/crm/crm-migration-checklist-detail";
-import { CrmReportsChecklist } from "@/components/crm/crm-reports-checklist";
-import { CrmTrainingChecklist } from "@/components/crm/crm-training-checklist";
 import { DatePickerField } from "@/components/date-picker-field";
 import {
   DesignTicketKpiGrid,
@@ -60,17 +50,13 @@ import { PageWrap } from "@/components/page-header";
 import { Pill } from "@/components/status-pill";
 import { ProgressBar } from "@/components/progress-bar";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import {
   CRM_COMM_ACTIONS,
   CRM_STAGE_LABELS,
   calcCrmOnboardingProgress,
-  calcModuleWorkflowProgress,
   createCrmOnboardingRecord,
   crmPendingActivityCount,
   isCrmIntegrationModule,
-  isSalesCrmModuleEnabled,
-  moduleRequiresProvider,
 } from "@/data/crm-onboarding-defaults";
 import { calcChecklistProgress } from "@/lib/checklist";
 import { resolveCrmMigrationCatalog } from "@/lib/crm-migration-catalog";
@@ -90,7 +76,6 @@ import {
 
 import type {
   CrmCommChannel,
-  CrmProductModuleKey,
 } from "@/types/crm-onboarding";
 import type { CrmAccount } from "@/types/crm-account";
 import { nowIso } from "@/types/common";
@@ -102,11 +87,6 @@ const OPEN_TASK_STATUSES: FollowUpTaskStatus[] = ["open", "in_progress", "blocke
 const TABS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "modules", label: "Modules", icon: Package },
-  { id: "integrations", label: "Integrations", icon: Link2 },
-  { id: "masters", label: "Masters", icon: ClipboardList },
-  { id: "migration", label: "Migration", icon: Upload },
-  { id: "training", label: "Training", icon: GraduationCap },
-  { id: "reports", label: "Reports", icon: TrendingUp },
   { id: "golive", label: "Go-Live", icon: Rocket },
   { id: "tasks", label: "Tasks", icon: CheckSquare },
   { id: "meetings", label: "Meetings", icon: Calendar },
@@ -187,26 +167,7 @@ export function CrmOnboardingHub({
   }, [account?.companyType, accountId, record]);
   const pct = calcCrmOnboardingProgress(liveRecord);
   const pending = crmPendingActivityCount(liveRecord);
-  const salesCrmEnabled = isSalesCrmModuleEnabled(liveRecord);
-  const visibleTabs = useMemo(
-    () =>
-      TABS.filter((t) => {
-        if (t.id === "masters" || t.id === "migration" || t.id === "training" || t.id === "reports") {
-          return salesCrmEnabled;
-        }
-        return true;
-      }),
-    [salesCrmEnabled],
-  );
-
-  useEffect(() => {
-    if (
-      !salesCrmEnabled &&
-      (tab === "masters" || tab === "migration" || tab === "training" || tab === "reports")
-    ) {
-      setTab("modules");
-    }
-  }, [salesCrmEnabled, tab, setTab]);
+  const visibleTabs = TABS;
 
   const openTickets = tickets.filter((t) => t.companyId === accountId && isTicketOpen(t)).length;
   const openTasks = tasks.filter(
@@ -241,13 +202,6 @@ export function CrmOnboardingHub({
       value: liveRecord.productModules.filter((m) => m.enabled && !isCrmIntegrationModule(m.key)).length,
       icon: Package,
       tone: "text-success",
-    },
-    {
-      id: "integrations",
-      label: "Integrations",
-      value: liveRecord.productModules.filter((m) => m.enabled && isCrmIntegrationModule(m.key)).length,
-      icon: Link2,
-      tone: "text-info",
     },
   ];
 
@@ -301,19 +255,17 @@ export function CrmOnboardingHub({
               if (k.id === "tickets") setTab("tickets");
               else if (k.id === "tasks") setTab("tasks");
               else if (k.id === "modules") setTab("modules");
-              else if (k.id === "integrations") setTab("integrations");
-              else if (k.id === "pending") setTab(salesCrmEnabled ? "masters" : "modules");
+              else if (k.id === "pending") setTab("modules");
               else setTab("dashboard");
             },
             active:
               (k.id === "tickets" && tab === "tickets") ||
               (k.id === "tasks" && tab === "tasks") ||
-              (k.id === "integrations" && tab === "integrations") ||
               (k.id === "modules" && tab === "modules") ||
-              (k.id === "pending" && tab === "masters") ||
+              (k.id === "pending" && tab === "modules") ||
               (k.id === "progress" && tab === "dashboard"),
           }))}
-          columns={6}
+          columns={5}
           size="compact"
         />
       </div>
@@ -340,11 +292,6 @@ export function CrmOnboardingHub({
             />
           ) : null}
           {tab === "modules" ? <CrmAccountModulesTab companyId={accountId} /> : null}
-          {tab === "integrations" ? <IntegrationsTab companyId={accountId} /> : null}
-          {tab === "masters" ? <MastersTab companyId={accountId} /> : null}
-          {tab === "migration" ? <MigrationTab companyId={accountId} /> : null}
-          {tab === "training" ? <TrainingTab companyId={accountId} /> : null}
-          {tab === "reports" ? <ReportsTab companyId={accountId} /> : null}
           {tab === "golive" ? (
             <GoLiveTab
               companyId={accountId}
@@ -530,10 +477,10 @@ function DashboardTab({
         }
       >
         <CrmAccountModulesOverview
+          companyId={accountId}
           modules={record.productModules}
           record={record}
           emptyModulesHint="No modules selected — open the Modules tab to subscribe."
-          emptyIntegrationsHint="No integrations selected — open the Integrations tab to configure."
         />
       </DesignTicketSection>
 
@@ -561,155 +508,6 @@ function StatCard({ label, value, bar }: { label: string; value: string; bar?: n
       {bar != null ? <ProgressBar value={bar} className="mt-2 h-1.5" /> : null}
     </div>
   );
-}
-
-function IntegrationsTab({ companyId }: { companyId: string }) {
-  const record = useCrmOnboardingStore((s) => s.getByCompanyId(companyId))!;
-  const setEnabled = useCrmOnboardingStore((s) => s.setProductModuleEnabled);
-
-  const inScope = (key: CrmProductModuleKey) => isCrmIntegrationModule(key);
-
-  const enabled = record.productModules.filter((m) => m.enabled && inScope(m.key));
-  const available = record.productModules.filter((m) => !m.enabled && inScope(m.key));
-  const needsProvider = enabled.filter((m) => moduleRequiresProvider(m.key) && !m.provider).length;
-
-  return (
-    <div className="space-y-2.5">
-      <DesignTicketSection
-        compact
-        title="Opted integrations & workflow"
-        action={
-          <span className="text-[10px] tabular-nums text-muted-foreground">
-            {enabled.length} opted
-            {needsProvider > 0 ? ` · ${needsProvider} need provider` : ""}
-          </span>
-        }
-      >
-        <p className="mb-2 text-[10px] text-muted-foreground">
-          Channel and lead integrations. Select a provider where required, then complete workflow
-          steps. Core modules are managed on the Modules tab.
-        </p>
-
-        {enabled.length === 0 ? (
-          <div className="rounded-lg border border-dashed px-3 py-8 text-center text-xs text-muted-foreground">
-            No integrations opted yet. Toggle an integration below to start tracking its workflow.
-          </div>
-        ) : (
-          <div className="space-y-1.5">
-            <AnimatePresence initial={false}>
-              {enabled.map((m) => {
-                const requiresProvider = moduleRequiresProvider(m.key);
-                const pct = calcModuleWorkflowProgress(m);
-                const steps = m.workflow ?? [];
-                return (
-                  <motion.div
-                    key={m.key}
-                    layout
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -6 }}
-                    transition={{ duration: 0.22, ease: TICKET_EASE }}
-                    className="card-soft border-primary/30 bg-primary/5 p-2.5"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 text-xs font-medium">
-                          {m.label}
-                          {requiresProvider ? (
-                            <Pill tone={m.provider ? "success" : "warning"} className="max-w-[12rem] truncate">
-                              {m.provider ?? "Provider pending"}
-                            </Pill>
-                          ) : null}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {requiresProvider ? (
-                          <CrmModuleProviderSelect
-                            companyId={companyId}
-                            moduleKey={m.key}
-                            moduleLabel={m.label}
-                            provider={m.provider}
-                          />
-                        ) : null}
-                        <Switch
-                          size="sm"
-                          checked={m.enabled}
-                          onCheckedChange={(v) => {
-                            setEnabled(companyId, m.key, v === true);
-                            toast.success(v ? `${m.label} opted` : `${m.label} removed`);
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    <CrmModuleWorkflowSteps
-                      companyId={companyId}
-                      moduleKey={m.key}
-                      moduleLabel={m.label}
-                      steps={steps}
-                      progress={pct}
-                      className="mt-2"
-                    />
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
-          </div>
-        )}
-      </DesignTicketSection>
-
-      <DesignTicketSection compact title="Available integrations">
-        <p className="mb-2 text-[10px] text-muted-foreground">
-          Toggle to opt an integration in for this customer.
-        </p>
-        {available.length === 0 ? (
-          <div className="rounded-lg border border-dashed px-3 py-6 text-center text-[11px] text-muted-foreground">
-            All integrations are opted in.
-          </div>
-        ) : (
-          <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
-            {available.map((m) => (
-              <label
-                key={m.key}
-                className="card-soft flex cursor-pointer items-center justify-between gap-2 p-2.5 text-xs transition-colors"
-              >
-                <span className="min-w-0 truncate font-medium">
-                  {m.label}
-                  {moduleRequiresProvider(m.key) ? (
-                    <span className="ml-1 text-[10px] text-muted-foreground">· provider</span>
-                  ) : null}
-                </span>
-                <Switch
-                  size="sm"
-                  checked={m.enabled}
-                  onCheckedChange={(v) => {
-                    setEnabled(companyId, m.key, v === true);
-                    toast.success(v ? `${m.label} opted` : `${m.label} removed`);
-                  }}
-                />
-              </label>
-            ))}
-          </div>
-        )}
-      </DesignTicketSection>
-    </div>
-  );
-}
-
-function MastersTab({ companyId }: { companyId: string }) {
-  return <CrmMasterChecklistDetail companyId={companyId} />;
-}
-
-function MigrationTab({ companyId }: { companyId: string }) {
-  return <CrmMigrationChecklistDetail companyId={companyId} />;
-}
-
-function TrainingTab({ companyId }: { companyId: string }) {
-  return <CrmTrainingChecklist companyId={companyId} />;
-}
-
-function ReportsTab({ companyId }: { companyId: string }) {
-  return <CrmReportsChecklist companyId={companyId} />;
 }
 
 function GoLiveTab({

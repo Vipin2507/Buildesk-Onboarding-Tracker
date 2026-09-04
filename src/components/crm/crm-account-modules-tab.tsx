@@ -1,11 +1,8 @@
-import { useMemo } from "react";
+import { Link } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
-import { Package } from "lucide-react";
+import { ArrowRight, Package } from "lucide-react";
 import { toast } from "sonner";
 
-import { CrmCpApplicationWorkflow } from "@/components/crm/crm-cp-application-workflow";
-import { CrmModuleProviderSelect } from "@/components/crm/crm-module-provider-select";
-import { CrmModuleWorkflowSteps } from "@/components/crm/crm-module-workflow-steps";
 import {
   DesignTicketSection,
   TICKET_EASE,
@@ -15,12 +12,10 @@ import { Pill } from "@/components/status-pill";
 import { Switch } from "@/components/ui/switch";
 import {
   calcProductModuleProgress,
-  calcSalesCrmModuleProgress,
   isCrmCoreModule,
-  moduleHasWorkflow,
-  moduleRequiresProvider,
+  isModuleGoLiveReady,
 } from "@/data/crm-onboarding-defaults";
-import { calcChecklistProgress } from "@/lib/checklist";
+import { cn } from "@/lib/utils";
 import { getCrmMasterProductModuleCatalog } from "@/stores/useCrmMasterStore";
 import { useCrmOnboardingStore } from "@/stores";
 import type { CrmOnboardingRecord, CrmProductModule, CrmProductModuleKey } from "@/types/crm-onboarding";
@@ -29,148 +24,49 @@ type Props = {
   companyId: string;
 };
 
-function SalesCrmModuleCard({
-  module: m,
-  record,
-  onToggle,
-}: {
-  companyId: string;
-  module: CrmProductModule;
-  record: CrmOnboardingRecord;
-  onToggle: (enabled: boolean) => void;
-}) {
-  const pct = calcSalesCrmModuleProgress(record);
-  const sections = [
-    { label: "Masters", value: calcChecklistProgress(record.masterChecklist) },
-    { label: "Migration", value: calcChecklistProgress(record.migrationChecklist) },
-    {
-      label: "Training",
-      value: Math.round(
-        (() => {
-          const applicable = record.trainingSessions.filter((s) => !s.notApplicable);
-          if (applicable.length === 0) return 100;
-          const done = applicable.filter((s) => s.completed || (s.sessionCount ?? 0) > 0).length;
-          return (done / applicable.length) * 100;
-        })(),
-      ),
-    },
-    {
-      label: "Reports",
-      value: Math.round(
-        (() => {
-          const applicable = record.reportChecklist.filter((r) => !r.notApplicable);
-          if (applicable.length === 0) return 100;
-          const done = applicable.filter((r) => r.status === "explained").length;
-          return (done / applicable.length) * 100;
-        })(),
-      ),
-    },
-  ];
-
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -6 }}
-      transition={{ duration: 0.22, ease: TICKET_EASE }}
-      className="card-soft border-primary/30 bg-primary/5 p-2.5"
-    >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 text-xs font-medium">
-            <Package className="h-3.5 w-3.5 shrink-0 text-primary" />
-            {m.label}
-          </div>
-          <div className="mt-0.5 text-[10px] text-muted-foreground">
-            Track via Masters, Migration, Training & Reports tabs · {pct}%
-          </div>
-        </div>
-        <Switch size="sm" checked={m.enabled} onCheckedChange={(v) => onToggle(v === true)} />
-      </div>
-      <ProgressBar value={pct} className="mt-2 h-1.5" />
-      <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
-        {sections.map((s) => (
-          <div key={s.label} className="rounded-md border bg-background/60 px-2 py-1.5">
-            <div className="flex items-center justify-between gap-2 text-[10px]">
-              <span className="text-muted-foreground">{s.label}</span>
-              <span className="font-medium tabular-nums">{s.value}%</span>
-            </div>
-            <ProgressBar value={s.value} className="mt-1 h-1" />
-          </div>
-        ))}
-      </div>
-    </motion.div>
-  );
-}
-
-function CoreModuleWorkflowCard({
+function ModuleSummaryCard({
   companyId,
   module: m,
   record,
-  onToggle,
 }: {
   companyId: string;
   module: CrmProductModule;
   record: CrmOnboardingRecord;
-  onToggle: (enabled: boolean) => void;
 }) {
   const pct = calcProductModuleProgress(m, record);
-  const steps = m.workflow ?? [];
+  const ready = isModuleGoLiveReady(m, record);
+  const hint =
+    m.key === "sales-crm"
+      ? "Integrations · Masters · Migration · Training · Reports"
+      : `${m.workflow?.filter((s) => s.done).length ?? 0}/${m.workflow?.length ?? 0} steps`;
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -6 }}
-      transition={{ duration: 0.22, ease: TICKET_EASE }}
-      className="card-soft border-primary/30 bg-primary/5 p-2.5"
+    <Link
+      to="/crm/accounts/$accountId/modules/$moduleKey"
+      params={{ accountId: companyId, moduleKey: m.key }}
+      className={cn(
+        "card-soft group block border p-3 transition-all",
+        "hover:border-primary/40 hover:bg-primary/[0.03] hover:shadow-sm",
+        ready ? "border-success/30 bg-success/[0.03]" : "border-border",
+      )}
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="flex items-center gap-1.5 text-xs font-medium">
+          <div className="flex items-center gap-1.5 text-sm font-semibold">
             <Package className="h-3.5 w-3.5 shrink-0 text-primary" />
-            {m.label}
-            {moduleRequiresProvider(m.key) && !m.provider ? (
-              <Pill tone="warning" className="text-[10px]">
-                Provider pending
-              </Pill>
-            ) : null}
+            <span className="truncate">{m.label}</span>
           </div>
+          <p className="mt-1 line-clamp-2 text-[10px] text-muted-foreground">{hint}</p>
         </div>
-        <div className="flex items-center gap-2">
-          {moduleRequiresProvider(m.key) ? (
-            <CrmModuleProviderSelect
-              companyId={companyId}
-              moduleKey={m.key}
-              moduleLabel={m.label}
-              provider={m.provider}
-            />
-          ) : null}
-          <Switch size="sm" checked={m.enabled} onCheckedChange={(v) => onToggle(v === true)} />
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <Pill tone={ready ? "success" : pct > 0 ? "info" : "muted"} className="text-[9px]">
+            {ready ? "Ready" : `${pct}%`}
+          </Pill>
+          <ArrowRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
         </div>
       </div>
-
-      {m.key === "cp-application" ? (
-        <CrmCpApplicationWorkflow
-          companyId={companyId}
-          moduleLabel={m.label}
-          steps={steps}
-          progress={pct}
-          className="mt-2"
-        />
-      ) : (
-        <CrmModuleWorkflowSteps
-          companyId={companyId}
-          moduleKey={m.key}
-          moduleLabel={m.label}
-          steps={steps}
-          progress={pct}
-          className="mt-2"
-        />
-      )}
-    </motion.div>
+      <ProgressBar value={pct} className="mt-2.5 h-1.5" />
+    </Link>
   );
 }
 
@@ -178,19 +74,15 @@ export function CrmAccountModulesTab({ companyId }: Props) {
   const record = useCrmOnboardingStore((s) => s.getByCompanyId(companyId))!;
   const setEnabled = useCrmOnboardingStore((s) => s.setProductModuleEnabled);
 
-  const catalogKeys = useMemo(
-    () => new Set(getCrmMasterProductModuleCatalog().map((m) => m.key)),
-    [],
-  );
-
+  const catalogKeys = new Set(getCrmMasterProductModuleCatalog().map((m) => m.key));
   const inScope = (key: CrmProductModuleKey) => isCrmCoreModule(key) && catalogKeys.has(key);
 
   const enabled = record.productModules.filter((m) => m.enabled && inScope(m.key));
   const available = record.productModules.filter((m) => !m.enabled && inScope(m.key));
 
-  function toggleModule(key: CrmProductModuleKey, label: string, enabled: boolean) {
-    setEnabled(companyId, key, enabled);
-    toast.success(enabled ? `${label} subscribed` : `${label} removed`);
+  function toggleModule(key: CrmProductModuleKey, label: string, next: boolean) {
+    setEnabled(companyId, key, next);
+    toast.success(next ? `${label} subscribed` : `${label} removed`);
   }
 
   return (
@@ -205,9 +97,8 @@ export function CrmAccountModulesTab({ companyId }: Props) {
         }
       >
         <p className="mb-2 text-[10px] text-muted-foreground">
-          Core CRM product modules for this account. Complete each module&apos;s workflow steps to
-          track onboarding progress. Sales CRM uses the Masters, Migration, Training, and Reports
-          tabs.
+          Open a module to complete its workflow. Sales CRM includes integrations, masters,
+          migration, training, reports, and module go-live on a dedicated page.
         </p>
 
         {enabled.length === 0 ? (
@@ -216,54 +107,20 @@ export function CrmAccountModulesTab({ companyId }: Props) {
             {available.length > 0 ? " Enable modules from Available modules below." : null}
           </div>
         ) : (
-          <div className="space-y-1.5">
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             <AnimatePresence initial={false}>
-              {enabled.map((m) =>
-                m.key === "sales-crm" ? (
-                  <SalesCrmModuleCard
-                    key={m.key}
-                    companyId={companyId}
-                    module={m}
-                    record={record}
-                    onToggle={(v) => toggleModule(m.key, m.label, v)}
-                  />
-                ) : moduleHasWorkflow(m.key) ? (
-                  <CoreModuleWorkflowCard
-                    key={m.key}
-                    companyId={companyId}
-                    module={m}
-                    record={record}
-                    onToggle={(v) => toggleModule(m.key, m.label, v)}
-                  />
-                ) : (
-                  <motion.div
-                    key={m.key}
-                    layout
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -6 }}
-                    transition={{ duration: 0.22, ease: TICKET_EASE }}
-                    className="card-soft flex items-center justify-between gap-2 p-2.5"
-                  >
-                    <div className="flex min-w-0 items-center gap-2">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                        <Package className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="truncate text-xs font-medium">{m.label}</div>
-                        <Pill tone="success" className="mt-0.5 text-[10px]">
-                          Subscribed
-                        </Pill>
-                      </div>
-                    </div>
-                    <Switch
-                      size="sm"
-                      checked={m.enabled}
-                      onCheckedChange={(v) => toggleModule(m.key, m.label, v === true)}
-                    />
-                  </motion.div>
-                ),
-              )}
+              {enabled.map((m) => (
+                <motion.div
+                  key={m.key}
+                  layout
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.22, ease: TICKET_EASE }}
+                >
+                  <ModuleSummaryCard companyId={companyId} module={m} record={record} />
+                </motion.div>
+              ))}
             </AnimatePresence>
           </div>
         )}

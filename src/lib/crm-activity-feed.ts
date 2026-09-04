@@ -121,8 +121,8 @@ export function crmActivityOpenLabel(
 }
 
 export function crmActivityTabForModule(moduleKey?: string): CrmAccountTabId {
-  if (moduleKey && isCrmIntegrationModule(moduleKey)) return "integrations";
-  return "dashboard";
+  if (moduleKey && isCrmIntegrationModule(moduleKey)) return "modules";
+  return "modules";
 }
 
 export function crmActivityAccountTabForCategory(
