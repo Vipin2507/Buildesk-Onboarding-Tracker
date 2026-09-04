@@ -69,7 +69,7 @@ export function CrmReportsChecklist({ companyId }: { companyId: string }) {
     [salesManager, users],
   );
 
-  const [categoryFilter, setCategoryFilter] = useSessionFilter(
+  const [categoryFilter, setCategoryFilter] = useSessionFilter<string>(
     `crm.account.${companyId}.reports.category`,
     "all",
   );

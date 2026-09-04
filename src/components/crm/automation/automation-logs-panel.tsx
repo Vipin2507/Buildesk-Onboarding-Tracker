@@ -33,11 +33,15 @@ const TRIGGER_LABEL = Object.fromEntries(AUTOMATION_TRIGGERS.map((t) => [t.value
 
 const BOOKING_TRIGGER_SET = new Set<string>(CRM_BOOKING_AUTOMATION_TRIGGERS);
 
-const AUTOMATION_LOG_FILTER_DEFAULTS = {
+const AUTOMATION_LOG_FILTER_DEFAULTS: {
+  statusFilter: "all" | AutomationLogStatus;
+  channelFilter: "all" | "email" | "whatsapp";
+  scopeFilter: "all" | "bookings" | "tickets";
+} = {
   statusFilter: "all",
   channelFilter: "all",
   scopeFilter: "all",
-} as const;
+};
 
 function statusTone(status: AutomationLogStatus) {
   if (status === "success") return "success" as const;

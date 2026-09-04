@@ -69,7 +69,23 @@ export const Route = createFileRoute("/crm/accounts")({
 
 type AccountKpiFilter = "all" | "onboarding" | "live" | "critical";
 
-const ACCOUNT_LIST_FILTER_DEFAULTS = {
+const ACCOUNT_LIST_FILTER_DEFAULTS: {
+  kpiFilter: AccountKpiFilter;
+  statusFilter: string;
+  typeFilter: string;
+  cityFilter: string;
+  regionFilter: string;
+  progressFilter: string;
+  managerFilter: string;
+  supportManager1Filter: string;
+  supportManager2Filter: string;
+  healthFilter: string;
+  stageFilter: string;
+  providerFilter: string;
+  dateFrom: string;
+  dateTo: string;
+  tableSearch: string;
+} = {
   kpiFilter: "all",
   statusFilter: "all",
   typeFilter: "all",
@@ -85,7 +101,7 @@ const ACCOUNT_LIST_FILTER_DEFAULTS = {
   dateFrom: "",
   dateTo: "",
   tableSearch: "",
-} as const;
+};
 
 const STATUS_CHIPS = [
   { id: "all", label: "All", status: null as CrmAccount["status"] | null },

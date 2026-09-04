@@ -61,7 +61,15 @@ import {
   type BookingAppointmentStatus,
 } from "@/types/booking";
 
-const BOOKING_LIST_FILTER_DEFAULTS = {
+const BOOKING_LIST_FILTER_DEFAULTS: {
+  tableSearch: string;
+  statusFilter: string;
+  accountFilter: string;
+  hostFilter: string;
+  callTypeFilter: string;
+  dateFrom: string;
+  dateTo: string;
+} = {
   tableSearch: "",
   statusFilter: "all",
   accountFilter: "all",
@@ -69,7 +77,7 @@ const BOOKING_LIST_FILTER_DEFAULTS = {
   callTypeFilter: "all",
   dateFrom: "",
   dateTo: "",
-} as const;
+};
 
 const EASE = TICKET_EASE;
 const POLL_MS = 15_000;

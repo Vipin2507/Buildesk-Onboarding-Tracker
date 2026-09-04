@@ -104,7 +104,7 @@ export function CrmTrainingChecklist({ companyId }: { companyId: string }) {
   );
   const trainerNames = useMemo(() => assignees.map((user) => user.name), [assignees]);
 
-  const [categoryFilter, setCategoryFilter] = useSessionFilter(
+  const [categoryFilter, setCategoryFilter] = useSessionFilter<string>(
     `crm.account.${companyId}.training.category`,
     "all",
   );

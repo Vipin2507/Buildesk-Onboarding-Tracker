@@ -74,10 +74,9 @@ export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who 
   const done = items.filter((g) => isCrmGoLiveItemComplete(g)).length;
   const pct = items.length ? Math.round((done / items.length) * 100) : 0;
 
-  const [categoryFilter, setCategoryFilter] = useSessionFilter(
-    `crm.account.${companyId}.golive.category`,
-    "all",
-  );
+  const [categoryFilter, setCategoryFilter] = useSessionFilter<
+    "all" | (typeof CRM_GO_LIVE_CATEGORIES)[number]
+  >(`crm.account.${companyId}.golive.category`, "all");
   const [confirmApprove, setConfirmApprove] = useState(false);
   const [confirmForce, setConfirmForce] = useState(false);
   const [confirmSuspended, setConfirmSuspended] = useState(false);

@@ -36,12 +36,17 @@ import {
 } from "@/types/design-ticket";
 import { useSessionFilterState } from "@/hooks/use-session-filter";
 
-const TICKET_LIST_FILTER_DEFAULTS = {
+const TICKET_LIST_FILTER_DEFAULTS: {
+  statusFilter: string;
+  priorityFilter: string;
+  accountFilter: string;
+  query: string;
+} = {
   statusFilter: "all",
   priorityFilter: "all",
   accountFilter: "all",
   query: "",
-} as const;
+};
 
 export const Route = createFileRoute("/crm/tickets")({
   component: CrmTicketsLayout,

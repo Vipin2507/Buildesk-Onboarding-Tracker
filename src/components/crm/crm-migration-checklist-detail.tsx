@@ -67,7 +67,7 @@ export function CrmMigrationChecklistDetail({ companyId }: { companyId: string }
     [account, users],
   );
 
-  const [categoryFilter, setCategoryFilter] = useSessionFilter(
+  const [categoryFilter, setCategoryFilter] = useSessionFilter<string>(
     `crm.account.${companyId}.migration.category`,
     "all",
   );
