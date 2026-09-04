@@ -33,6 +33,7 @@ import {
   resolveCrmSalesManagerDefaults,
   withCrmSalesManagerOption,
 } from "@/lib/crm-sales-manager-defaults";
+import { useSessionFilter } from "@/hooks/use-session-filter";
 import { cn } from "@/lib/utils";
 import { useCrmAccountStore, useCrmOnboardingStore, useUserStore } from "@/stores";
 import type { CrmAccount } from "@/types/crm-account";
@@ -73,7 +74,10 @@ export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who 
   const done = items.filter((g) => isCrmGoLiveItemComplete(g)).length;
   const pct = items.length ? Math.round((done / items.length) * 100) : 0;
 
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useSessionFilter(
+    `crm.account.${companyId}.golive.category`,
+    "all",
+  );
   const [confirmApprove, setConfirmApprove] = useState(false);
   const [confirmForce, setConfirmForce] = useState(false);
   const [confirmSuspended, setConfirmSuspended] = useState(false);

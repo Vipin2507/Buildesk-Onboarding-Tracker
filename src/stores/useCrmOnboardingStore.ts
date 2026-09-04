@@ -30,6 +30,7 @@ import {
   isCrmIntegrationModule,
   isDeveloperCompanyType,
   mergeCrmGoLiveChecklist,
+  mergeCrmMasterChecklist,
   mergeCrmMigrationChecklist,
   mergeCrmProductModules,
   mergeCrmReportChecklist,
@@ -38,6 +39,7 @@ import {
   moduleHasWorkflow,
   moduleRequiresProvider,
   needsModuleWorkflowUpgrade,
+  needsMasterChecklistUpgrade,
   needsProductModulesUpgrade,
   normalizeCrmMasterChecklist,
   syncGoLiveChecklistFromTabs,
@@ -276,7 +278,15 @@ function needsDataMigrationChecklistUpgrade(items: CrmMigrationChecklistItem[]) 
 
 function needsTrainingUpgrade(items: CrmTrainingSession[], companyType?: CompanyType) {
   const catalog = resolveCrmTrainingCatalogForCompany(companyType);
+  const catalogKeys = new Set(catalog.map((d) => d.key));
   if (items.some((i) => typeof i.sessionCount !== "number")) return true;
+  if (
+    items.some(
+      (i) => !i.templateKey.startsWith("custom-") && !catalogKeys.has(i.templateKey),
+    )
+  ) {
+    return true;
+  }
   const byKey = new Map(items.map((i) => [i.templateKey, i]));
   for (const def of catalog) {
     const prev = byKey.get(def.key);
@@ -389,6 +399,18 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
           records: updateRecord(s.records, companyId, (r) => ({
             ...r,
             masterChecklist: normalizeCrmMasterChecklist(
+              r.masterChecklist as Array<CrmMasterChecklistItem & { status?: string; completedAt?: string }>,
+            ),
+          })),
+        }));
+        changed = true;
+      }
+      const afterMasterNorm = get().getByCompanyId(companyId)!;
+      if (needsMasterChecklistUpgrade(afterMasterNorm.masterChecklist)) {
+        set((s) => ({
+          records: updateRecord(s.records, companyId, (r) => ({
+            ...r,
+            masterChecklist: mergeCrmMasterChecklist(
               r.masterChecklist as Array<CrmMasterChecklistItem & { status?: string; completedAt?: string }>,
             ),
           })),

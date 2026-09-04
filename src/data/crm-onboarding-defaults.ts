@@ -27,6 +27,15 @@ export const CRM_PROVIDER_OTHER = "Other";
 export const CRM_MODULE_PROVIDERS: Partial<Record<CrmProductModuleKey, string[]>> = {
   "whatsapp-integration": ["Gupshup", "WATI", "Interakt", "Meta Cloud API", "Twilio", "Kaleyra"],
   "sms-integration": ["MSG91", "Twilio", "Kaleyra", "Textlocal", "Gupshup", "Airtel IQ"],
+  "email-integration": [
+    "SendGrid",
+    "Mailgun",
+    "Amazon SES",
+    "SMTP",
+    "Microsoft 365",
+    "Google Workspace",
+    "Postmark",
+  ],
   "ivr-integration": ["Exotel", "Knowlarity", "MyOperator", "Servetel", "Ozonetel"],
   "meta-lead-integration": ["Meta Business Suite", "LeadsBridge", "Zapier"],
   "google-ads-integration": ["Google Ads API", "Google Tag Manager", "Zapier", "Manual Sync"],
@@ -448,6 +457,7 @@ export const CRM_CORE_MODULES: { key: CrmProductModuleKey; label: string }[] = [
 export const CRM_INTEGRATION_MODULES: { key: CrmProductModuleKey; label: string }[] = [
   { key: "whatsapp-integration", label: "WhatsApp Integration" },
   { key: "sms-integration", label: "SMS Integration" },
+  { key: "email-integration", label: "Email Integration" },
   { key: "ivr-integration", label: "IVR Integration" },
   { key: "meta-lead-integration", label: "Meta Lead Integration" },
   { key: "google-ads-integration", label: "Google Ads Integration" },
@@ -474,7 +484,6 @@ export function isCrmCoreModule(key: CrmProductModuleKey | string): boolean {
 
 export const CRM_MASTER_CHECKLIST_LABELS: { key: string; label: string }[] = [
   { key: "company_master", label: "Company Master Created" },
-  { key: "project_created", label: "Project Created" },
   { key: "user_creation", label: "User Creation" },
   { key: "team_creation", label: "Team Creation" },
   { key: "role_definition", label: "Role Definition" },
@@ -589,7 +598,6 @@ export const CRM_DEVELOPER_TRAINING: { key: string; label: string; category: str
   { key: "inventory", label: "Inventory Training", category: "Product modules" },
   { key: "booking", label: "Booking Training", category: "Product modules" },
   { key: "collections", label: "Collections Training", category: "Product modules" },
-  { key: "reports_training", label: "Reports Training", category: "Product modules" },
   { key: "whatsapp_sms", label: "WhatsApp / SMS Training", category: "Integrations" },
   { key: "lead_integrations", label: "Lead Integration Training", category: "Integrations" },
 ];
@@ -601,10 +609,7 @@ export const CRM_BROKER_CP_TRAINING: { key: string; label: string; category: str
   { key: "lead_management", label: "Lead Management", category: "Sales process" },
   { key: "site_visit_process", label: "Site Visit Process", category: "Sales process" },
   { key: "booking_process", label: "Booking Process", category: "Operations" },
-  { key: "customer_management", label: "Customer Management", category: "Operations" },
-  { key: "reports", label: "Reports", category: "Operations" },
   { key: "mobile_app", label: "Mobile App Training", category: "Product" },
-  { key: "cp_portal", label: "CP Portal Training", category: "Product" },
 ];
 
 export const CRM_TRAINING_CATEGORIES_DEVELOPER = [
@@ -757,6 +762,41 @@ export function normalizeCrmMasterChecklist(
   items: Array<CrmMasterChecklistItem & { status?: string; completedAt?: string }>,
 ): CrmMasterChecklistItem[] {
   return items.map(normalizeCrmMasterItem);
+}
+
+/** Sync master checklist rows to the current catalog (drops removed keys, adds new ones). */
+export function mergeCrmMasterChecklist(
+  existing: Array<CrmMasterChecklistItem & { status?: string; completedAt?: string }>,
+  catalog: typeof CRM_MASTER_CHECKLIST_LABELS = CRM_MASTER_CHECKLIST_LABELS,
+): CrmMasterChecklistItem[] {
+  const byKey = new Map(existing.map((item) => [item.key, item]));
+  return catalog.map((def) => {
+    const prev = byKey.get(def.key);
+    if (!prev) {
+      return {
+        key: def.key,
+        label: def.label,
+        collected: false,
+        uploaded: false,
+        live: false,
+        notApplicable: false,
+        remarks: "",
+      };
+    }
+    return normalizeCrmMasterItem({ ...prev, key: def.key, label: def.label });
+  });
+}
+
+export function needsMasterChecklistUpgrade(
+  existing: CrmMasterChecklistItem[] | undefined,
+  catalog: typeof CRM_MASTER_CHECKLIST_LABELS = CRM_MASTER_CHECKLIST_LABELS,
+): boolean {
+  if (!Array.isArray(existing)) return true;
+  const catalogKeys = new Set(catalog.map((d) => d.key));
+  if (existing.some((i) => !catalogKeys.has(i.key))) return true;
+  if (existing.length !== catalog.length) return true;
+  const byKey = new Map(existing.map((i) => [i.key, i]));
+  return catalog.some((def) => byKey.get(def.key)?.label !== def.label);
 }
 
 function defaultMigrationChecklist(
@@ -986,11 +1026,7 @@ export function mergeCrmTrainingSessions(
   const templates =
     catalog ?? (track === "developer" ? CRM_DEVELOPER_TRAINING : CRM_BROKER_CP_TRAINING);
   const byTemplate = new Map(existing.map((s) => [s.templateKey, s]));
-  const custom = existing.filter(
-    (s) =>
-      s.templateKey.startsWith("custom-") ||
-      !templates.some((t) => t.key === s.templateKey),
-  );
+  const custom = existing.filter((s) => s.templateKey.startsWith("custom-"));
 
   const merged = templates.map((t) => {
     const prev = byTemplate.get(t.key);

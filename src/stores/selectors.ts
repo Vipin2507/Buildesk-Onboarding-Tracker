@@ -19,6 +19,11 @@ import { useEmployeeStore } from "./useEmployeeStore";
 import { useUserStore } from "./useUserStore";
 import { useErpTaskStore } from "./useErpTaskStore";
 import { useClientVisitStore } from "./useClientVisitStore";
+import { useCrmAccountStore } from "./useCrmAccountStore";
+import { useCrmTaskStore } from "./useCrmTaskStore";
+import { useAuthStore } from "./useAuthStore";
+import { filterCrmAccountsForUser } from "@/lib/crm-account-access";
+import type { GlobalSearchResults } from "@/components/global-search-dropdown";
 import { resolveAssigneeName } from "@/lib/managers";
 import { isTicketOpen } from "@/lib/tickets";
 import { getDaysUntilExpiry, getRenewalUrgency } from "./useRenewalStore";
@@ -370,43 +375,57 @@ export function useTicketActivities(ticketId: string) {
   );
 }
 
-export function useGlobalSearch(query: string) {
+export function useGlobalSearch(query: string): GlobalSearchResults {
   const q = query.toLowerCase().trim();
   const companies = useCompanyStore((s) => s.companies);
+  const crmAccounts = useCrmAccountStore((s) => s.accounts);
+  const crmTasks = useCrmTaskStore((s) => s.tasks);
+  const currentUser = useAuthStore((s) => s.user);
   const projects = useProjectStore((s) => s.projects);
-  const employees = useEmployeeStore((s) => s.employees);
-  const tasks = useErpTaskStore((s) => s.tasks);
+  const erpTasks = useErpTaskStore((s) => s.tasks);
   const visits = useClientVisitStore((s) => s.visits);
+
+  const visibleCrmAccounts = useMemo(
+    () => filterCrmAccountsForUser(crmAccounts, currentUser),
+    [crmAccounts, currentUser],
+  );
 
   return useMemo(() => {
     if (!q) {
       return {
-        companies: [],
-        projects: [],
-        managers: [] as typeof employees,
-        tasks: [] as typeof tasks,
-        visits: [] as typeof visits,
+        crm: { accounts: [], tasks: [] },
+        erp: { companies: [], projects: [], tasks: [], visits: [] },
       };
     }
 
+    const matchesText = (...parts: Array<string | undefined>) =>
+      parts.some((part) => part?.toLowerCase().includes(q));
+
     return {
-      companies: companies
-        .filter((c) => c.name.toLowerCase().includes(q) || c.city.toLowerCase().includes(q))
-        .slice(0, 5),
-      projects: projects
-        .filter((p) => p.name.toLowerCase().includes(q) || p.city.toLowerCase().includes(q))
-        .slice(0, 5),
-      managers: employees.filter((e) => e.name.toLowerCase().includes(q)).slice(0, 3),
-      tasks: tasks.filter((t) => t.title.toLowerCase().includes(q)).slice(0, 5),
-      visits: visits
-        .filter(
-          (v) =>
-            v.purpose.toLowerCase().includes(q) ||
-            (v.outcome ?? "").toLowerCase().includes(q),
-        )
-        .slice(0, 5),
+      crm: {
+        accounts: visibleCrmAccounts
+          .filter((a) =>
+            matchesText(a.name, a.city, a.contact, a.ownerName, a.email, a.ownerEmail),
+          )
+          .slice(0, 5),
+        tasks: crmTasks
+          .filter((t) => (t.productScope ?? "crm") === "crm" && t.title.toLowerCase().includes(q))
+          .slice(0, 5),
+      },
+      erp: {
+        companies: companies
+          .filter((c) => c.name.toLowerCase().includes(q) || c.city.toLowerCase().includes(q))
+          .slice(0, 5),
+        projects: projects
+          .filter((p) => p.name.toLowerCase().includes(q) || p.city.toLowerCase().includes(q))
+          .slice(0, 5),
+        tasks: erpTasks.filter((t) => t.title.toLowerCase().includes(q)).slice(0, 5),
+        visits: visits
+          .filter((v) => matchesText(v.purpose, v.outcome))
+          .slice(0, 5),
+      },
     };
-  }, [q, companies, projects, employees, tasks, visits]);
+  }, [q, companies, visibleCrmAccounts, crmTasks, projects, erpTasks, visits]);
 }
 
 export { calcCombinedProjectProgress as calcProjectProgress };

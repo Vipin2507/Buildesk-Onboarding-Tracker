@@ -21,6 +21,7 @@ import {
   canManageCrmAccountTasks,
 } from "@/lib/crm-account-access";
 import { resolveDefaultTaskAssigneeIds, taskAssigneeUserOptions } from "@/lib/task-defaults";
+import { useSessionFilter } from "@/hooks/use-session-filter";
 import { formatTimeRange12h, formatTaskDurationDisplay } from "@/lib/task-scheduling";
 import {
   taskStatusTone,
@@ -90,9 +91,18 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
   );
 
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [assigneeFilter, setAssigneeFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useSessionFilter(
+    `crm.account.${accountId}.tasks.status`,
+    "all",
+  );
+  const [typeFilter, setTypeFilter] = useSessionFilter(
+    `crm.account.${accountId}.tasks.type`,
+    "all",
+  );
+  const [assigneeFilter, setAssigneeFilter] = useSessionFilter(
+    `crm.account.${accountId}.tasks.assignee`,
+    "all",
+  );
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<FollowUpTask | null>(null);

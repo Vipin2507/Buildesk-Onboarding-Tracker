@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Eye, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
@@ -23,6 +23,7 @@ import {
   type AutomationTrigger,
 } from "@/types/automation";
 import { formatDate } from "@/lib/utils";
+import { useSessionFilterState } from "@/hooks/use-session-filter";
 import { cn } from "@/lib/utils";
 
 const TRIGGER_LABEL = Object.fromEntries(AUTOMATION_TRIGGERS.map((t) => [t.value, t.label])) as Record<
@@ -31,6 +32,12 @@ const TRIGGER_LABEL = Object.fromEntries(AUTOMATION_TRIGGERS.map((t) => [t.value
 >;
 
 const BOOKING_TRIGGER_SET = new Set<string>(CRM_BOOKING_AUTOMATION_TRIGGERS);
+
+const AUTOMATION_LOG_FILTER_DEFAULTS = {
+  statusFilter: "all",
+  channelFilter: "all",
+  scopeFilter: "all",
+} as const;
 
 function statusTone(status: AutomationLogStatus) {
   if (status === "success") return "success" as const;
@@ -42,9 +49,23 @@ export function AutomationLogsPanel() {
   const logs = useCrmAutomationStore((s) => s.logs);
   const companies = useCompanyStore((s) => s.companies);
   const [payloadLog, setPayloadLog] = useState<AutomationLog | null>(null);
-  const [statusFilter, setStatusFilter] = useState<"all" | AutomationLogStatus>("all");
-  const [channelFilter, setChannelFilter] = useState<"all" | "email" | "whatsapp">("all");
-  const [scopeFilter, setScopeFilter] = useState<"all" | "bookings" | "tickets">("all");
+  const [listFilters, setListFilters] = useSessionFilterState(
+    "crm.automation.logs",
+    AUTOMATION_LOG_FILTER_DEFAULTS,
+  );
+  const { statusFilter, channelFilter, scopeFilter } = listFilters;
+  const setStatusFilter = useCallback(
+    (value: "all" | AutomationLogStatus) => setListFilters({ statusFilter: value }),
+    [setListFilters],
+  );
+  const setChannelFilter = useCallback(
+    (value: "all" | "email" | "whatsapp") => setListFilters({ channelFilter: value }),
+    [setListFilters],
+  );
+  const setScopeFilter = useCallback(
+    (value: "all" | "bookings" | "tickets") => setListFilters({ scopeFilter: value }),
+    [setListFilters],
+  );
   const [retryingId, setRetryingId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {

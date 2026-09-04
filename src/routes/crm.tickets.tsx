@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, useChildMatches, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { Link2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -34,6 +34,14 @@ import {
   DESIGN_TICKET_PRIORITY_LABEL,
   DESIGN_TICKET_STATUS_LABEL,
 } from "@/types/design-ticket";
+import { useSessionFilterState } from "@/hooks/use-session-filter";
+
+const TICKET_LIST_FILTER_DEFAULTS = {
+  statusFilter: "all",
+  priorityFilter: "all",
+  accountFilter: "all",
+  query: "",
+} as const;
 
 export const Route = createFileRoute("/crm/tickets")({
   component: CrmTicketsLayout,
@@ -54,10 +62,28 @@ function CrmTicketTrackingPage() {
   const accounts = useCrmAccountStore((s) => s.accounts);
   const crmTickets = useMemo(() => filterCrmDesignTickets(tickets), [tickets, accounts]);
 
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [priorityFilter, setPriorityFilter] = useState<string>("all");
-  const [accountFilter, setAccountFilter] = useState<string>("all");
-  const [query, setQuery] = useState("");
+  const [listFilters, setListFilters] = useSessionFilterState(
+    "crm.tickets.list",
+    TICKET_LIST_FILTER_DEFAULTS,
+  );
+  const { statusFilter, priorityFilter, accountFilter, query } = listFilters;
+
+  const setStatusFilter = useCallback(
+    (value: string) => setListFilters({ statusFilter: value }),
+    [setListFilters],
+  );
+  const setPriorityFilter = useCallback(
+    (value: string) => setListFilters({ priorityFilter: value }),
+    [setListFilters],
+  );
+  const setAccountFilter = useCallback(
+    (value: string) => setListFilters({ accountFilter: value }),
+    [setListFilters],
+  );
+  const setQuery = useCallback(
+    (value: string) => setListFilters({ query: value }),
+    [setListFilters],
+  );
 
   const accountName = useMemo(() => {
     const map = new Map(accounts.map((a) => [a.id, a.name]));

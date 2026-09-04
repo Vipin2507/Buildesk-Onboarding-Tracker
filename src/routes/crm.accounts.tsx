@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
@@ -45,6 +45,7 @@ import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { CRM_STAGE_LABELS } from "@/data/crm-onboarding-defaults";
 import { cn, formatDate } from "@/lib/utils";
+import { useSessionFilterState } from "@/hooks/use-session-filter";
 import {
   useAuthStore,
   useCompanyPortalStore,
@@ -67,6 +68,24 @@ export const Route = createFileRoute("/crm/accounts")({
 });
 
 type AccountKpiFilter = "all" | "onboarding" | "live" | "critical";
+
+const ACCOUNT_LIST_FILTER_DEFAULTS = {
+  kpiFilter: "all",
+  statusFilter: "all",
+  typeFilter: "all",
+  cityFilter: "all",
+  regionFilter: "all",
+  progressFilter: "all",
+  managerFilter: "all",
+  supportManager1Filter: "all",
+  supportManager2Filter: "all",
+  healthFilter: "all",
+  stageFilter: "all",
+  providerFilter: "all",
+  dateFrom: "",
+  dateTo: "",
+  tableSearch: "",
+} as const;
 
 const STATUS_CHIPS = [
   { id: "all", label: "All", status: null as CrmAccount["status"] | null },
@@ -220,21 +239,88 @@ function CrmAccountsPage() {
 
   const tableRef = useRef<HTMLDivElement>(null);
 
-  const [kpiFilter, setKpiFilter] = useState<AccountKpiFilter>("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [cityFilter, setCityFilter] = useState("all");
-  const [regionFilter, setRegionFilter] = useState("all");
-  const [progressFilter, setProgressFilter] = useState("all");
-  const [managerFilter, setManagerFilter] = useState("all");
-  const [supportManager1Filter, setSupportManager1Filter] = useState("all");
-  const [supportManager2Filter, setSupportManager2Filter] = useState("all");
-  const [healthFilter, setHealthFilter] = useState("all");
-  const [stageFilter, setStageFilter] = useState("all");
-  const [providerFilter, setProviderFilter] = useState("all");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [tableSearch, setTableSearch] = useState("");
+  const [listFilters, setListFilters] = useSessionFilterState(
+    "crm.accounts.list",
+    ACCOUNT_LIST_FILTER_DEFAULTS,
+  );
+  const {
+    kpiFilter,
+    statusFilter,
+    typeFilter,
+    cityFilter,
+    regionFilter,
+    progressFilter,
+    managerFilter,
+    supportManager1Filter,
+    supportManager2Filter,
+    healthFilter,
+    stageFilter,
+    providerFilter,
+    dateFrom,
+    dateTo,
+    tableSearch,
+  } = listFilters;
+
+  const setKpiFilter = useCallback(
+    (value: AccountKpiFilter) => setListFilters({ kpiFilter: value }),
+    [setListFilters],
+  );
+  const setStatusFilter = useCallback(
+    (value: string) => setListFilters({ statusFilter: value }),
+    [setListFilters],
+  );
+  const setTypeFilter = useCallback(
+    (value: string) => setListFilters({ typeFilter: value }),
+    [setListFilters],
+  );
+  const setCityFilter = useCallback(
+    (value: string) => setListFilters({ cityFilter: value }),
+    [setListFilters],
+  );
+  const setRegionFilter = useCallback(
+    (value: string) => setListFilters({ regionFilter: value }),
+    [setListFilters],
+  );
+  const setProgressFilter = useCallback(
+    (value: string) => setListFilters({ progressFilter: value }),
+    [setListFilters],
+  );
+  const setManagerFilter = useCallback(
+    (value: string) => setListFilters({ managerFilter: value }),
+    [setListFilters],
+  );
+  const setSupportManager1Filter = useCallback(
+    (value: string) => setListFilters({ supportManager1Filter: value }),
+    [setListFilters],
+  );
+  const setSupportManager2Filter = useCallback(
+    (value: string) => setListFilters({ supportManager2Filter: value }),
+    [setListFilters],
+  );
+  const setHealthFilter = useCallback(
+    (value: string) => setListFilters({ healthFilter: value }),
+    [setListFilters],
+  );
+  const setStageFilter = useCallback(
+    (value: string) => setListFilters({ stageFilter: value }),
+    [setListFilters],
+  );
+  const setProviderFilter = useCallback(
+    (value: string) => setListFilters({ providerFilter: value }),
+    [setListFilters],
+  );
+  const setDateFrom = useCallback(
+    (value: string) => setListFilters({ dateFrom: value }),
+    [setListFilters],
+  );
+  const setDateTo = useCallback(
+    (value: string) => setListFilters({ dateTo: value }),
+    [setListFilters],
+  );
+  const setTableSearch = useCallback(
+    (value: string) => setListFilters({ tableSearch: value }),
+    [setListFilters],
+  );
 
   const [modalOpen, setModalOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -302,7 +388,7 @@ function CrmAccountsPage() {
     return [...set].sort((a, b) => a.localeCompare(b));
   }, [rows]);
 
-  const listFilters = useMemo(
+  const toolbarFilters = useMemo(
     () => ({
       typeFilter,
       cityFilter,
@@ -335,17 +421,17 @@ function CrmAccountsPage() {
 
   /** Rows after toolbar filters — used for pill counts (status chip applied separately). */
   const toolbarScopedRows = useMemo(
-    () => rows.filter((r) => matchesAccountListFilters(r, listFilters)),
-    [rows, listFilters],
+    () => rows.filter((r) => matchesAccountListFilters(r, toolbarFilters)),
+    [rows, toolbarFilters],
   );
 
   /** Toolbar filters + status tab — KPI pill applied separately. */
   const scopedRows = useMemo(
     () =>
       rows.filter((r) =>
-        matchesAccountListFilters(r, { ...listFilters, statusFilter }),
+        matchesAccountListFilters(r, { ...toolbarFilters, statusFilter }),
       ),
-    [rows, listFilters, statusFilter],
+    [rows, toolbarFilters, statusFilter],
   );
 
   const avgProgress = useMemo(() => {
@@ -406,21 +492,7 @@ function CrmAccountsPage() {
   }
 
   function clearFilters() {
-    setKpiFilter("all");
-    setStatusFilter("all");
-    setTypeFilter("all");
-    setCityFilter("all");
-    setRegionFilter("all");
-    setProgressFilter("all");
-    setManagerFilter("all");
-    setSupportManager1Filter("all");
-    setSupportManager2Filter("all");
-    setHealthFilter("all");
-    setStageFilter("all");
-    setProviderFilter("all");
-    setDateFrom("");
-    setDateTo("");
-    setTableSearch("");
+    setListFilters({ ...ACCOUNT_LIST_FILTER_DEFAULTS });
   }
 
   function openCreateQuery(accountId?: string) {

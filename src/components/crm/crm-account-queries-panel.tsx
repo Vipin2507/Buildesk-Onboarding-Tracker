@@ -42,6 +42,7 @@ import {
   type CrmQueryMentionCandidate,
 } from "@/lib/crm-query-mentions";
 import { useCrmQueryLiveSync } from "@/hooks/use-crm-query-live-sync";
+import { useSessionFilter } from "@/hooks/use-session-filter";
 import { isAdminRoleKey } from "@/lib/permissions";
 import { cn, formatDate, formatTime } from "@/lib/utils";
 import {
@@ -801,7 +802,9 @@ export function CrmAccountQueriesPanel({
   const [createCategory, setCreateCategory] = useState<CrmAccountQueryCategory>("requirement");
   const [createMessage, setCreateMessage] = useState("");
   const [sending, setSending] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<"all" | "open" | "resolved" | "archived">("all");
+  const [statusFilter, setStatusFilter] = useSessionFilter<
+    "all" | "open" | "resolved" | "archived"
+  >(`crm.account.${accountId}.queries.status`, "all");
 
   useEffect(() => {
     if (initialQueryId) setSelectedId(initialQueryId);

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Ban, History, Minus, Plus } from "lucide-react";
 import { toast } from "sonner";
 
@@ -14,6 +14,7 @@ import { ProgressBar } from "@/components/progress-bar";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { CrmTrainerSelect } from "@/components/crm/crm-trainer-select";
+import { CrmChecklistStatusFilterBar } from "@/components/crm/crm-checklist-status-filter-bar";
 import { CRM_REPORT_CATEGORIES } from "@/data/crm-onboarding-defaults";
 import {
   crmTrainerInputPatch,
@@ -21,6 +22,12 @@ import {
   resolveCrmSalesManagerDefaults,
   withCrmSalesManagerOption,
 } from "@/lib/crm-sales-manager-defaults";
+import {
+  countReportStatusFilters,
+  matchesReportStatusFilter,
+  type CrmChecklistStatusFilter,
+} from "@/lib/crm-checklist-filters";
+import { useSessionFilter } from "@/hooks/use-session-filter";
 import { cn, formatDate } from "@/lib/utils";
 import { useCrmAccountStore, useCrmOnboardingStore, useUserStore } from "@/stores";
 import { nowIso } from "@/types/common";
@@ -62,7 +69,15 @@ export function CrmReportsChecklist({ companyId }: { companyId: string }) {
     [salesManager, users],
   );
 
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useSessionFilter(
+    `crm.account.${companyId}.reports.category`,
+    "all",
+  );
+  const [statusFilter, setStatusFilter] = useSessionFilter<CrmChecklistStatusFilter>(
+    `crm.account.${companyId}.reports.status`,
+    "all",
+  );
+  const statusCounts = useMemo(() => countReportStatusFilters(items), [items]);
   const [logging, setLogging] = useState<CrmReportChecklistItem | null>(null);
   const [historyFor, setHistoryFor] = useState<CrmReportChecklistItem | null>(null);
   const [sessionDate, setSessionDate] = useState(nowIso().slice(0, 10));
@@ -70,10 +85,13 @@ export function CrmReportsChecklist({ companyId }: { companyId: string }) {
   const [sessionNote, setSessionNote] = useState("");
 
   const grouped = useMemo(() => {
-    const filtered =
-      categoryFilter === "all"
-        ? items
-        : items.filter((i) => (i.category ?? "Sales reports") === categoryFilter);
+    let filtered = items;
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((i) => matchesReportStatusFilter(i, statusFilter));
+    }
+    if (categoryFilter !== "all") {
+      filtered = filtered.filter((i) => (i.category ?? "Sales reports") === categoryFilter);
+    }
     const map = new Map<string, CrmReportChecklistItem[]>();
     for (const item of filtered) {
       const cat = item.category ?? "Sales reports";
@@ -85,7 +103,7 @@ export function CrmReportsChecklist({ companyId }: { companyId: string }) {
     return order
       .filter((c) => map.has(c))
       .map((c) => ({ category: c, items: map.get(c)! }));
-  }, [items, categoryFilter]);
+  }, [items, categoryFilter, statusFilter]);
 
   function openLog(item: CrmReportChecklistItem) {
     if (item.notApplicable) return;
@@ -132,6 +150,13 @@ export function CrmReportsChecklist({ companyId }: { companyId: string }) {
         </p>
         <ProgressBar value={pct} className="mb-3 h-1.5" />
 
+        <CrmChecklistStatusFilterBar
+          value={statusFilter}
+          onChange={setStatusFilter}
+          counts={statusCounts}
+          completedLabel="Completed"
+        />
+
         <div className="mb-3 flex flex-wrap gap-1.5">
           <button
             type="button"
@@ -167,13 +192,18 @@ export function CrmReportsChecklist({ companyId }: { companyId: string }) {
         </div>
 
         <div className="space-y-3">
+          {grouped.length === 0 ? (
+            <div className="rounded-lg border border-dashed px-3 py-8 text-center text-xs text-muted-foreground">
+              No items match this filter.
+            </div>
+          ) : null}
+
           {grouped.map(({ category, items: catItems }) => (
-            <div key={category} className="space-y-1.5">
+            <div key={category} className="space-y-1.5 md:hidden">
               <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {category}
               </div>
-
-              <div className="space-y-1.5 md:hidden">
+              <div className="space-y-1.5">
                 {catItems.map((r) => (
                   <ReportCard
                     key={r.key}
@@ -200,140 +230,167 @@ export function CrmReportsChecklist({ companyId }: { companyId: string }) {
                   />
                 ))}
               </div>
-
-              <div className="hidden overflow-hidden rounded-lg border md:block">
-                <table className="w-full text-xs">
-                  <thead className="bg-muted/60 text-[10px] uppercase tracking-wide text-muted-foreground">
-                    <tr>
-                      <th className="px-3 py-1.5 text-left">Report</th>
-                      <th className="px-2 py-1.5 text-center">Status</th>
-                      <th className="px-2 py-1.5 text-center">Sessions</th>
-                      <th className="px-2 py-1.5 text-left">Last explained</th>
-                      <th className="px-2 py-1.5 text-left">Trainer</th>
-                      <th className="px-2 py-1.5 text-left">Notes</th>
-                      <th className="px-2 py-1.5 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {catItems.map((r) => {
-                      const na = !!r.notApplicable;
-                      const covered = !na && r.status === "explained";
-                      return (
-                        <tr key={r.key} className={cn("border-t hover:bg-muted/20", na && "bg-muted/20")}>
-                          <td
-                            className={cn(
-                              "px-3 py-2 font-medium",
-                              na && "text-muted-foreground line-through",
-                            )}
-                          >
-                            {r.label}
-                          </td>
-                          <td className="px-2 py-2 text-center">
-                            <Pill tone={na ? "muted" : covered ? "success" : "warning"}>
-                              {na ? "N/A" : covered ? "Explained" : "Pending"}
-                            </Pill>
-                          </td>
-                          <td className="px-2 py-2">
-                            <div className="flex items-center justify-center gap-1">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="h-7 w-7 p-0"
-                                disabled={na || (r.explanationCount ?? 0) <= 0}
-                                onClick={() => adjustReportExplanationCount(companyId, r.key, -1)}
-                                aria-label={`Decrease ${r.label} count`}
-                              >
-                                <Minus className="h-3 w-3" />
-                              </Button>
-                              <span className="min-w-[1.75rem] text-center text-sm font-semibold tabular-nums">
-                                {r.explanationCount ?? 0}
-                              </span>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="h-7 w-7 p-0"
-                                disabled={na}
-                                onClick={() => {
-                                  adjustReportExplanationCount(companyId, r.key, 1);
-                                  toast.success(`+1 · ${r.label}`);
-                                }}
-                                aria-label={`Increase ${r.label} count`}
-                              >
-                                <Plus className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </td>
-                          <td className="px-2 py-2 text-muted-foreground">
-                            {r.explainedAt ? formatDate(r.explainedAt) : "—"}
-                          </td>
-                          <td className="px-2 py-2">
-                            <CrmTrainerSelect
-                              disabled={na}
-                              className="h-7 w-32"
-                              value={crmTrainerInputValue(r.trainerName, salesManager.name)}
-                              executiveNames={trainerNames}
-                              onChange={(value) =>
-                                setReportItem(companyId, r.key, {
-                                  trainerName: crmTrainerInputPatch(value, salesManager.name),
-                                })
-                              }
-                            />
-                          </td>
-                          <td className="px-2 py-2">
-                            <input
-                              disabled={na}
-                              className="h-7 w-full min-w-[8rem] rounded border bg-background px-1.5 text-[11px] disabled:opacity-50"
-                              value={r.notes ?? ""}
-                              placeholder="Session notes…"
-                              onChange={(e) =>
-                                setReportItem(companyId, r.key, { notes: e.target.value })
-                              }
-                            />
-                          </td>
-                          <td className="px-2 py-2 text-right">
-                            <div className="inline-flex gap-1">
-                              <Button
-                                type="button"
-                                size="sm"
-                                className="h-7 gap-1 bg-primary text-[10px]"
-                                disabled={na}
-                                onClick={() => openLog(r)}
-                              >
-                                <Plus className="h-3 w-3" />
-                                Log
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="h-7 gap-1 text-[10px]"
-                                disabled={!r.explanationLog?.length}
-                                onClick={() => setHistoryFor(r)}
-                              >
-                                <History className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="h-7 gap-1 text-[10px]"
-                                onClick={() => toggleNa(r)}
-                              >
-                                <Ban className="h-3 w-3" />
-                                {na ? "Undo" : "N/A"}
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
             </div>
           ))}
+
+          {grouped.length > 0 ? (
+            <div className="hidden overflow-x-auto rounded-lg border md:block">
+              <table className="w-full min-w-[960px] table-fixed text-xs">
+                <colgroup>
+                  <col style={{ width: "24%" }} />
+                  <col style={{ width: "7%" }} />
+                  <col style={{ width: "8%" }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "12%" }} />
+                  <col style={{ width: "19%" }} />
+                  <col style={{ width: "20%" }} />
+                </colgroup>
+                <thead className="bg-muted/60 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-1.5 text-left">Report</th>
+                    <th className="px-2 py-1.5 text-center">Status</th>
+                    <th className="px-2 py-1.5 text-center">Sessions</th>
+                    <th className="px-2 py-1.5 text-center">Last explained</th>
+                    <th className="px-2 py-1.5 text-left">Trainer</th>
+                    <th className="px-2 py-1.5 text-left">Notes</th>
+                    <th className="px-2 py-1.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {grouped.map(({ category, items: catItems }) => (
+                    <Fragment key={category}>
+                      <tr className="border-t bg-muted/30">
+                        <td
+                          colSpan={7}
+                          className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                        >
+                          {category}
+                        </td>
+                      </tr>
+                      {catItems.map((r) => {
+                        const na = !!r.notApplicable;
+                        const covered = !na && r.status === "explained";
+                        return (
+                          <tr
+                            key={r.key}
+                            className={cn("border-t align-middle hover:bg-muted/20", na && "bg-muted/20")}
+                          >
+                            <td
+                              className={cn(
+                                "px-3 py-2 align-middle font-medium",
+                                na && "text-muted-foreground line-through",
+                              )}
+                            >
+                              {r.label}
+                            </td>
+                            <td className="px-2 py-2 text-center align-middle">
+                              <Pill tone={na ? "muted" : covered ? "success" : "warning"}>
+                                {na ? "N/A" : covered ? "Explained" : "Pending"}
+                              </Pill>
+                            </td>
+                            <td className="px-2 py-2 align-middle">
+                              <div className="flex items-center justify-center gap-1">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 w-7 shrink-0 p-0"
+                                  disabled={na || (r.explanationCount ?? 0) <= 0}
+                                  onClick={() => adjustReportExplanationCount(companyId, r.key, -1)}
+                                  aria-label={`Decrease ${r.label} count`}
+                                >
+                                  <Minus className="h-3 w-3" />
+                                </Button>
+                                <span className="min-w-[1.75rem] text-center text-sm font-semibold tabular-nums">
+                                  {r.explanationCount ?? 0}
+                                </span>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 w-7 shrink-0 p-0"
+                                  disabled={na}
+                                  onClick={() => {
+                                    adjustReportExplanationCount(companyId, r.key, 1);
+                                    toast.success(`+1 · ${r.label}`);
+                                  }}
+                                  aria-label={`Increase ${r.label} count`}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </td>
+                            <td className="px-2 py-2 text-center align-middle whitespace-nowrap text-muted-foreground">
+                              {r.explainedAt ? formatDate(r.explainedAt) : "—"}
+                            </td>
+                            <td className="px-2 py-2 align-middle">
+                              <CrmTrainerSelect
+                                disabled={na}
+                                className="h-7 w-full min-w-0"
+                                value={crmTrainerInputValue(r.trainerName, salesManager.name)}
+                                executiveNames={trainerNames}
+                                onChange={(value) =>
+                                  setReportItem(companyId, r.key, {
+                                    trainerName: crmTrainerInputPatch(value, salesManager.name),
+                                  })
+                                }
+                              />
+                            </td>
+                            <td className="px-2 py-2 align-middle">
+                              <input
+                                disabled={na}
+                                className="h-7 w-full min-w-0 rounded border bg-background px-1.5 text-[11px] disabled:opacity-50"
+                                value={r.notes ?? ""}
+                                placeholder="Session notes…"
+                                onChange={(e) =>
+                                  setReportItem(companyId, r.key, { notes: e.target.value })
+                                }
+                              />
+                            </td>
+                            <td className="px-2 py-2 text-right align-middle">
+                              <div className="flex flex-nowrap items-center justify-end gap-1">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  className="h-7 shrink-0 gap-1 bg-primary px-2 text-[10px]"
+                                  disabled={na}
+                                  onClick={() => openLog(r)}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                  Log
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 w-7 shrink-0 p-0"
+                                  disabled={!r.explanationLog?.length}
+                                  onClick={() => setHistoryFor(r)}
+                                  aria-label="Explanation history"
+                                >
+                                  <History className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 shrink-0 gap-1 px-2 text-[10px]"
+                                  onClick={() => toggleNa(r)}
+                                >
+                                  <Ban className="h-3 w-3" />
+                                  {na ? "Undo" : "N/A"}
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
         </div>
       </DesignTicketSection>
 

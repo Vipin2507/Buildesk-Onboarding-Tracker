@@ -9,6 +9,7 @@ import {
 } from "@/components/design-ticket/design-ticket-shared";
 import { CrmChecklistMarkAllCompleteButton } from "@/components/crm/crm-checklist-mark-all-complete-button";
 import { CrmChecklistPhaseCell } from "@/components/crm/crm-checklist-phase-cell";
+import { CrmChecklistStatusFilterBar } from "@/components/crm/crm-checklist-status-filter-bar";
 import { DatePickerField } from "@/components/date-picker-field";
 import { EntityFormModal } from "@/components/entity-form-modal";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,12 @@ import {
   phaseAtToYmd,
   type ChecklistPhase,
 } from "@/lib/checklist";
+import {
+  countChecklistPhaseStatusFilters,
+  matchesChecklistPhaseStatusFilter,
+  type CrmChecklistStatusFilter,
+} from "@/lib/crm-checklist-filters";
+import { useSessionFilter } from "@/hooks/use-session-filter";
 import { cn } from "@/lib/utils";
 import {
   crmAssigneeSelectPatch,
@@ -47,6 +54,15 @@ export function CrmMasterChecklistDetail({ companyId }: { companyId: string }) {
   const items = record.masterChecklist;
   const pct = calcChecklistProgress(items);
   const counts = countApplicableChecklist(items);
+  const statusCounts = useMemo(() => countChecklistPhaseStatusFilters(items), [items]);
+  const [statusFilter, setStatusFilter] = useSessionFilter<CrmChecklistStatusFilter>(
+    `crm.account.${companyId}.masters.status`,
+    "all",
+  );
+  const filteredItems = useMemo(
+    () => items.filter((item) => matchesChecklistPhaseStatusFilter(item, statusFilter)),
+    [items, statusFilter],
+  );
 
   const salesManager = useMemo(
     () => resolveCrmSalesManagerDefaults(account, users),
@@ -151,9 +167,21 @@ export function CrmMasterChecklistDetail({ companyId }: { companyId: string }) {
         </p>
         <ProgressBar value={pct} className="mb-3 h-1.5" />
 
+        <CrmChecklistStatusFilterBar
+          value={statusFilter}
+          onChange={setStatusFilter}
+          counts={statusCounts}
+        />
+
+        {filteredItems.length === 0 ? (
+          <div className="rounded-lg border border-dashed px-3 py-8 text-center text-xs text-muted-foreground">
+            No items match this filter.
+          </div>
+        ) : (
+          <>
         {/* Mobile cards */}
         <div className="space-y-2 md:hidden">
-          {items.map((item) => {
+          {filteredItems.map((item) => {
             const na = !!item.notApplicable;
             return (
               <div key={item.key} className={cn("card-soft p-3", na && "bg-muted/20")}>
@@ -280,7 +308,7 @@ export function CrmMasterChecklistDetail({ companyId }: { companyId: string }) {
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => {
+              {filteredItems.map((item) => {
                 const na = !!item.notApplicable;
                 return (
                   <tr key={item.key} className={cn("border-t", na && "bg-muted/20")}>
@@ -387,6 +415,8 @@ export function CrmMasterChecklistDetail({ companyId }: { companyId: string }) {
             </tbody>
           </table>
         </div>
+          </>
+        )}
       </DesignTicketSection>
 
       <EntityFormModal

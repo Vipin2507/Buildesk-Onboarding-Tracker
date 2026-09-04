@@ -9,6 +9,7 @@ import {
 } from "@/components/design-ticket/design-ticket-shared";
 import { CrmChecklistMarkAllCompleteButton } from "@/components/crm/crm-checklist-mark-all-complete-button";
 import { CrmChecklistPhaseCell } from "@/components/crm/crm-checklist-phase-cell";
+import { CrmChecklistStatusFilterBar } from "@/components/crm/crm-checklist-status-filter-bar";
 import { DatePickerField } from "@/components/date-picker-field";
 import { EntityFormModal } from "@/components/entity-form-modal";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,12 @@ import {
   resolveCrmSalesManagerDefaults,
   withCrmSalesManagerOption,
 } from "@/lib/crm-sales-manager-defaults";
+import {
+  countChecklistPhaseStatusFilters,
+  matchesChecklistPhaseStatusFilter,
+  type CrmChecklistStatusFilter,
+} from "@/lib/crm-checklist-filters";
+import { useSessionFilter } from "@/hooks/use-session-filter";
 import { cn } from "@/lib/utils";
 import { useCrmAccountStore, useCrmOnboardingStore, useUserStore } from "@/stores";
 import type { CrmMigrationChecklistItem } from "@/types/crm-onboarding";
@@ -60,7 +67,15 @@ export function CrmMigrationChecklistDetail({ companyId }: { companyId: string }
     [account, users],
   );
 
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useSessionFilter(
+    `crm.account.${companyId}.migration.category`,
+    "all",
+  );
+  const [statusFilter, setStatusFilter] = useSessionFilter<CrmChecklistStatusFilter>(
+    `crm.account.${companyId}.migration.status`,
+    "all",
+  );
+  const statusCounts = useMemo(() => countChecklistPhaseStatusFilters(items), [items]);
 
   const assignees = useMemo(
     () =>
@@ -97,10 +112,13 @@ export function CrmMigrationChecklistDetail({ companyId }: { companyId: string }
   }, [items]);
 
   const grouped = useMemo(() => {
-    const filtered =
-      categoryFilter === "all"
-        ? items
-        : items.filter((i) => (i.category ?? "CRM data") === categoryFilter);
+    let filtered = items;
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((i) => matchesChecklistPhaseStatusFilter(i, statusFilter));
+    }
+    if (categoryFilter !== "all") {
+      filtered = filtered.filter((i) => (i.category ?? "CRM data") === categoryFilter);
+    }
     const map = new Map<string, CrmMigrationChecklistItem[]>();
     for (const item of filtered) {
       const cat = item.category ?? "CRM data";
@@ -111,7 +129,7 @@ export function CrmMigrationChecklistDetail({ companyId }: { companyId: string }
     return categories
       .filter((c) => map.has(c))
       .map((c) => ({ category: c, items: map.get(c)! }));
-  }, [items, categoryFilter, categories]);
+  }, [items, categoryFilter, statusFilter, categories]);
 
   const [phaseDialog, setPhaseDialog] = useState<
     | {
@@ -202,6 +220,12 @@ export function CrmMigrationChecklistDetail({ companyId }: { companyId: string }
         </p>
         <ProgressBar value={pct} className="mb-3 h-1.5" />
 
+        <CrmChecklistStatusFilterBar
+          value={statusFilter}
+          onChange={setStatusFilter}
+          counts={statusCounts}
+        />
+
         <div className="mb-3 flex flex-wrap gap-1.5">
           <button
             type="button"
@@ -237,6 +261,11 @@ export function CrmMigrationChecklistDetail({ companyId }: { companyId: string }
         </div>
 
         <div className="space-y-3">
+          {grouped.length === 0 ? (
+            <div className="rounded-lg border border-dashed px-3 py-8 text-center text-xs text-muted-foreground">
+              No items match this filter.
+            </div>
+          ) : null}
           {grouped.map(({ category, items: catItems }) => (
             <div key={category} className="space-y-1.5">
               <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">

@@ -24,6 +24,7 @@ export type CrmProductModuleKey =
   | "reception-application"
   | "whatsapp-integration"
   | "sms-integration"
+  | "email-integration"
   | "ivr-integration"
   | "meta-lead-integration"
   | "google-ads-integration"

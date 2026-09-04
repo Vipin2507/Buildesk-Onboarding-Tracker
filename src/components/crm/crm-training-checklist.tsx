@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Ban, History, Minus, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -14,6 +14,7 @@ import { ProgressBar } from "@/components/progress-bar";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { CrmTrainerSelect } from "@/components/crm/crm-trainer-select";
+import { CrmChecklistStatusFilterBar } from "@/components/crm/crm-checklist-status-filter-bar";
 import {
   CRM_TRAINING_CATEGORIES_BROKER,
   CRM_TRAINING_CATEGORIES_DEVELOPER,
@@ -27,6 +28,12 @@ import {
   resolveCrmSalesManagerDefaults,
   withCrmSalesManagerOption,
 } from "@/lib/crm-sales-manager-defaults";
+import {
+  countTrainingStatusFilters,
+  matchesTrainingStatusFilter,
+  type CrmChecklistStatusFilter,
+} from "@/lib/crm-checklist-filters";
+import { useSessionFilter } from "@/hooks/use-session-filter";
 import { cn, formatDate } from "@/lib/utils";
 import { useCrmAccountStore, useCrmOnboardingStore, useUserStore } from "@/stores";
 import { newId, nowIso } from "@/types/common";
@@ -97,7 +104,15 @@ export function CrmTrainingChecklist({ companyId }: { companyId: string }) {
   );
   const trainerNames = useMemo(() => assignees.map((user) => user.name), [assignees]);
 
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useSessionFilter(
+    `crm.account.${companyId}.training.category`,
+    "all",
+  );
+  const [statusFilter, setStatusFilter] = useSessionFilter<CrmChecklistStatusFilter>(
+    `crm.account.${companyId}.training.status`,
+    "all",
+  );
+  const statusCounts = useMemo(() => countTrainingStatusFilters(sessions), [sessions]);
   const [editing, setEditing] = useState<CrmTrainingSession | null>(null);
   const [logging, setLogging] = useState<CrmTrainingSession | null>(null);
   const [historyFor, setHistoryFor] = useState<CrmTrainingSession | null>(null);
@@ -109,10 +124,13 @@ export function CrmTrainingChecklist({ companyId }: { companyId: string }) {
   const [sessionRecording, setSessionRecording] = useState(false);
 
   const grouped = useMemo(() => {
-    const filtered =
-      categoryFilter === "all"
-        ? sessions
-        : sessions.filter((s) => (s.category ?? "Custom") === categoryFilter);
+    let filtered = sessions;
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((s) => matchesTrainingStatusFilter(s, statusFilter));
+    }
+    if (categoryFilter !== "all") {
+      filtered = filtered.filter((s) => (s.category ?? "Custom") === categoryFilter);
+    }
     const map = new Map<string, CrmTrainingSession[]>();
     for (const item of filtered) {
       const cat = item.category ?? "Custom";
@@ -126,7 +144,7 @@ export function CrmTrainingChecklist({ companyId }: { companyId: string }) {
       .filter((c) => !order.includes(c))
       .map((c) => ({ category: c, items: map.get(c)! }));
     return [...known, ...extras];
-  }, [sessions, categoryFilter, categories]);
+  }, [sessions, categoryFilter, statusFilter, categories]);
 
   function blankSession(): CrmTrainingSession {
     const now = nowIso();
@@ -202,6 +220,12 @@ export function CrmTrainingChecklist({ companyId }: { companyId: string }) {
         </p>
         <ProgressBar value={pct} className="mb-3 h-1.5" />
 
+        <CrmChecklistStatusFilterBar
+          value={statusFilter}
+          onChange={setStatusFilter}
+          counts={statusCounts}
+        />
+
         <div className="mb-3 flex flex-wrap gap-1.5">
           <button
             type="button"
@@ -237,13 +261,18 @@ export function CrmTrainingChecklist({ companyId }: { companyId: string }) {
         </div>
 
         <div className="space-y-3">
+          {grouped.length === 0 ? (
+            <div className="rounded-lg border border-dashed px-3 py-8 text-center text-xs text-muted-foreground">
+              No items match this filter.
+            </div>
+          ) : null}
+
           {grouped.map(({ category, items }) => (
-            <div key={category} className="space-y-1.5">
+            <div key={category} className="space-y-1.5 md:hidden">
               <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {category}
               </div>
-
-              <div className="space-y-1.5 md:hidden">
+              <div className="space-y-1.5">
                 {items.map((s) => (
                   <TrainingCard
                     key={s.id}
@@ -271,212 +300,235 @@ export function CrmTrainingChecklist({ companyId }: { companyId: string }) {
                   />
                 ))}
               </div>
+            </div>
+          ))}
 
-              <div className="hidden overflow-x-auto rounded-lg border md:block">
-                <table className="w-full min-w-[920px] text-xs">
-                  <thead className="bg-muted/60 text-[10px] uppercase tracking-wide text-muted-foreground">
-                    <tr>
-                      <th className="px-3 py-1.5 text-left">Training</th>
-                      <th className="px-2 py-1.5 text-center">Status</th>
-                      <th className="px-2 py-1.5 text-center">Sessions</th>
-                      <th className="px-2 py-1.5 text-left">Last date</th>
-                      <th className="px-2 py-1.5 text-left">Trainer</th>
-                      <th className="px-2 py-1.5 text-left">Attendance</th>
-                      <th className="px-2 py-1.5 text-left">Assignee / due</th>
-                      <th className="px-2 py-1.5 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map((s) => {
-                      const na = !!s.notApplicable;
-                      const covered = !na && (s.completed || (s.sessionCount ?? 0) > 0);
-                      return (
-                        <tr key={s.id} className={cn("border-t", na && "bg-muted/20")}>
-                          <td
-                            className={cn(
-                              "px-3 py-2 font-medium",
-                              na && "text-muted-foreground line-through",
-                            )}
-                          >
-                            {s.label}
-                            {s.recordingUploaded ? (
-                              <Pill className="ml-2" tone="info">
-                                Recording
+          {grouped.length > 0 ? (
+            <div className="hidden overflow-x-auto rounded-lg border md:block">
+              <table className="w-full min-w-[1080px] table-fixed text-xs">
+                <colgroup>
+                  <col style={{ width: "21%" }} />
+                  <col style={{ width: "7%" }} />
+                  <col style={{ width: "8%" }} />
+                  <col style={{ width: "9%" }} />
+                  <col style={{ width: "11%" }} />
+                  <col style={{ width: "8%" }} />
+                  <col style={{ width: "17%" }} />
+                  <col style={{ width: "19%" }} />
+                </colgroup>
+                <thead className="bg-muted/60 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-1.5 text-left">Training</th>
+                    <th className="px-2 py-1.5 text-center">Status</th>
+                    <th className="px-2 py-1.5 text-center">Sessions</th>
+                    <th className="px-2 py-1.5 text-center">Last date</th>
+                    <th className="px-2 py-1.5 text-left">Trainer</th>
+                    <th className="px-2 py-1.5 text-center">Attendance</th>
+                    <th className="px-2 py-1.5 text-left">Assignee / due</th>
+                    <th className="px-2 py-1.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {grouped.map(({ category, items }) => (
+                    <Fragment key={category}>
+                      <tr className="border-t bg-muted/30">
+                        <td
+                          colSpan={8}
+                          className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                        >
+                          {category}
+                        </td>
+                      </tr>
+                      {items.map((s) => {
+                        const na = !!s.notApplicable;
+                        const covered = !na && (s.completed || (s.sessionCount ?? 0) > 0);
+                        return (
+                          <tr key={s.id} className={cn("border-t align-middle", na && "bg-muted/20")}>
+                            <td
+                              className={cn(
+                                "px-3 py-2 align-middle font-medium",
+                                na && "text-muted-foreground line-through",
+                              )}
+                            >
+                              {s.label}
+                              {s.recordingUploaded ? (
+                                <Pill className="ml-2" tone="info">
+                                  Recording
+                                </Pill>
+                              ) : null}
+                            </td>
+                            <td className="px-2 py-2 text-center align-middle">
+                              <Pill tone={na ? "muted" : covered ? "success" : "warning"}>
+                                {na ? "N/A" : covered ? "Done" : "Pending"}
                               </Pill>
-                            ) : null}
-                          </td>
-                          <td className="px-2 py-2 text-center">
-                            <Pill tone={na ? "muted" : covered ? "success" : "warning"}>
-                              {na ? "N/A" : covered ? "Done" : "Pending"}
-                            </Pill>
-                          </td>
-                          <td className="px-2 py-2">
-                            <div className="flex items-center justify-center gap-1">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="h-7 w-7 p-0"
-                                disabled={na || (s.sessionCount ?? 0) <= 0}
-                                onClick={() => adjustTrainingSessionCount(companyId, s.id, -1)}
-                              >
-                                <Minus className="h-3 w-3" />
-                              </Button>
-                              <span className="min-w-[1.75rem] text-center text-sm font-semibold tabular-nums">
-                                {s.sessionCount ?? 0}
-                              </span>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="h-7 w-7 p-0"
-                                disabled={na}
-                                onClick={() => {
-                                  adjustTrainingSessionCount(companyId, s.id, 1);
-                                  toast.success(`+1 · ${s.label}`);
-                                }}
-                              >
-                                <Plus className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </td>
-                          <td className="px-2 py-2 text-muted-foreground">
-                            {s.trainingDate ? formatDate(s.trainingDate) : "—"}
-                            {s.durationHours ? (
-                              <span className="ml-1 text-[10px]">· {s.durationHours}h</span>
-                            ) : null}
-                          </td>
-                          <td className="px-2 py-2">
-                            <CrmTrainerSelect
-                              disabled={na}
-                              className="h-7 w-32"
-                              value={crmTrainerInputValue(s.trainerName, salesManager.name)}
-                              executiveNames={trainerNames}
-                              onChange={(value) =>
-                                upsert(companyId, {
-                                  ...s,
-                                  trainerName: crmTrainerInputPatch(
-                                    value,
-                                    salesManager.name,
-                                  ),
-                                })
-                              }
-                            />
-                          </td>
-                          <td className="px-2 py-2">
-                            <input
-                              disabled={na}
-                              className="h-7 w-24 rounded border bg-background px-1.5 text-[11px] disabled:opacity-50"
-                              value={s.attendance}
-                              placeholder="e.g. 8/10"
-                              onChange={(e) =>
-                                upsert(companyId, { ...s, attendance: e.target.value })
-                              }
-                            />
-                          </td>
-                          <td className="px-2 py-2">
-                            <div className="flex flex-col gap-1">
-                              <select
-                                disabled={na}
-                                className="h-7 w-28 rounded border bg-background px-1.5 text-[11px] disabled:opacity-50"
-                                value={crmAssigneeSelectValue(s.assigneeUserId, salesManager.userId)}
-                                onChange={(e) =>
-                                  upsert(companyId, {
-                                    ...s,
-                                    assigneeUserId: crmAssigneeSelectPatch(
-                                      e.target.value,
-                                      salesManager.userId,
-                                    ),
-                                  })
-                                }
-                              >
-                                <option value="">Unassigned</option>
-                                {assignees.map((u) => (
-                                  <option key={u.id} value={u.id}>
-                                    {u.name}
-                                  </option>
-                                ))}
-                              </select>
-                              <DatePickerField
-                                compact
-                                disabled={na}
-                                className="w-40"
-                                placeholder="Due date"
-                                value={s.dueDate ?? ""}
-                                onChange={(v) =>
-                                  upsert(companyId, {
-                                    ...s,
-                                    dueDate: v || undefined,
-                                  })
-                                }
-                              />
-                            </div>
-                          </td>
-                          <td className="px-2 py-2 text-right">
-                            <div className="inline-flex flex-wrap justify-end gap-1">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="h-7 gap-1 text-[10px]"
-                                onClick={() => setTrainingNotApplicable(companyId, s.id, !na)}
-                              >
-                                <Ban className="h-3 w-3" />
-                                {na ? "Undo N/A" : "N/A"}
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                className="h-7 gap-1 bg-primary text-[10px]"
-                                disabled={na}
-                                onClick={() => openLog(s)}
-                              >
-                                <Plus className="h-3 w-3" />
-                                Log
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-[10px]"
-                                onClick={() => setEditing({ ...s })}
-                              >
-                                Edit
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="h-7 gap-1 text-[10px]"
-                                disabled={!s.sessionLog?.length}
-                                onClick={() => setHistoryFor(s)}
-                              >
-                                <History className="h-3 w-3" />
-                              </Button>
-                              {s.templateKey.startsWith("custom-") ? (
+                            </td>
+                            <td className="px-2 py-2 align-middle">
+                              <div className="flex items-center justify-center gap-1">
                                 <Button
                                   type="button"
                                   size="sm"
                                   variant="outline"
-                                  className="h-7 gap-1 text-[10px] text-destructive"
+                                  className="h-7 w-7 shrink-0 p-0"
+                                  disabled={na || (s.sessionCount ?? 0) <= 0}
+                                  onClick={() => adjustTrainingSessionCount(companyId, s.id, -1)}
+                                >
+                                  <Minus className="h-3 w-3" />
+                                </Button>
+                                <span className="min-w-[1.75rem] text-center text-sm font-semibold tabular-nums">
+                                  {s.sessionCount ?? 0}
+                                </span>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 w-7 shrink-0 p-0"
+                                  disabled={na}
                                   onClick={() => {
-                                    removeTrainingSession(companyId, s.id);
-                                    toast.success("Custom session removed");
+                                    adjustTrainingSessionCount(companyId, s.id, 1);
+                                    toast.success(`+1 · ${s.label}`);
                                   }}
                                 >
-                                  <Trash2 className="h-3 w-3" />
+                                  <Plus className="h-3 w-3" />
                                 </Button>
+                              </div>
+                            </td>
+                            <td className="px-2 py-2 text-center align-middle text-muted-foreground whitespace-nowrap">
+                              {s.trainingDate ? formatDate(s.trainingDate) : "—"}
+                              {s.durationHours ? (
+                                <span className="text-[10px]"> · {s.durationHours}h</span>
                               ) : null}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                            </td>
+                            <td className="px-2 py-2 align-middle">
+                              <CrmTrainerSelect
+                                disabled={na}
+                                className="h-7 w-full min-w-0"
+                                value={crmTrainerInputValue(s.trainerName, salesManager.name)}
+                                executiveNames={trainerNames}
+                                onChange={(value) =>
+                                  upsert(companyId, {
+                                    ...s,
+                                    trainerName: crmTrainerInputPatch(value, salesManager.name),
+                                  })
+                                }
+                              />
+                            </td>
+                            <td className="px-2 py-2 align-middle">
+                              <input
+                                disabled={na}
+                                className="mx-auto block h-7 w-full max-w-[6.5rem] rounded border bg-background px-1.5 text-center text-[11px] disabled:opacity-50"
+                                value={s.attendance}
+                                placeholder="e.g. 8/10"
+                                onChange={(e) =>
+                                  upsert(companyId, { ...s, attendance: e.target.value })
+                                }
+                              />
+                            </td>
+                            <td className="px-2 py-2 align-middle">
+                              <div className="flex min-w-0 items-center gap-1">
+                                <select
+                                  disabled={na}
+                                  className="h-7 min-w-0 flex-1 rounded border bg-background px-1.5 text-[11px] disabled:opacity-50"
+                                  value={crmAssigneeSelectValue(s.assigneeUserId, salesManager.userId)}
+                                  onChange={(e) =>
+                                    upsert(companyId, {
+                                      ...s,
+                                      assigneeUserId: crmAssigneeSelectPatch(
+                                        e.target.value,
+                                        salesManager.userId,
+                                      ),
+                                    })
+                                  }
+                                >
+                                  <option value="">Unassigned</option>
+                                  {assignees.map((u) => (
+                                    <option key={u.id} value={u.id}>
+                                      {u.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <DatePickerField
+                                  compact
+                                  disabled={na}
+                                  className="w-[7.25rem] shrink-0"
+                                  placeholder="Due date"
+                                  value={s.dueDate ?? ""}
+                                  onChange={(v) =>
+                                    upsert(companyId, {
+                                      ...s,
+                                      dueDate: v || undefined,
+                                    })
+                                  }
+                                />
+                              </div>
+                            </td>
+                            <td className="px-2 py-2 text-right align-middle">
+                              <div className="flex flex-nowrap items-center justify-end gap-1">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 shrink-0 gap-1 px-2 text-[10px]"
+                                  onClick={() => setTrainingNotApplicable(companyId, s.id, !na)}
+                                >
+                                  <Ban className="h-3 w-3" />
+                                  {na ? "Undo" : "N/A"}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  className="h-7 shrink-0 gap-1 bg-primary px-2 text-[10px]"
+                                  disabled={na}
+                                  onClick={() => openLog(s)}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                  Log
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 shrink-0 px-2 text-[10px]"
+                                  onClick={() => setEditing({ ...s })}
+                                >
+                                  Edit
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 w-7 shrink-0 p-0"
+                                  disabled={!s.sessionLog?.length}
+                                  onClick={() => setHistoryFor(s)}
+                                  aria-label="Session history"
+                                >
+                                  <History className="h-3 w-3" />
+                                </Button>
+                                {s.templateKey.startsWith("custom-") ? (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 w-7 shrink-0 p-0 text-destructive"
+                                    onClick={() => {
+                                      removeTrainingSession(companyId, s.id);
+                                      toast.success("Custom session removed");
+                                    }}
+                                    aria-label="Remove custom session"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                ) : null}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          ))}
+          ) : null}
         </div>
       </DesignTicketSection>
 

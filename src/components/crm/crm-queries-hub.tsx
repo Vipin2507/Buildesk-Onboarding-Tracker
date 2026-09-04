@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { ArrowRight, Search } from "lucide-react";
@@ -18,6 +18,7 @@ import {
   type CrmAccountQuerySummary,
 } from "@/types/crm-account-query";
 import { useCrmAccountQueryStore } from "@/stores";
+import { useSessionFilter } from "@/hooks/use-session-filter";
 import { cn, formatDate, formatTime } from "@/lib/utils";
 
 const STATUS_FILTERS = ["all", "open", "resolved", "archived"] as const;
@@ -44,7 +45,7 @@ export function CrmQueriesHub({ statusFilter, onStatusFilterChange, selectedQuer
   const refreshAllQueries = useCrmAccountQueryStore((s) => s.refreshAllQueries);
   const refreshCompanyQueries = useCrmAccountQueryStore((s) => s.refreshCompanyQueries);
 
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useSessionFilter("crm.queries.search", "");
 
   useEffect(() => {
     void refreshAllQueries("all").catch((err) => {

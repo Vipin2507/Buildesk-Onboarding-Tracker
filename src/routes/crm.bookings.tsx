@@ -14,7 +14,7 @@ import {
   Video,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { DatePickerField } from "@/components/date-picker-field";
@@ -48,6 +48,7 @@ import {
   type CrmBookingsTabId,
 } from "@/lib/crm-route-search";
 import { filterCrmAccountsForUser, canCreateCrmMeeting } from "@/lib/crm-account-access";
+import { useSessionFilterState } from "@/hooks/use-session-filter";
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/stores/useAuthStore";
 import { useBookingStore } from "@/stores/useBookingStore";
@@ -59,6 +60,16 @@ import {
   type BookingAppointment,
   type BookingAppointmentStatus,
 } from "@/types/booking";
+
+const BOOKING_LIST_FILTER_DEFAULTS = {
+  tableSearch: "",
+  statusFilter: "all",
+  accountFilter: "all",
+  hostFilter: "all",
+  callTypeFilter: "all",
+  dateFrom: "",
+  dateTo: "",
+} as const;
 
 const EASE = TICKET_EASE;
 const POLL_MS = 15_000;
@@ -295,13 +306,48 @@ function CrmBookingsPage() {
 
   const tableRef = useRef<HTMLDivElement>(null);
 
-  const [tableSearch, setTableSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [accountFilter, setAccountFilter] = useState("all");
-  const [hostFilter, setHostFilter] = useState("all");
-  const [callTypeFilter, setCallTypeFilter] = useState("all");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [listFilters, setListFilters] = useSessionFilterState(
+    "crm.bookings.list",
+    BOOKING_LIST_FILTER_DEFAULTS,
+  );
+  const {
+    tableSearch,
+    statusFilter,
+    accountFilter,
+    hostFilter,
+    callTypeFilter,
+    dateFrom,
+    dateTo,
+  } = listFilters;
+
+  const setTableSearch = useCallback(
+    (value: string) => setListFilters({ tableSearch: value }),
+    [setListFilters],
+  );
+  const setStatusFilter = useCallback(
+    (value: string) => setListFilters({ statusFilter: value }),
+    [setListFilters],
+  );
+  const setAccountFilter = useCallback(
+    (value: string) => setListFilters({ accountFilter: value }),
+    [setListFilters],
+  );
+  const setHostFilter = useCallback(
+    (value: string) => setListFilters({ hostFilter: value }),
+    [setListFilters],
+  );
+  const setCallTypeFilter = useCallback(
+    (value: string) => setListFilters({ callTypeFilter: value }),
+    [setListFilters],
+  );
+  const setDateFrom = useCallback(
+    (value: string) => setListFilters({ dateFrom: value }),
+    [setListFilters],
+  );
+  const setDateTo = useCallback(
+    (value: string) => setListFilters({ dateTo: value }),
+    [setListFilters],
+  );
   const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
@@ -382,7 +428,7 @@ function CrmBookingsPage() {
     [eventTypes],
   );
 
-  const listFilters = useMemo(
+  const toolbarFilters = useMemo(
     () => ({
       statusFilter,
       accountFilter,
@@ -410,8 +456,8 @@ function CrmBookingsPage() {
 
   const toolbarScoped = useMemo(
     () =>
-      appointments.filter((a) => matchesBookingToolbarFilters(a, listFilters, filterLookup)),
-    [appointments, listFilters, filterLookup],
+      appointments.filter((a) => matchesBookingToolbarFilters(a, toolbarFilters, filterLookup)),
+    [appointments, toolbarFilters, filterLookup],
   );
 
   const listTab = BOOKING_LIST_TAB_IDS.has(tab as BookingFilterChipId)
@@ -468,13 +514,7 @@ function CrmBookingsPage() {
   }
 
   function clearFilters() {
-    setTableSearch("");
-    setStatusFilter("all");
-    setAccountFilter("all");
-    setHostFilter("all");
-    setCallTypeFilter("all");
-    setDateFrom("");
-    setDateTo("");
+    setListFilters({ ...BOOKING_LIST_FILTER_DEFAULTS });
   }
 
   function renderMeetButton(meetUrl: string) {

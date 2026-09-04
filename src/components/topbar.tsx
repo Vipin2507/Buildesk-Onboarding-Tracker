@@ -3,19 +3,19 @@ import { useNavigate } from "@tanstack/react-router";
 import {
   Search,
   ChevronDown,
-  Building2,
-  Boxes,
   LogOut,
   Settings,
   User,
   UserRound,
   Menu,
-  CheckSquare,
-  MapPin,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { EditProfileDialog } from "@/components/edit-profile-dialog";
+import {
+  GlobalSearchDropdown,
+  type GlobalSearchScope,
+} from "@/components/global-search-dropdown";
 import { MobileNavSheet } from "@/components/mobile-nav-sheet";
 import { NotificationsBell } from "@/components/notifications-panel";
 import { ThemeToggle, ThemeToggleCompact } from "@/components/theme-toggle";
@@ -27,6 +27,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useSessionFilter } from "@/hooks/use-session-filter";
 import { useGlobalSearch, useAuthStore, useCurrentUser } from "@/stores";
 import { authLogout } from "@/lib/api";
 import { isCrmUser } from "@/lib/product-scope";
@@ -36,19 +37,25 @@ export function TopBar() {
   const [open, setOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const currentUser = useCurrentUser();
+  const crm = isCrmUser(currentUser);
+  const [searchScope, setSearchScope] = useSessionFilter<GlobalSearchScope>(
+    "global.search.scope",
+    crm ? "crm" : "erp",
+  );
   const results = useGlobalSearch(query);
   const navigate = useNavigate();
   const setUser = useAuthStore((s) => s.setUser);
-  const currentUser = useCurrentUser();
-  const crm = isCrmUser(currentUser);
   const ref = useRef<HTMLDivElement>(null);
 
-  const hasResults =
-    query.length > 0 &&
-    (results.companies.length > 0 ||
-      results.projects.length > 0 ||
-      (results.tasks?.length ?? 0) > 0 ||
-      (results.visits?.length ?? 0) > 0);
+  const canSearchCrm = crm;
+  const canSearchErp = !crm;
+
+  useEffect(() => {
+    setSearchScope(crm ? "crm" : "erp");
+  }, [crm]);
+
+  const showSearchPanel = open && query.length > 0;
   const initials = currentUser?.name.split(" ").map((n) => n[0]).join("").slice(0, 2) ?? "??";
 
   useEffect(() => {
@@ -67,12 +74,16 @@ export function TopBar() {
     }
     setUser(null);
     toast.success("Signed out");
-    // Await navigation so we don't leave a protected route with a cleared session.
     try {
       await navigate({ to: "/login", search: { mode: "login" }, replace: true });
     } catch {
       // AuthGate will also redirect if this fails.
     }
+  }
+
+  function closeSearch() {
+    setQuery("");
+    setOpen(false);
   }
 
   return (
@@ -96,99 +107,28 @@ export function TopBar() {
               setOpen(true);
             }}
             onFocus={() => setOpen(true)}
-            placeholder="Search…"
+            placeholder={
+              searchScope === "crm"
+                ? "Search CRM accounts, tasks…"
+                : "Search ERP companies, projects, tasks…"
+            }
             className="h-10 w-full rounded-lg border border-input bg-card pl-9 pr-3 text-sm outline-none transition-shadow focus:ring-2 focus:ring-ring/40"
-            aria-label="Search company, project, task, visit"
-            title="Search company, project, task, visit"
+            aria-label={
+              searchScope === "crm"
+                ? "Search CRM accounts and tasks"
+                : "Search ERP companies, projects, tasks, and visits"
+            }
           />
-          {open && hasResults && (
-            <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-[70vh] overflow-auto rounded-lg border bg-popover shadow-lg">
-              {results.companies.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-muted"
-                  onClick={() => {
-                    void navigate({ to: "/companies/$companyId", params: { companyId: c.id } });
-                    setQuery("");
-                    setOpen(false);
-                  }}
-                >
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <div className="font-medium">{c.name}</div>
-                    <div className="text-xs text-muted-foreground">{c.city}</div>
-                  </div>
-                </button>
-              ))}
-              {results.projects.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-muted"
-                  onClick={() => {
-                    void navigate({
-                      to: "/projects/$projectId",
-                      params: { projectId: p.id },
-                      search: { tab: "onboarding" },
-                    });
-                    setQuery("");
-                    setOpen(false);
-                  }}
-                >
-                  <Boxes className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <div className="font-medium">{p.name}</div>
-                    <div className="text-xs text-muted-foreground">{p.city}</div>
-                  </div>
-                </button>
-              ))}
-              {(results.tasks ?? []).map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-muted"
-                  onClick={() => {
-                    void navigate({
-                      to: "/companies/$companyId",
-                      params: { companyId: t.companyId },
-                      search: { tab: "Tasks" },
-                    });
-                    setQuery("");
-                    setOpen(false);
-                  }}
-                >
-                  <CheckSquare className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <div className="font-medium">{t.title}</div>
-                    <div className="text-xs text-muted-foreground">Task · {t.status}</div>
-                  </div>
-                </button>
-              ))}
-              {(results.visits ?? []).map((v) => (
-                <button
-                  key={v.id}
-                  type="button"
-                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-muted"
-                  onClick={() => {
-                    void navigate({
-                      to: "/companies/$companyId",
-                      params: { companyId: v.companyId },
-                      search: { tab: "Visits" },
-                    });
-                    setQuery("");
-                    setOpen(false);
-                  }}
-                >
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <div className="font-medium">{v.purpose}</div>
-                    <div className="text-xs text-muted-foreground">Visit · {v.status}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
+          {showSearchPanel ? (
+            <GlobalSearchDropdown
+              results={results}
+              scope={searchScope}
+              onScopeChange={setSearchScope}
+              canSearchCrm={canSearchCrm}
+              canSearchErp={canSearchErp}
+              onClose={closeSearch}
+            />
+          ) : null}
         </div>
 
         <div className="flex shrink-0 items-center gap-2 md:gap-3">
