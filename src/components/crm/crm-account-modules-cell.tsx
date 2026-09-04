@@ -1,46 +1,34 @@
-import { isCrmIntegrationModule } from "@/data/crm-onboarding-defaults";
+import { Pill } from "@/components/status-pill";
 
-type ModuleRef = { key: string; label: string };
+type ModuleChip = { key: string; label: string };
 
 type Props = {
-  subscribed: ModuleRef[];
+  modules: ModuleChip[];
   maxVisible?: number;
 };
 
-export function CrmAccountModulesCell({ subscribed }: Props) {
-  if (subscribed.length === 0) {
-    return <span className="text-xs text-muted-foreground">None</span>;
+export function CrmAccountModulesCell({ modules, maxVisible = 2 }: Props) {
+  if (modules.length === 0) {
+    return <span className="text-xs text-muted-foreground">—</span>;
   }
 
-  const core = subscribed.filter((m) => !isCrmIntegrationModule(m.key));
-  const integrations = subscribed.filter((m) => isCrmIntegrationModule(m.key));
-
-  function list(items: ModuleRef[]) {
-    if (items.length === 0) return <span className="text-[11px] text-muted-foreground">—</span>;
-    return (
-      <ul className="space-y-0.5 text-[11px] leading-snug text-foreground">
-        {items.map((m) => (
-          <li key={m.key} className="truncate">
-            {m.label}
-          </li>
-        ))}
-      </ul>
-    );
-  }
+  const visible = modules.slice(0, maxVisible);
+  const rest = modules.length - visible.length;
+  const hiddenLabels = modules.slice(maxVisible).map((m) => m.label).join(", ");
 
   return (
-    <div className="min-w-[10rem] space-y-2">
-      <div>
-        <div className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Modules ({core.length})
-        </div>
-        {list(core)}
-      </div>
-      <div>
-        <div className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Integrations ({integrations.length})
-        </div>
-        {list(integrations)}
+    <div className="min-w-[9rem]">
+      <div className="flex flex-wrap items-center gap-1">
+        {visible.map((mod) => (
+          <Pill key={mod.key} tone="accent" title={mod.label}>
+            {mod.label}
+          </Pill>
+        ))}
+        {rest > 0 ? (
+          <Pill tone="muted" title={hiddenLabels}>
+            +{rest}
+          </Pill>
+        ) : null}
       </div>
     </div>
   );

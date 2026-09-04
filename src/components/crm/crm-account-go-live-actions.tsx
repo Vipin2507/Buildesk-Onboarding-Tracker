@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ClipboardList,
+  MessageSquarePlus,
   MoreHorizontal,
   PauseCircle,
   Pencil,
@@ -39,6 +40,7 @@ type Props = {
   onOpenGoLiveTab?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onCreateQuery?: () => void;
   variant?: "button" | "icon";
   className?: string;
 };
@@ -51,6 +53,7 @@ export function CrmAccountGoLiveActions({
   onOpenGoLiveTab,
   onEdit,
   onDelete,
+  onCreateQuery,
   variant = "button",
   className,
 }: Props) {
@@ -183,12 +186,18 @@ export function CrmAccountGoLiveActions({
             {isInactive ? "Already Inactive" : "Mark Inactive"}
           </DropdownMenuItem>
 
-          {onEdit || onDelete ? (
+          {onCreateQuery || onEdit || onDelete ? (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuLabel className="text-[11px] uppercase tracking-wide text-muted-foreground">
                 Account
               </DropdownMenuLabel>
+              {onCreateQuery ? (
+                <DropdownMenuItem onClick={onCreateQuery}>
+                  <MessageSquarePlus className="mr-2 h-4 w-4" />
+                  Create query
+                </DropdownMenuItem>
+              ) : null}
               {onEdit ? (
                 <DropdownMenuItem onClick={onEdit}>
                   <Pencil className="mr-2 h-4 w-4" />
