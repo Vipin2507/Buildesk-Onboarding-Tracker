@@ -6,6 +6,7 @@ export type BreadcrumbItem = {
   label: string;
   to?: string;
   params?: Record<string, string>;
+  search?: Record<string, unknown>;
 };
 
 export function Breadcrumbs({ items }: { items: BreadcrumbItem[] }) {
@@ -18,6 +19,7 @@ export function Breadcrumbs({ items }: { items: BreadcrumbItem[] }) {
             <Link
               to={item.to}
               params={item.params}
+              search={item.search}
               className="hover:text-foreground hover:underline"
             >
               {item.label}

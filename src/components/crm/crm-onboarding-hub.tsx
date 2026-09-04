@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   CheckSquare,
+  ClipboardList,
   HelpCircle,
   LayoutDashboard,
   MessageSquare,

@@ -7,10 +7,11 @@ import {
   crmAccountSearchSchema,
   parseCrmAccountTab,
   type CrmAccountTabId,
+  type CrmSalesCrmSectionId,
 } from "@/lib/crm-route-search";
 import { useCrmAccountStore, useCrmOnboardingStore } from "@/stores";
 
-const LEGACY_SALES_CRM_TAB_SECTIONS: Record<string, string> = {
+const LEGACY_SALES_CRM_TAB_SECTIONS: Record<string, CrmSalesCrmSectionId> = {
   integrations: "integrations",
   masters: "masters",
   migration: "migration",
