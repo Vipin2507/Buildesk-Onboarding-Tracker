@@ -804,12 +804,7 @@ export function filterCrmActivityItems(
     if (!matchesManagerField(item.teamSalesManager, salesManagerFilter)) return false;
     if (!matchesManagerField(item.teamSupportManager1, supportManager1Filter)) return false;
     if (!matchesManagerField(item.teamSupportManager2, supportManager2Filter)) return false;
-    if (
-      executiveFilter !== "all" &&
-      !crmSalesManagerNamesMatch(item.executive, executiveFilter)
-    ) {
-      return false;
-    }
+    if (!matchesManagerField(item.executive, executiveFilter)) return false;
     if (!matchesManagerField(item.teamExecutive, teamExecutiveFilter)) return false;
     if (userQuery) {
       const actor = (item.executive ?? item.who ?? "").toLowerCase();

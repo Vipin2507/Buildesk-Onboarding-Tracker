@@ -19,6 +19,7 @@ import {
   CRM_ACTIVITY_STATUS_LABEL,
   crmActivityExecutiveDisplay,
   filterCrmActivityItems,
+  listCrmActivityExecutiveNames,
   type CrmActivityCategory,
   type CrmActivityDateRange,
   type CrmActivityItem,
@@ -77,6 +78,7 @@ export function CrmDashboardActivityPanel({ items }: Props) {
   const [category, setCategory] = useState<CrmActivityCategory>("all");
   const [kind, setKind] = useState<ActivityKind | "all">("all");
   const [accountFilter, setAccountFilter] = useState("all");
+  const [userFilter, setUserFilter] = useState("all");
   const [dateRange, setDateRange] = useState<CrmActivityDateRange>("30d");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -93,16 +95,23 @@ export function CrmDashboardActivityPanel({ items }: Props) {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [items]);
 
+  const userOptions = useMemo(() => listCrmActivityExecutiveNames(items), [items]);
+  const unassignedUserCount = useMemo(
+    () => items.filter((item) => !item.executive?.trim()).length,
+    [items],
+  );
+
   const toolbarFilters = useMemo(
     () => ({
       kind,
       query: tableSearch,
       accountId: accountFilter,
+      executiveFilter: userFilter,
       dateRange: (dateFrom || dateTo ? "all" : dateRange) as CrmActivityDateRange,
       dateFrom,
       dateTo,
     }),
-    [kind, tableSearch, accountFilter, dateRange, dateFrom, dateTo],
+    [kind, tableSearch, accountFilter, userFilter, dateRange, dateFrom, dateTo],
   );
 
   const toolbarScoped = useMemo(
@@ -135,15 +144,17 @@ export function CrmDashboardActivityPanel({ items }: Props) {
         kind,
         query: tableSearch,
         accountId: accountFilter,
+        executiveFilter: userFilter,
         dateRange: "7d",
       }).length,
-    [items, kind, tableSearch, accountFilter],
+    [items, kind, tableSearch, accountFilter, userFilter],
   );
 
   const activeFilterCount = [
     category !== "all",
     kind !== "all",
     accountFilter !== "all",
+    userFilter !== "all",
     dateRange !== "30d",
     Boolean(dateFrom),
     Boolean(dateTo),
@@ -154,6 +165,7 @@ export function CrmDashboardActivityPanel({ items }: Props) {
     setCategory("all");
     setKind("all");
     setAccountFilter("all");
+    setUserFilter("all");
     setDateRange("30d");
     setDateFrom("");
     setDateTo("");
@@ -245,7 +257,7 @@ export function CrmDashboardActivityPanel({ items }: Props) {
           <DesignTicketFilterBar
             variant="inline"
             compact
-            className="xl:grid-cols-4"
+            className="xl:grid-cols-5"
             activeFilterCount={activeFilterCount}
             onClear={clearFilters}
             onApply={applyFilters}
@@ -272,6 +284,20 @@ export function CrmDashboardActivityPanel({ items }: Props) {
                 options={[
                   { value: "all", label: "All accounts" },
                   ...accountOptions.map((a) => ({ value: a.id, label: a.name })),
+                ]}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketFilterField label="User" compact>
+              <DesignTicketSelect
+                compact
+                value={userFilter}
+                onChange={setUserFilter}
+                options={[
+                  { value: "all", label: "All users" },
+                  ...(unassignedUserCount > 0
+                    ? [{ value: "unassigned", label: `Unassigned (${unassignedUserCount})` }]
+                    : []),
+                  ...userOptions.map((name) => ({ value: name, label: name })),
                 ]}
               />
             </DesignTicketFilterField>
@@ -324,7 +350,7 @@ export function CrmDashboardActivityPanel({ items }: Props) {
             <div className="px-3 sm:px-4 lg:px-5">
               <EmptyState
                 title="No activity matches your filters"
-                description="Adjust category, account, status, date, or search terms."
+                description="Adjust category, account, user, status, date, or search terms."
                 actionLabel={
                   activeFilterCount > 0 || tableSearch ? "Clear filters" : undefined
                 }
