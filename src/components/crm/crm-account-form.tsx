@@ -1,22 +1,11 @@
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { z } from "zod";
 
 import { DatePickerField } from "@/components/date-picker-field";
-import {
-  ACCOUNT_COUNTRIES,
-  countryForState,
-  findLocationByCity,
-  INDIA_STATES,
-  regionForState,
-} from "@/data/india-locations";
-import { cn } from "@/lib/utils";
-import { useUserStore } from "@/stores";
-import { COMPANY_TYPES, type CompanyRegion, type CompanyType } from "@/types/company";
-import type { CrmAccount } from "@/types/crm-account";
-import type { CrmProductModuleKey } from "@/types/crm-onboarding";
-import { CrmAccountProductModulesPicker } from "@/components/crm/crm-account-product-modules-picker";
 import { CrmAccountCommercialFields } from "@/components/crm/crm-account-commercial-fields";
+import { CrmAccountLocationFields } from "@/components/crm/crm-account-location-fields";
+import { CrmAccountProductModulesPicker } from "@/components/crm/crm-account-product-modules-picker";
 import {
   buildInstallmentSchedule,
   calcInstallmentAmount,
@@ -25,6 +14,11 @@ import {
   roundMoney,
 } from "@/lib/crm-account-commercial";
 import { normalizePortalSlug, portalDashboardPath } from "@/lib/design-ticket-portal";
+import { cn } from "@/lib/utils";
+import { useUserStore } from "@/stores";
+import { COMPANY_TYPES, type CompanyRegion, type CompanyType } from "@/types/company";
+import type { CrmAccount } from "@/types/crm-account";
+import type { CrmProductModuleKey } from "@/types/crm-onboarding";
 import type { CrmAccountInstallment } from "@/types/crm-account";
 
 export const crmAccountSchema = z.object({
@@ -251,8 +245,6 @@ export function CrmAccountFormFields({
 }) {
   const errors = form.formState.errors;
   const users = useUserStore((s) => s.users);
-  const city = form.watch("city");
-  const state = form.watch("state");
   const portalApiKey = form.watch("portalApiKey");
   const portalSlugPreview = portalApiKey?.trim()
     ? normalizePortalSlug(portalApiKey)
@@ -273,33 +265,6 @@ export function CrmAccountFormFields({
       .filter((n) => n.length > 0 && !names.has(n));
     return [...extras.map((name) => ({ id: `legacy-${name}`, name })), ...base];
   }, [users, salesManagerName, supportManager1, supportManager2]);
-
-  const stateOptions = useMemo(() => {
-    if (state && !INDIA_STATES.includes(state)) return [state, ...INDIA_STATES];
-    return INDIA_STATES;
-  }, [state]);
-
-  // Typed city → auto-fill state / country / region when recognized.
-  useEffect(() => {
-    const loc = findLocationByCity(city);
-    if (!loc) return;
-    const opts = { shouldValidate: true, shouldDirty: true } as const;
-    if (form.getValues("state") !== loc.state) form.setValue("state", loc.state, opts);
-    if (form.getValues("country") !== loc.country) form.setValue("country", loc.country, opts);
-    if (form.getValues("region") !== loc.region) form.setValue("region", loc.region, opts);
-  }, [city, form]);
-
-  // State drives country / region when city is empty or not recognized.
-  useEffect(() => {
-    if (!state) return;
-    const loc = findLocationByCity(city);
-    if (loc && loc.state === state) return;
-    const opts = { shouldValidate: true, shouldDirty: true } as const;
-    const country = countryForState(state);
-    const region = regionForState(state);
-    if (country && form.getValues("country") !== country) form.setValue("country", country, opts);
-    if (form.getValues("region") !== region) form.setValue("region", region, opts);
-  }, [state, city, form]);
 
   return (
     <div className="grid gap-3.5">
@@ -357,51 +322,12 @@ export function CrmAccountFormFields({
       </Section>
 
       <Section title="Location">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div>
-            <Label required>City</Label>
-            <input
-              {...form.register("city")}
-              placeholder="e.g. Mumbai, Gurugram, Bengaluru"
-              autoComplete="address-level2"
-              className={fieldClass(!!errors.city)}
-            />
-            <FieldError message={errors.city?.message} />
-          </div>
-          <div>
-            <Label required>State</Label>
-            <select {...form.register("state")} className={fieldClass(!!errors.state)}>
-              <option value="">Select state</option>
-              {stateOptions.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-            <FieldError message={errors.state?.message} />
-          </div>
-          <div>
-            <Label required>Country</Label>
-            <select {...form.register("country")} className={fieldClass(!!errors.country)}>
-              {ACCOUNT_COUNTRIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-            <FieldError message={errors.country?.message} />
-          </div>
-          <div>
-            <Label required>Region</Label>
-            <input
-              readOnly
-              {...form.register("region")}
-              className={fieldClass(!!errors.region, true)}
-              tabIndex={-1}
-            />
-            <FieldError message={errors.region?.message} />
-          </div>
-        </div>
+        <CrmAccountLocationFields
+          form={form}
+          fieldClass={fieldClass}
+          Label={Label}
+          FieldError={FieldError}
+        />
       </Section>
 
       <Section title="Owner">
