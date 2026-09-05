@@ -54,7 +54,10 @@ export function clearAutomationLogsOnServer(key: AutomationLogConfigKey) {
 }
 
 /** Load latest logs from SQLite into a store. */
-export async function fetchAutomationLogsFromServer(key: AutomationLogConfigKey) {
+export async function fetchAutomationLogsFromServer(
+  key: AutomationLogConfigKey,
+): Promise<AutomationLog[]> {
   const { getAutomationLogs } = await import("@/lib/api");
-  return getAutomationLogs({ data: { key } });
+  const logs = await getAutomationLogs({ data: { key } });
+  return (Array.isArray(logs) ? logs : []) as AutomationLog[];
 }

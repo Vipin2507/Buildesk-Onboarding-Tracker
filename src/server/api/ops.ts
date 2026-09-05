@@ -8,13 +8,14 @@ import {
   appendAutomationLogToConfig,
   readAutomationLogsFromConfig,
   replaceAutomationLogsInConfig,
-  type AutomationConfigKey,
 } from "@/server/automation-log-persistence";
+import { automationLogSchema } from "@/server/automation-log-schema";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { loadCompanies, loadProjects } from "@/server/api/mappers";
 import { isTicketOpen, mapTicket, mapTicketActivity } from "@/lib/tickets";
 import type { TicketActivity } from "@/types";
+import type { AutomationLog } from "@/types/automation";
 
 const ticketStatus = z.enum([
   "Open",
@@ -577,28 +578,15 @@ export const getAppConfig = createServerFn({ method: "GET" })
 
 const automationConfigKeySchema = z.enum(["automation", "crm-automation"]);
 
-const automationLogSchema = z.object({
-  id: z.string(),
-  ticketId: z.string().optional(),
-  ticketNumber: z.string().optional(),
-  companyId: z.string().optional(),
-  channel: z.enum(["email", "whatsapp"]),
-  trigger: z.string(),
-  status: z.enum(["success", "failed", "retrying"]),
-  requestPayload: z.record(z.string(), z.unknown()),
-  responseSummary: z.string().optional(),
-  errorMessage: z.string().optional(),
-  attemptedAt: z.string(),
-  retryCount: z.number(),
-});
-
 export const getAutomationLogs = createServerFn({ method: "GET" })
   .inputValidator((data: unknown) =>
     z.object({ key: automationConfigKeySchema }).parse(data),
   )
   .handler(async ({ data }) => {
     requireUser(["Admin"]);
-    return readAutomationLogsFromConfig(getDb(), data.key as AutomationConfigKey);
+    const logs = readAutomationLogsFromConfig(getDb(), data.key);
+    // Round-trip so the payload is JSON-serializable for ServerFn typing.
+    return JSON.parse(JSON.stringify(logs)) as AutomationLog[];
   });
 
 export const appendAutomationLog = createServerFn({ method: "POST" })
@@ -612,8 +600,8 @@ export const appendAutomationLog = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     requireUser(["Admin"]);
-    appendAutomationLogToConfig(getDb(), data.key as AutomationConfigKey, data.log);
-    return { ok: true };
+    appendAutomationLogToConfig(getDb(), data.key, data.log as AutomationLog);
+    return { ok: true as const };
   });
 
 export const clearAutomationLogs = createServerFn({ method: "POST" })
@@ -622,8 +610,8 @@ export const clearAutomationLogs = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     requireUser(["Admin"]);
-    replaceAutomationLogsInConfig(getDb(), data.key as AutomationConfigKey, []);
-    return { ok: true };
+    replaceAutomationLogsInConfig(getDb(), data.key, []);
+    return { ok: true as const };
   });
 
 export const setAppConfig = createServerFn({ method: "POST" })
