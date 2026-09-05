@@ -9,7 +9,13 @@ const CRM_TICKET_TABS = [
   { to: "/crm/tickets/links", label: "Portal Links", exact: false },
 ] as const;
 
-export function CrmTicketsNav({ compact }: { compact?: boolean }) {
+export function CrmTicketsNav({
+  compact,
+  className,
+}: {
+  compact?: boolean;
+  className?: string;
+}) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   return (
@@ -19,7 +25,8 @@ export function CrmTicketsNav({ compact }: { compact?: boolean }) {
       transition={{ duration: 0.3, ease: TICKET_EASE }}
       className={cn(
         "flex gap-0.5 overflow-x-auto rounded-lg border bg-muted/30 p-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-        compact ? "mb-3" : "mb-5",
+        compact ? "mb-0 mt-2" : "mb-5",
+        className,
       )}
     >
       {CRM_TICKET_TABS.map((tab) => {
