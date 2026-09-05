@@ -1,4 +1,5 @@
 import type { AutomationLog, AutomationLogWire } from "@/types/automation";
+import { isTransientFetchError } from "@/lib/sync";
 
 const MAX_LOGS = 500;
 
@@ -55,6 +56,7 @@ export function syncAutomationLogToServer(key: AutomationLogConfigKey, log: Auto
       appendAutomationLog({ data: { key, log: automationLogToWire(slimAutomationLog(log)) } }),
     )
     .catch((err) => {
+      if (isTransientFetchError(err)) return;
       console.warn(`[automation-log] failed to persist log to ${key}`, err);
     });
 }
@@ -64,15 +66,24 @@ export function clearAutomationLogsOnServer(key: AutomationLogConfigKey) {
   void import("@/lib/api")
     .then(({ clearAutomationLogs }) => clearAutomationLogs({ data: { key } }))
     .catch((err) => {
+      if (isTransientFetchError(err)) return;
       console.warn(`[automation-log] failed to clear logs for ${key}`, err);
     });
 }
 
-/** Load latest logs from SQLite into a store. */
+/**
+ * Load latest logs from SQLite.
+ * Returns null when the server could not be reached (caller keeps cached logs).
+ */
 export async function fetchAutomationLogsFromServer(
   key: AutomationLogConfigKey,
-): Promise<AutomationLog[]> {
-  const { getAutomationLogs } = await import("@/lib/api");
-  const logs = await getAutomationLogs({ data: { key } });
-  return wireToAutomationLogs(Array.isArray(logs) ? logs : []);
+): Promise<AutomationLog[] | null> {
+  try {
+    const { getAutomationLogs } = await import("@/lib/api");
+    const logs = await getAutomationLogs({ data: { key } });
+    return wireToAutomationLogs(Array.isArray(logs) ? logs : []);
+  } catch (err) {
+    if (isTransientFetchError(err)) return null;
+    throw err;
+  }
 }

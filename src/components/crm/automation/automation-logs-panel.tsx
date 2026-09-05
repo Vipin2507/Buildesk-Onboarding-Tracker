@@ -77,8 +77,12 @@ export function AutomationLogsPanel() {
   const refreshLogs = useCallback(async () => {
     setRefreshing(true);
     try {
-      const logs = await fetchAutomationLogsFromServer("crm-automation");
-      useCrmAutomationStore.setState({ logs: logs.slice(0, 500) });
+      const next = await fetchAutomationLogsFromServer("crm-automation");
+      if (next === null) {
+        toast.message("Could not reach server — showing cached logs");
+        return;
+      }
+      useCrmAutomationStore.setState({ logs: next.slice(0, 500) });
     } catch {
       toast.error("Failed to refresh logs from database");
     } finally {
@@ -86,9 +90,15 @@ export function AutomationLogsPanel() {
     }
   }, []);
 
+  // Logs are hydrated on app bootstrap; refresh manually or when empty.
   useEffect(() => {
-    void refreshLogs();
-  }, [refreshLogs]);
+    if (useCrmAutomationStore.getState().logs.length > 0) return;
+    void fetchAutomationLogsFromServer("crm-automation").then((next) => {
+      if (next && next.length > 0) {
+        useCrmAutomationStore.setState({ logs: next.slice(0, 500) });
+      }
+    });
+  }, []);
 
   const filtered = useMemo(() => {
     return logs.filter((l) => {

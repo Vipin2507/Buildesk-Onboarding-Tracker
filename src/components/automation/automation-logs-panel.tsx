@@ -38,8 +38,12 @@ export function AutomationLogsPanel() {
   const refreshLogs = useCallback(async () => {
     setRefreshing(true);
     try {
-      const logs = await fetchAutomationLogsFromServer("automation");
-      useAutomationStore.setState({ logs: logs.slice(0, 500) });
+      const next = await fetchAutomationLogsFromServer("automation");
+      if (next === null) {
+        toast.message("Could not reach server — showing cached logs");
+        return;
+      }
+      useAutomationStore.setState({ logs: next.slice(0, 500) });
     } catch {
       toast.error("Failed to refresh logs from database");
     } finally {
@@ -48,8 +52,13 @@ export function AutomationLogsPanel() {
   }, []);
 
   useEffect(() => {
-    void refreshLogs();
-  }, [refreshLogs]);
+    if (useAutomationStore.getState().logs.length > 0) return;
+    void fetchAutomationLogsFromServer("automation").then((next) => {
+      if (next && next.length > 0) {
+        useAutomationStore.setState({ logs: next.slice(0, 500) });
+      }
+    });
+  }, []);
 
   const filtered = useMemo(() => {
     return logs.filter((l) => {

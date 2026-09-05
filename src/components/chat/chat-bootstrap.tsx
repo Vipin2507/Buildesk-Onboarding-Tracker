@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 
 import { listChatSessions } from "@/lib/api";
+import { isTransientFetchError } from "@/lib/sync";
 import { useChatStore } from "@/stores/useChatStore";
 
 const POLL_MS = 3_000;
@@ -17,7 +18,9 @@ export function ChatBootstrap() {
         const sessions = await listChatSessions();
         if (!cancelled) syncSessionsFromServer(sessions);
       } catch (e) {
-        console.warn("[chat bootstrap]", e);
+        if (!isTransientFetchError(e)) {
+          console.warn("[chat bootstrap]", e);
+        }
       }
     }
 

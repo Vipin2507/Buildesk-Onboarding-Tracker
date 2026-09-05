@@ -1,6 +1,7 @@
 import { toast } from "sonner";
 
-function isIgnorableSyncError(message: string) {
+export function isTransientFetchError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
   return (
     /not found/i.test(message) ||
     /FOREIGN KEY constraint failed/i.test(message) ||
@@ -8,10 +9,17 @@ function isIgnorableSyncError(message: string) {
     /company missing/i.test(message) ||
     /failed to fetch/i.test(message) ||
     /networkerror/i.test(message) ||
+    /network changed/i.test(message) ||
+    /internet disconnected/i.test(message) ||
     /load failed/i.test(message) ||
     /do not have permission/i.test(message) ||
-    /sign in required/i.test(message)
+    /sign in required/i.test(message) ||
+    /aborted/i.test(message)
   );
+}
+
+function isIgnorableSyncError(message: string) {
+  return isTransientFetchError(new Error(message));
 }
 
 const pending = new Map<string, Promise<unknown>>();
