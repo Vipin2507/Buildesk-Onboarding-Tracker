@@ -9,13 +9,14 @@ import {
   readAutomationLogsFromConfig,
   replaceAutomationLogsInConfig,
 } from "@/server/automation-log-persistence";
-import { automationLogSchema } from "@/server/automation-log-schema";
+import { automationLogWireSchema } from "@/server/automation-log-schema";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { loadCompanies, loadProjects } from "@/server/api/mappers";
 import { isTicketOpen, mapTicket, mapTicketActivity } from "@/lib/tickets";
+import { automationLogToWire } from "@/lib/automation-log-sync";
 import type { TicketActivity } from "@/types";
-import type { AutomationLog } from "@/types/automation";
+import type { AutomationLogWire } from "@/types/automation";
 
 const ticketStatus = z.enum([
   "Open",
@@ -582,11 +583,10 @@ export const getAutomationLogs = createServerFn({ method: "GET" })
   .inputValidator((data: unknown) =>
     z.object({ key: automationConfigKeySchema }).parse(data),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data }): Promise<AutomationLogWire[]> => {
     requireUser(["Admin"]);
     const logs = readAutomationLogsFromConfig(getDb(), data.key);
-    // Round-trip so the payload is JSON-serializable for ServerFn typing.
-    return JSON.parse(JSON.stringify(logs)) as AutomationLog[];
+    return JSON.parse(JSON.stringify(logs)) as AutomationLogWire[];
   });
 
 export const appendAutomationLog = createServerFn({ method: "POST" })
@@ -594,13 +594,13 @@ export const appendAutomationLog = createServerFn({ method: "POST" })
     z
       .object({
         key: automationConfigKeySchema,
-        log: automationLogSchema,
+        log: automationLogWireSchema,
       })
       .parse(data),
   )
   .handler(async ({ data }) => {
     requireUser(["Admin"]);
-    appendAutomationLogToConfig(getDb(), data.key, data.log as AutomationLog);
+    appendAutomationLogToConfig(getDb(), data.key, automationLogToWire(data.log));
     return { ok: true as const };
   });
 

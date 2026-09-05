@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { AutomationLog, AutomationTrigger } from "@/types/automation";
+import type { AutomationLogWire, AutomationTrigger, JsonValue } from "@/types/automation";
 
 export const AUTOMATION_TRIGGER_VALUES = [
   "ticket-created",
@@ -12,7 +12,13 @@ export const AUTOMATION_TRIGGER_VALUES = [
   "task-before-start",
 ] as const satisfies readonly AutomationTrigger[];
 
-export const automationLogSchema = z.object({
+const jsonLiteralSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+
+export const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
+  z.union([jsonLiteralSchema, z.array(jsonValueSchema), z.record(z.string(), jsonValueSchema)]),
+);
+
+export const automationLogWireSchema = z.object({
   id: z.string(),
   ticketId: z.string().optional(),
   ticketNumber: z.string().optional(),
@@ -20,18 +26,13 @@ export const automationLogSchema = z.object({
   channel: z.enum(["email", "whatsapp"]),
   trigger: z.enum(AUTOMATION_TRIGGER_VALUES),
   status: z.enum(["success", "failed", "retrying"]),
-  requestPayload: z.record(z.string(), z.unknown()),
+  requestPayload: z.record(z.string(), jsonValueSchema),
   responseSummary: z.string().optional(),
   errorMessage: z.string().optional(),
   attemptedAt: z.string(),
   retryCount: z.number(),
 });
 
-export function parseAutomationLog(input: unknown): AutomationLog {
-  return automationLogSchema.parse(input) as AutomationLog;
-}
-
-export function parseAutomationLogs(input: unknown): AutomationLog[] {
-  if (!Array.isArray(input)) return [];
-  return input.map((entry) => parseAutomationLog(entry));
+export function parseAutomationLogWire(input: unknown): AutomationLogWire {
+  return automationLogWireSchema.parse(input);
 }

@@ -85,7 +85,8 @@ import {
 import { hydrateCrmSettingsFromServer } from "@/stores/useCrmSettingsStore";
 import { hydrateCrmMasterFromServer, useCrmMasterStore } from "@/stores/useCrmMasterStore";
 import type { CrmOnboardingRecord } from "@/types/crm-onboarding";
-import type { AutomationLog } from "@/types/automation";
+import type { AutomationLogWire } from "@/types/automation";
+import { wireToAutomationLogs } from "@/lib/automation-log-sync";
 
 function readLegacyCrmOnboarding(): CrmOnboardingRecord[] {
   if (typeof window === "undefined") return [];
@@ -421,16 +422,16 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
         }
 
         if (user.role === "Admin") {
-          const emptyLogs: AutomationLog[] = [];
+          const emptyLogs: AutomationLogWire[] = [];
           const [erpLogs, crmLogs] = await Promise.all([
             getAutomationLogs({ data: { key: "automation" } }).catch(() => emptyLogs),
             getAutomationLogs({ data: { key: "crm-automation" } }).catch(() => emptyLogs),
           ]);
           if (erpLogs.length > 0) {
-            useAutomationStore.setState({ logs: erpLogs.slice(0, 500) });
+            useAutomationStore.setState({ logs: wireToAutomationLogs(erpLogs).slice(0, 500) });
           }
           if (crmLogs.length > 0) {
-            useCrmAutomationStore.setState({ logs: crmLogs.slice(0, 500) });
+            useCrmAutomationStore.setState({ logs: wireToAutomationLogs(crmLogs).slice(0, 500) });
           }
           const localErpLogs = useAutomationStore.getState().logs.length;
           const localCrmLogs = useCrmAutomationStore.getState().logs.length;

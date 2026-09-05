@@ -1,8 +1,23 @@
-import type { AutomationLog } from "@/types/automation";
+import type { AutomationLog, AutomationLogWire } from "@/types/automation";
 
 const MAX_LOGS = 500;
 
 export type AutomationLogConfigKey = "automation" | "crm-automation";
+
+export function wireToAutomationLog(log: AutomationLogWire): AutomationLog {
+  return {
+    ...log,
+    requestPayload: log.requestPayload as Record<string, unknown>,
+  };
+}
+
+export function wireToAutomationLogs(logs: AutomationLogWire[]): AutomationLog[] {
+  return logs.map(wireToAutomationLog);
+}
+
+export function automationLogToWire(log: AutomationLog): AutomationLogWire {
+  return JSON.parse(JSON.stringify(log)) as AutomationLogWire;
+}
 
 /** Keep logs durable without blowing SQLite with huge webhook bodies. */
 export function slimAutomationLog(log: AutomationLog): AutomationLog {
@@ -37,7 +52,7 @@ function slimPayload(payload: Record<string, unknown> | undefined): Record<strin
 export function syncAutomationLogToServer(key: AutomationLogConfigKey, log: AutomationLog) {
   void import("@/lib/api")
     .then(({ appendAutomationLog }) =>
-      appendAutomationLog({ data: { key, log: slimAutomationLog(log) } }),
+      appendAutomationLog({ data: { key, log: automationLogToWire(slimAutomationLog(log)) } }),
     )
     .catch((err) => {
       console.warn(`[automation-log] failed to persist log to ${key}`, err);
@@ -59,5 +74,5 @@ export async function fetchAutomationLogsFromServer(
 ): Promise<AutomationLog[]> {
   const { getAutomationLogs } = await import("@/lib/api");
   const logs = await getAutomationLogs({ data: { key } });
-  return (Array.isArray(logs) ? logs : []) as AutomationLog[];
+  return wireToAutomationLogs(Array.isArray(logs) ? logs : []);
 }

@@ -62,6 +62,10 @@ export interface AutomationRule {
 
 export type AutomationLogStatus = "success" | "failed" | "retrying";
 
+/** JSON-safe value for ServerFn wire transport. */
+export type JsonPrimitive = string | number | boolean | null;
+export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
+
 export interface AutomationLog {
   id: string;
   ticketId?: string;
@@ -76,6 +80,11 @@ export interface AutomationLog {
   attemptedAt: string;
   retryCount: number;
 }
+
+/** Serializable automation log shape for server/client API transport. */
+export type AutomationLogWire = Omit<AutomationLog, "requestPayload"> & {
+  requestPayload: Record<string, JsonValue>;
+};
 
 export type AutomationHealthMethod = "GET" | "POST";
 
