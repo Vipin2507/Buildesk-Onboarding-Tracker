@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { toast } from "sonner";
@@ -23,8 +23,8 @@ type CscState = { iso2: string; name: string };
 type Props = {
   form: UseFormReturn<CrmAccountFormValues>;
   fieldClass: (hasError?: boolean, readOnly?: boolean) => string;
-  Label: (props: { children: ReactNode; required?: boolean }) => JSX.Element;
-  FieldError: (props: { message?: string }) => JSX.Element | null;
+  Label: (props: { children: ReactNode; required?: boolean }) => ReactElement;
+  FieldError: (props: { message?: string }) => ReactElement | null;
 };
 
 function matchByName<T extends { name: string }>(rows: T[], value: string | undefined) {
