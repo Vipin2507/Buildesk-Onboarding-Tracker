@@ -13,6 +13,7 @@ import {
   renderAutomationSubject,
   renderAutomationTemplate,
 } from "@/services/automationTemplate";
+import { appendAutomationLogToConfig } from "@/server/automation-log-persistence";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { nowIso } from "@/types";
@@ -68,29 +69,7 @@ export function loadCrmAutomationConfig(db: ReturnType<typeof getDb>) {
 }
 
 export function appendServerCrmAutomationLog(db: ReturnType<typeof getDb>, log: AutomationLog) {
-  const row = db.select().from(t.appConfig).where(eq(t.appConfig.key, "crm-automation")).get();
-  let snapshot: Record<string, unknown> = {};
-  if (row?.valueJson) {
-    try {
-      snapshot = JSON.parse(row.valueJson) as Record<string, unknown>;
-    } catch {
-      snapshot = {};
-    }
-  }
-  const existing = Array.isArray(snapshot.logs) ? (snapshot.logs as AutomationLog[]) : [];
-  const nextLogs = [log, ...existing].slice(0, 500);
-  const valueJson = JSON.stringify({ ...snapshot, logs: nextLogs });
-  const now = nowIso();
-  if (row) {
-    db.update(t.appConfig)
-      .set({ valueJson, updatedAt: now })
-      .where(eq(t.appConfig.key, "crm-automation"))
-      .run();
-  } else {
-    db.insert(t.appConfig)
-      .values({ key: "crm-automation", valueJson, updatedAt: now })
-      .run();
-  }
+  appendAutomationLogToConfig(db, "crm-automation", log);
 }
 
 function formatBookingWhen(iso: string) {

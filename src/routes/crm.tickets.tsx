@@ -1,7 +1,7 @@
 import { createFileRoute, Link, Outlet, useChildMatches, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { Link2, Search } from "lucide-react";
-import { useCallback, useMemo, useRef } from "react";
+import { Link2, Plus, Search } from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { DataTable } from "@/components/data-table";
@@ -17,12 +17,14 @@ import {
 import { DesignTicketFilterBar, TICKET_EASE } from "@/components/design-ticket/design-ticket-shared";
 import { EmptyState } from "@/components/empty-state";
 import { PageWrap } from "@/components/page-header";
+import { TicketCreateDialog } from "@/components/tickets/ticket-create-dialog";
 import { Button } from "@/components/ui/button";
 import { useSessionFilterState } from "@/hooks/use-session-filter";
+import { filterCrmAccountsForUser } from "@/lib/crm-account-access";
 import { filterCrmDesignTickets } from "@/lib/crm-tickets";
 import { cn, formatDate } from "@/lib/utils";
 import { isDesignTicketActive } from "@/stores/design-ticket-selectors";
-import { useCrmAccountStore, useCurrentUser } from "@/stores";
+import { useAuthStore, useCrmAccountStore, useCurrentUser } from "@/stores";
 import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
 import type { DesignTicketPriority, DesignTicketStatus } from "@/types/design-ticket";
 import {
@@ -88,11 +90,22 @@ function CrmTicketTrackingPage() {
   const navigate = useNavigate();
   const tableRef = useRef<HTMLDivElement>(null);
   const currentUser = useCurrentUser();
+  const authUser = useAuthStore((s) => s.user);
   const tickets = useDesignTicketStore((s) => s.tickets);
   const updateStatus = useDesignTicketStore((s) => s.updateStatus);
   const updatePriority = useDesignTicketStore((s) => s.updatePriority);
   const accounts = useCrmAccountStore((s) => s.accounts);
   const crmTickets = useMemo(() => filterCrmDesignTickets(tickets), [tickets, accounts]);
+
+  const [createOpen, setCreateOpen] = useState(false);
+
+  const accountOptions = useMemo(
+    () =>
+      filterCrmAccountsForUser(accounts, authUser)
+        .map((a) => ({ id: a.id, name: a.name }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [accounts, authUser],
+  );
 
   const [listFilters, setListFilters] = useSessionFilterState(
     "crm.tickets.list",
@@ -181,12 +194,24 @@ function CrmTicketTrackingPage() {
               {filtered.length} {filtered.length === 1 ? "ticket" : "tickets"}
             </p>
           </div>
-          <Button type="button" size="sm" variant="outline" className="h-8 gap-1.5 text-xs" asChild>
-            <Link to="/crm/tickets/links">
-              <Link2 className="h-3.5 w-3.5" />
-              Portal Links
-            </Link>
-          </Button>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Button type="button" size="sm" variant="outline" className="h-8 gap-1.5 text-xs" asChild>
+              <Link to="/crm/tickets/links">
+                <Link2 className="h-3.5 w-3.5" />
+                Portal Links
+              </Link>
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="h-8 gap-1 bg-primary px-3 text-xs"
+              onClick={() => setCreateOpen(true)}
+              disabled={accountOptions.length === 0}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Create ticket
+            </Button>
+          </div>
         </div>
 
         <CrmTicketsNav compact />
@@ -302,9 +327,9 @@ function CrmTicketTrackingPage() {
             <div className="px-3 sm:px-4 lg:px-5">
               <EmptyState
                 title="No portal tickets yet"
-                description="Portal tickets created by clients appear here. Share links from Portal Links."
-                actionLabel="Portal Links"
-                href="/crm/tickets/links"
+                description="Create a ticket for any account or share portal links so clients can raise requests."
+                actionLabel="Create ticket"
+                onAction={() => setCreateOpen(true)}
               />
             </div>
           ) : filtered.length === 0 ? (
@@ -429,6 +454,18 @@ function CrmTicketTrackingPage() {
           )}
         </div>
       </div>
+
+      <TicketCreateDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        companies={accountOptions}
+        actorName={actorName}
+        title="Create portal ticket"
+        companyLabel="Account"
+        onCreated={(ticketId) => {
+          void navigate({ to: "/crm/tickets/$ticketId", params: { ticketId } });
+        }}
+      />
     </PageWrap>
   );
 }

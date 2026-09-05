@@ -217,7 +217,10 @@ export function CrmQueriesHub({ statusFilter, onStatusFilterChange, selectedQuer
             onAction={() => setCreateOpen(true)}
           />
         ) : (
-          <div ref={tableRef}>
+          <div
+            ref={tableRef}
+            className="bg-card [&_tbody_tr]:bg-card [&_thead]:bg-card"
+          >
             <DataTable
               data={filtered}
               columns={columns}

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Eye, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { CRM_BOOKING_AUTOMATION_TRIGGERS } from "@/data/crm-automation-defaults";
+import { fetchAutomationLogsFromServer } from "@/lib/automation-log-sync";
 import { retryCrmAutomationLog } from "@/services/crm-automation";
 import { useCrmAutomationStore } from "@/stores/useCrmAutomationStore";
 import { useCompanyStore } from "@/stores/useCompanyStore";
@@ -71,6 +72,23 @@ export function AutomationLogsPanel() {
     [setListFilters],
   );
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refreshLogs = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const logs = await fetchAutomationLogsFromServer("crm-automation");
+      useCrmAutomationStore.setState({ logs: logs.slice(0, 500) });
+    } catch {
+      toast.error("Failed to refresh logs from database");
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshLogs();
+  }, [refreshLogs]);
 
   const filtered = useMemo(() => {
     return logs.filter((l) => {
@@ -164,9 +182,20 @@ export function AutomationLogsPanel() {
           <h2 className="text-xs font-semibold text-muted-foreground">Automation logs</h2>
           <p className="text-[10px] text-muted-foreground">Every webhook attempt with retry support.</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => void retryAllFailed()} className="h-7 gap-1 px-2.5 text-xs">
-          <RefreshCw className="h-3.5 w-3.5" /> Retry all failed
-        </Button>
+        <div className="flex flex-wrap gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void refreshLogs()}
+            disabled={refreshing}
+            className="h-7 gap-1 px-2.5 text-xs"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} /> Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => void retryAllFailed()} className="h-7 gap-1 px-2.5 text-xs">
+            <RefreshCw className="h-3.5 w-3.5" /> Retry all failed
+          </Button>
+        </div>
       </div>
 
       <div className="mb-2 flex flex-wrap gap-1.5">

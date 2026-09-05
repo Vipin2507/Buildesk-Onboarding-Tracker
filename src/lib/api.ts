@@ -104,6 +104,9 @@ export {
   mutateIntegration,
   getAppConfig,
   setAppConfig,
+  getAutomationLogs,
+  appendAutomationLog,
+  clearAutomationLogs,
   getDashboardKpis,
 } from "@/server/api/ops";
 

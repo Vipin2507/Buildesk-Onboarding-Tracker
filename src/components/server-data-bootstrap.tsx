@@ -26,6 +26,7 @@ import {
   listNotifications,
   getAppConfig,
   setAppConfig,
+  getAutomationLogs,
   listFollowUpTasks,
   listErpFollowUpTasks,
   listClientVisits,
@@ -383,16 +384,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
         }
         if (automation && typeof automation === "object" && Object.keys(automation).length > 0) {
           hydrateAutomationFromServer(automation as Record<string, unknown>);
-          // Older DB rows lack logs — push local logs up so the next refresh keeps them.
-          if (
-            !("logs" in (automation as object)) &&
-            useAutomationStore.getState().logs.length > 0
-          ) {
-            const { flushAutomationConfigPersistence } = await import("@/lib/config-persistence");
-            flushAutomationConfigPersistence();
-          }
         } else {
-          // Backfill server config so automation ON/OFF state survives deploys and device changes.
           const localAutomation = useAutomationStore.getState();
           await setAppConfig({
             data: {
@@ -403,7 +395,6 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
                 waha: localAutomation.waha,
                 healthCheck: localAutomation.healthCheck,
                 rules: localAutomation.rules,
-                logs: localAutomation.logs.slice(0, 500),
               },
             },
           }).catch(() => {});
@@ -412,13 +403,6 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
         if (crmAutomation && typeof crmAutomation === "object" && Object.keys(crmAutomation).length > 0) {
           hydrateCrmAutomationFromServer(crmAutomation as Record<string, unknown>);
           useCrmAutomationStore.getState().ensureDefaults();
-          if (
-            !("logs" in (crmAutomation as object)) &&
-            useCrmAutomationStore.getState().logs.length > 0
-          ) {
-            const { flushAutomationConfigPersistence } = await import("@/lib/config-persistence");
-            flushAutomationConfigPersistence();
-          }
         } else {
           const localCrmAutomation = useCrmAutomationStore.getState();
           await setAppConfig({
@@ -430,10 +414,31 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
                 waha: localCrmAutomation.waha,
                 healthCheck: localCrmAutomation.healthCheck,
                 rules: localCrmAutomation.rules,
-                logs: localCrmAutomation.logs.slice(0, 500),
               },
             },
           }).catch(() => {});
+        }
+
+        if (user.role === "Admin") {
+          const [erpLogs, crmLogs] = await Promise.all([
+            getAutomationLogs({ data: { key: "automation" } }).catch(() => []),
+            getAutomationLogs({ data: { key: "crm-automation" } }).catch(() => []),
+          ]);
+          if (erpLogs.length > 0) {
+            useAutomationStore.setState({ logs: erpLogs.slice(0, 500) });
+          }
+          if (crmLogs.length > 0) {
+            useCrmAutomationStore.setState({ logs: crmLogs.slice(0, 500) });
+          }
+          const localErpLogs = useAutomationStore.getState().logs.length;
+          const localCrmLogs = useCrmAutomationStore.getState().logs.length;
+          if (
+            (erpLogs.length === 0 && localErpLogs > 0) ||
+            (crmLogs.length === 0 && localCrmLogs > 0)
+          ) {
+            const { migrateAutomationLogsToServer } = await import("@/lib/config-persistence");
+            migrateAutomationLogsToServer();
+          }
         }
 
         setReady(true);

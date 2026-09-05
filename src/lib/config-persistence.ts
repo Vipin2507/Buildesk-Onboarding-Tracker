@@ -1,4 +1,5 @@
 import { setAppConfig } from "@/lib/api";
+import { slimAutomationLogs } from "@/lib/automation-log-sync";
 import { isAdminRoleKey } from "@/lib/permissions";
 import { flushServerSyncDebounced, serverSyncDebounced } from "@/lib/sync";
 import { useAuthStore } from "@/stores/useAuthStore";
@@ -8,7 +9,6 @@ import { crmSettingsSnapshot, useCrmSettingsStore } from "@/stores/useCrmSetting
 import { crmMasterSnapshot, useCrmMasterStore } from "@/stores/useCrmMasterStore";
 import { useMasterStore } from "@/stores/useMasterStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
-import type { AutomationLog } from "@/types/automation";
 
 function canPersistAppConfig() {
   const user = useAuthStore.getState().user;
@@ -44,31 +44,6 @@ function settingsSnapshot() {
   };
 }
 
-/** Keep logs durable without blowing SQLite / localStorage with huge webhook bodies. */
-function slimAutomationLogs(logs: AutomationLog[]): AutomationLog[] {
-  return logs.slice(0, 500).map((log) => ({
-    ...log,
-    requestPayload: slimPayload(log.requestPayload),
-    responseSummary: log.responseSummary?.slice(0, 500),
-    errorMessage: log.errorMessage?.slice(0, 500),
-  }));
-}
-
-function slimPayload(payload: Record<string, unknown> | undefined): Record<string, unknown> {
-  if (!payload || typeof payload !== "object") return {};
-  const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(payload)) {
-    if (typeof value === "string" && value.length > 2_000) {
-      out[key] = `${value.slice(0, 2_000)}…`;
-    } else if (value && typeof value === "object" && !Array.isArray(value)) {
-      out[key] = slimPayload(value as Record<string, unknown>);
-    } else {
-      out[key] = value;
-    }
-  }
-  return out;
-}
-
 function automationSnapshot() {
   const s = useAutomationStore.getState();
   return {
@@ -77,7 +52,6 @@ function automationSnapshot() {
     waha: s.waha,
     healthCheck: s.healthCheck,
     rules: s.rules,
-    logs: slimAutomationLogs(s.logs),
   };
 }
 
@@ -89,7 +63,6 @@ function crmAutomationSnapshot() {
     waha: s.waha,
     healthCheck: s.healthCheck,
     rules: s.rules,
-    logs: slimAutomationLogs(s.logs),
   };
 }
 
@@ -128,13 +101,29 @@ export function flushCrmMasterConfigPersistence() {
   void setAppConfig({ data: { key: "crm-master", value: crmMasterSnapshot() } });
 }
 
-/** Force pending automation config (including logs) to SQLite now. */
+/** Force pending automation config to SQLite now (settings/rules — logs sync separately). */
 export function flushAutomationConfigPersistence() {
   if (!canPersistAppConfig()) return;
   persistAutomationConfig();
   persistCrmAutomationConfig();
   flushServerSyncDebounced("automation-config");
   flushServerSyncDebounced("crm-automation-config");
+}
+
+/** One-time migration: push local logs to SQLite when server row lacks them. */
+export function migrateAutomationLogsToServer() {
+  if (!canPersistAppConfig()) return;
+  const erpLogs = slimAutomationLogs(useAutomationStore.getState().logs);
+  const crmLogs = slimAutomationLogs(useCrmAutomationStore.getState().logs);
+  if (erpLogs.length === 0 && crmLogs.length === 0) return;
+  void import("@/lib/api").then(({ appendAutomationLog }) => {
+    for (const log of erpLogs) {
+      void appendAutomationLog({ data: { key: "automation", log } }).catch(() => {});
+    }
+    for (const log of crmLogs) {
+      void appendAutomationLog({ data: { key: "crm-automation", log } }).catch(() => {});
+    }
+  });
 }
 
 /** Subscribe master/settings stores so changes persist to SQLite app_config. */

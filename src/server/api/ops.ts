@@ -4,6 +4,12 @@ import { z } from "zod";
 
 import { requirePermission } from "@/server/auth/permissions";
 import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
+import {
+  appendAutomationLogToConfig,
+  readAutomationLogsFromConfig,
+  replaceAutomationLogsInConfig,
+  type AutomationConfigKey,
+} from "@/server/automation-log-persistence";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { loadCompanies, loadProjects } from "@/server/api/mappers";
@@ -569,6 +575,57 @@ export const getAppConfig = createServerFn({ method: "GET" })
     return row ? JSON.parse(row.valueJson) : {};
   });
 
+const automationConfigKeySchema = z.enum(["automation", "crm-automation"]);
+
+const automationLogSchema = z.object({
+  id: z.string(),
+  ticketId: z.string().optional(),
+  ticketNumber: z.string().optional(),
+  companyId: z.string().optional(),
+  channel: z.enum(["email", "whatsapp"]),
+  trigger: z.string(),
+  status: z.enum(["success", "failed", "retrying"]),
+  requestPayload: z.record(z.string(), z.unknown()),
+  responseSummary: z.string().optional(),
+  errorMessage: z.string().optional(),
+  attemptedAt: z.string(),
+  retryCount: z.number(),
+});
+
+export const getAutomationLogs = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) =>
+    z.object({ key: automationConfigKeySchema }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    requireUser(["Admin"]);
+    return readAutomationLogsFromConfig(getDb(), data.key as AutomationConfigKey);
+  });
+
+export const appendAutomationLog = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        key: automationConfigKeySchema,
+        log: automationLogSchema,
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    requireUser(["Admin"]);
+    appendAutomationLogToConfig(getDb(), data.key as AutomationConfigKey, data.log);
+    return { ok: true };
+  });
+
+export const clearAutomationLogs = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ key: automationConfigKeySchema }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    requireUser(["Admin"]);
+    replaceAutomationLogsInConfig(getDb(), data.key as AutomationConfigKey, []);
+    return { ok: true };
+  });
+
 export const setAppConfig = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z
@@ -583,14 +640,31 @@ export const setAppConfig = createServerFn({ method: "POST" })
     const db = getDb();
     const existing = db.select().from(t.appConfig).where(eq(t.appConfig.key, data.key)).get();
     const now = nowIso();
+    let value = data.value as Record<string, unknown>;
+    // Never wipe durable automation logs when persisting settings/rules from the client.
+    if (
+      (data.key === "automation" || data.key === "crm-automation") &&
+      existing?.valueJson &&
+      !("logs" in value)
+    ) {
+      try {
+        const prev = JSON.parse(existing.valueJson) as Record<string, unknown>;
+        if (Array.isArray(prev.logs)) {
+          value = { ...value, logs: prev.logs };
+        }
+      } catch {
+        /* keep incoming value */
+      }
+    }
+    const valueJson = JSON.stringify(value);
     if (existing) {
       db.update(t.appConfig)
-        .set({ valueJson: JSON.stringify(data.value), updatedAt: now })
+        .set({ valueJson, updatedAt: now })
         .where(eq(t.appConfig.key, data.key))
         .run();
     } else {
       db.insert(t.appConfig)
-        .values({ key: data.key, valueJson: JSON.stringify(data.value), updatedAt: now })
+        .values({ key: data.key, valueJson, updatedAt: now })
         .run();
     }
     return { ok: true };

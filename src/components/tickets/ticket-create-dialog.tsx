@@ -11,6 +11,7 @@ import {
   ticketTextareaClass,
 } from "@/components/design-ticket/design-ticket-shared";
 import { EntityFormModal } from "@/components/entity-form-modal";
+import { cn } from "@/lib/utils";
 import { DESIGN_TICKET_CATEGORIES } from "@/types/design-ticket";
 import type { DesignTicketPriority } from "@/types/design-ticket";
 import { DESIGN_TICKET_PRIORITY_LABEL } from "@/types/design-ticket";
@@ -25,6 +26,8 @@ export function TicketCreateDialog({
   projects = [],
   actorName,
   onCreated,
+  title = "Create client ticket",
+  companyLabel = "Company",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -32,6 +35,8 @@ export function TicketCreateDialog({
   projects?: { id: string; name: string; companyId: string }[];
   actorName: string;
   onCreated?: (ticketId: string) => void;
+  title?: string;
+  companyLabel?: string;
 }) {
   const createTeamTicket = useDesignTicketStore((s) => s.createTeamTicket);
   const [companyId, setCompanyId] = useState(companies[0]?.id ?? "");
@@ -94,36 +99,38 @@ export function TicketCreateDialog({
     <EntityFormModal
       open={open}
       onOpenChange={onOpenChange}
-      title="Create client ticket"
+      title={title}
       submitLabel={saving ? "Creating…" : "Create ticket"}
       onSubmit={() => void submit()}
     >
       <div className="grid gap-4">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <DesignTicketFormField label="Company">
+        <div className={cn("grid gap-4", projects.length > 0 ? "sm:grid-cols-2" : "")}>
+          <DesignTicketFormField label={companyLabel}>
             <DesignTicketSearchableSelect
               value={companyId}
-              placeholder="Search company..."
-              emptyLabel="No companies found"
+              placeholder={`Search ${companyLabel.toLowerCase()}...`}
+              emptyLabel={`No ${companyLabel.toLowerCase()}s found`}
               options={companies.map((c) => ({ value: c.id, label: c.name }))}
               onChange={handleCompanyChange}
             />
           </DesignTicketFormField>
-          <DesignTicketFormField label="Project (optional)">
-            <DesignTicketSearchableSelect
-              value={projectId || NONE_PROJECT}
-              placeholder="Search project..."
-              emptyLabel={
-                companyProjects.length ? "No projects found" : "No projects for this company"
-              }
-              options={[
-                { value: NONE_PROJECT, label: "No specific project" },
-                ...companyProjects.map((p) => ({ value: p.id, label: p.name })),
-              ]}
-              onChange={(v) => setProjectId(v === NONE_PROJECT ? "" : v)}
-              disabled={!companyId}
-            />
-          </DesignTicketFormField>
+          {projects.length > 0 ? (
+            <DesignTicketFormField label="Project (optional)">
+              <DesignTicketSearchableSelect
+                value={projectId || NONE_PROJECT}
+                placeholder="Search project..."
+                emptyLabel={
+                  companyProjects.length ? "No projects found" : "No projects for this company"
+                }
+                options={[
+                  { value: NONE_PROJECT, label: "No specific project" },
+                  ...companyProjects.map((p) => ({ value: p.id, label: p.name })),
+                ]}
+                onChange={(v) => setProjectId(v === NONE_PROJECT ? "" : v)}
+                disabled={!companyId}
+              />
+            </DesignTicketFormField>
+          ) : null}
         </div>
 
         <DesignTicketFormField label="Subject">

@@ -16,6 +16,10 @@ import {
   mergeCrmAutomationRules,
 } from "@/data/crm-automation-defaults";
 import { createPersistedStore, touch } from "./persist";
+import {
+  clearAutomationLogsOnServer,
+  syncAutomationLogToServer,
+} from "@/lib/automation-log-sync";
 
 type AutomationState = {
   settings: AutomationSettings;
@@ -241,9 +245,13 @@ export const useCrmAutomationStore = createPersistedStore<AutomationState>(
         }
         return { logs: [log, ...s.logs].slice(0, 500) };
       });
+      syncAutomationLogToServer("crm-automation", log);
     },
 
-    clearLogs: () => set({ logs: [] }),
+    clearLogs: () => {
+      set({ logs: [] });
+      clearAutomationLogsOnServer("crm-automation");
+    },
   }),
 );
 
@@ -258,9 +266,7 @@ export function hydrateCrmAutomationFromServer(snapshot: CrmAutomationSnapshot |
   if (snapshot.waha) patch.waha = snapshot.waha;
   if (snapshot.healthCheck) patch.healthCheck = snapshot.healthCheck;
   if (Array.isArray(snapshot.rules)) patch.rules = mergeCrmAutomationRules(snapshot.rules);
-  if ("logs" in snapshot && Array.isArray(snapshot.logs)) {
-    patch.logs = snapshot.logs.slice(0, 500);
-  }
+  // Logs are loaded separately from SQLite via getAutomationLogs.
   if (Object.keys(patch).length === 0) return;
   useCrmAutomationStore.setState((s) => ({
     ...s,
