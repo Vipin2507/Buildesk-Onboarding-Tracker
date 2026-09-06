@@ -50,14 +50,20 @@ import {
 function toDashboardActivityItem(item: CrmActivityItem): CrmDashboardActivityItem {
   return {
     id: item.id,
+    entityId: item.entityId,
     what: item.accountName ? `${item.accountName} · ${item.what}` : item.what,
+    who: item.who,
     executive: item.executive,
+    performerKind: item.performerKind,
     createdAt: item.createdAt,
     kind: item.kind,
     href: item.href,
     category: item.category,
     accountId: item.accountId,
     accountName: item.accountName,
+    remarks: item.remarks,
+    trackerStage: item.trackerStage,
+    moduleKey: item.moduleKey,
   };
 }
 

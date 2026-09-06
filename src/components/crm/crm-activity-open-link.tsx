@@ -104,9 +104,9 @@ export function CrmActivityOpenLink({ item, compact = false, onNavigate }: Props
     ? "h-7 gap-1 px-2 text-[10px]"
     : "h-7 gap-1 px-2.5 text-[10px]";
 
-  function handleNavigate() {
+  function handleNavigate(resolved: CrmActivityDestination) {
     onNavigate?.();
-    navigateToCrmActivityDestination(destination, navigate);
+    navigateToCrmActivityDestination(resolved, navigate);
   }
 
   if (destination.kind === "account") {
@@ -223,7 +223,7 @@ export function CrmActivityOpenLink({ item, compact = false, onNavigate }: Props
   }
 
   return (
-    <Button size="sm" variant="outline" className={className} onClick={handleNavigate}>
+    <Button size="sm" variant="outline" className={className} onClick={() => handleNavigate(destination)}>
       {label}
       <ArrowRight className="h-3 w-3" />
     </Button>

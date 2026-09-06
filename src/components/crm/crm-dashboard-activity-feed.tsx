@@ -6,7 +6,7 @@ import { CrmActivityOpenLink } from "@/components/crm/crm-activity-open-link";
 import { Pill } from "@/components/status-pill";
 import {
   CRM_ACTIVITY_CATEGORY_LABEL,
-  crmActivityExecutiveDisplay,
+  crmActivityPerformerDisplay,
   resolveCrmActivityDestination,
   type CrmActivityItem,
 } from "@/lib/crm-activity-feed";
@@ -19,8 +19,11 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 export type CrmDashboardActivityItem = Pick<
   CrmActivityItem,
   | "id"
+  | "entityId"
   | "what"
+  | "who"
   | "executive"
+  | "performerKind"
   | "createdAt"
   | "kind"
   | "href"
@@ -28,6 +31,8 @@ export type CrmDashboardActivityItem = Pick<
   | "accountId"
   | "accountName"
   | "remarks"
+  | "trackerStage"
+  | "moduleKey"
 >;
 
 const kindDot: Record<ActivityKind, string> = {
@@ -48,7 +53,7 @@ function ActivityRow({
   item: CrmDashboardActivityItem;
   index: number;
 }) {
-  const executive = crmActivityExecutiveDisplay({ executive: item.executive });
+  const executive = crmActivityPerformerDisplay(item);
   const destination = resolveCrmActivityDestination(item);
   const categoryLabel = CRM_ACTIVITY_CATEGORY_LABEL[item.category];
 
