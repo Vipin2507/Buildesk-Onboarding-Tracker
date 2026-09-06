@@ -19,6 +19,7 @@ export type CrmBookingsTabId = (typeof CRM_BOOKINGS_TAB_IDS)[number];
 
 export const crmBookingsSearchSchema = z.object({
   tab: z.enum(CRM_BOOKINGS_TAB_IDS).optional(),
+  appointmentId: z.string().optional(),
   google: z.enum(["connected", "error"]).optional(),
   googleError: z.string().optional(),
 });

@@ -1,7 +1,8 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { PageHeader, PageWrap } from "@/components/page-header";
 import { ListToolbar } from "@/components/list-toolbar";
@@ -16,11 +17,20 @@ import { assignableManagerUsers, resolveAssigneeLabel } from "@/lib/managers";
 import { formatDateTime } from "@/lib/utils";
 import { usePermissions } from "@/hooks/use-permissions";
 
+const clientVisitsSearchSchema = z.object({
+  visitId: z.string().optional(),
+});
+
 export const Route = createFileRoute("/client-visits")({
+  validateSearch: (search) => clientVisitsSearchSchema.parse(search),
   component: ClientVisitsPage,
 });
 
 function ClientVisitsPage() {
+  const navigate = useNavigate({ from: "/client-visits" });
+  const { visitId: linkedVisitId } = Route.useSearch();
+  const tableRef = useRef<HTMLDivElement>(null);
+
   const visits = useClientVisitStore((s) => s.visits);
   const addVisit = useClientVisitStore((s) => s.addVisit);
   const companies = useCompanyStore((s) => s.companies);
@@ -42,6 +52,11 @@ function ClientVisitsPage() {
   const today = new Date().toISOString().slice(0, 10);
 
   const filtered = useMemo(() => {
+    if (linkedVisitId) {
+      const linked = visits.find((v) => v.id === linkedVisitId);
+      if (linked) return [linked];
+    }
+
     const q = search.toLowerCase().trim();
     return visits
       .filter((v) => {
@@ -60,7 +75,21 @@ function ClientVisitsPage() {
         );
       })
       .sort((a, b) => b.scheduledAt.localeCompare(a.scheduledAt));
-  }, [visits, search, statusFilter, companyFilter, companies, today]);
+  }, [visits, search, statusFilter, companyFilter, companies, today, linkedVisitId]);
+
+  useEffect(() => {
+    if (!linkedVisitId) return;
+    const linked = visits.find((v) => v.id === linkedVisitId);
+    if (!linked) return;
+    const timer = window.setTimeout(() => {
+      tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [linkedVisitId, visits]);
+
+  function clearLinkedVisit() {
+    void navigate({ search: {} });
+  }
 
   function submit() {
     if (!purpose.trim() || !companyId || !scheduledDate) {
@@ -126,6 +155,20 @@ function ClientVisitsPage() {
         ]}
       />
 
+      {linkedVisitId ? (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-xs">
+          <span className="text-muted-foreground">
+            {filtered.length === 1
+              ? "Showing visit opened from activity history"
+              : "Visit from activity history was not found"}
+          </span>
+          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={clearLinkedVisit}>
+            View all visits
+          </Button>
+        </div>
+      ) : null}
+
+      <div ref={tableRef}>
       <DataTable
         data={filtered}
         hideSearch
@@ -176,6 +219,7 @@ function ClientVisitsPage() {
           },
         ]}
       />
+      </div>
 
       <EntityFormModal
         open={open}

@@ -1,9 +1,12 @@
 import { useMemo, useRef, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { Search } from "lucide-react";
 
-import { CrmActivityOpenLink } from "@/components/crm/crm-activity-open-link";
+import {
+  CrmActivityOpenLink,
+  navigateToCrmActivityDestination,
+} from "@/components/crm/crm-activity-open-link";
 import { DataTable } from "@/components/data-table";
 import {
   DesignTicketDateField,
@@ -17,9 +20,12 @@ import { Pill } from "@/components/status-pill";
 import {
   CRM_ACTIVITY_CATEGORY_LABEL,
   CRM_ACTIVITY_STATUS_LABEL,
-  crmActivityExecutiveDisplay,
+  crmActivityDetailLines,
+  crmActivityPerformerDisplay,
+  crmActivityPerformerIsPlaceholder,
   filterCrmActivityItems,
   listCrmActivityExecutiveNames,
+  resolveCrmActivityDestination,
   type CrmActivityCategory,
   type CrmActivityDateRange,
   type CrmActivityItem,
@@ -72,6 +78,7 @@ type Props = {
 };
 
 export function CrmDashboardActivityPanel({ items }: Props) {
+  const navigate = useNavigate();
   const tableRef = useRef<HTMLDivElement>(null);
 
   const [tableSearch, setTableSearch] = useState("");
@@ -97,7 +104,7 @@ export function CrmDashboardActivityPanel({ items }: Props) {
 
   const userOptions = useMemo(() => listCrmActivityExecutiveNames(items), [items]);
   const unassignedUserCount = useMemo(
-    () => items.filter((item) => !item.executive?.trim()).length,
+    () => items.filter((item) => crmActivityPerformerIsPlaceholder(item)).length,
     [items],
   );
 
@@ -373,24 +380,22 @@ export function CrmDashboardActivityPanel({ items }: Props) {
                 initialSortKey="createdAt"
                 initialSortDir="desc"
                 getRowId={(row) => row.id}
+                onRowClick={(row) => {
+                  const destination = resolveCrmActivityDestination(row);
+                  if (destination) navigateToCrmActivityDestination(destination, navigate);
+                }}
                 columns={[
                   {
                     key: "createdAt",
-                    header: "Date",
+                    header: "When",
                     sortable: true,
                     render: (row) => (
-                      <span className="whitespace-nowrap text-xs font-medium">
-                        {formatDate(row.createdAt)}
-                      </span>
-                    ),
-                  },
-                  {
-                    key: "time",
-                    header: "Time",
-                    render: (row) => (
-                      <span className="whitespace-nowrap text-xs tabular-nums text-muted-foreground">
-                        {formatTime(row.createdAt)}
-                      </span>
+                      <div className="whitespace-nowrap">
+                        <div className="text-xs font-medium">{formatDate(row.createdAt)}</div>
+                        <div className="text-[10px] tabular-nums text-muted-foreground">
+                          {formatTime(row.createdAt)}
+                        </div>
+                      </div>
                     ),
                   },
                   {
@@ -404,27 +409,29 @@ export function CrmDashboardActivityPanel({ items }: Props) {
                     ),
                   },
                   {
-                    key: "kind",
-                    header: "Status",
+                    key: "what",
+                    header: "Activity",
                     sortable: true,
-                    render: (row) => (
-                      <Pill tone={KIND_TONE[row.kind]}>{CRM_ACTIVITY_STATUS_LABEL[row.kind]}</Pill>
-                    ),
-                  },
-                  {
-                    key: "remarks",
-                    header: "Activity / remarks",
-                    sortable: true,
-                    render: (row) => (
-                      <div className="min-w-[12rem] max-w-[320px]">
-                        <div className="text-xs font-medium">{row.what}</div>
-                        {row.remarks && row.remarks !== row.what ? (
-                          <div className="mt-0.5 line-clamp-2 text-[10px] text-muted-foreground">
-                            {row.remarks}
-                          </div>
-                        ) : null}
-                      </div>
-                    ),
+                    render: (row) => {
+                      const details = crmActivityDetailLines(row);
+                      return (
+                        <div className="min-w-[12rem] max-w-[360px]">
+                          <div className="text-xs font-medium leading-snug">{row.what}</div>
+                          {details.length > 0 ? (
+                            <div className="mt-0.5 space-y-0.5">
+                              {details.map((line) => (
+                                <div
+                                  key={line}
+                                  className="line-clamp-2 text-[10px] text-muted-foreground"
+                                >
+                                  {line}
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    },
                   },
                   {
                     key: "accountName",
@@ -441,7 +448,7 @@ export function CrmDashboardActivityPanel({ items }: Props) {
                           {row.accountName ?? "Account"}
                         </Link>
                       ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
+                        <span className="text-xs text-muted-foreground">Not linked</span>
                       ),
                   },
                   {
@@ -449,25 +456,24 @@ export function CrmDashboardActivityPanel({ items }: Props) {
                     header: "Performed by",
                     sortable: true,
                     render: (row) => (
-                      <span className="text-xs">{crmActivityExecutiveDisplay(row)}</span>
-                    ),
-                  },
-                  {
-                    key: "leadContact",
-                    header: "Lead / contact",
-                    sortable: true,
-                    render: (row) => (
-                      <span className="text-xs">{row.leadContact?.trim() || "—"}</span>
-                    ),
-                  },
-                  {
-                    key: "nextFollowUp",
-                    header: "Next follow-up",
-                    sortable: true,
-                    render: (row) => (
-                      <span className="text-xs text-muted-foreground">
-                        {row.nextFollowUp ? formatDate(row.nextFollowUp) : "—"}
+                      <span
+                        className={cn(
+                          "text-xs",
+                          crmActivityPerformerIsPlaceholder(row) && "text-muted-foreground italic",
+                        )}
+                      >
+                        {crmActivityPerformerDisplay(row)}
                       </span>
+                    ),
+                  },
+                  {
+                    key: "kind",
+                    header: "Status",
+                    sortable: true,
+                    render: (row) => (
+                      <Pill tone={KIND_TONE[row.kind]} className="text-[10px]">
+                        {CRM_ACTIVITY_STATUS_LABEL[row.kind]}
+                      </Pill>
                     ),
                   },
                   {

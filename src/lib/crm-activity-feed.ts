@@ -28,6 +28,8 @@ export type CrmActivityCategory =
   | "visit"
   | "query";
 
+export type CrmActivityPerformerKind = "user" | "client" | "system" | "unassigned";
+
 export type CrmActivityItem = {
   id: string;
   what: string;
@@ -35,6 +37,8 @@ export type CrmActivityItem = {
   createdAt: string;
   kind: ActivityKind;
   category: Exclude<CrmActivityCategory, "all">;
+  /** Underlying record id (ticket, task, booking, etc.). */
+  entityId?: string;
   accountId?: string;
   accountName?: string;
   /** Account executive / account manager on the CRM account. */
@@ -44,6 +48,8 @@ export type CrmActivityItem = {
   teamSupportManager2?: string;
   /** Primary user/executive shown in CRM activity table. */
   executive?: string;
+  /** How to label the performer when name is missing. */
+  performerKind?: CrmActivityPerformerKind;
   /** Lead or contact name tied to the activity. */
   leadContact?: string;
   /** Activity detail / remarks body. */
@@ -80,13 +86,14 @@ export type CrmActivityDestination =
       kind: "account";
       accountId: string;
       tab?: CrmAccountTabId;
+      queryId?: string;
     }
   | { kind: "crm-ticket"; ticketId: string }
   | { kind: "support-ticket"; ticketId: string }
-  | { kind: "bookings" }
+  | { kind: "bookings"; appointmentId?: string }
   | { kind: "tasks"; taskId?: string }
-  | { kind: "visits" }
-  | { kind: "queries" };
+  | { kind: "visits"; visitId?: string }
+  | { kind: "queries"; queryId?: string; accountId?: string };
 
 export function crmActivityTrackerStageLabel(stage: CrmImplementationStage | string): string {
   if (stage === "customer_success") return "Go Live";
@@ -106,18 +113,75 @@ export function crmActivityOpenLabel(
     return "Open go-live";
   }
   const labels: Record<Exclude<CrmActivityCategory, "all">, string> = {
-    follow_up: "Open tasks",
-    visit: "Open visits",
-    ticket: "Open ticket",
-    support: "Open support",
-    booking: "Open meetings",
-    communication: "Open comms",
-    module: "Open modules",
-    tracker: "Open tracker",
-    account: "Open account",
-    query: "Open queries",
+    follow_up: "View task",
+    visit: "View visit",
+    ticket: "View portal ticket",
+    support: "View support ticket",
+    booking: "View meeting",
+    communication: "View comms",
+    module: "View modules",
+    tracker: "View tracker",
+    account: "View account",
+    query: "View query",
   };
   return labels[category];
+}
+
+const PERFORMER_FALLBACK: Record<Exclude<CrmActivityCategory, "all">, string> = {
+  account: "System",
+  tracker: "System",
+  module: "System",
+  booking: "No host assigned",
+  support: "Unassigned",
+  ticket: "Unassigned",
+  communication: "Not recorded",
+  follow_up: "Unassigned",
+  visit: "Unassigned",
+  query: "Unknown user",
+};
+
+export function crmActivityPerformerDisplay(
+  item: Pick<CrmActivityItem, "executive" | "who" | "category" | "performerKind">,
+): string {
+  const name = item.executive?.trim() || item.who?.trim();
+  if (name && name !== "—") return name;
+  if (item.performerKind === "client") return "Client";
+  if (item.performerKind === "system") return "System";
+  if (item.performerKind === "unassigned") {
+    return PERFORMER_FALLBACK[item.category] ?? "Unassigned";
+  }
+  return PERFORMER_FALLBACK[item.category] ?? "Unassigned";
+}
+
+export function crmActivityPerformerIsPlaceholder(
+  item: Pick<CrmActivityItem, "executive" | "who" | "category" | "performerKind">,
+): boolean {
+  const name = item.executive?.trim() || item.who?.trim();
+  if (name && name !== "—") return false;
+  return true;
+}
+
+export function crmActivityLeadContactDisplay(leadContact?: string): string {
+  return leadContact?.trim() || "Not recorded";
+}
+
+export function crmActivityFollowUpDisplay(nextFollowUp?: string, formatDateFn?: (iso: string) => string): string {
+  if (!nextFollowUp?.trim()) return "None scheduled";
+  return formatDateFn ? formatDateFn(nextFollowUp) : nextFollowUp.slice(0, 10);
+}
+
+export function crmActivityDetailLines(item: CrmActivityItem): string[] {
+  const lines: string[] = [];
+  if (item.remarks?.trim() && item.remarks.trim() !== item.what.trim()) {
+    lines.push(item.remarks.trim());
+  }
+  if (item.leadContact?.trim()) {
+    lines.push(`Contact: ${item.leadContact.trim()}`);
+  }
+  if (item.nextFollowUp?.trim()) {
+    lines.push(`Next follow-up: ${item.nextFollowUp.slice(0, 10)}`);
+  }
+  return lines;
 }
 
 export function crmActivityTabForModule(moduleKey?: string): CrmAccountTabId {
@@ -153,33 +217,51 @@ function parseActivityEntityId(id: string): string | undefined {
   return match?.[1];
 }
 
+function activityEntityId(
+  item: Pick<CrmActivityItem, "id" | "entityId">,
+): string | undefined {
+  return item.entityId ?? parseActivityEntityId(item.id);
+}
+
 export function resolveCrmActivityDestination(
-  item: Pick<CrmActivityItem, "id" | "category" | "accountId" | "trackerStage" | "moduleKey">,
+  item: Pick<
+    CrmActivityItem,
+    "id" | "entityId" | "category" | "accountId" | "trackerStage" | "moduleKey"
+  >,
 ): CrmActivityDestination | null {
-  const entityId = parseActivityEntityId(item.id);
+  const entityId = activityEntityId(item);
 
   switch (item.category) {
     case "follow_up":
-      if (item.accountId) {
-        return { kind: "account", accountId: item.accountId, tab: "tasks" };
-      }
-      return entityId ? { kind: "tasks", taskId: entityId } : { kind: "tasks" };
+      return entityId
+        ? { kind: "tasks", taskId: entityId }
+        : item.accountId
+          ? { kind: "account", accountId: item.accountId, tab: "tasks" }
+          : { kind: "tasks" };
     case "visit":
-      return { kind: "visits" };
+      return entityId ? { kind: "visits", visitId: entityId } : { kind: "visits" };
     case "ticket":
       return entityId ? { kind: "crm-ticket", ticketId: entityId } : null;
     case "support":
       return entityId ? { kind: "support-ticket", ticketId: entityId } : null;
     case "booking":
-      return { kind: "bookings" };
+      return entityId ? { kind: "bookings", appointmentId: entityId } : { kind: "bookings" };
     case "communication":
       return item.accountId
         ? { kind: "account", accountId: item.accountId, tab: "comms" }
         : null;
     case "query":
-      return item.accountId
-        ? { kind: "account", accountId: item.accountId, tab: "queries" }
-        : { kind: "queries" };
+      if (item.accountId && entityId) {
+        return {
+          kind: "account",
+          accountId: item.accountId,
+          tab: "queries",
+          queryId: entityId,
+        };
+      }
+      return entityId
+        ? { kind: "queries", queryId: entityId, accountId: item.accountId }
+        : { kind: "queries", accountId: item.accountId };
     case "module":
       return item.accountId
         ? {
@@ -258,14 +340,18 @@ function withAccountContext(
     executive?: string;
     leadContact?: string;
     remarks?: string;
+    entityId?: string;
+    performerKind?: CrmActivityPerformerKind;
   },
   account?: CrmAccount,
 ): CrmActivityItem {
   const accountId = item.accountId ?? account?.id;
   const accountName = item.accountName ?? account?.name;
   const team = teamForAccount(account ?? ({ id: accountId ?? "", name: accountName ?? "" } as CrmAccount));
+  const entityId = item.entityId ?? parseActivityEntityId(item.id);
   return {
     ...item,
+    entityId,
     accountId,
     accountName,
     ...team,
@@ -345,10 +431,11 @@ export const CRM_ACTIVITY_STATUS_LABEL: Record<ActivityKind, string> = {
   danger: "Failed / cancelled",
 };
 
+/** @deprecated Prefer crmActivityPerformerDisplay */
 export function crmActivityExecutiveDisplay(
-  item: Pick<CrmActivityItem, "executive">,
+  item: Pick<CrmActivityItem, "executive" | "who" | "category" | "performerKind">,
 ): string {
-  return item.executive?.trim() || "—";
+  return crmActivityPerformerDisplay(item);
 }
 
 export function listCrmActivityExecutiveNames(items: CrmActivityItem[]): string[] {
@@ -414,7 +501,7 @@ export function buildCrmActivityFeed(input: {
     subject: string;
     status: string;
     updatedAt: string;
-    createdBy: { name: string };
+    createdBy: { name: string; type?: "client" | "team" };
   }[];
   bookingAppointments: {
     id: string;
@@ -453,9 +540,11 @@ export function buildCrmActivityFeed(input: {
       withAccountContext(
         {
           id: `crm-event-${e.id}`,
+          entityId: e.id,
           what: formatCrmEventLabel(e, nameById.get(e.companyId) ?? "Account"),
-          who: e.actorName,
+          who: e.actorName ?? "",
           executive: resolveExecutive(e.actorName),
+          performerKind: e.actorName?.trim() ? "user" : "system",
           createdAt: e.createdAt,
           kind: crmEventKind(e.eventType),
           category: "account",
@@ -475,9 +564,11 @@ export function buildCrmActivityFeed(input: {
       withAccountContext(
         {
           id: `sub-event-${e.id}`,
+          entityId: e.id,
           what: `${String(e.moduleKey).replace(/_/g, " ")} → ${e.newStatus}`,
           who: e.actorName ?? "System",
           executive: resolveExecutive(e.actorName) ?? "System",
+          performerKind: e.actorName?.trim() ? "user" : "system",
           createdAt: e.createdAt,
           kind: crmEventKind(e.newStatus),
           category: "module",
@@ -498,9 +589,15 @@ export function buildCrmActivityFeed(input: {
       withAccountContext(
         {
           id: `support-${t.id}`,
+          entityId: t.id,
           what: `${t.ticketNumber}: ${t.subject}`,
-          who: t.createdBy.name || accountName,
+          who: t.createdBy.name || "",
           executive: resolveExecutive(t.createdBy.name),
+          performerKind: t.createdBy.type === "client"
+            ? "client"
+            : t.createdBy.name?.trim()
+              ? "user"
+              : "unassigned",
           createdAt: t.updatedAt,
           kind:
             t.status === "resolved" || t.status === "closed"
@@ -526,9 +623,11 @@ export function buildCrmActivityFeed(input: {
       withAccountContext(
         {
           id: `ticket-${t.id}`,
+          entityId: t.id,
           what: `${t.type}: ${t.title}`,
-          who: owner ?? "—",
+          who: owner ?? "",
           executive: owner,
+          performerKind: owner ? "user" : "unassigned",
           createdAt: t.updatedAt,
           kind:
             t.status === "Closed" || t.resolutionStatus === "Resolved"
@@ -554,9 +653,11 @@ export function buildCrmActivityFeed(input: {
       withAccountContext(
         {
           id: `booking-${b.id}`,
+          entityId: b.id,
           what: `Call ${BOOKING_STATUS_LABEL[b.status as keyof typeof BOOKING_STATUS_LABEL] ?? b.status} — ${b.guestName}`,
-          who: host ?? "—",
+          who: host ?? "",
           executive: host,
+          performerKind: host ? "user" : "unassigned",
           createdAt: b.updatedAt || b.createdAt,
           kind:
             b.status === "confirmed"
@@ -588,9 +689,11 @@ export function buildCrmActivityFeed(input: {
       withAccountContext(
         {
           id: `followup-${task.id}`,
+          entityId: task.id,
           what: task.title,
-          who: actor ?? "—",
+          who: actor ?? "",
           executive: actor,
+          performerKind: actor ? "user" : "unassigned",
           createdAt: task.updatedAt || task.createdAt,
           kind:
             task.status === "completed"
@@ -621,9 +724,11 @@ export function buildCrmActivityFeed(input: {
       withAccountContext(
         {
           id: `visit-${visit.id}`,
+          entityId: visit.id,
           what: visit.purpose,
-          who: actor ?? "—",
+          who: actor ?? "",
           executive: actor,
+          performerKind: actor ? "user" : "unassigned",
           createdAt: visit.updatedAt || visit.scheduledAt || visit.createdAt,
           kind:
             visit.status === "completed"
@@ -651,9 +756,11 @@ export function buildCrmActivityFeed(input: {
       withAccountContext(
         {
           id: `query-${query.id}`,
+          entityId: query.id,
           what: query.title,
-          who: query.createdByName,
+          who: query.createdByName ?? "",
           executive: query.createdByName,
+          performerKind: query.createdByName?.trim() ? "user" : "unassigned",
           createdAt: query.updatedAt || query.createdAt,
           kind:
             query.status === "resolved"
@@ -678,9 +785,11 @@ export function buildCrmActivityFeed(input: {
         withAccountContext(
           {
             id: `comm-${c.id}`,
+            entityId: c.id,
             what: c.summary,
-            who: c.loggedBy ?? "—",
+            who: c.loggedBy ?? "",
             executive: resolveExecutive(c.loggedBy),
+            performerKind: c.loggedBy?.trim() ? "user" : "unassigned",
             createdAt: c.createdAt,
             kind: c.status === "failed" ? "danger" : "info",
             category: "communication",
@@ -696,9 +805,11 @@ export function buildCrmActivityFeed(input: {
         withAccountContext(
           {
             id: `stage-${account.id}-${record.tracker.stage}-${record.updatedAt}`,
+            entityId: account.id,
             what: `Stage · ${crmActivityTrackerStageLabel(record.tracker.stage)}`,
-            who: record.tracker.lastUpdatedBy ?? "—",
+            who: record.tracker.lastUpdatedBy ?? "",
             executive: resolveExecutive(record.tracker.lastUpdatedBy),
+            performerKind: record.tracker.lastUpdatedBy?.trim() ? "user" : "system",
             createdAt: record.updatedAt,
             kind: account.status === "live" ? "success" : "info",
             category: "tracker",

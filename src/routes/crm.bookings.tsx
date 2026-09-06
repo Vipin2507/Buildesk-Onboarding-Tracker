@@ -374,6 +374,29 @@ function CrmBookingsPage() {
     }, 2000);
     return () => window.clearTimeout(timer);
   }, [search.google, search.tab, navigate]);
+
+  useEffect(() => {
+    const linkedId = search.appointmentId;
+    if (!linkedId) return;
+
+    if (tab !== "all") {
+      void navigate({
+        search: (prev) => ({ ...prev, tab: "all", appointmentId: linkedId }),
+        replace: true,
+      });
+      return;
+    }
+
+    const appt = appointments.find((a) => a.id === linkedId);
+    if (!appt) return;
+
+    setExpandedId(linkedId);
+    const timer = window.setTimeout(() => {
+      tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [search.appointmentId, tab, appointments, navigate]);
+
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
