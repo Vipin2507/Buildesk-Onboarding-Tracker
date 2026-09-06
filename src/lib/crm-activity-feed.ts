@@ -302,6 +302,23 @@ function teamForAccount(account: CrmAccount) {
   };
 }
 
+function trackerStageUpdatedAt(
+  record: CrmOnboardingRecord,
+): string | undefined {
+  if (record.tracker.stageUpdatedAt?.trim()) {
+    return record.tracker.stageUpdatedAt;
+  }
+  if (
+    record.tracker.stage !== "company_creation" &&
+    record.updatedAt &&
+    record.createdAt &&
+    record.updatedAt !== record.createdAt
+  ) {
+    return record.updatedAt;
+  }
+  return undefined;
+}
+
 function leadContactForAccount(account?: CrmAccount, override?: string) {
   if (override?.trim()) return override.trim();
   return (
@@ -800,17 +817,40 @@ export function buildCrmActivityFeed(input: {
         ),
       );
     }
-    if (record.updatedAt) {
+    if (record.createdAt) {
       events.push(
         withAccountContext(
           {
-            id: `stage-${account.id}-${record.tracker.stage}-${record.updatedAt}`,
+            id: `account-added-${account.id}-${record.createdAt}`,
             entityId: account.id,
-            what: `Stage · ${crmActivityTrackerStageLabel(record.tracker.stage)}`,
+            what: "Account added",
+            remarks: `Initial stage: ${crmActivityTrackerStageLabel("company_creation")}`,
+            who: "",
+            executive: undefined,
+            performerKind: "system",
+            createdAt: record.createdAt,
+            kind: "info",
+            category: "account",
+            accountId: account.id,
+            accountName: account.name,
+          },
+          account,
+        ),
+      );
+    }
+
+    const stageUpdatedAt = trackerStageUpdatedAt(record);
+    if (stageUpdatedAt) {
+      events.push(
+        withAccountContext(
+          {
+            id: `stage-${account.id}-${record.tracker.stage}-${stageUpdatedAt}`,
+            entityId: account.id,
+            what: `Stage updated · ${crmActivityTrackerStageLabel(record.tracker.stage)}`,
             who: record.tracker.lastUpdatedBy ?? "",
             executive: resolveExecutive(record.tracker.lastUpdatedBy),
             performerKind: record.tracker.lastUpdatedBy?.trim() ? "user" : "system",
-            createdAt: record.updatedAt,
+            createdAt: stageUpdatedAt,
             kind: account.status === "live" ? "success" : "info",
             category: "tracker",
             trackerStage: record.tracker.stage,

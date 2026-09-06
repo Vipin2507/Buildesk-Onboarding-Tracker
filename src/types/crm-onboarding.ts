@@ -195,6 +195,8 @@ export type CrmTrackerMeta = {
   delayReason?: string;
   priority: CrmTrackerPriority;
   lastUpdatedBy?: string;
+  /** Set when implementation stage changes (distinct from record created/updated). */
+  stageUpdatedAt?: string;
 };
 
 export type CrmCommChannel = "whatsapp" | "sms" | "email" | "push";

@@ -1140,6 +1140,7 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
           ...r.tracker,
           ...patch,
           lastUpdatedBy: who ?? r.tracker.lastUpdatedBy,
+          ...(stageChanged ? { stageUpdatedAt: nowIso() } : {}),
         },
       })),
     }));
