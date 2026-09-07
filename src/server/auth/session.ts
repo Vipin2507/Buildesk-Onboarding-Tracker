@@ -1,4 +1,3 @@
-import { randomBytes, randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { eq, and, gt } from "drizzle-orm";
 import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server";
@@ -23,7 +22,7 @@ export function nowIso() {
 }
 
 export function newId() {
-  return randomUUID();
+  return globalThis.crypto.randomUUID();
 }
 
 export async function hashPassword(password: string) {
@@ -61,6 +60,7 @@ export function toPublicUser(row: typeof users.$inferSelect): User {
 }
 
 export async function createSession(userId: string) {
+  const { randomBytes } = await import("node:crypto");
   const db = getDb();
   const id = randomBytes(32).toString("hex");
   const expiresAt = sessionExpiryIso();

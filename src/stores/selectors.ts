@@ -1,8 +1,7 @@
 import { useMemo } from "react";
 import { MODULE_CATALOG, normalizeCompanyModules } from "@/data/module-catalog";
 import type { ModuleKey } from "@/types";
-import { calcPostSalesProjectProgress } from "@/lib/post-sales-status";
-import { calcChecklistProgress } from "@/lib/checklist";
+import { calcChecklistProgress, isChecklistItemComplete } from "@/lib/checklist";
 import {
   calcManualGroupProgress,
   isCompanyModulesAllLive,
@@ -65,10 +64,7 @@ export function getModuleProgressPercent(
   postSalesProjects: ReturnType<typeof usePostSalesStore.getState>["projects"],
 ): number {
   if (moduleKey === "post-sales") {
-    const projects = postSalesProjects.filter((p) => p.companyId === companyId);
-    if (projects.length === 0) return 0;
-    const total = projects.reduce((sum, p) => sum + calcPostSalesProjectProgress(p), 0);
-    return Math.round(total / projects.length);
+    return calcCompanyOnboardingProjectsAverage(companyId) ?? 0;
   }
 
   const groups = MODULE_MILESTONE_GROUPS[moduleKey];
@@ -171,21 +167,30 @@ export function companyIsLive(companyId: string): boolean {
   });
 }
 
-export function usePostSalesProjectsForCompany(companyId: string) {
-  const projects = usePostSalesStore((s) => s.projects);
+export function useCompanyChecklistProjectsForCompany(companyId: string) {
+  const projects = useProjectStore((s) => s.projects);
+  const checklistItems = useOnboardingStore((s) => s.checklistItems);
   return useMemo(
     () =>
       projects
         .filter((p) => p.companyId === companyId)
-        .map((p) => ({
-          ...p,
-          progress: calcPostSalesProjectProgress(p),
-          stepsDone: p.steps.filter((s) => s.approvalStatus === "approved").length,
-        }))
-        .sort((a, b) => a.projectNumber.localeCompare(b.projectNumber)),
-    [projects, companyId],
+        .map((p) => {
+          const items = checklistItems.filter((i) => i.projectId === p.id && !i.notApplicable);
+          const checklistDone = items.filter((i) => isChecklistItemComplete(i)).length;
+          return {
+            ...p,
+            progress: calcCombinedProjectProgress(p.id, checklistItems),
+            checklistDone,
+            checklistTotal: items.length,
+          };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [projects, companyId, checklistItems],
   );
 }
+
+/** Post Sales projects are onboarding checklist projects for this company. */
+export const usePostSalesProjectsForCompany = useCompanyChecklistProjectsForCompany;
 
 export function useCompanyWithComputed(companyId: string) {
   const company = useCompanyStore((s) => s.companies.find((c) => c.id === companyId));

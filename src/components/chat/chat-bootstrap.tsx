@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { listChatSessions } from "@/lib/api";
+import { listChatSessions } from "@/server/api/chat";
 import { isTransientFetchError } from "@/lib/sync";
 import { useChatStore } from "@/stores/useChatStore";
 

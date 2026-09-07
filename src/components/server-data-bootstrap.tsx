@@ -259,6 +259,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
         useActivityStore.setState({ activities: activity });
         useNotificationStore.setState({ notifications });
         usePostSalesStore.setState({ projects: postSales });
+
         useNotesAttachmentsStore.setState({ notes, attachments });
         useOnboardingStore.setState({
           checklistItems: checklist.map((c) => ({
@@ -283,6 +284,19 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
             ]),
           ),
         });
+
+        try {
+          const { recovered, enabled } = (
+            await import("@/lib/migrate-post-sales-checklist-link")
+          ).migratePostSalesChecklistLink();
+          if (recovered > 0 || enabled > 0) {
+            console.info(
+              `[bootstrap] Post Sales checklist link: ${recovered} recovered, ${enabled} modules enabled`,
+            );
+          }
+        } catch (err) {
+          console.warn("[bootstrap] Post Sales checklist migration failed", err);
+        }
         useCrmTaskStore.setState({ tasks: followUpTasks });
         useErpTaskStore.setState({ tasks: erpFollowUpTasks });
         useClientVisitStore.setState({ visits: clientVisits });

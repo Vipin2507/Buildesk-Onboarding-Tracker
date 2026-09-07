@@ -5,10 +5,12 @@ import { ApiError, requireUser } from "@/server/auth/session";
 import {
   buildGoogleCalendarAuthUrl,
   disconnectGoogleCalendar,
+  exchangeGoogleCalendarCode,
   getGoogleCalendarStatus,
   isGoogleCalendarConfigured,
   googleCalendarRedirectUri,
   setGoogleCalendarSyncEnabled,
+  verifyGoogleOAuthState,
 } from "@/server/google/calendar-oauth";
 
 export const getGoogleCalendarConnectionStatus = createServerFn({ method: "GET" }).handler(
@@ -26,7 +28,7 @@ export const getGoogleCalendarAuthUrl = createServerFn({ method: "GET" }).handle
       "Google Calendar is not configured on the server. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI (or APP_BASE_URL).",
     );
   }
-  return { url: buildGoogleCalendarAuthUrl(user.id) };
+  return { url: await buildGoogleCalendarAuthUrl(user.id) };
 });
 
 export const disconnectGoogleCalendarConnection = createServerFn({ method: "POST" }).handler(
@@ -46,4 +48,30 @@ export const setGoogleCalendarBusySync = createServerFn({ method: "POST" })
     } catch (e) {
       throw new ApiError(400, e instanceof Error ? e.message : "Not connected");
     }
+  });
+
+export const completeGoogleCalendarOAuth = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        code: z.string().optional(),
+        state: z.string().optional(),
+        error: z.string().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    if (data.error) {
+      throw new ApiError(400, `Google authorization failed: ${data.error}`);
+    }
+    if (!data.code || !data.state) {
+      throw new ApiError(400, "Missing Google OAuth code or state");
+    }
+    const stateUserId = await verifyGoogleOAuthState(data.state);
+    if (!stateUserId || stateUserId !== user.id) {
+      throw new ApiError(403, "Invalid or expired Google OAuth state");
+    }
+    await exchangeGoogleCalendarCode(data.code, user.id);
+    return { ok: true as const };
   });

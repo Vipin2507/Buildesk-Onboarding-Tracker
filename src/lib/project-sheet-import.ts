@@ -401,7 +401,6 @@ export function buildProjectImportPlan(
         projectsToUpdate += 1;
         notes.push("Update project start");
       } else if (!raw.projectStartDate || existingProject.startDate === raw.projectStartDate) {
-        // nothing to change for project
         if (actions.length === 0) {
           rows.push({
             rowNumber: raw.rowNumber,

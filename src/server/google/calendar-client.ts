@@ -103,7 +103,7 @@ export async function createGoogleMeetEvent(input: {
       attendees,
       conferenceData: {
         createRequest: {
-          requestId: meetRequestId(`booking-${input.appointmentId}`),
+          requestId: await meetRequestId(`booking-${input.appointmentId}`),
           conferenceSolutionKey: { type: "hangoutsMeet" },
         },
       },

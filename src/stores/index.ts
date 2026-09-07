@@ -62,6 +62,7 @@ export {
   useProjectWithProgress,
   useModuleProgress,
   useCompanyModulesWithProgress,
+  useCompanyChecklistProjectsForCompany,
   usePostSalesProjectsForCompany,
   companyIsLive,
   getCompanyOverallProgress,

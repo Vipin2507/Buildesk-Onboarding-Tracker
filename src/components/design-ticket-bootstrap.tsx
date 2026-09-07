@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 
-import { ensureCompanyPortals, listDesignTickets, listNotifications } from "@/lib/api";
+import { listDesignTickets } from "@/server/api/design-tickets";
+import { listNotifications } from "@/server/api/notifications";
+import { ensureCompanyPortals } from "@/server/api/portal";
 import { useCompanyStore } from "@/stores/useCompanyStore";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
 import { useDesignTicketStore } from "@/stores/useDesignTicketStore";

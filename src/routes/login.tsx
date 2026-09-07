@@ -8,7 +8,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { ThemeToggleCompact } from "@/components/theme-toggle";
-import { authLogin } from "@/lib/api";
+import { authLogin } from "@/server/api/auth";
 import { homePathForUser } from "@/lib/product-scope";
 import { useAuthStore } from "@/stores";
 

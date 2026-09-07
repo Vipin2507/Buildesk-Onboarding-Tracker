@@ -7,7 +7,6 @@ import {
   ArrowRight,
   Building2,
   CalendarClock,
-  FolderKanban,
   Layers,
   Pencil,
   Plus,
@@ -50,16 +49,13 @@ import {
   useEmployeeStore,
   useCompanyProgress,
   useCompanyModulesWithProgress,
-  usePostSalesProjectsForCompany,
-  calcProjectProgress,
-  useOnboardingStore,
+  useCompanyChecklistProjectsForCompany,
   useUserStore,
   useClientVisitStore,
   useErpTaskStore,
   useCrmEventStore,
 } from "@/stores";
 import { getModuleLabel } from "@/data/module-catalog";
-import { calcPostSalesProjectProgress } from "@/lib/post-sales-status";
 import { resolveAssigneeName } from "@/lib/managers";
 import { formatDate } from "@/lib/utils";
 import type { Project } from "@/types";
@@ -131,12 +127,10 @@ function CompanyDetailContent() {
   const company = useCompanyStore((s) => s.companies.find((c) => c.id === companyId));
   const deleteCompany = useCompanyStore((s) => s.deleteCompany);
   const markRenewed = useCompanyStore((s) => s.markRenewed);
+  const enableModule = useCompanyStore((s) => s.enableModule);
   const addProject = useProjectStore((s) => s.addProject);
   const updateProject = useProjectStore((s) => s.updateProject);
-  const allProjects = useProjectStore((s) => s.projects);
-  const projects = useMemo(() => allProjects.filter((p) => p.companyId === companyId), [allProjects, companyId]);
-  const postSalesProjects = usePostSalesProjectsForCompany(companyId);
-  const checklistItems = useOnboardingStore((s) => s.checklistItems);
+  const checklistProjects = useCompanyChecklistProjectsForCompany(companyId);
   const employees = useEmployeeStore((s) => s.employees);
   const users = useUserStore((s) => s.users);
   const companyFormOptions = useMemo(
@@ -194,24 +188,26 @@ function CompanyDetailContent() {
     optedModules.length === 0
       ? 0
       : Math.round(optedModules.reduce((sum, m) => sum + m.progressPercent, 0) / optedModules.length);
-  const projectsLive = projects.filter((p) => p.status === "completed" || Boolean(p.goLiveAt)).length;
+  const projectsLive = checklistProjects.filter(
+    (p) => p.progress >= 100 || p.status === "completed" || Boolean(p.goLiveAt),
+  ).length;
   const progressCards = [
     { id: "opted", label: "Modules Opted", value: optedModules.length },
     { id: "live", label: "Modules Live", value: liveModules.length },
     { id: "avg", label: "Avg Module %", value: avgModuleProgress, suffix: "%" },
     { id: "overall", label: "Overall %", value: progress, suffix: "%" },
-    { id: "projects", label: "Projects", value: projects.length + postSalesProjects.length },
+    { id: "projects", label: "Projects", value: checklistProjects.length },
     {
       id: "projects_live",
       label: "Projects Live",
-      value: projectsLive + postSalesProjects.filter((p) => p.progress >= 100).length,
+      value: projectsLive,
     },
   ];
 
   function handleDelete() {
-    if (projects.length > 0 || postSalesProjects.length > 0) {
+    if (checklistProjects.length > 0) {
       toast.error("Delete linked projects first", {
-        description: `${projects.length + postSalesProjects.length} project(s) still linked`,
+        description: `${checklistProjects.length} project(s) still linked`,
       });
       return;
     }
@@ -221,6 +217,8 @@ function CompanyDetailContent() {
   }
 
   function openAddProject() {
+    const postSalesModule = company?.modules?.find((m) => m.moduleKey === "post-sales");
+    if (!postSalesModule?.optedIn) enableModule(companyId, "post-sales");
     setEditingProject(null);
     setTab("Project");
     setProjectModalOpen(true);
@@ -240,8 +238,8 @@ function CompanyDetailContent() {
       return;
     }
     const project = addProject({ ...patch, status: "not_started", currentStep: 0 });
-    toast.success("Project created", {
-      description: "Use Edit on the project card to add location, scale, and commercial details.",
+    toast.success("Post Sales project created", {
+      description: "Open the project to work through the onboarding checklist.",
       action: {
         label: "Open",
         onClick: () =>
@@ -342,7 +340,7 @@ function CompanyDetailContent() {
           value={formatDate(company.goLiveTarget)}
           foot={
             <span className="text-[10px] text-muted-foreground">
-              {projects.length + postSalesProjects.length} projects
+              {checklistProjects.length} projects
             </span>
           }
         />
@@ -447,140 +445,74 @@ function CompanyDetailContent() {
         <div className="space-y-4">
           <DesignTicketSection compact title="Projects" delay={0.02}>
             <p className="mb-2 text-xs text-muted-foreground">
-              Onboarding and Post Sales trackers — edit address, towers, floors, and commercial details.
+              Post Sales projects use the onboarding checklist — edit address, towers, floors, and commercial details.
             </p>
           </DesignTicketSection>
 
           <section className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">
-                <FolderKanban className="h-3.5 w-3.5 text-muted-foreground" />
-                <h4 className="text-xs font-semibold text-muted-foreground">Onboarding</h4>
-                <Pill>{projects.length}</Pill>
+                <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+                <h4 className="text-xs font-semibold text-muted-foreground">Post Sales</h4>
+                <Pill>{checklistProjects.length}</Pill>
               </div>
-              <Button
-                size="sm"
-                className="h-7 gap-1 bg-primary text-xs"
-                onClick={() => {
-                  setEditingProject(null);
-                  setProjectModalOpen(true);
-                }}
-              >
+              <Button size="sm" className="h-7 gap-1 bg-primary text-xs" onClick={openAddProject}>
                 <Plus className="h-3 w-3" /> Add Project
               </Button>
             </div>
-            {projects.length === 0 ? (
+            {checklistProjects.length === 0 ? (
               <EmptyState
-                title="No onboarding projects yet"
+                title="No Post Sales projects yet"
                 description="Create a project for this company to start the onboarding checklist."
                 actionLabel="+ Add Project"
-                onAction={() => {
-                  setEditingProject(null);
-                  setProjectModalOpen(true);
-                }}
+                onAction={openAddProject}
               />
             ) : (
               <div className="grid gap-2 md:grid-cols-2">
-                {projects.map((p) => {
-                  const pct = calcProjectProgress(p.id, checklistItems);
-                  return (
-                    <div
-                      key={p.id}
-                      className="card-soft group p-3 transition-all hover:-translate-y-0.5 hover:shadow-sm"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <Link
-                          to="/projects/$projectId"
-                          params={{ projectId: p.id }}
-                          search={{ tab: "onboarding" }}
-                          className="min-w-0 flex-1"
-                        >
-                          <div className="text-sm font-semibold group-hover:text-primary">{p.name}</div>
-                          <div className="mt-0.5 text-[11px] text-muted-foreground">
-                            {p.type} · {p.units} units · {p.city || "No city"}
-                            {p.address ? ` · ${p.address}` : ""}
-                          </div>
-                        </Link>
-                        <div className="flex shrink-0 items-center gap-1">
-                          <StatusPill status={p.status} />
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-7 gap-1 px-2 text-xs"
-                            onClick={() => openEditProject(p)}
-                          >
-                            <Pencil className="h-3 w-3" /> Edit
-                          </Button>
-                        </div>
-                      </div>
+                {checklistProjects.map((p) => (
+                  <div
+                    key={p.id}
+                    className="card-soft group p-3 transition-all hover:-translate-y-0.5 hover:shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-2">
                       <Link
                         to="/projects/$projectId"
                         params={{ projectId: p.id }}
                         search={{ tab: "onboarding" }}
-                        className="mt-2 block"
+                        className="min-w-0 flex-1"
                       >
-                        <ProgressBar value={pct} />
-                        <div className="mt-0.5 text-[10px] text-muted-foreground">{pct}% complete</div>
-                      </Link>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          <section className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5">
-                <Layers className="h-3.5 w-3.5 text-muted-foreground" />
-                <h4 className="text-xs font-semibold text-muted-foreground">Post Sales</h4>
-                <Pill>{postSalesProjects.length}</Pill>
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 text-xs"
-                onClick={() =>
-                  navigate({
-                    to: "/companies/$companyId/modules/$moduleKey",
-                    params: { companyId, moduleKey: "post-sales" },
-                  })
-                }
-              >
-                Manage Post Sales
-              </Button>
-            </div>
-            {postSalesProjects.length === 0 ? (
-              <div className="rounded-lg border border-dashed bg-muted/20 px-3 py-6 text-center text-xs text-muted-foreground">
-                No Post Sales projects. Open the Post Sales module to create one.
-              </div>
-            ) : (
-              <div className="grid gap-2 md:grid-cols-2">
-                {postSalesProjects.map((p) => {
-                  const pct = calcPostSalesProjectProgress(p);
-                  return (
-                    <Link
-                      key={p.id}
-                      to="/companies/$companyId/modules/post-sales/projects/$projectId"
-                      params={{ companyId, projectId: p.id }}
-                      className="card-soft group block p-3 transition-all hover:-translate-y-0.5 hover:shadow-sm"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="text-[10px] text-muted-foreground">{p.projectNumber}</div>
-                          <div className="text-sm font-semibold group-hover:text-primary">{p.projectName}</div>
+                        <div className="text-sm font-semibold group-hover:text-primary">{p.name}</div>
+                        <div className="mt-0.5 text-[11px] text-muted-foreground">
+                          {p.type} · {p.units} units · {p.city || "No city"}
+                          {p.address ? ` · ${p.address}` : ""}
                         </div>
-                        <Pill tone={pct >= 100 ? "success" : pct > 0 ? "accent" : "muted"}>
-                          {pct}%
-                        </Pill>
+                      </Link>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <StatusPill status={p.status} />
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 gap-1 px-2 text-xs"
+                          onClick={() => openEditProject(p)}
+                        >
+                          <Pencil className="h-3 w-3" /> Edit
+                        </Button>
                       </div>
-                      <div className="mt-2">
-                        <ProgressBar value={pct} />
+                    </div>
+                    <Link
+                      to="/projects/$projectId"
+                      params={{ projectId: p.id }}
+                      search={{ tab: "onboarding" }}
+                      className="mt-2 block"
+                    >
+                      <ProgressBar value={p.progress} />
+                      <div className="mt-0.5 text-[10px] text-muted-foreground">
+                        {p.checklistDone}/{p.checklistTotal} checklist items · {p.progress}% complete
                       </div>
                     </Link>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
             )}
           </section>

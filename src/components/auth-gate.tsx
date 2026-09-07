@@ -2,7 +2,7 @@ import { useEffect, type ReactNode } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 
 import { AppLoadingScreen } from "@/components/app-loading-screen";
-import { authMe } from "@/lib/api";
+import { authMe } from "@/server/api/auth";
 import { homePathForUser, isCrmUser } from "@/lib/product-scope";
 import { useAuthStore } from "@/stores";
 

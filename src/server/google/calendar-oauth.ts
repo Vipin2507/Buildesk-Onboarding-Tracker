@@ -1,10 +1,13 @@
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { google } from "googleapis";
 import { eq } from "drizzle-orm";
 
 import { nowIso } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
+
+async function nodeCrypto() {
+  return import("node:crypto");
+}
 
 export const GOOGLE_CALENDAR_SCOPES = [
   "openid",
@@ -55,14 +58,16 @@ function stateSecret() {
   return env("SESSION_SECRET") || "buildesk-google-calendar";
 }
 
-export function signGoogleOAuthState(userId: string) {
+export async function signGoogleOAuthState(userId: string) {
+  const { createHmac } = await nodeCrypto();
   const payload = `${userId}.${Date.now()}`;
   const sig = createHmac("sha256", stateSecret()).update(payload).digest("hex");
   return Buffer.from(`${payload}.${sig}`).toString("base64url");
 }
 
-export function verifyGoogleOAuthState(state: string, maxAgeMs = 15 * 60 * 1000) {
+export async function verifyGoogleOAuthState(state: string, maxAgeMs = 15 * 60 * 1000) {
   try {
+    const { createHmac, timingSafeEqual } = await nodeCrypto();
     const raw = Buffer.from(state, "base64url").toString("utf8");
     const parts = raw.split(".");
     if (parts.length !== 3) return null;
@@ -81,13 +86,13 @@ export function verifyGoogleOAuthState(state: string, maxAgeMs = 15 * 60 * 1000)
   }
 }
 
-export function buildGoogleCalendarAuthUrl(userId: string) {
+export async function buildGoogleCalendarAuthUrl(userId: string) {
   const client = oauthClient();
   return client.generateAuthUrl({
     access_type: "offline",
     prompt: "consent",
     scope: [...GOOGLE_CALENDAR_SCOPES],
-    state: signGoogleOAuthState(userId),
+    state: await signGoogleOAuthState(userId),
     include_granted_scopes: true,
   });
 }
@@ -219,6 +224,7 @@ export async function getAuthorizedGoogleClient(userId: string) {
   return { client, connection: getGoogleCalendarConnection(userId)! };
 }
 
-export function meetRequestId(seed: string) {
+export async function meetRequestId(seed: string) {
+  const { createHash } = await nodeCrypto();
   return createHash("sha256").update(seed).digest("hex").slice(0, 32);
 }
