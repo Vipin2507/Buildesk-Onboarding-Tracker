@@ -43,18 +43,14 @@ export type CrmMigrationStatus = "pending" | "in_progress" | "completed";
 export type CrmReportStatus = "pending" | "explained";
 export type CrmTrackerPriority = "low" | "medium" | "high" | "critical";
 export type CrmImplementationStage =
-  | "company_creation"
-  | "module_selection"
-  | "master_creation"
-  | "data_migration"
-  | "integration_setup"
+  | "new_account"
+  | "account_created"
+  | "data_collection"
+  | "data_setup_migration"
   | "training"
-  | "report_explanation"
-  | "uat"
-  | "client_signoff"
+  | "testing_uat"
   | "go_live"
-  | "ticket_support"
-  | "customer_success";
+  | "post_go_live_handover";
 
 export type CrmModuleWorkflowStepKind = "date" | "yes_no" | "file" | "remarks";
 

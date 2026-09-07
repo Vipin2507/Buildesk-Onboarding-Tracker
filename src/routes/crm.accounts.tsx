@@ -16,6 +16,7 @@ import { CrmAccountBulkUploadModal } from "@/components/crm/crm-account-bulk-upl
 import { CrmAccountClientTransferModal } from "@/components/crm/crm-account-client-transfer-modal";
 import { CrmAccountDateBulkUploadModal } from "@/components/crm/crm-account-date-bulk-upload-modal";
 import { CrmAccountGoLiveActions } from "@/components/crm/crm-account-go-live-actions";
+import { CrmAccountStageSelect } from "@/components/crm/crm-account-stage-select";
 import { CrmAccountModulesCell } from "@/components/crm/crm-account-modules-cell";
 import { CrmAccountStatusRemarksNote } from "@/components/crm/crm-account-status-remarks-modal";
 import {
@@ -40,7 +41,11 @@ import { PageWrap } from "@/components/page-header";
 import { ProgressBar } from "@/components/progress-bar";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
-import { CRM_STAGE_LABELS } from "@/data/crm-onboarding-defaults";
+import { isAdminRoleKey } from "@/lib/permissions";
+import {
+  listActiveCrmImplementationStages,
+  resolveCrmStageLabel,
+} from "@/lib/crm-implementation-stages";
 import { cn, formatDate } from "@/lib/utils";
 import { useSessionFilterState } from "@/hooks/use-session-filter";
 import {
@@ -248,6 +253,7 @@ function CrmAccountsPage() {
   const setProductModuleEnabled = useCrmOnboardingStore((s) => s.setProductModuleEnabled);
   const removeRecord = useCrmOnboardingStore((s) => s.removeRecord);
   const currentUser = useAuthStore((s) => s.user);
+  const isAdmin = isAdminRoleKey(currentUser?.role);
   const overview = useCrmDashboardOverview();
 
   const tableRef = useRef<HTMLDivElement>(null);
@@ -409,10 +415,13 @@ function CrmAccountsPage() {
   }, [rows]);
 
   const stages = useMemo(() => {
-    const set = new Set(rows.map((r) => r.stage));
-    return [...set].sort((a, b) =>
-      (CRM_STAGE_LABELS[a] ?? a).localeCompare(CRM_STAGE_LABELS[b] ?? b),
-    );
+    const catalog = listActiveCrmImplementationStages();
+    const seen = new Set(catalog.map((s) => s.key));
+    const extras = [...new Set(rows.map((r) => r.stage))].filter((s) => !seen.has(s));
+    return [
+      ...catalog.map((s) => s.key),
+      ...extras.sort((a, b) => resolveCrmStageLabel(a).localeCompare(resolveCrmStageLabel(b))),
+    ];
   }, [rows]);
 
   const providers = useMemo(() => {
@@ -813,7 +822,7 @@ function CrmAccountsPage() {
               { value: "all", label: "All stages" },
               ...stages.map((s) => ({
                 value: s,
-                label: CRM_STAGE_LABELS[s] ?? s,
+                label: resolveCrmStageLabel(s),
               })),
             ]}
           />
@@ -1111,6 +1120,22 @@ function CrmAccountsPage() {
                         </span>
                       </div>
                     ),
+                  },
+                  {
+                    key: "stage",
+                    header: "Stage",
+                    sortable: true,
+                    render: (r) =>
+                      isAdmin ? (
+                        <CrmAccountStageSelect
+                          companyId={r.id}
+                          stage={r.stage}
+                          who={currentUser?.name}
+                          compact
+                        />
+                      ) : (
+                        <span className="text-xs text-muted-foreground">{r.stageLabel}</span>
+                      ),
                   },
                   {
                     key: "healthBucket",

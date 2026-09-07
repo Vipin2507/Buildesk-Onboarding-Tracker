@@ -1,4 +1,8 @@
-import { CRM_STAGE_LABELS, isCrmIntegrationModule } from "@/data/crm-onboarding-defaults";
+import { isCrmIntegrationModule } from "@/data/crm-onboarding-defaults";
+import {
+  isCrmGoLiveStage,
+  resolveCrmStageLabel,
+} from "@/lib/crm-implementation-stages";
 import { crmSalesManagerNamesMatch } from "@/lib/crm-account-access";
 import type { CrmAccountTabId } from "@/lib/crm-route-search";
 import type { ActivityKind } from "@/types";
@@ -96,12 +100,11 @@ export type CrmActivityDestination =
   | { kind: "queries"; queryId?: string; accountId?: string };
 
 export function crmActivityTrackerStageLabel(stage: CrmImplementationStage | string): string {
-  if (stage === "customer_success") return "Go Live";
-  return CRM_STAGE_LABELS[stage] ?? stage;
+  return resolveCrmStageLabel(String(stage));
 }
 
 function crmActivityTrackerTab(stage?: CrmImplementationStage): CrmAccountTabId {
-  if (stage === "go_live" || stage === "customer_success") return "golive";
+  if (stage && isCrmGoLiveStage(stage)) return "golive";
   return "dashboard";
 }
 
@@ -309,7 +312,7 @@ function trackerStageUpdatedAt(
     return record.tracker.stageUpdatedAt;
   }
   if (
-    record.tracker.stage !== "company_creation" &&
+    record.tracker.stage !== "new_account" &&
     record.updatedAt &&
     record.createdAt &&
     record.updatedAt !== record.createdAt
@@ -824,7 +827,7 @@ export function buildCrmActivityFeed(input: {
             id: `account-added-${account.id}-${record.createdAt}`,
             entityId: account.id,
             what: "Account added",
-            remarks: `Initial stage: ${crmActivityTrackerStageLabel("company_creation")}`,
+            remarks: `Initial stage: ${crmActivityTrackerStageLabel("new_account")}`,
             who: "",
             executive: undefined,
             performerKind: "system",

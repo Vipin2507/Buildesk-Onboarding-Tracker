@@ -1,4 +1,4 @@
-import { CRM_STAGE_LABELS } from "@/data/crm-onboarding-defaults";
+import { resolveCrmStageLabel } from "@/lib/crm-implementation-stages";
 import type { CrmImplementationStage } from "@/types/crm-onboarding";
 import { notifyInApp } from "@/stores/useNotificationStore";
 
@@ -12,7 +12,7 @@ export function notifyCrmStageChange(
   stage: CrmImplementationStage,
   who?: string,
 ) {
-  const stageLabel = CRM_STAGE_LABELS[stage] ?? stage;
+  const stageLabel = resolveCrmStageLabel(stage);
   return notifyInApp({
     title: `${accountName} → ${stageLabel}`,
     body: who ? `Stage updated by ${who}` : "Implementation stage changed",

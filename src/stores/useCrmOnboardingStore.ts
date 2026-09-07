@@ -51,10 +51,10 @@ import type {
   CrmMasterDictItem,
   CrmMasterTeam,
 } from "@/types/crm-master";
-import {
-  notifyCrmStageChange,
+import { notifyCrmStageChange,
   notifyCrmTrainingLogged,
 } from "@/lib/crm-notify";
+import { normalizeCrmImplementationStage } from "@/lib/crm-implementation-stages";
 import {
   deleteCrmOnboardingRecord as apiDeleteCrmOnboardingRecord,
   upsertCrmOnboardingRecord as apiUpsertCrmOnboardingRecord,
@@ -353,6 +353,10 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
             masterStatuses: r.masterStatuses ?? [],
             masterFollowUps: r.masterFollowUps ?? [],
             masterTeams: r.masterTeams ?? [],
+            tracker: {
+              ...r.tracker,
+              stage: normalizeCrmImplementationStage(r.tracker.stage),
+            },
           }),
         ),
       });

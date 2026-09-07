@@ -1,5 +1,6 @@
 import type { Timestamps } from "./common";
 import type { FieldValueType } from "./master";
+import type { CrmImplementationStage } from "./crm-onboarding";
 
 /** Platform-level CRM Master Config (mirrors ERP Master Config, CRM-scoped). */
 export type CrmMasterPlatformSettings = {
@@ -76,6 +77,14 @@ export type CrmMigrationFieldDef = {
   key: string;
   label: string;
   category: string;
+};
+
+/** Account implementation pipeline stage (Master → Account stages). */
+export type CrmImplementationStageDef = {
+  key: CrmImplementationStage;
+  label: string;
+  order: number;
+  active: boolean;
 };
 
 /** Editable CRM Training catalog item (Master → Training). */

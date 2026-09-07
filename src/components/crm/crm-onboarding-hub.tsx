@@ -32,6 +32,7 @@ import { CrmAccountQueriesPanel } from "@/components/crm/crm-account-queries-pan
 import { CrmAccountMeetingsPanel } from "@/components/crm/crm-account-meetings-panel";
 import { CrmAccountModulesOverview } from "@/components/crm/crm-account-modules-overview";
 import { CrmAccountModulesTab } from "@/components/crm/crm-account-modules-tab";
+import { CrmAccountStageSelect } from "@/components/crm/crm-account-stage-select";
 import { CrmAccountPortalPanel } from "@/components/crm/crm-account-portal-panel";
 import { CrmAccountTasksPanel } from "@/components/crm/crm-account-tasks-panel";
 import { CrmGoLiveChecklist } from "@/components/crm/crm-go-live-checklist";
@@ -53,12 +54,13 @@ import { ProgressBar } from "@/components/progress-bar";
 import { Button } from "@/components/ui/button";
 import {
   CRM_COMM_ACTIONS,
-  CRM_STAGE_LABELS,
   calcCrmOnboardingProgress,
   createCrmOnboardingRecord,
   crmPendingActivityCount,
   isCrmIntegrationModule,
 } from "@/data/crm-onboarding-defaults";
+import { resolveCrmStageLabel } from "@/lib/crm-implementation-stages";
+import { isAdminRoleKey } from "@/lib/permissions";
 import { calcChecklistProgress } from "@/lib/checklist";
 import { resolveCrmMigrationCatalog } from "@/lib/crm-migration-catalog";
 import { resolveCrmTrainingCatalogForCompany } from "@/lib/crm-training-catalog";
@@ -191,6 +193,7 @@ export function CrmOnboardingHub({
   );
 
   const isLive = account?.status === "live";
+  const isAdmin = isAdminRoleKey(currentUser?.role);
 
   const kpis = [
     { id: "progress", label: "Completion", value: pct, icon: TrendingUp, tone: "text-primary" },
@@ -288,6 +291,8 @@ export function CrmOnboardingHub({
               pending={pending}
               openTickets={openTickets}
               isLive={isLive}
+              isAdmin={isAdmin}
+              who={currentUser?.name}
               onOpenTasks={() => setTab("tasks")}
               onOpenModules={() => setTab("modules")}
             />
@@ -323,7 +328,7 @@ export function CrmOnboardingHub({
           markLive(accountId, currentUser?.name);
           updateTracker(
             accountId,
-            { stage: "customer_success", priority: "medium" },
+            { stage: "post_go_live_handover", priority: "medium" },
             currentUser?.name,
           );
           toast.success(`${accountName} completed & marked Live`);
@@ -342,6 +347,8 @@ function DashboardTab({
   pending,
   openTickets,
   isLive,
+  isAdmin,
+  who,
   onOpenTasks,
   onOpenModules,
 }: {
@@ -351,6 +358,8 @@ function DashboardTab({
   pending: number;
   openTickets: number;
   isLive: boolean;
+  isAdmin: boolean;
+  who?: string;
   onOpenTasks: () => void;
   onOpenModules: () => void;
 }) {
@@ -444,8 +453,18 @@ function DashboardTab({
         <div className="card-soft p-3">
           <div className="text-[10px] uppercase text-muted-foreground">Health & stage</div>
           <div className="mt-1 text-xl font-semibold tabular-nums">{healthScore}</div>
-          <div className="mt-1 text-xs text-muted-foreground">
-            Stage: {CRM_STAGE_LABELS[record.tracker.stage] ?? record.tracker.stage}
+          <div className="mt-2 space-y-1">
+            <div className="text-[10px] uppercase text-muted-foreground">Stage</div>
+            {isAdmin ? (
+              <CrmAccountStageSelect
+                companyId={accountId}
+                stage={record.tracker.stage}
+                who={who}
+                compact
+              />
+            ) : (
+              <div className="text-xs font-medium">{resolveCrmStageLabel(record.tracker.stage)}</div>
+            )}
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
             Sales Manager: {account.salesManagerName || "—"}

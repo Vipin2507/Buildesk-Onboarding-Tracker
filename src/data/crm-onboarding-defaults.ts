@@ -20,6 +20,10 @@ import type {
   CrmTrainingSession,
 } from "@/types/crm-onboarding";
 import { calcChecklistProgress, isChecklistItemComplete } from "@/lib/checklist";
+import {
+  buildCrmStageLabelMap,
+  CRM_DEFAULT_IMPLEMENTATION_STAGES,
+} from "@/lib/crm-implementation-stages";
 
 /** Integration modules delivered via a third-party provider, with the vendor options for each. */
 export const CRM_PROVIDER_OTHER = "Other";
@@ -666,20 +670,13 @@ export const CRM_COMM_ACTIONS: { key: CrmCommActionKey; label: string }[] = [
   { key: "go_live_confirmation", label: "Send Go-Live Confirmation" },
 ];
 
-export const CRM_STAGE_LABELS: Record<string, string> = {
-  company_creation: "Company Creation",
-  module_selection: "Module Selection",
-  master_creation: "Master Creation",
-  data_migration: "Data Migration",
-  integration_setup: "Integration Setup",
-  training: "Training",
-  report_explanation: "Report Explanation",
-  uat: "UAT",
-  client_signoff: "Client Sign-Off",
-  go_live: "Go-Live",
-  ticket_support: "Ticket Support",
-  customer_success: "Customer Success",
-};
+export const CRM_STAGE_LABELS: Record<string, string> = buildCrmStageLabelMap(
+  CRM_DEFAULT_IMPLEMENTATION_STAGES,
+);
+
+export function seedCrmImplementationStages() {
+  return CRM_DEFAULT_IMPLEMENTATION_STAGES.map((s) => ({ ...s }));
+}
 
 function defaultProductModules(
   catalog: { key: CrmProductModuleKey; label: string }[] = CRM_PRODUCT_MODULES,
@@ -1166,7 +1163,7 @@ export function createCrmOnboardingRecord(
     reportChecklist: defaultReportChecklist(),
     goLiveChecklist: defaultGoLiveChecklist(),
     tracker: {
-      stage: "company_creation",
+      stage: "new_account",
       priority: "medium",
     },
     commLog: [],

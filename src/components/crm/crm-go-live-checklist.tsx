@@ -177,7 +177,7 @@ export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who 
   function forceCompleteAccount() {
     completeAllGoLiveItems(companyId);
     markLive(companyId, who);
-    updateTracker(companyId, { stage: "customer_success", priority: "medium" }, who);
+    updateTracker(companyId, { stage: "post_go_live_handover", priority: "medium" }, who);
     toast.success(`${accountName} completed & marked Live`);
     setConfirmForce(false);
   }

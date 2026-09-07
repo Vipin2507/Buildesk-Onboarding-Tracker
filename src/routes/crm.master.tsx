@@ -9,6 +9,7 @@ import {
   GraduationCap,
   Link2,
   ListChecks,
+  Milestone,
   Pencil,
   Plus,
   ShieldAlert,
@@ -41,12 +42,14 @@ import {
   getCrmMasterProductModuleCatalog,
   getCrmMasterTrainingFields,
 } from "@/stores/useCrmMasterStore";
+import { getCrmMasterImplementationStages } from "@/lib/crm-implementation-stages";
 import { useAuthStore, useCrmMasterStore, useCrmOnboardingStore } from "@/stores";
 import type {
   CrmBookingCallTypeDef,
   CrmBookingHostHoursDef,
   CrmMasterFieldDef,
   CrmMasterPicklist,
+  CrmImplementationStageDef,
   CrmMigrationFieldDef,
   CrmTrainingFieldDef,
 } from "@/types/crm-master";
@@ -62,6 +65,7 @@ const SECTIONS = [
   { id: "account-fields", label: "Account Fields", icon: Building2 },
   { id: "project-fields", label: "Project Fields", icon: Boxes },
   { id: "picklists", label: "Picklists", icon: ListChecks },
+  { id: "account-stages", label: "Account stages", icon: Milestone },
   { id: "integrations", label: "Integrations", icon: Link2 },
   { id: "migration", label: "Migration", icon: Upload },
   { id: "training", label: "Training", icon: GraduationCap },
@@ -162,6 +166,7 @@ function CrmMasterPage() {
             {section === "account-fields" ? <FieldsPanel entity="account" /> : null}
             {section === "project-fields" ? <FieldsPanel entity="project" /> : null}
             {section === "picklists" ? <PicklistsPanel /> : null}
+            {section === "account-stages" ? <AccountStagesPanel /> : null}
             {section === "integrations" ? <IntegrationsPanel /> : null}
             {section === "migration" ? <MigrationPanel /> : null}
             {section === "training" ? <TrainingPanel /> : null}
@@ -185,6 +190,7 @@ function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) 
   const trainingFieldsDeveloper = useCrmMasterStore((s) => s.trainingFieldsDeveloper);
   const trainingFieldsBroker = useCrmMasterStore((s) => s.trainingFieldsBroker);
   const bookingCallTypes = useCrmMasterStore((s) => s.bookingCallTypes);
+  const implementationStages = useCrmMasterStore((s) => s.implementationStages);
 
   const cards = [
     {
@@ -205,6 +211,12 @@ function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) 
       total: picklists.reduce((n, p) => n + p.values.length, 0),
       to: "picklists" as const,
       suffix: "values",
+    },
+    {
+      label: "Account stages",
+      value: (implementationStages?.length ?? getCrmMasterImplementationStages().length),
+      total: "pipeline steps",
+      to: "account-stages" as const,
     },
     {
       label: "Integrations",
@@ -667,6 +679,107 @@ function PicklistsPanel() {
           toast.success("Picklist deleted");
         }}
       />
+    </div>
+  );
+}
+
+function AccountStagesPanel() {
+  const implementationStages = useCrmMasterStore((s) => s.implementationStages);
+  const setImplementationStages = useCrmMasterStore((s) => s.setImplementationStages);
+  const stages = useMemo(
+    () =>
+      (implementationStages?.length ? implementationStages : getCrmMasterImplementationStages()).slice().sort(
+        (a, b) => a.order - b.order,
+      ),
+    [implementationStages],
+  );
+
+  function updateStage(index: number, patch: Partial<CrmImplementationStageDef>) {
+    const next = stages.map((stage, i) => (i === index ? { ...stage, ...patch } : stage));
+    setImplementationStages(next);
+  }
+
+  function moveStage(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= stages.length) return;
+    const next = stages.map((stage) => ({ ...stage }));
+    const currentOrder = next[index]!.order;
+    next[index]!.order = next[target]!.order;
+    next[target]!.order = currentOrder;
+    next.sort((a, b) => a.order - b.order);
+    setImplementationStages(next);
+    toast.success("Stage order updated");
+  }
+
+  function saveStages() {
+    flushCrmMasterConfigPersistence();
+    toast.success("Account stages saved");
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="card-soft p-3">
+        <h3 className="text-sm font-semibold">Account implementation stages</h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Controls the pipeline shown on CRM accounts. Admins can change an account&apos;s stage from
+          the accounts table; labels and visibility are managed here.
+        </p>
+      </div>
+
+      <div className="card-soft overflow-hidden">
+        <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)_auto_auto] gap-2 border-b bg-muted/40 px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          <div>Key</div>
+          <div>Label</div>
+          <div>Active</div>
+          <div>Order</div>
+        </div>
+        {stages.map((stage, index) => (
+          <div
+            key={stage.key}
+            className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)_auto_auto] items-center gap-2 border-b px-3 py-2 last:border-b-0"
+          >
+            <div className="font-mono text-[11px] text-muted-foreground">{stage.key}</div>
+            <input
+              value={stage.label}
+              onChange={(e) => updateStage(index, { label: e.target.value })}
+              className="h-8 rounded-md border bg-background px-2 text-xs"
+            />
+            <Switch
+              checked={stage.active}
+              onCheckedChange={(checked) => updateStage(index, { active: checked === true })}
+              size="sm"
+            />
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 px-2 text-[10px]"
+                disabled={index === 0}
+                onClick={() => moveStage(index, -1)}
+              >
+                Up
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 px-2 text-[10px]"
+                disabled={index === stages.length - 1}
+                onClick={() => moveStage(index, 1)}
+              >
+                Down
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex justify-end">
+        <Button size="sm" className="h-8 text-xs" onClick={saveStages}>
+          Save stages
+        </Button>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import type {
   CrmBookingCallTypeDef,
   CrmBookingHostHoursDef,
+  CrmImplementationStageDef,
   CrmMasterFieldDef,
   CrmMasterModuleDef,
   CrmMasterPicklist,
@@ -20,11 +21,13 @@ import {
   seedCrmMigrationFields,
   seedCrmModuleProviders,
   seedCrmTrainingFields,
+  seedCrmImplementationStages,
   CRM_CORE_MODULES,
   CRM_INTEGRATION_MODULES,
   CRM_PRODUCT_MODULES,
   type CrmTrainingTrack,
 } from "@/data/crm-onboarding-defaults";
+import { normalizeCrmImplementationStages } from "@/lib/crm-implementation-stages";
 import {
   normalizeCrmBookingCallTypes,
   normalizeCrmBookingHostHours,
@@ -51,6 +54,8 @@ type CrmMasterState = {
   bookingCallTypes: CrmBookingCallTypeDef[];
   /** Default executive weekly hours for booking availability. */
   bookingHostHours: CrmBookingHostHoursDef[];
+  /** Account implementation pipeline stages (editable in Master). */
+  implementationStages: CrmImplementationStageDef[];
 
   updatePlatform: (data: Partial<CrmMasterPlatformSettings>) => void;
 
@@ -72,6 +77,7 @@ type CrmMasterState = {
   setTrainingFields: (track: CrmTrainingTrack, fields: CrmTrainingFieldDef[]) => void;
   setBookingCallTypes: (fields: CrmBookingCallTypeDef[]) => void;
   setBookingHostHours: (hours: CrmBookingHostHoursDef[]) => void;
+  setImplementationStages: (stages: CrmImplementationStageDef[]) => void;
 
   resetAll: () => void;
 };
@@ -89,6 +95,7 @@ function seedState() {
     trainingFieldsBroker: seedCrmTrainingFields("broker_cp"),
     bookingCallTypes: seedCrmBookingCallTypes(),
     bookingHostHours: seedCrmBookingHostHours(),
+    implementationStages: seedCrmImplementationStages(),
   };
 }
 
@@ -270,6 +277,10 @@ export const useCrmMasterStore = createPersistedStore<CrmMasterState>(
       set({ bookingHostHours: normalizeCrmBookingHostHours(hours) });
     },
 
+    setImplementationStages: (stages) => {
+      set({ implementationStages: normalizeCrmImplementationStages(stages) });
+    },
+
     resetAll: () => {
       set(seedState());
     },
@@ -348,6 +359,7 @@ export function crmMasterSnapshot() {
     trainingFieldsBroker: s.trainingFieldsBroker,
     bookingCallTypes: s.bookingCallTypes,
     bookingHostHours: s.bookingHostHours,
+    implementationStages: s.implementationStages,
   };
 }
 
@@ -389,6 +401,13 @@ export function hydrateCrmMasterFromServer(raw: Record<string, unknown>) {
       : {}),
     ...(Array.isArray(raw.bookingHostHours)
       ? { bookingHostHours: normalizeCrmBookingHostHours(raw.bookingHostHours as CrmBookingHostHoursDef[]) }
+      : {}),
+    ...(Array.isArray(raw.implementationStages)
+      ? {
+          implementationStages: normalizeCrmImplementationStages(
+            raw.implementationStages as CrmImplementationStageDef[],
+          ),
+        }
       : {}),
   }));
   ensureCrmMasterModulesCatalog();

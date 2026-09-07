@@ -5,11 +5,14 @@ import {
   createCrmOnboardingRecord,
   CRM_PRODUCT_MODULES,
   CRM_CORE_MODULES,
-  CRM_STAGE_LABELS,
   crmGoLiveReady,
   ensureMasterDataFields,
   isCrmIntegrationModule,
 } from "@/data/crm-onboarding-defaults";
+import {
+  getCrmMasterImplementationStages,
+  resolveCrmStageLabel,
+} from "@/lib/crm-implementation-stages";
 import {
   getChecklistPhaseBucket,
   summarizeChecklistPhases,
@@ -230,7 +233,7 @@ export function useCrmDashboardOverview() {
         ...account,
         progress,
         stage: record.tracker.stage,
-        stageLabel: CRM_STAGE_LABELS[record.tracker.stage] ?? record.tracker.stage,
+        stageLabel: resolveCrmStageLabel(record.tracker.stage),
         healthBucket: healthBucketOf(resolvedHealth),
         resolvedHealth,
         openTickets,
@@ -319,11 +322,13 @@ export function useCrmDashboardOverview() {
       .sort((a, b) => b.opted - a.opted)
       .slice(0, 8);
 
-    const stageMix = Object.keys(CRM_STAGE_LABELS).map((stage) => ({
-      stage: stage as CrmImplementationStage,
-      label: CRM_STAGE_LABELS[stage]!,
-      value: rows.filter((r) => r.stage === stage).length,
-    }));
+    const stageMix = getCrmMasterImplementationStages()
+      .filter((s) => s.active)
+      .map((stage) => ({
+        stage: stage.key,
+        label: stage.label,
+        value: rows.filter((r) => r.stage === stage.key).length,
+      }));
 
     const recentActivity = buildCrmActivityFeed({
       accounts,
@@ -527,7 +532,7 @@ export function useCrmDashboardOverview() {
         case "stage":
           return {
             kind: "accounts" as const,
-            title: CRM_STAGE_LABELS[filter.stage] ?? filter.stage,
+            title: resolveCrmStageLabel(filter.stage),
             accounts: rows.filter((r) => r.stage === filter.stage),
           };
         case "modules":
