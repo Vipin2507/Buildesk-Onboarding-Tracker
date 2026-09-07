@@ -1,6 +1,5 @@
 import type { CrmImplementationStageDef } from "@/types/crm-master";
 import type { CrmImplementationStage } from "@/types/crm-onboarding";
-import { useCrmMasterStore } from "@/stores/useCrmMasterStore";
 
 export const CRM_DEFAULT_IMPLEMENTATION_STAGES: CrmImplementationStageDef[] = [
   { key: "new_account", label: "New Account", order: 1, active: true },
@@ -25,6 +24,10 @@ export const LEGACY_CRM_STAGE_MAP: Record<string, CrmImplementationStage> = {
   ticket_support: "post_go_live_handover",
   customer_success: "post_go_live_handover",
 };
+
+export function seedCrmImplementationStages(): CrmImplementationStageDef[] {
+  return CRM_DEFAULT_IMPLEMENTATION_STAGES.map((s) => ({ ...s }));
+}
 
 export function buildCrmStageLabelMap(
   stages: CrmImplementationStageDef[],
@@ -55,21 +58,6 @@ export function normalizeCrmImplementationStages(
       active: prev.active !== false,
     };
   }).sort((a, b) => a.order - b.order);
-}
-
-export function getCrmMasterImplementationStages(): CrmImplementationStageDef[] {
-  const stored = useCrmMasterStore.getState().implementationStages;
-  return normalizeCrmImplementationStages(stored);
-}
-
-export function listActiveCrmImplementationStages(): CrmImplementationStageDef[] {
-  return getCrmMasterImplementationStages().filter((s) => s.active);
-}
-
-export function resolveCrmStageLabel(stage: string | undefined): string {
-  const normalized = normalizeCrmImplementationStage(stage);
-  const match = getCrmMasterImplementationStages().find((s) => s.key === normalized);
-  return match?.label ?? normalized.replace(/_/g, " ");
 }
 
 export function isCrmGoLiveStage(stage: string | undefined): boolean {

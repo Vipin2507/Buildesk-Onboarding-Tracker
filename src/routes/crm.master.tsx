@@ -42,7 +42,7 @@ import {
   getCrmMasterProductModuleCatalog,
   getCrmMasterTrainingFields,
 } from "@/stores/useCrmMasterStore";
-import { getCrmMasterImplementationStages } from "@/lib/crm-implementation-stages";
+import { getCrmMasterImplementationStages } from "@/stores/useCrmMasterStore";
 import { useAuthStore, useCrmMasterStore, useCrmOnboardingStore } from "@/stores";
 import type {
   CrmBookingCallTypeDef,

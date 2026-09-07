@@ -1,8 +1,6 @@
 import { isCrmIntegrationModule } from "@/data/crm-onboarding-defaults";
-import {
-  isCrmGoLiveStage,
-  resolveCrmStageLabel,
-} from "@/lib/crm-implementation-stages";
+import { isCrmGoLiveStage } from "@/lib/crm-implementation-stages";
+import { resolveCrmStageLabel } from "@/stores/useCrmMasterStore";
 import { crmSalesManagerNamesMatch } from "@/lib/crm-account-access";
 import type { CrmAccountTabId } from "@/lib/crm-route-search";
 import type { ActivityKind } from "@/types";

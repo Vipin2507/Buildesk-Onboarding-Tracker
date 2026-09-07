@@ -18,16 +18,19 @@ import {
   CRM_SEED_PROJECT_FIELDS,
 } from "@/data/crm-master-seed";
 import {
-  seedCrmMigrationFields,
-  seedCrmModuleProviders,
-  seedCrmTrainingFields,
+  normalizeCrmImplementationStage,
+  normalizeCrmImplementationStages,
   seedCrmImplementationStages,
+} from "@/lib/crm-implementation-stages";
+import {
   CRM_CORE_MODULES,
   CRM_INTEGRATION_MODULES,
   CRM_PRODUCT_MODULES,
+  seedCrmMigrationFields,
+  seedCrmModuleProviders,
+  seedCrmTrainingFields,
   type CrmTrainingTrack,
 } from "@/data/crm-onboarding-defaults";
-import { normalizeCrmImplementationStages } from "@/lib/crm-implementation-stages";
 import {
   normalizeCrmBookingCallTypes,
   normalizeCrmBookingHostHours,
@@ -411,4 +414,19 @@ export function hydrateCrmMasterFromServer(raw: Record<string, unknown>) {
       : {}),
   }));
   ensureCrmMasterModulesCatalog();
+}
+
+export function getCrmMasterImplementationStages(): CrmImplementationStageDef[] {
+  const stored = useCrmMasterStore.getState().implementationStages;
+  return normalizeCrmImplementationStages(stored);
+}
+
+export function listActiveCrmImplementationStages(): CrmImplementationStageDef[] {
+  return getCrmMasterImplementationStages().filter((s) => s.active);
+}
+
+export function resolveCrmStageLabel(stage: string | undefined): string {
+  const normalized = normalizeCrmImplementationStage(stage);
+  const match = getCrmMasterImplementationStages().find((s) => s.key === normalized);
+  return match?.label ?? normalized.replace(/_/g, " ");
 }

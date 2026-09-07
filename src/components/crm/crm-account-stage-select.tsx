@@ -1,7 +1,7 @@
 import { toast } from "sonner";
 
 import { DesignTicketSelect } from "@/components/design-ticket/design-ticket-fields";
-import { listActiveCrmImplementationStages, resolveCrmStageLabel } from "@/lib/crm-implementation-stages";
+import { listActiveCrmImplementationStages, resolveCrmStageLabel } from "@/stores/useCrmMasterStore";
 import type { CrmImplementationStage } from "@/types/crm-onboarding";
 import { useCrmOnboardingStore } from "@/stores";
 

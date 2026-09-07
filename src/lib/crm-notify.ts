@@ -1,4 +1,4 @@
-import { resolveCrmStageLabel } from "@/lib/crm-implementation-stages";
+import { resolveCrmStageLabel } from "@/stores/useCrmMasterStore";
 import type { CrmImplementationStage } from "@/types/crm-onboarding";
 import { notifyInApp } from "@/stores/useNotificationStore";
 

@@ -59,7 +59,7 @@ import {
   crmPendingActivityCount,
   isCrmIntegrationModule,
 } from "@/data/crm-onboarding-defaults";
-import { resolveCrmStageLabel } from "@/lib/crm-implementation-stages";
+import { resolveCrmStageLabel } from "@/stores/useCrmMasterStore";
 import { isAdminRoleKey } from "@/lib/permissions";
 import { calcChecklistProgress } from "@/lib/checklist";
 import { resolveCrmMigrationCatalog } from "@/lib/crm-migration-catalog";

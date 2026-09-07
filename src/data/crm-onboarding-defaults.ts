@@ -674,10 +674,6 @@ export const CRM_STAGE_LABELS: Record<string, string> = buildCrmStageLabelMap(
   CRM_DEFAULT_IMPLEMENTATION_STAGES,
 );
 
-export function seedCrmImplementationStages() {
-  return CRM_DEFAULT_IMPLEMENTATION_STAGES.map((s) => ({ ...s }));
-}
-
 function defaultProductModules(
   catalog: { key: CrmProductModuleKey; label: string }[] = CRM_PRODUCT_MODULES,
 ): CrmProductModule[] {

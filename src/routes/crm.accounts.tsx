@@ -45,7 +45,7 @@ import { isAdminRoleKey } from "@/lib/permissions";
 import {
   listActiveCrmImplementationStages,
   resolveCrmStageLabel,
-} from "@/lib/crm-implementation-stages";
+} from "@/stores/useCrmMasterStore";
 import { cn, formatDate } from "@/lib/utils";
 import { useSessionFilterState } from "@/hooks/use-session-filter";
 import {

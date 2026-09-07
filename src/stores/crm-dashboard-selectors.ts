@@ -12,7 +12,7 @@ import {
 import {
   getCrmMasterImplementationStages,
   resolveCrmStageLabel,
-} from "@/lib/crm-implementation-stages";
+} from "@/stores/useCrmMasterStore";
 import {
   getChecklistPhaseBucket,
   summarizeChecklistPhases,
