@@ -18,7 +18,6 @@ import { CrmAccountDateBulkUploadModal } from "@/components/crm/crm-account-date
 import { CrmAccountGoLiveActions } from "@/components/crm/crm-account-go-live-actions";
 import { CrmAccountStageSelect } from "@/components/crm/crm-account-stage-select";
 import { CrmAccountModulesCell } from "@/components/crm/crm-account-modules-cell";
-import { CrmAccountStatusRemarksNote } from "@/components/crm/crm-account-status-remarks-modal";
 import {
   CrmAccountFormFields,
   crmAccountSchema,
@@ -144,15 +143,6 @@ function isAccountFilterPillActive(
   if (id === "critical") return kpiFilter === "critical";
   if (id === "all") return statusFilter === "all" && kpiFilter === "all";
   return statusFilter === id && kpiFilter === "all";
-}
-
-function statusTone(status: CrmAccount["status"]) {
-  if (status === "live") return "success" as const;
-  if (status === "onboarding") return "warning" as const;
-  if (status === "suspended" || status === "inactive" || status === "closed") {
-    return "muted" as const;
-  }
-  return "info" as const;
 }
 
 function healthTone(bucket: CrmAccountRow["healthBucket"]) {
@@ -1146,21 +1136,6 @@ function CrmAccountsPage() {
                         {r.healthBucket}
                         {r.overdue ? " · overdue" : ""}
                       </Pill>
-                    ),
-                  },
-                  {
-                    key: "status",
-                    header: "Status",
-                    sortable: true,
-                    render: (r) => (
-                      <div className="min-w-[5.5rem]">
-                        <Pill tone={statusTone(r.status)}>{r.status}</Pill>
-                        <CrmAccountStatusRemarksNote
-                          status={r.status}
-                          remarks={r.statusRemarks}
-                          className="mt-1 max-w-[12rem] line-clamp-3"
-                        />
-                      </div>
                     ),
                   },
                 ]}
