@@ -11,6 +11,7 @@ The app ships as two products in one codebase. Each user has a `productScope` (`
 
 Both products share authentication, SQLite storage, automation hooks, client portals, ticket tracking, live chat, and the design-ticket UI kit.
 
+
 ---
 
 ## Table of contents
