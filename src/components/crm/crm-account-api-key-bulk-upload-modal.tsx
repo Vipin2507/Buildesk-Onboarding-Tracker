@@ -37,8 +37,7 @@ export function CrmAccountApiKeyBulkUploadModal({
 }) {
   const accounts = useCrmAccountStore((s) => s.accounts);
   const portals = useCompanyPortalStore((s) => s.access);
-  const generateAccessForCompany = useCompanyPortalStore((s) => s.generateAccessForCompany);
-  const updateSlug = useCompanyPortalStore((s) => s.updateSlug);
+  const setPortalApiKey = useCompanyPortalStore((s) => s.setPortalApiKey);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -92,7 +91,7 @@ export function CrmAccountApiKeyBulkUploadModal({
     }
   }
 
-  function applyUpdates() {
+  async function applyUpdates() {
     if (!plan) return;
 
     const ready = plan.rows.filter((r) => r.action === "update" && r.existingId);
@@ -107,27 +106,18 @@ export function CrmAccountApiKeyBulkUploadModal({
       const failures: string[] = [];
 
       for (const row of ready) {
-        const account = accounts.find((a) => a.id === row.existingId);
+        const account = useCrmAccountStore.getState().accounts.find((a) => a.id === row.existingId);
         if (!account) continue;
 
-        let portal = useCompanyPortalStore.getState().getByCompanyId(account.id);
-        if (!portal) {
-          portal = generateAccessForCompany(
-            {
-              id: account.id,
-              name: account.name,
-              contact: account.contact,
-              email: account.email,
-            },
-            { slug: row.apiSlug },
-          );
-          if (portal.slug === row.apiSlug) {
-            updated += 1;
-            continue;
-          }
-        }
-
-        const result = updateSlug(account.id, row.apiRaw);
+        const result = await setPortalApiKey(
+          {
+            id: account.id,
+            name: account.name,
+            contact: account.contact,
+            email: account.email,
+          },
+          row.apiRaw,
+        );
         if (result.ok) {
           updated += 1;
         } else {
@@ -297,7 +287,7 @@ export function CrmAccountApiKeyBulkUploadModal({
           <Button
             type="button"
             disabled={busy || !plan || plan.summary.update === 0}
-            onClick={applyUpdates}
+            onClick={() => void applyUpdates()}
           >
             Update {plan?.summary.update ?? 0} API key{(plan?.summary.update ?? 0) === 1 ? "" : "s"}
           </Button>

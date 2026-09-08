@@ -41,7 +41,7 @@ export function CrmAccountPortalPanel({ accountId }: { accountId: string }) {
   const portal = useCompanyPortalStore((s) => s.getByCompanyId(accountId));
   const generateAccess = useCompanyPortalStore((s) => s.generateAccessForCompany);
   const regenerateSlug = useCompanyPortalStore((s) => s.regenerateSlug);
-  const updateSlug = useCompanyPortalStore((s) => s.updateSlug);
+  const setPortalApiKey = useCompanyPortalStore((s) => s.setPortalApiKey);
   const tickets = useDesignTicketsForCompany(accountId);
   const stats = useDesignTicketStats(accountId);
   const deleteTicket = useDesignTicketStore((s) => s.deleteTicket);
@@ -286,17 +286,26 @@ export function CrmAccountPortalPanel({ accountId }: { accountId: string }) {
         confirmLabel="Update slug"
         confirmTone="default"
         onConfirm={() => {
-          const result = updateSlug(accountId, apiKeyDraft);
-          if (!result.ok) {
-            toast.error(result.error);
-            return;
-          }
-          if (result.unchanged) {
-            toast.info("Portal slug unchanged");
-          } else {
-            toast.success(`Portal slug updated to ${result.slug}`);
-          }
-          setSlugOpen(false);
+          void setPortalApiKey(
+            {
+              id: account.id,
+              name: account.name,
+              contact: account.contact,
+              email: account.email,
+            },
+            apiKeyDraft,
+          ).then((result) => {
+            if (!result.ok) {
+              toast.error(result.error);
+              return;
+            }
+            if (result.unchanged) {
+              toast.info("Portal slug unchanged");
+            } else {
+              toast.success(`Portal slug updated to ${result.slug}`);
+            }
+            setSlugOpen(false);
+          });
         }}
       />
 

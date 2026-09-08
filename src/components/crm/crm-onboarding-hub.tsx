@@ -62,6 +62,7 @@ import {
 import { resolveCrmStageLabel } from "@/stores/useCrmMasterStore";
 import { isAdminRoleKey } from "@/lib/permissions";
 import { calcChecklistProgress } from "@/lib/checklist";
+import { portalPublicCreateUrl } from "@/lib/design-ticket-portal";
 import { resolveCrmMigrationCatalog } from "@/lib/crm-migration-catalog";
 import { resolveCrmTrainingCatalogForCompany } from "@/lib/crm-training-catalog";
 import { cn, formatDate } from "@/lib/utils";
@@ -69,6 +70,7 @@ import { isTicketOpen } from "@/lib/tickets";
 import {
   useAuthStore,
   useBookingStore,
+  useCompanyPortalStore,
   useCrmAccountQueryStore,
   useCrmAccountStore,
   useCrmOnboardingStore,
@@ -364,6 +366,7 @@ function DashboardTab({
   onOpenModules: () => void;
 }) {
   const account = useCrmAccountStore((s) => s.accounts.find((a) => a.id === accountId))!;
+  const portal = useCompanyPortalStore((s) => s.getByCompanyId(accountId));
   const updateAccount = useCrmAccountStore((s) => s.updateAccount);
   const ensure = useCrmOnboardingStore((s) => s.ensureForCompany);
   const setModuleEnabled = useCrmOnboardingStore((s) => s.setProductModuleEnabled);
@@ -427,6 +430,25 @@ function DashboardTab({
           </div>
           <div className="mt-2 text-[10px] text-muted-foreground">
             POC: {account.pocName || account.contact} · {account.pocMobile || account.phone}
+          </div>
+          <div className="mt-2 space-y-0.5 border-t border-border/60 pt-2 text-[10px] text-muted-foreground">
+            <div>
+              Client ID:{" "}
+              <code className="rounded bg-muted px-1 font-mono text-foreground">
+                {account.userId || "—"}
+              </code>
+            </div>
+            <div>
+              Portal API key:{" "}
+              <code className="rounded bg-muted px-1 font-mono text-foreground">
+                {portal?.slug || "—"}
+              </code>
+            </div>
+            {portal?.slug ? (
+              <div className="truncate font-mono text-[10px]">
+                {portalPublicCreateUrl(portal.slug)}
+              </div>
+            ) : null}
           </div>
         </div>
         <div className="card-soft p-3">

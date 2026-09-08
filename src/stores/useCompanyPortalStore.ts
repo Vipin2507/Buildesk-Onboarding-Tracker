@@ -5,7 +5,6 @@ import {
   regenerateCompanyPortalSlug,
   setCompanyPortalActive,
   updateCompanyPortalContact,
-  updateCompanyPortalSlug,
   upsertCompanyPortalAccess,
 } from "@/lib/api";
 import { generatePortalSlug, isValidPortalSlug, normalizePortalSlug } from "@/lib/design-ticket-portal";
@@ -26,6 +25,13 @@ type CompanyPortalState = {
     companyId: string,
     slugInput: string,
   ) => { ok: true; slug: string; unchanged?: boolean } | { ok: false; error: string };
+  /** Create or update portal API key and wait for server persistence. */
+  setPortalApiKey: (
+    company: Pick<Company, "id" | "name" | "contact" | "email">,
+    slugInput: string,
+  ) => Promise<
+    { ok: true; slug: string; unchanged?: boolean } | { ok: false; error: string }
+  >;
   setActive: (companyId: string, isActive: boolean) => void;
   updateContact: (
     companyId: string,
@@ -149,11 +155,66 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
         access: s.access.map((a) => (a.companyId === companyId ? updated : a)),
       }));
       serverSync("update portal slug", async () => {
-        const remote = await updateCompanyPortalSlug({ data: { companyId, slug: slugInput } });
+        const remote = await upsertCompanyPortalAccess({ data: updated });
         get().mergeAccess(remote);
         return remote;
       });
       return { ok: true, slug };
+    },
+
+    setPortalApiKey: async (company, slugInput) => {
+      const slug = normalizePortalSlug(slugInput);
+      if (!slug) return { ok: false, error: "Portal API key is required" };
+      if (!isValidPortalSlug(slug)) {
+        return {
+          ok: false,
+          error: "Portal API key must be 3–48 characters (letters, numbers, hyphens)",
+        };
+      }
+
+      const taken = get().access.find((a) => a.slug === slug && a.companyId !== company.id);
+      if (taken) return { ok: false, error: "This portal API key is already in use" };
+
+      const existing = get().getByCompanyId(company.id);
+      if (existing?.slug === slug) return { ok: true, slug, unchanged: true };
+
+      const now = nowIso();
+      const record: CompanyPortalAccess = existing
+        ? touch({ ...existing, slug, updatedAt: now })
+        : {
+            companyId: company.id,
+            companyName: company.name,
+            slug,
+            contactName: company.contact || company.name,
+            contactEmail: company.email,
+            isActive: true,
+            createdAt: now,
+            updatedAt: now,
+          };
+
+      if (existing) {
+        set((s) => ({
+          access: s.access.map((a) => (a.companyId === company.id ? record : a)),
+        }));
+      } else {
+        set((s) => ({ access: [...s.access, record] }));
+      }
+
+      try {
+        const remote = await upsertCompanyPortalAccess({ data: record });
+        get().mergeAccess(remote);
+        return { ok: true, slug: remote.slug };
+      } catch (e) {
+        if (existing) {
+          set((s) => ({
+            access: s.access.map((a) => (a.companyId === company.id ? existing : a)),
+          }));
+        } else {
+          set((s) => ({ access: s.access.filter((a) => a.companyId !== company.id) }));
+        }
+        const message = e instanceof Error ? e.message : "Failed to save portal API key";
+        return { ok: false, error: message };
+      }
     },
 
     setActive: (companyId, isActive) => {
