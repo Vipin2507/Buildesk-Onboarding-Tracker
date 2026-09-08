@@ -6,12 +6,14 @@ import {
   ArrowLeftRight,
   CalendarRange,
   FileSpreadsheet,
+  KeyRound,
   Plus,
   Search,
   Upload,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { CrmAccountApiKeyBulkUploadModal } from "@/components/crm/crm-account-api-key-bulk-upload-modal";
 import { CrmAccountBulkUploadModal } from "@/components/crm/crm-account-bulk-upload-modal";
 import { CrmAccountClientTransferModal } from "@/components/crm/crm-account-client-transfer-modal";
 import { CrmAccountDateBulkUploadModal } from "@/components/crm/crm-account-date-bulk-upload-modal";
@@ -336,6 +338,7 @@ function CrmAccountsPage() {
   const [bulkUpdateOpen, setBulkUpdateOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [dateBulkOpen, setDateBulkOpen] = useState(false);
+  const [apiKeyBulkOpen, setApiKeyBulkOpen] = useState(false);
   const [editing, setEditing] = useState<CrmAccount | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState<CrmAccountRow | null>(null);
@@ -664,6 +667,15 @@ function CrmAccountsPage() {
             >
               <FileSpreadsheet className="h-3.5 w-3.5" />
               Client bulk update
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 gap-1 px-3 text-xs"
+              onClick={() => setApiKeyBulkOpen(true)}
+            >
+              <KeyRound className="h-3.5 w-3.5" />
+              Update API keys
             </Button>
             <Button
               size="sm"
@@ -1210,6 +1222,7 @@ function CrmAccountsPage() {
         onTransferred={() => setSelectedIds(new Set())}
       />
       <CrmAccountDateBulkUploadModal open={dateBulkOpen} onOpenChange={setDateBulkOpen} />
+      <CrmAccountApiKeyBulkUploadModal open={apiKeyBulkOpen} onOpenChange={setApiKeyBulkOpen} />
 
       <ConfirmDeleteDialog
         open={deleteOpen}
