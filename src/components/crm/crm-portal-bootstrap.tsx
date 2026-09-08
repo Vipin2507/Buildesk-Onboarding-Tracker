@@ -4,18 +4,21 @@ import { useAuthStore, useBookingStore, useCompanyPortalStore, useCrmAccountStor
 
 /**
  * Ensures CRM accounts missing portal rows get one created (once per mount wave).
- * Booking defaults are seeded in one batch after auth is present (not per-account).
+ * Waits for server portal hydrate so we don't overwrite bulk-uploaded API keys with random slugs.
  */
 export function CrmPortalBootstrap() {
   const user = useAuthStore((s) => s.user);
   const accounts = useCrmAccountStore((s) => s.accounts);
-  const generateAccess = useCompanyPortalStore((s) => s.generateAccessForCompany);
+  const serverHydrated = useCompanyPortalStore((s) => s.serverHydrated);
+  const ensurePortalForCompany = useCompanyPortalStore((s) => s.ensurePortalForCompany);
   const getByCompanyId = useCompanyPortalStore((s) => s.getByCompanyId);
   const ensureDefaultsBatch = useBookingStore((s) => s.ensureDefaultsBatch);
   const attempted = useRef(new Set<string>());
   const bookingBatchKey = useRef<string | null>(null);
 
   useEffect(() => {
+    if (!serverHydrated) return;
+
     for (const account of accounts) {
       if (attempted.current.has(account.id)) continue;
       if (getByCompanyId(account.id)) {
@@ -23,14 +26,14 @@ export function CrmPortalBootstrap() {
         continue;
       }
       attempted.current.add(account.id);
-      generateAccess({
+      void ensurePortalForCompany({
         id: account.id,
         name: account.name,
         contact: account.contact,
         email: account.email,
-      });
+      }).catch((e) => console.warn("[crm portal bootstrap]", e));
     }
-  }, [accounts, generateAccess, getByCompanyId]);
+  }, [accounts, ensurePortalForCompany, getByCompanyId, serverHydrated]);
 
   useEffect(() => {
     if (!user) return;

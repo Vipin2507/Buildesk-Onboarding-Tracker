@@ -144,6 +144,7 @@ export function CrmOnboardingHub({
   const refreshAccountQueries = useCrmAccountQueryStore((s) => s.refreshCompanyQueries);
   const openQueries = useCrmAccountQueryStore((s) => s.openCountForCompany(accountId));
   const currentUser = useAuthStore((s) => s.user);
+  const refreshPortalAccessFromServer = useCompanyPortalStore((s) => s.refreshPortalAccessFromServer);
 
   const [internalTab, setInternalTab] = useState<TabId>("dashboard");
   const [confirmForceLive, setConfirmForceLive] = useState(false);
@@ -152,6 +153,10 @@ export function CrmOnboardingHub({
     if (onTabChange) onTabChange(next);
     else setInternalTab(next);
   };
+
+  useEffect(() => {
+    void refreshPortalAccessFromServer().catch(() => undefined);
+  }, [accountId, refreshPortalAccessFromServer]);
 
   useEffect(() => {
     ensureForCompany(accountId, account?.companyType);

@@ -2,6 +2,7 @@ import type { Company } from "@/types";
 import type { CompanyPortalAccess } from "@/types/design-ticket";
 import { nowIso } from "@/types";
 import {
+  listCompanyPortalAccess,
   regenerateCompanyPortalSlug,
   setCompanyPortalActive,
   updateCompanyPortalContact,
@@ -13,12 +14,20 @@ import { createPersistedStore, touch } from "./persist";
 
 type CompanyPortalState = {
   access: CompanyPortalAccess[];
+  /** Set after server-data-bootstrap loads portal rows — blocks premature random slug creation. */
+  serverHydrated: boolean;
+  markServerHydrated: () => void;
+  refreshPortalAccessFromServer: () => Promise<void>;
   hydrateAccess: (records: CompanyPortalAccess[]) => void;
   mergeAccess: (record: CompanyPortalAccess) => void;
   generateAccessForCompany: (
     company: Pick<Company, "id" | "name" | "contact" | "email">,
     opts?: { slug?: string },
-  ) => CompanyPortalAccess;
+  ) => CompanyPortalAccess | undefined;
+  ensurePortalForCompany: (
+    company: Pick<Company, "id" | "name" | "contact" | "email">,
+    opts?: { slug?: string },
+  ) => Promise<CompanyPortalAccess | undefined>;
   ensureAllCompanies: (companies: Company[]) => void;
   regenerateSlug: (companyId: string) => string | undefined;
   updateSlug: (
@@ -49,13 +58,22 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
   "company-portal-v1",
   (set, get) => ({
     access: [],
+    serverHydrated: false,
+
+    markServerHydrated: () => set({ serverHydrated: true }),
+
+    refreshPortalAccessFromServer: async () => {
+      const records = await listCompanyPortalAccess();
+      get().hydrateAccess(records);
+      get().markServerHydrated();
+    },
 
     hydrateAccess: (records) => {
       set((s) => {
         const serverIds = new Set(records.map((r) => r.companyId));
         // Keep local-only rows (e.g. CRM portals mid-sync) until the server has them.
         const localOnly = s.access.filter((a) => !serverIds.has(a.companyId));
-        return { access: [...records, ...localOnly] };
+        return { access: [...records, ...localOnly], serverHydrated: true };
       });
     },
 
@@ -74,11 +92,15 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
       if (existing) {
         if (existing.companyName !== company.name) {
           get().updateContact(company.id, { companyName: company.name });
-          return get().getByCompanyId(company.id)!;
+          return get().getByCompanyId(company.id);
         }
         // Do not re-POST existing portals on every page load — that floods the
         // reverse proxy and surfaces as net::ERR_FAILED / Failed to fetch.
         return existing;
+      }
+
+      if (!get().serverHydrated) {
+        return undefined;
       }
 
       const now = nowIso();
@@ -101,7 +123,32 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
       return record;
     },
 
+    ensurePortalForCompany: async (company, opts) => {
+      let existing = get().getByCompanyId(company.id);
+      if (existing && !opts?.slug) return existing;
+
+      if (!get().serverHydrated) {
+        try {
+          await get().refreshPortalAccessFromServer();
+        } catch (e) {
+          console.warn("[portal] refresh before ensure failed", e);
+        }
+      }
+
+      existing = get().getByCompanyId(company.id);
+      if (existing && !opts?.slug) return existing;
+
+      if (opts?.slug) {
+        const result = await get().setPortalApiKey(company, opts.slug);
+        if (!result.ok) return existing;
+        return get().getByCompanyId(company.id);
+      }
+
+      return get().generateAccessForCompany(company);
+    },
+
     ensureAllCompanies: (companies) => {
+      if (!get().serverHydrated) return;
       for (const company of companies) {
         get().generateAccessForCompany(company);
       }

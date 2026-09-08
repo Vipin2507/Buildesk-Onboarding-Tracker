@@ -52,6 +52,7 @@ import { useSessionFilterState } from "@/hooks/use-session-filter";
 import {
   useAuthStore,
   useCompanyPortalStore,
+  useCompanyPortalStore,
   useCrmAccountStore,
   useCrmOnboardingStore,
 } from "@/stores";
@@ -247,6 +248,14 @@ function CrmAccountsPage() {
   const currentUser = useAuthStore((s) => s.user);
   const isAdmin = isAdminRoleKey(currentUser?.role);
   const overview = useCrmDashboardOverview();
+  const portalAccess = useCompanyPortalStore((s) => s.access);
+  const portalSlugByAccountId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const portal of portalAccess) {
+      map.set(portal.companyId, portal.slug);
+    }
+    return map;
+  }, [portalAccess]);
 
   const tableRef = useRef<HTMLDivElement>(null);
 
@@ -573,15 +582,20 @@ function CrmAccountsPage() {
             ...data,
             status: "onboarding",
           });
-          useCompanyPortalStore.getState().generateAccessForCompany(
-            {
-              id: created.id,
-              name: created.name,
-              contact: created.contact,
-              email: created.email,
-            },
-            { slug: portalSlug },
-          );
+          void useCompanyPortalStore
+            .getState()
+            .setPortalApiKey(
+              {
+                id: created.id,
+                name: created.name,
+                contact: created.contact,
+                email: created.email,
+              },
+              values.portalApiKey ?? portalSlug,
+            )
+            .then((result) => {
+              if (!result.ok) toast.error(result.error);
+            });
           const record = ensure(created.id, created.companyType);
           const catalogKeys = new Set(getCrmMasterProductModuleCatalog().map((m) => m.key));
           for (const mod of record.productModules) {
@@ -1034,10 +1048,20 @@ function CrmAccountsPage() {
                             {r.name}
                           </a>
                         </div>
-                        <div className="font-mono text-xs text-muted-foreground">
-                          {r.userId?.trim() || "—"}
+                        <div className="text-[10px] text-muted-foreground">
+                          Client ID:{" "}
+                          <span className="font-mono">{r.userId?.trim() || "—"}</span>
                         </div>
                       </div>
+                    ),
+                  },
+                  {
+                    key: "portalApi",
+                    header: "Portal API",
+                    render: (r) => (
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {portalSlugByAccountId.get(r.id) || "—"}
+                      </span>
                     ),
                   },
                   {
@@ -1203,6 +1227,9 @@ function CrmAccountsPage() {
           form={form}
           showModulePicker={!editing}
           showPortalApiKey={!editing}
+          portalSlugReadOnly={
+            editing ? portalSlugByAccountId.get(editing.id) : undefined
+          }
           selectedModules={selectedModules}
           onSelectedModulesChange={setSelectedModules}
         />

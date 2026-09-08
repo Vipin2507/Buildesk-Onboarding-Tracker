@@ -80,8 +80,9 @@ function matchAccountByClientId(accounts: CrmAccount[], clientId: string) {
     return normalized === needle || compact(normalized) === compact(needle);
   });
 
-  if (hits.length >= 1) return hits[0];
-  return undefined;
+  if (hits.length > 1) return { kind: "ambiguous" as const, accounts: hits };
+  if (hits.length === 1) return { kind: "found" as const, account: hits[0]! };
+  return { kind: "missing" as const };
 }
 
 export function downloadCrmAccountApiKeyImportTemplate() {
@@ -198,8 +199,8 @@ export function buildCrmAccountApiKeyImportPlan(
       continue;
     }
 
-    const existing = matchAccountByClientId(accounts, raw.clientId);
-    if (!existing) {
+    const match = matchAccountByClientId(accounts, raw.clientId);
+    if (match.kind === "missing") {
       notFound += 1;
       rows.push({
         rowNumber: raw.rowNumber,
@@ -212,6 +213,20 @@ export function buildCrmAccountApiKeyImportPlan(
       });
       continue;
     }
+    if (match.kind === "ambiguous") {
+      error += 1;
+      rows.push({
+        rowNumber: raw.rowNumber,
+        key,
+        clientId: raw.clientId,
+        apiRaw: raw.apiRaw,
+        apiSlug: raw.apiSlug,
+        action: "error",
+        message: `Multiple accounts share Client ID “${raw.clientId}” — fix duplicates first`,
+      });
+      continue;
+    }
+    const existing = match.account;
 
     const priorSheetRow = sheetSlugOwners.get(raw.apiSlug);
     if (priorSheetRow != null) {

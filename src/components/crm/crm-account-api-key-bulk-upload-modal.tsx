@@ -72,9 +72,14 @@ export function CrmAccountApiKeyBulkUploadModal({
     setRawRows(null);
     setFileName(file.name);
     try {
+      await useCompanyPortalStore.getState().refreshPortalAccessFromServer();
       const raw = await parseCrmAccountApiKeyImportFile(file);
       setRawRows(raw);
-      const preview = buildCrmAccountApiKeyImportPlan(raw, accounts, portals);
+      const preview = buildCrmAccountApiKeyImportPlan(
+        raw,
+        accounts,
+        useCompanyPortalStore.getState().access,
+      );
       if (preview.summary.update === 0 && preview.summary.error > 0) {
         toast.error("Sheet has errors — fix rows and try again");
       } else if (preview.summary.notFound > 0) {
@@ -150,9 +155,11 @@ export function CrmAccountApiKeyBulkUploadModal({
             Bulk update portal API keys
           </AlertDialogTitle>
           <AlertDialogDescription>
-            Upload Excel with <strong>Client ID</strong> and <strong>API</strong> columns. Rows are
-            matched to CRM accounts by Client ID (User ID on the account). The API value becomes the
-            portal API key used in client portal links.
+            Upload Excel with <strong>Client ID</strong> and <strong>API</strong> columns. Rows match
+            CRM accounts by <strong>Client ID</strong> (User ID field — not the portal API). The{" "}
+            <strong>API</strong> column sets the portal slug used in client portal links. If upload
+            shows Skip with “already matches”, the portal API is already saved; check the Portal API
+            column on the accounts list.
           </AlertDialogDescription>
         </AlertDialogHeader>
 
@@ -251,8 +258,8 @@ export function CrmAccountApiKeyBulkUploadModal({
                         <th className="px-2 py-2 font-medium">Row</th>
                         <th className="px-2 py-2 font-medium">Client ID</th>
                         <th className="px-2 py-2 font-medium">Account</th>
-                        <th className="px-2 py-2 font-medium">Current API</th>
-                        <th className="px-2 py-2 font-medium">New API</th>
+                        <th className="px-2 py-2 font-medium">Current portal API</th>
+                        <th className="px-2 py-2 font-medium">New portal API</th>
                         <th className="px-2 py-2 font-medium">Action</th>
                       </tr>
                     </thead>

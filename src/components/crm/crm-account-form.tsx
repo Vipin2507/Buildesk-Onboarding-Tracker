@@ -234,12 +234,15 @@ export function CrmAccountFormFields({
   form,
   showModulePicker,
   showPortalApiKey,
+  portalSlugReadOnly,
   selectedModules,
   onSelectedModulesChange,
 }: {
   form: UseFormReturn<CrmAccountFormValues>;
   showModulePicker?: boolean;
   showPortalApiKey?: boolean;
+  /** Shown when editing an existing account (portal slug lives separately from User ID). */
+  portalSlugReadOnly?: string;
   selectedModules?: CrmProductModuleKey[];
   onSelectedModulesChange?: (keys: CrmProductModuleKey[]) => void;
 }) {
@@ -305,6 +308,19 @@ export function CrmAccountFormFields({
                     — <code className="rounded bg-muted px-1">{portalDashboardPath(portalSlugPreview)}</code>
                   </>
                 ) : null}
+              </p>
+            </div>
+          ) : portalSlugReadOnly ? (
+            <div>
+              <Label>Portal API key</Label>
+              <input
+                readOnly
+                value={portalSlugReadOnly}
+                className={cn(fieldClass(false), "font-mono")}
+              />
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Client ID (User ID) and portal API key are separate. Update the portal API from
+                Tickets → Portal API key, or use Bulk update API keys on the accounts list.
               </p>
             </div>
           ) : null}
