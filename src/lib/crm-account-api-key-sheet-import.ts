@@ -68,9 +68,14 @@ function mapHeaders(keys: string[]) {
   return mapped;
 }
 
-function matchAccountByClientId(accounts: CrmAccount[], clientId: string) {
+type ClientIdMatch =
+  | { kind: "found"; account: CrmAccount }
+  | { kind: "missing" }
+  | { kind: "ambiguous"; accounts: CrmAccount[] };
+
+function matchAccountByClientId(accounts: CrmAccount[], clientId: string): ClientIdMatch {
   const needle = normalizeManagerName(clientId);
-  if (!needle) return undefined;
+  if (!needle) return { kind: "missing" };
 
   const compact = (s: string) => s.replace(/\s+/g, "");
   const hits = accounts.filter((a) => {
@@ -80,9 +85,10 @@ function matchAccountByClientId(accounts: CrmAccount[], clientId: string) {
     return normalized === needle || compact(normalized) === compact(needle);
   });
 
-  if (hits.length > 1) return { kind: "ambiguous" as const, accounts: hits };
-  if (hits.length === 1) return { kind: "found" as const, account: hits[0]! };
-  return { kind: "missing" as const };
+  if (hits.length > 1) return { kind: "ambiguous", accounts: hits };
+  const account = hits[0];
+  if (account) return { kind: "found", account };
+  return { kind: "missing" };
 }
 
 export function downloadCrmAccountApiKeyImportTemplate() {
@@ -200,30 +206,30 @@ export function buildCrmAccountApiKeyImportPlan(
     }
 
     const match = matchAccountByClientId(accounts, raw.clientId);
-    if (match.kind === "missing") {
-      notFound += 1;
-      rows.push({
-        rowNumber: raw.rowNumber,
-        key,
-        clientId: raw.clientId,
-        apiRaw: raw.apiRaw,
-        apiSlug: raw.apiSlug,
-        action: "not_found",
-        message: `No account found with Client ID “${raw.clientId}”`,
-      });
-      continue;
-    }
-    if (match.kind === "ambiguous") {
-      error += 1;
-      rows.push({
-        rowNumber: raw.rowNumber,
-        key,
-        clientId: raw.clientId,
-        apiRaw: raw.apiRaw,
-        apiSlug: raw.apiSlug,
-        action: "error",
-        message: `Multiple accounts share Client ID “${raw.clientId}” — fix duplicates first`,
-      });
+    if (match.kind !== "found") {
+      if (match.kind === "ambiguous") {
+        error += 1;
+        rows.push({
+          rowNumber: raw.rowNumber,
+          key,
+          clientId: raw.clientId,
+          apiRaw: raw.apiRaw,
+          apiSlug: raw.apiSlug,
+          action: "error",
+          message: `Multiple accounts share Client ID “${raw.clientId}” — fix duplicates first`,
+        });
+      } else {
+        notFound += 1;
+        rows.push({
+          rowNumber: raw.rowNumber,
+          key,
+          clientId: raw.clientId,
+          apiRaw: raw.apiRaw,
+          apiSlug: raw.apiSlug,
+          action: "not_found",
+          message: `No account found with Client ID “${raw.clientId}”`,
+        });
+      }
       continue;
     }
     const existing = match.account;
