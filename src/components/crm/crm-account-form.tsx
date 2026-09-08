@@ -99,7 +99,10 @@ export function emptyCrmAccountForm(): CrmAccountFormValues {
   };
 }
 
-export function crmAccountToFormValues(account: CrmAccount): CrmAccountFormValues {
+export function crmAccountToFormValues(
+  account: CrmAccount,
+  portalApiKey = "",
+): CrmAccountFormValues {
   const ownerName = account.ownerName ?? account.contact;
   const ownerPhone = account.ownerPhone ?? account.phone;
   const ownerEmail = account.ownerEmail ?? account.email;
@@ -136,6 +139,7 @@ export function crmAccountToFormValues(account: CrmAccount): CrmAccountFormValue
     installments,
     startDate: account.startDate ?? "",
     endDate: account.endDate ?? "",
+    portalApiKey,
   };
 }
 
@@ -233,16 +237,15 @@ function Label({ children, required }: { children: React.ReactNode; required?: b
 export function CrmAccountFormFields({
   form,
   showModulePicker,
-  showPortalApiKey,
-  portalSlugReadOnly,
+  showPortalApiKey = true,
+  portalApiKeyRequired = false,
   selectedModules,
   onSelectedModulesChange,
 }: {
   form: UseFormReturn<CrmAccountFormValues>;
   showModulePicker?: boolean;
   showPortalApiKey?: boolean;
-  /** Shown when editing an existing account (portal slug lives separately from User ID). */
-  portalSlugReadOnly?: string;
+  portalApiKeyRequired?: boolean;
   selectedModules?: CrmProductModuleKey[];
   onSelectedModulesChange?: (keys: CrmProductModuleKey[]) => void;
 }) {
@@ -293,7 +296,7 @@ export function CrmAccountFormFields({
           </div>
           {showPortalApiKey ? (
             <div>
-              <Label required>Portal API key</Label>
+              <Label required={portalApiKeyRequired}>Portal API key</Label>
               <input
                 {...form.register("portalApiKey")}
                 placeholder="e.g. capital-infra or 126371"
@@ -308,19 +311,6 @@ export function CrmAccountFormFields({
                     — <code className="rounded bg-muted px-1">{portalDashboardPath(portalSlugPreview)}</code>
                   </>
                 ) : null}
-              </p>
-            </div>
-          ) : portalSlugReadOnly ? (
-            <div>
-              <Label>Portal API key</Label>
-              <input
-                readOnly
-                value={portalSlugReadOnly}
-                className={cn(fieldClass(false), "font-mono")}
-              />
-              <p className="mt-1 text-[10px] text-muted-foreground">
-                Client ID (User ID) and portal API key are separate. Update the portal API from
-                Tickets → Portal API key, or use Bulk update API keys on the accounts list.
               </p>
             </div>
           ) : null}

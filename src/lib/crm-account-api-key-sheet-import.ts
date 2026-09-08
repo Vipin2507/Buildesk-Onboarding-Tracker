@@ -68,14 +68,9 @@ function mapHeaders(keys: string[]) {
   return mapped;
 }
 
-type ClientIdMatch =
-  | { kind: "found"; account: CrmAccount }
-  | { kind: "missing" }
-  | { kind: "ambiguous"; accounts: CrmAccount[] };
-
-function matchAccountByClientId(accounts: CrmAccount[], clientId: string): ClientIdMatch {
+function matchAccountByClientId(accounts: CrmAccount[], clientId: string) {
   const needle = normalizeManagerName(clientId);
-  if (!needle) return { kind: "missing" };
+  if (!needle) return undefined;
 
   const compact = (s: string) => s.replace(/\s+/g, "");
   const hits = accounts.filter((a) => {
@@ -85,10 +80,8 @@ function matchAccountByClientId(accounts: CrmAccount[], clientId: string): Clien
     return normalized === needle || compact(normalized) === compact(needle);
   });
 
-  if (hits.length > 1) return { kind: "ambiguous", accounts: hits };
-  const account = hits[0];
-  if (account) return { kind: "found", account };
-  return { kind: "missing" };
+  if (hits.length >= 1) return hits[0];
+  return undefined;
 }
 
 export function downloadCrmAccountApiKeyImportTemplate() {
@@ -205,34 +198,20 @@ export function buildCrmAccountApiKeyImportPlan(
       continue;
     }
 
-    const match = matchAccountByClientId(accounts, raw.clientId);
-    if (match.kind !== "found") {
-      if (match.kind === "ambiguous") {
-        error += 1;
-        rows.push({
-          rowNumber: raw.rowNumber,
-          key,
-          clientId: raw.clientId,
-          apiRaw: raw.apiRaw,
-          apiSlug: raw.apiSlug,
-          action: "error",
-          message: `Multiple accounts share Client ID “${raw.clientId}” — fix duplicates first`,
-        });
-      } else {
-        notFound += 1;
-        rows.push({
-          rowNumber: raw.rowNumber,
-          key,
-          clientId: raw.clientId,
-          apiRaw: raw.apiRaw,
-          apiSlug: raw.apiSlug,
-          action: "not_found",
-          message: `No account found with Client ID “${raw.clientId}”`,
-        });
-      }
+    const existing = matchAccountByClientId(accounts, raw.clientId);
+    if (!existing) {
+      notFound += 1;
+      rows.push({
+        rowNumber: raw.rowNumber,
+        key,
+        clientId: raw.clientId,
+        apiRaw: raw.apiRaw,
+        apiSlug: raw.apiSlug,
+        action: "not_found",
+        message: `No account found with Client ID “${raw.clientId}”`,
+      });
       continue;
     }
-    const existing = match.account;
 
     const priorSheetRow = sheetSlugOwners.get(raw.apiSlug);
     if (priorSheetRow != null) {

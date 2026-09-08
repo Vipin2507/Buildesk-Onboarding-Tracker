@@ -23,7 +23,7 @@ export function CrmAccountMeetingsPanel({ accountId }: { accountId: string }) {
   const user = useAuthStore((s) => s.user);
   const account = useCrmAccountStore((s) => s.getById(accountId));
   const portal = useCompanyPortalStore((s) => s.getByCompanyId(accountId));
-  const ensurePortalForCompany = useCompanyPortalStore((s) => s.ensurePortalForCompany);
+  const generateAccess = useCompanyPortalStore((s) => s.generateAccessForCompany);
   const ensureDefaults = useBookingStore((s) => s.ensureDefaults);
   const storePending = useBookingStore(
     (s) => s.appointments.filter((a) => a.companyId === accountId && a.status === "pending").length,
@@ -45,13 +45,13 @@ export function CrmAccountMeetingsPanel({ accountId }: { accountId: string }) {
 
   useEffect(() => {
     if (!account) return;
-    void ensurePortalForCompany({
+    generateAccess({
       id: account.id,
       name: account.name,
       contact: account.contact,
       email: account.email,
     });
-  }, [account, ensurePortalForCompany]);
+  }, [account, generateAccess]);
 
   useEffect(() => {
     if (!account || !user) return;

@@ -39,7 +39,7 @@ import type { DesignTicket } from "@/types/design-ticket";
 export function CrmAccountPortalPanel({ accountId }: { accountId: string }) {
   const account = useCrmAccountStore((s) => s.getById(accountId));
   const portal = useCompanyPortalStore((s) => s.getByCompanyId(accountId));
-  const ensurePortalForCompany = useCompanyPortalStore((s) => s.ensurePortalForCompany);
+  const generateAccess = useCompanyPortalStore((s) => s.generateAccessForCompany);
   const regenerateSlug = useCompanyPortalStore((s) => s.regenerateSlug);
   const setPortalApiKey = useCompanyPortalStore((s) => s.setPortalApiKey);
   const tickets = useDesignTicketsForCompany(accountId);
@@ -51,13 +51,13 @@ export function CrmAccountPortalPanel({ accountId }: { accountId: string }) {
 
   useEffect(() => {
     if (!account) return;
-    void ensurePortalForCompany({
+    generateAccess({
       id: account.id,
       name: account.name,
       contact: account.contact,
       email: account.email,
     });
-  }, [account, ensurePortalForCompany]);
+  }, [account, generateAccess]);
 
   useEffect(() => {
     if (portal?.slug) setApiKeyDraft(portal.slug);

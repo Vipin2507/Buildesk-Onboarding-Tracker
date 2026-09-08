@@ -144,7 +144,6 @@ export function CrmOnboardingHub({
   const refreshAccountQueries = useCrmAccountQueryStore((s) => s.refreshCompanyQueries);
   const openQueries = useCrmAccountQueryStore((s) => s.openCountForCompany(accountId));
   const currentUser = useAuthStore((s) => s.user);
-  const refreshPortalAccessFromServer = useCompanyPortalStore((s) => s.refreshPortalAccessFromServer);
 
   const [internalTab, setInternalTab] = useState<TabId>("dashboard");
   const [confirmForceLive, setConfirmForceLive] = useState(false);
@@ -153,10 +152,6 @@ export function CrmOnboardingHub({
     if (onTabChange) onTabChange(next);
     else setInternalTab(next);
   };
-
-  useEffect(() => {
-    void refreshPortalAccessFromServer().catch(() => undefined);
-  }, [accountId, refreshPortalAccessFromServer]);
 
   useEffect(() => {
     ensureForCompany(accountId, account?.companyType);
@@ -372,6 +367,7 @@ function DashboardTab({
 }) {
   const account = useCrmAccountStore((s) => s.accounts.find((a) => a.id === accountId))!;
   const portal = useCompanyPortalStore((s) => s.getByCompanyId(accountId));
+  const setPortalApiKey = useCompanyPortalStore((s) => s.setPortalApiKey);
   const updateAccount = useCrmAccountStore((s) => s.updateAccount);
   const ensure = useCrmOnboardingStore((s) => s.ensureForCompany);
   const setModuleEnabled = useCrmOnboardingStore((s) => s.setProductModuleEnabled);
@@ -384,8 +380,8 @@ function DashboardTab({
   });
 
   useEffect(() => {
-    if (editing) form.reset(crmAccountToFormValues(account));
-  }, [editing, account, form]);
+    if (editing) form.reset(crmAccountToFormValues(account, portal?.slug ?? ""));
+  }, [editing, account, portal?.slug, form]);
   const trainApplicable = record.trainingSessions.filter((s) => !s.notApplicable);
   const trainPct = trainApplicable.length
     ? Math.round(
@@ -403,10 +399,28 @@ function DashboardTab({
     Math.min(100, Math.round(pct * 0.7 + (isLive ? 20 : 0) + Math.max(0, 10 - openTickets * 2)));
 
   function saveAccount() {
-    void form.handleSubmit((values) => {
+    void form.handleSubmit(async (values) => {
       const data = normalizeCrmAccountForm(values);
       updateAccount(accountId, data);
       ensure(accountId, data.companyType);
+
+      const apiKey = values.portalApiKey?.trim();
+      if (apiKey) {
+        const result = await setPortalApiKey(
+          {
+            id: accountId,
+            name: data.name,
+            contact: data.contact,
+            email: data.email,
+          },
+          apiKey,
+        );
+        if (!result.ok) {
+          toast.error(result.error);
+          return;
+        }
+      }
+
       setEditing(false);
       toast.success("Account details updated");
     })();
@@ -546,7 +560,7 @@ function DashboardTab({
         onSubmit={saveAccount}
         contentClassName="max-w-3xl"
       >
-        <CrmAccountFormFields form={form} />
+        <CrmAccountFormFields form={form} portalApiKeyRequired={false} />
       </EntityFormModal>
     </div>
   );

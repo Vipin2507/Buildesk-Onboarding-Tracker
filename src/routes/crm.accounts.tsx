@@ -247,14 +247,6 @@ function CrmAccountsPage() {
   const currentUser = useAuthStore((s) => s.user);
   const isAdmin = isAdminRoleKey(currentUser?.role);
   const overview = useCrmDashboardOverview();
-  const portalAccess = useCompanyPortalStore((s) => s.access);
-  const portalSlugByAccountId = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const portal of portalAccess) {
-      map.set(portal.companyId, portal.slug);
-    }
-    return map;
-  }, [portalAccess]);
 
   const tableRef = useRef<HTMLDivElement>(null);
 
@@ -546,13 +538,14 @@ function CrmAccountsPage() {
 
   function openEdit(account: CrmAccount) {
     setEditing(account);
-    form.reset(crmAccountToFormValues(account));
+    const portal = useCompanyPortalStore.getState().getByCompanyId(account.id);
+    form.reset(crmAccountToFormValues(account, portal?.slug ?? ""));
     setModalOpen(true);
   }
 
   function onSubmit() {
     void form.handleSubmit(
-      (values) => {
+      async (values) => {
         const data = normalizeCrmAccountForm(values);
         if (editing) {
           upsertAccount({
@@ -561,6 +554,24 @@ function CrmAccountsPage() {
             status: editing.status,
           });
           ensure(editing.id, data.companyType);
+
+          const apiKey = values.portalApiKey?.trim();
+          if (apiKey) {
+            const result = await useCompanyPortalStore.getState().setPortalApiKey(
+              {
+                id: editing.id,
+                name: data.name,
+                contact: data.contact,
+                email: data.email,
+              },
+              apiKey,
+            );
+            if (!result.ok) {
+              toast.error(result.error);
+              return;
+            }
+          }
+
           toast.success(`${data.name} updated`);
         } else {
           const portalSlug = normalizePortalSlug(values.portalApiKey ?? "");
@@ -581,20 +592,15 @@ function CrmAccountsPage() {
             ...data,
             status: "onboarding",
           });
-          void useCompanyPortalStore
-            .getState()
-            .setPortalApiKey(
-              {
-                id: created.id,
-                name: created.name,
-                contact: created.contact,
-                email: created.email,
-              },
-              values.portalApiKey ?? portalSlug,
-            )
-            .then((result) => {
-              if (!result.ok) toast.error(result.error);
-            });
+          useCompanyPortalStore.getState().generateAccessForCompany(
+            {
+              id: created.id,
+              name: created.name,
+              contact: created.contact,
+              email: created.email,
+            },
+            { slug: portalSlug },
+          );
           const record = ensure(created.id, created.companyType);
           const catalogKeys = new Set(getCrmMasterProductModuleCatalog().map((m) => m.key));
           for (const mod of record.productModules) {
@@ -1047,20 +1053,10 @@ function CrmAccountsPage() {
                             {r.name}
                           </a>
                         </div>
-                        <div className="text-[10px] text-muted-foreground">
-                          Client ID:{" "}
-                          <span className="font-mono">{r.userId?.trim() || "—"}</span>
+                        <div className="font-mono text-xs text-muted-foreground">
+                          {r.userId?.trim() || "—"}
                         </div>
                       </div>
-                    ),
-                  },
-                  {
-                    key: "portalApi",
-                    header: "Portal API",
-                    render: (r) => (
-                      <span className="font-mono text-xs text-muted-foreground">
-                        {portalSlugByAccountId.get(r.id) || "—"}
-                      </span>
                     ),
                   },
                   {
@@ -1225,10 +1221,7 @@ function CrmAccountsPage() {
         <CrmAccountFormFields
           form={form}
           showModulePicker={!editing}
-          showPortalApiKey={!editing}
-          portalSlugReadOnly={
-            editing ? portalSlugByAccountId.get(editing.id) : undefined
-          }
+          portalApiKeyRequired={!editing}
           selectedModules={selectedModules}
           onSelectedModulesChange={setSelectedModules}
         />
