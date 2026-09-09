@@ -5,7 +5,6 @@ import {
   PlusCircle,
   Ticket,
   CheckCircle2,
-  Clock,
   UserRound,
   Building2,
   Menu,
@@ -14,6 +13,7 @@ import {
 import { useEffect, useState } from "react";
 
 import { TICKET_EASE } from "@/components/design-ticket/design-ticket-shared";
+import { PortalEmbedProvider, usePortalEmbedMode } from "@/components/portal-embed-context";
 import { useTheme } from "@/components/theme-provider";
 import { ThemeToggleCompact } from "@/components/theme-toggle";
 import {
@@ -31,9 +31,9 @@ import { PortalChatWidget } from "@/components/chat/portal-chat-widget";
 
 const NAV = [
   { to: "dashboard", label: "Dashboard", shortLabel: "Home", icon: LayoutDashboard },
-  { to: "create-ticket", label: "Create New Ticket", shortLabel: "Create", icon: PlusCircle },
-  { to: "tickets", label: "My Tickets", shortLabel: "Tickets", icon: Ticket },
-  { to: "solved", label: "Solved Tickets", shortLabel: "Solved", icon: CheckCircle2 },
+  { to: "create-ticket", label: "Create ticket", shortLabel: "Create", icon: PlusCircle },
+  { to: "tickets", label: "My tickets", shortLabel: "Tickets", icon: Ticket },
+  { to: "solved", label: "Solved", shortLabel: "Solved", icon: CheckCircle2 },
   { to: "book", label: "Book a call", shortLabel: "Book", icon: Calendar },
   { to: "profile", label: "Profile", shortLabel: "Profile", icon: UserRound },
 ] as const;
@@ -82,6 +82,7 @@ function PortalNavLink({
   active,
   onNavigate,
   compact,
+  embedded,
 }: {
   slug: string;
   segment: string;
@@ -90,6 +91,7 @@ function PortalNavLink({
   active: boolean;
   onNavigate?: () => void;
   compact?: boolean;
+  embedded?: boolean;
 }) {
   const route = portalRoute(segment, slug);
   return (
@@ -98,50 +100,137 @@ function PortalNavLink({
       params={route.params}
       onClick={onNavigate}
       className={cn(
-        "relative flex items-center gap-2.5 rounded-lg transition-all duration-300",
-        compact
-          ? "flex-col gap-1 px-2 py-1.5 text-[10px] font-medium"
-          : "px-3 py-2.5 text-sm",
-        active
-          ? compact
-            ? "text-primary"
-            : "bg-primary/10 font-medium text-primary"
-          : compact
-            ? "text-muted-foreground"
-            : "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "relative flex shrink-0 items-center transition-colors duration-200",
+        embedded
+          ? cn(
+              "rounded-md px-2.5 py-1.5 text-xs font-medium",
+              active
+                ? "border border-primary/40 bg-primary/5 text-foreground ring-1 ring-primary/20"
+                : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+            )
+          : cn(
+              "gap-2.5 rounded-lg transition-all duration-300",
+              compact
+                ? "flex-col gap-1 px-2 py-1.5 text-[10px] font-medium"
+                : "px-3 py-2.5 text-sm",
+              active
+                ? compact
+                  ? "text-primary"
+                  : "bg-primary/10 font-medium text-primary"
+                : compact
+                  ? "text-muted-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+            ),
       )}
     >
-      {active && !compact ? (
+      {active && !compact && !embedded ? (
         <motion.span
           layoutId="portal-nav-indicator"
           className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-primary"
           transition={{ type: "spring", stiffness: 380, damping: 30 }}
         />
       ) : null}
-      <Icon className={cn("shrink-0", compact ? "h-5 w-5" : "h-4 w-4")} />
-      <span className={compact ? "max-w-[4.5rem] truncate" : undefined}>{label}</span>
+      <Icon className={cn("shrink-0", embedded ? "mr-1.5 h-3.5 w-3.5" : compact ? "h-5 w-5" : "h-4 w-4")} />
+      <span className={compact && !embedded ? "max-w-[4.5rem] truncate" : undefined}>{label}</span>
     </Link>
   );
 }
 
-export function ClientPortalLayout({ access }: { access: CompanyPortalAccess }) {
+function ClientPortalLayoutInner({ access }: { access: CompanyPortalAccess }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const embedded = usePortalEmbedMode();
   const { setMode } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const base = `/portal/${access.slug}`;
 
-  // Client portal prefers light unless the visitor already picked light/dark.
   useEffect(() => {
-    if (getStoredTheme() === "system") {
+    if (embedded || getStoredTheme() === "system") {
       setMode("light");
     }
-  }, [setMode]);
+  }, [embedded, setMode]);
 
   function isActive(segment: string) {
     if (segment === "dashboard") {
       return pathname === base || pathname === `${base}/` || pathname.endsWith("/dashboard");
     }
     return pathname.includes(`/${segment}`);
+  }
+
+  const navLinks = (
+    <>
+      {NAV.map(({ to, label, shortLabel, icon }) => (
+        <PortalNavLink
+          key={to}
+          slug={access.slug}
+          segment={to}
+          label={embedded ? label : shortLabel}
+          icon={icon}
+          active={isActive(to)}
+          onNavigate={menuOpen ? () => setMenuOpen(false) : undefined}
+          compact={!embedded}
+          embedded={embedded}
+        />
+      ))}
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div
+        className={cn(
+          "portal-embedded flex min-h-full flex-col bg-background text-foreground",
+          "[&_.card-soft]:rounded-lg [&_.card-soft]:shadow-sm",
+        )}
+      >
+        <PortalDesignTicketBootstrap access={access} />
+        <PortalChatBootstrap access={access} />
+        <PortalChatWidget access={access} />
+
+        <nav
+          aria-label="Support portal"
+          className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur"
+        >
+          <div className="flex items-center gap-2 px-3 py-2 sm:px-4 lg:px-5">
+            <button
+              type="button"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-card sm:hidden"
+              aria-label="Open menu"
+              onClick={() => setMenuOpen(true)}
+            >
+              <Menu className="h-4 w-4" />
+            </button>
+            <div className="hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto sm:flex">
+              {navLinks}
+            </div>
+          </div>
+        </nav>
+
+        <main className="min-w-0 flex-1 overflow-auto">
+          <Outlet />
+        </main>
+
+        <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+          <SheetContent side="left" className="flex w-[min(100%,16rem)] flex-col gap-0 p-0">
+            <SheetHeader className="border-b px-4 py-3 text-left">
+              <SheetTitle className="text-sm font-medium">Support</SheetTitle>
+            </SheetHeader>
+            <nav className="flex flex-col gap-0.5 p-2">
+              {NAV.map(({ to, label, icon }) => (
+                <PortalNavLink
+                  key={to}
+                  slug={access.slug}
+                  segment={to}
+                  label={label}
+                  icon={icon}
+                  active={isActive(to)}
+                  onNavigate={() => setMenuOpen(false)}
+                />
+              ))}
+            </nav>
+          </SheetContent>
+        </Sheet>
+      </div>
+    );
   }
 
   return (
@@ -192,12 +281,6 @@ export function ClientPortalLayout({ access }: { access: CompanyPortalAccess }) 
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <div className="hidden items-center gap-2 text-sm sm:flex">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <span>
-                Welcome, <span className="font-medium">{access.contactName}</span>
-              </span>
-            </div>
             <ThemeToggleCompact className="h-9 w-9 rounded-lg" />
           </div>
         </header>
@@ -258,5 +341,13 @@ export function ClientPortalLayout({ access }: { access: CompanyPortalAccess }) 
         </SheetContent>
       </Sheet>
     </div>
+  );
+}
+
+export function ClientPortalLayout({ access }: { access: CompanyPortalAccess }) {
+  return (
+    <PortalEmbedProvider>
+      <ClientPortalLayoutInner access={access} />
+    </PortalEmbedProvider>
   );
 }

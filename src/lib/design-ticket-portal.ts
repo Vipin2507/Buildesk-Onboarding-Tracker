@@ -40,6 +40,14 @@ export function portalPublicCreateUrl(slug: string): string {
   return base ? `${base}${path}` : path;
 }
 
+/** Iframe-friendly dashboard URL (`embed=1` is optional — iframe auto-detect also works). */
+export function portalPublicDashboardEmbedUrl(slug: string): string {
+  const path = portalDashboardPath(slug);
+  const base = getPortalBaseUrl();
+  const url = base ? `${base}${path}` : path;
+  return url.includes("?") ? `${url}&embed=1` : `${url}?embed=1`;
+}
+
 export function portalPublicDashboardUrl(slug: string): string {
   const path = portalDashboardPath(slug);
   const base = getPortalBaseUrl();

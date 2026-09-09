@@ -4,6 +4,7 @@ import { ChevronDown, ListFilter, RotateCcw, type LucideIcon } from "lucide-reac
 import { useState, type ReactNode } from "react";
 
 import { CountUp } from "@/components/count-up";
+import { usePortalEmbedMode } from "@/components/portal-embed-context";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -181,7 +182,7 @@ export function DesignTicketPageHeader({
       <div className="min-w-0 flex-1">
         <h1
           className={cn(
-            "font-semibold tracking-tight break-words",
+            "font-semibold tracking-tight break-words text-foreground",
             compact ? "text-base sm:text-lg" : "text-xl sm:text-2xl",
           )}
         >
@@ -522,12 +523,17 @@ export function InternalTicketsNav({ compact }: { compact?: boolean }) {
 
 /** Extra bottom padding on mobile for portal bottom nav. */
 export function PortalPageWrap({ children }: { children: ReactNode }) {
+  const embedded = usePortalEmbedMode();
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, y: embedded ? 0 : 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, ease: TICKET_EASE }}
-      className="p-3 pb-24 md:p-4 md:pb-8 lg:p-5"
+      transition={{ duration: embedded ? 0.2 : 0.35, ease: TICKET_EASE }}
+      className={cn(
+        embedded
+          ? "min-w-0 max-w-full overflow-x-hidden p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4 lg:p-5"
+          : "p-3 pb-24 md:p-4 md:pb-8 lg:p-5",
+      )}
     >
       {children}
     </motion.div>
