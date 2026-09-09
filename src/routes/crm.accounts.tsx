@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import {
   ArrowLeftRight,
   CalendarRange,
+  Download,
   FileSpreadsheet,
   KeyRound,
   Plus,
@@ -17,6 +18,7 @@ import { CrmAccountApiKeyBulkUploadModal } from "@/components/crm/crm-account-ap
 import { CrmAccountBulkUploadModal } from "@/components/crm/crm-account-bulk-upload-modal";
 import { CrmAccountClientTransferModal } from "@/components/crm/crm-account-client-transfer-modal";
 import { CrmAccountDateBulkUploadModal } from "@/components/crm/crm-account-date-bulk-upload-modal";
+import { CrmAccountExportModal } from "@/components/crm/crm-account-export-modal";
 import { CrmAccountGoLiveActions } from "@/components/crm/crm-account-go-live-actions";
 import { CrmAccountStageSelect } from "@/components/crm/crm-account-stage-select";
 import { CrmAccountModulesCell } from "@/components/crm/crm-account-modules-cell";
@@ -59,6 +61,7 @@ import {
   useCrmDashboardOverview,
   type CrmAccountRow,
 } from "@/stores/crm-dashboard-selectors";
+import { filterCrmAccountsForTableSearch } from "@/lib/crm-account-sheet-export";
 import { sortCrmAccountsByStartDateDesc } from "@/lib/crm-account-sort";
 import { isValidPortalSlug, normalizePortalSlug } from "@/lib/design-ticket-portal";
 import { getCrmMasterProductModuleCatalog } from "@/stores/useCrmMasterStore";
@@ -339,6 +342,7 @@ function CrmAccountsPage() {
   const [transferOpen, setTransferOpen] = useState(false);
   const [dateBulkOpen, setDateBulkOpen] = useState(false);
   const [apiKeyBulkOpen, setApiKeyBulkOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [editing, setEditing] = useState<CrmAccount | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState<CrmAccountRow | null>(null);
@@ -503,6 +507,19 @@ function CrmAccountsPage() {
       scopedRows.filter((r) => matchesAccountKpi(r, kpiFilter)),
     );
   }, [scopedRows, kpiFilter]);
+
+  const exportRows = useMemo(
+    () => filterCrmAccountsForTableSearch(filtered, tableSearch),
+    [filtered, tableSearch],
+  );
+
+  const portalAccess = useCompanyPortalStore((s) => s.access);
+  const exportContext = useMemo(
+    () => ({
+      portalSlugByCompanyId: new Map(portalAccess.map((item) => [item.companyId, item.slug])),
+    }),
+    [portalAccess],
+  );
 
   const activeFilterCount = [
     statusFilter !== "all",
@@ -669,6 +686,15 @@ function CrmAccountsPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1 px-3 text-xs"
+              onClick={() => setExportOpen(true)}
+            >
+              <Download className="h-3.5 w-3.5" />
+              Export
+            </Button>
             <Button
               size="sm"
               variant="ghost"
@@ -1130,6 +1156,16 @@ function CrmAccountsPage() {
                     ),
                   },
                   {
+                    key: "endDate",
+                    header: "End",
+                    sortable: true,
+                    render: (r) => (
+                      <span className="text-xs text-muted-foreground">
+                        {r.endDate ? formatDate(r.endDate) : "—"}
+                      </span>
+                    ),
+                  },
+                  {
                     key: "progress",
                     header: "Progress",
                     sortable: true,
@@ -1242,6 +1278,12 @@ function CrmAccountsPage() {
       />
       <CrmAccountDateBulkUploadModal open={dateBulkOpen} onOpenChange={setDateBulkOpen} />
       <CrmAccountApiKeyBulkUploadModal open={apiKeyBulkOpen} onOpenChange={setApiKeyBulkOpen} />
+      <CrmAccountExportModal
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        rows={exportRows}
+        exportContext={exportContext}
+      />
 
       <ConfirmDeleteDialog
         open={deleteOpen}

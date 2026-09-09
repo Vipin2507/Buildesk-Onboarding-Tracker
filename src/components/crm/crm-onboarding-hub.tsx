@@ -34,6 +34,7 @@ import { CrmAccountModulesOverview } from "@/components/crm/crm-account-modules-
 import { CrmAccountModulesTab } from "@/components/crm/crm-account-modules-tab";
 import { CrmAccountStageSelect } from "@/components/crm/crm-account-stage-select";
 import { CrmAccountPortalPanel } from "@/components/crm/crm-account-portal-panel";
+import { CrmAccountInstallmentSchedule } from "@/components/crm/crm-account-installment-schedule";
 import { CrmAccountTasksPanel } from "@/components/crm/crm-account-tasks-panel";
 import { CrmGoLiveChecklist } from "@/components/crm/crm-go-live-checklist";
 import { DatePickerField } from "@/components/date-picker-field";
@@ -528,6 +529,10 @@ function DashboardTab({
         <StatCard label="Training" value={`${trainPct}%`} bar={trainPct} />
         <StatCard label="Data upload" value={`${migPct}%`} bar={migPct} />
       </div>
+
+      <DesignTicketSection compact title="Commercial & installments">
+        <CrmAccountInstallmentSchedule account={account} />
+      </DesignTicketSection>
 
       <DesignTicketSection
         compact
