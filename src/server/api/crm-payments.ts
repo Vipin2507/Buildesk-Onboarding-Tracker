@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { canViewCrmAccount } from "@/lib/crm-account-access";
-import type { PaymentStatus } from "@/lib/crm-payment-allocation";
+import type { PaymentListFilterStatus } from "@/lib/crm-payment-allocation";
 import { isAdminRoleKey } from "@/lib/permissions";
 import { ApiError, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
@@ -27,6 +27,9 @@ const paymentStatusSchema = z.enum([
   "all",
   "overdue",
   "due_this_week",
+  "due_this_month",
+  "due_in_45_days",
+  "due_in_90_days",
   "upcoming",
   "fully_paid",
   "not_started",
@@ -35,6 +38,8 @@ const paymentStatusSchema = z.enum([
 const listFiltersSchema = z.object({
   status: paymentStatusSchema.optional(),
   salesManagerName: z.string().optional(),
+  supportManager1: z.string().optional(),
+  supportManager2: z.string().optional(),
   dueDateFrom: z.string().optional(),
   dueDateTo: z.string().optional(),
   search: z.string().optional(),
@@ -86,8 +91,10 @@ function assertCanViewAccountId(user: { name: string; role: string }, accountId:
 
 function toListFilters(data: z.infer<typeof listFiltersSchema>): PaymentsListFilters {
   return {
-    status: (data.status ?? "all") as PaymentStatus | "all",
+    status: (data.status ?? "all") as PaymentListFilterStatus,
     salesManagerName: data.salesManagerName,
+    supportManager1: data.supportManager1,
+    supportManager2: data.supportManager2,
     dueDateFrom: data.dueDateFrom,
     dueDateTo: data.dueDateTo,
     search: data.search,

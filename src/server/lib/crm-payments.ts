@@ -3,9 +3,11 @@ import { eq, sql } from "drizzle-orm";
 import { parseInstallmentsJson, roundMoney } from "@/lib/crm-account-commercial";
 import {
   allocateAccountPayments,
+  matchesPaymentDueFilter,
   PAYMENT_BACKFILL_NOTE,
   sumPaymentTransactions,
   type PaymentAllocationResult,
+  type PaymentListFilterStatus,
   type PaymentStatus,
 } from "@/lib/crm-payment-allocation";
 import { getDb } from "@/server/db/client";
@@ -233,8 +235,10 @@ export function runPaymentsBackfillIfNeeded(db: ReturnType<typeof getDb>) {
 }
 
 export type PaymentsListFilters = {
-  status?: PaymentStatus | "all";
+  status?: PaymentListFilterStatus;
   salesManagerName?: string;
+  supportManager1?: string;
+  supportManager2?: string;
   dueDateFrom?: string;
   dueDateTo?: string;
   search?: string;
@@ -243,6 +247,72 @@ export type PaymentsListFilters = {
   sortBy?: "nextDueDate" | "overdueAmount" | "collectionPercent";
   sortDir?: "asc" | "desc";
 };
+
+function matchesNamedManagerFilter(
+  value: string | undefined,
+  filter: string | undefined,
+): boolean {
+  if (!filter || filter === "all") return true;
+  if (filter === "unassigned") return !value?.trim();
+  return value === filter;
+}
+
+function applyPaymentsListFilters(
+  items: PaymentListItem[],
+  filters: PaymentsListFilters,
+  today: string,
+): PaymentListItem[] {
+  let rows = items;
+
+  const search = filters.search?.trim().toLowerCase();
+  if (search) {
+    rows = rows.filter(
+      (row) =>
+        row.accountName.toLowerCase().includes(search) ||
+        (row.salesManager ?? "").toLowerCase().includes(search) ||
+        (row.supportManager1 ?? "").toLowerCase().includes(search) ||
+        (row.supportManager2 ?? "").toLowerCase().includes(search),
+    );
+  }
+
+  if (filters.salesManagerName) {
+    rows = rows.filter((row) =>
+      matchesNamedManagerFilter(row.salesManager, filters.salesManagerName),
+    );
+  }
+  if (filters.supportManager1) {
+    rows = rows.filter((row) =>
+      matchesNamedManagerFilter(row.supportManager1, filters.supportManager1),
+    );
+  }
+  if (filters.supportManager2) {
+    rows = rows.filter((row) =>
+      matchesNamedManagerFilter(row.supportManager2, filters.supportManager2),
+    );
+  }
+
+  if (filters.dueDateFrom) {
+    rows = rows.filter(
+      (row) =>
+        row.nextDueInstallment &&
+        row.nextDueInstallment.dueDate.slice(0, 10) >= filters.dueDateFrom!.slice(0, 10),
+    );
+  }
+  if (filters.dueDateTo) {
+    rows = rows.filter(
+      (row) =>
+        row.nextDueInstallment &&
+        row.nextDueInstallment.dueDate.slice(0, 10) <= filters.dueDateTo!.slice(0, 10),
+    );
+  }
+
+  const status = filters.status ?? "all";
+  if (status !== "all") {
+    rows = rows.filter((row) => matchesPaymentDueFilter(row, status, today));
+  }
+
+  return rows;
+}
 
 export type PaymentListItem = {
   id: string;
@@ -313,43 +383,7 @@ export function queryPaymentListItems(
     };
   });
 
-  const search = filters.search?.trim().toLowerCase();
-  if (search) {
-    items = items.filter(
-      (row) =>
-        row.accountName.toLowerCase().includes(search) ||
-        (row.salesManager ?? "").toLowerCase().includes(search) ||
-        (row.supportManager1 ?? "").toLowerCase().includes(search) ||
-        (row.supportManager2 ?? "").toLowerCase().includes(search),
-    );
-  }
-
-  if (filters.salesManagerName && filters.salesManagerName !== "all") {
-    if (filters.salesManagerName === "unassigned") {
-      items = items.filter((row) => !row.salesManager?.trim());
-    } else {
-      items = items.filter((row) => row.salesManager === filters.salesManagerName);
-    }
-  }
-
-  if (filters.status && filters.status !== "all") {
-    items = items.filter((row) => row.paymentStatus === filters.status);
-  }
-
-  if (filters.dueDateFrom) {
-    items = items.filter(
-      (row) =>
-        row.nextDueInstallment &&
-        row.nextDueInstallment.dueDate.slice(0, 10) >= filters.dueDateFrom!.slice(0, 10),
-    );
-  }
-  if (filters.dueDateTo) {
-    items = items.filter(
-      (row) =>
-        row.nextDueInstallment &&
-        row.nextDueInstallment.dueDate.slice(0, 10) <= filters.dueDateTo!.slice(0, 10),
-    );
-  }
+  items = applyPaymentsListFilters(items, filters, today);
 
   const sortBy = filters.sortBy ?? "nextDueDate";
   const sortDir = filters.sortDir ?? "asc";
@@ -376,27 +410,54 @@ export function queryPaymentListItems(
   return { rows: items, total };
 }
 
+function sumDueAmount(rows: PaymentListItem[]) {
+  return roundMoney(rows.reduce((s, r) => s + (r.nextDueInstallment?.remainingAmount ?? 0), 0));
+}
+
+function countByDueFilter(rows: PaymentListItem[], filter: PaymentListFilterStatus, today: string) {
+  return rows.filter((r) => matchesPaymentDueFilter(r, filter, today)).length;
+}
+
 export function summarizePaymentList(
   db: ReturnType<typeof getDb>,
   filters: PaymentsListFilters,
   allowedAccountIds?: Set<string> | null,
 ) {
-  const { rows: allRows } = queryPaymentListItems(
+  const today = new Date().toISOString().slice(0, 10);
+  const { rows: tableRows } = queryPaymentListItems(
     db,
     { ...filters, page: 1, pageSize: 100000 },
     allowedAccountIds,
   );
 
-  const totalContractValue = roundMoney(allRows.reduce((s, r) => s + r.totalDealValue, 0));
-  const totalReceived = roundMoney(allRows.reduce((s, r) => s + r.paymentReceived, 0));
-  const totalPending = roundMoney(allRows.reduce((s, r) => s + r.pendingAmount, 0));
-  const totalOverdueAmount = roundMoney(allRows.reduce((s, r) => s + r.overdueAmount, 0));
-  const overdueAccountCount = allRows.filter((r) => r.paymentStatus === "overdue").length;
-  const dueThisWeekRows = allRows.filter((r) => r.paymentStatus === "due_this_week");
-  const dueThisWeekAmount = roundMoney(
-    dueThisWeekRows.reduce((s, r) => s + (r.nextDueInstallment?.remainingAmount ?? 0), 0),
+  // Tab counts: same toolbar filters, but ignore active status tab.
+  const { rows: countScope } = queryPaymentListItems(
+    db,
+    { ...filters, status: "all", page: 1, pageSize: 100000 },
+    allowedAccountIds,
   );
+
+  const totalContractValue = roundMoney(tableRows.reduce((s, r) => s + r.totalDealValue, 0));
+  const totalReceived = roundMoney(tableRows.reduce((s, r) => s + r.paymentReceived, 0));
+  const totalPending = roundMoney(tableRows.reduce((s, r) => s + r.pendingAmount, 0));
+  const totalOverdueAmount = roundMoney(tableRows.reduce((s, r) => s + r.overdueAmount, 0));
+  const overdueRows = tableRows.filter((r) => matchesPaymentDueFilter(r, "overdue", today));
+  const overdueAccountCount = overdueRows.length;
+  const dueThisWeekRows = tableRows.filter((r) =>
+    matchesPaymentDueFilter(r, "due_this_week", today),
+  );
+  const dueThisMonthRows = tableRows.filter((r) =>
+    matchesPaymentDueFilter(r, "due_this_month", today),
+  );
+  const dueIn45Rows = tableRows.filter((r) =>
+    matchesPaymentDueFilter(r, "due_in_45_days", today),
+  );
+  const dueThisWeekAmount = sumDueAmount(dueThisWeekRows);
   const dueThisWeekCount = dueThisWeekRows.length;
+  const dueThisMonthAmount = sumDueAmount(dueThisMonthRows);
+  const dueThisMonthCount = dueThisMonthRows.length;
+  const dueIn45DaysAmount = sumDueAmount(dueIn45Rows);
+  const dueIn45DaysCount = dueIn45Rows.length;
   const collectionRatePercent =
     totalContractValue > 0 ? roundMoney((totalReceived / totalContractValue) * 100) : 0;
 
@@ -408,14 +469,21 @@ export function summarizePaymentList(
     overdueAccountCount,
     dueThisWeekAmount,
     dueThisWeekCount,
+    dueThisMonthAmount,
+    dueThisMonthCount,
+    dueIn45DaysAmount,
+    dueIn45DaysCount,
     collectionRatePercent,
     statusCounts: {
-      all: allRows.length,
-      overdue: allRows.filter((r) => r.paymentStatus === "overdue").length,
-      due_this_week: dueThisWeekRows.length,
-      upcoming: allRows.filter((r) => r.paymentStatus === "upcoming").length,
-      fully_paid: allRows.filter((r) => r.paymentStatus === "fully_paid").length,
-      not_started: allRows.filter((r) => r.paymentStatus === "not_started").length,
+      all: countScope.length,
+      overdue: countByDueFilter(countScope, "overdue", today),
+      due_this_week: countByDueFilter(countScope, "due_this_week", today),
+      due_this_month: countByDueFilter(countScope, "due_this_month", today),
+      due_in_45_days: countByDueFilter(countScope, "due_in_45_days", today),
+      due_in_90_days: countByDueFilter(countScope, "due_in_90_days", today),
+      upcoming: countByDueFilter(countScope, "upcoming", today),
+      fully_paid: countByDueFilter(countScope, "fully_paid", today),
+      not_started: countByDueFilter(countScope, "not_started", today),
     },
   };
 }

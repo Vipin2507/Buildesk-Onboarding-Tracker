@@ -56,7 +56,98 @@ function endOfWeekSunday(ymd: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** FIFO allocation of totalReceived across ordered installments. */
+export function addDaysYmd(ymd: string, days: number): string {
+  const d = new Date(`${ymd.slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return ymd.slice(0, 10);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+export function startOfMonthYmd(ymd: string): string {
+  const d = new Date(`${ymd.slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return ymd.slice(0, 10);
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  return `${d.getFullYear()}-${month}-01`;
+}
+
+export function endOfMonthYmd(ymd: string): string {
+  const d = new Date(`${ymd.slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return ymd.slice(0, 10);
+  d.setMonth(d.getMonth() + 1, 0);
+  return d.toISOString().slice(0, 10);
+}
+
+/** List filter tabs — superset of row-level PaymentStatus. */
+export type PaymentListFilterStatus =
+  | PaymentStatus
+  | "all"
+  | "due_this_month"
+  | "due_in_45_days"
+  | "due_in_90_days";
+
+export function matchesPaymentDueFilter(
+  row: {
+    paymentStatus: PaymentStatus;
+    nextDueInstallment: { dueDate: string; remainingAmount?: number } | null;
+  },
+  filter: PaymentListFilterStatus,
+  todayYmd?: string,
+): boolean {
+  if (filter === "all") return true;
+
+  const today = (todayYmd ?? new Date().toISOString()).slice(0, 10);
+  const due = row.nextDueInstallment?.dueDate.slice(0, 10);
+
+  if (filter === "fully_paid") return row.paymentStatus === "fully_paid";
+  if (filter === "not_started") return row.paymentStatus === "not_started";
+
+  if (!due) return false;
+
+  if (filter === "overdue") return due < today;
+
+  if (filter === "due_this_week") {
+    return due >= today && due >= startOfWeekMonday(today) && due <= endOfWeekSunday(today);
+  }
+
+  if (filter === "due_this_month") {
+    return due >= startOfMonthYmd(today) && due <= endOfMonthYmd(today);
+  }
+
+  if (filter === "due_in_45_days") {
+    return due >= today && due <= addDaysYmd(today, 45);
+  }
+
+  if (filter === "due_in_90_days") {
+    return due >= today && due <= addDaysYmd(today, 90);
+  }
+
+  if (filter === "upcoming") {
+    return due > addDaysYmd(today, 90);
+  }
+
+  return row.paymentStatus === filter;
+}
+
+/**
+ * Installments are scheduled against pending amount only (see installmentBaseAmount).
+ * Upfront payment at account creation (= deal − installment total) must not consume
+ * installment #1 — only ledger payments beyond that baseline allocate FIFO.
+ */
+export function installmentAllocatablePool(
+  totalReceived: number,
+  totalDealValue: number,
+  installments: CrmAccountInstallment[],
+): number {
+  const received = roundMoney(Math.max(0, totalReceived));
+  const deal = roundMoney(Math.max(0, totalDealValue));
+  const installmentTotal = roundMoney(
+    installments.reduce((sum, row) => sum + (Number(row.amount) || 0), 0),
+  );
+  const upfrontBaseline = roundMoney(Math.max(0, deal - installmentTotal));
+  return roundMoney(Math.max(0, received - upfrontBaseline));
+}
+
+/** FIFO allocation of post-upfront received amount across ordered installments. */
 export function allocateAccountPayments(input: {
   installments: CrmAccountInstallment[];
   totalReceived: number;
@@ -68,7 +159,7 @@ export function allocateAccountPayments(input: {
   const totalDealValue = roundMoney(Math.max(0, input.totalDealValue));
   const ordered = [...input.installments].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
-  let pool = totalReceived;
+  let pool = installmentAllocatablePool(totalReceived, totalDealValue, ordered);
   const allocated: AllocatedInstallment[] = [];
   let overdueAmount = 0;
 

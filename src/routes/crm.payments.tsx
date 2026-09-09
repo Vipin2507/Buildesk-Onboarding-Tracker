@@ -36,8 +36,6 @@ import {
 } from "@/lib/crm-payments-search";
 import { cn, formatDate } from "@/lib/utils";
 import { useCrmAccountStore } from "@/stores";
-import { isAdminRoleKey } from "@/lib/permissions";
-import { useCurrentUser } from "@/stores/useAuthStore";
 
 export const Route = createFileRoute("/crm/payments")({
   validateSearch: (search) => crmPaymentsSearchSchema.parse(search),
@@ -47,8 +45,11 @@ export const Route = createFileRoute("/crm/payments")({
 const STATUS_TABS: { id: CrmPaymentStatusTabId; label: string }[] = [
   { id: "all", label: "All" },
   { id: "overdue", label: "Overdue" },
-  { id: "due_this_week", label: "Due this week" },
-  { id: "upcoming", label: "Upcoming" },
+  { id: "due_this_week", label: "This week" },
+  { id: "due_this_month", label: "This month" },
+  { id: "due_in_45_days", label: "45 days" },
+  { id: "due_in_90_days", label: "90 days" },
+  { id: "upcoming", label: "Later" },
   { id: "fully_paid", label: "Fully paid" },
 ];
 
@@ -56,9 +57,27 @@ const STATUS_TAB_TONE: Record<CrmPaymentStatusTabId, string> = {
   all: "text-foreground",
   overdue: "text-destructive",
   due_this_week: "text-amber-600 dark:text-amber-400",
-  upcoming: "text-primary",
+  due_this_month: "text-orange-600 dark:text-orange-400",
+  due_in_45_days: "text-primary",
+  due_in_90_days: "text-sky-600 dark:text-sky-400",
+  upcoming: "text-muted-foreground",
   fully_paid: "text-emerald-600 dark:text-emerald-400",
 };
+
+type ManagerField = "salesManagerName" | "supportManager1" | "supportManager2";
+
+function buildManagerFilterOptions(accounts: { salesManagerName?: string; supportManager1?: string; supportManager2?: string }[], field: ManagerField) {
+  const names = new Set<string>();
+  for (const a of accounts) {
+    const n = a[field]?.trim();
+    if (n) names.add(n);
+  }
+  return [
+    { value: "all", label: "All" },
+    { value: "unassigned", label: "Unassigned" },
+    ...[...names].sort().map((n) => ({ value: n, label: n })),
+  ];
+}
 
 function formatInr(value: number) {
   return `₹${value.toLocaleString("en-IN")}`;
@@ -101,7 +120,6 @@ function paymentStatusBadge(status: PaymentStatus) {
 function CrmPaymentsPage() {
   const navigate = useNavigate({ from: "/crm/payments" });
   const search = Route.useSearch();
-  const user = useCurrentUser();
   const accounts = useCrmAccountStore((s) => s.accounts);
 
   const statusTab = parseCrmPaymentStatusTab(search.status);
@@ -141,27 +159,33 @@ function CrmPaymentsPage() {
   const summary = summaryQuery.data;
   const statusCounts = summary?.statusCounts;
 
-  const salesManagerOptions = useMemo(() => {
-    const names = new Set<string>();
-    for (const a of accounts) {
-      const n = a.salesManagerName?.trim();
-      if (n) names.add(n);
-    }
-    return [
-      { value: "all", label: "All managers" },
-      { value: "unassigned", label: "Unassigned" },
-      ...[...names].sort().map((n) => ({ value: n, label: n })),
-    ];
-  }, [accounts]);
+  const salesManagerOptions = useMemo(
+    () => buildManagerFilterOptions(accounts, "salesManagerName"),
+    [accounts],
+  );
+  const supportManager1Options = useMemo(
+    () => buildManagerFilterOptions(accounts, "supportManager1"),
+    [accounts],
+  );
+  const supportManager2Options = useMemo(
+    () => buildManagerFilterOptions(accounts, "supportManager2"),
+    [accounts],
+  );
 
   const patchSearch = useCallback(
     (patch: Partial<typeof search>) => {
       void navigate({
         search: (prev) => {
           const next = { ...prev, ...patch };
-          if ("status" in patch || "salesManager" in patch || "dueDateFrom" in patch || "dueDateTo" in patch || "sortBy" in patch) {
-            next.page = undefined;
-          }
+          const resetsPage =
+            "status" in patch ||
+            "salesManager" in patch ||
+            "supportManager1" in patch ||
+            "supportManager2" in patch ||
+            "dueDateFrom" in patch ||
+            "dueDateTo" in patch ||
+            "sortBy" in patch;
+          if (resetsPage) next.page = undefined;
           return next;
         },
         replace: true,
@@ -262,7 +286,6 @@ function CrmPaymentsPage() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const showAdminActions = user && isAdminRoleKey(user.role);
 
   return (
     <PageWrap compact flushTop>
@@ -299,7 +322,7 @@ function CrmPaymentsPage() {
 
         {summary ? (
           <div className="mt-2 overflow-x-auto rounded-lg border border-border bg-card">
-            <div className="flex min-w-[640px] divide-x divide-border">
+            <div className="flex min-w-[880px] divide-x divide-border">
               {[
                 { label: "Contract value", value: formatInr(summary.totalContractValue) },
                 { label: "Received", value: formatInr(summary.totalReceived) },
@@ -315,6 +338,18 @@ function CrmPaymentsPage() {
                   value: formatInr(summary.dueThisWeekAmount),
                   sub: `${summary.dueThisWeekCount} accounts`,
                   tone: "text-amber-600 dark:text-amber-400",
+                },
+                {
+                  label: "Due this month",
+                  value: formatInr(summary.dueThisMonthAmount),
+                  sub: `${summary.dueThisMonthCount} accounts`,
+                  tone: "text-orange-600 dark:text-orange-400",
+                },
+                {
+                  label: "Due in 45 days",
+                  value: formatInr(summary.dueIn45DaysAmount),
+                  sub: `${summary.dueIn45DaysCount} accounts`,
+                  tone: "text-primary",
                 },
                 {
                   label: "Collection rate",
@@ -342,7 +377,7 @@ function CrmPaymentsPage() {
         <div
           role="tablist"
           aria-label="Payment status filters"
-          className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-5"
+          className="mt-2 flex gap-1.5 overflow-x-auto pb-1"
         >
           {STATUS_TABS.map((tab) => {
             const active = statusTab === tab.id;
@@ -358,7 +393,7 @@ function CrmPaymentsPage() {
                   patchSearch({ status: tab.id === "all" ? undefined : tab.id })
                 }
                 className={cn(
-                  "flex min-w-0 flex-col rounded-lg border bg-card px-2.5 py-2 text-left shadow-sm transition-all",
+                  "flex min-w-[5.5rem] shrink-0 flex-col rounded-lg border bg-card px-2.5 py-2 text-left shadow-sm transition-all",
                   "hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
                   active
                     ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"
@@ -402,18 +437,36 @@ function CrmPaymentsPage() {
               />
             </div>
           </DesignTicketFilterField>
-          {showAdminActions ? (
-            <DesignTicketFilterField label="Sales manager" className="min-w-[9rem]">
-              <DesignTicketSelect
-                compact
-                value={search.salesManager ?? "all"}
-                onChange={(v) =>
-                  patchSearch({ salesManager: v === "all" ? undefined : v })
-                }
-                options={salesManagerOptions}
-              />
-            </DesignTicketFilterField>
-          ) : null}
+          <DesignTicketFilterField label="Support 1" className="min-w-[8.5rem]">
+            <DesignTicketSelect
+              compact
+              value={search.supportManager1 ?? "all"}
+              onChange={(v) =>
+                patchSearch({ supportManager1: v === "all" ? undefined : v })
+              }
+              options={supportManager1Options}
+            />
+          </DesignTicketFilterField>
+          <DesignTicketFilterField label="Support 2" className="min-w-[8.5rem]">
+            <DesignTicketSelect
+              compact
+              value={search.supportManager2 ?? "all"}
+              onChange={(v) =>
+                patchSearch({ supportManager2: v === "all" ? undefined : v })
+              }
+              options={supportManager2Options}
+            />
+          </DesignTicketFilterField>
+          <DesignTicketFilterField label="Sales manager" className="min-w-[8.5rem]">
+            <DesignTicketSelect
+              compact
+              value={search.salesManager ?? "all"}
+              onChange={(v) =>
+                patchSearch({ salesManager: v === "all" ? undefined : v })
+              }
+              options={salesManagerOptions}
+            />
+          </DesignTicketFilterField>
           <DesignTicketDateField
             compact
             label="Due from"
