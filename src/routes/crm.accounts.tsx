@@ -49,7 +49,7 @@ import {
   listActiveCrmImplementationStages,
   resolveCrmStageLabel,
 } from "@/stores/useCrmMasterStore";
-import { cn, formatDate } from "@/lib/utils";
+import { cn, formatDateDmy } from "@/lib/utils";
 import { useSessionFilterState } from "@/hooks/use-session-filter";
 import {
   useAuthStore,
@@ -1150,8 +1150,8 @@ function CrmAccountsPage() {
                     header: "Start",
                     sortable: true,
                     render: (r) => (
-                      <span className="text-xs text-muted-foreground">
-                        {r.startDate ? formatDate(r.startDate) : "—"}
+                      <span className="whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+                        {formatDateDmy(r.startDate)}
                       </span>
                     ),
                   },
@@ -1160,8 +1160,8 @@ function CrmAccountsPage() {
                     header: "End",
                     sortable: true,
                     render: (r) => (
-                      <span className="text-xs text-muted-foreground">
-                        {r.endDate ? formatDate(r.endDate) : "—"}
+                      <span className="whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+                        {formatDateDmy(r.endDate)}
                       </span>
                     ),
                   },

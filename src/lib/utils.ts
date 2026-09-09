@@ -20,6 +20,19 @@ export function formatDate(value?: string | null) {
   return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
 
+/** Display YYYY-MM-DD (or ISO) as DD/MM/YYYY on one line. */
+export function formatDateDmy(value?: string | null) {
+  if (!value) return "—";
+  const iso = value.slice(0, 10);
+  const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) return `${match[3]}/${match[2]}/${match[1]}`;
+  const d = new Date(value.length <= 10 ? `${value}T00:00:00` : value);
+  if (Number.isNaN(d.getTime())) return value;
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  return `${day}/${month}/${d.getFullYear()}`;
+}
+
 /** Display ISO as time only (e.g. 2:30 PM). */
 export function formatTime(value?: string | null) {
   if (!value) return "—";
