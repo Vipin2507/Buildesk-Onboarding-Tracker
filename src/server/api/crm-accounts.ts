@@ -9,6 +9,10 @@ import { canViewCrmAccount, crmSalesManagerNamesMatch } from "@/lib/crm-account-
 import { sortCrmAccountsByStartDateDesc } from "@/lib/crm-account-sort";
 import { isAdminRoleKey } from "@/lib/permissions";
 import { parseInstallmentsJson } from "@/lib/crm-account-commercial";
+import {
+  ensureInitialPaymentOnAccountCreate,
+  syncAccountPaymentTotals,
+} from "@/server/lib/crm-payments";
 import type { CrmAccount } from "@/types/crm-account";
 import type { CompanyType } from "@/types/company";
 
@@ -211,12 +215,21 @@ export const upsertCrmAccount = createServerFn({ method: "POST" })
         })
         .where(eq(t.crmAccounts.id, id))
         .run();
+      syncAccountPaymentTotals(db, id);
     } else {
       const createdAt = data.createdAt ?? now;
       const updatedAt = data.updatedAt ?? now;
       db.insert(t.crmAccounts)
         .values(toRowValues(data, id, createdAt, updatedAt))
         .run();
+      const initialReceived = Math.max(0, Number(data.paymentReceived) || 0);
+      ensureInitialPaymentOnAccountCreate(
+        db,
+        id,
+        initialReceived,
+        (data.startDate ?? now).slice(0, 10),
+        user.id,
+      );
     }
 
     const row = db.select().from(t.crmAccounts).where(eq(t.crmAccounts.id, id)).get();
@@ -247,12 +260,14 @@ export const upsertCrmAccountsBatch = createServerFn({ method: "POST" })
           })
           .where(eq(t.crmAccounts.id, id))
           .run();
+        syncAccountPaymentTotals(db, id);
       } else {
         const createdAt = item.createdAt ?? now;
         const updatedAt = item.updatedAt ?? now;
         db.insert(t.crmAccounts)
           .values(toRowValues(item, id, createdAt, updatedAt))
           .run();
+        ensureInitialPaymentOnAccountCreate(db, id, item.paymentReceived ?? 0, item.startDate ?? null);
       }
       const row = db.select().from(t.crmAccounts).where(eq(t.crmAccounts.id, id)).get();
       if (row) saved.push(mapRow(row));

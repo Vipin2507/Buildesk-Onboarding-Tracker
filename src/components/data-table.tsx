@@ -46,6 +46,7 @@ export function DataTable<T>({
   initialSortKey = null,
   initialSortDir = "asc",
   expandedRowId = null,
+  expandedRowIds,
   renderExpandedRow,
   flush = false,
 }: {
@@ -71,7 +72,9 @@ export function DataTable<T>({
   density?: "default" | "compact";
   initialSortKey?: string | null;
   initialSortDir?: "asc" | "desc";
-  /** When set, renders an expanded panel directly beneath the matching row. */
+  /** When set, renders expanded panels beneath matching rows (multi-expand). */
+  expandedRowIds?: Set<string>;
+  /** Single expanded row (legacy — use expandedRowIds for multi). */
   expandedRowId?: string | null;
   renderExpandedRow?: (row: T) => ReactNode;
   /** Edge-to-edge table — no side border/radius (for dense list pages). */
@@ -186,7 +189,8 @@ export function DataTable<T>({
           {paged.map((row, i) => {
             const id = getRowId?.(row) ?? String(i);
             const selected = selection?.selectedIds.has(id) ?? false;
-            const expanded = expandedRowId === id;
+            const expanded =
+              expandedRowIds?.has(id) ?? expandedRowId === id;
             return (
               <motion.div
                 key={id}
@@ -340,7 +344,8 @@ export function DataTable<T>({
               {paged.map((row, i) => {
                 const id = getRowId?.(row) ?? String(i);
                 const selected = selection?.selectedIds.has(id) ?? false;
-                const expanded = expandedRowId === id;
+                const expanded =
+              expandedRowIds?.has(id) ?? expandedRowId === id;
                 const colSpan =
                   columns.length + (selection ? 1 : 0) + (actions ? 1 : 0);
                 return (

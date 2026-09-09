@@ -171,6 +171,26 @@ export const crmAccounts = sqliteTable(
   ],
 );
 
+/** CRM account payment ledger — source of truth for collections. */
+export const paymentTransactions = sqliteTable(
+  "payment_transactions",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => crmAccounts.id, { onDelete: "cascade" }),
+    amount: real("amount").notNull(),
+    paidDate: text("paid_date").notNull(),
+    note: text("note"),
+    createdBy: text("created_by"),
+    ...timestamps,
+  },
+  (t) => [
+    index("payment_transactions_account_idx").on(t.accountId),
+    index("payment_transactions_paid_date_idx").on(t.paidDate),
+  ],
+);
+
 /** Full CRM account onboarding document (checklists, tracker, modules, …). */
 export const crmOnboardingRecords = sqliteTable(
   "crm_onboarding_records",

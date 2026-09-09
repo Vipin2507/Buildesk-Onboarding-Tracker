@@ -157,6 +157,16 @@ export {
 } from "@/server/api/crm-accounts";
 
 export {
+  listCrmPayments,
+  getCrmPaymentsSummary,
+  getCrmPaymentInstallments,
+  listCrmPaymentTransactions,
+  recordCrmPaymentTransaction,
+  remindCrmPaymentAccount,
+  remindCrmPaymentsBulk,
+} from "@/server/api/crm-payments";
+
+export {
   listCrmOnboardingRecords,
   upsertCrmOnboardingRecord,
   deleteCrmOnboardingRecord,

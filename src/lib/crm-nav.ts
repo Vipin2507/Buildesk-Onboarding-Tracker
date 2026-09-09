@@ -6,6 +6,7 @@ import {
   CheckSquare,
   Database,
   History,
+  IndianRupee,
   LifeBuoy,
   MessageSquareText,
   MessagesSquare,
@@ -18,6 +19,7 @@ import type { NavItem } from "@/lib/nav";
 export const CRM_NAV: NavItem[] = [
   { to: "/crm", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { to: "/crm/accounts", label: "Accounts", icon: BriefcaseBusiness },
+  { to: "/crm/payments", label: "Payments", icon: IndianRupee },
   { to: "/crm/bookings", label: "Meetings", icon: Calendar },
   { to: "/crm/tasks", label: "Tasks", icon: CheckSquare },
   { to: "/crm/queries", label: "Account queries", icon: HelpCircle },

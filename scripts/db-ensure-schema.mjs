@@ -1089,5 +1089,23 @@ if (!tableExists("crm_account_queries")) {
   console.log("+ CREATE TABLE crm_account_queries + crm_account_query_messages");
 }
 
+if (!tableExists("payment_transactions")) {
+  sqlite.exec(`
+    CREATE TABLE payment_transactions (
+      id TEXT PRIMARY KEY NOT NULL,
+      account_id TEXT NOT NULL REFERENCES crm_accounts(id) ON DELETE CASCADE,
+      amount REAL NOT NULL,
+      paid_date TEXT NOT NULL,
+      note TEXT,
+      created_by TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS payment_transactions_account_idx ON payment_transactions(account_id);
+    CREATE INDEX IF NOT EXISTS payment_transactions_paid_date_idx ON payment_transactions(paid_date);
+  `);
+  console.log("+ CREATE TABLE payment_transactions");
+}
+
 sqlite.close();
 console.log("db:ensure complete");
