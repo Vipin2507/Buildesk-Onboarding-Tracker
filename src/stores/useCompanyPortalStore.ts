@@ -154,11 +154,34 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
           error: "Portal API key must be 3–48 characters (letters, numbers, hyphens)",
         };
       }
+
+      const stored = portalSlugAccountLookup(companyId);
+      const accountLookup = (id: string) => {
+        if (id === companyId) {
+          return { name: current.companyName, userId: stored?.userId };
+        }
+        return portalSlugAccountLookup(id);
+      };
+      const targetClientId = stored?.userId ?? null;
+
+      set((s) => ({
+        access: s.access.filter(
+          (p) =>
+            p.companyId === companyId ||
+            !isSameCrmAccountIdentity(p.companyId, companyId, accountLookup, {
+              ownerPortalCompanyName: p.companyName,
+              targetCompanyName: current.companyName,
+              targetClientId,
+            }),
+        ),
+      }));
+
       const conflict = findPortalSlugConflictMessage(
         get().access,
         slug,
         companyId,
-        portalSlugAccountLookup,
+        accountLookup,
+        { targetCompanyName: current.companyName, targetClientId },
       );
       if (conflict) return { ok: false, error: conflict };
       if (slug === current.slug) return { ok: true, slug, unchanged: true };
@@ -168,7 +191,9 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
         access: s.access.map((a) => (a.companyId === companyId ? updated : a)),
       }));
       serverSync("update portal slug", async () => {
-        const remote = await upsertCompanyPortalAccess({ data: updated });
+        const remote = await upsertCompanyPortalAccess({
+          data: { ...updated, clientUserId: targetClientId },
+        });
         get().mergeAccess(remote);
         return remote;
       });
@@ -185,11 +210,31 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
         };
       }
 
+      const accountLookup = (companyId: string) => {
+        if (companyId === company.id) {
+          const stored = portalSlugAccountLookup(companyId);
+          return { name: company.name, userId: stored?.userId };
+        }
+        return portalSlugAccountLookup(companyId);
+      };
+
+      set((s) => ({
+        access: s.access.filter(
+          (p) =>
+            p.companyId === company.id ||
+            !isSameCrmAccountIdentity(p.companyId, company.id, accountLookup, {
+              ownerPortalCompanyName: p.companyName,
+            }),
+        ),
+      }));
+
+      const targetClientId = accountLookup(company.id)?.userId ?? null;
       const conflict = findPortalSlugConflictMessage(
         get().access,
         slug,
         company.id,
-        portalSlugAccountLookup,
+        accountLookup,
+        { targetCompanyName: company.name, targetClientId },
       );
       if (conflict) return { ok: false, error: conflict };
 
@@ -210,14 +255,6 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
             updatedAt: now,
           };
 
-      set((s) => ({
-        access: s.access.filter(
-          (p) =>
-            p.companyId === company.id ||
-            !isSameCrmAccountIdentity(p.companyId, company.id, portalSlugAccountLookup),
-        ),
-      }));
-
       if (existing) {
         set((s) => ({
           access: s.access.map((a) => (a.companyId === company.id ? record : a)),
@@ -227,8 +264,22 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
       }
 
       try {
-        const remote = await upsertCompanyPortalAccess({ data: record });
+        const remote = await upsertCompanyPortalAccess({
+          data: { ...record, clientUserId: targetClientId },
+        });
         get().mergeAccess(remote);
+        set((s) => ({
+          access: s.access.filter(
+            (p) =>
+              p.companyId === company.id ||
+              p.slug !== remote.slug ||
+              !isSameCrmAccountIdentity(p.companyId, company.id, accountLookup, {
+                ownerPortalCompanyName: p.companyName,
+                targetCompanyName: company.name,
+                targetClientId,
+              }),
+          ),
+        }));
         return { ok: true, slug: remote.slug };
       } catch (e) {
         if (existing) {

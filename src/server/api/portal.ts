@@ -11,6 +11,7 @@ import {
 import { formatPortalSlugInUseMessage, type PortalSlugOwner } from "@/lib/portal-slug-conflict";
 import {
   isSameCrmAccountIdentity,
+  normalizeAccountName,
   normalizeClientId,
 } from "@/lib/portal-slug-identity";
 import { ApiError, nowIso, requireUser } from "@/server/auth/session";
@@ -56,30 +57,64 @@ function resolvePortalSlugOwner(
 
 function lookupCrmAccountIdentity(db: ReturnType<typeof getDb>, companyId: string) {
   return db
-    .select({ userId: t.crmAccounts.userId })
+    .select({ name: t.crmAccounts.name, userId: t.crmAccounts.userId })
     .from(t.crmAccounts)
     .where(eq(t.crmAccounts.id, companyId))
     .get();
 }
 
+function deletePortalForCompany(db: ReturnType<typeof getDb>, companyId: string) {
+  db.delete(t.companyPortalAccess)
+    .where(eq(t.companyPortalAccess.companyId, companyId))
+    .run();
+}
+
+type PortalTargetHints = {
+  companyName?: string;
+  userId?: string | null;
+};
+
 /** Drop stale portal rows left on an old account id after duplicate CRM imports. */
-function removeOrphanPortalsForSameClient(db: ReturnType<typeof getDb>, targetCompanyId: string) {
+function removeOrphanPortalsForSameClient(
+  db: ReturnType<typeof getDb>,
+  targetCompanyId: string,
+  hints?: PortalTargetHints,
+) {
   const target = lookupCrmAccountIdentity(db, targetCompanyId);
-  const clientId = normalizeClientId(target?.userId);
-  if (!clientId) return;
+  const clientId = normalizeClientId(target?.userId ?? hints?.userId);
+  const targetName = normalizeAccountName(target?.name ?? hints?.companyName);
 
-  const siblings = db
-    .select({ id: t.crmAccounts.id, userId: t.crmAccounts.userId })
+  const accounts = db
+    .select({ id: t.crmAccounts.id, name: t.crmAccounts.name, userId: t.crmAccounts.userId })
     .from(t.crmAccounts)
-    .all()
-    .filter(
-      (row) => row.id !== targetCompanyId && normalizeClientId(row.userId) === clientId,
-    );
+    .all();
 
-  for (const sibling of siblings) {
-    db.delete(t.companyPortalAccess)
-      .where(eq(t.companyPortalAccess.companyId, sibling.id))
-      .run();
+  for (const row of accounts) {
+    if (row.id === targetCompanyId) continue;
+    const sameClient = Boolean(clientId && normalizeClientId(row.userId) === clientId);
+    const sameName = Boolean(targetName && normalizeAccountName(row.name) === targetName);
+    if (sameClient || sameName) {
+      deletePortalForCompany(db, row.id);
+    }
+  }
+
+  if (!targetName) return;
+
+  const portals = db
+    .select({
+      companyId: t.companyPortalAccess.companyId,
+      companyName: t.companyPortalAccess.companyName,
+    })
+    .from(t.companyPortalAccess)
+    .all();
+  const accountIds = new Set(accounts.map((row) => row.id));
+
+  for (const portal of portals) {
+    if (portal.companyId === targetCompanyId) continue;
+    if (accountIds.has(portal.companyId)) continue;
+    if (normalizeAccountName(portal.companyName) === targetName) {
+      deletePortalForCompany(db, portal.companyId);
+    }
   }
 }
 
@@ -87,6 +122,7 @@ function assertPortalSlugAvailable(
   db: ReturnType<typeof getDb>,
   slug: string,
   excludeCompanyId: string,
+  targetHints?: PortalTargetHints,
 ) {
   const taken = db
     .select({
@@ -98,13 +134,18 @@ function assertPortalSlugAvailable(
     .get();
   if (taken && taken.companyId !== excludeCompanyId) {
     if (
-      isSameCrmAccountIdentity(taken.companyId, excludeCompanyId, (id) =>
-        lookupCrmAccountIdentity(db, id),
+      isSameCrmAccountIdentity(
+        taken.companyId,
+        excludeCompanyId,
+        (id) => lookupCrmAccountIdentity(db, id),
+        {
+          ownerPortalCompanyName: taken.companyName,
+          targetCompanyName: targetHints?.companyName,
+          targetClientId: targetHints?.userId,
+        },
       )
     ) {
-      db.delete(t.companyPortalAccess)
-        .where(eq(t.companyPortalAccess.companyId, taken.companyId))
-        .run();
+      deletePortalForCompany(db, taken.companyId);
       return;
     }
     const owner = resolvePortalSlugOwner(db, taken.companyId, taken.companyName);
@@ -251,47 +292,54 @@ const portalAccessSchema = z.object({
   isActive: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  /** Client ID hint for reclaiming stale portal rows; not persisted on portal access. */
+  clientUserId: z.string().nullable().optional(),
 });
 
 export const upsertCompanyPortalAccess = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => portalAccessSchema.parse(data))
   .handler(async ({ data }) => {
     requireUser();
-    ensureCompanyRowForPortal(data);
+    const { clientUserId, ...portalData } = data;
+    const targetHints: PortalTargetHints = {
+      companyName: portalData.companyName,
+      userId: clientUserId,
+    };
+    ensureCompanyRowForPortal(portalData);
     const db = getDb();
-    removeOrphanPortalsForSameClient(db, data.companyId);
+    removeOrphanPortalsForSameClient(db, portalData.companyId, targetHints);
 
     const existing = db
       .select()
       .from(t.companyPortalAccess)
-      .where(eq(t.companyPortalAccess.companyId, data.companyId))
+      .where(eq(t.companyPortalAccess.companyId, portalData.companyId))
       .get();
 
-    assertPortalSlugAvailable(db, data.slug, data.companyId);
+    assertPortalSlugAvailable(db, portalData.slug, portalData.companyId, targetHints);
 
     if (existing) {
       db.update(t.companyPortalAccess)
         .set({
-          companyName: data.companyName,
-          slug: data.slug,
-          contactName: data.contactName,
-          contactEmail: data.contactEmail,
-          isActive: data.isActive,
-          updatedAt: data.updatedAt,
+          companyName: portalData.companyName,
+          slug: portalData.slug,
+          contactName: portalData.contactName,
+          contactEmail: portalData.contactEmail,
+          isActive: portalData.isActive,
+          updatedAt: portalData.updatedAt,
         })
-        .where(eq(t.companyPortalAccess.companyId, data.companyId))
+        .where(eq(t.companyPortalAccess.companyId, portalData.companyId))
         .run();
     } else {
       db.insert(t.companyPortalAccess)
         .values({
-          companyId: data.companyId,
-          companyName: data.companyName,
-          slug: data.slug,
-          contactName: data.contactName,
-          contactEmail: data.contactEmail,
-          isActive: data.isActive,
-          createdAt: data.createdAt,
-          updatedAt: data.updatedAt,
+          companyId: portalData.companyId,
+          companyName: portalData.companyName,
+          slug: portalData.slug,
+          contactName: portalData.contactName,
+          contactEmail: portalData.contactEmail,
+          isActive: portalData.isActive,
+          createdAt: portalData.createdAt,
+          updatedAt: portalData.updatedAt,
         })
         .run();
     }
@@ -299,7 +347,7 @@ export const upsertCompanyPortalAccess = createServerFn({ method: "POST" })
     const row = db
       .select()
       .from(t.companyPortalAccess)
-      .where(eq(t.companyPortalAccess.companyId, data.companyId))
+      .where(eq(t.companyPortalAccess.companyId, portalData.companyId))
       .get();
     if (!row) throw new ApiError(500, "Failed to save portal access");
     return mapPortalRow(row);
@@ -355,8 +403,13 @@ export const updateCompanyPortalSlug = createServerFn({ method: "POST" })
     if (!current) throw new ApiError(404, "Portal not found");
     if (current.slug === slug) return mapPortalRow(current);
 
-    removeOrphanPortalsForSameClient(db, data.companyId);
-    assertPortalSlugAvailable(db, slug, data.companyId);
+    const targetAccount = lookupCrmAccountIdentity(db, data.companyId);
+    const targetHints: PortalTargetHints = {
+      companyName: current.companyName,
+      userId: targetAccount?.userId,
+    };
+    removeOrphanPortalsForSameClient(db, data.companyId, targetHints);
+    assertPortalSlugAvailable(db, slug, data.companyId, targetHints);
 
     const now = nowIso();
     db.update(t.companyPortalAccess)

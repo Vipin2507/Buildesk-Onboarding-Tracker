@@ -257,7 +257,12 @@ export function buildCrmAccountApiKeyImportPlan(
     if (
       slugOwner &&
       slugOwner !== existing.id &&
-      !isSameCrmAccountIdentity(slugOwner, existing.id, (id) => accounts.find((a) => a.id === id))
+      !isSameCrmAccountIdentity(
+        slugOwner,
+        existing.id,
+        (id) => accounts.find((a) => a.id === id),
+        { ownerPortalCompanyName: portals.find((p) => p.companyId === slugOwner)?.companyName },
+      )
     ) {
       error += 1;
       const owner = resolvePortalSlugOwner(
@@ -354,8 +359,11 @@ export async function reconcileApiKeyImportPlanWithServer(
         const remote = await getPortalBySlug({ data: { slug: row.apiSlug } });
         if (remote.companyId === row.existingId) return;
         if (
-          isSameCrmAccountIdentity(remote.companyId, row.existingId, (id) =>
-            accounts.find((a) => a.id === id),
+          isSameCrmAccountIdentity(
+            remote.companyId,
+            row.existingId,
+            (id) => accounts.find((a) => a.id === id),
+            { ownerPortalCompanyName: remote.companyName },
           )
         ) {
           return;
