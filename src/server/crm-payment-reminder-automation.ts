@@ -10,6 +10,7 @@ import {
   renderAutomationTemplate,
 } from "@/services/automationTemplate";
 import { appendServerCrmAutomationLog, loadCrmAutomationConfig } from "@/server/crm-booking-automation";
+import { buildServerCrmN8nEmailBody } from "@/server/crm-n8n-email-payload";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { buildAccountPaymentSnapshot, getAccountPaymentReceived } from "@/server/lib/crm-payments";
@@ -106,6 +107,7 @@ async function dispatchPaymentEmailRule(
     account: typeof t.crmAccounts.$inferSelect;
     recipientEmail: string;
     recipientName: string;
+    recipientPhone?: string;
     vars: Record<string, string>;
   },
 ): Promise<boolean> {
@@ -127,32 +129,37 @@ async function dispatchPaymentEmailRule(
   for (const rule of rules) {
     const message = renderAutomationTemplate(rule.templateBody, opts.vars);
     const subject = renderAutomationSubject(rule.templateSubject, opts.vars);
-    const body = {
-      channel: "email" as const,
-      templateId: rule.id,
-      templateName: rule.name,
+    const body = buildServerCrmN8nEmailBody({
+      rule,
+      settings: config.settings,
+      waha: config.waha,
       trigger: opts.trigger,
       recipientEmail: opts.recipientEmail,
       recipientName: opts.recipientName,
+      recipientPhone: opts.recipientPhone,
       messageBody: message,
       emailSubject: subject,
       entityType: "crm-payment",
-      productScope: "crm",
       entityId: opts.account.id,
       entityName: opts.account.name,
       companyName: opts.account.name,
-      accountName: opts.account.name,
-      customerName: opts.vars.customerName,
-      salesManagerName: opts.vars.salesManagerName,
-      supportManager1: opts.vars.supportManager1,
-      supportManager2: opts.vars.supportManager2,
-      dueAmount: opts.vars.dueAmount,
-      dueDate: opts.vars.dueDate,
-      paymentReceived: opts.vars.paymentReceived,
-      pendingAmount: opts.vars.pendingAmount,
-      totalDealValue: opts.vars.totalDealValue,
-      overdueAmount: opts.vars.overdueAmount,
-    };
+      status: opts.vars.status,
+      fields: {
+        accountName: opts.account.name,
+        accountId: opts.account.id,
+        salesManagerName: opts.vars.salesManagerName,
+        supportManager1: opts.vars.supportManager1,
+        supportManager2: opts.vars.supportManager2,
+        executiveName: opts.vars.executiveName,
+        dueAmount: opts.vars.dueAmount,
+        dueDate: opts.vars.dueDate,
+        paymentReceived: opts.vars.paymentReceived,
+        pendingAmount: opts.vars.pendingAmount,
+        totalDealValue: opts.vars.totalDealValue,
+        overdueAmount: opts.vars.overdueAmount,
+        overdueDays: opts.vars.overdueDays,
+      },
+    });
 
     const attemptedAt = nowIso();
     const logId = serverLogId();
@@ -224,6 +231,7 @@ export async function dispatchServerPaymentClientReminder(
     account,
     recipientEmail,
     recipientName,
+    recipientPhone: account.pocMobile || account.phone || undefined,
     vars,
   });
 
@@ -256,6 +264,7 @@ export async function dispatchServerPaymentExecutiveReminder(
     account,
     recipientEmail,
     recipientName,
+    recipientPhone: undefined,
     vars,
   });
 
