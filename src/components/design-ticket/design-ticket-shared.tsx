@@ -1,9 +1,10 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { AnimatePresence, motion, type Variants } from "framer-motion";
-import { ChevronDown, ListFilter, RotateCcw, type LucideIcon } from "lucide-react";
+import { ChevronDown, ListFilter, MessageCircle, RotateCcw, type LucideIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { CountUp } from "@/components/count-up";
+import { usePortalContentScope } from "@/components/portal-content-context";
 import { usePortalEmbedMode } from "@/components/portal-embed-context";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -49,6 +50,39 @@ export type TicketKpiItem = {
   onClick?: () => void;
   active?: boolean;
 };
+
+export type PortalStatTone = "brand" | "success" | "neutral";
+
+export type PortalContentStatItem = {
+  id: string;
+  label: string;
+  value: number;
+  valueTone?: PortalStatTone;
+  onClick?: () => void;
+};
+
+export function PortalContentStatStrip({ items }: { items: PortalContentStatItem[] }) {
+  return (
+    <div className="portal-stat-strip">
+      {items.map((item) => {
+        const Wrapper = item.onClick ? "button" : "div";
+        return (
+          <Wrapper
+            key={item.id}
+            type={item.onClick ? "button" : undefined}
+            onClick={item.onClick}
+            className={cn("portal-stat-cell", item.onClick && "cursor-pointer")}
+          >
+            <span className="portal-stat-label">{item.label}</span>
+            <span className="portal-stat-value" data-tone={item.valueTone ?? "neutral"}>
+              <CountUp to={item.value} />
+            </span>
+          </Wrapper>
+        );
+      })}
+    </div>
+  );
+}
 
 export function DesignTicketKpiGrid({
   items,
@@ -176,11 +210,13 @@ export function DesignTicketPageHeader({
   compact?: boolean;
 }) {
   const embedded = usePortalEmbedMode();
+  const inPortalContent = usePortalContentScope();
+  const portalChrome = embedded || inPortalContent;
   return (
     <motion.div
-      initial={{ opacity: 0, y: embedded ? 0 : 8 }}
+      initial={{ opacity: 0, y: portalChrome ? 0 : 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: embedded ? 0.2 : 0.35, ease: TICKET_EASE }}
+      transition={{ duration: portalChrome ? 0.2 : 0.35, ease: TICKET_EASE }}
       className={cn(
         "flex max-w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between md:items-center",
         compact ? "mb-3" : "mb-5 sm:mb-6 md:items-end",
@@ -190,7 +226,7 @@ export function DesignTicketPageHeader({
         <h1
           className={cn(
             "break-words",
-            embedded
+            portalChrome
               ? "portal-page-title"
               : cn(
                   "font-semibold tracking-tight text-foreground",
@@ -256,6 +292,20 @@ export function DesignTicketInfoBanner({
   children: ReactNode;
   compact?: boolean;
 }) {
+  const inPortalContent = usePortalContentScope();
+  if (inPortalContent) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.35, delay: 0.1, ease: TICKET_EASE }}
+        className="portal-info-banner"
+      >
+        <MessageCircle className="portal-info-banner-icon h-4 w-4" aria-hidden />
+        <div>{children}</div>
+      </motion.div>
+    );
+  }
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -536,14 +586,16 @@ export function InternalTicketsNav({ compact }: { compact?: boolean }) {
 /** Extra bottom padding on mobile for portal bottom nav. */
 export function PortalPageWrap({ children }: { children: ReactNode }) {
   const embedded = usePortalEmbedMode();
+  const inPortalContent = usePortalContentScope();
+  const compact = embedded || inPortalContent;
   return (
     <motion.div
-      initial={{ opacity: 0, y: embedded ? 0 : 8 }}
+      initial={{ opacity: 0, y: compact ? 0 : 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: embedded ? 0.2 : 0.35, ease: TICKET_EASE }}
+      transition={{ duration: compact ? 0.2 : 0.35, ease: TICKET_EASE }}
       className={cn(
-        embedded
-          ? "min-w-0 max-w-full overflow-x-hidden p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4 lg:p-5"
+        compact
+          ? "min-w-0 max-w-full overflow-x-hidden p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4 lg:px-5 lg:py-4"
           : "p-3 pb-24 md:p-4 md:pb-8 lg:p-5",
       )}
     >

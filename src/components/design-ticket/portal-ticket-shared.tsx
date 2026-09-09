@@ -3,14 +3,17 @@ import { motion } from "framer-motion";
 
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
-import {
-  DesignTicketPriorityChip,
-  DesignTicketStatusPill,
-} from "@/components/design-ticket/design-ticket-chips";
 import { DesignTicketSection, TICKET_EASE } from "@/components/design-ticket/design-ticket-shared";
+import { usePortalContentScope } from "@/components/portal-content-context";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatDate } from "@/lib/utils";
-import type { DesignTicket } from "@/types/design-ticket";
+import { cn, formatDate } from "@/lib/utils";
+import {
+  DESIGN_TICKET_PRIORITY_LABEL,
+  DESIGN_TICKET_STATUS_LABEL,
+  type DesignTicket,
+  type DesignTicketPriority,
+  type DesignTicketStatus,
+} from "@/types/design-ticket";
 
 export type PortalTicketFilter = "all" | "pending" | "open" | "in-progress";
 
@@ -52,6 +55,22 @@ export function portalTicketFilterLabel(filter: PortalTicketFilter): string {
   }
 }
 
+export function PortalTicketStatusBadge({ status }: { status: DesignTicketStatus }) {
+  return (
+    <span className="portal-status-badge" data-status={status}>
+      {DESIGN_TICKET_STATUS_LABEL[status]}
+    </span>
+  );
+}
+
+export function PortalTicketPriorityBadge({ priority }: { priority: DesignTicketPriority }) {
+  return (
+    <span className="portal-priority-badge" data-priority={priority}>
+      {DESIGN_TICKET_PRIORITY_LABEL[priority]}
+    </span>
+  );
+}
+
 export function PortalTicketListSkeleton() {
   return (
     <div className="card-soft space-y-3 p-4">
@@ -75,6 +94,29 @@ export function PortalTicketTableCard({
   delay?: number;
   className?: string;
 }) {
+  const inPortalContent = usePortalContentScope();
+
+  if (inPortalContent) {
+    return (
+      <motion.section
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, delay, ease: TICKET_EASE }}
+        className={cn("portal-content-section", className)}
+      >
+        <div className="portal-content-card">
+          {title || action ? (
+            <div className="portal-content-card-header">
+              {title ? <h2 className="portal-content-card-title">{title}</h2> : <span />}
+              {action}
+            </div>
+          ) : null}
+          <div className="portal-content-card-body">{children}</div>
+        </div>
+      </motion.section>
+    );
+  }
+
   return (
     <DesignTicketSection title={title} action={action} delay={delay} className={className}>
       <div className="card-soft overflow-hidden p-1">{children}</div>
@@ -86,21 +128,24 @@ const activeColumns = [
   {
     key: "ticketNumber",
     header: "Ticket ID",
-    render: (r: DesignTicket) => (
-      <span className="font-medium text-primary">{r.ticketNumber}</span>
-    ),
+    render: (r: DesignTicket) => <span className="portal-ticket-id">{r.ticketNumber}</span>,
     sortable: true,
   },
-  { key: "subject", header: "Subject", render: (r: DesignTicket) => r.subject, sortable: true },
+  {
+    key: "subject",
+    header: "Subject",
+    render: (r: DesignTicket) => r.subject,
+    sortable: true,
+  },
   {
     key: "status",
     header: "Status",
-    render: (r: DesignTicket) => <DesignTicketStatusPill status={r.status} />,
+    render: (r: DesignTicket) => <PortalTicketStatusBadge status={r.status} />,
   },
   {
     key: "priority",
     header: "Priority",
-    render: (r: DesignTicket) => <DesignTicketPriorityChip priority={r.priority} />,
+    render: (r: DesignTicket) => <PortalTicketPriorityBadge priority={r.priority} />,
   },
   {
     key: "updatedAt",
@@ -114,9 +159,7 @@ const solvedColumns = [
   {
     key: "ticketNumber",
     header: "Ticket ID",
-    render: (r: DesignTicket) => (
-      <span className="font-medium text-primary">{r.ticketNumber}</span>
-    ),
+    render: (r: DesignTicket) => <span className="portal-ticket-id">{r.ticketNumber}</span>,
     sortable: true,
   },
   { key: "subject", header: "Subject", render: (r: DesignTicket) => r.subject, sortable: true },
@@ -129,7 +172,7 @@ const solvedColumns = [
   {
     key: "status",
     header: "Status",
-    render: (r: DesignTicket) => <DesignTicketStatusPill status={r.status} />,
+    render: (r: DesignTicket) => <PortalTicketStatusBadge status={r.status} />,
   },
 ];
 
@@ -156,15 +199,17 @@ export function PortalActiveTicketsTable({
   }
 
   return (
-    <DataTable
-      data={rows}
-      getRowId={(r) => r.id}
-      searchKeys={["ticketNumber", "subject", "category"]}
-      pageSize={pageSize}
-      density="compact"
-      onRowClick={onRowClick}
-      columns={activeColumns}
-    />
+    <div className="portal-data-table">
+      <DataTable
+        data={rows}
+        getRowId={(r) => r.id}
+        searchKeys={["ticketNumber", "subject", "category"]}
+        pageSize={pageSize}
+        density="compact"
+        onRowClick={onRowClick}
+        columns={activeColumns}
+      />
+    </div>
   );
 }
 
@@ -189,15 +234,17 @@ export function PortalSolvedTicketsTable({
   }
 
   return (
-    <DataTable
-      data={rows}
-      getRowId={(r) => r.id}
-      searchKeys={["ticketNumber", "subject"]}
-      pageSize={pageSize}
-      density="compact"
-      onRowClick={onRowClick}
-      columns={solvedColumns}
-    />
+    <div className="portal-data-table">
+      <DataTable
+        data={rows}
+        getRowId={(r) => r.id}
+        searchKeys={["ticketNumber", "subject"]}
+        pageSize={pageSize}
+        density="compact"
+        onRowClick={onRowClick}
+        columns={solvedColumns}
+      />
+    </div>
   );
 }
 

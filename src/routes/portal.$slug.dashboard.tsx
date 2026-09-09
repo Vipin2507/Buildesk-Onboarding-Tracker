@@ -5,8 +5,8 @@ import { Plus } from "lucide-react";
 
 import {
   DesignTicketInfoBanner,
-  DesignTicketKpiGrid,
   DesignTicketPageHeader,
+  PortalContentStatStrip,
   PortalPageWrap,
   ticketSectionVariants,
 } from "@/components/design-ticket/design-ticket-shared";
@@ -69,13 +69,13 @@ function PortalDashboard() {
   const pendingCount = stats.open + stats.inProgress;
   const recentBookings = bookings.slice(0, 8);
 
-  const kpiCards = useMemo(
+  const statItems = useMemo(
     () => [
       {
         id: "pending",
         label: "Pending",
         value: pendingCount,
-        tone: "text-primary",
+        valueTone: "neutral" as const,
         onClick: () =>
           void navigate({
             to: "/portal/$slug/tickets",
@@ -87,7 +87,7 @@ function PortalDashboard() {
         id: "open",
         label: "Open",
         value: stats.open,
-        tone: "text-info",
+        valueTone: "brand" as const,
         onClick: () =>
           void navigate({
             to: "/portal/$slug/tickets",
@@ -97,9 +97,9 @@ function PortalDashboard() {
       },
       {
         id: "in-progress",
-        label: "In Progress",
+        label: "In progress",
         value: stats.inProgress,
-        tone: "text-warning-foreground",
+        valueTone: "neutral" as const,
         onClick: () =>
           void navigate({
             to: "/portal/$slug/tickets",
@@ -111,7 +111,7 @@ function PortalDashboard() {
         id: "solved",
         label: "Solved",
         value: stats.resolved + stats.closed,
-        tone: "text-success",
+        valueTone: "success" as const,
         onClick: () => void navigate({ to: "/portal/$slug/solved", params: { slug } }),
       },
     ],
@@ -146,7 +146,7 @@ function PortalDashboard() {
         animate="show"
         className="mb-4"
       >
-        <DesignTicketKpiGrid items={kpiCards} columns={4} size="compact" />
+        <PortalContentStatStrip items={statItems} />
       </motion.div>
 
       <PortalTicketTableCard
@@ -156,16 +156,16 @@ function PortalDashboard() {
           <Link
             to="/portal/$slug/book"
             params={{ slug }}
-            className="text-xs font-medium text-primary hover:underline"
+            className="portal-content-link"
           >
             Book a call
           </Link>
         }
       >
         {recentBookings.length === 0 ? (
-          <p className="p-4 text-sm text-muted-foreground">
+          <p className="p-4 text-[13px] text-muted-foreground">
             No booked calls yet.{" "}
-            <Link to="/portal/$slug/book" params={{ slug }} className="text-primary hover:underline">
+            <Link to="/portal/$slug/book" params={{ slug }} className="portal-content-link">
               Request a call
             </Link>{" "}
             to see status here.
@@ -178,7 +178,7 @@ function PortalDashboard() {
                 className="flex flex-wrap items-center justify-between gap-2 px-4 py-3"
               >
                 <div className="min-w-0">
-                  <div className="text-sm font-medium">{formatWhen(appt.startsAt)}</div>
+                  <div className="text-[13px] font-medium">{formatWhen(appt.startsAt)}</div>
                   <div className="text-xs text-muted-foreground truncate">
                     {appt.notes?.split("\n")[0] || "Call request"}
                   </div>
@@ -187,7 +187,7 @@ function PortalDashboard() {
                       href={appt.meetUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="mt-1 inline-flex text-xs font-medium text-primary hover:underline"
+                      className="portal-content-link mt-1 inline-flex"
                     >
                       Join Google Meet
                     </a>
@@ -202,7 +202,7 @@ function PortalDashboard() {
         )}
       </PortalTicketTableCard>
 
-      <PortalTicketTableCard title="My Current Tickets" delay={0.06} className="mt-8">
+      <PortalTicketTableCard title="My Current Tickets" delay={0.06}>
         {current.length === 0 ? (
           <div className="p-4">
             <EmptyPortalCurrent slug={slug} />
@@ -225,16 +225,15 @@ function PortalDashboard() {
             <Link
               to="/portal/$slug/solved"
               params={{ slug }}
-              className="text-xs font-medium text-primary hover:underline"
+              className="portal-content-link"
             >
               View all
             </Link>
           ) : null
         }
-        className="mt-8"
       >
         {solved.length === 0 ? (
-          <p className="p-4 text-sm text-muted-foreground">No solved tickets yet.</p>
+          <p className="p-4 text-[13px] text-muted-foreground">No solved tickets yet.</p>
         ) : (
           <PortalSolvedTicketsTable
             rows={solved.slice(0, 5)}
@@ -249,7 +248,6 @@ function PortalDashboard() {
         variants={ticketSectionVariants}
         initial="hidden"
         animate="show"
-        className="mt-8"
       >
         <DesignTicketInfoBanner>
           Replies from our team appear in real time. Use live chat for quick questions.

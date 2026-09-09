@@ -29,6 +29,7 @@ import {
 import type { CompanyPortalAccess } from "@/types/design-ticket";
 import { getStoredTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { PortalContentScope } from "@/components/portal-content-context";
 import { PortalDesignTicketBootstrap } from "@/components/portal-design-ticket-bootstrap";
 import { PortalChatBootstrap } from "@/components/chat/portal-chat-bootstrap";
 import { PortalChatWidget } from "@/components/chat/portal-chat-widget";
@@ -202,7 +203,9 @@ function ClientPortalLayoutInner({ access }: { access: CompanyPortalAccess }) {
         </nav>
 
         <main className="min-w-0 flex-1 overflow-auto">
-          <Outlet />
+          <PortalContentScope>
+            <Outlet />
+          </PortalContentScope>
         </main>
 
         <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
@@ -290,7 +293,9 @@ function ClientPortalLayoutInner({ access }: { access: CompanyPortalAccess }) {
             transition={{ duration: 0.22, ease: TICKET_EASE }}
             className="flex-1 overflow-auto"
           >
-            <Outlet />
+            <PortalContentScope>
+              <Outlet />
+            </PortalContentScope>
           </motion.main>
         </AnimatePresence>
 
