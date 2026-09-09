@@ -2,7 +2,7 @@
 export const PORTAL_CRM_EMBED_PRIMARY = "#1e60d5";
 
 /** Portal content/page background (matches CRM shell). */
-export const PORTAL_PAGE_BACKGROUND = "#dee4e8";
+export const PORTAL_PAGE_BACKGROUND = "#ffffff";
 
 /** Default palette aligned with typical CRM shells (white bar + slate text). */
 export const PORTAL_EMBED_THEME_DEFAULTS = {
