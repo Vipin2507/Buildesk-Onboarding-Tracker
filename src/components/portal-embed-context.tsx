@@ -35,6 +35,12 @@ export function PortalEmbedProvider({ children }: { children: ReactNode }) {
     setEmbedded(detectPortalEmbedMode());
   }, []);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.add("portal-route-active");
+    return () => root.classList.remove("portal-route-active");
+  }, []);
+
   const themeStyle = useMemo(() => {
     if (!embedded) return undefined;
     const theme = mergePortalEmbedTheme(readPortalEmbedThemeFromUrl(), messageTheme);
