@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, FileSpreadsheet, KeyRound, Upload } from "lucide-react";
 import { toast } from "sonner";
 
@@ -16,8 +16,10 @@ import {
   buildCrmAccountApiKeyImportPlan,
   downloadCrmAccountApiKeyImportTemplate,
   parseCrmAccountApiKeyImportFile,
+  reconcileApiKeyImportPlanWithServer,
   type CrmAccountApiKeyImportPlan,
 } from "@/lib/crm-account-api-key-sheet-import";
+import { listCompanyPortalAccess } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useCompanyPortalStore, useCrmAccountStore } from "@/stores";
 
@@ -37,6 +39,7 @@ export function CrmAccountApiKeyBulkUploadModal({
 }) {
   const accounts = useCrmAccountStore((s) => s.accounts);
   const portals = useCompanyPortalStore((s) => s.access);
+  const hydratePortalAccess = useCompanyPortalStore((s) => s.hydrateAccess);
   const setPortalApiKey = useCompanyPortalStore((s) => s.setPortalApiKey);
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -46,16 +49,27 @@ export function CrmAccountApiKeyBulkUploadModal({
   > | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [serverPlan, setServerPlan] = useState<CrmAccountApiKeyImportPlan | null>(null);
 
-  const plan: CrmAccountApiKeyImportPlan | null = useMemo(() => {
+  useEffect(() => {
+    if (!open) return;
+    void listCompanyPortalAccess()
+      .then((records) => hydratePortalAccess(records))
+      .catch(() => {});
+  }, [open, hydratePortalAccess]);
+
+  const localPlan: CrmAccountApiKeyImportPlan | null = useMemo(() => {
     if (!rawRows) return null;
     return buildCrmAccountApiKeyImportPlan(rawRows, accounts, portals);
   }, [rawRows, accounts, portals]);
+
+  const plan = serverPlan ?? localPlan;
 
   function reset() {
     setFileName(null);
     setRawRows(null);
     setParseError(null);
+    setServerPlan(null);
     setBusy(false);
     if (inputRef.current) inputRef.current.value = "";
   }
@@ -70,11 +84,21 @@ export function CrmAccountApiKeyBulkUploadModal({
     setBusy(true);
     setParseError(null);
     setRawRows(null);
+    setServerPlan(null);
     setFileName(file.name);
     try {
+      const records = await listCompanyPortalAccess().catch(() => null);
+      if (records) hydratePortalAccess(records);
+      const freshPortals = useCompanyPortalStore.getState().access;
+
       const raw = await parseCrmAccountApiKeyImportFile(file);
       setRawRows(raw);
-      const preview = buildCrmAccountApiKeyImportPlan(raw, accounts, portals);
+      const preview = await reconcileApiKeyImportPlanWithServer(
+        buildCrmAccountApiKeyImportPlan(raw, accounts, freshPortals),
+        accounts,
+        freshPortals,
+      );
+      setServerPlan(preview);
       if (preview.summary.update === 0 && preview.summary.error > 0) {
         toast.error("Sheet has errors — fix rows and try again");
       } else if (preview.summary.notFound > 0) {

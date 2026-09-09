@@ -1,6 +1,10 @@
 import * as XLSX from "xlsx";
 
-import { formatPortalSlugInUseMessage } from "@/lib/portal-slug-conflict";
+import { getPortalBySlug } from "@/lib/api";
+import {
+  formatPortalSlugInUseMessage,
+  resolvePortalSlugOwner,
+} from "@/lib/portal-slug-conflict";
 import { isValidPortalSlug, normalizePortalSlug } from "@/lib/design-ticket-portal";
 import { normalizeManagerName } from "@/lib/crm-account-sheet-import";
 import type { CrmAccount } from "@/types/crm-account";
@@ -247,7 +251,15 @@ export function buildCrmAccountApiKeyImportPlan(
     const slugOwner = slugToAccountId.get(raw.apiSlug);
     if (slugOwner && slugOwner !== existing.id) {
       error += 1;
-      const other = accounts.find((a) => a.id === slugOwner);
+      const owner = resolvePortalSlugOwner(
+        portals,
+        slugOwner,
+        portals.find((p) => p.companyId === slugOwner)?.companyName,
+        (id) => {
+          const account = accounts.find((a) => a.id === id);
+          return account ? { name: account.name, userId: account.userId } : undefined;
+        },
+      );
       rows.push({
         rowNumber: raw.rowNumber,
         key,
@@ -258,11 +270,7 @@ export function buildCrmAccountApiKeyImportPlan(
         existingId: existing.id,
         existingName: existing.name,
         previousSlug,
-        message: formatPortalSlugInUseMessage(raw.apiSlug, {
-          companyId: slugOwner,
-          companyName: other?.name ?? "another account",
-          clientId: other?.userId,
-        }),
+        message: formatPortalSlugInUseMessage(raw.apiSlug, owner),
       });
       continue;
     }
@@ -304,5 +312,61 @@ export function buildCrmAccountApiKeyImportPlan(
   return {
     rows,
     summary: { update, skip, error, notFound },
+  };
+}
+
+function summarizeApiKeyImportPlan(rows: CrmAccountApiKeyImportPlanRow[]) {
+  return rows.reduce(
+    (acc, row) => {
+      if (row.action === "update") acc.update += 1;
+      else if (row.action === "skip") acc.skip += 1;
+      else if (row.action === "error") acc.error += 1;
+      else if (row.action === "not_found") acc.notFound += 1;
+      return acc;
+    },
+    { update: 0, skip: 0, error: 0, notFound: 0 },
+  );
+}
+
+/** Cross-check update rows against server portal slugs (local portal cache can be stale). */
+export async function reconcileApiKeyImportPlanWithServer(
+  plan: CrmAccountApiKeyImportPlan,
+  accounts: CrmAccount[],
+  portals: CompanyPortalAccess[],
+): Promise<CrmAccountApiKeyImportPlan> {
+  const rows = [...plan.rows];
+  const accountLookup = (id: string) => {
+    const account = accounts.find((a) => a.id === id);
+    return account ? { name: account.name, userId: account.userId } : undefined;
+  };
+
+  await Promise.all(
+    rows.map(async (row, index) => {
+      if (row.action !== "update" || !row.apiSlug || !row.existingId) return;
+
+      try {
+        const remote = await getPortalBySlug({ data: { slug: row.apiSlug } });
+        if (remote.companyId === row.existingId) return;
+
+        const owner = resolvePortalSlugOwner(
+          [...portals, remote],
+          remote.companyId,
+          remote.companyName,
+          accountLookup,
+        );
+        rows[index] = {
+          ...row,
+          action: "error",
+          message: formatPortalSlugInUseMessage(row.apiSlug, owner),
+        };
+      } catch {
+        // Slug is free on the server — keep as update.
+      }
+    }),
+  );
+
+  return {
+    rows,
+    summary: summarizeApiKeyImportPlan(rows),
   };
 }

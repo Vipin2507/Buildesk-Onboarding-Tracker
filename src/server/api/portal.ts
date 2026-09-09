@@ -30,9 +30,22 @@ function resolvePortalSlugOwner(
     .where(eq(t.companyPortalAccess.companyId, companyId))
     .get();
 
+  const company = db
+    .select({ name: t.companies.name })
+    .from(t.companies)
+    .where(eq(t.companies.id, companyId))
+    .get();
+
+  const companyName =
+    account?.name?.trim() ||
+    portal?.companyName?.trim() ||
+    fallbackName?.trim() ||
+    company?.name?.trim() ||
+    `account ${companyId.slice(0, 8)}…`;
+
   return {
     companyId,
-    companyName: account?.name ?? portal?.companyName ?? fallbackName ?? "another account",
+    companyName,
     clientId: account?.userId ?? undefined,
   };
 }

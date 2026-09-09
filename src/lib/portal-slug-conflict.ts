@@ -14,6 +14,14 @@ export function formatPortalSlugInUseMessage(slug: string, owner: PortalSlugOwne
   return `Portal API key "${slug}" is already in use by ${owner.companyName}${clientPart}`;
 }
 
+function pickOwnerLabel(...candidates: (string | undefined | null)[]) {
+  for (const value of candidates) {
+    const trimmed = value?.trim();
+    if (trimmed) return trimmed;
+  }
+  return undefined;
+}
+
 export function resolvePortalSlugOwner(
   portals: CompanyPortalAccess[],
   companyId: string,
@@ -22,9 +30,12 @@ export function resolvePortalSlugOwner(
 ): PortalSlugOwner {
   const portal = portals.find((p) => p.companyId === companyId);
   const account = getAccount?.(companyId);
+  const companyName =
+    pickOwnerLabel(account?.name, portal?.companyName, fallbackName, portal?.contactName) ??
+    `account ${companyId.slice(0, 8)}…`;
   return {
     companyId,
-    companyName: account?.name ?? portal?.companyName ?? fallbackName ?? "another account",
+    companyName,
     clientId: account?.userId,
   };
 }
