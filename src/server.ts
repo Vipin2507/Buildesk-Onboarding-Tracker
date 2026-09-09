@@ -2,6 +2,7 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { applyPortalIframeHeaders } from "./lib/portal-iframe-headers";
 import { handleCrmQueryFileRequest } from "./server/lib/crm-query-file-storage";
 import { startCrmReminderScheduler } from "./server/crm-reminder-scheduler";
 
@@ -58,7 +59,8 @@ export default {
 
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      const normalized = await normalizeCatastrophicSsrResponse(response);
+      return applyPortalIframeHeaders(normalized, url.pathname);
     } catch (error) {
       console.error(error);
       return new Response(renderErrorPage(), {
