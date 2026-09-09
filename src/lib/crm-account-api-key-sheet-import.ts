@@ -5,6 +5,7 @@ import {
   formatPortalSlugInUseMessage,
   resolvePortalSlugOwner,
 } from "@/lib/portal-slug-conflict";
+import { isSameCrmAccountIdentity } from "@/lib/portal-slug-identity";
 import { isValidPortalSlug, normalizePortalSlug } from "@/lib/design-ticket-portal";
 import { normalizeManagerName } from "@/lib/crm-account-sheet-import";
 import type { CrmAccount } from "@/types/crm-account";
@@ -249,16 +250,21 @@ export function buildCrmAccountApiKeyImportPlan(
     const portal = portals.find((p) => p.companyId === existing.id);
     const previousSlug = portal?.slug;
     const slugOwner = slugToAccountId.get(raw.apiSlug);
-    if (slugOwner && slugOwner !== existing.id) {
+    const accountLookup = (id: string) => {
+      const account = accounts.find((a) => a.id === id);
+      return account ? { name: account.name, userId: account.userId } : undefined;
+    };
+    if (
+      slugOwner &&
+      slugOwner !== existing.id &&
+      !isSameCrmAccountIdentity(slugOwner, existing.id, (id) => accounts.find((a) => a.id === id))
+    ) {
       error += 1;
       const owner = resolvePortalSlugOwner(
         portals,
         slugOwner,
         portals.find((p) => p.companyId === slugOwner)?.companyName,
-        (id) => {
-          const account = accounts.find((a) => a.id === id);
-          return account ? { name: account.name, userId: account.userId } : undefined;
-        },
+        accountLookup,
       );
       rows.push({
         rowNumber: raw.rowNumber,
@@ -347,6 +353,13 @@ export async function reconcileApiKeyImportPlanWithServer(
       try {
         const remote = await getPortalBySlug({ data: { slug: row.apiSlug } });
         if (remote.companyId === row.existingId) return;
+        if (
+          isSameCrmAccountIdentity(remote.companyId, row.existingId, (id) =>
+            accounts.find((a) => a.id === id),
+          )
+        ) {
+          return;
+        }
 
         const owner = resolvePortalSlugOwner(
           [...portals, remote],

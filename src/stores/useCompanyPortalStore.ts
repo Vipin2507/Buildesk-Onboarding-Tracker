@@ -9,6 +9,7 @@ import {
 } from "@/lib/api";
 import { generatePortalSlug, isValidPortalSlug, normalizePortalSlug } from "@/lib/design-ticket-portal";
 import { findPortalSlugConflictMessage } from "@/lib/portal-slug-conflict";
+import { isSameCrmAccountIdentity } from "@/lib/portal-slug-identity";
 import { serverSync } from "@/lib/sync";
 import { createPersistedStore, touch } from "./persist";
 import { useCrmAccountStore } from "./useCrmAccountStore";
@@ -208,6 +209,14 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
             createdAt: now,
             updatedAt: now,
           };
+
+      set((s) => ({
+        access: s.access.filter(
+          (p) =>
+            p.companyId === company.id ||
+            !isSameCrmAccountIdentity(p.companyId, company.id, portalSlugAccountLookup),
+        ),
+      }));
 
       if (existing) {
         set((s) => ({

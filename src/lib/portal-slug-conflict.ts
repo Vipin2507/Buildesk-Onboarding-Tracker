@@ -1,3 +1,4 @@
+import { isSameCrmAccountIdentity } from "@/lib/portal-slug-identity";
 import type { CompanyPortalAccess } from "@/types/design-ticket";
 
 export type PortalSlugOwner = {
@@ -44,10 +45,13 @@ export function findPortalSlugConflictMessage(
   portals: CompanyPortalAccess[],
   slug: string,
   excludeCompanyId: string,
-  getAccount?: (id: string) => { name: string; userId?: string } | undefined,
+  getAccount?: (id: string) => { name: string; userId?: string | null } | undefined,
 ): string | null {
   const taken = portals.find((p) => p.slug === slug && p.companyId !== excludeCompanyId);
   if (!taken) return null;
+  if (isSameCrmAccountIdentity(taken.companyId, excludeCompanyId, getAccount)) {
+    return null;
+  }
   const owner = resolvePortalSlugOwner(portals, taken.companyId, taken.companyName, getAccount);
   return formatPortalSlugInUseMessage(slug, owner);
 }
