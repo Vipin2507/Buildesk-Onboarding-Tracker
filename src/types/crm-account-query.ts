@@ -4,7 +4,8 @@ export type CrmAccountQueryCategory =
   | "bug"
   | "suggestion"
   | "feature"
-  | "requirement";
+  | "requirement"
+  | "query";
 
 /** @deprecated Stored on older queries — use crmAccountQueryCategoryLabel for display. */
 export type CrmAccountQueryCategoryLegacy =
@@ -76,6 +77,7 @@ export const CRM_ACCOUNT_QUERY_CATEGORIES: CrmAccountQueryCategory[] = [
   "suggestion",
   "feature",
   "requirement",
+  "query",
 ];
 
 export const CRM_ACCOUNT_QUERY_CATEGORY_LABEL: Record<CrmAccountQueryCategory, string> = {
@@ -83,6 +85,7 @@ export const CRM_ACCOUNT_QUERY_CATEGORY_LABEL: Record<CrmAccountQueryCategory, s
   suggestion: "Suggestion",
   feature: "Feature",
   requirement: "Requirement",
+  query: "Query",
 };
 
 const CRM_ACCOUNT_QUERY_LEGACY_CATEGORY_LABEL: Record<CrmAccountQueryCategoryLegacy, string> = {

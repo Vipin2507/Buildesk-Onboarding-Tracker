@@ -42,9 +42,16 @@ import {
   type CrmQueryMentionCandidate,
 } from "@/lib/crm-query-mentions";
 import { useCrmQueryLiveSync } from "@/hooks/use-crm-query-live-sync";
-import { useSessionFilter } from "@/hooks/use-session-filter";
+import { useSessionFilterState } from "@/hooks/use-session-filter";
 import { isAdminRoleKey } from "@/lib/permissions";
+import {
+  DesignTicketDateField,
+  DesignTicketFilterField,
+  DesignTicketSelect,
+} from "@/components/design-ticket/design-ticket-fields";
+import { inDateRange } from "@/components/list-toolbar";
 import { cn, formatDate, formatTime } from "@/lib/utils";
+import { formatRelativeTime } from "@/types/common";
 import {
   useAuthStore,
   useCrmAccountQueryStore,
@@ -802,9 +809,24 @@ export function CrmAccountQueriesPanel({
   const [createCategory, setCreateCategory] = useState<CrmAccountQueryCategory>("requirement");
   const [createMessage, setCreateMessage] = useState("");
   const [sending, setSending] = useState(false);
-  const [statusFilter, setStatusFilter] = useSessionFilter<
-    "all" | "open" | "resolved" | "archived"
-  >(`crm.account.${accountId}.queries.status`, "all");
+  const [queryFilters, setQueryFilters] = useSessionFilterState(
+    `crm.account.${accountId}.queries.filters`,
+    {
+      statusFilter: "all",
+      executiveFilter: "all",
+      dateFrom: "",
+      dateTo: "",
+      sortBy: "updatedAt",
+      sortDir: "desc",
+    },
+  );
+  const { statusFilter, executiveFilter, dateFrom, dateTo, sortBy, sortDir } = queryFilters;
+  const setStatusFilter = (value: string) => setQueryFilters({ statusFilter: value });
+  const setExecutiveFilter = (value: string) => setQueryFilters({ executiveFilter: value });
+  const setDateFrom = (value: string) => setQueryFilters({ dateFrom: value });
+  const setDateTo = (value: string) => setQueryFilters({ dateTo: value });
+  const setSortBy = (value: string) => setQueryFilters({ sortBy: value });
+  const setSortDir = (value: string) => setQueryFilters({ sortDir: value });
 
   useEffect(() => {
     if (initialQueryId) setSelectedId(initialQueryId);
@@ -835,10 +857,34 @@ export function CrmAccountQueriesPanel({
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
   }, [teamMembers, users]);
 
+  const executiveOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of queries) {
+      map.set(row.createdByUserId, row.createdByName);
+    }
+    return [...map.entries()]
+      .sort((a, b) => a[1].localeCompare(b[1]))
+      .map(([id, name]) => ({ value: id, label: name }));
+  }, [queries]);
+
   const filteredQueries = useMemo(() => {
-    if (statusFilter === "all") return queries;
-    return queries.filter((q) => q.status === statusFilter);
-  }, [queries, statusFilter]);
+    const rows = queries.filter((q) => {
+      if (statusFilter !== "all" && q.status !== statusFilter) return false;
+      if (executiveFilter !== "all" && q.createdByUserId !== executiveFilter) return false;
+      if (!inDateRange(q.updatedAt, dateFrom, dateTo)) return false;
+      return true;
+    });
+
+    rows.sort((a, b) => {
+      let cmp = 0;
+      if (sortBy === "title") cmp = a.title.localeCompare(b.title);
+      else if (sortBy === "createdAt") cmp = a.createdAt.localeCompare(b.createdAt);
+      else cmp = a.updatedAt.localeCompare(b.updatedAt);
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+
+    return rows;
+  }, [queries, statusFilter, executiveFilter, dateFrom, dateTo, sortBy, sortDir]);
 
   const selected = selectedId ? queries.find((q) => q.id === selectedId) : filteredQueries[0];
 
@@ -925,7 +971,7 @@ export function CrmAccountQueriesPanel({
           </Button>
         }
       >
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-1">
             {(["all", "open", "resolved", "archived"] as const).map((id) => (
               <button
@@ -933,21 +979,62 @@ export function CrmAccountQueriesPanel({
                 type="button"
                 onClick={() => setStatusFilter(id)}
                 className={cn(
-                  "rounded-md px-2 py-0.5 text-[11px] font-medium capitalize transition-colors",
+                  "inline-flex h-7 items-center rounded-md border px-2 text-[11px] font-medium capitalize transition-colors",
                   statusFilter === id
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted",
+                    ? "border-primary/40 bg-primary/5 text-foreground"
+                    : "border-transparent text-muted-foreground hover:bg-muted",
                 )}
               >
                 {id}
               </button>
             ))}
           </div>
-          {teamMembers.length > 0 ? (
-            <p className="text-[10px] text-muted-foreground">
-              {teamMembers.map((m) => m.name).join(", ")} · admins
-            </p>
-          ) : null}
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <DesignTicketFilterField label="Executive" compact>
+              <DesignTicketSelect
+                compact
+                value={executiveFilter}
+                onChange={setExecutiveFilter}
+                options={[
+                  { value: "all", label: "All executives" },
+                  ...executiveOptions,
+                ]}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketDateField
+              compact
+              label="Updated from"
+              value={dateFrom}
+              onChange={setDateFrom}
+              placeholder="From"
+            />
+            <DesignTicketDateField
+              compact
+              label="Updated to"
+              value={dateTo}
+              onChange={setDateTo}
+              placeholder="To"
+            />
+            <DesignTicketFilterField label="Sort by" compact>
+              <DesignTicketSelect
+                compact
+                value={`${sortBy}:${sortDir}`}
+                onChange={(value) => {
+                  const [nextSortBy, nextSortDir] = value.split(":");
+                  setSortBy(nextSortBy ?? "updatedAt");
+                  setSortDir(nextSortDir ?? "desc");
+                }}
+                options={[
+                  { value: "updatedAt:desc", label: "Updated · newest" },
+                  { value: "updatedAt:asc", label: "Updated · oldest" },
+                  { value: "createdAt:desc", label: "Age · newest first" },
+                  { value: "createdAt:asc", label: "Age · oldest first" },
+                  { value: "title:asc", label: "Subject · A–Z" },
+                  { value: "title:desc", label: "Subject · Z–A" },
+                ]}
+              />
+            </DesignTicketFilterField>
+          </div>
         </div>
 
         {loading && queries.length === 0 ? (
@@ -986,7 +1073,8 @@ export function CrmAccountQueriesPanel({
                       {lastMessagePreview(query)}
                     </p>
                     <p className="text-[9px] tabular-nums text-muted-foreground">
-                      {formatDate(query.updatedAt)} · {query.messages.length}
+                      {formatRelativeTime(query.createdAt)} · {formatDate(query.updatedAt)} ·{" "}
+                      {query.messages.length} msg
                     </p>
                   </button>
                 );

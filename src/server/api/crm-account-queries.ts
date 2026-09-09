@@ -282,7 +282,7 @@ function loadAccessibleAccountMap(
 const createQuerySchema = z.object({
   companyId: z.string().min(1),
   title: z.string().min(1).max(200),
-  category: z.enum(["bug", "suggestion", "feature", "requirement"]).optional(),
+  category: z.enum(["bug", "suggestion", "feature", "requirement", "query"]).optional(),
   initialMessage: z.string().optional(),
   attachments: z.array(attachmentSchema).optional(),
 });
