@@ -290,6 +290,25 @@
   box-shadow: var(--shadow-soft);
 }
 
+/* Portal typography scale (content + embed chrome) */
+.portal-shell {
+  --portal-font-base: 15px;
+  --portal-font-sm: 14px;
+  --portal-font-xs: 12px;
+  --portal-font-label: 11px;
+  --portal-font-title: 17px;
+  --portal-weight-normal: 500;
+  --portal-weight-medium: 600;
+  --portal-weight-semibold: 700;
+
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: var(--portal-font-base);
+  font-weight: var(--portal-weight-normal);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 /* Iframe embed — match external CRM shell (white bar, slate text) */
 html.portal-embed-active,
 html.portal-embed-active body {
@@ -310,17 +329,12 @@ html.portal-embed-active body {
 
   background-color: var(--background);
   color: var(--foreground);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  font-size: 14px;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
 .portal-embedded .portal-page-title {
   color: var(--foreground);
-  font-size: 15px;
-  font-weight: 600;
+  font-size: var(--portal-font-title);
+  font-weight: var(--portal-weight-semibold);
   letter-spacing: -0.01em;
 }
 
@@ -335,8 +349,8 @@ html.portal-embed-active body {
   background: transparent;
   box-shadow: none;
   color: var(--muted-foreground);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--portal-font-sm);
+  font-weight: var(--portal-weight-medium);
   letter-spacing: -0.01em;
   padding: 0.5rem 0.25rem;
   margin-bottom: -1px;
@@ -351,7 +365,7 @@ html.portal-embed-active body {
   background: transparent;
   border-bottom: 2px solid var(--primary);
   color: var(--primary);
-  font-weight: 600;
+  font-weight: var(--portal-weight-semibold);
   box-shadow: none;
 }
 
@@ -377,7 +391,7 @@ html.portal-embed-active body {
   border-color: var(--border);
   background: var(--background);
   color: var(--foreground);
-  font-size: 13px;
+  font-size: var(--portal-font-sm);
 }
 
 .portal-embedded .portal-chat-widget input::placeholder {
@@ -388,21 +402,20 @@ html.portal-embed-active body {
 .portal-content {
   min-height: 100%;
   background-color: var(--portal-embed-bg, #dee4e8);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color: var(--foreground);
 }
 
 .portal-content .portal-page-title {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: var(--portal-font-title);
+  font-weight: var(--portal-weight-semibold);
   letter-spacing: -0.01em;
   color: var(--foreground);
 }
 
 .portal-content .portal-content-link {
   color: var(--primary);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--portal-font-sm);
+  font-weight: var(--portal-weight-medium);
   text-decoration: none;
 }
 
@@ -455,16 +468,16 @@ html.portal-embed-active body {
 }
 
 .portal-content .portal-stat-label {
-  font-size: 10px;
-  font-weight: 500;
+  font-size: var(--portal-font-label);
+  font-weight: var(--portal-weight-medium);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--muted-foreground);
 }
 
 .portal-content .portal-stat-value {
-  font-size: 1.125rem;
-  font-weight: 600;
+  font-size: 1.25rem;
+  font-weight: var(--portal-weight-semibold);
   line-height: 1;
   font-variant-numeric: tabular-nums;
   color: var(--foreground);
@@ -500,13 +513,14 @@ html.portal-embed-active body {
 }
 
 .portal-content .portal-content-card-title {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--portal-font-sm);
+  font-weight: var(--portal-weight-semibold);
   color: var(--foreground);
 }
 
 .portal-content .portal-content-card-body {
-  font-size: 13px;
+  font-size: var(--portal-font-sm);
+  font-weight: var(--portal-weight-normal);
 }
 
 .portal-content .portal-content-card-body .divide-y > * {
@@ -515,8 +529,8 @@ html.portal-embed-active body {
 }
 
 .portal-content .portal-ticket-id {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--portal-font-sm);
+  font-weight: var(--portal-weight-semibold);
   color: var(--primary);
 }
 
@@ -526,8 +540,8 @@ html.portal-embed-active body {
   align-items: center;
   border-radius: 0.375rem;
   padding: 0.125rem 0.5rem;
-  font-size: 11px;
-  font-weight: 500;
+  font-size: var(--portal-font-xs);
+  font-weight: var(--portal-weight-medium);
   line-height: 1.25;
 }
 
@@ -568,15 +582,16 @@ html.portal-embed-active body {
 
 .portal-content .portal-data-table thead th {
   border-bottom: 1px solid var(--border);
-  font-size: 10px;
-  font-weight: 500;
+  font-size: var(--portal-font-label);
+  font-weight: var(--portal-weight-medium);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--muted-foreground);
 }
 
 .portal-content .portal-data-table tbody td {
-  font-size: 13px;
+  font-size: var(--portal-font-sm);
+  font-weight: var(--portal-weight-normal);
 }
 
 .portal-content .portal-info-banner {
@@ -587,7 +602,8 @@ html.portal-embed-active body {
   border-radius: 0.375rem;
   background: color-mix(in srgb, var(--primary) 6%, var(--card));
   padding: 0.75rem 0.875rem;
-  font-size: 13px;
+  font-size: var(--portal-font-sm);
+  font-weight: var(--portal-weight-normal);
   line-height: 1.45;
   color: var(--muted-foreground);
 }
@@ -596,4 +612,28 @@ html.portal-embed-active body {
   margin-top: 0.125rem;
   flex-shrink: 0;
   color: var(--primary);
+}
+
+.portal-shell aside nav a {
+  font-size: var(--portal-font-sm);
+  font-weight: var(--portal-weight-medium);
+}
+
+.portal-shell aside nav a[class*="font-medium"],
+.portal-shell aside nav a[class*="font-semibold"] {
+  font-weight: var(--portal-weight-semibold);
+}
+
+.portal-shell header {
+  font-size: var(--portal-font-sm);
+  font-weight: var(--portal-weight-medium);
+}
+
+.portal-shell .portal-chat-widget [class*="text-[13px]"],
+.portal-shell .portal-chat-widget [class*="text-[11px]"] {
+  font-size: var(--portal-font-sm);
+}
+
+.portal-shell .portal-chat-widget [class*="text-xs"] {
+  font-size: var(--portal-font-xs);
 }

@@ -158,7 +158,7 @@ function PortalDashboard() {
         }
       >
         {recentBookings.length === 0 ? (
-          <p className="p-4 text-[13px] text-muted-foreground">
+          <p className="p-4 text-sm text-muted-foreground">
             No booked calls yet.{" "}
             <Link to="/portal/$slug/book" params={{ slug }} className="portal-content-link">
               Request a call
@@ -173,7 +173,7 @@ function PortalDashboard() {
                 className="flex flex-wrap items-center justify-between gap-2 px-4 py-3"
               >
                 <div className="min-w-0">
-                  <div className="text-[13px] font-medium">{formatWhen(appt.startsAt)}</div>
+                  <div className="text-sm font-semibold">{formatWhen(appt.startsAt)}</div>
                   <div className="text-xs text-muted-foreground truncate">
                     {appt.notes?.split("\n")[0] || "Call request"}
                   </div>
@@ -228,7 +228,7 @@ function PortalDashboard() {
         }
       >
         {solved.length === 0 ? (
-          <p className="p-4 text-[13px] text-muted-foreground">No solved tickets yet.</p>
+          <p className="p-4 text-sm text-muted-foreground">No solved tickets yet.</p>
         ) : (
           <PortalSolvedTicketsTable
             rows={solved.slice(0, 5)}

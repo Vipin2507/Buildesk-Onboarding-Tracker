@@ -180,7 +180,7 @@ function ClientPortalLayoutInner({ access }: { access: CompanyPortalAccess }) {
     return (
       <div
         style={themeStyle}
-        className="portal-embedded flex min-h-full flex-col bg-background text-foreground"
+        className="portal-shell portal-embedded flex min-h-full flex-col bg-background text-foreground"
       >
         <PortalDesignTicketBootstrap access={access} />
         <PortalChatBootstrap access={access} />
@@ -233,7 +233,7 @@ function ClientPortalLayoutInner({ access }: { access: CompanyPortalAccess }) {
   }
 
   return (
-    <div className="flex min-h-[100dvh] bg-background text-foreground">
+    <div className="portal-shell flex min-h-[100dvh] bg-background text-foreground">
       <PortalDesignTicketBootstrap access={access} />
       <PortalChatBootstrap access={access} />
       <PortalChatWidget access={access} />
