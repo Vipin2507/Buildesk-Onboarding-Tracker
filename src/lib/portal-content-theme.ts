@@ -2,7 +2,7 @@
  * Read-only brand tokens for the Support Portal content area.
  * Values trace to the embed theme (--primary) and shared app CSS — do not invent colors here.
  */
-import { PORTAL_CRM_EMBED_PRIMARY } from "@/lib/portal-embed-theme";
+import { PORTAL_CRM_EMBED_PRIMARY, PORTAL_PAGE_BACKGROUND } from "@/lib/portal-embed-theme";
 
 /** Sidebar active / Support highlight blue (also set as --primary in embed mode). */
 export const PORTAL_BRAND_BLUE = PORTAL_CRM_EMBED_PRIMARY;
@@ -17,7 +17,7 @@ export const PORTAL_CONTENT_BORDER = "#e5e7eb";
 export const PORTAL_CONTENT_MUTED = "#64748b";
 
 /** Page background inside the content outlet. */
-export const PORTAL_CONTENT_BACKGROUND = "#ffffff";
+export const PORTAL_CONTENT_BACKGROUND = PORTAL_PAGE_BACKGROUND;
 
 /** Semantic tints derived from brand + app success/warning tokens. */
 export const PORTAL_CONTENT_SEMANTIC = {

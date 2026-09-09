@@ -293,14 +293,14 @@
 /* Iframe embed — match external CRM shell (white bar, slate text) */
 html.portal-embed-active,
 html.portal-embed-active body {
-  background-color: var(--portal-embed-bg, #ffffff);
+  background-color: var(--portal-embed-bg, #dee4e8);
   color: var(--portal-embed-fg, #334155);
 }
 
 .portal-embedded {
-  --background: var(--portal-embed-bg, #ffffff);
+  --background: var(--portal-embed-bg, #dee4e8);
   --foreground: var(--portal-embed-fg, #334155);
-  --card: var(--portal-embed-bg, #ffffff);
+  --card: #ffffff;
   --card-foreground: var(--portal-embed-fg, #334155);
   --muted: #f8f9fa;
   --muted-foreground: var(--portal-embed-muted, #64748b);
@@ -325,7 +325,7 @@ html.portal-embed-active body {
 }
 
 .portal-embedded .portal-embed-nav {
-  background-color: var(--background);
+  background-color: var(--portal-embed-bg, #dee4e8);
   border-bottom: 1px solid var(--border);
 }
 
@@ -386,6 +386,8 @@ html.portal-embed-active body {
 
 /* Portal main-outlet content (dashboard, tickets, …) — not navbar/sidebar chrome */
 .portal-content {
+  min-height: 100%;
+  background-color: var(--portal-embed-bg, #dee4e8);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color: var(--foreground);
 }

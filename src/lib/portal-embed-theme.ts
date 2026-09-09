@@ -1,9 +1,12 @@
 /** CRM Support sidebar blue — used for embed mode accents. */
 export const PORTAL_CRM_EMBED_PRIMARY = "#1e60d5";
 
+/** Portal content/page background (matches CRM shell). */
+export const PORTAL_PAGE_BACKGROUND = "#dee4e8";
+
 /** Default palette aligned with typical CRM shells (white bar + slate text). */
 export const PORTAL_EMBED_THEME_DEFAULTS = {
-  background: "#ffffff",
+  background: PORTAL_PAGE_BACKGROUND,
   foreground: "#334155",
   mutedForeground: "#64748b",
   border: "#e5e7eb",
