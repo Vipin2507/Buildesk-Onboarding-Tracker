@@ -12,7 +12,19 @@ export const PORTAL_EMBED_THEME_DEFAULTS = {
   primary: PORTAL_CRM_EMBED_PRIMARY,
 } as const;
 
-export type PortalEmbedTheme = Partial<typeof PORTAL_EMBED_THEME_DEFAULTS>;
+export type PortalEmbedTheme = {
+  background?: string;
+  foreground?: string;
+  mutedForeground?: string;
+  border?: string;
+  card?: string;
+  muted?: string;
+  primary?: string;
+};
+
+export type PortalEmbedThemeResolved = {
+  [K in keyof typeof PORTAL_EMBED_THEME_DEFAULTS]: string;
+};
 
 function normalizeHexColor(value: string | null | undefined): string | undefined {
   if (!value?.trim()) return undefined;
@@ -45,16 +57,14 @@ export function readPortalEmbedThemeFromUrl(): PortalEmbedTheme {
 
 export function mergePortalEmbedTheme(
   ...layers: (PortalEmbedTheme | null | undefined)[]
-): typeof PORTAL_EMBED_THEME_DEFAULTS {
+): PortalEmbedThemeResolved {
   return {
     ...PORTAL_EMBED_THEME_DEFAULTS,
     ...layers.reduce<PortalEmbedTheme>((acc, layer) => ({ ...acc, ...layer }), {}),
   };
 }
 
-export function portalEmbedThemeToCssVars(
-  theme: typeof PORTAL_EMBED_THEME_DEFAULTS,
-): Record<string, string> {
+export function portalEmbedThemeToCssVars(theme: PortalEmbedThemeResolved): Record<string, string> {
   return {
     "--background": theme.background,
     "--foreground": theme.foreground,
