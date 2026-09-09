@@ -163,6 +163,7 @@ export {
   listCrmPaymentTransactions,
   recordCrmPaymentTransaction,
   remindCrmPaymentAccount,
+  remindCrmPaymentExecutive,
   remindCrmPaymentsBulk,
 } from "@/server/api/crm-payments";
 

@@ -10,6 +10,8 @@ export const AUTOMATION_TRIGGER_VALUES = [
   "booking-created",
   "booking-status-changed",
   "task-before-start",
+  "payment-overdue",
+  "payment-executive-remind",
 ] as const satisfies readonly AutomationTrigger[];
 
 const jsonLiteralSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);

@@ -40,7 +40,9 @@ export type AutomationTrigger =
   | "ticket-reply-from-team"
   | "booking-created"
   | "booking-status-changed"
-  | "task-before-start";
+  | "task-before-start"
+  | "payment-overdue"
+  | "payment-executive-remind";
 
 export interface AutomationRule {
   id: string;
@@ -141,6 +143,16 @@ export type AutomationPayload = {
   taskUrl?: string;
   assigneeName?: string;
   offsetMinutes?: number;
+  /** Payment collection fields (optional). */
+  dueAmount?: string;
+  dueDate?: string;
+  paymentReceived?: string;
+  pendingAmount?: string;
+  totalDealValue?: string;
+  overdueAmount?: string;
+  supportManager1?: string;
+  supportManager2?: string;
+  executiveName?: string;
 };
 
 export const AUTOMATION_TRIGGERS: { value: AutomationTrigger; label: string }[] = [
@@ -151,6 +163,8 @@ export const AUTOMATION_TRIGGERS: { value: AutomationTrigger; label: string }[] 
   { value: "booking-created", label: "Meeting request (executive)" },
   { value: "booking-status-changed", label: "Meeting status (customer)" },
   { value: "task-before-start", label: "Before scheduled task" },
+  { value: "payment-overdue", label: "Payment reminder (client)" },
+  { value: "payment-executive-remind", label: "Payment reminder (executive)" },
 ];
 
 export const AUTOMATION_TEMPLATE_VARS = [

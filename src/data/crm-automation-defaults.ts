@@ -73,6 +73,11 @@ export const CRM_BOOKING_AUTOMATION_TRIGGERS = ["booking-created", "booking-stat
 
 export const CRM_TASK_AUTOMATION_TRIGGERS = ["task-before-start"] as const;
 
+export const CRM_PAYMENT_AUTOMATION_TRIGGERS = [
+  "payment-overdue",
+  "payment-executive-remind",
+] as const;
+
 export const DEFAULT_TASK_REMINDER_OFFSET_MINUTES = 15;
 
 /** Merge seed rules by id so booking automations appear even on older saved configs. */
@@ -193,6 +198,29 @@ export const DEFAULT_CRM_AUTOMATION_RULES: AutomationRule[] = [
     templateBody:
       "Hi {{assigneeName}}, reminder: \"{{taskTitle}}\" for {{accountName}} starts at {{startsAt}} (in {{offsetMinutes}} min). {{taskUrl}}",
   }),
+  rule({
+    id: "crm-rule-payment-overdue-email",
+    name: "Payment reminder — Client email",
+    description: "Email the account contact when a payment reminder is sent from Payments",
+    trigger: "payment-overdue",
+    channel: "email",
+    isActive: true,
+    templateSubject: "Payment reminder — {{accountName}}",
+    templateBody:
+      "Hi {{customerName}},\n\nThis is a reminder that ₹{{dueAmount}} is due by {{dueDate}} for {{accountName}}.\n\nReceived so far: ₹{{paymentReceived}}\nPending: ₹{{pendingAmount}}\n\nPlease arrange payment at your earliest convenience.\n\nThank you.",
+  }),
+  rule({
+    id: "crm-rule-payment-executive-email",
+    name: "Payment reminder — Executive email",
+    description:
+      "Email sales manager and support managers when an executive payment reminder is sent",
+    trigger: "payment-executive-remind",
+    channel: "email",
+    isActive: true,
+    templateSubject: "Payment follow-up — {{accountName}}",
+    templateBody:
+      "Hi {{executiveName}},\n\nPayment collection update for {{accountName}}:\n\nDue: ₹{{dueAmount}} by {{dueDate}}\nOverdue: ₹{{overdueAmount}}\nReceived: ₹{{paymentReceived}} of ₹{{totalDealValue}}\nPending: ₹{{pendingAmount}}\n\nSales manager: {{salesManagerName}}\nSupport 1: {{supportManager1}}\nSupport 2: {{supportManager2}}\n\nReview in CRM Payments.",
+  }),
 ];
 
 export const CRM_AUTOMATION_TEMPLATE_VARS = [
@@ -221,6 +249,16 @@ export const CRM_AUTOMATION_TEMPLATE_VARS = [
   "{{taskUrl}}",
   "{{assigneeName}}",
   "{{offsetMinutes}}",
+  "{{dueAmount}}",
+  "{{dueDate}}",
+  "{{paymentReceived}}",
+  "{{pendingAmount}}",
+  "{{totalDealValue}}",
+  "{{overdueAmount}}",
+  "{{overdueDays}}",
+  "{{supportManager1}}",
+  "{{supportManager2}}",
+  "{{executiveName}}",
 ] as const;
 
 export const CRM_AUTOMATION_SAMPLE_VARS: Record<string, string> = {
@@ -249,4 +287,14 @@ export const CRM_AUTOMATION_SAMPLE_VARS: Record<string, string> = {
   taskUrl: "https://track.example.com/crm/tasks?task=task-9001",
   assigneeName: "Priya Sales",
   offsetMinutes: "15",
+  dueAmount: "250000",
+  dueDate: "2026-09-15",
+  paymentReceived: "500000",
+  pendingAmount: "750000",
+  totalDealValue: "1250000",
+  overdueAmount: "0",
+  overdueDays: "0",
+  supportManager1: "Anita Support",
+  supportManager2: "Ravi Support",
+  executiveName: "Priya Sales, Anita Support",
 };

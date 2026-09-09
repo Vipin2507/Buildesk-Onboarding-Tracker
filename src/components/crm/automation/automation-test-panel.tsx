@@ -28,6 +28,8 @@ const TRIGGER_SHORT: Record<AutomationRule["trigger"], string> = {
   "booking-created": "Meeting request",
   "booking-status-changed": "Meeting status",
   "task-before-start": "Task reminder",
+  "payment-overdue": "Payment (client)",
+  "payment-executive-remind": "Payment (executive)",
 };
 
 export function AutomationTestPanel({ className }: { className?: string }) {

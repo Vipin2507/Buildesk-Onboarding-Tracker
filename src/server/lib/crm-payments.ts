@@ -247,6 +247,8 @@ export type PaymentsListFilters = {
 export type PaymentListItem = {
   id: string;
   accountName: string;
+  supportManager1?: string;
+  supportManager2?: string;
   salesManager?: string;
   totalDealValue: number;
   paymentReceived: number;
@@ -297,6 +299,8 @@ export function queryPaymentListItems(
     return {
       id: account.id,
       accountName: account.name,
+      supportManager1: account.supportManager1 ?? undefined,
+      supportManager2: account.supportManager2 ?? undefined,
       salesManager: account.salesManagerName ?? undefined,
       totalDealValue: snap.totalDealValue,
       paymentReceived: snap.paymentReceived,
@@ -314,7 +318,9 @@ export function queryPaymentListItems(
     items = items.filter(
       (row) =>
         row.accountName.toLowerCase().includes(search) ||
-        (row.salesManager ?? "").toLowerCase().includes(search),
+        (row.salesManager ?? "").toLowerCase().includes(search) ||
+        (row.supportManager1 ?? "").toLowerCase().includes(search) ||
+        (row.supportManager2 ?? "").toLowerCase().includes(search),
     );
   }
 

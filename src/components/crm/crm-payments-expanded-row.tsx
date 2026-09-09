@@ -1,4 +1,4 @@
-import { Bell, Plus } from "lucide-react";
+import { Bell, Mail, Plus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -10,6 +10,7 @@ import {
   useCrmPaymentTransactions,
   useRecordCrmPayment,
   useRemindCrmPayment,
+  useRemindCrmPaymentExecutive,
 } from "@/hooks/use-crm-payments";
 import type { CrmPaymentsSearch } from "@/lib/crm-payments-search";
 import { cn, formatDate } from "@/lib/utils";
@@ -53,14 +54,28 @@ export function CrmPaymentsExpandedRow({ row, search }: Props) {
   const installmentsQuery = useCrmPaymentInstallments(row.id, true);
   const transactionsQuery = useCrmPaymentTransactions(row.id, true);
   const recordPayment = useRecordCrmPayment(search);
-  const remind = useRemindCrmPayment();
+  const remindClient = useRemindCrmPayment();
+  const remindExecutive = useRemindCrmPaymentExecutive();
 
-  async function handleRemind() {
+  async function handleRemindClient() {
     try {
-      await remind.mutateAsync(row.id);
-      toast.success("Reminder sent");
+      await remindClient.mutateAsync(row.id);
+      toast.success("Client payment reminder sent");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to send reminder");
+      toast.error(e instanceof Error ? e.message : "Failed to send client reminder");
+    }
+  }
+
+  async function handleRemindExecutive() {
+    try {
+      const result = await remindExecutive.mutateAsync(row.id);
+      toast.success(
+        result.recipientCount
+          ? `Executive reminder sent to ${result.recipientCount} recipients`
+          : "Executive reminder sent",
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to send executive reminder");
     }
   }
 
@@ -70,21 +85,34 @@ export function CrmPaymentsExpandedRow({ row, search }: Props) {
   return (
     <div className="grid gap-3 border-t border-border/80 bg-muted/20 p-3 dark:bg-muted/10 md:grid-cols-2">
       <div className="min-w-0">
-        <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Installment schedule
           </h4>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-7 gap-1 px-2 text-[11px]"
-            disabled={remind.isPending}
-            onClick={() => void handleRemind()}
-          >
-            <Bell className="h-3 w-3" />
-            Remind
-          </Button>
+          <div className="flex flex-wrap gap-1">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1 px-2 text-[11px]"
+              disabled={remindClient.isPending}
+              onClick={() => void handleRemindClient()}
+            >
+              <Bell className="h-3 w-3" />
+              Remind client
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1 px-2 text-[11px]"
+              disabled={remindExecutive.isPending}
+              onClick={() => void handleRemindExecutive()}
+            >
+              <Mail className="h-3 w-3" />
+              Remind executives
+            </Button>
+          </div>
         </div>
         {installmentsQuery.isLoading ? (
           <p className="py-2 text-xs text-muted-foreground">Loading schedule…</p>

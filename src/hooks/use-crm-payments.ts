@@ -7,6 +7,7 @@ import {
   listCrmPayments,
   recordCrmPaymentTransaction,
   remindCrmPaymentAccount,
+  remindCrmPaymentExecutive,
   remindCrmPaymentsBulk,
 } from "@/lib/api";
 import type { CrmPaymentsSearch } from "@/lib/crm-payments-search";
@@ -91,6 +92,12 @@ export function useRecordCrmPayment(search: CrmPaymentsSearch) {
 export function useRemindCrmPayment() {
   return useMutation({
     mutationFn: (accountId: string) => remindCrmPaymentAccount({ data: { accountId } }),
+  });
+}
+
+export function useRemindCrmPaymentExecutive() {
+  return useMutation({
+    mutationFn: (accountId: string) => remindCrmPaymentExecutive({ data: { accountId } }),
   });
 }
 

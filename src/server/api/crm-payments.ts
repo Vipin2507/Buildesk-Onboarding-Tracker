@@ -5,9 +5,13 @@ import { z } from "zod";
 import { canViewCrmAccount } from "@/lib/crm-account-access";
 import type { PaymentStatus } from "@/lib/crm-payment-allocation";
 import { isAdminRoleKey } from "@/lib/permissions";
-import { ApiError, nowIso, requireUser } from "@/server/auth/session";
+import { ApiError, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
+import {
+  dispatchServerPaymentClientReminder,
+  dispatchServerPaymentExecutiveReminder,
+} from "@/server/crm-payment-reminder-automation";
 import {
   buildAccountPaymentSnapshot,
   getAccountPaymentReceived,
@@ -18,7 +22,6 @@ import {
   summarizePaymentList,
   type PaymentsListFilters,
 } from "@/server/lib/crm-payments";
-import { appendServerCrmAutomationLog, loadCrmAutomationConfig } from "@/server/crm-booking-automation";
 
 const paymentStatusSchema = z.enum([
   "all",
@@ -79,11 +82,6 @@ function assertCanViewAccountId(user: { name: string; role: string }, accountId:
     throw new ApiError(403, "You do not have permission to view this account");
   }
   return row;
-}
-
-function buildN8nUrl(base: string, segment: string) {
-  const trimmed = base.replace(/\/+$/, "");
-  return `${trimmed}/${segment.replace(/^\/+/, "")}`;
 }
 
 function toListFilters(data: z.infer<typeof listFiltersSchema>): PaymentsListFilters {
@@ -175,77 +173,25 @@ export const recordCrmPaymentTransaction = createServerFn({ method: "POST" })
 
 async function sendPaymentReminderForAccount(accountId: string, userId: string) {
   const db = getDb();
-  const account = db.select().from(t.crmAccounts).where(eq(t.crmAccounts.id, accountId)).get();
-  if (!account) throw new ApiError(404, "CRM account not found");
-
-  const received = getAccountPaymentReceived(db, accountId);
-  const snap = buildAccountPaymentSnapshot(account, received);
-  const due = snap.nextDueInstallment;
-
-  const config = loadCrmAutomationConfig(db);
-  const emailEndpoint = config.endpoints.find((e) => e.channel === "email" && e.isEnabled);
-  const to = account.pocEmail || account.email;
-  const subject = `Payment reminder — ${account.name}`;
-  const body = due
-    ? `Reminder: ₹${due.remainingAmount.toLocaleString("en-IN")} due by ${due.dueDate} for ${account.name}.`
-    : `Payment reminder for ${account.name}.`;
-
-  if (emailEndpoint?.webhookUrl) {
-    const url = buildN8nUrl(config.settings.n8nWebhookBase, emailEndpoint.webhookUrl);
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to,
-          subject,
-          body,
-          event: "payment.overdue",
-          accountId,
-          accountName: account.name,
-        }),
-      });
-      appendServerCrmAutomationLog(db, {
-        id: `PAY-${Date.now()}`,
-        companyId: accountId,
-        channel: "email",
-        trigger: "booking-status-changed",
-        status: res.ok ? "success" : "failed",
-        requestPayload: {
-          event: "payment.overdue",
-          accountId,
-          accountName: account.name,
-          to,
-          subject,
-        },
-        responseSummary: res.ok ? `Reminder sent to ${to}` : undefined,
-        errorMessage: res.ok ? undefined : `HTTP ${res.status}`,
-        attemptedAt: nowIso(),
-        retryCount: 0,
-      });
-    } catch (e) {
-      appendServerCrmAutomationLog(db, {
-        id: `PAY-${Date.now()}`,
-        companyId: accountId,
-        channel: "email",
-        trigger: "booking-status-changed",
-        status: "failed",
-        requestPayload: {
-          event: "payment.overdue",
-          accountId,
-          accountName: account.name,
-          to,
-          subject,
-        },
-        errorMessage: e instanceof Error ? e.message : "Reminder failed",
-        attemptedAt: nowIso(),
-        retryCount: 0,
-      });
-      throw new ApiError(502, "Failed to send payment reminder");
-    }
+  const result = await dispatchServerPaymentClientReminder(db, accountId);
+  if (!result.ok) {
+    throw new ApiError(502, result.error ?? "Failed to send payment reminder");
   }
-
   return { ok: true as const, accountId, triggeredBy: userId };
+}
+
+async function sendPaymentExecutiveReminderForAccount(accountId: string, userId: string) {
+  const db = getDb();
+  const result = await dispatchServerPaymentExecutiveReminder(db, accountId);
+  if (!result.ok) {
+    throw new ApiError(502, result.error ?? "Failed to send executive reminder");
+  }
+  return {
+    ok: true as const,
+    accountId,
+    triggeredBy: userId,
+    recipientCount: result.recipientCount ?? 0,
+  };
 }
 
 export const remindCrmPaymentAccount = createServerFn({ method: "POST" })
@@ -254,6 +200,14 @@ export const remindCrmPaymentAccount = createServerFn({ method: "POST" })
     const user = requireUser();
     assertCanViewAccountId(user, data.accountId);
     return sendPaymentReminderForAccount(data.accountId, user.id);
+  });
+
+export const remindCrmPaymentExecutive = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ accountId: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    assertCanViewAccountId(user, data.accountId);
+    return sendPaymentExecutiveReminderForAccount(data.accountId, user.id);
   });
 
 export const remindCrmPaymentsBulk = createServerFn({ method: "POST" })

@@ -64,6 +64,14 @@ function formatInr(value: number) {
   return `₹${value.toLocaleString("en-IN")}`;
 }
 
+function managerCell(value?: string) {
+  return value?.trim() ? (
+    <span className="text-xs">{value}</span>
+  ) : (
+    <span className="text-xs text-muted-foreground">—</span>
+  );
+}
+
 function paymentStatusBadge(status: PaymentStatus) {
   const map: Record<PaymentStatus, { label: string; className: string }> = {
     overdue: {
@@ -209,6 +217,8 @@ function CrmPaymentsPage() {
       const data = await listCrmPayments({ data: filters });
       const header = [
         "Account",
+        "Support 1",
+        "Support 2",
         "Sales manager",
         "Deal value",
         "Received",
@@ -222,6 +232,8 @@ function CrmPaymentsPage() {
       const lines = data.rows.map((r) =>
         [
           r.accountName,
+          r.supportManager1 ?? "",
+          r.supportManager2 ?? "",
           r.salesManager ?? "",
           r.totalDealValue,
           r.paymentReceived,
@@ -496,20 +508,30 @@ function CrmPaymentsPage() {
                 key: "accountName",
                 header: "Account",
                 render: (r) => (
-                  <div>
-                    <Link
-                      to="/crm/accounts/$accountId"
-                      params={{ accountId: r.id }}
-                      className="font-medium hover:underline"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {r.accountName}
-                    </Link>
-                    {r.salesManager ? (
-                      <div className="text-[10px] text-muted-foreground">{r.salesManager}</div>
-                    ) : null}
-                  </div>
+                  <Link
+                    to="/crm/accounts/$accountId"
+                    params={{ accountId: r.id }}
+                    className="font-medium hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {r.accountName}
+                  </Link>
                 ),
+              },
+              {
+                key: "supportManager1",
+                header: "Support 1",
+                render: (r) => managerCell(r.supportManager1),
+              },
+              {
+                key: "supportManager2",
+                header: "Support 2",
+                render: (r) => managerCell(r.supportManager2),
+              },
+              {
+                key: "salesManager",
+                header: "Sales manager",
+                render: (r) => managerCell(r.salesManager),
               },
               {
                 key: "totalDealValue",

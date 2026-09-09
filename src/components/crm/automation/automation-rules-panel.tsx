@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { CalendarDays, ClipboardList, Mail, MessageCircle, Pencil, Play, Plus, Power, Trash2, Ticket, Zap } from "lucide-react";
+import { CalendarDays, ClipboardList, IndianRupee, Mail, MessageCircle, Pencil, Play, Plus, Power, Trash2, Ticket, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 import { AutomationRuleDialog } from "@/components/crm/automation/automation-rule-dialog";
@@ -9,7 +9,11 @@ import { DataTable } from "@/components/data-table";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { CRM_BOOKING_AUTOMATION_TRIGGERS, CRM_TASK_AUTOMATION_TRIGGERS } from "@/data/crm-automation-defaults";
+import {
+  CRM_BOOKING_AUTOMATION_TRIGGERS,
+  CRM_PAYMENT_AUTOMATION_TRIGGERS,
+  CRM_TASK_AUTOMATION_TRIGGERS,
+} from "@/data/crm-automation-defaults";
 import {
   AUTOMATION_TRIGGERS,
   type AutomationRule,
@@ -27,6 +31,7 @@ const TRIGGER_LABEL = Object.fromEntries(AUTOMATION_TRIGGERS.map((t) => [t.value
 
 const BOOKING_TRIGGER_SET = new Set<string>(CRM_BOOKING_AUTOMATION_TRIGGERS);
 const TASK_TRIGGER_SET = new Set<string>(CRM_TASK_AUTOMATION_TRIGGERS);
+const PAYMENT_TRIGGER_SET = new Set<string>(CRM_PAYMENT_AUTOMATION_TRIGGERS);
 
 type RuleColumn = {
   key: string;
@@ -123,16 +128,18 @@ export function AutomationRulesPanel() {
   const [testingRuleId, setTestingRuleId] = useState<string | null>(null);
   const [editing, setEditing] = useState<AutomationRule | null>(null);
 
-  const { ticketRules, bookingRules, taskRules } = useMemo(() => {
+  const { ticketRules, bookingRules, taskRules, paymentRules } = useMemo(() => {
     const ticketRules: AutomationRule[] = [];
     const bookingRules: AutomationRule[] = [];
     const taskRules: AutomationRule[] = [];
+    const paymentRules: AutomationRule[] = [];
     for (const rule of rules) {
-      if (BOOKING_TRIGGER_SET.has(rule.trigger)) bookingRules.push(rule);
+      if (PAYMENT_TRIGGER_SET.has(rule.trigger)) paymentRules.push(rule);
+      else if (BOOKING_TRIGGER_SET.has(rule.trigger)) bookingRules.push(rule);
       else if (TASK_TRIGGER_SET.has(rule.trigger)) taskRules.push(rule);
       else ticketRules.push(rule);
     }
-    return { ticketRules, bookingRules, taskRules };
+    return { ticketRules, bookingRules, taskRules, paymentRules };
   }, [rules]);
 
   function openCreate() {
@@ -236,7 +243,7 @@ export function AutomationRulesPanel() {
         <div>
           <h2 className="text-xs font-semibold text-muted-foreground">Automation rules</h2>
           <p className="text-[10px] text-muted-foreground">
-            Support tickets, scheduled task reminders, and meeting notifications · Email via n8n · WhatsApp via WAHA.
+            Support tickets, payments, scheduled task reminders, and meeting notifications · Email via n8n · WhatsApp via WAHA.
           </p>
         </div>
         <Button onClick={openCreate} size="sm" className="h-7 gap-1 px-2.5 text-xs bg-primary">
@@ -265,7 +272,7 @@ export function AutomationRulesPanel() {
             <div className="text-sm font-medium">Enable automation rules</div>
             <p className="mt-0.5 max-w-xl text-[10px] text-muted-foreground">
               {rulesEnabled
-                ? "Active rules run on support ticket events, task reminders, and meeting status changes."
+                ? "Active rules run on support tickets, payment reminders, task reminders, and meeting status changes."
                 : "All rules are paused. Individual on/off settings are kept, but nothing will trigger until you turn this back on."}
             </p>
           </div>
@@ -300,6 +307,12 @@ export function AutomationRulesPanel() {
         </motion.div>
       ) : (
         <div className="space-y-5">
+          {renderRulesSection(
+            "Payments",
+            "Client and executive payment reminders sent from the CRM Payments page.",
+            <IndianRupee className="h-3.5 w-3.5" />,
+            paymentRules,
+          )}
           {renderRulesSection(
             "Meetings",
             "Portal call requests and approval / status emails to executives and guests.",
