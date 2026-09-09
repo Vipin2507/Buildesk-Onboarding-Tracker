@@ -207,22 +207,39 @@ async function sendPaymentReminderForAccount(accountId: string, userId: string) 
       });
       appendServerCrmAutomationLog(db, {
         id: `PAY-${Date.now()}`,
-        ruleId: "payment-reminder",
-        ruleName: "Payment reminder",
+        companyId: accountId,
         channel: "email",
+        trigger: "booking-status-changed",
         status: res.ok ? "success" : "failed",
-        message: res.ok ? `Reminder sent to ${to}` : `HTTP ${res.status}`,
-        createdAt: nowIso(),
+        requestPayload: {
+          event: "payment.overdue",
+          accountId,
+          accountName: account.name,
+          to,
+          subject,
+        },
+        responseSummary: res.ok ? `Reminder sent to ${to}` : undefined,
+        errorMessage: res.ok ? undefined : `HTTP ${res.status}`,
+        attemptedAt: nowIso(),
+        retryCount: 0,
       });
     } catch (e) {
       appendServerCrmAutomationLog(db, {
         id: `PAY-${Date.now()}`,
-        ruleId: "payment-reminder",
-        ruleName: "Payment reminder",
+        companyId: accountId,
         channel: "email",
+        trigger: "booking-status-changed",
         status: "failed",
-        message: e instanceof Error ? e.message : "Reminder failed",
-        createdAt: nowIso(),
+        requestPayload: {
+          event: "payment.overdue",
+          accountId,
+          accountName: account.name,
+          to,
+          subject,
+        },
+        errorMessage: e instanceof Error ? e.message : "Reminder failed",
+        attemptedAt: nowIso(),
+        retryCount: 0,
       });
       throw new ApiError(502, "Failed to send payment reminder");
     }

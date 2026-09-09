@@ -93,7 +93,7 @@ function paymentStatusBadge(status: PaymentStatus) {
 function CrmPaymentsPage() {
   const navigate = useNavigate({ from: "/crm/payments" });
   const search = Route.useSearch();
-  const { user } = useCurrentUser();
+  const user = useCurrentUser();
   const accounts = useCrmAccountStore((s) => s.accounts);
 
   const statusTab = parseCrmPaymentStatusTab(search.status);
@@ -371,7 +371,8 @@ function CrmPaymentsPage() {
 
         <DesignTicketFilterBar
           className="mt-2"
-          onReset={() =>
+          variant="inline"
+          onClear={() =>
             void navigate({
               search: {},
               replace: true,

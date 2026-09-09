@@ -267,7 +267,12 @@ export const upsertCrmAccountsBatch = createServerFn({ method: "POST" })
         db.insert(t.crmAccounts)
           .values(toRowValues(item, id, createdAt, updatedAt))
           .run();
-        ensureInitialPaymentOnAccountCreate(db, id, item.paymentReceived ?? 0, item.startDate ?? null);
+        ensureInitialPaymentOnAccountCreate(
+          db,
+          id,
+          item.paymentReceived ?? 0,
+          (item.startDate ?? now).slice(0, 10),
+        );
       }
       const row = db.select().from(t.crmAccounts).where(eq(t.crmAccounts.id, id)).get();
       if (row) saved.push(mapRow(row));
