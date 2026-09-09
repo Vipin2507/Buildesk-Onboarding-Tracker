@@ -63,6 +63,7 @@ import {
 } from "@/stores/crm-dashboard-selectors";
 import { filterCrmAccountsForTableSearch } from "@/lib/crm-account-sheet-export";
 import { sortCrmAccountsByStartDateDesc } from "@/lib/crm-account-sort";
+import { findPortalSlugConflictMessage } from "@/lib/portal-slug-conflict";
 import { isValidPortalSlug, normalizePortalSlug } from "@/lib/design-ticket-portal";
 import { getCrmMasterProductModuleCatalog } from "@/stores/useCrmMasterStore";
 import type { CrmProductModuleKey } from "@/types/crm-onboarding";
@@ -600,8 +601,17 @@ function CrmAccountsPage() {
             toast.error("Portal API key must be 3–48 characters (letters, numbers, hyphens)");
             return;
           }
-          if (useCompanyPortalStore.getState().getBySlug(portalSlug)) {
-            toast.error("This portal API key is already in use");
+          const portalConflict = findPortalSlugConflictMessage(
+            useCompanyPortalStore.getState().access,
+            portalSlug,
+            "",
+            (id) => {
+              const account = useCrmAccountStore.getState().getById(id);
+              return account ? { name: account.name, userId: account.userId } : undefined;
+            },
+          );
+          if (portalConflict) {
+            toast.error(portalConflict);
             return;
           }
 

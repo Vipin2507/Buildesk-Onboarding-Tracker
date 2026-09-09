@@ -8,8 +8,15 @@ import {
   upsertCompanyPortalAccess,
 } from "@/lib/api";
 import { generatePortalSlug, isValidPortalSlug, normalizePortalSlug } from "@/lib/design-ticket-portal";
+import { findPortalSlugConflictMessage } from "@/lib/portal-slug-conflict";
 import { serverSync } from "@/lib/sync";
 import { createPersistedStore, touch } from "./persist";
+import { useCrmAccountStore } from "./useCrmAccountStore";
+
+function portalSlugAccountLookup(companyId: string) {
+  const account = useCrmAccountStore.getState().getById(companyId);
+  return account ? { name: account.name, userId: account.userId } : undefined;
+}
 
 type CompanyPortalState = {
   access: CompanyPortalAccess[];
@@ -146,8 +153,13 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
           error: "Portal API key must be 3–48 characters (letters, numbers, hyphens)",
         };
       }
-      const taken = get().access.find((a) => a.slug === slug && a.companyId !== companyId);
-      if (taken) return { ok: false, error: "This portal API key is already in use" };
+      const conflict = findPortalSlugConflictMessage(
+        get().access,
+        slug,
+        companyId,
+        portalSlugAccountLookup,
+      );
+      if (conflict) return { ok: false, error: conflict };
       if (slug === current.slug) return { ok: true, slug, unchanged: true };
 
       const updated = touch({ ...current, slug });
@@ -172,8 +184,13 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
         };
       }
 
-      const taken = get().access.find((a) => a.slug === slug && a.companyId !== company.id);
-      if (taken) return { ok: false, error: "This portal API key is already in use" };
+      const conflict = findPortalSlugConflictMessage(
+        get().access,
+        slug,
+        company.id,
+        portalSlugAccountLookup,
+      );
+      if (conflict) return { ok: false, error: conflict };
 
       const existing = get().getByCompanyId(company.id);
       if (existing?.slug === slug) return { ok: true, slug, unchanged: true };

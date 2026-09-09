@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 
+import { formatPortalSlugInUseMessage } from "@/lib/portal-slug-conflict";
 import { isValidPortalSlug, normalizePortalSlug } from "@/lib/design-ticket-portal";
 import { normalizeManagerName } from "@/lib/crm-account-sheet-import";
 import type { CrmAccount } from "@/types/crm-account";
@@ -165,7 +166,10 @@ export function buildCrmAccountApiKeyImportPlan(
     slugToAccountId.set(portal.slug, portal.companyId);
   }
 
-  const sheetSlugOwners = new Map<string, number>();
+  const sheetSlugOwners = new Map<
+    string,
+    { rowNumber: number; clientId: string; accountName?: string }
+  >();
 
   for (const raw of rawRows) {
     const key = `row-${raw.rowNumber}`;
@@ -216,6 +220,9 @@ export function buildCrmAccountApiKeyImportPlan(
     const priorSheetRow = sheetSlugOwners.get(raw.apiSlug);
     if (priorSheetRow != null) {
       error += 1;
+      const priorLabel = priorSheetRow.accountName
+        ? `${priorSheetRow.accountName}${priorSheetRow.clientId ? ` (${priorSheetRow.clientId})` : ""}`
+        : priorSheetRow.clientId || "another row";
       rows.push({
         rowNumber: raw.rowNumber,
         key,
@@ -225,11 +232,15 @@ export function buildCrmAccountApiKeyImportPlan(
         action: "error",
         existingId: existing.id,
         existingName: existing.name,
-        message: `Duplicate API “${raw.apiSlug}” in sheet (also on row ${priorSheetRow})`,
+        message: `Duplicate API “${raw.apiSlug}” in sheet — already assigned on row ${priorSheetRow.rowNumber} to ${priorLabel}`,
       });
       continue;
     }
-    sheetSlugOwners.set(raw.apiSlug, raw.rowNumber);
+    sheetSlugOwners.set(raw.apiSlug, {
+      rowNumber: raw.rowNumber,
+      clientId: raw.clientId,
+      accountName: existing.name,
+    });
 
     const portal = portals.find((p) => p.companyId === existing.id);
     const previousSlug = portal?.slug;
@@ -247,7 +258,11 @@ export function buildCrmAccountApiKeyImportPlan(
         existingId: existing.id,
         existingName: existing.name,
         previousSlug,
-        message: `API “${raw.apiSlug}” is already used by ${other?.name ?? "another account"}`,
+        message: formatPortalSlugInUseMessage(raw.apiSlug, {
+          companyId: slugOwner,
+          companyName: other?.name ?? "another account",
+          clientId: other?.userId,
+        }),
       });
       continue;
     }

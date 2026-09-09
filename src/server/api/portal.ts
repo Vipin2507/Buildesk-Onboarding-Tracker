@@ -8,10 +8,53 @@ import {
   isValidPortalSlug,
   normalizePortalSlug,
 } from "@/lib/design-ticket-portal";
+import { formatPortalSlugInUseMessage, type PortalSlugOwner } from "@/lib/portal-slug-conflict";
 import { ApiError, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import type { CompanyPortalAccess } from "@/types/design-ticket";
+
+function resolvePortalSlugOwner(
+  db: ReturnType<typeof getDb>,
+  companyId: string,
+  fallbackName?: string,
+): PortalSlugOwner {
+  const account = db
+    .select({ name: t.crmAccounts.name, userId: t.crmAccounts.userId })
+    .from(t.crmAccounts)
+    .where(eq(t.crmAccounts.id, companyId))
+    .get();
+  const portal = db
+    .select({ companyName: t.companyPortalAccess.companyName })
+    .from(t.companyPortalAccess)
+    .where(eq(t.companyPortalAccess.companyId, companyId))
+    .get();
+
+  return {
+    companyId,
+    companyName: account?.name ?? portal?.companyName ?? fallbackName ?? "another account",
+    clientId: account?.userId ?? undefined,
+  };
+}
+
+function assertPortalSlugAvailable(
+  db: ReturnType<typeof getDb>,
+  slug: string,
+  excludeCompanyId: string,
+) {
+  const taken = db
+    .select({
+      companyId: t.companyPortalAccess.companyId,
+      companyName: t.companyPortalAccess.companyName,
+    })
+    .from(t.companyPortalAccess)
+    .where(eq(t.companyPortalAccess.slug, slug))
+    .get();
+  if (taken && taken.companyId !== excludeCompanyId) {
+    const owner = resolvePortalSlugOwner(db, taken.companyId, taken.companyName);
+    throw new ApiError(409, formatPortalSlugInUseMessage(slug, owner));
+  }
+}
 
 function mapPortalRow(row: typeof t.companyPortalAccess.$inferSelect): CompanyPortalAccess {
   return {
@@ -166,6 +209,8 @@ export const upsertCompanyPortalAccess = createServerFn({ method: "POST" })
       .where(eq(t.companyPortalAccess.companyId, data.companyId))
       .get();
 
+    assertPortalSlugAvailable(db, data.slug, data.companyId);
+
     if (existing) {
       db.update(t.companyPortalAccess)
         .set({
@@ -252,14 +297,7 @@ export const updateCompanyPortalSlug = createServerFn({ method: "POST" })
     if (!current) throw new ApiError(404, "Portal not found");
     if (current.slug === slug) return mapPortalRow(current);
 
-    const taken = db
-      .select({ companyId: t.companyPortalAccess.companyId })
-      .from(t.companyPortalAccess)
-      .where(eq(t.companyPortalAccess.slug, slug))
-      .get();
-    if (taken && taken.companyId !== data.companyId) {
-      throw new ApiError(409, "This portal API key is already in use");
-    }
+    assertPortalSlugAvailable(db, slug, data.companyId);
 
     const now = nowIso();
     db.update(t.companyPortalAccess)
