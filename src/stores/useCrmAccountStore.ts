@@ -55,6 +55,7 @@ function toApiPayload(account: CrmAccount) {
     endDate: account.endDate,
     annualLicense: account.annualLicense,
     dealSize: account.dealSize,
+    gstPercent: account.gstPercent,
     usersPurchased: account.usersPurchased,
     valuePerUser: account.valuePerUser,
     totalCost: account.totalCost,

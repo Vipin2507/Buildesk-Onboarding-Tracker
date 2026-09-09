@@ -14,6 +14,65 @@ export function calcDealFromPerUser(valuePerUser: number, usersPurchased: number
   return roundMoney(valuePerUser * usersPurchased);
 }
 
+/** Deal value excluding GST when total is GST-inclusive. */
+export function calcDealExGst(dealInclGst: number, gstPercent: number): number {
+  if (dealInclGst <= 0) return 0;
+  const rate = Math.max(0, gstPercent) / 100;
+  if (rate <= 0) return roundMoney(dealInclGst);
+  return roundMoney(dealInclGst / (1 + rate));
+}
+
+export function calcGstAmount(dealInclGst: number, gstPercent: number): number {
+  if (dealInclGst <= 0) return 0;
+  return roundMoney(dealInclGst - calcDealExGst(dealInclGst, gstPercent));
+}
+
+export function sumInstallments(installments: CrmAccountInstallment[]): number {
+  return roundMoney(installments.reduce((sum, row) => sum + (Number(row.amount) || 0), 0));
+}
+
+export function installmentScheduleTarget(dealSize: number, pendingAmount: number): number {
+  return installmentBaseAmount(dealSize, pendingAmount);
+}
+
+export type InstallmentTotalValidation = {
+  ok: boolean;
+  total: number;
+  target: number;
+  message?: string;
+};
+
+/** Installments must sum exactly to pending (or full deal if pending is zero). */
+export function validateInstallmentTotal(
+  dealSize: number,
+  pendingAmount: number,
+  installments: CrmAccountInstallment[],
+): InstallmentTotalValidation {
+  const target = installmentScheduleTarget(dealSize, pendingAmount);
+  const total = sumInstallments(installments);
+  if (installments.length === 0 || target <= 0) {
+    return { ok: true, total, target };
+  }
+  const diff = roundMoney(total - target);
+  if (Math.abs(diff) < 0.01) {
+    return { ok: true, total, target };
+  }
+  if (diff > 0) {
+    return {
+      ok: false,
+      total,
+      target,
+      message: `Installment total (₹${total.toLocaleString("en-IN")}) exceeds deal value (₹${target.toLocaleString("en-IN")})`,
+    };
+  }
+  return {
+    ok: false,
+    total,
+    target,
+    message: `Installment total (₹${total.toLocaleString("en-IN")}) is less than deal value (₹${target.toLocaleString("en-IN")})`,
+  };
+}
+
 export function installmentBaseAmount(dealSize: number, pendingAmount: number): number {
   return pendingAmount > 0 ? pendingAmount : dealSize;
 }

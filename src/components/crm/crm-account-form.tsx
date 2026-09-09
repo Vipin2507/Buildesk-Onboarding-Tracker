@@ -12,6 +12,7 @@ import {
   calcValuePerUser,
   installmentBaseAmount,
   roundMoney,
+  validateInstallmentTotal,
 } from "@/lib/crm-account-commercial";
 import { normalizePortalSlug, portalDashboardPath } from "@/lib/design-ticket-portal";
 import { cn } from "@/lib/utils";
@@ -47,6 +48,7 @@ export const crmAccountSchema = z.object({
   supportManager2: z.string().optional(),
   usersPurchased: z.coerce.number().int().min(1, "Users purchased is required"),
   dealSize: z.coerce.number().min(0),
+  gstPercent: z.coerce.number().min(0).max(100),
   valuePerUser: z.coerce.number().min(0).optional(),
   pendingAmount: z.coerce.number().min(0),
   installmentCount: z.coerce.number().int().min(0).optional(),
@@ -62,7 +64,32 @@ export const crmAccountSchema = z.object({
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
   portalApiKey: z.string().optional(),
-});
+})
+  .superRefine((data, ctx) => {
+    const dealSize = Number(data.dealSize) || 0;
+    const pendingAmount = Number(data.pendingAmount) || 0;
+
+    if (dealSize > 0 && pendingAmount > dealSize + 0.01) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["pendingAmount"],
+        message: "Pending amount cannot exceed total deal value (incl. GST)",
+      });
+    }
+
+    const installmentCount = Math.max(0, Math.floor(Number(data.installmentCount) || 0));
+    const installments = data.installments ?? [];
+    if (installmentCount > 0 && installments.length > 0) {
+      const check = validateInstallmentTotal(dealSize, pendingAmount, installments);
+      if (!check.ok && check.message) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["installments"],
+          message: check.message,
+        });
+      }
+    }
+  });
 
 export type CrmAccountFormValues = z.infer<typeof crmAccountSchema>;
 
@@ -88,6 +115,7 @@ export function emptyCrmAccountForm(): CrmAccountFormValues {
     supportManager2: "",
     usersPurchased: 1,
     dealSize: 0,
+    gstPercent: 18,
     valuePerUser: 0,
     pendingAmount: 0,
     installmentCount: 0,
@@ -130,6 +158,7 @@ export function crmAccountToFormValues(
     supportManager2: account.supportManager2 ?? "",
     usersPurchased: users,
     dealSize: deal,
+    gstPercent: account.gstPercent ?? 18,
     valuePerUser: account.valuePerUser ?? calcValuePerUser(deal, users),
     pendingAmount: pending,
     installmentCount,
@@ -184,6 +213,7 @@ export function normalizeCrmAccountForm(data: CrmAccountFormValues) {
     dealSize,
     valuePerUser,
     totalCost: dealSize,
+    gstPercent: Math.max(0, Number(data.gstPercent) || 0),
     pendingAmount,
     paymentReceived: Math.max(0, roundMoney(dealSize - pendingAmount)),
     installmentCount: installmentCount || undefined,

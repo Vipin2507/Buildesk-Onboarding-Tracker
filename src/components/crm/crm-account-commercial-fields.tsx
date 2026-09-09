@@ -4,17 +4,22 @@ import type { UseFormReturn } from "react-hook-form";
 import { DatePickerField } from "@/components/date-picker-field";
 import {
   buildInstallmentSchedule,
+  calcDealExGst,
   calcDealFromPerUser,
+  calcGstAmount,
   calcInstallmentAmount,
   calcValuePerUser,
   installmentBaseAmount,
   roundMoney,
+  sumInstallments,
+  validateInstallmentTotal,
 } from "@/lib/crm-account-commercial";
 import { cn, formatDate } from "@/lib/utils";
 import type { CrmAccountFormValues } from "@/components/crm/crm-account-form";
 
 type CommercialDriver =
   | "dealSize"
+  | "gstPercent"
   | "valuePerUser"
   | "usersPurchased"
   | "pendingAmount"
@@ -54,6 +59,7 @@ export function CrmAccountCommercialFields({
 
   const usersPurchased = Number(form.watch("usersPurchased")) || 0;
   const dealSize = Number(form.watch("dealSize")) || 0;
+  const gstPercent = Number(form.watch("gstPercent")) || 0;
   const valuePerUser = Number(form.watch("valuePerUser")) || 0;
   const pendingAmount = Number(form.watch("pendingAmount")) || 0;
   const installmentCount = Number(form.watch("installmentCount")) || 0;
@@ -61,6 +67,14 @@ export function CrmAccountCommercialFields({
   const startDate = form.watch("startDate") ?? "";
   const installments = form.watch("installments") ?? [];
   const paymentReceived = Math.max(0, roundMoney(dealSize - pendingAmount));
+  const dealExGst = calcDealExGst(dealSize, gstPercent);
+  const gstAmount = calcGstAmount(dealSize, gstPercent);
+  const installmentTarget = installmentBaseAmount(dealSize, pendingAmount);
+  const installmentTotal = sumInstallments(installments);
+  const installmentCheck =
+    installments.length > 0 && installmentTarget > 0
+      ? validateInstallmentTotal(dealSize, pendingAmount, installments)
+      : null;
 
   function setCommercial(
     patch: Partial<CrmAccountFormValues>,
@@ -154,7 +168,7 @@ export function CrmAccountCommercialFields({
           <FieldError message={errors.usersPurchased?.message} />
         </div>
         <div>
-          <Label>Total deal value (₹)</Label>
+          <Label required>Total deal value incl. GST (₹)</Label>
           <input
             type="number"
             min={0}
@@ -168,7 +182,22 @@ export function CrmAccountCommercialFields({
           <FieldError message={errors.dealSize?.message} />
         </div>
         <div>
-          <Label>Value per user (₹)</Label>
+          <Label required>GST %</Label>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step="any"
+            {...form.register("gstPercent", {
+              valueAsNumber: true,
+              onChange: () => markDriver("gstPercent"),
+            })}
+            className={fieldClass(!!errors.gstPercent)}
+          />
+          <FieldError message={errors.gstPercent?.message} />
+        </div>
+        <div>
+          <Label>Value per user incl. GST (₹)</Label>
           <input
             type="number"
             min={0}
@@ -181,11 +210,19 @@ export function CrmAccountCommercialFields({
           />
           <FieldError message={errors.valuePerUser?.message} />
           <p className="mt-1 text-[10px] text-muted-foreground">
-            Edit deal value or per-user — the other updates automatically.
+            Per-user amount is based on deal value incl. GST.
           </p>
         </div>
         <div>
-          <Label>Pending amount (₹)</Label>
+          <Label>Taxable value ex-GST (₹)</Label>
+          <input readOnly value={dealExGst} className={fieldClass(false, true)} tabIndex={-1} />
+        </div>
+        <div>
+          <Label>GST amount (₹)</Label>
+          <input readOnly value={gstAmount} className={fieldClass(false, true)} tabIndex={-1} />
+        </div>
+        <div>
+          <Label>Pending amount incl. GST (₹)</Label>
           <input
             type="number"
             min={0}
@@ -273,8 +310,8 @@ export function CrmAccountCommercialFields({
             />
             <FieldError message={errors.installmentAmount?.message} />
             <p className="mt-1 text-[10px] text-muted-foreground">
-              Based on pending amount
-              {pendingAmount <= 0 && dealSize > 0 ? " (using deal value)" : ""}.
+              Installments are scheduled against pending amount
+              {pendingAmount <= 0 && dealSize > 0 ? " (using full deal value incl. GST)" : ""}.
             </p>
           </div>
         </div>
@@ -306,6 +343,7 @@ export function CrmAccountCommercialFields({
                             amount: roundMoney(Number(e.target.value) || 0),
                           };
                           setCommercial({ installments: next });
+                          void form.trigger("installments");
                         }}
                         className={cn(fieldClass(), "mt-0 h-8")}
                       />
@@ -326,11 +364,27 @@ export function CrmAccountCommercialFields({
                 ))}
               </tbody>
             </table>
-            <div className="border-t bg-muted/20 px-2 py-1.5 text-[10px] text-muted-foreground">
-              Total scheduled: ₹
-              {installments.reduce((sum, row) => sum + (Number(row.amount) || 0), 0).toLocaleString("en-IN")}
+            <div
+              className={cn(
+                "border-t px-2 py-1.5 text-[10px]",
+                installmentCheck && !installmentCheck.ok
+                  ? "bg-destructive/10 text-destructive"
+                  : "bg-muted/20 text-muted-foreground",
+              )}
+            >
+              Total scheduled: ₹{installmentTotal.toLocaleString("en-IN")}
+              {installmentTarget > 0 ? (
+                <>
+                  {" "}
+                  / ₹{installmentTarget.toLocaleString("en-IN")} (incl. GST)
+                </>
+              ) : null}
               {" · "}
               First due {installments[0]?.dueDate ? formatDate(installments[0].dueDate) : "—"}
+              {installmentCheck && !installmentCheck.ok ? (
+                <div className="mt-1 font-medium">{installmentCheck.message}</div>
+              ) : null}
+              <FieldError message={errors.installments?.message} />
             </div>
           </div>
         ) : (

@@ -291,6 +291,7 @@ const EXTRA_COLUMNS = [
   { table: "crm_accounts", name: "installments_json", ddl: "TEXT" },
   { table: "follow_up_tasks", name: "remarks_json", ddl: "TEXT" },
   { table: "crm_accounts", name: "status_remarks", ddl: "TEXT" },
+  { table: "crm_accounts", name: "gst_percent", ddl: "REAL" },
 ];
 
 for (const col of EXTRA_COLUMNS) {

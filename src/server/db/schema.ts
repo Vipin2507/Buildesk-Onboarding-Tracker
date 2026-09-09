@@ -151,6 +151,7 @@ export const crmAccounts = sqliteTable(
     endDate: text("end_date"),
     annualLicense: integer("annual_license", { mode: "boolean" }),
     dealSize: real("deal_size"),
+    gstPercent: real("gst_percent"),
     usersPurchased: integer("users_purchased"),
     valuePerUser: real("value_per_user"),
     totalCost: real("total_cost"),

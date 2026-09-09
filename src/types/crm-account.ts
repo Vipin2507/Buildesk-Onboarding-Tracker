@@ -35,6 +35,8 @@ export type CrmAccount = Timestamps & {
   totalCost?: number;
   paymentReceived?: number;
   pendingAmount?: number;
+  /** GST rate applied to deal value (deal size is inclusive of GST). */
+  gstPercent?: number;
   installmentCount?: number;
   installments?: CrmAccountInstallment[];
   healthScore?: number;
