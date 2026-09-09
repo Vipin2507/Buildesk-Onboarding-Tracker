@@ -309,31 +309,15 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Portal routes — always white page canvas (matches CRM iframe shell) */
-html.portal-route-active {
-  --background: #ffffff;
-  background-color: #ffffff;
-}
-
-html.portal-route-active body {
-  background-color: #ffffff;
-}
-
-html.portal-route-active .portal-shell,
-html.portal-route-active .portal-shell main,
-html.portal-route-active .portal-content {
-  background-color: #ffffff;
-}
-
 /* Iframe embed — match external CRM shell (white bar, slate text) */
 html.portal-embed-active,
 html.portal-embed-active body {
-  background-color: #ffffff;
+  background-color: var(--portal-embed-bg, #ffffff);
   color: var(--portal-embed-fg, #334155);
 }
 
 .portal-embedded {
-  --background: #ffffff;
+  --background: var(--portal-embed-bg, #ffffff);
   --foreground: var(--portal-embed-fg, #334155);
   --card: #ffffff;
   --card-foreground: var(--portal-embed-fg, #334155);
@@ -355,7 +339,7 @@ html.portal-embed-active body {
 }
 
 .portal-embedded .portal-embed-nav {
-  background-color: #ffffff;
+  background-color: var(--portal-embed-bg, #ffffff);
   border-bottom: 1px solid var(--border);
 }
 
@@ -417,7 +401,7 @@ html.portal-embed-active body {
 /* Portal main-outlet content (dashboard, tickets, …) — not navbar/sidebar chrome */
 .portal-content {
   min-height: 100%;
-  background-color: #ffffff;
+  background-color: var(--portal-embed-bg, #ffffff);
   color: var(--foreground);
 }
 

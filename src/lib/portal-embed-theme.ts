@@ -68,10 +68,8 @@ export function mergePortalEmbedTheme(
 }
 
 export function portalEmbedThemeToCssVars(theme: PortalEmbedThemeResolved): Record<string, string> {
-  const pageBg = PORTAL_PAGE_BACKGROUND;
-
   return {
-    "--background": pageBg,
+    "--background": theme.background,
     "--foreground": theme.foreground,
     "--card": theme.card,
     "--card-foreground": theme.foreground,
@@ -88,7 +86,7 @@ export function portalEmbedThemeToCssVars(theme: PortalEmbedThemeResolved): Reco
     "--ring": theme.primary,
     "--brand": theme.primary,
     "--portal-embed-primary": theme.primary,
-    "--portal-embed-bg": pageBg,
+    "--portal-embed-bg": theme.background,
     "--portal-embed-fg": theme.foreground,
     "--portal-embed-muted": theme.mutedForeground,
     "--portal-embed-border": theme.border,

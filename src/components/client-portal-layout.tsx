@@ -180,7 +180,7 @@ function ClientPortalLayoutInner({ access }: { access: CompanyPortalAccess }) {
     return (
       <div
         style={themeStyle}
-        className="portal-shell portal-embedded flex min-h-[100dvh] flex-col bg-background text-foreground"
+        className="portal-shell portal-embedded flex min-h-full flex-col bg-background text-foreground"
       >
         <PortalDesignTicketBootstrap access={access} />
         <PortalChatBootstrap access={access} />
@@ -202,7 +202,7 @@ function ClientPortalLayoutInner({ access }: { access: CompanyPortalAccess }) {
           </div>
         </nav>
 
-        <main className="min-w-0 flex-1 overflow-auto bg-background">
+        <main className="min-w-0 flex-1 overflow-auto">
           <PortalContentScope>
             <Outlet />
           </PortalContentScope>
