@@ -292,14 +292,14 @@
 
 /* Portal typography scale (content + embed chrome) */
 .portal-shell {
-  --portal-font-base: 15px;
-  --portal-font-sm: 14px;
-  --portal-font-xs: 12px;
-  --portal-font-label: 11px;
-  --portal-font-title: 17px;
-  --portal-weight-normal: 500;
-  --portal-weight-medium: 600;
-  --portal-weight-semibold: 700;
+  --portal-font-base: 17px;
+  --portal-font-sm: 16px;
+  --portal-font-xs: 14px;
+  --portal-font-label: 13px;
+  --portal-font-title: 20px;
+  --portal-weight-normal: 600;
+  --portal-weight-medium: 700;
+  --portal-weight-semibold: 800;
 
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: var(--portal-font-base);
@@ -309,11 +309,30 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Iframe embed — match external CRM shell (white bar, slate text) */
+/* Portal routes — match CRM iframe (pure white, no app shell gray leak) */
+html.portal-route,
+html.portal-route body,
+html.portal-embed-active,
+html.portal-embed-active body,
+body.portal-route,
+body:has(.portal-shell),
+body:has(.portal-shell) .portal-shell,
+body:has(.portal-embedded),
+body:has(.portal-embedded) .portal-embedded,
+body:has(.portal-embedded) .portal-embedded > main,
+body:has(.portal-embedded) .portal-content {
+  background-color: var(--portal-embed-bg, #ffffff) !important;
+}
+
+html.portal-route,
 html.portal-embed-active,
 html.portal-embed-active body {
-  background-color: var(--portal-embed-bg, #ffffff);
   color: var(--portal-embed-fg, #334155);
+}
+
+html.portal-route,
+html.portal-embed-active {
+  --background: #ffffff;
 }
 
 .portal-embedded {
@@ -340,7 +359,8 @@ html.portal-embed-active body {
 
 .portal-embedded .portal-embed-nav {
   background-color: var(--portal-embed-bg, #ffffff);
-  border-bottom: 1px solid var(--border);
+  border-bottom: none;
+  box-shadow: none;
 }
 
 .portal-embedded .portal-embed-tab {
@@ -476,7 +496,7 @@ html.portal-embed-active body {
 }
 
 .portal-content .portal-stat-value {
-  font-size: 1.25rem;
+  font-size: 1.375rem;
   font-weight: var(--portal-weight-semibold);
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -513,7 +533,7 @@ html.portal-embed-active body {
 }
 
 .portal-content .portal-content-card-title {
-  font-size: var(--portal-font-sm);
+  font-size: var(--portal-font-base);
   font-weight: var(--portal-weight-semibold);
   color: var(--foreground);
 }

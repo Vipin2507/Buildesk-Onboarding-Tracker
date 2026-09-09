@@ -179,8 +179,8 @@ function ClientPortalLayoutInner({ access }: { access: CompanyPortalAccess }) {
   if (embedded) {
     return (
       <div
-        style={themeStyle}
-        className="portal-shell portal-embedded flex min-h-full flex-col bg-background text-foreground"
+        style={{ ...themeStyle, backgroundColor: "#ffffff" }}
+        className="portal-shell portal-embedded flex min-h-[100dvh] flex-col bg-white text-foreground"
       >
         <PortalDesignTicketBootstrap access={access} />
         <PortalChatBootstrap access={access} />
@@ -202,7 +202,7 @@ function ClientPortalLayoutInner({ access }: { access: CompanyPortalAccess }) {
           </div>
         </nav>
 
-        <main className="min-w-0 flex-1 overflow-auto">
+        <main className="min-w-0 flex-1 overflow-auto bg-white">
           <PortalContentScope>
             <Outlet />
           </PortalContentScope>

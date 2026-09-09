@@ -42,12 +42,29 @@ export function PortalEmbedProvider({ children }: { children: ReactNode }) {
   }, [embedded, messageTheme]);
 
   useEffect(() => {
-    if (!embedded) return;
-
     const root = document.documentElement;
+    const body = document.body;
+    root.classList.add("portal-route");
+    body.classList.add("portal-route");
+    root.style.backgroundColor = "#ffffff";
+    body.style.backgroundColor = "#ffffff";
+
+    if (!embedded) {
+      return () => {
+        root.classList.remove("portal-route");
+        body.classList.remove("portal-route");
+        root.style.removeProperty("background-color");
+        body.style.removeProperty("background-color");
+      };
+    }
+
     root.classList.add("portal-embed-active");
     return () => {
       root.classList.remove("portal-embed-active");
+      root.classList.remove("portal-route");
+      body.classList.remove("portal-route");
+      root.style.removeProperty("background-color");
+      body.style.removeProperty("background-color");
       for (const key of [
         "--portal-embed-bg",
         "--portal-embed-fg",

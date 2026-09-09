@@ -44,7 +44,7 @@ function PortalLayoutRoute() {
 
   if (access === undefined) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
+      <div className="flex min-h-screen items-center justify-center bg-white text-sm text-muted-foreground">
         Loading client portal…
       </div>
     );
