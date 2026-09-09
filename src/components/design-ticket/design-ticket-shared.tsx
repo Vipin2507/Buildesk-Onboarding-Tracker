@@ -60,6 +60,7 @@ export function DesignTicketKpiGrid({
   /** Compact horizontal stat chips for dense admin lists */
   size?: "default" | "compact";
 }) {
+  const embedded = usePortalEmbedMode();
   const colClass =
     columns === 6
       ? size === "compact"
@@ -97,13 +98,18 @@ export function DesignTicketKpiGrid({
             <Wrapper
               type={clickable ? "button" : undefined}
               onClick={k.onClick}
+              data-active={embedded && k.active ? "true" : undefined}
               className={cn(
                 size === "compact"
-                  ? "flex h-full w-full min-w-0 flex-col gap-1 rounded-lg border border-border/80 bg-card px-2.5 py-2 text-left shadow-sm transition-all sm:flex-row sm:items-center sm:justify-between sm:gap-2"
+                  ? cn(
+                      "portal-kpi-chip flex h-full w-full min-w-0 flex-col gap-1 rounded-lg border border-border/80 bg-card px-2.5 py-2 text-left transition-all sm:flex-row sm:items-center sm:justify-between sm:gap-2",
+                      !embedded && "shadow-sm",
+                    )
                   : "card-soft group h-full w-full p-3.5 text-left transition-all sm:p-4",
                 clickable &&
-                  "cursor-pointer hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-                k.active && "border-primary/40 bg-primary/5 ring-1 ring-primary/20",
+                  "cursor-pointer hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                !embedded && clickable && "hover:shadow-md",
+                k.active && !embedded && "border-primary/40 bg-primary/5 ring-1 ring-primary/20",
               )}
             >
               {size === "compact" ? (
@@ -169,11 +175,12 @@ export function DesignTicketPageHeader({
   actions?: ReactNode;
   compact?: boolean;
 }) {
+  const embedded = usePortalEmbedMode();
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, y: embedded ? 0 : 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, ease: TICKET_EASE }}
+      transition={{ duration: embedded ? 0.2 : 0.35, ease: TICKET_EASE }}
       className={cn(
         "flex max-w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between md:items-center",
         compact ? "mb-3" : "mb-5 sm:mb-6 md:items-end",
@@ -182,8 +189,13 @@ export function DesignTicketPageHeader({
       <div className="min-w-0 flex-1">
         <h1
           className={cn(
-            "font-semibold tracking-tight break-words text-foreground",
-            compact ? "text-base sm:text-lg" : "text-xl sm:text-2xl",
+            "break-words",
+            embedded
+              ? "portal-page-title"
+              : cn(
+                  "font-semibold tracking-tight text-foreground",
+                  compact ? "text-base sm:text-lg" : "text-xl sm:text-2xl",
+                ),
           )}
         >
           {title}

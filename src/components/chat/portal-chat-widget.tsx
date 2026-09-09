@@ -4,6 +4,7 @@ import { History, MessageCircle, Plus, Send, Ticket, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { ChatThread } from "@/components/chat/chat-thread";
+import { usePortalEmbedMode } from "@/components/portal-embed-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CHATBOT_QUICK_REPLIES } from "@/data/chatbotResponses";
@@ -14,6 +15,7 @@ import { cn, formatDate } from "@/lib/utils";
 const EASE = [0.22, 1, 0.36, 1] as const;
 
 export function PortalChatWidget({ access }: { access: CompanyPortalAccess }) {
+  const embedded = usePortalEmbedMode();
   const [open, setOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [draft, setDraft] = useState("");
@@ -113,28 +115,65 @@ export function PortalChatWidget({ access }: { access: CompanyPortalAccess }) {
     setShowHistory(false);
   }
 
+  const anchorClass = embedded
+    ? "bottom-4 right-4"
+    : "bottom-20 right-3 md:bottom-6 md:right-6";
+
   return (
-    <>
-      <AnimatePresence>
+    <div
+      className={cn(
+        "fixed z-40 flex flex-col items-end",
+        anchorClass,
+        embedded && "portal-chat-widget",
+      )}
+    >
+      <AnimatePresence mode="wait">
         {open ? (
           <motion.div
-            initial={{ opacity: 0, y: 16, scale: 0.96 }}
+            key="panel"
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 12, scale: 0.96 }}
-            transition={{ duration: 0.28, ease: EASE }}
-            className="fixed bottom-20 right-3 z-40 flex h-[min(70vh,520px)] w-[min(calc(100vw-1.5rem),380px)] flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl md:bottom-6 md:right-6"
+            exit={{ opacity: 0, y: 8, scale: 0.98 }}
+            transition={{ duration: 0.22, ease: EASE }}
+            className={cn(
+              "flex h-[min(70vh,520px)] w-[min(calc(100vw-2rem),380px)] flex-col overflow-hidden origin-bottom-right",
+              embedded
+                ? "rounded-lg border border-border bg-background shadow-md"
+                : "rounded-2xl border bg-background shadow-2xl",
+            )}
           >
-            <div className="flex items-center justify-between border-b bg-primary px-3 py-2.5 text-primary-foreground">
+            <div
+              className={cn(
+                "flex items-center justify-between border-b px-3 py-2.5",
+                embedded
+                  ? "border-border bg-background text-foreground"
+                  : "bg-primary text-primary-foreground",
+              )}
+            >
               <div className="min-w-0">
-                <div className="font-semibold">{showHistory ? "Chat history" : "Live chat"}</div>
-                <div className="truncate text-xs opacity-90">{access.companyName}</div>
+                <div className={cn(embedded ? "text-[13px] font-semibold" : "font-semibold")}>
+                  {showHistory ? "Chat history" : "Live chat"}
+                </div>
+                <div
+                  className={cn(
+                    "truncate",
+                    embedded ? "text-[11px] text-muted-foreground" : "text-xs opacity-90",
+                  )}
+                >
+                  {access.companyName}
+                </div>
               </div>
               <div className="flex items-center gap-0.5">
                 {!showHistory && historySessions.length > 0 ? (
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-8 w-8 text-primary-foreground hover:bg-white/10"
+                    className={cn(
+                      "h-8 w-8",
+                      embedded
+                        ? "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        : "text-primary-foreground hover:bg-white/10",
+                    )}
                     onClick={() => setShowHistory(true)}
                     aria-label="View chat history"
                   >
@@ -145,7 +184,12 @@ export function PortalChatWidget({ access }: { access: CompanyPortalAccess }) {
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-8 w-8 text-primary-foreground hover:bg-white/10"
+                    className={cn(
+                      "h-8 w-8",
+                      embedded
+                        ? "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        : "text-primary-foreground hover:bg-white/10",
+                    )}
                     onClick={() => setShowHistory(false)}
                     aria-label="Back to chat"
                   >
@@ -155,7 +199,12 @@ export function PortalChatWidget({ access }: { access: CompanyPortalAccess }) {
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-8 w-8 text-primary-foreground hover:bg-white/10"
+                    className={cn(
+                      "h-8 w-8",
+                      embedded
+                        ? "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        : "text-primary-foreground hover:bg-white/10",
+                    )}
                     onClick={() => setOpen(false)}
                   >
                     <X className="h-4 w-4" />
@@ -165,7 +214,7 @@ export function PortalChatWidget({ access }: { access: CompanyPortalAccess }) {
             </div>
 
             {showHistory ? (
-              <div className="flex-1 overflow-y-auto p-2">
+              <div className="flex-1 overflow-y-auto bg-background p-2">
                 {historySessions.length === 0 ? (
                   <p className="p-3 text-center text-xs text-muted-foreground">No past conversations.</p>
                 ) : (
@@ -177,9 +226,9 @@ export function PortalChatWidget({ access }: { access: CompanyPortalAccess }) {
                           <button
                             type="button"
                             onClick={() => openHistorySession(s.id)}
-                            className="w-full rounded-lg border bg-card/60 px-3 py-2 text-left transition-colors hover:bg-muted/50"
+                            className="w-full rounded-lg border border-border bg-card px-3 py-2 text-left transition-colors hover:bg-muted/40"
                           >
-                            <div className="text-xs font-medium">{formatDate(s.updatedAt)}</div>
+                            <div className="text-xs font-medium text-foreground">{formatDate(s.updatedAt)}</div>
                             <div className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">
                               {last?.text ?? "No messages"}
                             </div>
@@ -195,30 +244,35 @@ export function PortalChatWidget({ access }: { access: CompanyPortalAccess }) {
               </div>
             ) : (
               <>
-                <div className="flex-1 overflow-y-auto p-3">
-                  {session ? <ChatThread messages={session.messages} /> : null}
+                <div className="flex-1 overflow-y-auto bg-background p-3">
+                  {session ? <ChatThread messages={session.messages} embedded={embedded} /> : null}
                   <div ref={bottomRef} />
                 </div>
 
                 {isClosed ? (
-                  <div className="space-y-2 border-t p-3">
+                  <div className="space-y-2 border-t border-border bg-background p-3">
                     <p className="text-center text-xs text-muted-foreground">
                       This conversation was closed. Your messages are saved.
                     </p>
-                    <Button size="sm" className="h-8 w-full gap-1.5 bg-primary" onClick={startNewChat}>
+                    <Button
+                      size="sm"
+                      className={cn("h-8 w-full gap-1.5", !embedded && "bg-primary")}
+                      variant={embedded ? "outline" : "default"}
+                      onClick={startNewChat}
+                    >
                       <Plus className="h-3.5 w-3.5" /> Start new conversation
                     </Button>
                   </div>
                 ) : (
                   <>
                     {session?.status === "bot-handling" ? (
-                      <div className="flex flex-wrap gap-1.5 border-t px-3 py-2">
+                      <div className="flex flex-wrap gap-1.5 border-t border-border bg-background px-3 py-2">
                         {CHATBOT_QUICK_REPLIES.map((q) => (
                           <button
                             key={q.id}
                             type="button"
                             onClick={() => session && sendQuickReply(session.id, q.label)}
-                            className="rounded-full border bg-muted/40 px-2.5 py-1 text-[11px] hover:bg-muted"
+                            className="rounded-md border border-border bg-background px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
                           >
                             {q.label}
                           </button>
@@ -226,15 +280,21 @@ export function PortalChatWidget({ access }: { access: CompanyPortalAccess }) {
                       </div>
                     ) : null}
 
-                    <div className="border-t p-3">
+                    <div className="border-t border-border bg-background p-3">
                       <div className="flex gap-2">
                         <Input
                           value={draft}
                           onChange={(e) => setDraft(e.target.value)}
                           placeholder="Type a message…"
+                          className={cn(embedded && "h-9 text-[13px]")}
                           onKeyDown={(e) => e.key === "Enter" && send()}
                         />
-                        <Button size="icon" onClick={send} className="shrink-0 bg-primary">
+                        <Button
+                          size="icon"
+                          onClick={send}
+                          variant="default"
+                          className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90"
+                        >
                           <Send className="h-4 w-4" />
                         </Button>
                       </div>
@@ -242,7 +302,7 @@ export function PortalChatWidget({ access }: { access: CompanyPortalAccess }) {
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="mt-2 h-8 w-full gap-1.5 text-xs"
+                          className="mt-2 h-8 w-full gap-1.5 text-xs text-muted-foreground hover:text-foreground"
                           onClick={() => convertToTicket(session.id)}
                         >
                           <Ticket className="h-3.5 w-3.5" /> Convert to ticket
@@ -254,24 +314,42 @@ export function PortalChatWidget({ access }: { access: CompanyPortalAccess }) {
               </>
             )}
           </motion.div>
-        ) : null}
-      </AnimatePresence>
-
-      <motion.button
-        type="button"
-        animate={{ scale: [1, 1.04, 1] }}
-        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-        onClick={() => setOpen((v) => !v)}
-        className={cn(
-          "fixed bottom-20 right-3 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg md:bottom-6 md:right-6",
+        ) : embedded ? (
+          <motion.button
+            key="fab"
+            type="button"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.18, ease: EASE }}
+            onClick={() => setOpen(true)}
+            className="relative flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md transition-opacity hover:opacity-90"
+            aria-label="Open chat"
+          >
+            <MessageCircle className="h-5 w-5" />
+            {unread ? (
+              <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-background bg-destructive" />
+            ) : null}
+          </motion.button>
+        ) : (
+          <motion.button
+            key="fab"
+            type="button"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.18, ease: EASE }}
+            onClick={() => setOpen(true)}
+            className="relative flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg"
+            aria-label="Open chat"
+          >
+            <MessageCircle className="h-6 w-6" />
+            {unread ? (
+              <span className="absolute right-1 top-1 h-3 w-3 rounded-full border-2 border-background bg-destructive" />
+            ) : null}
+          </motion.button>
         )}
-        aria-label="Open chat"
-      >
-        <MessageCircle className="h-6 w-6" />
-        {unread && !open ? (
-          <span className="absolute right-1 top-1 h-3 w-3 rounded-full border-2 border-background bg-destructive" />
-        ) : null}
-      </motion.button>
-    </>
+      </AnimatePresence>
+    </div>
   );
 }

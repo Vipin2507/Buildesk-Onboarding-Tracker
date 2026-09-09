@@ -289,3 +289,97 @@
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-soft);
 }
+
+/* Iframe embed — match external CRM shell (white bar, slate text) */
+html.portal-embed-active,
+html.portal-embed-active body {
+  background-color: var(--portal-embed-bg, #ffffff);
+  color: var(--portal-embed-fg, #334155);
+}
+
+.portal-embedded {
+  --background: var(--portal-embed-bg, #ffffff);
+  --foreground: var(--portal-embed-fg, #334155);
+  --card: var(--portal-embed-bg, #ffffff);
+  --card-foreground: var(--portal-embed-fg, #334155);
+  --muted: #f8f9fa;
+  --muted-foreground: var(--portal-embed-muted, #64748b);
+  --border: var(--portal-embed-border, #e5e7eb);
+  --input: var(--portal-embed-border, #e5e7eb);
+  --shadow-soft-value: none;
+
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.portal-embedded .portal-page-title {
+  color: var(--foreground);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.portal-embedded .portal-embed-nav {
+  background-color: var(--background);
+  border-bottom: 1px solid var(--border);
+}
+
+.portal-embedded .portal-embed-tab {
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  padding: 0.5rem 0.25rem;
+  margin-bottom: -1px;
+}
+
+.portal-embedded .portal-embed-tab:hover {
+  background: transparent;
+  color: var(--foreground);
+}
+
+.portal-embedded .portal-embed-tab[data-active="true"] {
+  background: transparent;
+  border-bottom: 2px solid var(--primary);
+  color: var(--foreground);
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.portal-embedded .card-soft {
+  border-radius: 0.5rem;
+  box-shadow: none;
+  border-color: var(--border);
+}
+
+.portal-embedded .portal-kpi-chip {
+  border-color: var(--border);
+  box-shadow: none;
+  background: var(--card);
+}
+
+.portal-embedded .portal-kpi-chip[data-active="true"] {
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+  background: color-mix(in srgb, var(--primary) 4%, var(--card));
+  box-shadow: none;
+}
+
+.portal-embedded .portal-chat-widget input {
+  border-color: var(--border);
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 13px;
+}
+
+.portal-embedded .portal-chat-widget input::placeholder {
+  color: var(--muted-foreground);
+}

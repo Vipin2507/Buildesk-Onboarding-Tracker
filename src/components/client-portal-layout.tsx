@@ -13,7 +13,11 @@ import {
 import { useEffect, useState } from "react";
 
 import { TICKET_EASE } from "@/components/design-ticket/design-ticket-shared";
-import { PortalEmbedProvider, usePortalEmbedMode } from "@/components/portal-embed-context";
+import {
+  PortalEmbedProvider,
+  usePortalEmbedMode,
+  usePortalEmbedThemeStyle,
+} from "@/components/portal-embed-context";
 import { useTheme } from "@/components/theme-provider";
 import { ThemeToggleCompact } from "@/components/theme-toggle";
 import {
@@ -99,15 +103,11 @@ function PortalNavLink({
       to={route.to}
       params={route.params}
       onClick={onNavigate}
+      data-active={embedded && active ? "true" : undefined}
       className={cn(
         "relative flex shrink-0 items-center transition-colors duration-200",
         embedded
-          ? cn(
-              "rounded-md px-2.5 py-1.5 text-xs font-medium",
-              active
-                ? "border border-primary/40 bg-primary/5 text-foreground ring-1 ring-primary/20"
-                : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-            )
+          ? "portal-embed-tab inline-flex items-center gap-1.5 whitespace-nowrap"
           : cn(
               "gap-2.5 rounded-lg transition-all duration-300",
               compact
@@ -139,6 +139,7 @@ function PortalNavLink({
 function ClientPortalLayoutInner({ access }: { access: CompanyPortalAccess }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const embedded = usePortalEmbedMode();
+  const themeStyle = usePortalEmbedThemeStyle();
   const { setMode } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const base = `/portal/${access.slug}`;
@@ -177,29 +178,24 @@ function ClientPortalLayoutInner({ access }: { access: CompanyPortalAccess }) {
   if (embedded) {
     return (
       <div
-        className={cn(
-          "portal-embedded flex min-h-full flex-col bg-background text-foreground",
-          "[&_.card-soft]:rounded-lg [&_.card-soft]:shadow-sm",
-        )}
+        style={themeStyle}
+        className="portal-embedded flex min-h-full flex-col bg-background text-foreground"
       >
         <PortalDesignTicketBootstrap access={access} />
         <PortalChatBootstrap access={access} />
         <PortalChatWidget access={access} />
 
-        <nav
-          aria-label="Support portal"
-          className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur"
-        >
-          <div className="flex items-center gap-2 px-3 py-2 sm:px-4 lg:px-5">
+        <nav aria-label="Support portal" className="portal-embed-nav sticky top-0 z-20">
+          <div className="flex items-center gap-3 px-4 py-0 sm:px-5">
             <button
               type="button"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-card sm:hidden"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground sm:hidden"
               aria-label="Open menu"
               onClick={() => setMenuOpen(true)}
             >
               <Menu className="h-4 w-4" />
             </button>
-            <div className="hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto sm:flex">
+            <div className="hidden min-w-0 flex-1 items-center gap-4 overflow-x-auto sm:flex">
               {navLinks}
             </div>
           </div>

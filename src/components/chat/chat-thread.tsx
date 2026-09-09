@@ -26,7 +26,15 @@ function ChatMessageBody({ text }: { text: string }) {
   );
 }
 
-export function ChatThread({ messages, className }: { messages: ChatMessage[]; className?: string }) {
+export function ChatThread({
+  messages,
+  className,
+  embedded = false,
+}: {
+  messages: ChatMessage[];
+  className?: string;
+  embedded?: boolean;
+}) {
   return (
     <div className={cn("space-y-3", className)}>
       {messages.map((m, i) => {
@@ -44,7 +52,13 @@ export function ChatThread({ messages, className }: { messages: ChatMessage[]; c
             <div
               className={cn(
                 "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-                isCustomer ? "bg-primary/15 text-primary" : isBot ? "bg-muted text-muted-foreground" : "bg-info/15 text-info",
+                embedded
+                  ? "bg-muted text-muted-foreground"
+                  : isCustomer
+                    ? "bg-primary/15 text-primary"
+                    : isBot
+                      ? "bg-muted text-muted-foreground"
+                      : "bg-info/15 text-info",
               )}
             >
               <Icon className="h-4 w-4" />
@@ -55,10 +69,17 @@ export function ChatThread({ messages, className }: { messages: ChatMessage[]; c
               </div>
               <div
                 className={cn(
-                  "inline-block rounded-2xl px-3 py-2 text-sm leading-relaxed",
-                  isCustomer
-                    ? "rounded-tr-md bg-primary text-primary-foreground"
-                    : "rounded-tl-md border bg-card",
+                  "inline-block rounded-lg px-3 py-2 text-[13px] leading-relaxed",
+                  embedded
+                    ? isCustomer
+                      ? "rounded-tr-sm border border-border bg-muted/60 text-foreground"
+                      : "rounded-tl-sm border border-border bg-card text-foreground"
+                    : cn(
+                        "rounded-2xl text-sm",
+                        isCustomer
+                          ? "rounded-tr-md bg-primary text-primary-foreground"
+                          : "rounded-tl-md border bg-card",
+                      ),
                 )}
               >
                 <ChatMessageBody text={m.text} />
