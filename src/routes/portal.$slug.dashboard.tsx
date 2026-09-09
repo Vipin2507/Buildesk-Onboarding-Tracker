@@ -9,6 +9,7 @@ import {
   PortalContentStatStrip,
   PortalPageWrap,
   ticketSectionVariants,
+  type PortalContentStatItem,
 } from "@/components/design-ticket/design-ticket-shared";
 import {
   PortalActiveTicketsTable,
@@ -69,54 +70,48 @@ function PortalDashboard() {
   const pendingCount = stats.open + stats.inProgress;
   const recentBookings = bookings.slice(0, 8);
 
-  const statItems = useMemo(
-    () => [
+  const statItems = useMemo((): PortalContentStatItem[] => {
+    const goTickets = (filter: "pending" | "open" | "in-progress") => {
+      void navigate({
+        to: "/portal/$slug/tickets",
+        params: { slug },
+        search: { filter },
+      });
+    };
+
+    return [
       {
         id: "pending",
         label: "Pending",
         value: pendingCount,
-        valueTone: "neutral" as const,
-        onClick: () =>
-          void navigate({
-            to: "/portal/$slug/tickets",
-            params: { slug },
-            search: { filter: "pending" },
-          }),
+        valueTone: "neutral",
+        onClick: () => goTickets("pending"),
       },
       {
         id: "open",
         label: "Open",
         value: stats.open,
-        valueTone: "brand" as const,
-        onClick: () =>
-          void navigate({
-            to: "/portal/$slug/tickets",
-            params: { slug },
-            search: { filter: "open" },
-          }),
+        valueTone: "brand",
+        onClick: () => goTickets("open"),
       },
       {
         id: "in-progress",
         label: "In progress",
         value: stats.inProgress,
-        valueTone: "neutral" as const,
-        onClick: () =>
-          void navigate({
-            to: "/portal/$slug/tickets",
-            params: { slug },
-            search: { filter: "in-progress" },
-          }),
+        valueTone: "neutral",
+        onClick: () => goTickets("in-progress"),
       },
       {
         id: "solved",
         label: "Solved",
         value: stats.resolved + stats.closed,
-        valueTone: "success" as const,
-        onClick: () => void navigate({ to: "/portal/$slug/solved", params: { slug } }),
+        valueTone: "success",
+        onClick: () => {
+          void navigate({ to: "/portal/$slug/solved", params: { slug } });
+        },
       },
-    ],
-    [navigate, slug, pendingCount, stats],
-  );
+    ];
+  }, [navigate, slug, pendingCount, stats]);
 
   function openTicket(ticketId: string) {
     void navigate({
