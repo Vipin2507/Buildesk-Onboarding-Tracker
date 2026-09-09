@@ -323,10 +323,10 @@ export function PortalChatWidget({ access }: { access: CompanyPortalAccess }) {
             exit={{ opacity: 0, scale: 0.9 }}
             transition={{ duration: 0.18, ease: EASE }}
             onClick={() => setOpen(true)}
-            className="relative flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md transition-opacity hover:opacity-90"
+            className="portal-chat-fab relative flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md transition-opacity hover:opacity-90"
             aria-label="Open chat"
           >
-            <MessageCircle className="h-5 w-5" />
+            <MessageCircle className="portal-icon-lg" />
             {unread ? (
               <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-background bg-destructive" />
             ) : null}
@@ -340,10 +340,10 @@ export function PortalChatWidget({ access }: { access: CompanyPortalAccess }) {
             exit={{ opacity: 0, scale: 0.9 }}
             transition={{ duration: 0.18, ease: EASE }}
             onClick={() => setOpen(true)}
-            className="relative flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg"
+            className="portal-chat-fab relative flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg"
             aria-label="Open chat"
           >
-            <MessageCircle className="h-6 w-6" />
+            <MessageCircle className="portal-icon-lg" />
             {unread ? (
               <span className="absolute right-1 top-1 h-3 w-3 rounded-full border-2 border-background bg-destructive" />
             ) : null}

@@ -108,7 +108,7 @@ function PortalNavLink({
       className={cn(
         "relative flex shrink-0 items-center transition-colors duration-200",
         embedded
-          ? "portal-embed-tab inline-flex items-center gap-1.5 whitespace-nowrap"
+          ? "portal-embed-tab inline-flex items-center gap-2 whitespace-nowrap"
           : cn(
               "gap-2.5 rounded-lg transition-all duration-300",
               compact
@@ -131,7 +131,7 @@ function PortalNavLink({
           transition={{ type: "spring", stiffness: 380, damping: 30 }}
         />
       ) : null}
-      <Icon className={cn("shrink-0", embedded ? "mr-1.5 h-3.5 w-3.5" : compact ? "h-5 w-5" : "h-4 w-4")} />
+      <Icon className={cn("portal-icon-md shrink-0", embedded && "mr-2")} />
       <span className={compact && !embedded ? "max-w-[4.5rem] truncate" : undefined}>{label}</span>
     </Link>
   );
@@ -194,7 +194,7 @@ function ClientPortalLayoutInner({ access }: { access: CompanyPortalAccess }) {
               aria-label="Open menu"
               onClick={() => setMenuOpen(true)}
             >
-              <Menu className="h-4 w-4" />
+              <Menu className="portal-icon-sm" />
             </button>
             <div className="hidden min-w-0 flex-1 items-center gap-4 overflow-x-auto sm:flex">
               {navLinks}
@@ -271,7 +271,7 @@ function ClientPortalLayoutInner({ access }: { access: CompanyPortalAccess }) {
             aria-label="Open menu"
             onClick={() => setMenuOpen(true)}
           >
-            <Menu className="h-4 w-4" />
+            <Menu className="portal-icon-sm" />
           </button>
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-semibold">{access.companyName}</div>

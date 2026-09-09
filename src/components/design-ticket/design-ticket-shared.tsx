@@ -301,7 +301,7 @@ export function DesignTicketInfoBanner({
         transition={{ duration: 0.35, delay: 0.1, ease: TICKET_EASE }}
         className="portal-info-banner"
       >
-        <MessageCircle className="portal-info-banner-icon h-4 w-4" aria-hidden />
+        <MessageCircle className="portal-info-banner-icon" aria-hidden />
         <div>{children}</div>
       </motion.div>
     );
