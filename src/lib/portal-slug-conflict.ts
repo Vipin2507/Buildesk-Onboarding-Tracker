@@ -27,7 +27,7 @@ export function resolvePortalSlugOwner(
   portals: CompanyPortalAccess[],
   companyId: string,
   fallbackName?: string,
-  getAccount?: (id: string) => { name: string; userId?: string } | undefined,
+  getAccount?: (id: string) => { name: string; userId?: string | null } | undefined,
 ): PortalSlugOwner {
   const portal = portals.find((p) => p.companyId === companyId);
   const account = getAccount?.(companyId);
@@ -37,7 +37,7 @@ export function resolvePortalSlugOwner(
   return {
     companyId,
     companyName,
-    clientId: account?.userId,
+    clientId: account?.userId ?? undefined,
   };
 }
 
