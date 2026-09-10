@@ -1,8 +1,9 @@
-import type { ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
 
 import { DatePickerField } from "@/components/date-picker-field";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Command,
   CommandEmpty,
@@ -176,6 +177,140 @@ export function DesignTicketSearchableSelect({
             ))}
           </CommandList>
         </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function multiSelectSummaryLabel(
+  values: string[],
+  options: DesignTicketSelectOption[],
+  placeholder: string,
+) {
+  if (values.length === 0) return placeholder;
+  if (values.length === 1) {
+    return options.find((option) => option.value === values[0])?.label ?? values[0];
+  }
+  return `${values.length} selected`;
+}
+
+/** Multi-select popover for filter toolbars (checkbox list, stays open while selecting). */
+export function DesignTicketMultiSelect({
+  id,
+  values,
+  onChange,
+  options,
+  placeholder = "All",
+  searchPlaceholder = "Search…",
+  emptyLabel = "No results found",
+  className,
+  disabled,
+  compact,
+}: {
+  id?: string;
+  values: string[];
+  onChange: (values: string[]) => void;
+  options: DesignTicketSelectOption[];
+  placeholder?: string;
+  searchPlaceholder?: string;
+  emptyLabel?: string;
+  className?: string;
+  disabled?: boolean;
+  compact?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+
+  const filteredOptions = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter(
+      (option) =>
+        option.label.toLowerCase().includes(q) || option.value.toLowerCase().includes(q),
+    );
+  }, [options, query]);
+
+  function toggle(value: string) {
+    if (values.includes(value)) {
+      onChange(values.filter((item) => item !== value));
+      return;
+    }
+    onChange([...values, value]);
+  }
+
+  const summary = multiSelectSummaryLabel(values, options, placeholder);
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setQuery("");
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          id={id}
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          disabled={disabled}
+          className={cn(
+            compact ? ticketFieldControlCompact : ticketFieldControl,
+            "w-full justify-between font-normal hover:bg-card dark:hover:bg-muted/40",
+            values.length === 0 && "text-muted-foreground",
+            className,
+          )}
+        >
+          <span className="truncate">{summary}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder={searchPlaceholder}
+            value={query}
+            onValueChange={setQuery}
+          />
+          <CommandList className="max-h-[min(16rem,70vh)]">
+            {filteredOptions.length === 0 ? <CommandEmpty>{emptyLabel}</CommandEmpty> : null}
+            {filteredOptions.map((option) => {
+              const checked = values.includes(option.value);
+              return (
+                <CommandItem
+                  key={option.value}
+                  value={option.label}
+                  onSelect={() => toggle(option.value)}
+                  className="gap-2"
+                >
+                  <Checkbox
+                    checked={checked}
+                    tabIndex={-1}
+                    aria-hidden
+                    className="pointer-events-none"
+                  />
+                  <span className="truncate">{option.label}</span>
+                  {checked ? <Check className="ml-auto h-4 w-4 shrink-0 text-primary" /> : null}
+                </CommandItem>
+              );
+            })}
+          </CommandList>
+        </Command>
+        {values.length > 0 ? (
+          <div className="border-t border-border p-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 w-full justify-center text-xs"
+              onClick={() => onChange([])}
+            >
+              Clear selection
+            </Button>
+          </div>
+        ) : null}
       </PopoverContent>
     </Popover>
   );

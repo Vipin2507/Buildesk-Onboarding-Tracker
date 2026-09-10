@@ -33,6 +33,7 @@ import {
 import {
   DesignTicketDateField,
   DesignTicketFilterField,
+  DesignTicketMultiSelect,
   DesignTicketSelect,
 } from "@/components/design-ticket/design-ticket-fields";
 import { DesignTicketFilterBar } from "@/components/design-ticket/design-ticket-shared";
@@ -89,6 +90,7 @@ const ACCOUNT_LIST_FILTER_DEFAULTS: {
   healthFilter: string;
   stageFilter: string;
   providerFilter: string;
+  moduleFilter: string;
   dateFrom: string;
   dateTo: string;
   tableSearch: string;
@@ -105,10 +107,16 @@ const ACCOUNT_LIST_FILTER_DEFAULTS: {
   healthFilter: "all",
   stageFilter: "all",
   providerFilter: "all",
+  moduleFilter: "",
   dateFrom: "",
   dateTo: "",
   tableSearch: "",
 };
+
+function parseModuleFilterKeys(value: string): string[] {
+  if (!value.trim()) return [];
+  return [...new Set(value.split(",").map((item) => item.trim()).filter(Boolean))];
+}
 
 const STATUS_CHIPS = [
   { id: "all", label: "All", status: null as CrmAccount["status"] | null },
@@ -176,6 +184,7 @@ type AccountListFilters = {
   healthFilter: string;
   stageFilter: string;
   providerFilter: string;
+  moduleFilter: string;
   progressFilter: string;
   dateFrom: string;
   dateTo: string;
@@ -219,6 +228,13 @@ function matchesAccountListFilters(row: CrmAccountRow, f: AccountListFilters) {
     f.providerFilter !== "all" &&
     f.providerFilter !== "none" &&
     !row.providers.includes(f.providerFilter)
+  ) {
+    return false;
+  }
+  const moduleFilterKeys = parseModuleFilterKeys(f.moduleFilter);
+  if (
+    moduleFilterKeys.length > 0 &&
+    !moduleFilterKeys.some((key) => row.enabledModuleKeys.includes(key))
   ) {
     return false;
   }
@@ -271,10 +287,13 @@ function CrmAccountsPage() {
     healthFilter,
     stageFilter,
     providerFilter,
+    moduleFilter,
     dateFrom,
     dateTo,
     tableSearch,
   } = listFilters;
+
+  const moduleFilterKeys = useMemo(() => parseModuleFilterKeys(moduleFilter), [moduleFilter]);
 
   const setKpiFilter = useCallback(
     (value: AccountKpiFilter) => setListFilters({ kpiFilter: value }),
@@ -322,6 +341,10 @@ function CrmAccountsPage() {
   );
   const setProviderFilter = useCallback(
     (value: string) => setListFilters({ providerFilter: value }),
+    [setListFilters],
+  );
+  const setModuleFilterKeys = useCallback(
+    (keys: string[]) => setListFilters({ moduleFilter: keys.join(",") }),
     [setListFilters],
   );
   const setDateFrom = useCallback(
@@ -427,6 +450,15 @@ function CrmAccountsPage() {
     return [...set].sort((a, b) => a.localeCompare(b));
   }, [rows]);
 
+  const moduleOptions = useMemo(
+    () =>
+      getCrmMasterProductModuleCatalog().map((module) => ({
+        value: module.key,
+        label: module.label,
+      })),
+    [],
+  );
+
   const toolbarFilters = useMemo(
     () => ({
       typeFilter,
@@ -438,6 +470,7 @@ function CrmAccountsPage() {
       healthFilter,
       stageFilter,
       providerFilter,
+      moduleFilter,
       progressFilter,
       dateFrom,
       dateTo,
@@ -452,6 +485,7 @@ function CrmAccountsPage() {
       healthFilter,
       stageFilter,
       providerFilter,
+      moduleFilter,
       progressFilter,
       dateFrom,
       dateTo,
@@ -534,6 +568,7 @@ function CrmAccountsPage() {
     healthFilter !== "all",
     stageFilter !== "all",
     providerFilter !== "all",
+    moduleFilterKeys.length > 0,
     Boolean(dateFrom),
     Boolean(dateTo),
     kpiFilter !== "all",
@@ -841,6 +876,16 @@ function CrmAccountsPage() {
               { value: "all", label: "All types" },
               ...COMPANY_TYPES.map((t) => ({ value: t, label: t })),
             ]}
+          />
+        </DesignTicketFilterField>
+        <DesignTicketFilterField label="Module" compact>
+          <DesignTicketMultiSelect
+            compact
+            values={moduleFilterKeys}
+            onChange={setModuleFilterKeys}
+            placeholder="All modules"
+            searchPlaceholder="Search modules…"
+            options={moduleOptions}
           />
         </DesignTicketFilterField>
         <DesignTicketFilterField label="Health" compact>
