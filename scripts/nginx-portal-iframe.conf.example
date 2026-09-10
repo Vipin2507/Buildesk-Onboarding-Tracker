@@ -1,6 +1,22 @@
 # Hostinger / nginx: allow client portal pages to load inside external iframes.
-# Without this, nginx may add `X-Frame-Options: SAMEORIGIN`, which blocks embedding
-# on other domains (e.g. a client's website or ERP).
+#
+# Symptom in browser console:
+#   Refused to display 'https://track.example.com/...' in a frame because it set
+#   'X-Frame-Options' to 'sameorigin'.
+#
+# Why it works on some machines but not others:
+#   - Local dev (no nginx) → Node strips X-Frame-Options → works
+#   - VPS with Hostinger default security headers → SAMEORIGIN added → blocked
+#   - VPS with this config applied → works
+#
+# Also disable Hostinger hPanel → Security → "HTTP Security Headers" if it forces
+# X-Frame-Options on every response.
+#
+# Iframe src must be a /portal/ URL, not the site root:
+#   https://track.cravingcodetech.in/portal/{slug}/dashboard?embed=1
+#
+# Verify after deploy:
+#   bash scripts/verify-portal-iframe-headers.sh https://track.cravingcodetech.in {slug}
 #
 # Add inside your site's server { } block for track.cravingcodetech.in:
 
@@ -12,9 +28,19 @@ location ^~ /portal/ {
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
 
+    # Strip SAMEORIGIN from upstream AND from nginx defaults, then allow embed.
     proxy_hide_header X-Frame-Options;
     add_header Content-Security-Policy "frame-ancestors *" always;
 }
+
+# If your main location / also proxies to Node, hide X-Frame-Options there too so
+# nginx does not stack SAMEORIGIN on top of the app response:
+#
+# location / {
+#     proxy_pass http://127.0.0.1:3000;
+#     ...
+#     proxy_hide_header X-Frame-Options;
+# }
 
 # Optional: restrict embedding to specific parent sites instead of *:
 # add_header Content-Security-Policy "frame-ancestors 'self' https://client.example.com" always;

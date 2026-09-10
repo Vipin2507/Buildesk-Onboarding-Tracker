@@ -23,6 +23,7 @@ import {
   portalCreatePath,
   portalDashboardPath,
   portalPublicCreateUrl,
+  portalPublicDashboardEmbedUrl,
   portalPublicDashboardUrl,
   normalizePortalSlug,
 } from "@/lib/design-ticket-portal";
@@ -65,6 +66,7 @@ export function CrmAccountPortalPanel({ accountId }: { accountId: string }) {
 
   const publicUrl = portal ? portalPublicCreateUrl(portal.slug) : "";
   const previewUrl = portal ? portalPublicDashboardUrl(portal.slug) : "";
+  const embedUrl = portal ? portalPublicDashboardEmbedUrl(portal.slug) : "";
   const slugPreview = apiKeyDraft.trim() ? normalizePortalSlug(apiKeyDraft) : "";
 
   const enriched = useMemo(
@@ -72,11 +74,15 @@ export function CrmAccountPortalPanel({ accountId }: { accountId: string }) {
     [tickets],
   );
 
-  async function copyLink(inputEl?: HTMLInputElement | null) {
-    if (!publicUrl) return;
-    const ok = await copyTextToClipboard(publicUrl);
+  async function copyLink(
+    url: string,
+    label: string,
+    inputEl?: HTMLInputElement | null,
+  ) {
+    if (!url) return;
+    const ok = await copyTextToClipboard(url);
     if (ok) {
-      toast.success("CRM portal link copied");
+      toast.success(`${label} copied`);
       return;
     }
     if (inputEl) selectInputText(inputEl);
@@ -127,7 +133,11 @@ export function CrmAccountPortalPanel({ accountId }: { accountId: string }) {
               className="h-8 gap-1 text-xs"
               onClick={(e) => {
                 const input = e.currentTarget.closest(".card-soft")?.querySelector("input");
-                void copyLink(input instanceof HTMLInputElement ? input : null);
+                void copyLink(
+                  publicUrl,
+                  "CRM portal link",
+                  input instanceof HTMLInputElement ? input : null,
+                );
               }}
             >
               <Copy className="h-3.5 w-3.5" />
@@ -158,6 +168,50 @@ export function CrmAccountPortalPanel({ accountId }: { accountId: string }) {
           </span>
           . Update <code className="rounded bg-muted px-1">VITE_PORTAL_BASE_URL</code> if the host
           changes.
+        </p>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: TICKET_EASE, delay: 0.03 }}
+        className="card-soft space-y-2 p-3"
+      >
+        <div className="text-xs font-semibold">Website iframe embed</div>
+        <p className="text-[10px] text-muted-foreground">
+          Use this URL as the iframe <code className="rounded bg-muted px-1">src</code> on a client
+          website. Do not use the site root — it must include{" "}
+          <code className="rounded bg-muted px-1">/portal/{portal.slug}/dashboard</code>.
+        </p>
+        <div className="flex flex-col gap-1.5 sm:flex-row">
+          <Input
+            readOnly
+            value={embedUrl}
+            className="h-8 font-mono text-xs"
+            onFocus={(e) => selectInputText(e.currentTarget)}
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-8 shrink-0 gap-1 text-xs"
+            onClick={(e) => {
+              const input = e.currentTarget.closest(".card-soft")?.querySelector("input");
+              void copyLink(
+                embedUrl,
+                "Iframe embed URL",
+                input instanceof HTMLInputElement ? input : null,
+              );
+            }}
+          >
+            <Copy className="h-3.5 w-3.5" />
+            Copy embed URL
+          </Button>
+        </div>
+        <p className="text-[10px] text-muted-foreground">
+          If embedding fails with <span className="font-mono">X-Frame-Options: sameorigin</span>,
+          apply <code className="rounded bg-muted px-1">scripts/nginx-portal-iframe.conf.example</code>{" "}
+          on the VPS and disable Hostinger security headers that force SAMEORIGIN.
         </p>
       </motion.div>
 
