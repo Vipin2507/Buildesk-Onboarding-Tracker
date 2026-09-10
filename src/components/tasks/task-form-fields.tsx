@@ -53,6 +53,7 @@ type Props = {
   markCompleteOnCreate?: boolean;
   onMarkCompleteOnCreateChange?: (checked: boolean) => void;
   productScope?: TaskProductScope;
+  internalMeeting?: boolean;
 };
 
 const fieldClass = cn(ticketFieldClass, "h-8 text-xs");
@@ -163,11 +164,33 @@ export function useTaskFormState(props: Props) {
 
   async function validateSchedule(): Promise<boolean> {
     const allowPast = allowPastSchedule(props);
+    const isCreate = !props.editing;
+
+    if (isCreate) {
+      if (!dueDate.trim()) {
+        toast.error("Due date is required");
+        return false;
+      }
+      if (!startTime.trim()) {
+        toast.error("Start time is required");
+        return false;
+      }
+      if (!endTime.trim()) {
+        toast.error("End time is required");
+        return false;
+      }
+    }
+
+    if (!isCreate && !dueDate && !startTime && !endTime) return true;
+
     if (!props.editing && !allowPast && dueDate && isPastDateYmd(dueDate)) {
       toast.error("Due date cannot be in the past");
       return false;
     }
-    if (!taskType || !dueDate || !startTime) return true;
+    if (!dueDate || !startTime) {
+      if (isCreate) return false;
+      return true;
+    }
     const todayMin = !props.editing && !allowPast ? minSelectableTimeForDate(dueDate) : undefined;
     if (todayMin && isTimeBeforeMin(startTime, todayMin)) {
       toast.error("Start time cannot be in the past");
@@ -191,7 +214,7 @@ export function useTaskFormState(props: Props) {
       return false;
     }
     if (assigneeUserIds.length === 0) {
-      toast.error("Assign at least one user for a scheduled task");
+      toast.error(isCreate ? "Assign at least one user" : "Assign at least one user for a scheduled task");
       return false;
     }
     try {
@@ -213,7 +236,8 @@ export function useTaskFormState(props: Props) {
         return false;
       }
     } catch {
-      /* server validates on save */
+      toast.error("Could not verify assignee availability — try again");
+      return false;
     }
     return true;
   }
@@ -290,11 +314,12 @@ export function TaskFormFields(props: Props & ReturnType<typeof useTaskFormState
     editing,
     markCompleteOnCreate,
     onMarkCompleteOnCreateChange,
+    internalMeeting,
   } = props;
 
-  const scheduled = Boolean(taskType);
   const readOnlyBooking = editing?.source === "booking";
   const showMarkCompleteOnCreate = !editing && Boolean(onMarkCompleteOnCreateChange);
+  const scheduleRequired = !editing;
   const allowPast = allowPastSchedule({ editing, markCompleteOnCreate });
   const blockPastSchedule = !editing && !allowPast;
   const startTimeMin = blockPastSchedule && dueDate ? minSelectableTimeForDate(dueDate) : undefined;
@@ -365,7 +390,8 @@ export function TaskFormFields(props: Props & ReturnType<typeof useTaskFormState
       </label>
 
       <label className="block text-xs font-medium">
-        Due date / scheduled date
+        Due date
+        {scheduleRequired ? <span className="text-destructive"> *</span> : null}
         <div className="mt-1">
           <DatePickerField
             value={dueDate}
@@ -379,58 +405,68 @@ export function TaskFormFields(props: Props & ReturnType<typeof useTaskFormState
         </div>
       </label>
 
-      {scheduled ? (
-        <div className="space-y-3 rounded-lg border bg-muted/10 p-3">
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block text-xs font-medium">
-              Start time
-              <div className="mt-1">
-                <TimePickerField
-                  value={startTime}
-                  onChange={onStartTimeChange}
-                  min={startTimeMin}
-                  modal
-                  compact
-                  disabled={readOnlyBooking}
-                />
-              </div>
-            </label>
-            <label className="block text-xs font-medium">
-              End time
-              <div className="mt-1">
-                <TimePickerField
-                  value={endTime}
-                  onChange={onEndTimeChange}
-                  min={endTimeMin}
-                  modal
-                  compact
-                  disabled={readOnlyBooking}
-                />
-              </div>
-            </label>
-          </div>
+      <div className="space-y-3 rounded-lg border bg-muted/10 p-3">
+        <div className="grid grid-cols-2 gap-3">
           <label className="block text-xs font-medium">
-            Duration ({durationMinutes} mins)
-            <input
-              type="range"
-              min={5}
-              max={240}
-              step={5}
-              className="mt-2 w-full accent-primary"
-              value={durationMinutes}
-              onChange={(e) => onDurationChange(Number(e.target.value))}
-              disabled={readOnlyBooking}
-            />
-            <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
-              <span>5m</span>
-              <span>4h</span>
+            Start time
+            {scheduleRequired ? <span className="text-destructive"> *</span> : null}
+            <div className="mt-1">
+              <TimePickerField
+                value={startTime}
+                onChange={onStartTimeChange}
+                min={startTimeMin}
+                modal
+                compact
+                disabled={readOnlyBooking}
+              />
+            </div>
+          </label>
+          <label className="block text-xs font-medium">
+            End time
+            {scheduleRequired ? <span className="text-destructive"> *</span> : null}
+            <div className="mt-1">
+              <TimePickerField
+                value={endTime}
+                onChange={onEndTimeChange}
+                min={endTimeMin}
+                modal
+                compact
+                disabled={readOnlyBooking}
+              />
             </div>
           </label>
         </div>
+        <label className="block text-xs font-medium">
+          Duration ({durationMinutes} mins)
+          <input
+            type="range"
+            min={5}
+            max={240}
+            step={5}
+            className="mt-2 w-full accent-primary"
+            value={durationMinutes}
+            onChange={(e) => onDurationChange(Number(e.target.value))}
+            disabled={readOnlyBooking}
+          />
+          <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
+            <span>5m</span>
+            <span>4h</span>
+          </div>
+        </label>
+      </div>
+
+      {internalMeeting ? (
+        <p className="rounded-lg border border-dashed bg-muted/10 px-3 py-2 text-[11px] text-muted-foreground">
+          Assignees must be free at the selected time. Conflicts with other tasks and meetings
+          are blocked automatically.
+        </p>
       ) : null}
 
       <div>
-        <div className="mb-1 text-xs font-medium">Assignee(s)</div>
+        <div className="mb-1 text-xs font-medium">
+          Assignee(s)
+          {scheduleRequired ? <span className="text-destructive"> *</span> : null}
+        </div>
         <MultiAssigneeSelect
           users={users}
           value={assigneeUserIds}

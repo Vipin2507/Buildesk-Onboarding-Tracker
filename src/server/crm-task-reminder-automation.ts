@@ -343,10 +343,12 @@ export async function processTaskReminderAutomations(
     const startsAt = task.startsAt!.slice(0, 19);
     if (now >= startsAt) continue;
 
-    const account =
-      db.select({ name: t.crmAccounts.name }).from(t.crmAccounts).where(eq(t.crmAccounts.id, task.companyId)).get() ??
-      db.select({ name: t.companies.name }).from(t.companies).where(eq(t.companies.id, task.companyId)).get();
-    const accountName = account?.name ?? "CRM account";
+    const accountName = task.isInternal
+      ? "Internal meeting"
+      : (
+          db.select({ name: t.crmAccounts.name }).from(t.crmAccounts).where(eq(t.crmAccounts.id, task.companyId)).get() ??
+          db.select({ name: t.companies.name }).from(t.companies).where(eq(t.companies.id, task.companyId)).get()
+        )?.name ?? "CRM account";
 
     const assigneeIds = taskAssigneeIds(row);
     if (assigneeIds.length === 0) continue;

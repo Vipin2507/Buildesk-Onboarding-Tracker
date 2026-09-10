@@ -51,6 +51,7 @@ function taskPayload(task: Partial<FollowUpTask>) {
     assigneeUserIds: task.assigneeUserIds,
     source: task.source,
     bookingAppointmentId: task.bookingAppointmentId,
+    isInternal: task.isInternal,
   };
 }
 

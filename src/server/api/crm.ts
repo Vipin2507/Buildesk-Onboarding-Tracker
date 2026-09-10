@@ -46,7 +46,22 @@ function assertCrmTaskRow(row: typeof t.followUpTasks.$inferSelect) {
   }
 }
 
-function assertCanManageFollowUpTask(user: ReturnType<typeof requireUser>, companyId: string) {
+function assertCanManageInternalFollowUpTask(user: ReturnType<typeof requireUser>) {
+  if (user.role === "Admin") return;
+  const roles = loadServerRoles();
+  if (roleHasPermission(roles, user.role, "manageTasks")) return;
+  throw new ApiError(403, "You do not have permission for this action");
+}
+
+function assertCanManageFollowUpTask(
+  user: ReturnType<typeof requireUser>,
+  companyId: string,
+  isInternal?: boolean,
+) {
+  if (isInternal) {
+    assertCanManageInternalFollowUpTask(user);
+    return;
+  }
   if (user.role === "Admin") return;
 
   const roles = loadServerRoles();
@@ -435,9 +450,16 @@ const taskInput = z.object({
   progressPercent: z.number().int().min(0).max(100).default(0),
   dueDate: z.string().optional().nullable(),
   taskType: z
-    .enum(["on_call_phone", "on_call_gmeet_teams", "offline_site_visit", "offline_office"])
+    .enum([
+      "on_call_phone",
+      "on_call_gmeet_teams",
+      "offline_site_visit",
+      "offline_office",
+      "internal_meeting",
+    ])
     .optional()
     .nullable(),
+  isInternal: z.boolean().optional(),
   startTime: z.string().optional().nullable(),
   endTime: z.string().optional().nullable(),
   durationMinutes: z.number().int().min(1).optional().nullable(),
@@ -448,6 +470,30 @@ const taskInput = z.object({
   bookingAppointmentId: z.string().optional().nullable(),
   skipConflictCheck: z.boolean().optional(),
 });
+
+function resolveAssigneeIdsFromTaskInput(data: {
+  assigneeUserIds?: string[] | null;
+  assigneeUserId?: string | null;
+}): string[] {
+  if (data.assigneeUserIds?.length) return data.assigneeUserIds;
+  if (data.assigneeUserId) return [data.assigneeUserId];
+  return [];
+}
+
+function assertRequiredCrmTaskSchedule(data: {
+  dueDate?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  assigneeUserIds?: string[] | null;
+  assigneeUserId?: string | null;
+}) {
+  if (!data.dueDate?.trim()) throw new ApiError(400, "Due date is required");
+  if (!data.startTime?.trim()) throw new ApiError(400, "Start time is required");
+  if (!data.endTime?.trim()) throw new ApiError(400, "End time is required");
+  if (resolveAssigneeIdsFromTaskInput(data).length === 0) {
+    throw new ApiError(400, "Assign at least one user");
+  }
+}
 
 function assertNoScheduleConflicts(input: {
   userIds: string[];
@@ -466,15 +512,45 @@ function assertNoScheduleConflicts(input: {
   }
 }
 
+function assertCrmAssigneeAvailability(input: {
+  startsAt: string | null;
+  endsAt: string | null;
+  assigneeUserIds: string[];
+  excludeTaskId?: string;
+  excludeBookingId?: string;
+  skipConflictCheck?: boolean;
+}) {
+  if (input.skipConflictCheck) return;
+  if (!input.startsAt || !input.endsAt) {
+    throw new ApiError(400, "A valid schedule is required");
+  }
+  if (input.assigneeUserIds.length === 0) {
+    throw new ApiError(400, "Assign at least one user");
+  }
+  assertNoScheduleConflicts({
+    userIds: input.assigneeUserIds,
+    startsAt: input.startsAt,
+    endsAt: input.endsAt,
+    excludeTaskId: input.excludeTaskId,
+    excludeBookingId: input.excludeBookingId,
+  });
+}
+
 export const createFollowUpTask = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => taskInput.parse(data))
   .handler(async ({ data }) => {
     const user = requireUser();
-    assertCanManageFollowUpTask(user, data.companyId);
+    const isInternal = Boolean(data.isInternal);
+    const companyId = isInternal ? "__crm_internal__" : data.companyId;
+    assertCanManageFollowUpTask(user, companyId, isInternal);
     const db = getDb();
     const id = data.id ?? newId();
     const now = nowIso();
     const completedAt = data.status === "completed" ? now : null;
+
+    if (data.source !== "booking") {
+      assertRequiredCrmTaskSchedule(data);
+    }
 
     let schedule;
     try {
@@ -489,22 +565,13 @@ export const createFollowUpTask = createServerFn({ method: "POST" })
       throw new ApiError(400, "End time must be after start time");
     }
 
-    if (data.taskType && schedule.startsAt && schedule.endsAt && !data.skipConflictCheck) {
-      const assigneeIds = data.assigneeUserIds?.length
-        ? data.assigneeUserIds
-        : data.assigneeUserId
-          ? [data.assigneeUserId]
-          : [];
-      if (assigneeIds.length === 0) {
-        throw new ApiError(400, "Assign at least one user for a scheduled task");
-      }
-      assertNoScheduleConflicts({
-        userIds: assigneeIds,
-        startsAt: schedule.startsAt,
-        endsAt: schedule.endsAt,
-        excludeBookingId: data.bookingAppointmentId ?? undefined,
-      });
-    }
+    assertCrmAssigneeAvailability({
+      startsAt: schedule.startsAt,
+      endsAt: schedule.endsAt,
+      assigneeUserIds: resolveAssigneeIdsFromTaskInput(data),
+      excludeBookingId: data.bookingAppointmentId ?? undefined,
+      skipConflictCheck: data.source === "booking" ? data.skipConflictCheck : false,
+    });
 
     const assigneeUserIdsJson = serializeAssigneeIds(
       data.assigneeUserIds ?? undefined,
@@ -518,7 +585,8 @@ export const createFollowUpTask = createServerFn({ method: "POST" })
     db.insert(t.followUpTasks)
       .values({
         id,
-        companyId: data.companyId,
+        companyId,
+        isInternal,
         onboardingProjectId: data.onboardingProjectId ?? null,
         postSalesProjectId: data.postSalesProjectId ?? null,
         sourceVisitId: data.sourceVisitId ?? null,
@@ -546,31 +614,33 @@ export const createFollowUpTask = createServerFn({ method: "POST" })
         updatedAt: now,
       })
       .run();
-    writeCrmEvent({
-      companyId: data.companyId,
-      entityType: "task",
-      taskId: id,
-      eventType: "task_created",
-      actorUserId: user.id,
-      actorName: user.name,
-      newValues: {
-        title: data.title,
-        status: data.status,
-        taskType: data.taskType,
-        dueDate: schedule.dueDate,
-        startTime: schedule.startTime,
-        endTime: schedule.endTime,
-        assigneeUserId: primaryAssignee,
-        assigneeUserIds: data.assigneeUserIds,
-      },
-      dueDate: schedule.dueDate ?? undefined,
-    });
-    logActivity({
-      who: user.name,
-      what: `Created follow-up task: ${data.title}`,
-      kind: "info",
-      companyId: data.companyId,
-    });
+    if (!isInternal) {
+      writeCrmEvent({
+        companyId,
+        entityType: "task",
+        taskId: id,
+        eventType: "task_created",
+        actorUserId: user.id,
+        actorName: user.name,
+        newValues: {
+          title: data.title,
+          status: data.status,
+          taskType: data.taskType,
+          dueDate: schedule.dueDate,
+          startTime: schedule.startTime,
+          endTime: schedule.endTime,
+          assigneeUserId: primaryAssignee,
+          assigneeUserIds: data.assigneeUserIds,
+        },
+        dueDate: schedule.dueDate ?? undefined,
+      });
+      logActivity({
+        who: user.name,
+        what: `Created follow-up task: ${data.title}`,
+        kind: "info",
+        companyId,
+      });
+    }
     const tz = user.timezone || DEFAULT_BOOKING_TIMEZONE;
     processTaskInAppReminders(db, tz);
     void processTaskWebPushReminders(db, tz);
@@ -595,7 +665,7 @@ export const updateFollowUpTask = createServerFn({ method: "POST" })
     const existing = db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, data.id)).get();
     if (!existing) throw new ApiError(404, "Task not found");
     assertCrmTaskRow(existing);
-    assertCanManageFollowUpTask(user, existing.companyId);
+    assertCanManageFollowUpTask(user, existing.companyId, existing.isInternal ?? false);
     const { remark, ...patch } = data.patch;
     const now = nowIso();
     const nextStatus = patch.status ?? existing.status;
@@ -666,22 +736,20 @@ export const updateFollowUpTask = createServerFn({ method: "POST" })
       ? patch.assigneeUserIds
       : primaryAssignee
         ? [primaryAssignee]
-        : [];
+        : JSON.parse(existing.assigneeUserIdsJson || "[]") as string[];
 
     if (
-      taskType &&
       schedule.startsAt &&
       schedule.endsAt &&
-      !patch.skipConflictCheck &&
-      assigneeIdsForConflict.length > 0 &&
       ["open", "in_progress", "blocked"].includes(nextStatus)
     ) {
-      assertNoScheduleConflicts({
-        userIds: assigneeIdsForConflict,
+      assertCrmAssigneeAvailability({
         startsAt: schedule.startsAt,
         endsAt: schedule.endsAt,
+        assigneeUserIds: assigneeIdsForConflict,
         excludeTaskId: data.id,
         excludeBookingId: existing.bookingAppointmentId ?? undefined,
+        skipConflictCheck: patch.skipConflictCheck,
       });
     }
 
@@ -766,7 +834,7 @@ export const completeFollowUpTask = createServerFn({ method: "POST" })
     const existing = db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, data.id)).get();
     if (!existing) throw new ApiError(404, "Task not found");
     assertCrmTaskRow(existing);
-    assertCanManageFollowUpTask(user, existing.companyId);
+    assertCanManageFollowUpTask(user, existing.companyId, existing.isInternal ?? false);
     const now = nowIso();
     const remarkUpdate = data.remark?.trim()
       ? appendTaskRemark(existing.remarksJson, existing.latestRemark, data.remark, {
@@ -841,7 +909,7 @@ export const cancelFollowUpTask = createServerFn({ method: "POST" })
     const existing = db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, data.id)).get();
     if (!existing) throw new ApiError(404, "Task not found");
     assertCrmTaskRow(existing);
-    assertCanManageFollowUpTask(user, existing.companyId);
+    assertCanManageFollowUpTask(user, existing.companyId, existing.isInternal ?? false);
     const now = nowIso();
     const remarkUpdate = data.reason?.trim()
       ? appendTaskRemark(existing.remarksJson, existing.latestRemark, data.reason, {

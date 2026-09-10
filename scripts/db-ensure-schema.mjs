@@ -290,6 +290,11 @@ const EXTRA_COLUMNS = [
   { table: "crm_accounts", name: "installment_count", ddl: "INTEGER" },
   { table: "crm_accounts", name: "installments_json", ddl: "TEXT" },
   { table: "follow_up_tasks", name: "remarks_json", ddl: "TEXT" },
+  {
+    table: "follow_up_tasks",
+    name: "is_internal",
+    ddl: "INTEGER NOT NULL DEFAULT 0",
+  },
   { table: "crm_accounts", name: "status_remarks", ddl: "TEXT" },
   { table: "crm_accounts", name: "gst_percent", ddl: "REAL" },
 ];
@@ -1105,6 +1110,31 @@ if (!tableExists("payment_transactions")) {
     CREATE INDEX IF NOT EXISTS payment_transactions_paid_date_idx ON payment_transactions(paid_date);
   `);
   console.log("+ CREATE TABLE payment_transactions");
+}
+
+if (tableExists("crm_accounts")) {
+  const now = new Date().toISOString();
+  const seeded = sqlite
+    .prepare(
+      `INSERT OR IGNORE INTO crm_accounts (
+        id, name, company_type, contact, phone, email, city, status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      "__crm_internal__",
+      "Internal meetings",
+      "Developer",
+      "Internal",
+      "-",
+      "internal@buildesk.local",
+      "Internal",
+      "active",
+      now,
+      now,
+    );
+  if (seeded.changes > 0) {
+    console.log("crm_accounts: seeded internal task placeholder row");
+  }
 }
 
 sqlite.close();

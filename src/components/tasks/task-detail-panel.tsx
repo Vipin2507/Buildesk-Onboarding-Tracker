@@ -13,6 +13,7 @@ import {
   resolveTaskExtraTimeMinutes,
   taskHasSchedule,
 } from "@/lib/task-scheduling";
+import { isInternalCrmTask } from "@/lib/crm-internal-task";
 import { resolveTaskRemarks } from "@/lib/task-remarks";
 import { taskStatusTone } from "@/hooks/use-task-time-status";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
@@ -108,16 +109,20 @@ export function TaskDetailPanel({
             </MetaItem>
             <MetaItem label="Duration">{formatTaskDurationDisplay(task)}</MetaItem>
             <MetaItem label="Assignee">{assigneeLabels || "—"}</MetaItem>
-            <MetaItem label="Account">
-              <Link
-                to="/crm/accounts/$accountId"
-                params={{ accountId: task.companyId }}
-                search={{ tab: "tasks" }}
-                className="font-medium text-primary hover:underline"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {accountName}
-              </Link>
+            <MetaItem label={isInternalCrmTask(task) ? "Type" : "Account"}>
+              {isInternalCrmTask(task) ? (
+                <span className="font-medium text-foreground">{accountName}</span>
+              ) : (
+                <Link
+                  to="/crm/accounts/$accountId"
+                  params={{ accountId: task.companyId }}
+                  search={{ tab: "tasks" }}
+                  className="font-medium text-primary hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {accountName}
+                </Link>
+              )}
             </MetaItem>
             {task.completedAt ? (
               <MetaItem label="Completed">{formatDateTime(task.completedAt)}</MetaItem>

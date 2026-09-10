@@ -20,7 +20,7 @@ import {
   ticketSectionVariants,
 } from "@/components/design-ticket/design-ticket-shared";
 import { ConfirmDeleteDialog, EntityFormModal } from "@/components/entity-form-modal";
-import { ListToolbar } from "@/components/list-toolbar";
+import { inDateRange, ListToolbar } from "@/components/list-toolbar";
 import { PageWrap } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import {
@@ -132,6 +132,8 @@ export function ErpTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [assigneeFilter, setAssigneeFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -142,6 +144,7 @@ export function ErpTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
       if (assigneeFilter !== "all" && !resolveTaskAssigneeIds(task).includes(assigneeFilter)) {
         return false;
       }
+      if (!inDateRange(task.dueDate, dateFrom, dateTo)) return false;
       if (!q) return true;
       const companyName = companyOptions.find((a) => a.id === task.companyId)?.name ?? "";
       return (
@@ -150,7 +153,7 @@ export function ErpTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
         (task.description ?? "").toLowerCase().includes(q)
       );
     });
-  }, [tabFiltered, query, companyFilter, typeFilter, statusFilter, assigneeFilter, companyOptions]);
+  }, [tabFiltered, query, companyFilter, typeFilter, statusFilter, assigneeFilter, dateFrom, dateTo, companyOptions]);
 
   const selectedTask = selectedTaskId ? erpTasks.find((t) => t.id === selectedTaskId) : undefined;
   const editingCompany = selectedTask
@@ -265,6 +268,8 @@ export function ErpTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
     typeFilter !== "all",
     statusFilter !== "all",
     assigneeFilter !== "all",
+    Boolean(dateFrom),
+    Boolean(dateTo),
   ].filter(Boolean).length;
 
   const assigneeOptions = useMemo(() => {
@@ -412,6 +417,15 @@ export function ErpTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
               setTypeFilter("all");
               setStatusFilter("all");
               setAssigneeFilter("all");
+              setDateFrom("");
+              setDateTo("");
+            }}
+            dateRange={{
+              label: "Due date",
+              from: dateFrom,
+              to: dateTo,
+              onFromChange: setDateFrom,
+              onToChange: setDateTo,
             }}
             selects={[
               {

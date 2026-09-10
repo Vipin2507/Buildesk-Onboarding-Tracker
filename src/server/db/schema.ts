@@ -288,6 +288,7 @@ export const followUpTasks = sqliteTable(
     source: text("source").notNull().default("manual"),
     bookingAppointmentId: text("booking_appointment_id"),
     productScope: text("product_scope").notNull().default("erp"),
+    isInternal: integer("is_internal", { mode: "boolean" }).notNull().default(false),
     ...timestamps,
   },
   (t) => [

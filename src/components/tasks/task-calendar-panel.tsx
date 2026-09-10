@@ -14,6 +14,7 @@ import {
 } from "@/types";
 import { formatTimeRange12h, formatTaskDurationDisplay, resolveTaskAssigneeIds } from "@/lib/task-scheduling";
 import { taskStatusTone } from "@/hooks/use-task-time-status";
+import { isInternalCrmTask, resolveCrmTaskAccountLabel } from "@/lib/crm-internal-task";
 import { cn, formatDate } from "@/lib/utils";
 import { resolveAssigneeLabel } from "@/lib/managers";
 import { TaskRowRemark } from "@/components/tasks/task-detail-panel";
@@ -331,7 +332,10 @@ function TaskListTable({
             <div>
               <div className="font-medium">{task.title}</div>
               <div className="text-[10px] text-muted-foreground">
-                {companies.find((c) => c.id === task.companyId)?.name ?? "—"}
+                {resolveCrmTaskAccountLabel(
+                  task,
+                  companies.find((c) => c.id === task.companyId)?.name,
+                )}
               </div>
               <TaskRowRemark task={task} />
             </div>
@@ -398,35 +402,38 @@ function TaskListTable({
         {
           key: "company",
           header: "Account",
-          render: (task) => (
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 gap-1 px-2 text-[10px]"
-              asChild
-              onClick={(e) => e.stopPropagation()}
-            >
-              {entityLinkTarget === "crm" ? (
-                <Link
-                  to="/crm/accounts/$accountId"
-                  params={{ accountId: task.companyId }}
-                  search={{ tab: "tasks" }}
-                >
-                  <Building2 className="h-3 w-3" />
-                  Account
-                </Link>
-              ) : (
-                <Link
-                  to="/companies/$companyId"
-                  params={{ companyId: task.companyId }}
-                  search={{ tab: "Tasks" }}
-                >
-                  <Building2 className="h-3 w-3" />
-                  Account
-                </Link>
-              )}
-            </Button>
-          ),
+          render: (task) =>
+            isInternalCrmTask(task) ? (
+              <span className="text-xs text-muted-foreground">Internal</span>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1 px-2 text-[10px]"
+                asChild
+                onClick={(e) => e.stopPropagation()}
+              >
+                {entityLinkTarget === "crm" ? (
+                  <Link
+                    to="/crm/accounts/$accountId"
+                    params={{ accountId: task.companyId }}
+                    search={{ tab: "tasks" }}
+                  >
+                    <Building2 className="h-3 w-3" />
+                    Account
+                  </Link>
+                ) : (
+                  <Link
+                    to="/companies/$companyId"
+                    params={{ companyId: task.companyId }}
+                    search={{ tab: "Tasks" }}
+                  >
+                    <Building2 className="h-3 w-3" />
+                    Account
+                  </Link>
+                )}
+              </Button>
+            ),
         },
       ]}
       />

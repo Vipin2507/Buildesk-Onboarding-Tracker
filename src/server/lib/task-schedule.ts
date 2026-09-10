@@ -60,6 +60,7 @@ export function mapTaskRow(row: typeof t.followUpTasks.$inferSelect): FollowUpTa
     source: (row.source as FollowUpTask["source"]) ?? "manual",
     bookingAppointmentId: row.bookingAppointmentId ?? undefined,
     productScope: (row.productScope as FollowUpTask["productScope"]) ?? "erp",
+    isInternal: row.isInternal ?? false,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

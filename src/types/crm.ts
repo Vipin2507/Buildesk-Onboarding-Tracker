@@ -75,13 +75,15 @@ export type FollowUpTaskType =
   | "on_call_phone"
   | "on_call_gmeet_teams"
   | "offline_site_visit"
-  | "offline_office";
+  | "offline_office"
+  | "internal_meeting";
 
 export const FOLLOW_UP_TASK_TYPES: FollowUpTaskType[] = [
   "on_call_phone",
   "on_call_gmeet_teams",
   "offline_site_visit",
   "offline_office",
+  "internal_meeting",
 ];
 
 export const FOLLOW_UP_TASK_TYPE_LABEL: Record<FollowUpTaskType, string> = {
@@ -89,6 +91,7 @@ export const FOLLOW_UP_TASK_TYPE_LABEL: Record<FollowUpTaskType, string> = {
   on_call_gmeet_teams: "On Call Via GMeet / Teams",
   offline_site_visit: "Offline - Site Visit",
   offline_office: "Offline - Office",
+  internal_meeting: "Internal meeting",
 };
 
 export type FollowUpTaskSource = "manual" | "booking";
@@ -106,6 +109,8 @@ export type FollowUpTask = Timestamps & {
   id: string;
   /** ERP company id or CRM account id depending on productScope. */
   companyId: string;
+  /** CRM team task with no linked customer account. */
+  isInternal?: boolean;
   productScope?: TaskProductScope;
   onboardingProjectId?: string;
   postSalesProjectId?: string;

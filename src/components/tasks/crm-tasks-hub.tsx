@@ -13,9 +13,11 @@ import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
+  DesignTicketDateField,
   DesignTicketFilterField,
   DesignTicketSelect,
 } from "@/components/design-ticket/design-ticket-fields";
+import { inDateRange } from "@/components/list-toolbar";
 import {
   DesignTicketFilterBar,
   DesignTicketTabNav,
@@ -37,7 +39,17 @@ import {
   canManageCrmAccountTasks,
   filterCrmAccountsForUser,
 } from "@/lib/crm-account-access";
-import { resolveDefaultTaskAssigneeIds, taskAssigneeUserOptions } from "@/lib/task-defaults";
+import {
+  INTERNAL_CRM_TASK_ACCOUNT_LABEL,
+  INTERNAL_CRM_TASK_COMPANY_ID,
+  isInternalCrmTask,
+  resolveCrmTaskAccountLabel,
+} from "@/lib/crm-internal-task";
+import {
+  crmTaskAssigneeUsers,
+  resolveDefaultTaskAssigneeIds,
+  taskAssigneeUserOptions,
+} from "@/lib/task-defaults";
 import { resolveTaskAssigneeIds } from "@/lib/task-scheduling";
 import { useTaskTimeStatusSync, useTasksWithTimeStatus } from "@/hooks/use-task-time-status";
 import { useAuthStore, useCrmAccountStore, useCrmTaskStore, useUserStore } from "@/stores";
@@ -117,6 +129,8 @@ type TaskToolbarFilters = {
   statusFilter: string;
   assigneeFilter: string;
   sourceFilter: string;
+  dateFrom: string;
+  dateTo: string;
   tableSearch: string;
 };
 
@@ -137,6 +151,7 @@ function matchesTaskToolbarFilters(
   ) {
     return false;
   }
+  if (!inDateRange(task.dueDate, filters.dateFrom, filters.dateTo)) return false;
   const q = filters.tableSearch.trim().toLowerCase();
   if (!q) return true;
   const accountName = accountOptions.find((a) => a.id === task.companyId)?.name ?? "";
@@ -183,8 +198,17 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
   );
 
   const crmTasks = useMemo(
-    () => timeAwareTasks.filter((t) => accountIds.has(t.companyId)),
-    [timeAwareTasks, accountIds],
+    () =>
+      timeAwareTasks.filter((t) => {
+        if (isInternalCrmTask(t)) {
+          if (isAdmin || can("manageTasks")) return true;
+          return currentUser?.id
+            ? resolveTaskAssigneeIds(t).includes(currentUser.id)
+            : false;
+        }
+        return accountIds.has(t.companyId);
+      }),
+    [timeAwareTasks, accountIds, isAdmin, can, currentUser?.id],
   );
 
   const today = new Date().toISOString().slice(0, 10);
@@ -197,6 +221,8 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
   const [statusFilter, setStatusFilter] = useState("all");
   const [assigneeFilter, setAssigneeFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const listFilters = useMemo(
     () => ({
@@ -205,9 +231,11 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
       statusFilter,
       assigneeFilter,
       sourceFilter,
+      dateFrom,
+      dateTo,
       tableSearch,
     }),
-    [accountFilter, typeFilter, statusFilter, assigneeFilter, sourceFilter, tableSearch],
+    [accountFilter, typeFilter, statusFilter, assigneeFilter, sourceFilter, dateFrom, dateTo, tableSearch],
   );
 
   const toolbarScoped = useMemo(
@@ -248,24 +276,31 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<FollowUpTask | null>(null);
   const [createAccountId, setCreateAccountId] = useState("");
+  const [createMode, setCreateMode] = useState<"account" | "internal">("account");
   const [remark, setRemark] = useState("");
   const [markCompleteOnCreate, setMarkCompleteOnCreate] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<FollowUpTask | null>(null);
 
   const createAccount = visibleAccounts.find((a) => a.id === createAccountId);
-  const assignees = useMemo(
-    () =>
-      taskAssigneeUserOptions({
-        users,
-        crmAccount: createAccount,
-      }),
-    [createAccount, users],
-  );
+  const isInternalCreate = !editing && createMode === "internal";
+  const assignees = useMemo(() => {
+    if (isInternalCreate || (editing && isInternalCrmTask(editing))) {
+      return crmTaskAssigneeUsers(users);
+    }
+    return taskAssigneeUserOptions({
+      users,
+      crmAccount: createAccount,
+    });
+  }, [createAccount, editing, isInternalCreate, users]);
 
-  const defaultAssigneeIds = useMemo(
-    () => resolveDefaultTaskAssigneeIds({ crmAccount: createAccount, users }),
-    [createAccount, users],
-  );
+  const defaultAssigneeIds = useMemo(() => {
+    if (isInternalCreate) {
+      return currentUser?.id && assignees.some((u) => u.id === currentUser.id)
+        ? [currentUser.id]
+        : [];
+    }
+    return resolveDefaultTaskAssigneeIds({ crmAccount: createAccount, users });
+  }, [assignees, createAccount, currentUser?.id, isInternalCreate, users]);
 
   const form = useTaskFormState({
     users: assignees,
@@ -278,6 +313,9 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
   function canManageTask(task?: FollowUpTask) {
     if (!task) return false;
     if (isAdmin || can("manageTasks")) return true;
+    if (isInternalCrmTask(task)) {
+      return currentUser?.id ? resolveTaskAssigneeIds(task).includes(currentUser.id) : false;
+    }
     const account = visibleAccounts.find((a) => a.id === task.companyId);
     return account ? canManageCrmAccountTasks(account, currentUser) : false;
   }
@@ -286,11 +324,27 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
     isAdmin ||
     can("manageTasks") ||
     visibleAccounts.some((a) => canManageCrmAccountTasks(a, currentUser));
+  const canCreateInternal = isAdmin || can("manageTasks");
 
   function openCreate() {
     setEditing(null);
+    setCreateMode("account");
     setCreateAccountId(visibleAccounts[0]?.id ?? "");
     form.reset();
+    setRemark("");
+    setMarkCompleteOnCreate(false);
+    setModalOpen(true);
+  }
+
+  function openCreateInternal() {
+    setEditing(null);
+    setCreateMode("internal");
+    setCreateAccountId("");
+    form.reset();
+    form.setTaskType("internal_meeting");
+    if (currentUser?.id) {
+      form.setAssigneeUserIds([currentUser.id]);
+    }
     setRemark("");
     setMarkCompleteOnCreate(false);
     setModalOpen(true);
@@ -309,19 +363,27 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
       toast.error("Title is required");
       return;
     }
-    const companyId = createAccountId || editing?.companyId;
-    if (!companyId) {
+    const internalTask = Boolean(editing && isInternalCrmTask(editing)) || isInternalCreate;
+    const companyId = internalTask
+      ? INTERNAL_CRM_TASK_COMPANY_ID
+      : createAccountId || editing?.companyId;
+    if (!internalTask && !companyId) {
       toast.error("Account is required");
+      return;
+    }
+    if (form.assigneeUserIds.length === 0) {
+      toast.error("Assign at least one executive");
       return;
     }
     if (!(await form.validateSchedule())) return;
 
     const payload = {
-      companyId,
+      companyId: companyId!,
+      isInternal: internalTask,
       title: form.title.trim(),
       description: form.description.trim() || undefined,
       dueDate: form.dueDate || undefined,
-      taskType: form.taskType || undefined,
+      taskType: internalTask ? (form.taskType || "internal_meeting") : form.taskType || undefined,
       startTime: form.startTime || undefined,
       endTime: form.endTime || undefined,
       durationMinutes: form.durationMinutes || undefined,
@@ -358,6 +420,8 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
     statusFilter !== "all",
     assigneeFilter !== "all",
     sourceFilter !== "all",
+    Boolean(dateFrom),
+    Boolean(dateTo),
   ].filter(Boolean).length;
 
   function clearFilters() {
@@ -367,6 +431,8 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
     setStatusFilter("all");
     setAssigneeFilter("all");
     setSourceFilter("all");
+    setDateFrom("");
+    setDateTo("");
   }
 
   function applyFilters() {
@@ -398,7 +464,10 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
       <TaskDetailPanel
         embedded
         task={task}
-        accountName={accountOptions.find((a) => a.id === task.companyId)?.name ?? "—"}
+        accountName={resolveCrmTaskAccountLabel(
+          task,
+          accountOptions.find((a) => a.id === task.companyId)?.name,
+        )}
         users={users}
         canManage={canManageTask(task)}
         canDeleteAdmin={isAdmin}
@@ -452,14 +521,27 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             {canCreate ? (
-              <Button
-                size="sm"
-                className="h-8 gap-1 bg-primary px-3 text-xs"
-                onClick={openCreate}
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Create task
-              </Button>
+              <>
+                <Button
+                  size="sm"
+                  className="h-8 gap-1 bg-primary px-3 text-xs"
+                  onClick={openCreate}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Create task
+                </Button>
+                {canCreateInternal ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 gap-1 px-3 text-xs"
+                    onClick={openCreateInternal}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Internal meeting
+                  </Button>
+                ) : null}
+              </>
             ) : null}
           </div>
         </div>
@@ -567,6 +649,7 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
                     onChange={setAccountFilter}
                     options={[
                       { value: "all", label: "All accounts" },
+                      { value: INTERNAL_CRM_TASK_COMPANY_ID, label: INTERNAL_CRM_TASK_ACCOUNT_LABEL },
                       ...accountOptions.map((a) => ({ value: a.id, label: a.name })),
                     ]}
                   />
@@ -620,6 +703,20 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
                     ]}
                   />
                 </DesignTicketFilterField>
+                <DesignTicketDateField
+                  compact
+                  label="Due from"
+                  value={dateFrom}
+                  onChange={setDateFrom}
+                  placeholder="From"
+                />
+                <DesignTicketDateField
+                  compact
+                  label="Due to"
+                  value={dateTo}
+                  onChange={setDateTo}
+                  placeholder="To"
+                />
               </DesignTicketFilterBar>
             </div>
 
@@ -668,23 +765,66 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
         onSubmit={submit}
       >
         {!editing ? (
-          <label className="mb-3 block text-xs font-medium">
-            Account
-            <select
-              className="mt-1 h-9 w-full rounded-md border px-3 text-sm"
-              value={createAccountId}
-              onChange={(e) => {
-                setCreateAccountId(e.target.value);
-              }}
-            >
-              <option value="">Select account</option>
-              {visibleAccounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="mb-3 space-y-3">
+            <div className="flex flex-wrap gap-1 rounded-lg border bg-muted/20 p-1">
+              <button
+                type="button"
+                className={cn(
+                  "flex-1 rounded-md px-3 py-2 text-xs font-medium transition-colors",
+                  createMode === "account"
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => setCreateMode("account")}
+              >
+                Account task
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  "flex-1 rounded-md px-3 py-2 text-xs font-medium transition-colors",
+                  createMode === "internal"
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => {
+                  setCreateMode("internal");
+                  if (!form.taskType) form.setTaskType("internal_meeting");
+                  if (currentUser?.id) form.setAssigneeUserIds([currentUser.id]);
+                }}
+              >
+                Internal meeting
+              </button>
+            </div>
+            {createMode === "account" ? (
+              <label className="block text-xs font-medium">
+                Account
+                <select
+                  className="mt-1 h-9 w-full rounded-md border px-3 text-sm"
+                  value={createAccountId}
+                  onChange={(e) => {
+                    setCreateAccountId(e.target.value);
+                  }}
+                >
+                  <option value="">Select account</option>
+                  {visibleAccounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <p className="rounded-lg border border-dashed bg-muted/10 px-3 py-2 text-xs text-muted-foreground">
+                This task is for your team only and is not linked to a customer account.
+              </p>
+            )}
+          </div>
+        ) : isInternalCrmTask(editing) ? (
+          <p className="mb-3 text-xs text-muted-foreground">
+            Type:{" "}
+            <span className="font-medium text-foreground">{INTERNAL_CRM_TASK_ACCOUNT_LABEL}</span>
+          </p>
         ) : editingAccount ? (
           <p className="mb-3 text-xs text-muted-foreground">
             Account: <span className="font-medium text-foreground">{editingAccount.name}</span>
@@ -699,6 +839,7 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
           markCompleteOnCreate={markCompleteOnCreate}
           onMarkCompleteOnCreateChange={setMarkCompleteOnCreate}
           productScope="crm"
+          internalMeeting={isInternalCreate || Boolean(editing && isInternalCrmTask(editing))}
         />
 
         {editing ? (
