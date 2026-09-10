@@ -12,6 +12,7 @@ import {
   type FollowUpTask,
   type FollowUpTaskType,
 } from "@/types";
+import { formatTaskPreviewTitle } from "@/lib/task-display";
 import { formatTimeRange12h, formatTaskDurationDisplay, resolveTaskAssigneeIds } from "@/lib/task-scheduling";
 import { taskStatusTone } from "@/hooks/use-task-time-status";
 import { isInternalCrmTask, resolveCrmTaskAccountLabel } from "@/lib/crm-internal-task";
@@ -247,6 +248,7 @@ export function TaskCalendarPanel({
           date={cursorDate}
           tasks={dayTasks}
           users={users}
+          companies={companies}
           onTaskClick={onTaskClick}
           selectedTaskId={selectedTaskId}
           renderTaskDetail={renderTaskDetail}
@@ -261,6 +263,7 @@ export function TaskCalendarPanel({
               date={day}
               tasks={weekTasksByDay.get(day) ?? []}
               users={users}
+              companies={companies}
               compact
               onTaskClick={onTaskClick}
               selectedTaskId={selectedTaskId}
@@ -279,6 +282,7 @@ export function TaskCalendarPanel({
                 key={task.id}
                 task={task}
                 users={users}
+                accountName={companies.find((c) => c.id === task.companyId)?.name}
                 onClick={onTaskClick}
                 selected={selectedTaskId === task.id}
                 renderTaskDetail={renderTaskDetail}
@@ -330,7 +334,12 @@ function TaskListTable({
           header: "Task",
           render: (task) => (
             <div>
-              <div className="font-medium">{task.title}</div>
+              <div className="font-medium">
+                {formatTaskPreviewTitle(
+                  task,
+                  companies.find((c) => c.id === task.companyId)?.name,
+                )}
+              </div>
               <div className="text-[10px] text-muted-foreground">
                 {resolveCrmTaskAccountLabel(
                   task,
@@ -445,6 +454,7 @@ function ScheduleDayColumn({
   date,
   tasks,
   users,
+  companies,
   compact,
   onTaskClick,
   selectedTaskId,
@@ -453,6 +463,7 @@ function ScheduleDayColumn({
   date: string;
   tasks: FollowUpTask[];
   users: User[];
+  companies: { id: string; name: string }[];
   compact?: boolean;
   onTaskClick?: (task: FollowUpTask) => void;
   selectedTaskId?: string;
@@ -470,6 +481,7 @@ function ScheduleDayColumn({
             key={task.id}
             task={task}
             users={users}
+            accountName={companies.find((c) => c.id === task.companyId)?.name}
             compact={compact}
             onClick={onTaskClick}
             selected={selectedTaskId === task.id}
@@ -487,6 +499,7 @@ function ScheduleDayColumn({
 function TaskScheduleRow({
   task,
   users,
+  accountName,
   compact,
   onClick,
   selected = false,
@@ -494,6 +507,7 @@ function TaskScheduleRow({
 }: {
   task: FollowUpTask;
   users: User[];
+  accountName?: string;
   compact?: boolean;
   onClick?: (task: FollowUpTask) => void;
   selected?: boolean;
@@ -517,7 +531,9 @@ function TaskScheduleRow({
         )}
         onClick={() => onClick?.(task)}
       >
-        <div className={cn("font-medium", compact ? "text-[10px]" : "text-xs")}>{task.title}</div>
+        <div className={cn("font-medium", compact ? "text-[10px]" : "text-xs")}>
+          {formatTaskPreviewTitle(task, accountName)}
+        </div>
         <div className="text-[10px] text-muted-foreground">
           {formatTimeRange12h(task.startTime, task.endTime)}
           {task.taskType ? ` · ${FOLLOW_UP_TASK_TYPE_LABEL[task.taskType]}` : ""}

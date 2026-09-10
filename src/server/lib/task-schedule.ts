@@ -10,6 +10,7 @@ import {
 import { resolveTaskRemarks } from "@/lib/task-remarks";
 import { localWallClockIso } from "@/lib/booking-slots";
 import type { FollowUpTask, FollowUpTaskType } from "@/types";
+import { FOLLOW_UP_TASK_TYPE_LABEL } from "@/types/crm";
 import { DEFAULT_BOOKING_TIMEZONE } from "@/types/booking";
 import { newId, nowIso } from "@/types";
 import { getDb } from "@/server/db/client";
@@ -163,7 +164,7 @@ export function findScheduleConflicts(input: {
         if (scheduleRangesOverlap(input.startsAt, input.endsAt, booking.startsAt, booking.endsAt)) {
           conflicts.push({
             kind: "booking",
-            title: booking.guestName ? `Meeting – ${booking.guestName}` : "Meeting",
+            title: booking.guestName ? `${booking.guestName} – Meeting` : "Meeting",
             startsAt: booking.startsAt,
             endsAt: booking.endsAt,
             userId,
@@ -255,8 +256,15 @@ export function syncTaskFromBookingAppointment(
   if (!isVideoBookingEvent(slug, title, appointment.meetUrl)) return null;
 
   const now = nowIso();
-  const guestLabel = appointment.guestName?.trim() || "Client";
-  const taskTitle = `GMeet Meeting – ${guestLabel}`;
+  const account =
+    db
+      .select({ name: t.crmAccounts.name })
+      .from(t.crmAccounts)
+      .where(eq(t.crmAccounts.id, appointment.companyId))
+      .get() ?? null;
+  const accountName = account?.name?.trim() || "Account";
+  const typeLabel = FOLLOW_UP_TASK_TYPE_LABEL.on_call_gmeet_teams;
+  const taskTitle = `${accountName} – ${typeLabel}`;
   const assigneeIds = [appointment.hostUserId];
   const schedule = {
     dueDate: appointment.startsAt.slice(0, 10),

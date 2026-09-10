@@ -19,6 +19,7 @@ import {
   type ChecklistPhaseBucket,
 } from "@/lib/checklist";
 import { filterCrmAccountsForUser } from "@/lib/crm-account-access";
+import { formatTaskPreviewTitle } from "@/lib/task-display";
 import { isCrmAccountEnded } from "@/lib/crm-account-status";
 import { sortCrmAccountsByStartDateDesc } from "@/lib/crm-account-sort";
 import { resolveCrmMigrationCatalog } from "@/lib/crm-migration-catalog";
@@ -390,11 +391,13 @@ export function useCrmDashboardOverview() {
         return b.updatedAt.localeCompare(a.updatedAt);
       })
       .slice(0, 6)
-      .map((task) => ({
+      .map((task) => {
+        const accountName = accountNameById.get(task.companyId) ?? "Account";
+        return {
         id: task.id,
-        title: task.title,
+        title: formatTaskPreviewTitle(task, accountName),
         accountId: task.companyId,
-        accountName: accountNameById.get(task.companyId) ?? "Account",
+        accountName,
         dueDate: task.dueDate,
         status: task.status,
         priority: task.priority,
@@ -404,7 +407,8 @@ export function useCrmDashboardOverview() {
           .map((id) => resolveAssigneeLabel(id, users))
           .filter(Boolean)
           .join(", "),
-      }));
+        };
+      });
 
     const recentOpenQueries: CrmDashboardQueryItem[] = [...scopedOpenQueries]
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))

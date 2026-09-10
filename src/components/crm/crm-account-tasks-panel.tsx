@@ -22,6 +22,7 @@ import {
 } from "@/lib/crm-account-access";
 import { resolveDefaultTaskAssigneeIds, taskAssigneeUserOptions } from "@/lib/task-defaults";
 import { useSessionFilter } from "@/hooks/use-session-filter";
+import { formatTaskPreviewTitle } from "@/lib/task-display";
 import { formatTimeRange12h, formatTaskDurationDisplay } from "@/lib/task-scheduling";
 import {
   taskStatusTone,
@@ -308,7 +309,9 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
             const row = (
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="text-sm font-medium">{task.title}</div>
+                  <div className="text-sm font-medium">
+                    {formatTaskPreviewTitle(task, account?.name)}
+                  </div>
                   <div className="text-[10px] text-muted-foreground">
                     {formatTimeRange12h(task.startTime, task.endTime)} · Due{" "}
                     {task.dueDate ? formatDate(task.dueDate) : "—"}
@@ -350,7 +353,9 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
               sortable: true,
               render: (task) => (
                 <div className="min-w-[10rem]">
-                  <div className="font-medium">{task.title}</div>
+                  <div className="font-medium">
+                    {formatTaskPreviewTitle(task, account?.name)}
+                  </div>
                   {task.description ? (
                     <div className="line-clamp-1 text-[10px] text-muted-foreground">
                       {task.description}
