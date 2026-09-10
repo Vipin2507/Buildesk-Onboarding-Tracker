@@ -1202,22 +1202,13 @@ function CrmAccountsPage() {
                   },
                   {
                     key: "startDate",
-                    header: "Start",
+                    header: "Dates",
                     sortable: true,
                     render: (r) => (
-                      <span className="whitespace-nowrap text-xs tabular-nums text-muted-foreground">
-                        {formatDateDmy(r.startDate)}
-                      </span>
-                    ),
-                  },
-                  {
-                    key: "endDate",
-                    header: "End",
-                    sortable: true,
-                    render: (r) => (
-                      <span className="whitespace-nowrap text-xs tabular-nums text-muted-foreground">
-                        {formatDateDmy(r.endDate)}
-                      </span>
+                      <div className="text-xs tabular-nums text-muted-foreground">
+                        <div className="whitespace-nowrap">{formatDateDmy(r.startDate)}</div>
+                        <div className="whitespace-nowrap">{formatDateDmy(r.endDate)}</div>
+                      </div>
                     ),
                   },
                   {
