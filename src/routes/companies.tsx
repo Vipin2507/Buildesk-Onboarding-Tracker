@@ -115,29 +115,57 @@ function defaultCompanyFormValues(users: User[]): CompanyForm {
   };
 }
 
-function normalizeCompanyPayload(data: CompanyForm, users: User[]) {
+type CompanyWritePayload = Omit<Company, "id" | "createdAt" | "updatedAt" | "modules" | "status">;
+
+function emptyOptionalEnum<T extends string>(value: T | "" | undefined): T | undefined {
+  if (!value?.trim()) return undefined;
+  return value as T;
+}
+
+function normalizeCompanyPayload(data: CompanyForm, users: User[]): CompanyWritePayload {
   const managers = assignableManagerUsers(users);
   const phone = data.phone.replace(/\D/g, "");
   const onboardingManagerId = data.onboardingManagerId?.trim() || managers[0]?.id || "";
+  const {
+    modules: _modules,
+    gstPercent: _gstPercent,
+    commercialStatus,
+    planName,
+    paymentStatus,
+    endDate,
+    installmentDueDate,
+    billingInfo,
+    gstNumber,
+    salesAgentId,
+    supportManager1Id,
+    supportManager2Id,
+    ownerName,
+    ownerMobile,
+    pocName,
+    pocMobile,
+    csmId,
+    ...rest
+  } = data;
+
   return {
-    ...data,
+    ...rest,
     phone,
-    ownerName: (data.ownerName ?? "").trim() || data.contact.trim(),
-    ownerMobile: (data.ownerMobile ?? "").trim() || phone,
-    pocName: (data.pocName ?? "").trim() || data.contact.trim(),
-    pocMobile: (data.pocMobile ?? "").trim() || phone,
-    csmId: data.csmId ?? "",
+    ownerName: (ownerName ?? "").trim() || data.contact.trim(),
+    ownerMobile: (ownerMobile ?? "").trim() || phone,
+    pocName: (pocName ?? "").trim() || data.contact.trim(),
+    pocMobile: (pocMobile ?? "").trim() || phone,
+    csmId: csmId ?? "",
     onboardingManagerId,
-    salesAgentId: data.salesAgentId?.trim() || undefined,
-    supportManager1Id: data.supportManager1Id?.trim() || undefined,
-    supportManager2Id: data.supportManager2Id?.trim() || undefined,
-    endDate: data.endDate?.trim() || undefined,
-    planName: data.planName?.trim() || undefined,
-    commercialStatus: data.commercialStatus?.trim() || undefined,
-    paymentStatus: data.paymentStatus?.trim() || undefined,
-    installmentDueDate: data.installmentDueDate?.trim() || undefined,
-    billingInfo: data.billingInfo?.trim() || undefined,
-    gstNumber: data.gstNumber?.trim() || undefined,
+    salesAgentId: salesAgentId?.trim() || undefined,
+    supportManager1Id: supportManager1Id?.trim() || undefined,
+    supportManager2Id: supportManager2Id?.trim() || undefined,
+    endDate: endDate?.trim() || undefined,
+    planName: emptyOptionalEnum(planName),
+    commercialStatus: emptyOptionalEnum(commercialStatus),
+    paymentStatus: emptyOptionalEnum(paymentStatus),
+    installmentDueDate: installmentDueDate?.trim() || undefined,
+    billingInfo: billingInfo?.trim() || undefined,
+    gstNumber: gstNumber?.trim() || undefined,
   };
 }
 
