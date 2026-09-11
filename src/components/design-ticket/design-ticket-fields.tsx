@@ -323,6 +323,7 @@ export function DesignTicketDateField({
   placeholder,
   className,
   compact,
+  displayFormat,
 }: {
   label: string;
   value: string;
@@ -330,6 +331,7 @@ export function DesignTicketDateField({
   placeholder?: string;
   className?: string;
   compact?: boolean;
+  displayFormat?: string;
 }) {
   return (
     <DesignTicketFilterField label={label} className={className} compact={compact}>
@@ -337,6 +339,7 @@ export function DesignTicketDateField({
         value={value}
         onChange={onChange}
         placeholder={placeholder ?? "Pick a date"}
+        displayFormat={displayFormat}
         className={cn("w-full", compact ? "[&_input]:h-8 [&_input]:text-xs" : "[&_input]:h-10")}
       />
     </DesignTicketFilterField>

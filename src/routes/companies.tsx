@@ -2,16 +2,13 @@ import { createFileRoute, Outlet, useChildMatches, useNavigate } from "@tanstack
 import { useMemo, useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import {
-  Building2,
-  CheckCircle2,
-  Clock,
   Plus,
   Pencil,
   Trash2,
   UserRound,
   FileSpreadsheet,
   Download,
-  TrendingUp,
+  Search,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -24,13 +21,7 @@ import {
   DesignTicketFilterField,
   DesignTicketSelect,
 } from "@/components/design-ticket/design-ticket-fields";
-import {
-  DesignTicketFilterBar,
-  DesignTicketKpiGrid,
-  DesignTicketPageHeader,
-  DesignTicketSection,
-  DesignTicketTabNav,
-} from "@/components/design-ticket/design-ticket-shared";
+import { DesignTicketFilterBar } from "@/components/design-ticket/design-ticket-shared";
 import { StatusPill, Pill } from "@/components/status-pill";
 import { ProgressBar } from "@/components/progress-bar";
 import { Button } from "@/components/ui/button";
@@ -52,9 +43,17 @@ import {
 import { isCompanyModulesAllLive } from "@/lib/module-progress";
 import { assignableManagerUsers, resolveAssigneeLabel } from "@/lib/managers";
 import type { Company, ModuleKey, User } from "@/types";
-import { COMPANY_REGIONS, COMPANY_TYPES } from "@/types";
+import {
+  COMPANY_COMMERCIAL_PLAN_NAMES,
+  COMPANY_COMMERCIAL_STATUSES,
+  COMPANY_PAYMENT_STATUSES,
+  COMPANY_REGIONS,
+  COMPANY_TYPES,
+} from "@/types";
+import { calcDealExGst, calcGstAmount } from "@/lib/crm-account-commercial";
 import { downloadCompaniesExport } from "@/lib/company-sheet-export";
-import { cn, formatDate } from "@/lib/utils";
+import { DatePickerField } from "@/components/date-picker-field";
+import { cn, formatDateDmy } from "@/lib/utils";
 
 const FIELD_LABELS: Record<string, string> = {
   name: "Company Name",
@@ -101,6 +100,18 @@ function defaultCompanyFormValues(users: User[]): CompanyForm {
     paymentReceived: undefined,
     pendingAmount: undefined,
     endDate: "",
+    commercialStatus: "",
+    planName: "",
+    amountWithGst: undefined,
+    taxableAmount: undefined,
+    gstAmount: undefined,
+    gstPercent: 18,
+    paymentStatus: "",
+    installmentAmount: undefined,
+    installmentDueDate: "",
+    installmentCount: undefined,
+    billingInfo: "",
+    gstNumber: "",
   };
 }
 
@@ -121,6 +132,12 @@ function normalizeCompanyPayload(data: CompanyForm, users: User[]) {
     supportManager1Id: data.supportManager1Id?.trim() || undefined,
     supportManager2Id: data.supportManager2Id?.trim() || undefined,
     endDate: data.endDate?.trim() || undefined,
+    planName: data.planName?.trim() || undefined,
+    commercialStatus: data.commercialStatus?.trim() || undefined,
+    paymentStatus: data.paymentStatus?.trim() || undefined,
+    installmentDueDate: data.installmentDueDate?.trim() || undefined,
+    billingInfo: data.billingInfo?.trim() || undefined,
+    gstNumber: data.gstNumber?.trim() || undefined,
   };
 }
 
@@ -129,6 +146,15 @@ function inputClass(hasError?: boolean) {
     "mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40",
     hasError && "border-destructive focus:ring-destructive/30",
   );
+}
+
+function deriveCompanyGstPercent(company: Pick<Company, "taxableAmount" | "dealSize" | "gstAmount">) {
+  const taxable = company.taxableAmount ?? company.dealSize;
+  const gst = company.gstAmount;
+  if (taxable && gst && taxable > 0) {
+    return Math.round((gst / taxable) * 1000) / 10;
+  }
+  return 18;
 }
 
 export const Route = createFileRoute("/companies")({
@@ -179,6 +205,18 @@ const companySchema = z.object({
   paymentReceived: z.coerce.number().optional(),
   pendingAmount: z.coerce.number().optional(),
   endDate: z.string().optional(),
+  commercialStatus: z.union([z.enum(COMPANY_COMMERCIAL_STATUSES), z.literal("")]).optional(),
+  planName: z.union([z.enum(COMPANY_COMMERCIAL_PLAN_NAMES), z.literal("")]).optional(),
+  amountWithGst: z.coerce.number().optional(),
+  taxableAmount: z.coerce.number().optional(),
+  gstAmount: z.coerce.number().optional(),
+  gstPercent: z.coerce.number().min(0).max(100).optional(),
+  paymentStatus: z.union([z.enum(COMPANY_PAYMENT_STATUSES), z.literal("")]).optional(),
+  installmentAmount: z.coerce.number().optional(),
+  installmentDueDate: z.string().optional(),
+  installmentCount: z.coerce.number().optional(),
+  billingInfo: z.string().optional(),
+  gstNumber: z.string().optional(),
 });
 
 type CompanyForm = z.infer<typeof companySchema>;
@@ -191,8 +229,58 @@ const STATUS_CHIPS = [
   { id: "not_started", label: "Not Started", status: "not_started" },
 ] as const;
 
-
 type CompanyKpiFilter = "all" | "pending" | "in_progress" | "live";
+
+type CompanyFilterPillId =
+  | "all"
+  | "pending"
+  | "active"
+  | "live"
+  | "not_started"
+  | "in_progress"
+  | "on_hold"
+  | "completed";
+
+type CompanyFilterTone = "muted" | "warning" | "success" | "info" | "danger";
+
+const COMPANY_FILTER_BOX_COUNT_TONE: Record<CompanyFilterTone, string> = {
+  muted: "text-foreground",
+  warning: "text-amber-600 dark:text-amber-400",
+  success: "text-emerald-600 dark:text-emerald-400",
+  info: "text-primary",
+  danger: "text-destructive",
+};
+
+const COMPANY_FILTER_PILLS: { id: CompanyFilterPillId; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "pending", label: "Pending" },
+  { id: "active", label: "Progressing" },
+  { id: "live", label: "Live" },
+  { id: "not_started", label: "Not Started" },
+  { id: "in_progress", label: "In Progress" },
+  { id: "on_hold", label: "On Hold" },
+  { id: "completed", label: "Completed" },
+];
+
+function companyFilterPillTone(id: CompanyFilterPillId): CompanyFilterTone {
+  if (id === "pending") return "warning";
+  if (id === "live" || id === "completed") return "success";
+  if (id === "active" || id === "in_progress") return "info";
+  if (id === "on_hold") return "danger";
+  return "muted";
+}
+
+function isCompanyFilterPillActive(
+  id: CompanyFilterPillId,
+  statusFilter: string,
+  kpiFilter: CompanyKpiFilter,
+) {
+  if (id === "all") return statusFilter === "all" && kpiFilter === "all";
+  if (id === "pending") return kpiFilter === "pending";
+  if (id === "active") return kpiFilter === "in_progress";
+  if (id === "live") return kpiFilter === "live";
+  return statusFilter === id && kpiFilter === "all";
+}
 
 function matchesCompanyKpi(
   c: {
@@ -218,19 +306,6 @@ function matchesCompanyKpi(
   if (filter === "in_progress") return isInProgress;
   if (filter === "live") return isLive;
   return true;
-}
-
-function companyKpiFilterLabel(filter: CompanyKpiFilter): string {
-  switch (filter) {
-    case "pending":
-      return "Pending onboarding";
-    case "in_progress":
-      return "In progress";
-    case "live":
-      return "Live companies";
-    default:
-      return "All companies";
-  }
 }
 
 function CompaniesPage() {
@@ -266,6 +341,7 @@ function CompaniesListPage() {
   const [cityFilter, setCityFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [tableSearch, setTableSearch] = useState("");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [savingCompany, setSavingCompany] = useState(false);
@@ -406,19 +482,79 @@ function CompaniesListPage() {
     setAssignOpen(false);
   }
 
-  const statusCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: enriched.length };
-    for (const chip of STATUS_CHIPS) {
-      if (!chip.status) continue;
-      counts[chip.id] = enriched.filter(
-        (c) => c.computedStatus === chip.status || c.status === chip.status,
-      ).length;
+  function matchesCompanyToolbarFilters(c: (typeof enriched)[number]) {
+    if (planFilter !== "all" && c.plan !== planFilter) return false;
+    if (healthFilter !== "all" && c.health !== healthFilter) return false;
+    if (managerFilter === "unassigned" && c.onboardingManagerId) return false;
+    if (managerFilter !== "all" && managerFilter !== "unassigned" && c.onboardingManagerId !== managerFilter) {
+      return false;
     }
-    return counts;
-  }, [enriched]);
+    if (salesAgentFilter === "unassigned" && c.salesAgentId) return false;
+    if (
+      salesAgentFilter !== "all" &&
+      salesAgentFilter !== "unassigned" &&
+      c.salesAgentId !== salesAgentFilter
+    ) {
+      return false;
+    }
+    if (cityFilter !== "all" && c.city !== cityFilter) return false;
+    if (progressFilter === "0" && c.progress !== 0) return false;
+    if (progressFilter === "1-49" && !(c.progress >= 1 && c.progress <= 49)) return false;
+    if (progressFilter === "50-99" && !(c.progress >= 50 && c.progress <= 99)) return false;
+    if (progressFilter === "100" && c.progress !== 100) return false;
+    if (!inDateRange(c.startDate || c.agreementDate, dateFrom, dateTo)) return false;
+    return true;
+  }
+
+  const toolbarScoped = useMemo(
+    () => enriched.filter((c) => matchesCompanyToolbarFilters(c)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- toolbar filter fields only
+    [
+      enriched,
+      planFilter,
+      healthFilter,
+      managerFilter,
+      salesAgentFilter,
+      cityFilter,
+      progressFilter,
+      dateFrom,
+      dateTo,
+    ],
+  );
+
+  const avgProgress = useMemo(() => {
+    if (!toolbarScoped.length) return 0;
+    return Math.round(toolbarScoped.reduce((sum, c) => sum + c.progress, 0) / toolbarScoped.length);
+  }, [toolbarScoped]);
+
+  function companyFilterPillCount(id: CompanyFilterPillId) {
+    if (id === "all") return toolbarScoped.length;
+    if (id === "pending") return toolbarScoped.filter((c) => matchesCompanyKpi(c, "pending")).length;
+    if (id === "active") return toolbarScoped.filter((c) => matchesCompanyKpi(c, "in_progress")).length;
+    if (id === "live") return toolbarScoped.filter((c) => matchesCompanyKpi(c, "live")).length;
+    return toolbarScoped.filter(
+      (c) => c.computedStatus === id || c.status === id,
+    ).length;
+  }
+
+  function selectCompanyFilterPill(id: CompanyFilterPillId) {
+    if (id === "all") {
+      setStatusFilter("all");
+      setKpiFilter("all");
+      return;
+    }
+    if (id === "pending" || id === "active" || id === "live") {
+      setStatusFilter("all");
+      setKpiFilter(id === "active" ? "in_progress" : id);
+      return;
+    }
+    setStatusFilter(id);
+    setKpiFilter("all");
+  }
 
   const filtered = useMemo(() => {
-    return enriched.filter((c) => {
+    const q = tableSearch.trim().toLowerCase();
+    return toolbarScoped.filter((c) => {
       if (!matchesCompanyKpi(c, kpiFilter)) return false;
       if (statusFilter !== "all") {
         const chip = STATUS_CHIPS.find((s) => s.id === statusFilter);
@@ -426,41 +562,23 @@ function CompaniesListPage() {
           return false;
         }
       }
-      if (planFilter !== "all" && c.plan !== planFilter) return false;
-      if (healthFilter !== "all" && c.health !== healthFilter) return false;
-      if (managerFilter === "unassigned" && c.onboardingManagerId) return false;
-      if (managerFilter !== "all" && managerFilter !== "unassigned" && c.onboardingManagerId !== managerFilter) {
-        return false;
-      }
-      if (salesAgentFilter === "unassigned" && c.salesAgentId) return false;
-      if (
-        salesAgentFilter !== "all" &&
-        salesAgentFilter !== "unassigned" &&
-        c.salesAgentId !== salesAgentFilter
-      ) {
-        return false;
-      }
-      if (cityFilter !== "all" && c.city !== cityFilter) return false;
-      if (progressFilter === "0" && c.progress !== 0) return false;
-      if (progressFilter === "1-49" && !(c.progress >= 1 && c.progress <= 49)) return false;
-      if (progressFilter === "50-99" && !(c.progress >= 50 && c.progress <= 99)) return false;
-      if (progressFilter === "100" && c.progress !== 100) return false;
-      if (!inDateRange(c.startDate || c.agreementDate, dateFrom, dateTo)) return false;
-      return true;
+      if (!q) return true;
+      const hay = [c.name, c.city, c.contact, c.email, c.plan, c.health]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
     });
-  }, [
-    enriched,
-    kpiFilter,
-    statusFilter,
-    planFilter,
-    healthFilter,
-    managerFilter,
-    salesAgentFilter,
-    cityFilter,
-    progressFilter,
-    dateFrom,
-    dateTo,
-  ]);
+  }, [toolbarScoped, kpiFilter, statusFilter, tableSearch]);
+
+  const tableRows = useMemo(
+    () =>
+      filtered.map((c) => ({
+        ...c,
+        startDate: c.startDate || c.agreementDate || "",
+      })),
+    [filtered],
+  );
 
   const activeFilterCount = [
     statusFilter !== "all",
@@ -473,65 +591,8 @@ function CompaniesListPage() {
     Boolean(dateFrom),
     Boolean(dateTo),
     kpiFilter !== "all",
+    Boolean(tableSearch.trim()),
   ].filter(Boolean).length;
-
-  const kpiStats = useMemo(() => {
-    const pending = enriched.filter((c) => matchesCompanyKpi(c, "pending")).length;
-    const inProgress = enriched.filter((c) => matchesCompanyKpi(c, "in_progress")).length;
-    const live = enriched.filter((c) => matchesCompanyKpi(c, "live")).length;
-    const avg = enriched.length
-      ? Math.round(enriched.reduce((sum, c) => sum + c.progress, 0) / enriched.length)
-      : 0;
-    return { total: enriched.length, pending, inProgress, live, avg };
-  }, [enriched]);
-
-  const kpiCards = [
-    {
-      id: "all",
-      label: "Total",
-      value: kpiStats.total,
-      icon: Building2,
-      onClick: () => setKpiFilter("all"),
-      active: kpiFilter === "all",
-    },
-    {
-      id: "pending",
-      label: "Pending",
-      value: kpiStats.pending,
-      icon: Clock,
-      tone: "text-amber-600 dark:text-amber-400",
-      onClick: () => setKpiFilter("pending"),
-      active: kpiFilter === "pending",
-    },
-    {
-      id: "in_progress",
-      label: "In Progress",
-      value: kpiStats.inProgress,
-      icon: TrendingUp,
-      tone: "text-primary",
-      onClick: () => setKpiFilter("in_progress"),
-      active: kpiFilter === "in_progress",
-    },
-    {
-      id: "live",
-      label: "Live",
-      value: kpiStats.live,
-      icon: CheckCircle2,
-      tone: "text-emerald-600 dark:text-emerald-400",
-      onClick: () => setKpiFilter("live"),
-      active: kpiFilter === "live",
-    },
-    {
-      id: "avg",
-      label: "Avg %",
-      value: kpiStats.avg,
-    },
-  ];
-
-  const statusTabs = STATUS_CHIPS.map((c) => ({
-    id: c.id,
-    label: `${c.label} (${statusCounts[c.id] ?? 0})`,
-  }));
 
   function applyFilters() {
     tableRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -548,6 +609,7 @@ function CompaniesListPage() {
     setCityFilter("all");
     setDateFrom("");
     setDateTo("");
+    setTableSearch("");
   }
 
   const projectCountByCompanyId = useMemo(() => {
@@ -609,8 +671,31 @@ function CompaniesListPage() {
       paymentReceived: c.paymentReceived,
       pendingAmount: c.pendingAmount,
       endDate: c.endDate ?? "",
+      commercialStatus: c.commercialStatus ?? "",
+      planName: c.planName ?? "",
+      amountWithGst: c.amountWithGst,
+      taxableAmount: c.taxableAmount,
+      gstAmount: c.gstAmount,
+      gstPercent: deriveCompanyGstPercent(c),
+      paymentStatus: c.paymentStatus ?? "",
+      installmentAmount: c.installmentAmount,
+      installmentDueDate: c.installmentDueDate ?? "",
+      installmentCount: c.installmentCount,
+      billingInfo: c.billingInfo ?? "",
+      gstNumber: c.gstNumber ?? "",
     });
     setModalOpen(true);
+  }
+
+  function applyGstBreakdownFromDeal() {
+    const dealInclGst = Number(form.getValues("amountWithGst") || form.getValues("dealSize") || 0);
+    const gstPercent = Number(form.getValues("gstPercent") || 0);
+    if (!dealInclGst || dealInclGst <= 0) return;
+    form.setValue("taxableAmount", calcDealExGst(dealInclGst, gstPercent), { shouldDirty: true });
+    form.setValue("gstAmount", calcGstAmount(dealInclGst, gstPercent), { shouldDirty: true });
+    if (!form.getValues("amountWithGst")) {
+      form.setValue("amountWithGst", dealInclGst, { shouldDirty: true });
+    }
   }
 
   function onSubmit() {
@@ -686,17 +771,20 @@ function CompaniesListPage() {
   }
 
   return (
-    <PageWrap compact>
-      <DesignTicketPageHeader
-        compact
-        title="Companies"
-        subtitle="Client onboarding portfolio — track progress, modules, and go-live status."
-        actions={
-          <div className="flex flex-wrap gap-1.5">
+    <PageWrap compact flushTop>
+      <div className="mb-0 border-b border-border pb-2 pt-1">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h1 className="text-base font-medium tracking-tight">Companies</h1>
+            <p className="text-xs text-muted-foreground">
+              {filtered.length} {filtered.length === 1 ? "company" : "companies"}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
             <Button
               size="sm"
               variant="outline"
-              className="gap-1"
+              className="h-8 gap-1 px-3 text-xs"
               onClick={exportFilteredCompanies}
               disabled={filtered.length === 0}
             >
@@ -705,49 +793,107 @@ function CompaniesListPage() {
             </Button>
             {canManageCompanies ? (
               <>
-                <Button size="sm" variant="outline" className="gap-1" onClick={() => setImportOpen(true)}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 gap-1 px-3 text-xs"
+                  onClick={() => setImportOpen(true)}
+                >
                   <FileSpreadsheet className="h-3.5 w-3.5" />
                   Import
                 </Button>
                 <Button
                   size="sm"
-                  variant="outline"
-                  className="gap-1"
+                  variant="ghost"
+                  className="h-8 gap-1 px-3 text-xs"
                   onClick={() => setCommercialUpdateOpen(true)}
                 >
                   <FileSpreadsheet className="h-3.5 w-3.5" />
                   Update commercial
                 </Button>
-                <Button size="sm" className="gap-1 bg-primary" onClick={openCreate}>
+                <Button size="sm" className="h-8 gap-1 bg-primary px-3 text-xs" onClick={openCreate}>
                   <Plus className="h-3.5 w-3.5" />
-                  Add Company
+                  Add company
                 </Button>
               </>
             ) : null}
           </div>
-        }
-      />
+        </div>
 
-      <div className="mb-3 min-w-0">
-        <DesignTicketKpiGrid items={kpiCards} columns={5} size="compact" />
+        <div className="mt-2 flex flex-col gap-2 lg:flex-row lg:items-stretch">
+          <div
+            role="tablist"
+            aria-label="Company filters"
+            className="grid min-w-0 flex-1 grid-cols-2 gap-1.5 sm:grid-cols-4 xl:grid-cols-8"
+          >
+            {COMPANY_FILTER_PILLS.map((pill) => {
+              const tone = companyFilterPillTone(pill.id);
+              const active = isCompanyFilterPillActive(pill.id, statusFilter, kpiFilter);
+              return (
+                <button
+                  key={pill.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => selectCompanyFilterPill(pill.id)}
+                  className={cn(
+                    "flex min-w-0 flex-col rounded-lg border bg-card px-2.5 py-2 text-left shadow-sm transition-all",
+                    "hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                    active
+                      ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"
+                      : "border-border/80",
+                  )}
+                >
+                  <span className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {pill.label}
+                  </span>
+                  <span
+                    className={cn(
+                      "mt-1 text-lg font-semibold tabular-nums leading-none",
+                      COMPANY_FILTER_BOX_COUNT_TONE[tone],
+                    )}
+                  >
+                    {companyFilterPillCount(pill.id)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex shrink-0 flex-col justify-center rounded-lg border border-border/80 bg-card px-3 py-2 shadow-sm lg:min-w-[5.5rem]">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Avg
+            </span>
+            <span className="mt-1 text-lg font-semibold tabular-nums leading-none text-foreground">
+              {avgProgress}%
+            </span>
+          </div>
+        </div>
       </div>
 
-      <DesignTicketTabNav
-        compact
-        tabs={statusTabs}
-        activeId={statusFilter}
-        onChange={setStatusFilter}
-      />
-
-      <DesignTicketFilterBar
-        compact
-        className="xl:grid-cols-4"
-        activeFilterCount={activeFilterCount}
-        onClear={clearFilters}
-        onApply={applyFilters}
-        resultCount={filtered.length}
-        resultLabel={filtered.length === 1 ? "company" : "companies"}
-      >
+      <div className="-mx-3 sm:-mx-4 lg:-mx-5">
+        <div className="px-3 sm:px-4 lg:px-5">
+          <DesignTicketFilterBar
+            variant="inline"
+            compact
+            className="xl:grid-cols-4"
+            activeFilterCount={activeFilterCount}
+            onClear={clearFilters}
+            onApply={applyFilters}
+            resultCount={filtered.length}
+            resultLabel={filtered.length === 1 ? "company" : "companies"}
+            trailing={
+              <div className="relative min-w-[140px] flex-1 sm:max-w-xs">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={tableSearch}
+                  onChange={(e) => setTableSearch(e.target.value)}
+                  placeholder="Search companies…"
+                  aria-label="Search companies"
+                  className="h-8 w-full rounded-md border border-input bg-background pl-8 pr-3 text-xs outline-none focus:ring-2 focus:ring-ring/40"
+                />
+              </div>
+            }
+          >
         <DesignTicketFilterField label="Plan" compact>
           <DesignTicketSelect
             compact
@@ -831,207 +977,248 @@ function CompaniesListPage() {
         ) : null}
         <DesignTicketDateField
           compact
+          displayFormat="dd/MM/yyyy"
           label="Start from"
           value={dateFrom}
           onChange={setDateFrom}
-          placeholder="From"
+          placeholder="DD/MM/YYYY"
         />
         <DesignTicketDateField
           compact
+          displayFormat="dd/MM/yyyy"
           label="Start to"
           value={dateTo}
           onChange={setDateTo}
-          placeholder="To"
+          placeholder="DD/MM/YYYY"
         />
-      </DesignTicketFilterBar>
+          </DesignTicketFilterBar>
 
-      <div ref={tableRef}>
-        <DesignTicketSection title={companyKpiFilterLabel(kpiFilter)} delay={0.06} compact>
-          {isAdmin && selectedIds.size > 0 ? (
-            <motion.div
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mb-2 flex flex-wrap items-center gap-1.5 rounded-lg border border-primary/25 bg-primary/5 px-2.5 py-1.5"
-            >
-              <span className="text-xs font-medium">
-                {selectedIds.size} {selectedIds.size === 1 ? "company" : "companies"} selected
-              </span>
-              <Button size="sm" variant="outline" className="gap-1" onClick={openBulkAssign}>
-                <UserRound className="h-3.5 w-3.5" />
-                Assign manager
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
-                Clear
-              </Button>
-            </motion.div>
-          ) : null}
-
-          {enriched.length > 0 && filtered.length < enriched.length ? (
-            <motion.div
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2"
-            >
-              <p className="text-xs text-muted-foreground">
-                Showing {filtered.length} of {enriched.length} companies — filters or KPI selection may be
-                hiding some rows (new companies start as <strong>Pending</strong> / Not Started).
-              </p>
-              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={clearFilters}>
-                Clear filters
-              </Button>
-            </motion.div>
-          ) : null}
-
-          {enriched.length === 0 ? (
-            <EmptyState
-              title="No companies yet"
-              description="Add your first client company to start onboarding."
-              actionLabel="+ Add Company"
-              onAction={openCreate}
-            />
-          ) : filtered.length === 0 ? (
-            <EmptyState
-              title="No matches"
-              description="Try another KPI card, clear filters, or adjust your search."
-              actionLabel="Clear filters"
-              onAction={clearFilters}
-            />
-          ) : (
-            <div className="card-soft overflow-hidden p-0.5">
-              <DataTable
-                data={filtered}
-                getRowId={(c) => c.id}
-                searchKeys={["name", "city", "contact", "email", "plan", "health"]}
-                pageSize={15}
-                density="compact"
-                selection={
-                  isAdmin
-                    ? {
-                        selectedIds,
-                        onToggle: toggleSelection,
-                        onToggleAll: toggleSelectionAll,
-                      }
-                    : undefined
-                }
-                onRowClick={(c) =>
-                  navigate({ to: "/companies/$companyId", params: { companyId: c.id } })
-                }
-                columns={[
-              {
-                key: "name",
-                header: "Company",
-                sortable: true,
-                render: (c) => (
-                  <div>
-                    <div className="font-medium">
-                      <a
-                        href={`/companies/${c.id}`}
-                        className="hover:underline"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {c.name}
-                      </a>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {c.city} · {c.plan}
-                    </div>
-                  </div>
-                ),
-              },
-              {
-                key: "contact",
-                header: "Contact",
-                render: (c) => (
-                  <div>
-                    <div>{c.contact}</div>
-                    <div className="text-xs text-muted-foreground">{c.designation}</div>
-                  </div>
-                ),
-              },
-              {
-                key: "onboardingManagerId",
-                header: "Manager",
-                render: (c) => resolveAssigneeLabel(c.onboardingManagerId, users, employees),
-              },
-              {
-                key: "salesAgentId",
-                header: "Sales Agent",
-                render: (c) => resolveAssigneeLabel(c.salesAgentId, users, employees),
-              },
-              {
-                key: "startDate",
-                header: "Start Date",
-                sortable: true,
-                render: (c) => (
-                  <span className="text-muted-foreground">
-                    {formatDate(c.startDate || c.agreementDate)}
-                  </span>
-                ),
-              },
-              {
-                key: "modules",
-                header: "Modules",
-                render: (c) => (
-                  <div className="flex flex-wrap gap-1">
-                    {c.modules
-                      .filter((m) => m.optedIn)
-                      .slice(0, 2)
-                      .map((m) => (
-                        <Pill key={m.moduleKey} tone="accent">
-                          {m.label}
-                        </Pill>
-                      ))}
-                    {c.modules.filter((m) => m.optedIn).length > 2 && (
-                      <Pill>+{c.modules.filter((m) => m.optedIn).length - 2}</Pill>
-                    )}
-                  </div>
-                ),
-              },
-              {
-                key: "progress",
-                header: "Progress",
-                sortable: true,
-                render: (c) => (
-                  <div className="flex items-center gap-2">
-                    <ProgressBar value={c.progress} className="w-20" />
-                    <span className="text-[11px] tabular-nums text-muted-foreground">{c.progress}%</span>
-                  </div>
-                ),
-              },
-              {
-                key: "computedStatus",
-                header: "Status",
-                sortable: true,
-                render: (c) => <StatusPill status={c.computedStatus} />,
-              },
-              {
-                key: "projects",
-                header: "Projects",
-                render: (c) => allProjects.filter((p) => p.companyId === c.id).length,
-              },
-            ]}
-            actions={(c) => (
-              <div className="flex justify-end gap-0.5">
-                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(c)}>
-                  <Pencil className="h-3.5 w-3.5" />
+          <div ref={tableRef}>
+            {isAdmin && selectedIds.size > 0 ? (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-2 flex flex-wrap items-center gap-1.5 rounded-lg border border-primary/25 bg-primary/5 px-2.5 py-1.5"
+              >
+                <span className="text-xs font-medium">
+                  {selectedIds.size} {selectedIds.size === 1 ? "company" : "companies"} selected
+                </span>
+                <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={openBulkAssign}>
+                  <UserRound className="h-3.5 w-3.5" />
+                  Assign manager
                 </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8"
-                  onClick={() => {
-                    setDeleting(c);
-                    setDeleteOpen(true);
-                  }}
-                >
-                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setSelectedIds(new Set())}>
+                  Clear
                 </Button>
+              </motion.div>
+            ) : null}
+
+            {enriched.length > 0 && filtered.length < enriched.length ? (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2"
+              >
+                <p className="text-xs text-muted-foreground">
+                  Showing {filtered.length} of {enriched.length} companies — filters may be hiding some rows.
+                </p>
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              </motion.div>
+            ) : null}
+
+            {enriched.length === 0 ? (
+              <div className="px-0 py-2">
+                <EmptyState
+                  title="No companies yet"
+                  description="Add your first client company to start onboarding."
+                  actionLabel="+ Add company"
+                  onAction={openCreate}
+                />
               </div>
+            ) : filtered.length === 0 ? (
+              <div className="px-0 py-2">
+                <EmptyState
+                  title="No matches"
+                  description="Try another filter pill, clear filters, or adjust your search."
+                  actionLabel="Clear filters"
+                  onAction={clearFilters}
+                />
+              </div>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                className="bg-card [&_tbody_tr]:bg-card [&_thead]:bg-card"
+              >
+                <DataTable
+                  flush
+                  data={tableRows}
+                  initialSortKey="startDate"
+                  initialSortDir="desc"
+                  getRowId={(c) => c.id}
+                  hideSearch
+                  searchQuery={tableSearch}
+                  onSearchQueryChange={setTableSearch}
+                  searchKeys={["name", "city", "contact", "email", "plan", "health"]}
+                  pageSize={15}
+                  density="compact"
+                  selection={
+                    isAdmin
+                      ? {
+                          selectedIds,
+                          onToggle: toggleSelection,
+                          onToggleAll: toggleSelectionAll,
+                        }
+                      : undefined
+                  }
+                  onRowClick={(c) =>
+                    navigate({ to: "/companies/$companyId", params: { companyId: c.id } })
+                  }
+                  columns={[
+                    {
+                      key: "name",
+                      header: "Company",
+                      sortable: true,
+                      render: (c) => (
+                        <div>
+                          <div className="font-medium">
+                            <a
+                              href={`/companies/${c.id}`}
+                              className="hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {c.name}
+                            </a>
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {c.city} · {c.plan}
+                          </div>
+                        </div>
+                      ),
+                    },
+                    {
+                      key: "contact",
+                      header: "Contact",
+                      render: (c) => (
+                        <div className="text-xs">
+                          <div className="font-medium text-foreground">{c.contact}</div>
+                          <div className="text-muted-foreground">{c.designation}</div>
+                        </div>
+                      ),
+                    },
+                    {
+                      key: "onboardingManagerId",
+                      header: "Manager",
+                      sortable: true,
+                      render: (c) => (
+                        <span className="text-xs">
+                          {resolveAssigneeLabel(c.onboardingManagerId, users, employees) || "—"}
+                        </span>
+                      ),
+                    },
+                    {
+                      key: "salesAgentId",
+                      header: "Sales",
+                      sortable: true,
+                      render: (c) => (
+                        <span className="text-xs">
+                          {resolveAssigneeLabel(c.salesAgentId, users, employees) || "—"}
+                        </span>
+                      ),
+                    },
+                    {
+                      key: "startDate",
+                      header: "Dates",
+                      sortable: true,
+                      render: (c) => (
+                        <div className="text-xs tabular-nums text-muted-foreground">
+                          <div className="whitespace-nowrap">
+                            {formatDateDmy(c.startDate || c.agreementDate)}
+                          </div>
+                          <div className="whitespace-nowrap">{formatDateDmy(c.endDate)}</div>
+                        </div>
+                      ),
+                    },
+                    {
+                      key: "modules",
+                      header: "Modules",
+                      render: (c) => (
+                        <div className="flex flex-wrap gap-1">
+                          {c.modules
+                            .filter((m) => m.optedIn)
+                            .slice(0, 2)
+                            .map((m) => (
+                              <Pill key={m.moduleKey} tone="accent">
+                                {m.label}
+                              </Pill>
+                            ))}
+                          {c.modules.filter((m) => m.optedIn).length > 2 ? (
+                            <Pill>+{c.modules.filter((m) => m.optedIn).length - 2}</Pill>
+                          ) : null}
+                        </div>
+                      ),
+                    },
+                    {
+                      key: "progress",
+                      header: "Progress",
+                      sortable: true,
+                      render: (c) => (
+                        <div className="flex items-center gap-2">
+                          <ProgressBar value={c.progress} className="w-20" />
+                          <span className="text-[11px] tabular-nums text-muted-foreground">
+                            {c.progress}%
+                          </span>
+                        </div>
+                      ),
+                    },
+                    {
+                      key: "computedStatus",
+                      header: "Status",
+                      sortable: true,
+                      render: (c) => <StatusPill status={c.computedStatus} />,
+                    },
+                    {
+                      key: "projects",
+                      header: "Projects",
+                      sortable: true,
+                      render: (c) => (
+                        <span className="text-xs tabular-nums">
+                          {projectCountByCompanyId.get(c.id) ?? 0}
+                        </span>
+                      ),
+                    },
+                  ]}
+                  actions={(c) => (
+                    <div className="flex justify-end gap-0.5">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        onClick={() => openEdit(c)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        onClick={() => {
+                          setDeleting(c);
+                          setDeleteOpen(true);
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    </div>
+                  )}
+                />
+              </motion.div>
             )}
-          />
-            </div>
-          )}
-        </DesignTicketSection>
+          </div>
+        </div>
       </div>
 
       <EntityFormModal
@@ -1235,8 +1422,63 @@ function CompaniesListPage() {
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium">Deal Size</label>
-                <input type="number" step="any" {...form.register("dealSize")} className={inputClass()} />
+                <label className="text-xs font-medium">Subscription Status</label>
+                <select {...form.register("commercialStatus")} className={inputClass()}>
+                  <option value="">—</option>
+                  {COMPANY_COMMERCIAL_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium">Plan Name</label>
+                <select {...form.register("planName")} className={inputClass()}>
+                  <option value="">—</option>
+                  {COMPANY_COMMERCIAL_PLAN_NAMES.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium">Deal Value</label>
+                <input
+                  type="number"
+                  step="any"
+                  {...form.register("dealSize", { onBlur: applyGstBreakdownFromDeal })}
+                  className={inputClass()}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium">Amount with GST</label>
+                <input
+                  type="number"
+                  step="any"
+                  {...form.register("amountWithGst", { onBlur: applyGstBreakdownFromDeal })}
+                  className={inputClass()}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium">GST %</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.1"
+                  {...form.register("gstPercent", { onBlur: applyGstBreakdownFromDeal })}
+                  className={inputClass()}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium">Taxable</label>
+                <input type="number" step="any" {...form.register("taxableAmount")} className={inputClass()} />
+              </div>
+              <div>
+                <label className="text-xs font-medium">GST Amount</label>
+                <input type="number" step="any" {...form.register("gstAmount")} className={inputClass()} />
               </div>
               <div>
                 <label className="text-xs font-medium">Users Purchased</label>
@@ -1247,6 +1489,17 @@ function CompaniesListPage() {
                 <input type="number" step="any" {...form.register("totalCost")} className={inputClass()} />
               </div>
               <div>
+                <label className="text-xs font-medium">Payment Status</label>
+                <select {...form.register("paymentStatus")} className={inputClass()}>
+                  <option value="">—</option>
+                  {COMPANY_PAYMENT_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label className="text-xs font-medium">Payment Received</label>
                 <input type="number" step="any" {...form.register("paymentReceived")} className={inputClass()} />
               </div>
@@ -1254,29 +1507,98 @@ function CompaniesListPage() {
                 <label className="text-xs font-medium">Pending Amount</label>
                 <input type="number" step="any" {...form.register("pendingAmount")} className={inputClass()} />
               </div>
+              <div>
+                <label className="text-xs font-medium">Installment Amount</label>
+                <input type="number" step="any" {...form.register("installmentAmount")} className={inputClass()} />
+              </div>
+              <div>
+                <label className="text-xs font-medium">Installment Due Date</label>
+                <DatePickerField
+                  modal
+                  compact
+                  displayFormat="dd/MM/yyyy"
+                  value={form.watch("installmentDueDate") ?? ""}
+                  onChange={(v) => form.setValue("installmentDueDate", v, { shouldDirty: true })}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium">Installments</label>
+                <input type="number" min={0} step={1} {...form.register("installmentCount")} className={inputClass()} />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="text-xs font-medium">GST Number</label>
+                <input {...form.register("gstNumber")} className={inputClass()} />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="text-xs font-medium">Billing Info</label>
+                <input {...form.register("billingInfo")} placeholder="e.g. Annual plan" className={inputClass()} />
+              </div>
             </div>
+            <p className="text-[10px] text-muted-foreground">
+              Enter deal value or amount with GST and GST % — taxable and GST amount auto-fill on blur. You can
+              override them manually.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="text-xs font-medium">Start Date</label>
-              <input type="date" {...form.register("startDate")} className={inputClass(!!form.formState.errors.startDate)} />
+              <DatePickerField
+                modal
+                compact
+                displayFormat="dd/MM/yyyy"
+                value={form.watch("startDate") ?? ""}
+                onChange={(v) => form.setValue("startDate", v, { shouldDirty: true, shouldValidate: true })}
+                className="mt-1"
+              />
+              {form.formState.errors.startDate ? (
+                <p className="mt-1 text-xs text-destructive">{form.formState.errors.startDate.message}</p>
+              ) : null}
             </div>
             <div>
               <label className="text-xs font-medium">End Date</label>
-              <input type="date" {...form.register("endDate")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" />
+              <DatePickerField
+                modal
+                compact
+                displayFormat="dd/MM/yyyy"
+                value={form.watch("endDate") ?? ""}
+                onChange={(v) => form.setValue("endDate", v, { shouldDirty: true })}
+                className="mt-1"
+              />
             </div>
             <div>
               <label className="text-xs font-medium">Agreement Date</label>
-              <input type="date" {...form.register("agreementDate")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" />
+              <DatePickerField
+                modal
+                compact
+                displayFormat="dd/MM/yyyy"
+                value={form.watch("agreementDate") ?? ""}
+                onChange={(v) => form.setValue("agreementDate", v, { shouldDirty: true })}
+                className="mt-1"
+              />
             </div>
             <div>
               <label className="text-xs font-medium">Go-Live Target</label>
-              <input type="date" {...form.register("goLiveTarget")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" />
+              <DatePickerField
+                modal
+                compact
+                displayFormat="dd/MM/yyyy"
+                value={form.watch("goLiveTarget") ?? ""}
+                onChange={(v) => form.setValue("goLiveTarget", v, { shouldDirty: true })}
+                className="mt-1"
+              />
             </div>
             <div>
               <label className="text-xs font-medium">Plan Expiry</label>
-              <input type="date" {...form.register("planExpiry")} className="mt-1 h-9 w-full rounded-md border px-3 text-sm" />
+              <DatePickerField
+                modal
+                compact
+                displayFormat="dd/MM/yyyy"
+                value={form.watch("planExpiry") ?? ""}
+                onChange={(v) => form.setValue("planExpiry", v, { shouldDirty: true })}
+                className="mt-1"
+              />
             </div>
           </div>
           <div>

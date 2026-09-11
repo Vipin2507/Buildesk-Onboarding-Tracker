@@ -48,9 +48,9 @@ function parseTypedDate(raw: string): Date | undefined {
   return isValid(fallback) ? fallback : undefined;
 }
 
-function displayValue(ymd: string): string {
+function displayValue(ymd: string, displayFormat = "dd MMM yyyy"): string {
   const d = parseYmd(ymd);
-  return d ? format(d, "dd MMM yyyy") : "";
+  return d ? format(d, displayFormat) : "";
 }
 
 type DatePickerFieldProps = {
@@ -68,6 +68,8 @@ type DatePickerFieldProps = {
   /** Dense variant for table cells and inline rows. */
   compact?: boolean;
   disabled?: boolean;
+  /** How the stored YYYY-MM-DD value is shown in the text input. */
+  displayFormat?: string;
 };
 
 export function DatePickerField({
@@ -83,16 +85,17 @@ export function DatePickerField({
   modal = false,
   compact = false,
   disabled = false,
+  displayFormat = "dd MMM yyyy",
 }: DatePickerFieldProps) {
   const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState(() => displayValue(value));
+  const [draft, setDraft] = useState(() => displayValue(value, displayFormat));
   const selected = useMemo(() => parseYmd(value), [value]);
   const minDate = useMemo(() => parseYmd(min ?? ""), [min]);
   const maxDate = useMemo(() => parseYmd(max ?? ""), [max]);
 
   useEffect(() => {
-    setDraft(displayValue(value));
-  }, [value]);
+    setDraft(displayValue(value, displayFormat));
+  }, [value, displayFormat]);
 
   // Stable month bounds — new Date() every render previously caused DayPicker update loops (#185).
   const startMonth = useMemo(() => {
@@ -124,20 +127,20 @@ export function DatePickerField({
     }
     const parsed = parseTypedDate(trimmed);
     if (!parsed) {
-      setDraft(displayValue(value));
+      setDraft(displayValue(value, displayFormat));
       return;
     }
     if (minDate && parsed < minDate) {
-      setDraft(displayValue(value));
+      setDraft(displayValue(value, displayFormat));
       return;
     }
     if (maxDate && parsed > maxDate) {
-      setDraft(displayValue(value));
+      setDraft(displayValue(value, displayFormat));
       return;
     }
     const next = toYmd(parsed);
     onChange(next);
-    setDraft(format(parsed, "dd MMM yyyy"));
+    setDraft(format(parsed, displayFormat));
   }
 
   return (
@@ -160,7 +163,7 @@ export function DatePickerField({
               (e.target as HTMLInputElement).blur();
             }
             if (e.key === "Escape") {
-              setDraft(displayValue(value));
+              setDraft(displayValue(value, displayFormat));
               (e.target as HTMLInputElement).blur();
             }
           }}
@@ -228,7 +231,7 @@ export function DatePickerField({
                   setDraft("");
                 } else {
                   onChange(toYmd(date));
-                  setDraft(format(date, "dd MMM yyyy"));
+                  setDraft(format(date, displayFormat));
                 }
                 setOpen(false);
               }}
