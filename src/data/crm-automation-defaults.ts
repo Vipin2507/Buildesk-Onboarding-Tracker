@@ -106,7 +106,8 @@ export function crmAutomationRuleNeedsSeedSync(
   }
 
   if (seed.id === "crm-rule-payment-executive-whatsapp") {
-    if (existing.templateBody?.includes("{{digestDetails}}")) return false;
+    if (existing.templateBody?.trim() === "{{digestBody}}") return false;
+    if (existing.templateBody?.includes("payment reminder ({{accountCount}}")) return true;
     return existing.templateBody !== seed.templateBody || existing.description !== seed.description;
   }
 
@@ -309,8 +310,7 @@ export const DEFAULT_CRM_AUTOMATION_RULES: AutomationRule[] = [
     trigger: "payment-executive-remind",
     channel: "whatsapp",
     isActive: true,
-    templateBody:
-      "Hi {{executiveName}}, payment reminder ({{accountCount}} account(s)):\n\n{{digestDetails}}\n\nCRM → Payments.",
+    templateBody: "{{digestBody}}",
   }),
   rule({
     id: "crm-rule-query-response-whatsapp",
@@ -376,6 +376,7 @@ export const CRM_AUTOMATION_TEMPLATE_VARS = [
   "{{accountCount}}",
   "{{digestDetails}}",
   "{{digestBody}}",
+  "{{totalOutstanding}}",
   "{{authorName}}",
   "{{messageSnippet}}",
   "{{queryUrl}}",
@@ -420,9 +421,10 @@ export const CRM_AUTOMATION_SAMPLE_VARS: Record<string, string> = {
   executiveName: "Priya Sales",
   accountCount: "2",
   digestDetails:
-    "1. Horizon Realty\n   Overdue: ₹250,000 (5 day(s) overdue) · Due: 2026-09-10\n   Pending: ₹750,000 · Received: ₹500,000 of ₹1,250,000\n   Sales manager: Priya Sales · Support 1: Anita Support · Support 2: Ravi Support\n\n2. Skyline Developers\n   Overdue: ₹120,000 (2 day(s) overdue) · Due: 2026-09-12\n   Pending: ₹350,000 · Received: ₹500,000 of ₹850,000\n   Sales manager: Priya Sales · Support 1: Anita Support · Support 2: —",
+    "1. Horizon Realty\n🔴 Overdue: ₹2,50,000 (5 days)\n📅 Due: 10 Sept 2026\n💰 Pending: ₹7,50,000\n✅ Received: ₹5,00,000 / ₹12,50,000\n👤 Support: Anita Support, Ravi Support\n\n2. Skyline Developers\n🔴 Overdue: ₹1,20,000 (2 days)\n📅 Due: 12 Sept 2026\n💰 Pending: ₹3,50,000\n✅ Received: ₹5,00,000 / ₹8,50,000\n👤 Support: Anita Support",
   digestBody:
-    "Hi Priya Sales,\n\nThe following CRM account payments are overdue:\n\n1. Horizon Realty\n   …\n\nPlease follow up with clients and review details in CRM → Payments.",
+    "Hi Priya Sales,\n\n🔔 PAYMENT REMINDER — 2 ACCOUNTS\n\nPlease find below the accounts with overdue payments:\n\n…\n\n📌 TOTAL OUTSTANDING: ₹3,70,000\n\nRequest you to please review these accounts and ensure the necessary payment follow-up and closure.\n\n🔗 CRM → Payments",
+  totalOutstanding: "370000",
   authorName: "Amit Verma",
   messageSnippet: "Can we get an update on the onboarding checklist?",
   queryUrl: "https://track.example.com/crm/accounts/acme?tab=queries&queryId=q-1001",

@@ -1,5 +1,7 @@
 /** Shared types and message formatting for executive overdue payment digests. */
 
+import { formatDate } from "@/lib/utils";
+
 export type ExecutiveDigestAccountLine = {
   accountId: string;
   accountName: string;
@@ -34,25 +36,43 @@ export type ExecutiveDigestDelivery = {
 };
 
 function formatInr(value: number) {
-  return `₹${value.toLocaleString("en-IN")}`;
+  return `₹${Math.round(value).toLocaleString("en-IN")}`;
 }
 
-function managerLabel(value?: string) {
-  const trimmed = value?.trim();
-  return trimmed || "—";
+function formatSupportNames(a: ExecutiveDigestAccountLine): string {
+  const names = [a.supportManager1, a.supportManager2]
+    .map((v) => v?.trim())
+    .filter((v): v is string => Boolean(v));
+  return names.length > 0 ? names.join(", ") : "—";
+}
+
+function formatOverdueDaysLabel(days: number | null): string {
+  if (days == null || days <= 0) return "overdue";
+  return `${days} day${days === 1 ? "" : "s"}`;
+}
+
+export function formatExecutiveDigestAccountBlock(
+  a: ExecutiveDigestAccountLine,
+  index: number,
+): string {
+  return [
+    `${index + 1}. ${a.accountName}`,
+    `🔴 Overdue: ${formatInr(a.overdueAmount)} (${formatOverdueDaysLabel(a.overdueDays)})`,
+    `📅 Due: ${formatDate(a.dueDate)}`,
+    `💰 Pending: ${formatInr(a.pendingAmount)}`,
+    `✅ Received: ${formatInr(a.paymentReceived)} / ${formatInr(a.totalDealValue)}`,
+    `👤 Support: ${formatSupportNames(a)}`,
+  ].join("\n");
 }
 
 export function formatExecutiveDigestAccountLines(accounts: ExecutiveDigestAccountLine[]): string {
   return accounts
-    .map((a, i) => {
-      const overdueLabel =
-        a.overdueDays != null && a.overdueDays > 0
-          ? `${a.overdueDays} day(s) overdue`
-          : "overdue";
-      const due = a.dueDate?.slice(0, 10) ?? "—";
-      return `${i + 1}. ${a.accountName}\n   Overdue: ${formatInr(a.overdueAmount)} (${overdueLabel}) · Due: ${due}\n   Pending: ${formatInr(a.pendingAmount)} · Received: ${formatInr(a.paymentReceived)} of ${formatInr(a.totalDealValue)}\n   Sales manager: ${managerLabel(a.salesManager)} · Support 1: ${managerLabel(a.supportManager1)} · Support 2: ${managerLabel(a.supportManager2)}`;
-    })
+    .map((a, i) => formatExecutiveDigestAccountBlock(a, i))
     .join("\n\n");
+}
+
+export function sumExecutiveDigestOverdue(accounts: ExecutiveDigestAccountLine[]): number {
+  return accounts.reduce((sum, a) => sum + (a.overdueAmount > 0 ? a.overdueAmount : 0), 0);
 }
 
 export function buildExecutiveDigestTemplateVars(
@@ -60,13 +80,29 @@ export function buildExecutiveDigestTemplateVars(
   accounts: ExecutiveDigestAccountLine[],
 ): Record<string, string> {
   const digestDetails = formatExecutiveDigestAccountLines(accounts);
+  const totalOutstanding = sumExecutiveDigestOverdue(accounts);
   const primary = accounts[0];
   const accountCount = accounts.length;
-  const subject = `Overdue payments digest — ${accountCount} account${accountCount === 1 ? "" : "s"}`;
+  const accountLabel = accountCount === 1 ? "1 ACCOUNT" : `${accountCount} ACCOUNTS`;
+  const subject = `Payment reminder — ${accountCount} account${accountCount === 1 ? "" : "s"}`;
   const body =
     accountCount === 0
       ? `Hi ${recipientName},\n\nNo overdue accounts in this digest.`
-      : `Hi ${recipientName},\n\nThe following CRM account payments are overdue:\n\n${digestDetails}\n\nPlease follow up with clients and review details in CRM → Payments.`;
+      : [
+          `Hi ${recipientName},`,
+          "",
+          `🔔 PAYMENT REMINDER — ${accountLabel}`,
+          "",
+          "Please find below the accounts with overdue payments:",
+          "",
+          digestDetails,
+          "",
+          `📌 TOTAL OUTSTANDING: ${formatInr(totalOutstanding)}`,
+          "",
+          "Request you to please review these accounts and ensure the necessary payment follow-up and closure.",
+          "",
+          "🔗 CRM → Payments",
+        ].join("\n");
 
   return {
     executiveName: recipientName,
@@ -78,6 +114,7 @@ export function buildExecutiveDigestTemplateVars(
     companyName: primary?.accountName ?? "CRM Payments",
     digestDetails,
     digestBody: body,
+    totalOutstanding: String(Math.round(totalOutstanding)),
     subject,
     title: subject,
     status: "overdue",
