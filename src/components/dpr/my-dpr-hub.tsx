@@ -218,9 +218,9 @@ export function MyDprHub() {
       <DprStatStrip items={stats} />
 
       <DesignTicketSection title="Quick add">
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="min-w-[140px] flex-1">
-            <Label className="text-xs">Category</Label>
+        <div className="flex flex-wrap items-end gap-x-2 gap-y-3">
+          <div className="flex min-w-[140px] flex-1 flex-col gap-1.5">
+            <Label className="flex min-h-[1rem] items-center text-xs">Category</Label>
             <Select
               value={category}
               onValueChange={(v) => {
@@ -241,8 +241,8 @@ export function MyDprHub() {
               </SelectContent>
             </Select>
           </div>
-          <div className="min-w-[140px] flex-1">
-            <Label className="text-xs">Subcategory</Label>
+          <div className="flex min-w-[140px] flex-1 flex-col gap-1.5">
+            <Label className="flex min-h-[1rem] items-center text-xs">Subcategory</Label>
             <Select value={subcategory} onValueChange={setSubcategory} disabled={!category}>
               <SelectTrigger className="h-8 text-xs">
                 <SelectValue placeholder="Subcategory" />
@@ -256,8 +256,17 @@ export function MyDprHub() {
               </SelectContent>
             </Select>
           </div>
-          <div className="min-w-[160px] flex-[2]">
-            <Label className="text-xs">Client</Label>
+          <div className="flex min-w-[160px] flex-[2] flex-col gap-1.5">
+            <div className="flex min-h-[1rem] items-center justify-between gap-2">
+              <Label className="text-xs">Client</Label>
+              <button
+                type="button"
+                className="shrink-0 text-[10px] font-normal text-primary hover:underline"
+                onClick={() => setUseFreeTextClient((v) => !v)}
+              >
+                {useFreeTextClient ? "Pick from companies" : "Use free text"}
+              </button>
+            </div>
             {useFreeTextClient ? (
               <Input
                 className="h-8 text-xs"
@@ -279,16 +288,9 @@ export function MyDprHub() {
                 </SelectContent>
               </Select>
             )}
-            <button
-              type="button"
-              className="mt-0.5 text-[10px] text-primary hover:underline"
-              onClick={() => setUseFreeTextClient((v) => !v)}
-            >
-              {useFreeTextClient ? "Pick from companies" : "Use free text"}
-            </button>
           </div>
-          <div className="min-w-[140px] flex-[2]">
-            <Label className="text-xs">Task name</Label>
+          <div className="flex min-w-[140px] flex-[2] flex-col gap-1.5">
+            <Label className="flex min-h-[1rem] items-center text-xs">Task name</Label>
             <Input
               className="h-8 text-xs"
               value={taskName}
@@ -296,8 +298,8 @@ export function MyDprHub() {
               placeholder="What did you work on?"
             />
           </div>
-          <div className="w-[100px]">
-            <Label className="text-xs">Priority</Label>
+          <div className="flex w-[100px] flex-col gap-1.5">
+            <Label className="flex min-h-[1rem] items-center text-xs">Priority</Label>
             <Select value={priority} onValueChange={(v) => setPriority(v as DprPriority)}>
               <SelectTrigger className="h-8 text-xs">
                 <SelectValue />
