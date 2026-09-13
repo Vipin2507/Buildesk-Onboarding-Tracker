@@ -14,6 +14,7 @@ import {
   CRM_PAYMENT_AUTOMATION_TRIGGERS,
   CRM_QUERY_AUTOMATION_TRIGGERS,
   CRM_TASK_AUTOMATION_TRIGGERS,
+  mergeCrmAutomationRules,
 } from "@/data/crm-automation-defaults";
 import {
   AUTOMATION_TRIGGERS,
@@ -119,7 +120,8 @@ function buildRuleColumns(
 }
 
 export function AutomationRulesPanel() {
-  const rules = useCrmAutomationStore((s) => s.rules);
+  const storedRules = useCrmAutomationStore((s) => s.rules);
+  const rules = useMemo(() => mergeCrmAutomationRules(storedRules), [storedRules]);
   const rulesEnabled = useCrmAutomationStore((s) => s.settings.automationsEnabled);
   const setSettings = useCrmAutomationStore((s) => s.setSettings);
   const deleteRule = useCrmAutomationStore((s) => s.deleteRule);

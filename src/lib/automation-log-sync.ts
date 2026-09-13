@@ -87,3 +87,17 @@ export async function fetchAutomationLogsFromServer(
     throw err;
   }
 }
+
+/** Replace in-memory CRM/ERP automation logs with the latest SQLite snapshot. */
+export async function refreshAutomationLogsInStore(key: AutomationLogConfigKey): Promise<boolean> {
+  const next = await fetchAutomationLogsFromServer(key);
+  if (next === null) return false;
+  if (key === "crm-automation") {
+    const { useCrmAutomationStore } = await import("@/stores/useCrmAutomationStore");
+    useCrmAutomationStore.setState({ logs: next.slice(0, MAX_LOGS) });
+  } else {
+    const { useAutomationStore } = await import("@/stores/useAutomationStore");
+    useAutomationStore.setState({ logs: next.slice(0, MAX_LOGS) });
+  }
+  return true;
+}

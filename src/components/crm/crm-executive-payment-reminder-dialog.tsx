@@ -23,6 +23,7 @@ import {
   usePreviewExecutivePaymentDigest,
   useSendExecutivePaymentDigest,
 } from "@/hooks/use-crm-payments";
+import { refreshAutomationLogsInStore } from "@/lib/automation-log-sync";
 import { cn, formatDate, formatInr } from "@/lib/utils";
 
 export function CrmExecutivePaymentReminderDialog({
@@ -131,9 +132,10 @@ export function CrmExecutivePaymentReminderDialog({
         return;
       }
       toast.success(
-        `Sent ${res.sent} digest email${res.sent === 1 ? "" : "s"}` +
+        `Sent ${res.sent} digest${res.sent === 1 ? "" : "s"}` +
           (res.failed > 0 ? ` · ${res.failed} failed` : ""),
       );
+      void refreshAutomationLogsInStore("crm-automation");
       onOpenChange(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to send digest");

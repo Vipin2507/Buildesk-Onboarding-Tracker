@@ -82,13 +82,91 @@ export const CRM_QUERY_AUTOMATION_TRIGGERS = ["query-response"] as const;
 
 export const DEFAULT_TASK_REMINDER_OFFSET_MINUTES = 15;
 
-/** Merge seed rules by id so booking automations appear even on older saved configs. */
+const CRM_AUTOMATION_SEED_SYNC_RULE_IDS = new Set([
+  "crm-rule-payment-executive-email",
+  "crm-rule-payment-executive-whatsapp",
+  "crm-rule-query-response-email",
+  "crm-rule-query-response-whatsapp",
+]);
+
+/** True when a saved rule still has pre-digest copy/templates and should pick up seed defaults. */
+export function crmAutomationRuleNeedsSeedSync(
+  existing: AutomationRule,
+  seed: AutomationRule,
+): boolean {
+  if (!CRM_AUTOMATION_SEED_SYNC_RULE_IDS.has(seed.id)) return false;
+  if (existing.id !== seed.id) return false;
+
+  if (seed.id === "crm-rule-payment-executive-email") {
+    if (existing.templateBody?.includes("{{digestBody}}")) return false;
+    if (existing.description?.includes("overdue payments digest")) return false;
+    if (existing.description?.includes("sales manager and support managers")) return true;
+    if (existing.templateBody?.includes("Payment collection update")) return true;
+    return existing.templateSubject !== seed.templateSubject || existing.templateBody !== seed.templateBody;
+  }
+
+  if (seed.id === "crm-rule-payment-executive-whatsapp") {
+    if (existing.templateBody?.includes("{{digestDetails}}")) return false;
+    return existing.templateBody !== seed.templateBody || existing.description !== seed.description;
+  }
+
+  if (seed.trigger === "query-response") {
+    if (existing.description === seed.description && existing.templateBody === seed.templateBody) {
+      return false;
+    }
+    if (!existing.description?.includes("replied on a query") && seed.description?.includes("replied on a query")) {
+      return true;
+    }
+  }
+
+  return (
+    existing.name !== seed.name ||
+    existing.description !== seed.description ||
+    existing.templateSubject !== seed.templateSubject ||
+    existing.templateBody !== seed.templateBody
+  );
+}
+
+function applyCrmAutomationSeedSync(existing: AutomationRule, seed: AutomationRule): AutomationRule {
+  if (!crmAutomationRuleNeedsSeedSync(existing, seed)) return existing;
+  return {
+    ...existing,
+    name: seed.name,
+    description: seed.description,
+    templateSubject: seed.templateSubject,
+    templateBody: seed.templateBody,
+    updatedAt: nowIso(),
+  };
+}
+
+/** Merge seed rules by id so new automations appear on older saved configs; patch legacy payment/query templates. */
 export function mergeCrmAutomationRules(existing: AutomationRule[]): AutomationRule[] {
   const byId = new Map(existing.map((r) => [r.id, r]));
   for (const seed of DEFAULT_CRM_AUTOMATION_RULES) {
-    if (!byId.has(seed.id)) byId.set(seed.id, seed);
+    const current = byId.get(seed.id);
+    if (!current) {
+      byId.set(seed.id, seed);
+      continue;
+    }
+    byId.set(seed.id, applyCrmAutomationSeedSync(current, seed));
   }
   return [...byId.values()];
+}
+
+export function crmAutomationRulesDifferFromMerge(existing: AutomationRule[]): boolean {
+  const merged = mergeCrmAutomationRules(existing);
+  if (merged.length !== existing.length) return true;
+  const byId = new Map(existing.map((r) => [r.id, r]));
+  return merged.some((r) => {
+    const prev = byId.get(r.id);
+    if (!prev) return true;
+    return (
+      prev.name !== r.name ||
+      prev.description !== r.description ||
+      prev.templateSubject !== r.templateSubject ||
+      prev.templateBody !== r.templateBody
+    );
+  });
 }
 
 /** Seed rules for CRM Support Desk tickets (account-scoped). */

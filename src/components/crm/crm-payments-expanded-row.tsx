@@ -12,6 +12,7 @@ import {
   useRemindCrmPayment,
   useRemindCrmPaymentExecutive,
 } from "@/hooks/use-crm-payments";
+import { refreshAutomationLogsInStore } from "@/lib/automation-log-sync";
 import type { CrmPaymentsSearch } from "@/lib/crm-payments-search";
 import { cn, formatDate } from "@/lib/utils";
 
@@ -61,6 +62,7 @@ export function CrmPaymentsExpandedRow({ row, search }: Props) {
     try {
       await remindClient.mutateAsync(row.id);
       toast.success("Client payment reminder sent");
+      void refreshAutomationLogsInStore("crm-automation");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to send client reminder");
     }
@@ -74,6 +76,7 @@ export function CrmPaymentsExpandedRow({ row, search }: Props) {
           ? `Executive reminder sent to ${result.recipientCount} recipients`
           : "Executive reminder sent",
       );
+      void refreshAutomationLogsInStore("crm-automation");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to send executive reminder");
     }

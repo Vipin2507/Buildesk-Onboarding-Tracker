@@ -630,19 +630,8 @@ export const setAppConfig = createServerFn({ method: "POST" })
     const now = nowIso();
     let value = data.value as Record<string, unknown>;
     // Never wipe durable automation logs when persisting settings/rules from the client.
-    if (
-      (data.key === "automation" || data.key === "crm-automation") &&
-      existing?.valueJson &&
-      !("logs" in value)
-    ) {
-      try {
-        const prev = JSON.parse(existing.valueJson) as Record<string, unknown>;
-        if (Array.isArray(prev.logs)) {
-          value = { ...value, logs: prev.logs };
-        }
-      } catch {
-        /* keep incoming value */
-      }
+    if ((data.key === "automation" || data.key === "crm-automation") && !("logs" in value)) {
+      value = { ...value, logs: readAutomationLogsFromConfig(db, data.key) };
     }
     const valueJson = JSON.stringify(value);
     if (existing) {

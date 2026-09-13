@@ -12,7 +12,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { CRM_BOOKING_AUTOMATION_TRIGGERS } from "@/data/crm-automation-defaults";
+import {
+  CRM_BOOKING_AUTOMATION_TRIGGERS,
+  CRM_PAYMENT_AUTOMATION_TRIGGERS,
+} from "@/data/crm-automation-defaults";
 import { fetchAutomationLogsFromServer } from "@/lib/automation-log-sync";
 import { retryCrmAutomationLog } from "@/services/crm-automation";
 import { useCrmAutomationStore } from "@/stores/useCrmAutomationStore";
@@ -33,11 +36,12 @@ const TRIGGER_LABEL = Object.fromEntries(AUTOMATION_TRIGGERS.map((t) => [t.value
 >;
 
 const BOOKING_TRIGGER_SET = new Set<string>(CRM_BOOKING_AUTOMATION_TRIGGERS);
+const PAYMENT_TRIGGER_SET = new Set<string>(CRM_PAYMENT_AUTOMATION_TRIGGERS);
 
 const AUTOMATION_LOG_FILTER_DEFAULTS: {
   statusFilter: "all" | AutomationLogStatus;
   channelFilter: "all" | "email" | "whatsapp";
-  scopeFilter: "all" | "bookings" | "tickets";
+  scopeFilter: "all" | "bookings" | "payments" | "tickets";
 } = {
   statusFilter: "all",
   channelFilter: "all",
@@ -68,7 +72,7 @@ export function AutomationLogsPanel() {
     [setListFilters],
   );
   const setScopeFilter = useCallback(
-    (value: "all" | "bookings" | "tickets") => setListFilters({ scopeFilter: value }),
+    (value: "all" | "bookings" | "payments" | "tickets") => setListFilters({ scopeFilter: value }),
     [setListFilters],
   );
   const [retryingId, setRetryingId] = useState<string | null>(null);
@@ -90,22 +94,23 @@ export function AutomationLogsPanel() {
     }
   }, []);
 
-  // Logs are hydrated on app bootstrap; refresh manually or when empty.
+  // Pull latest logs from SQLite whenever the Logs tab is opened (server sends may have run elsewhere).
   useEffect(() => {
-    if (useCrmAutomationStore.getState().logs.length > 0) return;
-    void fetchAutomationLogsFromServer("crm-automation").then((next) => {
-      if (next && next.length > 0) {
-        useCrmAutomationStore.setState({ logs: next.slice(0, 500) });
-      }
-    });
-  }, []);
+    void refreshLogs();
+  }, [refreshLogs]);
 
   const filtered = useMemo(() => {
     return logs.filter((l) => {
       if (statusFilter !== "all" && l.status !== statusFilter) return false;
       if (channelFilter !== "all" && l.channel !== channelFilter) return false;
       if (scopeFilter === "bookings" && !BOOKING_TRIGGER_SET.has(l.trigger)) return false;
-      if (scopeFilter === "tickets" && BOOKING_TRIGGER_SET.has(l.trigger)) return false;
+      if (scopeFilter === "payments" && !PAYMENT_TRIGGER_SET.has(l.trigger)) return false;
+      if (
+        scopeFilter === "tickets" &&
+        (BOOKING_TRIGGER_SET.has(l.trigger) || PAYMENT_TRIGGER_SET.has(l.trigger))
+      ) {
+        return false;
+      }
       return true;
     });
   }, [logs, statusFilter, channelFilter, scopeFilter]);
@@ -235,6 +240,7 @@ export function AutomationLogsPanel() {
         >
           <option value="all">All types</option>
           <option value="bookings">Meetings</option>
+          <option value="payments">Payments</option>
           <option value="tickets">Tickets</option>
         </select>
       </div>

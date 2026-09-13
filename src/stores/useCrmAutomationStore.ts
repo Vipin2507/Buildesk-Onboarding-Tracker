@@ -13,6 +13,7 @@ import {
   DEFAULT_CRM_AUTOMATION_SETTINGS,
   DEFAULT_CRM_HEALTH_CONFIG,
   DEFAULT_CRM_WAHA_CONFIG,
+  crmAutomationRulesDifferFromMerge,
   mergeCrmAutomationRules,
 } from "@/data/crm-automation-defaults";
 import { createPersistedStore, touch } from "./persist";
@@ -89,7 +90,7 @@ export const useCrmAutomationStore = createPersistedStore<AutomationState>(
 
       const existingRules = s.rules.length > 0 ? s.rules : DEFAULT_CRM_AUTOMATION_RULES;
       const mergedRules = mergeCrmAutomationRules(existingRules);
-      const addedSeedRules = mergedRules.length > existingRules.length;
+      const rulesNeedUpdate = crmAutomationRulesDifferFromMerge(existingRules);
 
       if (
         s.seeded &&
@@ -98,7 +99,7 @@ export const useCrmAutomationStore = createPersistedStore<AutomationState>(
         !needsProvider &&
         !needsSettings &&
         !usesLegacyCrmSegment &&
-        !addedSeedRules
+        !rulesNeedUpdate
       ) {
         return;
       }
