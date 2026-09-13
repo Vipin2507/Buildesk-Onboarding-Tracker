@@ -92,7 +92,10 @@ function filterAndSortEntries(
   if (filters.clientId) out = out.filter((r) => r.clientId === filters.clientId);
   if (filters.status) out = out.filter((r) => r.status === filters.status);
   if (filters.priority) out = out.filter((r) => r.priority === filters.priority);
-  if (filters.entryDate) out = out.filter((r) => r.entryDate === filters.entryDate.slice(0, 10));
+  if (filters.entryDate) {
+    const entryDate = filters.entryDate.slice(0, 10);
+    out = out.filter((r) => r.entryDate === entryDate);
+  }
   if (filters.dateFrom) {
     const from = filters.dateFrom.slice(0, 10);
     out = out.filter((r) => r.entryDate >= from);

@@ -75,7 +75,7 @@ export async function remindDprExecutives(executiveIds: string[], entryDate?: st
   insertNotificationsForUserIds(db, unique, {
     title: "DPR not submitted",
     body: `Please log your DPR for ${date} in My DPR.`,
-    kind: "reminder",
+    kind: "warning",
     href: "/dpr",
   });
 
