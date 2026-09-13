@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { dprSubcategoriesForCategory } from "@/data/dpr-catalog";
 import {
   useCreateDprEntry,
   useCreateDprFromTemplate,
@@ -84,10 +85,10 @@ export function MyDprHub() {
 
   const { data: templates } = useDprTemplates(category, subcategory);
 
-  const subcategories = useMemo(() => {
-    if (!categories || !category) return [];
-    return (categories as Record<string, string[]>)[category] ?? [];
-  }, [categories, category]);
+  const subcategories = useMemo(
+    () => dprSubcategoriesForCategory(categories, category),
+    [categories, category],
+  );
 
   const entries = listData?.items ?? [];
   const submitted = submission?.submitted === true;

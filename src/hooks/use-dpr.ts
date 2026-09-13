@@ -13,6 +13,11 @@ import {
   submitDprDay,
   updateDprEntry,
 } from "@/lib/api";
+import type {
+  CreateDprEntryInput,
+  CreateDprFromTemplateInput,
+  UpdateDprEntryInput,
+} from "@/server/api/dpr";
 import type { dprTrackerSearchToApiFilters } from "@/lib/dpr-tracker-search";
 
 export const dprKeys = {
@@ -83,8 +88,7 @@ function invalidateDprQueries(queryClient: ReturnType<typeof useQueryClient>, en
 export function useCreateDprEntry(entryDate: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: Parameters<typeof createDprEntry>[0]["data"]) =>
-      createDprEntry({ data: input }),
+    mutationFn: (input: CreateDprEntryInput) => createDprEntry({ data: input }),
     onSuccess: () => invalidateDprQueries(queryClient, entryDate),
   });
 }
@@ -92,7 +96,7 @@ export function useCreateDprEntry(entryDate: string) {
 export function useCreateDprFromTemplate(entryDate: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: Parameters<typeof createDprEntriesFromTemplate>[0]["data"]) =>
+    mutationFn: (input: CreateDprFromTemplateInput) =>
       createDprEntriesFromTemplate({ data: input }),
     onSuccess: () => invalidateDprQueries(queryClient, entryDate),
   });
@@ -101,8 +105,7 @@ export function useCreateDprFromTemplate(entryDate: string) {
 export function useUpdateDprEntry(entryDate: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: Parameters<typeof updateDprEntry>[0]["data"]) =>
-      updateDprEntry({ data: input }),
+    mutationFn: (input: UpdateDprEntryInput) => updateDprEntry({ data: input }),
     onSuccess: () => invalidateDprQueries(queryClient, entryDate),
   });
 }

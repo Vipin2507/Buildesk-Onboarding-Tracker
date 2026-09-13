@@ -211,7 +211,7 @@ export const listDprEntries = createServerFn({ method: "GET" })
     };
   });
 
-const createEntrySchema = z.object({
+export const createDprEntryInputSchema = z.object({
   executiveId: z.string().optional(),
   entryDate: z.string(),
   category: z.string(),
@@ -237,7 +237,7 @@ function validatePendingFields(status: string, pendingReason?: string | null) {
 }
 
 export const createDprEntry = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => createEntrySchema.parse(data))
+  .inputValidator((data: unknown) => createDprEntryInputSchema.parse(data))
   .handler(async ({ data }) => {
     const user = assertCanManageDpr();
     const db = getDb();
@@ -300,18 +300,16 @@ function pendingReasonTrim(v?: string | null) {
   return t;
 }
 
+export const createDprFromTemplateInputSchema = z.object({
+  templateId: z.string(),
+  clientId: z.string().nullable().optional(),
+  clientNameFreeText: z.string().nullable().optional(),
+  executiveId: z.string().optional(),
+  entryDate: z.string(),
+});
+
 export const createDprEntriesFromTemplate = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) =>
-    z
-      .object({
-        templateId: z.string(),
-        clientId: z.string().nullable().optional(),
-        clientNameFreeText: z.string().nullable().optional(),
-        executiveId: z.string().optional(),
-        entryDate: z.string(),
-      })
-      .parse(data),
-  )
+  .inputValidator((data: unknown) => createDprFromTemplateInputSchema.parse(data))
   .handler(async ({ data }) => {
     const user = assertCanManageDpr();
     const db = getDb();
@@ -377,7 +375,7 @@ export const createDprEntriesFromTemplate = createServerFn({ method: "POST" })
     return hydrateDprEntries(rows);
   });
 
-const patchEntrySchema = z.object({
+export const updateDprEntryInputSchema = z.object({
   id: z.string(),
   status: statusSchema.optional(),
   priority: prioritySchema.optional(),
@@ -389,8 +387,12 @@ const patchEntrySchema = z.object({
   taskDescription: z.string().nullable().optional(),
 });
 
+export type CreateDprEntryInput = z.infer<typeof createDprEntryInputSchema>;
+export type CreateDprFromTemplateInput = z.infer<typeof createDprFromTemplateInputSchema>;
+export type UpdateDprEntryInput = z.infer<typeof updateDprEntryInputSchema>;
+
 export const updateDprEntry = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => patchEntrySchema.parse(data))
+  .inputValidator((data: unknown) => updateDprEntryInputSchema.parse(data))
   .handler(async ({ data }) => {
     const user = requireUser();
     const db = getDb();

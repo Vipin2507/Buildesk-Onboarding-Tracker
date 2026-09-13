@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { dprSubcategoriesForCategory } from "@/data/dpr-catalog";
 import {
   useDprCategories,
   useDprCompliance,
@@ -65,10 +66,10 @@ export function DprTrackerHub({ search, onSearchChange }: Props) {
   const notSubmitted =
     compliance?.executives.filter((e) => !e.hasSubmitted) ?? [];
 
-  const subcategories = useMemo(() => {
-    if (!categories || !search.category) return [];
-    return (categories as Record<string, string[]>)[search.category] ?? [];
-  }, [categories, search.category]);
+  const subcategories = useMemo(
+    () => dprSubcategoriesForCategory(categories, search.category ?? ""),
+    [categories, search.category],
+  );
 
   const stats = [
     { id: "total", label: "Total tasks", value: summary?.totalEntries ?? 0 },
@@ -116,12 +117,12 @@ export function DprTrackerHub({ search, onSearchChange }: Props) {
     downloadCsv(
       `dpr-tracker-${filters.dateFrom}-${filters.dateTo}.csv`,
       [
-        { key: "executive", header: "Executive" },
-        { key: "category", header: "Category" },
-        { key: "task", header: "Task" },
-        { key: "client", header: "Client" },
-        { key: "status", header: "Status" },
-        { key: "followUp", header: "Follow-up" },
+        { key: "executive", label: "Executive" },
+        { key: "category", label: "Category" },
+        { key: "task", label: "Task" },
+        { key: "client", label: "Client" },
+        { key: "status", label: "Status" },
+        { key: "followUp", label: "Follow-up" },
       ],
       entries.map((e) => ({
         executive: e.executiveName ?? "",

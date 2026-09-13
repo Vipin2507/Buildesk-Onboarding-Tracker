@@ -46,6 +46,16 @@ export const DPR_CATALOG_CATEGORIES = Object.keys(
   DPR_CATEGORY_SUBCATEGORIES,
 ) as DprCatalogCategory[];
 
+export type DprCategoriesMap = typeof DPR_CATEGORY_SUBCATEGORIES;
+
+export function dprSubcategoriesForCategory(
+  catalog: DprCategoriesMap | undefined,
+  category: string,
+): string[] {
+  if (!catalog || !isValidDprCategory(category)) return [];
+  return [...catalog[category]];
+}
+
 export function isValidDprCategory(value: string): value is DprCatalogCategory {
   return value in DPR_CATEGORY_SUBCATEGORIES;
 }
