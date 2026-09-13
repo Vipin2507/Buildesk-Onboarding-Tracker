@@ -38,6 +38,13 @@ function serverLogId() {
   return `PAY-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
+/** Delay between payment automation sends (email ↔ WhatsApp, recipient ↔ recipient). */
+export const PAYMENT_AUTOMATION_SEND_PAUSE_MS = 400;
+
+function pauseBetweenPaymentSends() {
+  return new Promise<void>((resolve) => setTimeout(resolve, PAYMENT_AUTOMATION_SEND_PAUSE_MS));
+}
+
 function listActiveCrmUsers(db: ReturnType<typeof getDb>) {
   return db
     .select()
@@ -270,7 +277,9 @@ async function dispatchPaymentWhatsappRule(
   if (!chatId) return false;
 
   let sent = false;
-  for (const rule of rules) {
+  for (let ruleIndex = 0; ruleIndex < rules.length; ruleIndex++) {
+    const rule = rules[ruleIndex]!;
+    if (ruleIndex > 0) await pauseBetweenPaymentSends();
     const message = renderAutomationTemplate(rule.templateBody, opts.vars);
     const attemptedAt = nowIso();
     const baseLog: AutomationLog = {
@@ -328,20 +337,38 @@ export async function dispatchExecutivePaymentChannels(
     entityId?: string;
   },
 ): Promise<ExecutivePaymentChannelResult> {
-  const email = await dispatchPaymentEmailRule(db, {
-    trigger: "payment-executive-remind",
-    account: opts.account,
-    recipientEmail: opts.recipientEmail,
-    recipientName: opts.recipientName,
-    recipientPhone: opts.recipientPhone,
-    vars: opts.vars,
-  });
-  const whatsapp = await dispatchPaymentWhatsappRule(db, {
-    trigger: "payment-executive-remind",
-    account: opts.account,
-    recipientPhone: opts.recipientPhone,
-    vars: opts.vars,
-  });
+  const config = loadCrmAutomationConfig(db);
+  const emailRulesActive = config.rules.some(
+    (r) => r.isActive && r.trigger === "payment-executive-remind" && r.channel === "email",
+  );
+  const whatsappRulesActive = config.rules.some(
+    (r) => r.isActive && r.trigger === "payment-executive-remind" && r.channel === "whatsapp",
+  );
+
+  let email = false;
+  let whatsapp = false;
+
+  if (emailRulesActive && opts.recipientEmail.trim()) {
+    email = await dispatchPaymentEmailRule(db, {
+      trigger: "payment-executive-remind",
+      account: opts.account,
+      recipientEmail: opts.recipientEmail,
+      recipientName: opts.recipientName,
+      recipientPhone: opts.recipientPhone,
+      vars: opts.vars,
+    });
+  }
+
+  if (whatsappRulesActive) {
+    if (email) await pauseBetweenPaymentSends();
+    whatsapp = await dispatchPaymentWhatsappRule(db, {
+      trigger: "payment-executive-remind",
+      account: opts.account,
+      recipientPhone: opts.recipientPhone,
+      vars: opts.vars,
+    });
+  }
+
   return { email, whatsapp };
 }
 
@@ -393,7 +420,9 @@ export async function dispatchServerPaymentExecutiveReminder(
   const snap = buildAccountPaymentSnapshot(account, received);
 
   let anySent = false;
-  for (const executive of executives) {
+  for (let i = 0; i < executives.length; i++) {
+    const executive = executives[i]!;
+    if (i > 0) await pauseBetweenPaymentSends();
     const vars = buildPaymentTemplateVars(account, snap, executive.name);
     const result = await dispatchExecutivePaymentChannels(db, {
       account,

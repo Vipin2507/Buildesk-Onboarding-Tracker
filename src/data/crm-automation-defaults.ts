@@ -342,7 +342,7 @@ export const CRM_AUTOMATION_SAMPLE_VARS: Record<string, string> = {
   executiveName: "Priya Sales",
   accountCount: "2",
   digestDetails:
-    "1. Horizon Realty\n   Overdue: ₹250,000 (5 day(s) overdue) · Due: 2026-09-10\n   Pending: ₹750,000 · Received: ₹500,000 of ₹1,250,000\n\n2. Skyline Developers\n   Overdue: ₹120,000 (2 day(s) overdue) · Due: 2026-09-12\n   Pending: ₹350,000 · Received: ₹500,000 of ₹850,000",
+    "1. Horizon Realty\n   Overdue: ₹250,000 (5 day(s) overdue) · Due: 2026-09-10\n   Pending: ₹750,000 · Received: ₹500,000 of ₹1,250,000\n   Sales manager: Priya Sales · Support 1: Anita Support · Support 2: Ravi Support\n\n2. Skyline Developers\n   Overdue: ₹120,000 (2 day(s) overdue) · Due: 2026-09-12\n   Pending: ₹350,000 · Received: ₹500,000 of ₹850,000\n   Sales manager: Priya Sales · Support 1: Anita Support · Support 2: —",
   digestBody:
     "Hi Priya Sales,\n\nThe following CRM account payments are overdue:\n\n1. Horizon Realty\n   …\n\nPlease follow up with clients and review details in CRM → Payments.",
   authorName: "Amit Verma",

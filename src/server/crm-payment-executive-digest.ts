@@ -10,7 +10,10 @@ import {
 import { resolveUserWorkEmail } from "@/lib/user-email";
 import { listActiveAdminUserIds } from "@/server/api/notifications";
 import { loadCrmAutomationConfig } from "@/server/crm-booking-automation";
-import { dispatchExecutivePaymentChannels } from "@/server/crm-payment-reminder-automation";
+import {
+  dispatchExecutivePaymentChannels,
+  PAYMENT_AUTOMATION_SEND_PAUSE_MS,
+} from "@/server/crm-payment-reminder-automation";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { queryPaymentListItems, type PaymentListItem } from "@/server/lib/crm-payments";
@@ -18,6 +21,8 @@ import { queryPaymentListItems, type PaymentListItem } from "@/server/lib/crm-pa
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+const digestRecipientPauseMs = PAYMENT_AUTOMATION_SEND_PAUSE_MS;
 
 function listActiveCrmUsers(db: ReturnType<typeof getDb>) {
   return db
@@ -233,7 +238,7 @@ export async function sendExecutiveOverdueDigest(
 
   for (let i = 0; i < deliveries.length; i++) {
     const delivery = deliveries[i]!;
-    if (i > 0) await sleep(400);
+    if (i > 0) await sleep(digestRecipientPauseMs);
 
     const recipient = db.select().from(t.users).where(eq(t.users.id, delivery.recipientUserId)).get();
     if (!recipient) {

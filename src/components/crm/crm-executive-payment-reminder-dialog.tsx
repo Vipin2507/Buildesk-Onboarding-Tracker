@@ -154,8 +154,9 @@ export function CrmExecutivePaymentReminderDialog({
           <AlertDialogDescription>
             One consolidated message per person (admins, sales manager, support 1 / 2) via the active
             Payment reminder (executive) email and WhatsApp rules in CRM Automation. Each person
-            only sees overdue accounts they are tied to. Deliveries run sequentially to avoid
-            overloading the server.
+            only sees overdue accounts they are tied to (with sales manager and support 1 / 2 per
+            account). Each recipient gets email then WhatsApp with a short pause (~400ms) between
+            channels; another pause between recipients.
             {accountIdsScope?.length
               ? ` Scope: ${accountIdsScope.length} selected account(s).`
               : " Scope: all overdue accounts you can view."}
@@ -222,6 +223,10 @@ export function CrmExecutivePaymentReminderDialog({
                           Overdue {formatInr(a.overdueAmount)}
                           {a.overdueDays != null ? ` · ${a.overdueDays}d` : ""}
                           {a.dueDate ? ` · Due ${formatDate(a.dueDate)}` : ""}
+                        </span>
+                        <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                          SM: {a.salesManager?.trim() || "—"} · S1: {a.supportManager1?.trim() || "—"} · S2:{" "}
+                          {a.supportManager2?.trim() || "—"}
                         </span>
                       </span>
                     </label>

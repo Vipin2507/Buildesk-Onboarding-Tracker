@@ -37,6 +37,11 @@ function formatInr(value: number) {
   return `₹${value.toLocaleString("en-IN")}`;
 }
 
+function managerLabel(value?: string) {
+  const trimmed = value?.trim();
+  return trimmed || "—";
+}
+
 export function formatExecutiveDigestAccountLines(accounts: ExecutiveDigestAccountLine[]): string {
   return accounts
     .map((a, i) => {
@@ -45,7 +50,7 @@ export function formatExecutiveDigestAccountLines(accounts: ExecutiveDigestAccou
           ? `${a.overdueDays} day(s) overdue`
           : "overdue";
       const due = a.dueDate?.slice(0, 10) ?? "—";
-      return `${i + 1}. ${a.accountName}\n   Overdue: ${formatInr(a.overdueAmount)} (${overdueLabel}) · Due: ${due}\n   Pending: ${formatInr(a.pendingAmount)} · Received: ${formatInr(a.paymentReceived)} of ${formatInr(a.totalDealValue)}`;
+      return `${i + 1}. ${a.accountName}\n   Overdue: ${formatInr(a.overdueAmount)} (${overdueLabel}) · Due: ${due}\n   Pending: ${formatInr(a.pendingAmount)} · Received: ${formatInr(a.paymentReceived)} of ${formatInr(a.totalDealValue)}\n   Sales manager: ${managerLabel(a.salesManager)} · Support 1: ${managerLabel(a.supportManager1)} · Support 2: ${managerLabel(a.supportManager2)}`;
     })
     .join("\n\n");
 }
