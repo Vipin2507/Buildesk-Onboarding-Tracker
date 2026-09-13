@@ -297,6 +297,10 @@ const EXTRA_COLUMNS = [
   },
   { table: "crm_accounts", name: "status_remarks", ddl: "TEXT" },
   { table: "crm_accounts", name: "gst_percent", ddl: "REAL" },
+  { table: "erp_meetings", name: "google_event_id", ddl: "TEXT" },
+  { table: "erp_meetings", name: "meet_url", ddl: "TEXT" },
+  { table: "erp_meetings", name: "google_sync_status", ddl: "TEXT NOT NULL DEFAULT 'none'" },
+  { table: "erp_meetings", name: "google_sync_error", ddl: "TEXT" },
 ];
 
 for (const col of EXTRA_COLUMNS) {
@@ -1092,6 +1096,40 @@ if (!tableExists("crm_account_queries")) {
     CREATE INDEX IF NOT EXISTS crm_account_query_messages_query_idx ON crm_account_query_messages(query_id);
   `);
   console.log("+ CREATE TABLE crm_account_queries + crm_account_query_messages");
+}
+
+if (!tableExists("erp_meetings")) {
+  sqlite.exec(`
+    CREATE TABLE erp_meetings (
+      id TEXT PRIMARY KEY NOT NULL,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      starts_at TEXT NOT NULL,
+      ends_at TEXT,
+      status TEXT NOT NULL DEFAULT 'scheduled',
+      meeting_type TEXT NOT NULL DEFAULT 'other',
+      format TEXT NOT NULL DEFAULT 'online',
+      host_user_id TEXT,
+      attendee_name TEXT,
+      attendee_email TEXT,
+      location TEXT,
+      meeting_link TEXT,
+      notes TEXT,
+      outcome TEXT,
+      created_by_user_id TEXT,
+      google_event_id TEXT,
+      meet_url TEXT,
+      google_sync_status TEXT NOT NULL DEFAULT 'none',
+      google_sync_error TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS erp_meetings_company_idx ON erp_meetings(company_id);
+    CREATE INDEX IF NOT EXISTS erp_meetings_host_idx ON erp_meetings(host_user_id);
+    CREATE INDEX IF NOT EXISTS erp_meetings_status_idx ON erp_meetings(status);
+    CREATE INDEX IF NOT EXISTS erp_meetings_starts_idx ON erp_meetings(starts_at);
+  `);
+  console.log("+ CREATE TABLE erp_meetings");
 }
 
 if (!tableExists("payment_transactions")) {

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Bot, Headphones, UserRound } from "lucide-react";
 
@@ -30,13 +31,23 @@ export function ChatThread({
   messages,
   className,
   embedded = false,
+  scrollable = false,
 }: {
   messages: ChatMessage[];
   className?: string;
   embedded?: boolean;
+  /** Fill parent flex area, scroll overflow, and stick to latest message. */
+  scrollable?: boolean;
 }) {
-  return (
-    <div className={cn("space-y-3", className)}>
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!scrollable) return;
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, scrollable]);
+
+  const body = (
+    <>
       {messages.map((m, i) => {
         const isCustomer = m.senderType === "customer";
         const isBot = m.senderType === "bot";
@@ -88,6 +99,17 @@ export function ChatThread({
           </motion.div>
         );
       })}
+      {scrollable ? <div ref={bottomRef} className="h-px shrink-0" aria-hidden /> : null}
+    </>
+  );
+
+  if (!scrollable) {
+    return <div className={cn("space-y-3", className)}>{body}</div>;
+  }
+
+  return (
+    <div className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain p-3", className)}>
+      <div className="space-y-3">{body}</div>
     </div>
   );
 }

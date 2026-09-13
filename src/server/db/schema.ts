@@ -379,6 +379,41 @@ export const clientVisits = sqliteTable(
   ],
 );
 
+export const erpMeetings = sqliteTable(
+  "erp_meetings",
+  {
+    id: text("id").primaryKey(),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    startsAt: text("starts_at").notNull(),
+    endsAt: text("ends_at"),
+    status: text("status").notNull().default("scheduled"),
+    meetingType: text("meeting_type").notNull().default("other"),
+    format: text("format").notNull().default("online"),
+    hostUserId: text("host_user_id"),
+    attendeeName: text("attendee_name"),
+    attendeeEmail: text("attendee_email"),
+    location: text("location"),
+    meetingLink: text("meeting_link"),
+    notes: text("notes"),
+    outcome: text("outcome"),
+    createdByUserId: text("created_by_user_id"),
+    googleEventId: text("google_event_id"),
+    meetUrl: text("meet_url"),
+    googleSyncStatus: text("google_sync_status").notNull().default("none"),
+    googleSyncError: text("google_sync_error"),
+    ...timestamps,
+  },
+  (t) => [
+    index("erp_meetings_company_idx").on(t.companyId),
+    index("erp_meetings_host_idx").on(t.hostUserId),
+    index("erp_meetings_status_idx").on(t.status),
+    index("erp_meetings_starts_idx").on(t.startsAt),
+  ],
+);
+
 export const crmEvents = sqliteTable(
   "crm_events",
   {

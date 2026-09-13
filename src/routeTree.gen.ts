@@ -20,6 +20,7 @@ import { Route as RenewalsRouteImport } from './routes/renewals'
 import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as ModulesRouteImport } from './routes/modules'
+import { Route as MeetingsRouteImport } from './routes/meetings'
 import { Route as MasterRouteImport } from './routes/master'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LiveChatRouteImport } from './routes/live-chat'
@@ -124,6 +125,11 @@ const OnboardingRoute = OnboardingRouteImport.update({
 const ModulesRoute = ModulesRouteImport.update({
   id: '/modules',
   path: '/modules',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MeetingsRoute = MeetingsRouteImport.update({
+  id: '/meetings',
+  path: '/meetings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MasterRoute = MasterRouteImport.update({
@@ -398,6 +404,7 @@ export interface FileRoutesByFullPath {
   '/live-chat': typeof LiveChatRoute
   '/login': typeof LoginRoute
   '/master': typeof MasterRoute
+  '/meetings': typeof MeetingsRoute
   '/modules': typeof ModulesRoute
   '/onboarding': typeof OnboardingRoute
   '/projects': typeof ProjectsRouteWithChildren
@@ -460,6 +467,7 @@ export interface FileRoutesByTo {
   '/live-chat': typeof LiveChatRoute
   '/login': typeof LoginRoute
   '/master': typeof MasterRoute
+  '/meetings': typeof MeetingsRoute
   '/modules': typeof ModulesRoute
   '/onboarding': typeof OnboardingRoute
   '/projects': typeof ProjectsRouteWithChildren
@@ -522,6 +530,7 @@ export interface FileRoutesById {
   '/live-chat': typeof LiveChatRoute
   '/login': typeof LoginRoute
   '/master': typeof MasterRoute
+  '/meetings': typeof MeetingsRoute
   '/modules': typeof ModulesRoute
   '/onboarding': typeof OnboardingRoute
   '/projects': typeof ProjectsRouteWithChildren
@@ -587,6 +596,7 @@ export interface FileRouteTypes {
     | '/live-chat'
     | '/login'
     | '/master'
+    | '/meetings'
     | '/modules'
     | '/onboarding'
     | '/projects'
@@ -649,6 +659,7 @@ export interface FileRouteTypes {
     | '/live-chat'
     | '/login'
     | '/master'
+    | '/meetings'
     | '/modules'
     | '/onboarding'
     | '/projects'
@@ -710,6 +721,7 @@ export interface FileRouteTypes {
     | '/live-chat'
     | '/login'
     | '/master'
+    | '/meetings'
     | '/modules'
     | '/onboarding'
     | '/projects'
@@ -774,6 +786,7 @@ export interface RootRouteChildren {
   LiveChatRoute: typeof LiveChatRoute
   LoginRoute: typeof LoginRoute
   MasterRoute: typeof MasterRoute
+  MeetingsRoute: typeof MeetingsRoute
   ModulesRoute: typeof ModulesRoute
   OnboardingRoute: typeof OnboardingRoute
   ProjectsRoute: typeof ProjectsRouteWithChildren
@@ -866,6 +879,13 @@ declare module '@tanstack/react-router' {
       path: '/modules'
       fullPath: '/modules'
       preLoaderRoute: typeof ModulesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/meetings': {
+      id: '/meetings'
+      path: '/meetings'
+      fullPath: '/meetings'
+      preLoaderRoute: typeof MeetingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/master': {
@@ -1420,6 +1440,7 @@ const rootRouteChildren: RootRouteChildren = {
   LiveChatRoute: LiveChatRoute,
   LoginRoute: LoginRoute,
   MasterRoute: MasterRoute,
+  MeetingsRoute: MeetingsRoute,
   ModulesRoute: ModulesRoute,
   OnboardingRoute: OnboardingRoute,
   ProjectsRoute: ProjectsRouteWithChildren,

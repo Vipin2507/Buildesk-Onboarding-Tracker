@@ -73,9 +73,10 @@ export async function createGoogleMeetEvent(input: {
   startsAt: string;
   endsAt: string;
   timeZone: string;
-  guestEmail: string;
+  guestEmail?: string;
   guestName?: string;
   guestEmails?: string[];
+  includeMeet?: boolean;
 }): Promise<GoogleMeetEventResult | null> {
   const auth = await getAuthorizedGoogleClient(input.hostUserId);
   if (!auth) return null;
@@ -85,28 +86,35 @@ export async function createGoogleMeetEvent(input: {
   const attendeeEmails =
     input.guestEmails?.length && input.guestEmails.length > 0
       ? input.guestEmails
-      : [input.guestEmail];
+      : input.guestEmail
+        ? [input.guestEmail]
+        : [];
   const attendees = attendeeEmails.map((email) => ({
     email,
     displayName: email === input.guestEmail ? input.guestName : undefined,
   }));
+  const includeMeet = input.includeMeet !== false;
 
   const res = await calendar.events.insert({
     calendarId,
-    conferenceDataVersion: 1,
-    sendUpdates: "all",
+    conferenceDataVersion: includeMeet ? 1 : 0,
+    sendUpdates: attendeeEmails.length ? "all" : "none",
     requestBody: {
       summary: input.summary,
       description: input.description,
       start: wallToGoogleDateTime(input.startsAt, input.timeZone),
       end: wallToGoogleDateTime(input.endsAt, input.timeZone),
-      attendees,
-      conferenceData: {
-        createRequest: {
-          requestId: await meetRequestId(`booking-${input.appointmentId}`),
-          conferenceSolutionKey: { type: "hangoutsMeet" },
-        },
-      },
+      ...(attendees.length ? { attendees } : {}),
+      ...(includeMeet
+        ? {
+            conferenceData: {
+              createRequest: {
+                requestId: await meetRequestId(`booking-${input.appointmentId}`),
+                conferenceSolutionKey: { type: "hangoutsMeet" },
+              },
+            },
+          }
+        : {}),
     },
   });
 

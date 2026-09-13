@@ -11,16 +11,20 @@ export const Route = createFileRoute("/auth/google/calendar/callback")({
   }),
   beforeLoad: async ({ search }) => {
     try {
-      await completeGoogleCalendarOAuth({
+      const result = await completeGoogleCalendarOAuth({
         data: {
           code: search.code,
           state: search.state,
           error: search.error,
         },
       });
+      const returnTo = result.returnTo === "erp" ? "erp" : "crm";
       throw redirect({
-        to: "/crm/bookings",
-        search: { tab: "calendar", google: "connected" },
+        to: returnTo === "erp" ? "/meetings" : "/crm/bookings",
+        search:
+          returnTo === "erp"
+            ? { tab: "calendar", google: "connected" }
+            : { tab: "calendar", google: "connected" },
         replace: true,
       });
     } catch (e) {
@@ -34,9 +38,24 @@ export const Route = createFileRoute("/auth/google/calendar/callback")({
               typeof (e as { message: unknown }).message === "string"
             ? (e as { message: string }).message
             : "Google Calendar connection failed";
+
+      let returnTo: "crm" | "erp" = "crm";
+      if (search.state) {
+        try {
+          const raw = Buffer.from(search.state, "base64url").toString("utf8");
+          const parts = raw.split(".");
+          if (parts.length === 4 && parts[1] === "erp") returnTo = "erp";
+        } catch {
+          /* use default */
+        }
+      }
+
       throw redirect({
-        to: "/crm/bookings",
-        search: { tab: "calendar", google: "error", googleError: message.slice(0, 200) },
+        to: returnTo === "erp" ? "/meetings" : "/crm/bookings",
+        search:
+          returnTo === "erp"
+            ? { tab: "calendar", google: "error", googleError: message.slice(0, 200) }
+            : { tab: "calendar", google: "error", googleError: message.slice(0, 200) },
         replace: true,
       });
     }

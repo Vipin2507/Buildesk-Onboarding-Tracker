@@ -118,8 +118,8 @@ function LiveChatPage() {
       />
 
       <AnimatedSection delay={0.04}>
-        <div className="grid min-h-[58vh] gap-2.5 lg:grid-cols-[minmax(220px,280px)_1fr]">
-          <div className="card-soft flex max-h-[68vh] flex-col overflow-hidden p-0">
+        <div className="grid h-[min(68vh,calc(100dvh-11rem))] min-h-[320px] gap-2.5 lg:grid-cols-[minmax(220px,280px)_1fr]">
+          <div className="card-soft flex min-h-0 flex-col overflow-hidden p-0">
             <div className="flex border-b">
               <button
                 type="button"
@@ -147,7 +147,7 @@ function LiveChatPage() {
                 History ({historySessions.length})
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               {sorted.length === 0 ? (
                 <p className="p-3 text-xs text-muted-foreground">
                   {tab === "active" ? "No active chat sessions." : "No closed sessions yet."}
@@ -167,7 +167,7 @@ function LiveChatPage() {
             </div>
           </div>
 
-          <div className="card-soft flex max-h-[68vh] flex-col overflow-hidden">
+          <div className="card-soft flex min-h-0 flex-col overflow-hidden">
             {active ? (
               <>
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
@@ -220,9 +220,7 @@ function LiveChatPage() {
                     ) : null}
                   </div>
                 </div>
-                <div className="flex-1 overflow-y-auto p-3">
-                  <ChatThread messages={active.messages} />
-                </div>
+                <ChatThread scrollable messages={active.messages} />
                 {isReadOnly ? (
                   <div className="border-t bg-muted/30 px-3 py-2 text-center text-xs text-muted-foreground">
                     This session is closed — view-only transcript ({active.messages.length} messages)

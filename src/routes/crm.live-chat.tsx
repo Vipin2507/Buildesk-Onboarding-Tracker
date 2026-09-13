@@ -114,8 +114,8 @@ function CrmLiveChatPage() {
         subtitle="CRM account chats and unlinked visitors — convert to a CRM support ticket when needed."
       />
 
-      <div className="grid min-h-[58vh] gap-2.5 lg:grid-cols-[minmax(220px,280px)_1fr]">
-        <div className="card-soft flex max-h-[68vh] flex-col overflow-hidden p-0">
+      <div className="grid h-[min(68vh,calc(100dvh-11rem))] min-h-[320px] gap-2.5 lg:grid-cols-[minmax(220px,280px)_1fr]">
+        <div className="card-soft flex min-h-0 flex-col overflow-hidden p-0">
           <div className="flex border-b">
             <button
               type="button"
@@ -143,7 +143,7 @@ function CrmLiveChatPage() {
               History ({historySessions.length})
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             {sorted.length === 0 ? (
               <p className="p-3 text-xs text-muted-foreground">
                 {tab === "active" ? "No active CRM chat sessions." : "No closed sessions yet."}
@@ -163,7 +163,7 @@ function CrmLiveChatPage() {
           </div>
         </div>
 
-        <div className="card-soft flex max-h-[68vh] flex-col overflow-hidden">
+        <div className="card-soft flex min-h-0 flex-col overflow-hidden">
           {active ? (
             <>
               <div className="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
@@ -213,9 +213,7 @@ function CrmLiveChatPage() {
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-hidden">
-                <ChatThread messages={active.messages} />
-              </div>
+              <ChatThread scrollable messages={active.messages} />
 
               {!isReadOnly ? (
                 <div className="flex gap-2 border-t p-2">

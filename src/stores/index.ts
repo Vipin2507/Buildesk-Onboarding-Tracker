@@ -28,6 +28,7 @@ export { useProjectProgressStore } from "./useProjectProgressStore";
 export { useCrmTaskStore, useTaskStore } from "./useCrmTaskStore";
 export { useErpTaskStore } from "./useErpTaskStore";
 export { useClientVisitStore } from "./useClientVisitStore";
+export { useErpMeetingStore } from "./useErpMeetingStore";
 export { useCrmOnboardingStore } from "./useCrmOnboardingStore";
 export { useCrmAccountStore } from "./useCrmAccountStore";
 export { useCrmMasterStore, getCrmPicklistValues, getCrmMasterMigrationFields, getCrmMasterTrainingFields, getCrmMasterBookingCallTypes, getCrmMasterBookingHostHours } from "./useCrmMasterStore";

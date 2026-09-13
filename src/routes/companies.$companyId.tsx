@@ -33,6 +33,7 @@ import { CompanyHistoryTab } from "@/components/company-history";
 import { CompanyDesignTicketsPanel } from "@/components/company-design-tickets-panel";
 import { CompanyTasksPanel } from "@/components/company-tasks-panel";
 import { CompanyVisitsPanel } from "@/components/company-visits-panel";
+import { CompanyMeetingsPanel } from "@/components/company-meetings-panel";
 import { EntityNotFound, EmptyState } from "@/components/empty-state";
 import { DetailPageSkeleton } from "@/components/loading-skeleton";
 import { ConfirmDeleteDialog } from "@/components/entity-form-modal";
@@ -52,6 +53,7 @@ import {
   useCompanyChecklistProjectsForCompany,
   useUserStore,
   useClientVisitStore,
+  useErpMeetingStore,
   useErpTaskStore,
   useCrmEventStore,
 } from "@/stores";
@@ -67,6 +69,7 @@ const tabSchema = z.enum([
   "Project",
   "Tickets",
   "Tasks",
+  "Meetings",
   "Visits",
   "Notes & Attachments",
   "History",
@@ -95,6 +98,7 @@ const TABS = [
   { id: "Project", label: "Project" },
   { id: "Tickets", label: "Tickets" },
   { id: "Tasks", label: "Tasks" },
+  { id: "Meetings", label: "Meetings" },
   { id: "Visits", label: "Visits" },
   { id: "Notes & Attachments", label: "Notes & Files" },
   { id: "History", label: "History" },
@@ -141,6 +145,7 @@ function CompanyDetailContent() {
   const modulesWithProgress = useCompanyModulesWithProgress(companyId);
   const allTasks = useErpTaskStore((s) => s.tasks);
   const allVisits = useClientVisitStore((s) => s.visits);
+  const allMeetings = useErpMeetingStore((s) => s.meetings);
   const allSubscriptions = useCrmEventStore((s) => s.subscriptions);
   const companyTasks = useMemo(
     () => allTasks.filter((t) => t.companyId === companyId),
@@ -149,6 +154,10 @@ function CompanyDetailContent() {
   const companyVisits = useMemo(
     () => allVisits.filter((v) => v.companyId === companyId),
     [allVisits, companyId],
+  );
+  const companyMeetings = useMemo(
+    () => allMeetings.filter((m) => m.companyId === companyId),
+    [allMeetings, companyId],
   );
   const companySubscriptions = useMemo(
     () => allSubscriptions.filter((s) => s.companyId === companyId),
@@ -180,6 +189,7 @@ function CompanyDetailContent() {
     ["open", "in_progress", "blocked"].includes(t.status),
   ).length;
   const visitCount = companyVisits.length;
+  const meetingCount = companyMeetings.length;
   const optedModules = modulesWithProgress.filter((m) => m.optedIn);
   const liveModules = optedModules.filter((m) => m.isLive);
   const companyLive =
@@ -330,7 +340,7 @@ function CompanyDetailContent() {
           value={`${openTasks} open`}
           foot={
             <span className="text-[10px] text-muted-foreground">
-              {visitCount} visits · {companyTasks.length} tasks
+              {meetingCount} meetings · {visitCount} visits · {companyTasks.length} tasks
             </span>
           }
         />
@@ -522,6 +532,8 @@ function CompanyDetailContent() {
       {tab === "Tickets" && <CompanyDesignTicketsPanel companyId={companyId} />}
 
       {tab === "Tasks" && <CompanyTasksPanel companyId={companyId} />}
+
+      {tab === "Meetings" && <CompanyMeetingsPanel companyId={companyId} />}
 
       {tab === "Visits" && <CompanyVisitsPanel companyId={companyId} />}
 

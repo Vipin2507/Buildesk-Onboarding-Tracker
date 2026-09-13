@@ -30,6 +30,7 @@ import {
   listFollowUpTasks,
   listErpFollowUpTasks,
   listClientVisits,
+  listErpMeetings,
   listModuleSubscriptions,
   listModuleSubscriptionEvents,
   listCrmEvents,
@@ -69,6 +70,7 @@ import {
   useCrmTaskStore,
   useErpTaskStore,
   useClientVisitStore,
+  useErpMeetingStore,
   useCrmEventStore,
   useCrmAccountStore,
   useCrmOnboardingStore,
@@ -159,6 +161,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           followUpTasks,
           erpFollowUpTasks,
           clientVisits,
+          erpMeetings,
           moduleSubscriptions,
           subscriptionEvents,
           crmEvents,
@@ -204,6 +207,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           listFollowUpTasks({ data: {} }).catch(() => []),
           listErpFollowUpTasks({ data: {} }).catch(() => []),
           listClientVisits({ data: {} }).catch(() => []),
+          listErpMeetings({ data: {} }).catch(() => []),
           listModuleSubscriptions({ data: {} }).catch(() => []),
           listModuleSubscriptionEvents({ data: {} }).catch(() => []),
           listCrmEvents({ data: { limit: 200 } }).catch(() => []),
@@ -300,6 +304,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
         useCrmTaskStore.setState({ tasks: followUpTasks });
         useErpTaskStore.setState({ tasks: erpFollowUpTasks });
         useClientVisitStore.setState({ visits: clientVisits });
+        useErpMeetingStore.setState({ meetings: erpMeetings });
         useCrmEventStore.setState({
           subscriptions: moduleSubscriptions,
           subscriptionEvents,

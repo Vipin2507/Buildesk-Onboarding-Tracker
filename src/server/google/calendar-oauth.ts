@@ -58,9 +58,14 @@ function stateSecret() {
   return env("SESSION_SECRET") || "buildesk-google-calendar";
 }
 
-export async function signGoogleOAuthState(userId: string) {
+export type GoogleOAuthReturnTarget = "crm" | "erp";
+
+export async function signGoogleOAuthState(
+  userId: string,
+  returnTo: GoogleOAuthReturnTarget = "crm",
+) {
   const { createHmac } = await nodeCrypto();
-  const payload = `${userId}.${Date.now()}`;
+  const payload = `${userId}.${returnTo}.${Date.now()}`;
   const sig = createHmac("sha256", stateSecret()).update(payload).digest("hex");
   return Buffer.from(`${payload}.${sig}`).toString("base64url");
 }
@@ -70,29 +75,44 @@ export async function verifyGoogleOAuthState(state: string, maxAgeMs = 15 * 60 *
     const { createHmac, timingSafeEqual } = await nodeCrypto();
     const raw = Buffer.from(state, "base64url").toString("utf8");
     const parts = raw.split(".");
-    if (parts.length !== 3) return null;
-    const [userId, tsStr, sig] = parts;
+    if (parts.length !== 3 && parts.length !== 4) return null;
+
+    let userId: string;
+    let returnTo: GoogleOAuthReturnTarget = "crm";
+    let tsStr: string;
+    let sig: string;
+
+    if (parts.length === 4) {
+      [userId, returnTo, tsStr, sig] = parts as [string, GoogleOAuthReturnTarget, string, string];
+      if (returnTo !== "crm" && returnTo !== "erp") return null;
+    } else {
+      [userId, tsStr, sig] = parts as [string, string, string];
+    }
+
     if (!userId || !tsStr || !sig) return null;
-    const payload = `${userId}.${tsStr}`;
+    const payload = parts.length === 4 ? `${userId}.${returnTo}.${tsStr}` : `${userId}.${tsStr}`;
     const expected = createHmac("sha256", stateSecret()).update(payload).digest("hex");
     const a = Buffer.from(sig);
     const b = Buffer.from(expected);
     if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
     const ts = Number(tsStr);
     if (!Number.isFinite(ts) || Date.now() - ts > maxAgeMs) return null;
-    return userId;
+    return { userId, returnTo };
   } catch {
     return null;
   }
 }
 
-export async function buildGoogleCalendarAuthUrl(userId: string) {
+export async function buildGoogleCalendarAuthUrl(
+  userId: string,
+  returnTo: GoogleOAuthReturnTarget = "crm",
+) {
   const client = oauthClient();
   return client.generateAuthUrl({
     access_type: "offline",
     prompt: "consent",
     scope: [...GOOGLE_CALENDAR_SCOPES],
-    state: await signGoogleOAuthState(userId),
+    state: await signGoogleOAuthState(userId, returnTo),
     include_granted_scopes: true,
   });
 }

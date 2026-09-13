@@ -20,16 +20,20 @@ export const getGoogleCalendarConnectionStatus = createServerFn({ method: "GET" 
   },
 );
 
-export const getGoogleCalendarAuthUrl = createServerFn({ method: "GET" }).handler(async () => {
-  const user = requireUser();
-  if (!isGoogleCalendarConfigured() || !googleCalendarRedirectUri()) {
-    throw new ApiError(
-      400,
-      "Google Calendar is not configured on the server. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI (or APP_BASE_URL).",
-    );
-  }
-  return { url: await buildGoogleCalendarAuthUrl(user.id) };
-});
+export const getGoogleCalendarAuthUrl = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) =>
+    z.object({ returnTo: z.enum(["crm", "erp"]).optional() }).optional().parse(data ?? {}),
+  )
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    if (!isGoogleCalendarConfigured() || !googleCalendarRedirectUri()) {
+      throw new ApiError(
+        400,
+        "Google Calendar is not configured on the server. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI (or APP_BASE_URL).",
+      );
+    }
+    return { url: await buildGoogleCalendarAuthUrl(user.id, data?.returnTo ?? "crm") };
+  });
 
 export const disconnectGoogleCalendarConnection = createServerFn({ method: "POST" }).handler(
   async () => {
@@ -68,10 +72,10 @@ export const completeGoogleCalendarOAuth = createServerFn({ method: "GET" })
     if (!data.code || !data.state) {
       throw new ApiError(400, "Missing Google OAuth code or state");
     }
-    const stateUserId = await verifyGoogleOAuthState(data.state);
-    if (!stateUserId || stateUserId !== user.id) {
+    const verified = await verifyGoogleOAuthState(data.state);
+    if (!verified || verified.userId !== user.id) {
       throw new ApiError(403, "Invalid or expired Google OAuth state");
     }
     await exchangeGoogleCalendarCode(data.code, user.id);
-    return { ok: true as const };
+    return { ok: true as const, returnTo: verified.returnTo };
   });

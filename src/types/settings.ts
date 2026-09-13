@@ -73,6 +73,7 @@ export type RolePermissionKey =
   | "manageRoles"
   | "manageTasks"
   | "manageClientVisits"
+  | "manageErpMeetings"
   | "manageModuleSubscriptions"
   | "assignSalesAgent";
 
@@ -104,6 +105,7 @@ export const ALL_PERMISSION_KEYS: RolePermissionKey[] = [
   "manageRoles",
   "manageTasks",
   "manageClientVisits",
+  "manageErpMeetings",
   "manageModuleSubscriptions",
   "assignSalesAgent",
 ];
@@ -133,6 +135,7 @@ export const PERMISSION_GROUPS: Array<{
       "manageTickets",
       "manageTasks",
       "manageClientVisits",
+      "manageErpMeetings",
       "manageModuleSubscriptions",
       "assignSalesAgent",
     ],
@@ -170,6 +173,7 @@ export const PERMISSION_LABELS: Record<RolePermissionKey, string> = {
   manageRoles: "Manage roles & permissions",
   manageTasks: "Manage follow-up tasks",
   manageClientVisits: "Manage client visits",
+  manageErpMeetings: "Manage ERP meetings",
   manageModuleSubscriptions: "Manage module subscriptions",
   assignSalesAgent: "Assign sales agents",
 };
@@ -187,6 +191,7 @@ export const PERMISSION_DESCRIPTIONS: Record<RolePermissionKey, string> = {
   manageRoles: "Create roles and configure the permission matrix",
   manageTasks: "Create and update company follow-up tasks and remarks",
   manageClientVisits: "Log and update client visits and outcomes",
+  manageErpMeetings: "Schedule and update onboarding meetings with client companies",
   manageModuleSubscriptions: "Activate, renew, pause, or cancel module subscriptions",
   assignSalesAgent: "Assign or clear a company's sales agent",
 };

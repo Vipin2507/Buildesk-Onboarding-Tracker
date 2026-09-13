@@ -150,6 +150,14 @@ export {
 } from "@/server/api/erp-tasks";
 
 export {
+  listErpMeetings,
+  getErpMeeting,
+  createErpMeeting,
+  updateErpMeeting,
+  retryErpMeetingGoogleCalendarSync,
+} from "@/server/api/erp-meetings";
+
+export {
   listCrmAccounts,
   upsertCrmAccount,
   upsertCrmAccountsBatch,
