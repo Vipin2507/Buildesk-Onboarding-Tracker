@@ -42,7 +42,8 @@ export type AutomationTrigger =
   | "booking-status-changed"
   | "task-before-start"
   | "payment-overdue"
-  | "payment-executive-remind";
+  | "payment-executive-remind"
+  | "query-response";
 
 export interface AutomationRule {
   id: string;
@@ -165,6 +166,7 @@ export const AUTOMATION_TRIGGERS: { value: AutomationTrigger; label: string }[] 
   { value: "task-before-start", label: "Before scheduled task" },
   { value: "payment-overdue", label: "Payment reminder (client)" },
   { value: "payment-executive-remind", label: "Payment reminder (executive)" },
+  { value: "query-response", label: "Reply on account query" },
 ];
 
 export const AUTOMATION_TEMPLATE_VARS = [

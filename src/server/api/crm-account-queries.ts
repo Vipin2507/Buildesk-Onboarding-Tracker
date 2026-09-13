@@ -7,8 +7,10 @@ import { resolveCrmQueryMentionUserIds } from "@/lib/crm-query-mentions";
 import { isAdminRoleKey } from "@/lib/permissions";
 import {
   insertNotificationsForUserIds,
+  resolveCrmQueryResponseRecipientUserIds,
   resolveNotificationRecipientIds,
 } from "@/server/api/notifications";
+import { dispatchCrmQueryResponseAutomation } from "@/server/crm-query-response-automation";
 import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
@@ -227,6 +229,41 @@ function notifyAccountQueryMentions(
   }
 
   return mentionedIds;
+}
+
+function notifyAccountQueryResponseTeam(
+  db: ReturnType<typeof getDb>,
+  opts: {
+    companyId: string;
+    queryId: string;
+    title: string;
+    body: string;
+    excludeUserId: string;
+    alsoExcludeUserIds?: string[];
+    kind?: "info" | "success" | "warning";
+  },
+) {
+  const extraExclude = new Set(opts.alsoExcludeUserIds ?? []);
+  const recipientIds = resolveCrmQueryResponseRecipientUserIds(db, opts.companyId, opts.excludeUserId).filter(
+    (id) => !extraExclude.has(id),
+  );
+
+  const users = db.select().from(t.users).all();
+  const enabledIds = recipientIds.filter((id) => {
+    const user = users.find((u) => u.id === id);
+    return user?.active !== false && user?.notifyInApp !== false;
+  });
+
+  if (!enabledIds.length) return;
+
+  insertNotificationsForUserIds(db, enabledIds, {
+    title: opts.title,
+    body: opts.body,
+    href: `/crm/accounts/${opts.companyId}?tab=queries&queryId=${opts.queryId}`,
+    companyId: opts.companyId,
+    ticketId: opts.queryId,
+    kind: opts.kind ?? "info",
+  });
 }
 
 function notifyAccountQueryParticipants(
@@ -567,13 +604,23 @@ export const addCrmAccountQueryMessage = createServerFn({ method: "POST" })
       authorUserId: user.id,
     });
 
-    notifyAccountQueryParticipants(db, {
+    notifyAccountQueryResponseTeam(db, {
       companyId: existing.companyId,
       queryId: data.queryId,
       title: `Reply on ${existing.title}`,
       body: `${user.name}: ${data.body.trim().slice(0, 120)}`,
       excludeUserId: user.id,
       alsoExcludeUserIds: mentionedIds,
+    });
+
+    void dispatchCrmQueryResponseAutomation(db, {
+      accountId: existing.companyId,
+      queryId: data.queryId,
+      queryTitle: existing.title,
+      queryStatus: wasResolved ? "open" : existing.status,
+      authorName: user.name,
+      messageBody: data.body.trim(),
+      excludeUserId: user.id,
     });
 
     setCrmQueryTyping(data.queryId, user.id, user.name, false);

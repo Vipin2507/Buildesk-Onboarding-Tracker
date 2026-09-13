@@ -30,6 +30,7 @@ const TRIGGER_SHORT: Record<AutomationRule["trigger"], string> = {
   "task-before-start": "Task reminder",
   "payment-overdue": "Payment (client)",
   "payment-executive-remind": "Payment (executive)",
+  "query-response": "Query reply",
 };
 
 export function AutomationTestPanel({ className }: { className?: string }) {

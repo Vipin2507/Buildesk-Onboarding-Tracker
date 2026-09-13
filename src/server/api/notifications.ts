@@ -53,6 +53,50 @@ export function listActiveAdminUserIds(
     .map((u) => u.id);
 }
 
+/** Admins plus CRM account sales manager and support 1 / 2 (by display name). */
+export function resolveCrmQueryResponseRecipientUserIds(
+  db: ReturnType<typeof getDb>,
+  accountId: string,
+  excludeUserId?: string,
+): string[] {
+  const ids = new Set<string>(listActiveAdminUserIds(db, "crm"));
+
+  const account = db
+    .select()
+    .from(t.crmAccounts)
+    .where(eq(t.crmAccounts.id, accountId))
+    .get();
+  if (!account) {
+    if (excludeUserId?.trim()) ids.delete(excludeUserId.trim());
+    return [...ids];
+  }
+
+  const users = db
+    .select({
+      id: t.users.id,
+      name: t.users.name,
+      active: t.users.active,
+      productScope: t.users.productScope,
+    })
+    .from(t.users)
+    .all()
+    .filter((u) => u.active && (u.productScope || "erp") === "crm");
+
+  for (const label of [
+    account.salesManagerName,
+    account.supportManager1,
+    account.supportManager2,
+  ]) {
+    if (!label?.trim()) continue;
+    for (const u of users) {
+      if (crmSalesManagerNamesMatch(label, u.name)) ids.add(u.id);
+    }
+  }
+
+  if (excludeUserId?.trim()) ids.delete(excludeUserId.trim());
+  return [...ids];
+}
+
 /**
  * Recipients for a notification:
  * - all active Admins (always)

@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { CalendarDays, ClipboardList, IndianRupee, Mail, MessageCircle, Pencil, Play, Plus, Power, Trash2, Ticket, Zap } from "lucide-react";
+import { CalendarDays, ClipboardList, IndianRupee, Mail, MessageCircle, MessageSquare, Pencil, Play, Plus, Power, Trash2, Ticket, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 import { AutomationRuleDialog } from "@/components/crm/automation/automation-rule-dialog";
@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import {
   CRM_BOOKING_AUTOMATION_TRIGGERS,
   CRM_PAYMENT_AUTOMATION_TRIGGERS,
+  CRM_QUERY_AUTOMATION_TRIGGERS,
   CRM_TASK_AUTOMATION_TRIGGERS,
 } from "@/data/crm-automation-defaults";
 import {
@@ -32,6 +33,7 @@ const TRIGGER_LABEL = Object.fromEntries(AUTOMATION_TRIGGERS.map((t) => [t.value
 const BOOKING_TRIGGER_SET = new Set<string>(CRM_BOOKING_AUTOMATION_TRIGGERS);
 const TASK_TRIGGER_SET = new Set<string>(CRM_TASK_AUTOMATION_TRIGGERS);
 const PAYMENT_TRIGGER_SET = new Set<string>(CRM_PAYMENT_AUTOMATION_TRIGGERS);
+const QUERY_TRIGGER_SET = new Set<string>(CRM_QUERY_AUTOMATION_TRIGGERS);
 
 type RuleColumn = {
   key: string;
@@ -128,18 +130,20 @@ export function AutomationRulesPanel() {
   const [testingRuleId, setTestingRuleId] = useState<string | null>(null);
   const [editing, setEditing] = useState<AutomationRule | null>(null);
 
-  const { ticketRules, bookingRules, taskRules, paymentRules } = useMemo(() => {
+  const { ticketRules, bookingRules, taskRules, paymentRules, queryRules } = useMemo(() => {
     const ticketRules: AutomationRule[] = [];
     const bookingRules: AutomationRule[] = [];
     const taskRules: AutomationRule[] = [];
     const paymentRules: AutomationRule[] = [];
+    const queryRules: AutomationRule[] = [];
     for (const rule of rules) {
       if (PAYMENT_TRIGGER_SET.has(rule.trigger)) paymentRules.push(rule);
+      else if (QUERY_TRIGGER_SET.has(rule.trigger)) queryRules.push(rule);
       else if (BOOKING_TRIGGER_SET.has(rule.trigger)) bookingRules.push(rule);
       else if (TASK_TRIGGER_SET.has(rule.trigger)) taskRules.push(rule);
       else ticketRules.push(rule);
     }
-    return { ticketRules, bookingRules, taskRules, paymentRules };
+    return { ticketRules, bookingRules, taskRules, paymentRules, queryRules };
   }, [rules]);
 
   function openCreate() {
@@ -324,6 +328,12 @@ export function AutomationRulesPanel() {
             "Email and WhatsApp reminders to assignees before a task start time.",
             <ClipboardList className="h-3.5 w-3.5" />,
             taskRules,
+          )}
+          {renderRulesSection(
+            "Account queries",
+            "In-app alerts plus WhatsApp or email to admins and account executives when someone replies on a query.",
+            <MessageSquare className="h-3.5 w-3.5" />,
+            queryRules,
           )}
           {renderRulesSection(
             "Support tickets",

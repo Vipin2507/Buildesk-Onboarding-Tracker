@@ -78,6 +78,8 @@ export const CRM_PAYMENT_AUTOMATION_TRIGGERS = [
   "payment-executive-remind",
 ] as const;
 
+export const CRM_QUERY_AUTOMATION_TRIGGERS = ["query-response"] as const;
+
 export const DEFAULT_TASK_REMINDER_OFFSET_MINUTES = 15;
 
 /** Merge seed rules by id so booking automations appear even on older saved configs. */
@@ -221,6 +223,29 @@ export const DEFAULT_CRM_AUTOMATION_RULES: AutomationRule[] = [
     templateBody:
       "Hi {{executiveName}},\n\nPayment collection update for {{accountName}}:\n\nDue: ₹{{dueAmount}} by {{dueDate}}\nOverdue: ₹{{overdueAmount}}\nReceived: ₹{{paymentReceived}} of ₹{{totalDealValue}}\nPending: ₹{{pendingAmount}}\n\nSales manager: {{salesManagerName}}\nSupport 1: {{supportManager1}}\nSupport 2: {{supportManager2}}\n\nReview in CRM Payments.",
   }),
+  rule({
+    id: "crm-rule-query-response-whatsapp",
+    name: "Account query reply — Executive WhatsApp",
+    description:
+      "WhatsApp CRM admins and the account sales manager and support managers when someone replies on a query",
+    trigger: "query-response",
+    channel: "whatsapp",
+    isActive: true,
+    templateBody:
+      "Hi {{recipientName}}, {{authorName}} replied on \"{{title}}\" ({{accountName}}): {{messageSnippet}}\n\nOpen in CRM: {{queryUrl}}",
+  }),
+  rule({
+    id: "crm-rule-query-response-email",
+    name: "Account query reply — Executive email",
+    description:
+      "Email CRM admins and the account sales manager and support managers when someone replies on a query",
+    trigger: "query-response",
+    channel: "email",
+    isActive: false,
+    templateSubject: "New reply on {{title}} — {{accountName}}",
+    templateBody:
+      "Hi {{recipientName}},\n\n{{authorName}} replied on the account query \"{{title}}\" for {{accountName}}.\n\n{{messageSnippet}}\n\nOpen in CRM: {{queryUrl}}",
+  }),
 ];
 
 export const CRM_AUTOMATION_TEMPLATE_VARS = [
@@ -259,6 +284,10 @@ export const CRM_AUTOMATION_TEMPLATE_VARS = [
   "{{supportManager1}}",
   "{{supportManager2}}",
   "{{executiveName}}",
+  "{{authorName}}",
+  "{{messageSnippet}}",
+  "{{queryUrl}}",
+  "{{recipientName}}",
 ] as const;
 
 export const CRM_AUTOMATION_SAMPLE_VARS: Record<string, string> = {
@@ -297,4 +326,8 @@ export const CRM_AUTOMATION_SAMPLE_VARS: Record<string, string> = {
   supportManager1: "Anita Support",
   supportManager2: "Ravi Support",
   executiveName: "Priya Sales, Anita Support",
+  authorName: "Amit Verma",
+  messageSnippet: "Can we get an update on the onboarding checklist?",
+  queryUrl: "https://track.example.com/crm/accounts/acme?tab=queries&queryId=q-1001",
+  recipientName: "Priya Sales",
 };
