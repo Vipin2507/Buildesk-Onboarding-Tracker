@@ -27,6 +27,7 @@ import { Route as LiveChatRouteImport } from './routes/live-chat'
 import { Route as LaborRouteImport } from './routes/labor'
 import { Route as IntegrationsRouteImport } from './routes/integrations'
 import { Route as EmployeesRouteImport } from './routes/employees'
+import { Route as DprRouteImport } from './routes/dpr'
 import { Route as DocumentsRouteImport } from './routes/documents'
 import { Route as DataMigrationRouteImport } from './routes/data-migration'
 import { Route as CustomerAppRouteImport } from './routes/customer-app'
@@ -41,6 +42,7 @@ import { Route as TicketsTicketIdRouteImport } from './routes/tickets.$ticketId'
 import { Route as SupportTicketIdRouteImport } from './routes/support.$ticketId'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects.$projectId'
 import { Route as PortalSlugRouteImport } from './routes/portal.$slug'
+import { Route as DprTrackerRouteImport } from './routes/dpr.tracker'
 import { Route as CrmTicketsRouteImport } from './routes/crm.tickets'
 import { Route as CrmTasksRouteImport } from './routes/crm.tasks'
 import { Route as CrmSupportRouteImport } from './routes/crm.support'
@@ -162,6 +164,11 @@ const EmployeesRoute = EmployeesRouteImport.update({
   path: '/employees',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DprRoute = DprRouteImport.update({
+  id: '/dpr',
+  path: '/dpr',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DocumentsRoute = DocumentsRouteImport.update({
   id: '/documents',
   path: '/documents',
@@ -231,6 +238,11 @@ const PortalSlugRoute = PortalSlugRouteImport.update({
   id: '/portal/$slug',
   path: '/portal/$slug',
   getParentRoute: () => rootRouteImport,
+} as any)
+const DprTrackerRoute = DprTrackerRouteImport.update({
+  id: '/tracker',
+  path: '/tracker',
+  getParentRoute: () => DprRoute,
 } as any)
 const CrmTicketsRoute = CrmTicketsRouteImport.update({
   id: '/tickets',
@@ -398,6 +410,7 @@ export interface FileRoutesByFullPath {
   '/customer-app': typeof CustomerAppRoute
   '/data-migration': typeof DataMigrationRoute
   '/documents': typeof DocumentsRoute
+  '/dpr': typeof DprRouteWithChildren
   '/employees': typeof EmployeesRoute
   '/integrations': typeof IntegrationsRoute
   '/labor': typeof LaborRoute
@@ -429,6 +442,7 @@ export interface FileRoutesByFullPath {
   '/crm/support': typeof CrmSupportRouteWithChildren
   '/crm/tasks': typeof CrmTasksRoute
   '/crm/tickets': typeof CrmTicketsRouteWithChildren
+  '/dpr/tracker': typeof DprTrackerRoute
   '/portal/$slug': typeof PortalSlugRouteWithChildren
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/support/$ticketId': typeof SupportTicketIdRoute
@@ -461,6 +475,7 @@ export interface FileRoutesByTo {
   '/customer-app': typeof CustomerAppRoute
   '/data-migration': typeof DataMigrationRoute
   '/documents': typeof DocumentsRoute
+  '/dpr': typeof DprRouteWithChildren
   '/employees': typeof EmployeesRoute
   '/integrations': typeof IntegrationsRoute
   '/labor': typeof LaborRoute
@@ -492,6 +507,7 @@ export interface FileRoutesByTo {
   '/crm/support': typeof CrmSupportRouteWithChildren
   '/crm/tasks': typeof CrmTasksRoute
   '/crm/tickets': typeof CrmTicketsRouteWithChildren
+  '/dpr/tracker': typeof DprTrackerRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/support/$ticketId': typeof SupportTicketIdRoute
   '/tickets/$ticketId': typeof TicketsTicketIdRoute
@@ -524,6 +540,7 @@ export interface FileRoutesById {
   '/customer-app': typeof CustomerAppRoute
   '/data-migration': typeof DataMigrationRoute
   '/documents': typeof DocumentsRoute
+  '/dpr': typeof DprRouteWithChildren
   '/employees': typeof EmployeesRoute
   '/integrations': typeof IntegrationsRoute
   '/labor': typeof LaborRoute
@@ -555,6 +572,7 @@ export interface FileRoutesById {
   '/crm/support': typeof CrmSupportRouteWithChildren
   '/crm/tasks': typeof CrmTasksRoute
   '/crm/tickets': typeof CrmTicketsRouteWithChildren
+  '/dpr/tracker': typeof DprTrackerRoute
   '/portal/$slug': typeof PortalSlugRouteWithChildren
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/support/$ticketId': typeof SupportTicketIdRoute
@@ -590,6 +608,7 @@ export interface FileRouteTypes {
     | '/customer-app'
     | '/data-migration'
     | '/documents'
+    | '/dpr'
     | '/employees'
     | '/integrations'
     | '/labor'
@@ -621,6 +640,7 @@ export interface FileRouteTypes {
     | '/crm/support'
     | '/crm/tasks'
     | '/crm/tickets'
+    | '/dpr/tracker'
     | '/portal/$slug'
     | '/projects/$projectId'
     | '/support/$ticketId'
@@ -653,6 +673,7 @@ export interface FileRouteTypes {
     | '/customer-app'
     | '/data-migration'
     | '/documents'
+    | '/dpr'
     | '/employees'
     | '/integrations'
     | '/labor'
@@ -684,6 +705,7 @@ export interface FileRouteTypes {
     | '/crm/support'
     | '/crm/tasks'
     | '/crm/tickets'
+    | '/dpr/tracker'
     | '/projects/$projectId'
     | '/support/$ticketId'
     | '/tickets/$ticketId'
@@ -715,6 +737,7 @@ export interface FileRouteTypes {
     | '/customer-app'
     | '/data-migration'
     | '/documents'
+    | '/dpr'
     | '/employees'
     | '/integrations'
     | '/labor'
@@ -746,6 +769,7 @@ export interface FileRouteTypes {
     | '/crm/support'
     | '/crm/tasks'
     | '/crm/tickets'
+    | '/dpr/tracker'
     | '/portal/$slug'
     | '/projects/$projectId'
     | '/support/$ticketId'
@@ -780,6 +804,7 @@ export interface RootRouteChildren {
   CustomerAppRoute: typeof CustomerAppRoute
   DataMigrationRoute: typeof DataMigrationRoute
   DocumentsRoute: typeof DocumentsRoute
+  DprRoute: typeof DprRouteWithChildren
   EmployeesRoute: typeof EmployeesRoute
   IntegrationsRoute: typeof IntegrationsRoute
   LaborRoute: typeof LaborRoute
@@ -930,6 +955,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EmployeesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dpr': {
+      id: '/dpr'
+      path: '/dpr'
+      fullPath: '/dpr'
+      preLoaderRoute: typeof DprRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/documents': {
       id: '/documents'
       path: '/documents'
@@ -1027,6 +1059,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/portal/$slug'
       preLoaderRoute: typeof PortalSlugRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/dpr/tracker': {
+      id: '/dpr/tracker'
+      path: '/tracker'
+      fullPath: '/dpr/tracker'
+      preLoaderRoute: typeof DprTrackerRouteImport
+      parentRoute: typeof DprRoute
     }
     '/crm/tickets': {
       id: '/crm/tickets'
@@ -1354,6 +1393,16 @@ const CrmRouteChildren: CrmRouteChildren = {
 
 const CrmRouteWithChildren = CrmRoute._addFileChildren(CrmRouteChildren)
 
+interface DprRouteChildren {
+  DprTrackerRoute: typeof DprTrackerRoute
+}
+
+const DprRouteChildren: DprRouteChildren = {
+  DprTrackerRoute: DprTrackerRoute,
+}
+
+const DprRouteWithChildren = DprRoute._addFileChildren(DprRouteChildren)
+
 interface ProjectsRouteChildren {
   ProjectsProjectIdRoute: typeof ProjectsProjectIdRoute
 }
@@ -1434,6 +1483,7 @@ const rootRouteChildren: RootRouteChildren = {
   CustomerAppRoute: CustomerAppRoute,
   DataMigrationRoute: DataMigrationRoute,
   DocumentsRoute: DocumentsRoute,
+  DprRoute: DprRouteWithChildren,
   EmployeesRoute: EmployeesRoute,
   IntegrationsRoute: IntegrationsRoute,
   LaborRoute: LaborRoute,

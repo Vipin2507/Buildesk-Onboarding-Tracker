@@ -75,7 +75,9 @@ export type RolePermissionKey =
   | "manageClientVisits"
   | "manageErpMeetings"
   | "manageModuleSubscriptions"
-  | "assignSalesAgent";
+  | "assignSalesAgent"
+  | "manageDpr"
+  | "viewDprTracker";
 
 export type RolePermissionMap = Record<RolePermissionKey, boolean>;
 
@@ -108,6 +110,8 @@ export const ALL_PERMISSION_KEYS: RolePermissionKey[] = [
   "manageErpMeetings",
   "manageModuleSubscriptions",
   "assignSalesAgent",
+  "manageDpr",
+  "viewDprTracker",
 ];
 
 /** Admin system role always retains these — cannot be toggled off. */
@@ -138,13 +142,14 @@ export const PERMISSION_GROUPS: Array<{
       "manageErpMeetings",
       "manageModuleSubscriptions",
       "assignSalesAgent",
+      "manageDpr",
     ],
   },
   {
     id: "insights",
     label: "Insights",
     description: "Reporting and portfolio visibility",
-    keys: ["viewReports"],
+    keys: ["viewReports", "viewDprTracker"],
   },
   {
     id: "people",
@@ -176,6 +181,8 @@ export const PERMISSION_LABELS: Record<RolePermissionKey, string> = {
   manageErpMeetings: "Manage ERP meetings",
   manageModuleSubscriptions: "Manage module subscriptions",
   assignSalesAgent: "Assign sales agents",
+  manageDpr: "Log daily progress reports (My DPR)",
+  viewDprTracker: "View team DPR tracker & compliance",
 };
 
 export const PERMISSION_DESCRIPTIONS: Record<RolePermissionKey, string> = {
@@ -194,4 +201,6 @@ export const PERMISSION_DESCRIPTIONS: Record<RolePermissionKey, string> = {
   manageErpMeetings: "Schedule and update onboarding meetings with client companies",
   manageModuleSubscriptions: "Activate, renew, pause, or cancel module subscriptions",
   assignSalesAgent: "Assign or clear a company's sales agent",
+  manageDpr: "Create and update your daily progress report tasks",
+  viewDprTracker: "Monitor team DPR compliance, filters, and reminders",
 };

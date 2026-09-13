@@ -1175,5 +1175,65 @@ if (tableExists("crm_accounts")) {
   }
 }
 
+if (!tableExists("dpr_task_templates")) {
+  sqlite.exec(`
+    CREATE TABLE dpr_task_templates (
+      id TEXT PRIMARY KEY NOT NULL,
+      category TEXT NOT NULL,
+      subcategory TEXT NOT NULL,
+      template_name TEXT NOT NULL,
+      description TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE TABLE dpr_template_steps (
+      id TEXT PRIMARY KEY NOT NULL,
+      template_id TEXT NOT NULL REFERENCES dpr_task_templates(id) ON DELETE CASCADE,
+      step_order INTEGER NOT NULL,
+      step_name TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX dpr_template_steps_order_uidx ON dpr_template_steps(template_id, step_order);
+    CREATE INDEX dpr_template_steps_template_idx ON dpr_template_steps(template_id);
+
+    CREATE TABLE dpr_entries (
+      id TEXT PRIMARY KEY NOT NULL,
+      executive_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      entry_date TEXT NOT NULL,
+      category TEXT NOT NULL,
+      subcategory TEXT NOT NULL,
+      client_id TEXT REFERENCES companies(id) ON DELETE SET NULL,
+      client_name_free_text TEXT,
+      task_name TEXT NOT NULL,
+      task_description TEXT,
+      assigned_to TEXT REFERENCES users(id) ON DELETE SET NULL,
+      status TEXT NOT NULL DEFAULT 'Pending',
+      priority TEXT NOT NULL DEFAULT 'Medium',
+      start_time TEXT NOT NULL,
+      end_time TEXT,
+      remarks TEXT,
+      pending_reason TEXT,
+      next_follow_up_date TEXT,
+      completion_date TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX dpr_entries_executive_date_idx ON dpr_entries(executive_id, entry_date);
+    CREATE INDEX dpr_entries_entry_date_idx ON dpr_entries(entry_date);
+    CREATE INDEX dpr_entries_status_idx ON dpr_entries(status);
+    CREATE INDEX dpr_entries_client_idx ON dpr_entries(client_id);
+
+    CREATE TABLE dpr_submissions (
+      id TEXT PRIMARY KEY NOT NULL,
+      executive_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      entry_date TEXT NOT NULL,
+      submitted_at TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX dpr_submissions_exec_date_uidx ON dpr_submissions(executive_id, entry_date);
+  `);
+  console.log("+ CREATE TABLE dpr_* (entries, templates, submissions)");
+}
+
 sqlite.close();
 console.log("db:ensure complete");

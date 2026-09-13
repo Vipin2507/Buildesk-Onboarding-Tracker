@@ -1084,3 +1084,75 @@ export const crmAccountQueryMessages = sqliteTable(
   },
   (t) => [index("crm_account_query_messages_query_idx").on(t.queryId)],
 );
+
+export const dprTaskTemplates = sqliteTable("dpr_task_templates", {
+  id: text("id").primaryKey(),
+  category: text("category").notNull(),
+  subcategory: text("subcategory").notNull(),
+  templateName: text("template_name").notNull(),
+  description: text("description"),
+  ...timestamps,
+});
+
+export const dprTemplateSteps = sqliteTable(
+  "dpr_template_steps",
+  {
+    id: text("id").primaryKey(),
+    templateId: text("template_id")
+      .notNull()
+      .references(() => dprTaskTemplates.id, { onDelete: "cascade" }),
+    stepOrder: integer("step_order").notNull(),
+    stepName: text("step_name").notNull(),
+  },
+  (t) => [
+    index("dpr_template_steps_template_idx").on(t.templateId),
+    uniqueIndex("dpr_template_steps_order_uidx").on(t.templateId, t.stepOrder),
+  ],
+);
+
+export const dprEntries = sqliteTable(
+  "dpr_entries",
+  {
+    id: text("id").primaryKey(),
+    executiveId: text("executive_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    entryDate: text("entry_date").notNull(),
+    category: text("category").notNull(),
+    subcategory: text("subcategory").notNull(),
+    clientId: text("client_id").references(() => companies.id, { onDelete: "set null" }),
+    clientNameFreeText: text("client_name_free_text"),
+    taskName: text("task_name").notNull(),
+    taskDescription: text("task_description"),
+    assignedTo: text("assigned_to").references(() => users.id, { onDelete: "set null" }),
+    status: text("status").notNull().default("Pending"),
+    priority: text("priority").notNull().default("Medium"),
+    startTime: text("start_time").notNull(),
+    endTime: text("end_time"),
+    remarks: text("remarks"),
+    pendingReason: text("pending_reason"),
+    nextFollowUpDate: text("next_follow_up_date"),
+    completionDate: text("completion_date"),
+    ...timestamps,
+  },
+  (t) => [
+    index("dpr_entries_executive_date_idx").on(t.executiveId, t.entryDate),
+    index("dpr_entries_entry_date_idx").on(t.entryDate),
+    index("dpr_entries_status_idx").on(t.status),
+    index("dpr_entries_client_idx").on(t.clientId),
+  ],
+);
+
+export const dprSubmissions = sqliteTable(
+  "dpr_submissions",
+  {
+    id: text("id").primaryKey(),
+    executiveId: text("executive_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    entryDate: text("entry_date").notNull(),
+    submittedAt: text("submitted_at").notNull(),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("dpr_submissions_exec_date_uidx").on(t.executiveId, t.entryDate)],
+);

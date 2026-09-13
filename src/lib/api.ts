@@ -273,3 +273,17 @@ export {
 } from "@/server/api/google-calendar";
 
 export { listCscCountries, listCscStates, listCscCities } from "@/server/api/locations";
+
+export {
+  getDprCategories,
+  listDprTemplates,
+  listDprEntries,
+  createDprEntry,
+  createDprEntriesFromTemplate,
+  updateDprEntry,
+  getDprSummary,
+  getDprCompliance,
+  remindDprCompliance,
+  submitDprDay,
+  getDprDaySubmission,
+} from "@/server/api/dpr";
