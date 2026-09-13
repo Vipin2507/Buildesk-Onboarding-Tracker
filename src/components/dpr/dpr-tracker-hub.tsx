@@ -34,14 +34,18 @@ import {
   useDprSummary,
   useRemindDprCompliance,
 } from "@/hooks/use-dpr";
+import { DprTrackerDateFilter } from "@/components/dpr/dpr-tracker-date-filter";
 import type { DprTrackerSearch } from "@/lib/dpr-tracker-search";
-import { dprTrackerSearchToApiFilters } from "@/lib/dpr-tracker-search";
+import {
+  dprTrackerComplianceDate,
+  dprTrackerSearchToApiFilters,
+} from "@/lib/dpr-tracker-search";
 import { downloadCsv } from "@/lib/reports";
 import { formatDate } from "@/lib/utils";
 import { useUserStore } from "@/stores/useUserStore";
 import type { DprEntry } from "@/types/dpr";
 import { formatDprTimeRange } from "@/lib/dpr-time";
-import { isDprFollowUpOverdue, todayIsoDate } from "@/lib/dpr-utils";
+import { isDprFollowUpOverdue } from "@/lib/dpr-utils";
 
 type Props = {
   search: DprTrackerSearch;
@@ -50,7 +54,8 @@ type Props = {
 
 export function DprTrackerHub({ search, onSearchChange }: Props) {
   const filters = useMemo(() => dprTrackerSearchToApiFilters(search), [search]);
-  const complianceDate = filters.dateFrom ?? todayIsoDate();
+  const complianceDate = dprTrackerComplianceDate(search);
+  const { dateFrom, dateTo } = filters;
 
   const { data: categories } = useDprCategories();
   const { data: listData, isLoading } = useDprEntries(filters);
@@ -168,7 +173,14 @@ export function DprTrackerHub({ search, onSearchChange }: Props) {
 
       <DprStatStrip items={stats} />
 
-      <div className="flex flex-wrap gap-2">
+      <DprTrackerDateFilter
+        search={search}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onSearchChange={onSearchChange}
+      />
+
+      <div className="flex flex-wrap items-end gap-2">
         <Input
           className="h-8 min-w-[140px] flex-1 text-xs"
           placeholder="Search task or client…"
@@ -231,12 +243,42 @@ export function DprTrackerHub({ search, onSearchChange }: Props) {
             ))}
           </SelectContent>
         </Select>
-        <Input
-          type="date"
-          className="h-8 w-[130px] text-xs"
-          value={search.dateFrom ?? complianceDate}
-          onChange={(e) => onSearchChange({ dateFrom: e.target.value, dateTo: e.target.value })}
-        />
+        <Select
+          value={search.status ?? "all"}
+          onValueChange={(v) =>
+            onSearchChange({
+              status: v === "all" ? undefined : (v as DprTrackerSearch["status"]),
+            })
+          }
+        >
+          <SelectTrigger className="h-8 w-[120px] text-xs">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            <SelectItem value="Pending">Pending</SelectItem>
+            <SelectItem value="In Progress">In Progress</SelectItem>
+            <SelectItem value="Completed">Completed</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select
+          value={search.priority ?? "all"}
+          onValueChange={(v) =>
+            onSearchChange({
+              priority: v === "all" ? undefined : (v as DprTrackerSearch["priority"]),
+            })
+          }
+        >
+          <SelectTrigger className="h-8 w-[120px] text-xs">
+            <SelectValue placeholder="Priority" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All priorities</SelectItem>
+            <SelectItem value="High">High</SelectItem>
+            <SelectItem value="Medium">Medium</SelectItem>
+            <SelectItem value="Low">Low</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <DesignTicketTabNav
@@ -254,6 +296,7 @@ export function DprTrackerHub({ search, onSearchChange }: Props) {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground">
               {notSubmitted.length} executive(s) with no DPR on {formatDate(complianceDate)}
+              {dateFrom !== dateTo ? " (compliance uses end date of range)" : ""}
             </p>
             <Button
               size="sm"

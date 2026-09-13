@@ -17,8 +17,7 @@ import { fetchAutomationLogsFromServer } from "@/lib/automation-log-sync";
 import { useAutomationStore } from "@/stores/useAutomationStore";
 import { useCompanyStore } from "@/stores/useCompanyStore";
 import type { AutomationLog, AutomationLogStatus } from "@/types/automation";
-import { formatDate } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { cn, formatDate, formatTime } from "@/lib/utils";
 
 function statusTone(status: AutomationLogStatus) {
   if (status === "success") return "success" as const;
@@ -98,9 +97,18 @@ export function AutomationLogsPanel() {
   }[] = [
     {
       key: "attemptedAt",
-      header: "Time",
+      header: "Date",
       sortable: true,
-      render: (l) => formatDate(l.attemptedAt),
+      render: (l) => (
+        <span className="whitespace-nowrap tabular-nums">{formatDate(l.attemptedAt)}</span>
+      ),
+    },
+    {
+      key: "attemptedTime",
+      header: "Time",
+      render: (l) => (
+        <span className="whitespace-nowrap tabular-nums">{formatTime(l.attemptedAt)}</span>
+      ),
     },
     {
       key: "ticketNumber",

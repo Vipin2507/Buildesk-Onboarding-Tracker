@@ -26,7 +26,7 @@ import {
   type AutomationLogStatus,
   type AutomationTrigger,
 } from "@/types/automation";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatTime } from "@/lib/utils";
 import { useSessionFilterState } from "@/hooks/use-session-filter";
 import { cn } from "@/lib/utils";
 
@@ -145,9 +145,18 @@ export function AutomationLogsPanel() {
   }[] = [
     {
       key: "attemptedAt",
-      header: "Time",
+      header: "Date",
       sortable: true,
-      render: (l) => formatDate(l.attemptedAt),
+      render: (l) => (
+        <span className="whitespace-nowrap tabular-nums">{formatDate(l.attemptedAt)}</span>
+      ),
+    },
+    {
+      key: "attemptedTime",
+      header: "Time",
+      render: (l) => (
+        <span className="whitespace-nowrap tabular-nums">{formatTime(l.attemptedAt)}</span>
+      ),
     },
     {
       key: "ticketNumber",
