@@ -9,6 +9,10 @@ import { ApiError, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import {
+  buildExecutiveOverdueDigestPreview,
+  sendExecutiveOverdueDigest,
+} from "@/server/crm-payment-executive-digest";
+import {
   dispatchServerPaymentClientReminder,
   dispatchServerPaymentExecutiveReminder,
 } from "@/server/crm-payment-reminder-automation";
@@ -215,6 +219,41 @@ export const remindCrmPaymentExecutive = createServerFn({ method: "POST" })
     const user = requireUser();
     assertCanViewAccountId(user, data.accountId);
     return sendPaymentExecutiveReminderForAccount(data.accountId, user.id);
+  });
+
+export const previewCrmExecutivePaymentDigest = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ accountIds: z.array(z.string()).optional() }).parse(data ?? {}),
+  )
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    const db = getDb();
+    const allowed = allowedAccountIdsForUser(user);
+    const accountIds = data.accountIds?.length ? data.accountIds : undefined;
+    return buildExecutiveOverdueDigestPreview(db, allowed, accountIds);
+  });
+
+export const sendCrmExecutivePaymentDigest = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        deliveries: z
+          .array(
+            z.object({
+              recipientUserId: z.string().min(1),
+              accountIds: z.array(z.string().min(1)).min(1),
+            }),
+          )
+          .min(1)
+          .max(100),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    const db = getDb();
+    const allowed = allowedAccountIdsForUser(user);
+    return sendExecutiveOverdueDigest(db, data.deliveries, allowed);
   });
 
 export const remindCrmPaymentsBulk = createServerFn({ method: "POST" })

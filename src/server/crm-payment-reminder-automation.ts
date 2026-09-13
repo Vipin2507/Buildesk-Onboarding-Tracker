@@ -4,6 +4,9 @@ import {
   DEFAULT_CRM_AUTOMATION_SETTINGS,
   N8N_EMAIL_SEGMENT,
 } from "@/data/crm-automation-defaults";
+import { crmSalesManagerNamesMatch } from "@/lib/crm-account-access";
+import { phoneToWahaChatId } from "@/lib/automationEndpoints";
+import { buildExecutiveDigestTemplateVars } from "@/lib/crm-payment-executive-digest";
 import { resolveUserWorkEmail } from "@/lib/user-email";
 import {
   renderAutomationSubject,
@@ -15,7 +18,7 @@ import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { buildAccountPaymentSnapshot, getAccountPaymentReceived } from "@/server/lib/crm-payments";
 import { nowIso } from "@/types";
-import type { AutomationLog, AutomationTrigger } from "@/types/automation";
+import type { AutomationLog, AutomationTrigger, WahaConfig } from "@/types/automation";
 
 function trimSlash(url: string) {
   return url.replace(/\/+$/, "");
@@ -35,15 +38,12 @@ function serverLogId() {
   return `PAY-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
-function findUserByDisplayName(db: ReturnType<typeof getDb>, name?: string | null) {
-  const needle = name?.trim();
-  if (!needle) return undefined;
-  const lower = needle.toLowerCase();
+function listActiveCrmUsers(db: ReturnType<typeof getDb>) {
   return db
     .select()
     .from(t.users)
     .all()
-    .find((user) => user.name.trim().toLowerCase() === lower);
+    .filter((u) => u.active !== false && (u.productScope || "erp") === "crm");
 }
 
 function resolveExecutiveRecipients(
@@ -56,23 +56,44 @@ function resolveExecutiveRecipients(
     { label: "Sales manager", name: account.salesManagerName },
   ];
   const seen = new Set<string>();
-  const recipients: { name: string; email: string; role: string }[] = [];
+  const recipients: { name: string; email: string; phone?: string; role: string }[] = [];
 
   for (const role of roles) {
     const displayName = role.name?.trim();
     if (!displayName) continue;
-    const user = findUserByDisplayName(db, displayName);
-    const email = resolveUserWorkEmail(user);
-    if (!email || seen.has(email)) continue;
-    seen.add(email);
-    recipients.push({
-      name: user?.name ?? displayName,
-      email,
-      role: role.label,
-    });
+    for (const user of listActiveCrmUsers(db)) {
+      if (!crmSalesManagerNamesMatch(displayName, user.name)) continue;
+      const email = resolveUserWorkEmail(user);
+      if (!email || seen.has(email)) continue;
+      seen.add(email);
+      recipients.push({
+        name: user.name,
+        email,
+        phone: user.phone ?? undefined,
+        role: role.label,
+      });
+    }
   }
 
   return recipients;
+}
+
+async function sendServerWahaText(waha: WahaConfig, chatId: string, text: string) {
+  const res = await fetch(`${trimSlash(waha.apiUrl)}/api/sendText`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "X-Api-Key": waha.apiKey,
+    },
+    body: JSON.stringify({
+      session: waha.sessionName,
+      chatId,
+      text,
+    }),
+  });
+  const body = await res.text();
+  return { ok: res.ok, status: res.status, text: body };
 }
 
 function buildPaymentTemplateVars(
@@ -81,7 +102,23 @@ function buildPaymentTemplateVars(
   recipientName: string,
 ) {
   const due = snap.nextDueInstallment;
+  const digestVars = buildExecutiveDigestTemplateVars(recipientName, [
+    {
+      accountId: account.id,
+      accountName: account.name,
+      overdueAmount: snap.overdueAmount,
+      overdueDays: snap.overdueDays,
+      dueDate: due?.dueDate ?? null,
+      pendingAmount: snap.pendingAmount,
+      paymentReceived: snap.paymentReceived,
+      totalDealValue: snap.totalDealValue,
+      salesManager: account.salesManagerName ?? undefined,
+      supportManager1: account.supportManager1 ?? undefined,
+      supportManager2: account.supportManager2 ?? undefined,
+    },
+  ]);
   return {
+    ...digestVars,
     customerName: account.pocName?.trim() || account.contact?.trim() || account.name,
     accountName: account.name,
     companyName: account.name,
@@ -209,6 +246,105 @@ async function dispatchPaymentEmailRule(
   return sent;
 }
 
+async function dispatchPaymentWhatsappRule(
+  db: ReturnType<typeof getDb>,
+  opts: {
+    trigger: Extract<AutomationTrigger, "payment-overdue" | "payment-executive-remind">;
+    account: typeof t.crmAccounts.$inferSelect;
+    recipientPhone?: string;
+    vars: Record<string, string>;
+  },
+): Promise<boolean> {
+  const config = loadCrmAutomationConfig(db);
+  if (!config.settings.automationsEnabled) return false;
+
+  const rules = config.rules.filter(
+    (r) => r.isActive && r.trigger === opts.trigger && r.channel === "whatsapp",
+  );
+  if (rules.length === 0) return false;
+
+  const wahaEndpoint = config.endpoints.find((e) => e.channel === "whatsapp" && e.isEnabled);
+  if (!wahaEndpoint || !config.waha.isEnabled) return false;
+
+  const chatId = phoneToWahaChatId(opts.recipientPhone ?? undefined);
+  if (!chatId) return false;
+
+  let sent = false;
+  for (const rule of rules) {
+    const message = renderAutomationTemplate(rule.templateBody, opts.vars);
+    const attemptedAt = nowIso();
+    const baseLog: AutomationLog = {
+      id: serverLogId(),
+      companyId: opts.account.id,
+      channel: "whatsapp",
+      trigger: opts.trigger,
+      status: "retrying",
+      requestPayload: { chatId, ruleId: rule.id },
+      attemptedAt,
+      retryCount: 0,
+    };
+
+    try {
+      const res = await sendServerWahaText(config.waha, chatId, message);
+      if (!res.ok) {
+        appendServerCrmAutomationLog(db, {
+          ...baseLog,
+          status: "failed",
+          errorMessage: `HTTP ${res.status}: ${summarizeResponse(res.text, 240)}`,
+          responseSummary: summarizeResponse(res.text),
+        });
+        continue;
+      }
+      appendServerCrmAutomationLog(db, {
+        ...baseLog,
+        status: "success",
+        responseSummary: summarizeResponse(res.text),
+      });
+      sent = true;
+    } catch (err) {
+      appendServerCrmAutomationLog(db, {
+        ...baseLog,
+        status: "failed",
+        errorMessage: err instanceof Error ? err.message : "Network error",
+      });
+    }
+  }
+
+  return sent;
+}
+
+export type ExecutivePaymentChannelResult = { email: boolean; whatsapp: boolean };
+
+/** Sends active payment-executive-remind email and/or WhatsApp rules for one recipient. */
+export async function dispatchExecutivePaymentChannels(
+  db: ReturnType<typeof getDb>,
+  opts: {
+    account: typeof t.crmAccounts.$inferSelect;
+    recipientEmail: string;
+    recipientName: string;
+    recipientPhone?: string;
+    vars: Record<string, string>;
+    entityType?: string;
+    entityId?: string;
+  },
+): Promise<ExecutivePaymentChannelResult> {
+  const email = await dispatchPaymentEmailRule(db, {
+    trigger: "payment-executive-remind",
+    account: opts.account,
+    recipientEmail: opts.recipientEmail,
+    recipientName: opts.recipientName,
+    recipientPhone: opts.recipientPhone,
+    vars: opts.vars,
+  });
+  const whatsapp = await dispatchPaymentWhatsappRule(db, {
+    trigger: "payment-executive-remind",
+    account: opts.account,
+    recipientPhone: opts.recipientPhone,
+    vars: opts.vars,
+  });
+  return { email, whatsapp };
+}
+
 export async function dispatchServerPaymentClientReminder(
   db: ReturnType<typeof getDb>,
   accountId: string,
@@ -255,21 +391,22 @@ export async function dispatchServerPaymentExecutiveReminder(
 
   const received = getAccountPaymentReceived(db, accountId);
   const snap = buildAccountPaymentSnapshot(account, received);
-  const recipientEmail = executives.map((e) => e.email).join(", ");
-  const recipientName = executives.map((e) => e.name).join(", ");
-  const vars = buildPaymentTemplateVars(account, snap, recipientName);
 
-  const sent = await dispatchPaymentEmailRule(db, {
-    trigger: "payment-executive-remind",
-    account,
-    recipientEmail,
-    recipientName,
-    recipientPhone: undefined,
-    vars,
-  });
+  let anySent = false;
+  for (const executive of executives) {
+    const vars = buildPaymentTemplateVars(account, snap, executive.name);
+    const result = await dispatchExecutivePaymentChannels(db, {
+      account,
+      recipientEmail: executive.email,
+      recipientName: executive.name,
+      recipientPhone: executive.phone,
+      vars,
+    });
+    if (result.email || result.whatsapp) anySent = true;
+  }
 
-  if (!sent) {
-    return { ok: false, error: "No active executive reminder rules or email endpoint" };
+  if (!anySent) {
+    return { ok: false, error: "No active executive reminder rules or endpoints" };
   }
   return { ok: true, recipientCount: executives.length };
 }

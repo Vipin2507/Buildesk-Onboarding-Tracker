@@ -9,7 +9,10 @@ import {
   remindCrmPaymentAccount,
   remindCrmPaymentExecutive,
   remindCrmPaymentsBulk,
+  previewCrmExecutivePaymentDigest,
+  sendCrmExecutivePaymentDigest,
 } from "@/lib/api";
+import type { ExecutiveDigestDelivery } from "@/lib/crm-payment-executive-digest";
 import type { CrmPaymentsSearch } from "@/lib/crm-payments-search";
 import { crmPaymentsSearchToApiFilters } from "@/lib/crm-payments-search";
 
@@ -104,5 +107,21 @@ export function useRemindCrmPaymentExecutive() {
 export function useRemindCrmPaymentsBulk() {
   return useMutation({
     mutationFn: (accountIds: string[]) => remindCrmPaymentsBulk({ data: { accountIds } }),
+  });
+}
+
+export function usePreviewExecutivePaymentDigest() {
+  return useMutation({
+    mutationFn: (accountIds?: string[]) =>
+      previewCrmExecutivePaymentDigest({
+        data: { accountIds: accountIds?.length ? accountIds : undefined },
+      }),
+  });
+}
+
+export function useSendExecutivePaymentDigest() {
+  return useMutation({
+    mutationFn: (deliveries: ExecutiveDigestDelivery[]) =>
+      sendCrmExecutivePaymentDigest({ data: { deliveries } }),
   });
 }

@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   Bell,
+  Users,
   ChevronDown,
   ChevronRight,
   Download,
@@ -11,6 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { CrmAccountPaymentBulkUpdateModal } from "@/components/crm/crm-account-payment-bulk-update-modal";
+import { CrmExecutivePaymentReminderDialog } from "@/components/crm/crm-executive-payment-reminder-dialog";
 import { CrmPaymentsExpandedRow } from "@/components/crm/crm-payments-expanded-row";
 import { DataTable } from "@/components/data-table";
 import {
@@ -132,6 +134,7 @@ function CrmPaymentsPage() {
   const [expandedRowIds, setExpandedRowIds] = useState<Set<string>>(() => new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [bulkPaymentOpen, setBulkPaymentOpen] = useState(false);
+  const [executiveDigestOpen, setExecutiveDigestOpen] = useState(false);
 
   useEffect(() => {
     setSearchDraft(search.search ?? "");
@@ -301,6 +304,15 @@ function CrmPaymentsPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1 px-3 text-xs"
+              onClick={() => setExecutiveDigestOpen(true)}
+            >
+              <Users className="h-3.5 w-3.5" />
+              Remind executives
+            </Button>
             <Button
               size="sm"
               variant="outline"
@@ -720,6 +732,11 @@ function CrmPaymentsPage() {
         </div>
       )}
       <CrmAccountPaymentBulkUpdateModal open={bulkPaymentOpen} onOpenChange={setBulkPaymentOpen} />
+      <CrmExecutivePaymentReminderDialog
+        open={executiveDigestOpen}
+        onOpenChange={setExecutiveDigestOpen}
+        accountIdsScope={selectedIds.size > 0 ? [...selectedIds] : undefined}
+      />
     </PageWrap>
   );
 }

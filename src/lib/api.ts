@@ -174,6 +174,8 @@ export {
   remindCrmPaymentAccount,
   remindCrmPaymentExecutive,
   remindCrmPaymentsBulk,
+  previewCrmExecutivePaymentDigest,
+  sendCrmExecutivePaymentDigest,
 } from "@/server/api/crm-payments";
 
 export {
