@@ -11,6 +11,7 @@ import { isAdminRoleKey } from "@/lib/permissions";
 import { parseInstallmentsJson } from "@/lib/crm-account-commercial";
 import {
   ensureInitialPaymentOnAccountCreate,
+  replaceAccountPaymentLedgerForImport,
   syncAccountPaymentTotals,
 } from "@/server/lib/crm-payments";
 import type { CrmAccount } from "@/types/crm-account";
@@ -304,4 +305,66 @@ export const deleteCrmAccount = createServerFn({ method: "POST" })
     db.delete(t.crmOnboardingRecords).where(eq(t.crmOnboardingRecords.companyId, data.id)).run();
     db.delete(t.crmAccounts).where(eq(t.crmAccounts.id, data.id)).run();
     return mapRow(existing);
+  });
+
+const paymentBulkPatchSchema = z.object({
+  accountId: z.string(),
+  userId: z.string().optional().nullable(),
+  dealSize: z.number().optional().nullable(),
+  gstPercent: z.number().optional().nullable(),
+  targetPaid: z.number().optional().nullable(),
+  pendingAmount: z.number().optional().nullable(),
+  installmentCount: z.number().int().optional().nullable(),
+  installmentsJson: z.string().optional().nullable(),
+});
+
+/** Bulk-update CRM account commercial + installment schedule from payments Excel sheet. */
+export const bulkUpdateCrmAccountPayments = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ updates: z.array(paymentBulkPatchSchema).min(1).max(500) }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    const db = getDb();
+    const now = nowIso();
+    const saved: CrmAccount[] = [];
+
+    for (const patch of data.updates) {
+      const existing = db
+        .select()
+        .from(t.crmAccounts)
+        .where(eq(t.crmAccounts.id, patch.accountId))
+        .get();
+      if (!existing) continue;
+
+      assertCanMutateAccount(user, existing, existing.salesManagerName);
+
+      const set: Record<string, unknown> = { updatedAt: now };
+      if (patch.userId !== undefined) set.userId = patch.userId?.trim() || null;
+      if (patch.dealSize != null) {
+        set.dealSize = patch.dealSize;
+        set.totalCost = patch.dealSize;
+      }
+      if (patch.gstPercent != null) set.gstPercent = patch.gstPercent;
+      if (patch.installmentCount != null) set.installmentCount = patch.installmentCount;
+      if (patch.installmentsJson !== undefined) set.installmentsJson = patch.installmentsJson;
+
+      db.update(t.crmAccounts).set(set).where(eq(t.crmAccounts.id, patch.accountId)).run();
+
+      if (patch.targetPaid != null) {
+        const paidDate = (existing.startDate ?? now).slice(0, 10);
+        replaceAccountPaymentLedgerForImport(db, patch.accountId, patch.targetPaid, paidDate, user.id);
+      } else {
+        syncAccountPaymentTotals(db, patch.accountId);
+      }
+
+      const row = db
+        .select()
+        .from(t.crmAccounts)
+        .where(eq(t.crmAccounts.id, patch.accountId))
+        .get();
+      if (row) saved.push(mapRow(row));
+    }
+
+    return { updated: saved.length, accounts: saved };
   });

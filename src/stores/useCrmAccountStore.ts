@@ -2,7 +2,9 @@ import { serializeInstallments } from "@/lib/crm-account-commercial";
 import type { CrmAccount } from "@/types/crm-account";
 import { newId, nowIso } from "@/types/common";
 import { notifyCrmGoLive } from "@/lib/crm-notify";
+import type { CrmAccountPaymentBulkPatch } from "@/lib/crm-account-payment-sheet-import";
 import {
+  bulkUpdateCrmAccountPayments as apiBulkUpdateCrmAccountPayments,
   deleteCrmAccount as apiDeleteCrmAccount,
   upsertCrmAccount as apiUpsertCrmAccount,
   upsertCrmAccountsBatch as apiUpsertCrmAccountsBatch,
@@ -26,6 +28,7 @@ type CrmAccountState = {
     opts?: { who?: string; statusRemarks?: string },
   ) => void;
   deleteAccount: (id: string) => CrmAccount | undefined;
+  bulkUpdatePaymentsFromSheet: (updates: CrmAccountPaymentBulkPatch[]) => Promise<number>;
 };
 
 function toApiPayload(account: CrmAccount) {
@@ -182,5 +185,15 @@ export const useCrmAccountStore = createStore<CrmAccountState>((set, get) => ({
     set((s) => ({ accounts: s.accounts.filter((a) => a.id !== id) }));
     serverSync("delete crm account", () => apiDeleteCrmAccount({ data: { id } }));
     return existing;
+  },
+
+  bulkUpdatePaymentsFromSheet: async (updates) => {
+    const res = await apiBulkUpdateCrmAccountPayments({ data: { updates } });
+    const byId = new Map(get().accounts.map((a) => [a.id, a]));
+    for (const account of res.accounts) {
+      byId.set(account.id, account);
+    }
+    set({ accounts: [...byId.values()] });
+    return res.updated;
   },
 }));

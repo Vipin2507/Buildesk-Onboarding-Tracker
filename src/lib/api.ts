@@ -162,6 +162,7 @@ export {
   upsertCrmAccount,
   upsertCrmAccountsBatch,
   deleteCrmAccount,
+  bulkUpdateCrmAccountPayments,
 } from "@/server/api/crm-accounts";
 
 export {

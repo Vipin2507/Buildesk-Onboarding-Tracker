@@ -167,6 +167,40 @@ export function ensureInitialPaymentOnAccountCreate(
   });
 }
 
+export const PAYMENT_SHEET_IMPORT_NOTE = "Bulk payment sheet import";
+
+/** Replace ledger with a single entry matching imported Paid (bulk sheet only). */
+export function replaceAccountPaymentLedgerForImport(
+  db: ReturnType<typeof getDb>,
+  accountId: string,
+  targetPaid: number,
+  paidDate: string,
+  createdBy?: string,
+) {
+  const target = roundMoney(Math.max(0, targetPaid));
+  db.delete(t.paymentTransactions)
+    .where(eq(t.paymentTransactions.accountId, accountId))
+    .run();
+
+  if (target > 0) {
+    const now = nowIso();
+    db.insert(t.paymentTransactions)
+      .values({
+        id: newId(),
+        accountId,
+        amount: target,
+        paidDate: paidDate.slice(0, 10),
+        note: PAYMENT_SHEET_IMPORT_NOTE,
+        createdBy: createdBy ?? null,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+  }
+
+  syncAccountPaymentTotals(db, accountId);
+}
+
 export const PAYMENTS_BACKFILL_CONFIG_KEY = "payments-backfill-v1";
 
 export function runPaymentsBackfillIfNeeded(db: ReturnType<typeof getDb>) {

@@ -4,11 +4,13 @@ import {
   ChevronDown,
   ChevronRight,
   Download,
+  FileSpreadsheet,
   Search,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { CrmAccountPaymentBulkUpdateModal } from "@/components/crm/crm-account-payment-bulk-update-modal";
 import { CrmPaymentsExpandedRow } from "@/components/crm/crm-payments-expanded-row";
 import { DataTable } from "@/components/data-table";
 import {
@@ -129,6 +131,7 @@ function CrmPaymentsPage() {
   const [searchDraft, setSearchDraft] = useState(search.search ?? "");
   const [expandedRowIds, setExpandedRowIds] = useState<Set<string>>(() => new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [bulkPaymentOpen, setBulkPaymentOpen] = useState(false);
 
   useEffect(() => {
     setSearchDraft(search.search ?? "");
@@ -298,6 +301,15 @@ function CrmPaymentsPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1 px-3 text-xs"
+              onClick={() => setBulkPaymentOpen(true)}
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              Bulk update
+            </Button>
             <Button
               size="sm"
               variant="outline"
@@ -707,6 +719,7 @@ function CrmPaymentsPage() {
           ) : null}
         </div>
       )}
+      <CrmAccountPaymentBulkUpdateModal open={bulkPaymentOpen} onOpenChange={setBulkPaymentOpen} />
     </PageWrap>
   );
 }
