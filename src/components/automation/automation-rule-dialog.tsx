@@ -631,7 +631,7 @@ export function AutomationRuleDialog({
                       if (selection) {
                         requestAnimationFrame(() => {
                           const el = document.getElementById("automation-template-subject");
-                          if (el && "setSelectionRange" in el) {
+                          if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
                             el.setSelectionRange(selection.start, selection.end);
                           }
                         });
