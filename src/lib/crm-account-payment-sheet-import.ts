@@ -6,7 +6,7 @@ import {
   serializeInstallments,
   validateInstallmentTotal,
 } from "@/lib/crm-account-commercial";
-import { normalizeImportDate } from "@/lib/project-sheet-import";
+import { isEmptyImportDateValue, normalizeImportDate } from "@/lib/project-sheet-import";
 import type { CrmAccount, CrmAccountInstallment } from "@/types/crm-account";
 
 /** Headers from the CRM payments bulk-update sheet. */
@@ -129,11 +129,18 @@ function parseNumber(value: unknown): number | null {
 /** Split "01-07-2027 & 01-07-2028" or comma-separated lists. */
 export function splitSheetList(value: string): string[] {
   const raw = value.trim();
-  if (!raw) return [];
+  if (!raw || isEmptyImportDateValue(raw)) return [];
   return raw
     .split(/\s*&\s*|\s*;\s*|\s*,\s*(?=\d)/)
     .map((part) => part.trim())
-    .filter(Boolean);
+    .filter((part) => part && !isEmptyImportDateValue(part));
+}
+
+function splitSheetAmountList(value: string): string[] {
+  return splitSheetList(value).filter((part) => {
+    const n = parseNumber(part);
+    return n != null && n > 0;
+  });
 }
 
 function mapHeaders(keys: string[]) {
@@ -168,8 +175,16 @@ export function buildInstallmentsFromPaymentSheet(input: {
   installmentAmountsRaw: string;
 }): { installments: CrmAccountInstallment[]; errors: string[] } {
   const errors: string[] = [];
+  const pending = roundMoney(Math.max(0, input.pendingAmount));
+  const deal = roundMoney(Math.max(0, input.dealSize));
+
+  /** Fully paid — ignore leftover installment cells (e.g. "-" dates). */
+  if (pending <= 0) {
+    return { installments: [], errors: [] };
+  }
+
   const dateParts = splitSheetList(input.installmentDatesRaw);
-  const amountParts = splitSheetList(input.installmentAmountsRaw);
+  const amountParts = splitSheetAmountList(input.installmentAmountsRaw);
 
   if (dateParts.length === 0 && amountParts.length === 0) {
     return { installments: [], errors: [] };
@@ -177,28 +192,24 @@ export function buildInstallmentsFromPaymentSheet(input: {
 
   const dueDates: string[] = [];
   for (const part of dateParts) {
+    if (isEmptyImportDateValue(part)) continue;
     const ymd = normalizeImportDate(part);
     if (!ymd) errors.push(`Invalid installment date: ${part}`);
     else dueDates.push(ymd);
   }
 
-  const amounts: number[] = [];
-  for (const part of amountParts) {
-    const n = parseNumber(part);
-    if (n == null) errors.push(`Invalid installment amount: ${part}`);
-    else amounts.push(roundMoney(n));
-  }
+  const amounts: number[] = amountParts.map((part) => roundMoney(parseNumber(part)!));
 
   if (dueDates.length === 0) {
-    if (amountParts.length) errors.push("Installment date is required when amounts are provided");
+    if (amounts.length > 0) {
+      errors.push("Installment date is required when amounts are provided");
+    }
     return { installments: [], errors };
   }
 
   dueDates.sort((a, b) => a.localeCompare(b));
 
   let rowAmounts: number[] = [];
-  const pending = roundMoney(Math.max(0, input.pendingAmount));
-  const deal = roundMoney(Math.max(0, input.dealSize));
 
   if (amounts.length === dueDates.length) {
     rowAmounts = amounts;
@@ -555,7 +566,7 @@ export function mergeCrmAccountPaymentImportRow(
     gstPercent: row.gstPercent,
     targetPaid: row.paymentReceived,
     pendingAmount: row.pendingAmount,
-    installmentCount: row.installmentCount > 0 ? row.installmentCount : null,
+    installmentCount: row.installments.length,
     installmentsJson:
       row.installments.length > 0 ? serializeInstallments(row.installments) : null,
   };

@@ -346,7 +346,7 @@ export const bulkUpdateCrmAccountPayments = createServerFn({ method: "POST" })
         set.totalCost = patch.dealSize;
       }
       if (patch.gstPercent != null) set.gstPercent = patch.gstPercent;
-      if (patch.installmentCount != null) set.installmentCount = patch.installmentCount;
+      if (patch.installmentCount !== undefined) set.installmentCount = patch.installmentCount;
       if (patch.installmentsJson !== undefined) set.installmentsJson = patch.installmentsJson;
 
       db.update(t.crmAccounts).set(set).where(eq(t.crmAccounts.id, patch.accountId)).run();
