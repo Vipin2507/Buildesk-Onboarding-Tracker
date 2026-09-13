@@ -40,6 +40,7 @@ import { downloadCsv } from "@/lib/reports";
 import { formatDate } from "@/lib/utils";
 import { useUserStore } from "@/stores/useUserStore";
 import type { DprEntry } from "@/types/dpr";
+import { formatDprTimeRange } from "@/lib/dpr-time";
 import { isDprFollowUpOverdue, todayIsoDate } from "@/lib/dpr-utils";
 
 type Props = {
@@ -328,8 +329,7 @@ export function DprTrackerHub({ search, onSearchChange }: Props) {
                   <td className="px-3 py-2 font-medium">{e.taskName}</td>
                   <td className="px-3 py-2">{e.clientDisplayName ?? "—"}</td>
                   <td className="px-3 py-2 tabular-nums text-muted-foreground">
-                    {e.startTime.slice(11, 16)}
-                    {e.endTime ? ` – ${e.endTime.slice(11, 16)}` : ""}
+                    {formatDprTimeRange(e.startTime, e.endTime)}
                   </td>
                   <td className="px-3 py-2">
                     <DprStatusBadge status={e.status} />

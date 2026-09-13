@@ -22,6 +22,7 @@ import {
   todayIsoDate,
 } from "@/server/lib/dpr-map";
 import { ensureDprTemplatesSeeded } from "@/server/lib/dpr-seed";
+import { dprWallClockNow } from "@/server/lib/dpr-time";
 import { DPR_PRIORITIES, DPR_STATUSES, type DprComplianceRow, type DprSummary } from "@/types/dpr";
 
 const statusSchema = z.enum(DPR_STATUSES);
@@ -259,12 +260,13 @@ export const createDprEntry = createServerFn({ method: "POST" })
     }
 
     const now = nowIso();
-    const startTime = data.startTime || now;
+    const wallNow = dprWallClockNow(db);
+    const startTime = data.startTime?.trim() || wallNow;
     let completionDate: string | null = null;
     let endTime = data.endTime ?? null;
     if (status === "Completed") {
       completionDate = entryDate;
-      endTime = endTime || now;
+      endTime = endTime || wallNow;
     }
 
     const id = newId();
@@ -340,6 +342,7 @@ export const createDprEntriesFromTemplate = createServerFn({ method: "POST" })
     if (steps.length === 0) throw new ApiError(400, "Template has no steps");
 
     const now = nowIso();
+    const wallNow = dprWallClockNow(db);
     const createdIds: string[] = [];
     for (const step of steps) {
       const id = newId();
@@ -357,7 +360,7 @@ export const createDprEntriesFromTemplate = createServerFn({ method: "POST" })
           assignedTo: executiveId,
           status: "Pending",
           priority: "Medium",
-          startTime: now,
+          startTime: wallNow,
           endTime: null,
           remarks: null,
           pendingReason: "Checklist step not started",
@@ -415,12 +418,13 @@ export const updateDprEntry = createServerFn({ method: "POST" })
     }
 
     const now = nowIso();
+    const wallNow = dprWallClockNow(db);
     let completionDate = row.completionDate;
     let endTime = data.endTime !== undefined ? data.endTime : row.endTime;
 
     if (data.status === "Completed" && row.status !== "Completed") {
       completionDate = row.entryDate;
-      endTime = endTime || now;
+      endTime = endTime?.trim() || wallNow;
     }
     if (data.status && data.status !== "Completed") {
       completionDate = null;

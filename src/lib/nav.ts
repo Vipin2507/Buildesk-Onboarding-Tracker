@@ -55,7 +55,7 @@ export const APP_NAV: NavItem[] = [
   { to: "/tickets", label: "Ticket Tracking", icon: MessageSquareText },
   { to: "/live-chat", label: "Live Chat", icon: MessagesSquare, permission: "manageTickets" },
   { to: "/tasks", label: "Tasks", icon: CheckSquare, permission: "manageTasks" },
-  { to: "/dpr", label: "My DPR", icon: ClipboardCheck, permission: "manageDpr" },
+  { to: "/dpr", label: "My DPR", icon: ClipboardCheck, permission: "manageDpr", exact: true },
   { to: "/dpr/tracker", label: "DPR Tracker", icon: ClipboardList, permission: "viewDprTracker" },
   { to: "/meetings", label: "Meetings", icon: Calendar, permission: "manageErpMeetings" },
   { to: "/client-visits", label: "Client Visits", icon: MapPin, permission: "manageClientVisits" },

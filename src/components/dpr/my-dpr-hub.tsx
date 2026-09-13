@@ -38,22 +38,18 @@ import {
   useSubmitDprDay,
   useUpdateDprEntry,
 } from "@/hooks/use-dpr";
+import { browserWallClockIso } from "@/lib/booking-slots";
+import { formatDprTimeRange } from "@/lib/dpr-time";
 import { formatDate } from "@/lib/utils";
 import { useCompanyStore } from "@/stores/useCompanyStore";
 import type { DprEntry, DprPriority, DprStatus } from "@/types/dpr";
 
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function formatTimeRange(start: string, end: string | null) {
-  const s = start.length >= 16 ? start.slice(11, 16) : start;
-  const e = end && end.length >= 16 ? end.slice(11, 16) : end;
-  return e ? `${s} – ${e}` : s;
+function todayLocalDate() {
+  return browserWallClockIso().slice(0, 10);
 }
 
 export function MyDprHub() {
-  const entryDate = todayIso();
+  const entryDate = todayLocalDate();
   const listFilters = useMemo(
     () => ({ entryDate, executiveId: undefined, page: 1, pageSize: 500, sortBy: "entryDate" as const }),
     [entryDate],
@@ -131,6 +127,7 @@ export function MyDprHub() {
         taskName: taskName.trim(),
         priority,
         status: "In Progress",
+        startTime: browserWallClockIso(),
         clientId: useFreeTextClient ? null : clientId || null,
         clientNameFreeText: useFreeTextClient ? clientFreeText.trim() || null : null,
       });
@@ -374,7 +371,7 @@ export function MyDprHub() {
                             </span>
                           </div>
                           <span className="text-muted-foreground tabular-nums">
-                            {formatTimeRange(entry.startTime, entry.endTime)}
+                            {formatDprTimeRange(entry.startTime, entry.endTime)}
                           </span>
                           <DprStatusBadge status={entry.status} />
                           <Select
