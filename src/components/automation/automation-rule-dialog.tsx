@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AtSign,
@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { AutomationTemplateFormatToolbar } from "@/components/automation/automation-template-format-toolbar";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -45,6 +46,7 @@ import {
   renderAutomationTemplate,
 } from "@/services/automationTemplate";
 import { notifyAutomationResult, testAutomationRule } from "@/services/automation";
+import { automationMessageToEmailHtml } from "@/lib/automation-message-format";
 import { useAutomationStore } from "@/stores/useAutomationStore";
 import { cn } from "@/lib/utils";
 
@@ -323,9 +325,16 @@ function PreviewPanel({ form }: { form: RuleFormState }) {
 
           <div className="rounded-lg border border-border/50 bg-background/80 p-3">
             <span className="text-[10px] font-medium uppercase text-muted-foreground">Message</span>
-            <pre className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
-              {previewBody || "Your message will appear here…"}
-            </pre>
+            {previewBody ? (
+              <div
+                className="mt-2 text-sm leading-relaxed text-foreground/90 [&_em]:italic [&_strong]:font-semibold"
+                dangerouslySetInnerHTML={{
+                  __html: automationMessageToEmailHtml(previewBody),
+                }}
+              />
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">Your message will appear here…</p>
+            )}
           </div>
         </div>
       </div>
@@ -350,6 +359,7 @@ export function AutomationRuleDialog({
 
   const [form, setForm] = useState<RuleFormState>(DEFAULT_FORM);
   const [activeField, setActiveField] = useState<"subject" | "body">("body");
+  const bodyTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -554,6 +564,7 @@ export function AutomationRuleDialog({
                     >
                       <Field label="Email subject" required hint="Supports template variables.">
                         <Input
+                          id="automation-template-subject"
                           value={form.templateSubject}
                           onChange={(e) => setForm({ ...form, templateSubject: e.target.value })}
                           onFocus={() => setActiveField("subject")}
@@ -609,13 +620,43 @@ export function AutomationRuleDialog({
                 delay={0.08}
               >
                 <Field label="Message body" required>
+                  <AutomationTemplateFormatToolbar
+                    textareaRef={bodyTextareaRef}
+                    value={form.templateBody}
+                    activeField={activeField}
+                    subjectMode={form.channel === "email"}
+                    subjectValue={form.templateSubject}
+                    onSubjectChange={(templateSubject, selection) => {
+                      setForm((f) => ({ ...f, templateSubject }));
+                      if (selection) {
+                        requestAnimationFrame(() => {
+                          const el = document.getElementById("automation-template-subject");
+                          if (el && "setSelectionRange" in el) {
+                            el.setSelectionRange(selection.start, selection.end);
+                          }
+                        });
+                      }
+                    }}
+                    onChange={(templateBody, selection) => {
+                      setForm((f) => ({ ...f, templateBody }));
+                      if (selection) {
+                        requestAnimationFrame(() => {
+                          bodyTextareaRef.current?.setSelectionRange(
+                            selection.start,
+                            selection.end,
+                          );
+                        });
+                      }
+                    }}
+                  />
                   <Textarea
+                    ref={bodyTextareaRef}
                     rows={8}
                     value={form.templateBody}
                     onChange={(e) => setForm({ ...form, templateBody: e.target.value })}
                     onFocus={() => setActiveField("body")}
                     placeholder="Hi {{customerName}}, …"
-                    className="min-h-[160px] resize-y font-mono text-sm leading-relaxed"
+                    className="mt-2 min-h-[160px] resize-y font-mono text-sm leading-relaxed"
                   />
                 </Field>
                 <VariableChips

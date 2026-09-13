@@ -106,7 +106,8 @@ export function crmAutomationRuleNeedsSeedSync(
   }
 
   if (seed.id === "crm-rule-payment-executive-whatsapp") {
-    if (existing.templateBody?.trim() === "{{digestBody}}") return false;
+    if (existing.templateBody?.trim() === "{{digestBodyWhatsapp}}") return false;
+    if (existing.templateBody?.trim() === "{{digestBody}}") return true;
     if (existing.templateBody?.includes("payment reminder ({{accountCount}}")) return true;
     return existing.templateBody !== seed.templateBody || existing.description !== seed.description;
   }
@@ -310,7 +311,7 @@ export const DEFAULT_CRM_AUTOMATION_RULES: AutomationRule[] = [
     trigger: "payment-executive-remind",
     channel: "whatsapp",
     isActive: true,
-    templateBody: "{{digestBody}}",
+    templateBody: "{{digestBodyWhatsapp}}",
   }),
   rule({
     id: "crm-rule-query-response-whatsapp",
@@ -376,6 +377,7 @@ export const CRM_AUTOMATION_TEMPLATE_VARS = [
   "{{accountCount}}",
   "{{digestDetails}}",
   "{{digestBody}}",
+  "{{digestBodyWhatsapp}}",
   "{{totalOutstanding}}",
   "{{authorName}}",
   "{{messageSnippet}}",
@@ -424,6 +426,8 @@ export const CRM_AUTOMATION_SAMPLE_VARS: Record<string, string> = {
     "1. Horizon Realty\n🔴 Overdue: ₹2,50,000 (5 days)\n📅 Due: 10 Sept 2026\n💰 Pending: ₹7,50,000\n✅ Received: ₹5,00,000 / ₹12,50,000\n👤 Support: Anita Support, Ravi Support\n\n2. Skyline Developers\n🔴 Overdue: ₹1,20,000 (2 days)\n📅 Due: 12 Sept 2026\n💰 Pending: ₹3,50,000\n✅ Received: ₹5,00,000 / ₹8,50,000\n👤 Support: Anita Support",
   digestBody:
     "Hi Priya Sales,\n\n🔔 PAYMENT REMINDER — 2 ACCOUNTS\n\nPlease find below the accounts with overdue payments:\n\n…\n\n📌 TOTAL OUTSTANDING: ₹3,70,000\n\nRequest you to please review these accounts and ensure the necessary payment follow-up and closure.\n\n🔗 CRM → Payments",
+  digestBodyWhatsapp:
+    "Hi *Priya Sales*,\n\n*🔔 PAYMENT REMINDER — 2 ACCOUNTS*\n\n_Please find below the accounts with overdue payments:_\n\n…\n\n📌 *TOTAL OUTSTANDING: ₹3,70,000*\n\n_Request you to please review…_\n\n*🔗 CRM → Payments*",
   totalOutstanding: "370000",
   authorName: "Amit Verma",
   messageSnippet: "Can we get an update on the onboarding checklist?",

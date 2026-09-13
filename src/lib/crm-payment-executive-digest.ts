@@ -51,6 +51,16 @@ function formatOverdueDaysLabel(days: number | null): string {
   return `${days} day${days === 1 ? "" : "s"}`;
 }
 
+/** WhatsApp: *bold* */
+function waBold(text: string) {
+  return `*${text}*`;
+}
+
+/** WhatsApp: _italic_ */
+function waItalic(text: string) {
+  return `_${text}_`;
+}
+
 export function formatExecutiveDigestAccountBlock(
   a: ExecutiveDigestAccountLine,
   index: number,
@@ -65,9 +75,29 @@ export function formatExecutiveDigestAccountBlock(
   ].join("\n");
 }
 
+export function formatExecutiveDigestAccountBlockWhatsapp(
+  a: ExecutiveDigestAccountLine,
+  index: number,
+): string {
+  return [
+    `${index + 1}. ${waBold(a.accountName)}`,
+    `🔴 ${waBold("Overdue:")} ${formatInr(a.overdueAmount)} (${formatOverdueDaysLabel(a.overdueDays)})`,
+    `📅 ${waBold("Due:")} ${formatDate(a.dueDate)}`,
+    `💰 ${waBold("Pending:")} ${formatInr(a.pendingAmount)}`,
+    `✅ ${waBold("Received:")} ${formatInr(a.paymentReceived)} / ${formatInr(a.totalDealValue)}`,
+    `👤 ${waBold("Support:")} ${formatSupportNames(a)}`,
+  ].join("\n");
+}
+
 export function formatExecutiveDigestAccountLines(accounts: ExecutiveDigestAccountLine[]): string {
   return accounts
     .map((a, i) => formatExecutiveDigestAccountBlock(a, i))
+    .join("\n\n");
+}
+
+function formatExecutiveDigestAccountLinesWhatsapp(accounts: ExecutiveDigestAccountLine[]): string {
+  return accounts
+    .map((a, i) => formatExecutiveDigestAccountBlockWhatsapp(a, i))
     .join("\n\n");
 }
 
@@ -80,6 +110,7 @@ export function buildExecutiveDigestTemplateVars(
   accounts: ExecutiveDigestAccountLine[],
 ): Record<string, string> {
   const digestDetails = formatExecutiveDigestAccountLines(accounts);
+  const digestDetailsWhatsapp = formatExecutiveDigestAccountLinesWhatsapp(accounts);
   const totalOutstanding = sumExecutiveDigestOverdue(accounts);
   const primary = accounts[0];
   const accountCount = accounts.length;
@@ -104,6 +135,27 @@ export function buildExecutiveDigestTemplateVars(
           "🔗 CRM → Payments",
         ].join("\n");
 
+  const bodyWhatsapp =
+    accountCount === 0
+      ? `Hi ${waBold(recipientName)},\n\nNo overdue accounts in this digest.`
+      : [
+          `Hi ${waBold(recipientName)},`,
+          "",
+          waBold(`🔔 PAYMENT REMINDER — ${accountLabel}`),
+          "",
+          waItalic("Please find below the accounts with overdue payments:"),
+          "",
+          digestDetailsWhatsapp,
+          "",
+          `📌 ${waBold(`TOTAL OUTSTANDING: ${formatInr(totalOutstanding)}`)}`,
+          "",
+          waItalic(
+            "Request you to please review these accounts and ensure the necessary payment follow-up and closure.",
+          ),
+          "",
+          waBold("🔗 CRM → Payments"),
+        ].join("\n");
+
   return {
     executiveName: recipientName,
     assigneeName: recipientName,
@@ -114,6 +166,7 @@ export function buildExecutiveDigestTemplateVars(
     companyName: primary?.accountName ?? "CRM Payments",
     digestDetails,
     digestBody: body,
+    digestBodyWhatsapp: bodyWhatsapp,
     totalOutstanding: String(Math.round(totalOutstanding)),
     subject,
     title: subject,
@@ -136,7 +189,7 @@ export function formatExecutivePaymentDigestMessage(
   accounts: ExecutiveDigestAccountLine[],
 ): { subject: string; body: string } {
   const vars = buildExecutiveDigestTemplateVars(recipientName, accounts);
-  return { subject: vars.subject!, body: vars.digestBody! };
+  return { subject: vars.subject!, body: vars.digestBodyWhatsapp! };
 }
 
 export function buildDeliveriesFromSelection(input: {
