@@ -11,6 +11,7 @@ export const CRM_PAYMENT_STATUS_TAB_IDS = [
   "due_in_90_days",
   "upcoming",
   "fully_paid",
+  "lost",
 ] as const;
 
 export type CrmPaymentStatusTabId = (typeof CRM_PAYMENT_STATUS_TAB_IDS)[number];

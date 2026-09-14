@@ -37,6 +37,7 @@ const paymentStatusSchema = z.enum([
   "upcoming",
   "fully_paid",
   "not_started",
+  "lost",
 ]);
 
 const listFiltersSchema = z.object({

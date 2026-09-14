@@ -83,7 +83,12 @@ export type PaymentListFilterStatus =
   | "all"
   | "due_this_month"
   | "due_in_45_days"
-  | "due_in_90_days";
+  | "due_in_90_days"
+  | "lost";
+
+export function isInactiveCrmAccountForPayments(accountStatus: string): boolean {
+  return accountStatus === "inactive";
+}
 
 export function matchesPaymentDueFilter(
   row: {
@@ -94,6 +99,7 @@ export function matchesPaymentDueFilter(
   todayYmd?: string,
 ): boolean {
   if (filter === "all") return true;
+  if (filter === "lost") return false;
 
   const today = (todayYmd ?? new Date().toISOString()).slice(0, 10);
   const due = row.nextDueInstallment?.dueDate.slice(0, 10);

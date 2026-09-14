@@ -3,6 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import { parseInstallmentsJson, roundMoney } from "@/lib/crm-account-commercial";
 import {
   allocateAccountPayments,
+  isInactiveCrmAccountForPayments,
   matchesPaymentDueFilter,
   PAYMENT_BACKFILL_NOTE,
   sumPaymentTransactions,
@@ -10,6 +11,7 @@ import {
   type PaymentListFilterStatus,
   type PaymentStatus,
 } from "@/lib/crm-payment-allocation";
+import type { CrmAccount } from "@/types/crm-account";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { newId, nowIso } from "@/types";
@@ -291,10 +293,9 @@ function matchesNamedManagerFilter(
   return value === filter;
 }
 
-function applyPaymentsListFilters(
+function applyPaymentsToolbarFilters(
   items: PaymentListItem[],
   filters: PaymentsListFilters,
-  today: string,
 ): PaymentListItem[] {
   let rows = items;
 
@@ -340,17 +341,37 @@ function applyPaymentsListFilters(
     );
   }
 
-  const status = filters.status ?? "all";
-  if (status !== "all") {
-    rows = rows.filter((row) => matchesPaymentDueFilter(row, status, today));
+  return rows;
+}
+
+function applyPaymentsStatusFilter(
+  items: PaymentListItem[],
+  status: PaymentListFilterStatus,
+  today: string,
+): PaymentListItem[] {
+  if (status === "lost") {
+    return items.filter((row) => isInactiveCrmAccountForPayments(row.accountStatus));
   }
 
-  return rows;
+  const active = items.filter((row) => !isInactiveCrmAccountForPayments(row.accountStatus));
+  if (status === "all") return active;
+  return active.filter((row) => matchesPaymentDueFilter(row, status, today));
+}
+
+function applyPaymentsListFilters(
+  items: PaymentListItem[],
+  filters: PaymentsListFilters,
+  today: string,
+): PaymentListItem[] {
+  const rows = applyPaymentsToolbarFilters(items, filters);
+  const status = filters.status ?? "all";
+  return applyPaymentsStatusFilter(rows, status, today);
 }
 
 export type PaymentListItem = {
   id: string;
   accountName: string;
+  accountStatus: CrmAccount["status"];
   supportManager1?: string;
   supportManager2?: string;
   salesManager?: string;
@@ -368,20 +389,34 @@ export type PaymentListItem = {
   paymentStatus: PaymentStatus;
 };
 
-export function queryPaymentListItems(
-  db: ReturnType<typeof getDb>,
-  filters: PaymentsListFilters,
-  allowedAccountIds?: Set<string> | null,
-): { rows: PaymentListItem[]; total: number } {
-  runPaymentsBackfillIfNeeded(db);
+function mapAccountsToPaymentListItems(
+  accounts: (typeof t.crmAccounts.$inferSelect)[],
+  receivedByAccount: Map<string, number>,
+  today: string,
+): PaymentListItem[] {
+  return accounts.map((account) => {
+    const received = receivedByAccount.get(account.id) ?? 0;
+    const snap = buildAccountPaymentSnapshot(account, received, today);
+    return {
+      id: account.id,
+      accountName: account.name,
+      accountStatus: account.status as CrmAccount["status"],
+      supportManager1: account.supportManager1 ?? undefined,
+      supportManager2: account.supportManager2 ?? undefined,
+      salesManager: account.salesManagerName ?? undefined,
+      totalDealValue: snap.totalDealValue,
+      paymentReceived: snap.paymentReceived,
+      pendingAmount: snap.pendingAmount,
+      nextDueInstallment: snap.nextDueInstallment,
+      overdueAmount: snap.overdueAmount,
+      overdueDays: snap.overdueDays,
+      collectionPercent: snap.collectionPercent,
+      paymentStatus: snap.paymentStatus,
+    };
+  });
+}
 
-  const today = new Date().toISOString().slice(0, 10);
-  let accounts = db.select().from(t.crmAccounts).all();
-
-  if (allowedAccountIds) {
-    accounts = accounts.filter((a) => allowedAccountIds.has(a.id));
-  }
-
+function paymentReceivedByAccount(db: ReturnType<typeof getDb>): Map<string, number> {
   const receivedByAccount = new Map<string, number>();
   const txnRows = db
     .select({
@@ -396,26 +431,26 @@ export function queryPaymentListItems(
       roundMoney((receivedByAccount.get(row.accountId) ?? 0) + (Number(row.amount) || 0)),
     );
   }
+  return receivedByAccount;
+}
 
-  let items: PaymentListItem[] = accounts.map((account) => {
-    const received = receivedByAccount.get(account.id) ?? 0;
-    const snap = buildAccountPaymentSnapshot(account, received, today);
-    return {
-      id: account.id,
-      accountName: account.name,
-      supportManager1: account.supportManager1 ?? undefined,
-      supportManager2: account.supportManager2 ?? undefined,
-      salesManager: account.salesManagerName ?? undefined,
-      totalDealValue: snap.totalDealValue,
-      paymentReceived: snap.paymentReceived,
-      pendingAmount: snap.pendingAmount,
-      nextDueInstallment: snap.nextDueInstallment,
-      overdueAmount: snap.overdueAmount,
-      overdueDays: snap.overdueDays,
-      collectionPercent: snap.collectionPercent,
-      paymentStatus: snap.paymentStatus,
-    };
-  });
+export function queryPaymentListItems(
+  db: ReturnType<typeof getDb>,
+  filters: PaymentsListFilters,
+  allowedAccountIds?: Set<string> | null,
+): { rows: PaymentListItem[]; total: number } {
+  runPaymentsBackfillIfNeeded(db);
+
+  const today = new Date().toISOString().slice(0, 10);
+  let accounts = db.select().from(t.crmAccounts).all();
+
+  if (allowedAccountIds) {
+    accounts = accounts.filter((a) => allowedAccountIds.has(a.id));
+  }
+
+  const receivedByAccount = paymentReceivedByAccount(db);
+
+  let items = mapAccountsToPaymentListItems(accounts, receivedByAccount, today);
 
   items = applyPaymentsListFilters(items, filters, today);
 
@@ -448,8 +483,8 @@ function sumDueAmount(rows: PaymentListItem[]) {
   return roundMoney(rows.reduce((s, r) => s + (r.nextDueInstallment?.remainingAmount ?? 0), 0));
 }
 
-function countByDueFilter(rows: PaymentListItem[], filter: PaymentListFilterStatus, today: string) {
-  return rows.filter((r) => matchesPaymentDueFilter(r, filter, today)).length;
+function countByStatusTab(rows: PaymentListItem[], filter: PaymentListFilterStatus, today: string) {
+  return applyPaymentsStatusFilter(rows, filter, today).length;
 }
 
 export function summarizePaymentList(
@@ -465,10 +500,14 @@ export function summarizePaymentList(
   );
 
   // Tab counts: same toolbar filters, but ignore active status tab.
-  const { rows: countScope } = queryPaymentListItems(
-    db,
-    { ...filters, status: "all", page: 1, pageSize: 100000 },
-    allowedAccountIds,
+  runPaymentsBackfillIfNeeded(db);
+  let countAccounts = db.select().from(t.crmAccounts).all();
+  if (allowedAccountIds) {
+    countAccounts = countAccounts.filter((a) => allowedAccountIds.has(a.id));
+  }
+  const countScope = applyPaymentsToolbarFilters(
+    mapAccountsToPaymentListItems(countAccounts, paymentReceivedByAccount(db), today),
+    filters,
   );
 
   const totalContractValue = roundMoney(tableRows.reduce((s, r) => s + r.totalDealValue, 0));
@@ -509,15 +548,16 @@ export function summarizePaymentList(
     dueIn45DaysCount,
     collectionRatePercent,
     statusCounts: {
-      all: countScope.length,
-      overdue: countByDueFilter(countScope, "overdue", today),
-      due_this_week: countByDueFilter(countScope, "due_this_week", today),
-      due_this_month: countByDueFilter(countScope, "due_this_month", today),
-      due_in_45_days: countByDueFilter(countScope, "due_in_45_days", today),
-      due_in_90_days: countByDueFilter(countScope, "due_in_90_days", today),
-      upcoming: countByDueFilter(countScope, "upcoming", today),
-      fully_paid: countByDueFilter(countScope, "fully_paid", today),
-      not_started: countByDueFilter(countScope, "not_started", today),
+      all: countByStatusTab(countScope, "all", today),
+      overdue: countByStatusTab(countScope, "overdue", today),
+      due_this_week: countByStatusTab(countScope, "due_this_week", today),
+      due_this_month: countByStatusTab(countScope, "due_this_month", today),
+      due_in_45_days: countByStatusTab(countScope, "due_in_45_days", today),
+      due_in_90_days: countByStatusTab(countScope, "due_in_90_days", today),
+      upcoming: countByStatusTab(countScope, "upcoming", today),
+      fully_paid: countByStatusTab(countScope, "fully_paid", today),
+      not_started: countByStatusTab(countScope, "not_started", today),
+      lost: countByStatusTab(countScope, "lost", today),
     },
   };
 }

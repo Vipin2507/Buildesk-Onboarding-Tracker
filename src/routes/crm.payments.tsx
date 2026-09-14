@@ -55,6 +55,7 @@ const STATUS_TABS: { id: CrmPaymentStatusTabId; label: string }[] = [
   { id: "due_in_90_days", label: "90 days" },
   { id: "upcoming", label: "Later" },
   { id: "fully_paid", label: "Fully paid" },
+  { id: "lost", label: "Lost" },
 ];
 
 const STATUS_TAB_TONE: Record<CrmPaymentStatusTabId, string> = {
@@ -66,6 +67,7 @@ const STATUS_TAB_TONE: Record<CrmPaymentStatusTabId, string> = {
   due_in_90_days: "text-sky-600 dark:text-sky-400",
   upcoming: "text-muted-foreground",
   fully_paid: "text-emerald-600 dark:text-emerald-400",
+  lost: "text-muted-foreground",
 };
 
 type ManagerField = "salesManagerName" | "supportManager1" | "supportManager2";
