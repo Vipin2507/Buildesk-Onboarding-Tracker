@@ -13,6 +13,7 @@ import {
 } from "@/components/design-ticket/design-ticket-shared";
 import { ProgressBar } from "@/components/progress-bar";
 import { ProjectDocumentsPanel } from "@/components/project-documents-panel";
+import { ProjectFilesPanel } from "@/components/project-files-panel";
 import { DatePickerField } from "@/components/date-picker-field";
 import { Button } from "@/components/ui/button";
 import { EntityNotFound } from "@/components/empty-state";
@@ -76,7 +77,7 @@ function stepForSection(sectionKey: string): number {
 
 const searchSchema = z.object({
   tab: z
-    .enum(["onboarding", "documents"])
+    .enum(["onboarding", "documents", "files"])
     .or(z.literal("progress").transform(() => "onboarding" as const))
     .optional()
     .default("onboarding"),
@@ -187,6 +188,7 @@ function ProjectDetailPage() {
   const TABS = [
     { key: "onboarding", label: "Checklist Detail" },
     { key: "documents", label: "Documents" },
+    { key: "files", label: "Files" },
   ] as const;
 
   function handleGoLive() {
@@ -825,6 +827,16 @@ function ProjectDetailPage() {
           transition={{ duration: 0.28, ease: TICKET_EASE }}
         >
           <ProjectDocumentsPanel projectId={projectId} />
+        </motion.div>
+      )}
+
+      {tab === "files" && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, ease: TICKET_EASE }}
+        >
+          <ProjectFilesPanel projectId={projectId} />
         </motion.div>
       )}
 

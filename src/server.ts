@@ -4,6 +4,7 @@ import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { applyPortalIframeHeaders } from "./lib/portal-iframe-headers";
 import { handleCrmQueryFileRequest } from "./server/lib/crm-query-file-storage";
+import { handleProjectFileRequest } from "./server/lib/project-file-storage";
 import { startCrmReminderScheduler } from "./server/crm-reminder-scheduler";
 
 startCrmReminderScheduler();
@@ -55,6 +56,9 @@ export default {
       const url = new URL(request.url);
       if (url.pathname.startsWith("/api/crm-query-files/")) {
         return handleCrmQueryFileRequest(request);
+      }
+      if (url.pathname.startsWith("/api/project-files/")) {
+        return handleProjectFileRequest(request);
       }
 
       const handler = await getServerEntry();

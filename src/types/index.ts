@@ -22,3 +22,4 @@ export * from "./crm-account";
 export * from "./crm-master";
 export * from "./booking";
 export * from "./erp-meeting";
+export * from "./project-file";

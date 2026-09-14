@@ -1156,3 +1156,32 @@ export const dprSubmissions = sqliteTable(
   },
   (t) => [uniqueIndex("dpr_submissions_exec_date_uidx").on(t.executiveId, t.entryDate)],
 );
+
+export const projectFiles = sqliteTable(
+  "project_files",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    fileName: text("file_name").notNull(),
+    mimeType: text("mime_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull().default(0),
+    category: text("category").notNull().default("other"),
+    purpose: text("purpose"),
+    notes: text("notes"),
+    storageKey: text("storage_key").notNull(),
+    uploadedBy: text("uploaded_by").notNull(),
+    uploadedByUserId: text("uploaded_by_user_id"),
+    uploadedAt: text("uploaded_at").notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    index("project_files_project_idx").on(t.projectId),
+    index("project_files_company_idx").on(t.companyId),
+    index("project_files_uploaded_idx").on(t.uploadedAt),
+  ],
+);

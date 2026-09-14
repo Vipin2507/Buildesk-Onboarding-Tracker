@@ -1235,5 +1235,31 @@ if (!tableExists("dpr_task_templates")) {
   console.log("+ CREATE TABLE dpr_* (entries, templates, submissions)");
 }
 
+if (!tableExists("project_files")) {
+  sqlite.exec(`
+    CREATE TABLE project_files (
+      id TEXT PRIMARY KEY NOT NULL,
+      project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      file_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL DEFAULT 0,
+      category TEXT NOT NULL DEFAULT 'other',
+      purpose TEXT,
+      notes TEXT,
+      storage_key TEXT NOT NULL,
+      uploaded_by TEXT NOT NULL,
+      uploaded_by_user_id TEXT,
+      uploaded_at TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS project_files_project_idx ON project_files(project_id);
+    CREATE INDEX IF NOT EXISTS project_files_company_idx ON project_files(company_id);
+    CREATE INDEX IF NOT EXISTS project_files_uploaded_idx ON project_files(uploaded_at);
+  `);
+  console.log("+ CREATE TABLE project_files");
+}
+
 sqlite.close();
 console.log("db:ensure complete");

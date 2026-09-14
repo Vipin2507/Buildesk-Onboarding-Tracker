@@ -287,3 +287,10 @@ export {
   submitDprDay,
   getDprDaySubmission,
 } from "@/server/api/dpr";
+
+export {
+  listProjectFiles,
+  uploadProjectFile,
+  updateProjectFileMeta,
+  deleteProjectFile,
+} from "@/server/api/project-files";
