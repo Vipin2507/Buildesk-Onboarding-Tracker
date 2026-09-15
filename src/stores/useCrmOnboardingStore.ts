@@ -181,6 +181,11 @@ type CrmOnboardingState = {
   ) => void;
   completeAllGoLiveItems: (companyId: string) => void;
   updateTracker: (companyId: string, patch: Partial<CrmTrackerMeta>, who?: string) => void;
+  bulkUpdateTracker: (
+    companyIds: string[],
+    patch: Partial<CrmTrackerMeta>,
+    who?: string,
+  ) => number;
   logComm: (
     companyId: string,
     action: CrmCommActionKey,
@@ -1152,6 +1157,15 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
       const accountName = useCrmAccountStore.getState().getById(companyId)?.name ?? "CRM account";
       notifyCrmStageChange(companyId, accountName, patch.stage, who);
     }
+  },
+
+  bulkUpdateTracker: (companyIds, patch, who) => {
+    const uniqueIds = [...new Set(companyIds.filter(Boolean))];
+    if (uniqueIds.length === 0) return 0;
+    for (const companyId of uniqueIds) {
+      get().updateTracker(companyId, patch, who);
+    }
+    return uniqueIds.length;
   },
 
   logComm: (companyId, action, channel, summary, status = "logged", loggedBy) => {

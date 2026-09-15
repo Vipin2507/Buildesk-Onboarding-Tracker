@@ -8,6 +8,7 @@ import {
   Download,
   FileSpreadsheet,
   KeyRound,
+  Layers,
   Plus,
   Search,
   Upload,
@@ -45,6 +46,13 @@ import { PageWrap } from "@/components/page-header";
 import { ProgressBar } from "@/components/progress-bar";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { isAdminRoleKey } from "@/lib/permissions";
 import {
   listActiveCrmImplementationStages,
@@ -67,7 +75,7 @@ import { sortCrmAccountsByStartDateDesc } from "@/lib/crm-account-sort";
 import { findPortalSlugConflictMessage } from "@/lib/portal-slug-conflict";
 import { isValidPortalSlug, normalizePortalSlug } from "@/lib/design-ticket-portal";
 import { getCrmMasterProductModuleCatalog } from "@/stores/useCrmMasterStore";
-import type { CrmProductModuleKey } from "@/types/crm-onboarding";
+import type { CrmProductModuleKey, CrmImplementationStage } from "@/types/crm-onboarding";
 import { COMPANY_TYPES } from "@/types/company";
 import type { CrmAccount } from "@/types/crm-account";
 
@@ -264,6 +272,7 @@ function CrmAccountsPage() {
   const ensure = useCrmOnboardingStore((s) => s.ensureForCompany);
   const setProductModuleEnabled = useCrmOnboardingStore((s) => s.setProductModuleEnabled);
   const removeRecord = useCrmOnboardingStore((s) => s.removeRecord);
+  const bulkUpdateTracker = useCrmOnboardingStore((s) => s.bulkUpdateTracker);
   const currentUser = useAuthStore((s) => s.user);
   const isAdmin = isAdminRoleKey(currentUser?.role);
   const overview = useCrmDashboardOverview();
@@ -364,6 +373,8 @@ function CrmAccountsPage() {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkUpdateOpen, setBulkUpdateOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [bulkStageOpen, setBulkStageOpen] = useState(false);
+  const [bulkStage, setBulkStage] = useState<CrmImplementationStage>("new_account");
   const [dateBulkOpen, setDateBulkOpen] = useState(false);
   const [apiKeyBulkOpen, setApiKeyBulkOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -392,6 +403,30 @@ function CrmAccountsPage() {
       return next;
     });
   }, []);
+
+  const stageOptions = listActiveCrmImplementationStages().map((s) => ({
+    value: s.key,
+    label: s.label,
+  }));
+
+  function openBulkStage() {
+    const firstId = [...selectedIds][0];
+    const firstStage = firstId
+      ? overview.rows.find((r) => r.id === firstId)?.stage
+      : undefined;
+    setBulkStage((firstStage as CrmImplementationStage | undefined) ?? "new_account");
+    setBulkStageOpen(true);
+  }
+
+  function runBulkStageUpdate() {
+    if (selectedIds.size === 0) return;
+    const count = bulkUpdateTracker([...selectedIds], { stage: bulkStage }, currentUser?.name);
+    toast.success(
+      `Updated stage to ${resolveCrmStageLabel(bulkStage)} for ${count} ${count === 1 ? "account" : "accounts"}`,
+    );
+    setBulkStageOpen(false);
+    setSelectedIds(new Set());
+  }
 
   const form = useForm<CrmAccountFormValues>({
     resolver: zodResolver(crmAccountSchema),
@@ -1055,6 +1090,17 @@ function CrmAccountsPage() {
               <ArrowLeftRight className="h-3.5 w-3.5" />
               Transfer selected
             </Button>
+            {isAdmin ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1 text-xs"
+                onClick={openBulkStage}
+              >
+                <Layers className="h-3.5 w-3.5" />
+                Update stage
+              </Button>
+            ) : null}
             <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setSelectedIds(new Set())}>
               Clear
             </Button>
@@ -1322,6 +1368,30 @@ function CrmAccountsPage() {
         selectedAccountIds={selectedIds}
         onTransferred={() => setSelectedIds(new Set())}
       />
+
+      <Dialog open={bulkStageOpen} onOpenChange={setBulkStageOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              Update stage ({selectedIds.size} {selectedIds.size === 1 ? "account" : "accounts"})
+            </DialogTitle>
+          </DialogHeader>
+          <DesignTicketFilterField label="Implementation stage">
+            <DesignTicketSelect
+              value={bulkStage}
+              onChange={(v) => setBulkStage(v as CrmImplementationStage)}
+              options={stageOptions}
+            />
+          </DesignTicketFilterField>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkStageOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={runBulkStageUpdate}>Update stage</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <CrmAccountDateBulkUploadModal open={dateBulkOpen} onOpenChange={setDateBulkOpen} />
       <CrmAccountApiKeyBulkUploadModal open={apiKeyBulkOpen} onOpenChange={setApiKeyBulkOpen} />
       <CrmAccountExportModal
