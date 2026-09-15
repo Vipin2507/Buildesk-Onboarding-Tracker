@@ -53,6 +53,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { isCrmGoLiveStage } from "@/lib/crm-implementation-stages";
 import { isAdminRoleKey } from "@/lib/permissions";
 import {
   listActiveCrmImplementationStages,
@@ -175,8 +176,10 @@ function healthTone(bucket: CrmAccountRow["healthBucket"]) {
 
 function matchesAccountKpi(row: CrmAccountRow, filter: AccountKpiFilter) {
   if (filter === "all") return true;
-  if (filter === "onboarding") return row.status === "onboarding";
-  if (filter === "live") return row.status === "live";
+  if (filter === "onboarding") {
+    return row.status === "onboarding" && !isCrmGoLiveStage(row.stage);
+  }
+  if (filter === "live") return row.status === "live" || isCrmGoLiveStage(row.stage);
   if (filter === "critical") return row.healthBucket === "Critical" || row.overdue;
   return true;
 }
@@ -199,7 +202,15 @@ type AccountListFilters = {
 };
 
 function matchesAccountListFilters(row: CrmAccountRow, f: AccountListFilters) {
-  if (f.statusFilter && f.statusFilter !== "all" && row.status !== f.statusFilter) return false;
+  if (f.statusFilter && f.statusFilter !== "all") {
+    if (f.statusFilter === "onboarding") {
+      if (row.status !== "onboarding" || isCrmGoLiveStage(row.stage)) return false;
+    } else if (f.statusFilter === "live") {
+      if (row.status !== "live" && !isCrmGoLiveStage(row.stage)) return false;
+    } else if (row.status !== f.statusFilter) {
+      return false;
+    }
+  }
   if (f.typeFilter !== "all" && row.companyType !== f.typeFilter) return false;
   if (f.cityFilter !== "all" && row.city !== f.cityFilter) return false;
   if (f.regionFilter !== "all" && row.region !== f.regionFilter) return false;
@@ -269,6 +280,7 @@ function CrmAccountsPage() {
   const accounts = useCrmAccountStore((s) => s.accounts);
   const upsertAccount = useCrmAccountStore((s) => s.upsertAccount);
   const deleteAccount = useCrmAccountStore((s) => s.deleteAccount);
+  const updateAccount = useCrmAccountStore((s) => s.updateAccount);
   const ensure = useCrmOnboardingStore((s) => s.ensureForCompany);
   const setProductModuleEnabled = useCrmOnboardingStore((s) => s.setProductModuleEnabled);
   const removeRecord = useCrmOnboardingStore((s) => s.removeRecord);
@@ -437,6 +449,15 @@ function CrmAccountsPage() {
     for (const a of accounts) ensure(a.id, a.companyType);
   }, [accounts, ensure]);
 
+  // Heal accounts already at go-live stages but still marked onboarding.
+  useEffect(() => {
+    for (const row of overview.rows) {
+      if (row.status === "onboarding" && isCrmGoLiveStage(row.stage)) {
+        updateAccount(row.id, { status: "live" });
+      }
+    }
+  }, [overview.rows, updateAccount]);
+
   const rows = overview.rows;
 
   const cities = useMemo(() => {
@@ -553,6 +574,16 @@ function CrmAccountsPage() {
     if (id === "all") return toolbarScopedRows.length;
     if (id === "critical") {
       return toolbarScopedRows.filter((r) => matchesAccountKpi(r, "critical")).length;
+    }
+    if (id === "onboarding") {
+      return toolbarScopedRows.filter(
+        (r) => r.status === "onboarding" && !isCrmGoLiveStage(r.stage),
+      ).length;
+    }
+    if (id === "live") {
+      return toolbarScopedRows.filter(
+        (r) => r.status === "live" || isCrmGoLiveStage(r.stage),
+      ).length;
     }
     return toolbarScopedRows.filter((r) => r.status === id).length;
   }

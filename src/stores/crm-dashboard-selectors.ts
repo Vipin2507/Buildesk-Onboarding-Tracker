@@ -21,6 +21,7 @@ import {
 import { filterCrmAccountsForUser } from "@/lib/crm-account-access";
 import { formatTaskPreviewTitle } from "@/lib/task-display";
 import { isCrmAccountEnded } from "@/lib/crm-account-status";
+import { isCrmGoLiveStage } from "@/lib/crm-implementation-stages";
 import { sortCrmAccountsByStartDateDesc } from "@/lib/crm-account-sort";
 import { resolveCrmMigrationCatalog } from "@/lib/crm-migration-catalog";
 import { resolveCrmTrainingCatalogForCompany } from "@/lib/crm-training-catalog";
@@ -269,8 +270,12 @@ export function useCrmDashboardOverview() {
     const allMasters = accounts.flatMap((account) => recordFor(account, records).masterChecklist);
     const phaseStats = summarizeChecklistPhases(allMasters);
 
-    const live = rows.filter((r) => r.status === "live").length;
-    const onboarding = rows.filter((r) => r.status === "onboarding").length;
+    const live = rows.filter(
+      (r) => r.status === "live" || isCrmGoLiveStage(r.stage),
+    ).length;
+    const onboarding = rows.filter(
+      (r) => r.status === "onboarding" && !isCrmGoLiveStage(r.stage),
+    ).length;
     const active = rows.filter((r) => r.status === "active").length;
     const closed = rows.filter(
       (r) => r.status === "closed" || r.status === "suspended" || r.status === "inactive" || (r.status as string) === "churned",

@@ -17,6 +17,7 @@ import type {
   CrmTrainingSession,
 } from "@/types/crm-onboarding";
 import type { ChecklistPhase } from "@/types/onboarding";
+import { isCrmGoLiveStage } from "@/lib/crm-implementation-stages";
 import {
   createCrmOnboardingRecord,
   CRM_GO_LIVE_CHECKLIST_LABELS,
@@ -1156,6 +1157,13 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
     if (stageChanged && patch.stage) {
       const accountName = useCrmAccountStore.getState().getById(companyId)?.name ?? "CRM account";
       notifyCrmStageChange(companyId, accountName, patch.stage, who);
+      // Keep account status in sync with go-live stages (same as Approve Go-Live actions).
+      if (isCrmGoLiveStage(patch.stage)) {
+        const account = useCrmAccountStore.getState().getById(companyId);
+        if (account?.status === "onboarding") {
+          useCrmAccountStore.getState().markLive(companyId, who);
+        }
+      }
     }
   },
 
