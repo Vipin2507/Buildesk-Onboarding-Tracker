@@ -13,6 +13,7 @@ export const AUTOMATION_TRIGGER_VALUES = [
   "payment-overdue",
   "payment-executive-remind",
   "query-response",
+  "live-chat-started",
 ] as const satisfies readonly AutomationTrigger[];
 
 const jsonLiteralSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);

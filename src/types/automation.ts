@@ -43,7 +43,8 @@ export type AutomationTrigger =
   | "task-before-start"
   | "payment-overdue"
   | "payment-executive-remind"
-  | "query-response";
+  | "query-response"
+  | "live-chat-started";
 
 export interface AutomationRule {
   id: string;
@@ -167,6 +168,7 @@ export const AUTOMATION_TRIGGERS: { value: AutomationTrigger; label: string }[] 
   { value: "payment-overdue", label: "Payment reminder (client)" },
   { value: "payment-executive-remind", label: "Payment reminder (executive)" },
   { value: "query-response", label: "Reply on account query" },
+  { value: "live-chat-started", label: "Customer starts live chat" },
 ];
 
 export const AUTOMATION_TEMPLATE_VARS = [

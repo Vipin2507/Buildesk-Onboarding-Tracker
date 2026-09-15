@@ -6,6 +6,7 @@ import { CHATBOT_GREETING } from "@/data/chatbotResponses";
 import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
+import { dispatchCrmLiveChatStartedAutomation } from "@/server/crm-live-chat-automation";
 import type { ChatMessage, ChatSession, ChatSessionStatus } from "@/types/chat";
 
 const messageSchema = z.object({
@@ -288,6 +289,16 @@ export const createPortalChatSession = createServerFn({ method: "POST" })
     };
 
     upsertSessionRecord(db, session);
+
+    // Notify CRM executives when a customer opens a new live chat on a CRM account portal.
+    void dispatchCrmLiveChatStartedAutomation(db, {
+      accountId: portal.companyId,
+      sessionId: id,
+      visitorName: data.visitorName,
+    }).catch((err) => {
+      console.warn("[live-chat-started automation]", err);
+    });
+
     return loadSession(db, id)!;
   });
 

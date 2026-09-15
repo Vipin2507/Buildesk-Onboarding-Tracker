@@ -80,6 +80,8 @@ export const CRM_PAYMENT_AUTOMATION_TRIGGERS = [
 
 export const CRM_QUERY_AUTOMATION_TRIGGERS = ["query-response"] as const;
 
+export const CRM_LIVE_CHAT_AUTOMATION_TRIGGERS = ["live-chat-started"] as const;
+
 export const DEFAULT_TASK_REMINDER_OFFSET_MINUTES = 15;
 
 const CRM_AUTOMATION_SEED_SYNC_RULE_IDS = new Set([
@@ -336,6 +338,17 @@ export const DEFAULT_CRM_AUTOMATION_RULES: AutomationRule[] = [
     templateBody:
       "Hi {{recipientName}},\n\n{{authorName}} replied on the account query \"{{title}}\" for {{accountName}}.\n\n{{messageSnippet}}\n\nOpen in CRM: {{queryUrl}}",
   }),
+  rule({
+    id: "crm-rule-live-chat-started-whatsapp",
+    name: "Live chat started — Executive WhatsApp",
+    description:
+      "WhatsApp CRM admins and the account sales manager and support managers when a customer starts a live chat from the portal",
+    trigger: "live-chat-started",
+    channel: "whatsapp",
+    isActive: true,
+    templateBody:
+      "Hi {{recipientName}}, {{visitorName}} started a live chat for {{accountName}}.\n\nOpen Live Chat: {{chatUrl}}",
+  }),
 ];
 
 export const CRM_AUTOMATION_TEMPLATE_VARS = [
@@ -383,6 +396,9 @@ export const CRM_AUTOMATION_TEMPLATE_VARS = [
   "{{messageSnippet}}",
   "{{queryUrl}}",
   "{{recipientName}}",
+  "{{visitorName}}",
+  "{{chatUrl}}",
+  "{{sessionId}}",
 ] as const;
 
 export const CRM_AUTOMATION_SAMPLE_VARS: Record<string, string> = {
@@ -433,4 +449,7 @@ export const CRM_AUTOMATION_SAMPLE_VARS: Record<string, string> = {
   messageSnippet: "Can we get an update on the onboarding checklist?",
   queryUrl: "https://track.example.com/crm/accounts/acme?tab=queries&queryId=q-1001",
   recipientName: "Priya Sales",
+  visitorName: "Amit Verma",
+  chatUrl: "https://track.example.com/crm/live-chat",
+  sessionId: "CS-1001",
 };

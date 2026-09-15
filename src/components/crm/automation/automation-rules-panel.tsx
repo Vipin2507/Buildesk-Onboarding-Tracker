@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import {
   CRM_BOOKING_AUTOMATION_TRIGGERS,
+  CRM_LIVE_CHAT_AUTOMATION_TRIGGERS,
   CRM_PAYMENT_AUTOMATION_TRIGGERS,
   CRM_QUERY_AUTOMATION_TRIGGERS,
   CRM_TASK_AUTOMATION_TRIGGERS,
@@ -35,6 +36,7 @@ const BOOKING_TRIGGER_SET = new Set<string>(CRM_BOOKING_AUTOMATION_TRIGGERS);
 const TASK_TRIGGER_SET = new Set<string>(CRM_TASK_AUTOMATION_TRIGGERS);
 const PAYMENT_TRIGGER_SET = new Set<string>(CRM_PAYMENT_AUTOMATION_TRIGGERS);
 const QUERY_TRIGGER_SET = new Set<string>(CRM_QUERY_AUTOMATION_TRIGGERS);
+const LIVE_CHAT_TRIGGER_SET = new Set<string>(CRM_LIVE_CHAT_AUTOMATION_TRIGGERS);
 
 type RuleColumn = {
   key: string;
@@ -132,20 +134,22 @@ export function AutomationRulesPanel() {
   const [testingRuleId, setTestingRuleId] = useState<string | null>(null);
   const [editing, setEditing] = useState<AutomationRule | null>(null);
 
-  const { ticketRules, bookingRules, taskRules, paymentRules, queryRules } = useMemo(() => {
+  const { ticketRules, bookingRules, taskRules, paymentRules, queryRules, liveChatRules } = useMemo(() => {
     const ticketRules: AutomationRule[] = [];
     const bookingRules: AutomationRule[] = [];
     const taskRules: AutomationRule[] = [];
     const paymentRules: AutomationRule[] = [];
     const queryRules: AutomationRule[] = [];
+    const liveChatRules: AutomationRule[] = [];
     for (const rule of rules) {
       if (PAYMENT_TRIGGER_SET.has(rule.trigger)) paymentRules.push(rule);
       else if (QUERY_TRIGGER_SET.has(rule.trigger)) queryRules.push(rule);
+      else if (LIVE_CHAT_TRIGGER_SET.has(rule.trigger)) liveChatRules.push(rule);
       else if (BOOKING_TRIGGER_SET.has(rule.trigger)) bookingRules.push(rule);
       else if (TASK_TRIGGER_SET.has(rule.trigger)) taskRules.push(rule);
       else ticketRules.push(rule);
     }
-    return { ticketRules, bookingRules, taskRules, paymentRules, queryRules };
+    return { ticketRules, bookingRules, taskRules, paymentRules, queryRules, liveChatRules };
   }, [rules]);
 
   function openCreate() {
@@ -336,6 +340,12 @@ export function AutomationRulesPanel() {
             "In-app alerts plus WhatsApp or email to admins and account executives when someone replies on a query.",
             <MessageSquare className="h-3.5 w-3.5" />,
             queryRules,
+          )}
+          {renderRulesSection(
+            "Live chat",
+            "WhatsApp CRM admins and account executives when a customer starts a portal live chat.",
+            <MessageCircle className="h-3.5 w-3.5" />,
+            liveChatRules,
           )}
           {renderRulesSection(
             "Support tickets",
