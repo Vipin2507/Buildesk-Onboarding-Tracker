@@ -8,6 +8,7 @@ import { usePortalEmbedMode } from "@/components/portal-embed-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CHATBOT_QUICK_REPLIES } from "@/data/chatbotResponses";
+import { CHAT_IDLE_STILL_HERE_LABEL } from "@/lib/chat-idle";
 import type { CompanyPortalAccess } from "@/types/design-ticket";
 import { useChatStore } from "@/stores/useChatStore";
 import { cn, formatDate } from "@/lib/utils";
@@ -24,6 +25,7 @@ export function PortalChatWidget({ access }: { access: CompanyPortalAccess }) {
   const startSession = useChatStore((s) => s.startSession);
   const sendCustomerMessage = useChatStore((s) => s.sendCustomerMessage);
   const sendQuickReply = useChatStore((s) => s.sendQuickReply);
+  const confirmStillOnline = useChatStore((s) => s.confirmStillOnline);
   const convertToTicket = useChatStore((s) => s.convertToTicket);
   const setActivePortalSession = useChatStore((s) => s.setActivePortalSession);
   const markSessionRead = useChatStore((s) => s.markSessionRead);
@@ -265,6 +267,21 @@ export function PortalChatWidget({ access }: { access: CompanyPortalAccess }) {
                   </div>
                 ) : (
                   <>
+                    {session?.idleCheckAt && session.status !== "closed" ? (
+                      <div className="space-y-2 border-t border-amber-500/30 bg-amber-500/5 px-3 py-2.5">
+                        <p className="text-center text-[11px] text-amber-900 dark:text-amber-100">
+                          Are you still online for this chat? Reply below or confirm to keep it open.
+                        </p>
+                        <Button
+                          size="sm"
+                          className="h-8 w-full gap-1.5"
+                          onClick={() => confirmStillOnline(session.id)}
+                        >
+                          {CHAT_IDLE_STILL_HERE_LABEL}
+                        </Button>
+                      </div>
+                    ) : null}
+
                     {session?.status === "bot-handling" ? (
                       <div className="flex flex-wrap gap-1.5 border-t border-border bg-background px-3 py-2">
                         {CHATBOT_QUICK_REPLIES.map((q) => (

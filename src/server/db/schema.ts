@@ -901,6 +901,7 @@ export const chatSessions = sqliteTable(
     assignedAgentName: text("assigned_agent_name"),
     linkedTicketId: text("linked_ticket_id"),
     botAttempts: integer("bot_attempts").notNull().default(0),
+    idleCheckAt: text("idle_check_at"),
     ...timestamps,
   },
   (t) => [

@@ -28,6 +28,7 @@ const sessionSchema = z.object({
   assignedAgentName: z.string().optional(),
   linkedTicketId: z.string().optional(),
   botAttempts: z.number().int().nonnegative(),
+  idleCheckAt: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
   messages: z.array(messageSchema),
@@ -59,6 +60,7 @@ function mapSession(
     assignedAgentName: row.assignedAgentName ?? undefined,
     linkedTicketId: row.linkedTicketId ?? undefined,
     botAttempts: row.botAttempts,
+    idleCheckAt: row.idleCheckAt ?? undefined,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     messages: messages.map(mapMessage),
@@ -122,6 +124,7 @@ function upsertSessionRecord(db: ReturnType<typeof getDb>, session: ChatSession)
     assignedAgentName: session.assignedAgentName ?? null,
     linkedTicketId: session.linkedTicketId ?? null,
     botAttempts: session.botAttempts,
+    idleCheckAt: session.idleCheckAt ?? null,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
   };

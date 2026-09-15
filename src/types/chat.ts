@@ -26,4 +26,6 @@ export interface ChatSession {
   linkedTicketId?: string;
   botAttempts: number;
   lastNotifiedAt?: string;
+  /** When the “still online?” prompt was sent; cleared when the client replies. */
+  idleCheckAt?: string;
 }

@@ -6,6 +6,13 @@ import {
   CHATBOT_GREETING,
 } from "@/data/chatbotResponses";
 import {
+  CHAT_IDLE_AUTO_CLOSE_MESSAGE,
+  CHAT_IDLE_CHECK_MESSAGE,
+  CHAT_IDLE_CLOSE_AFTER_MS,
+  CHAT_IDLE_PROMPT_AFTER_MS,
+  CHAT_IDLE_STILL_HERE_LABEL,
+} from "@/lib/chat-idle";
+import {
   createPortalChatSession,
   syncChatSession,
   syncPortalChatSession,
@@ -48,6 +55,8 @@ type ChatState = {
   claimSession: (sessionId: string, agentId: string, agentName: string) => void;
   convertToTicket: (sessionId: string) => string | null;
   closeSession: (sessionId: string) => void;
+  confirmStillOnline: (sessionId: string) => void;
+  processIdleSessions: (nowMs?: number) => void;
   markSessionRead: (sessionId: string, reader: "agent" | "customer") => void;
   getLiveChatBadgeCount: (scope?: "all" | "crm" | "erp") => number;
   getUnreadForAgent: () => number;
@@ -71,6 +80,36 @@ function pushMessage(session: ChatSession, message: Omit<ChatMessage, "id" | "se
     ...session,
     messages: [...session.messages, full],
   });
+}
+
+function clearIdleCheck(session: ChatSession): ChatSession {
+  if (!session.idleCheckAt) return session;
+  return { ...session, idleCheckAt: undefined };
+}
+
+function lastMessage(session: ChatSession) {
+  return session.messages[session.messages.length - 1];
+}
+
+/** True when the ball is in the client's court (last speaker was bot/agent). */
+function waitingOnCustomer(session: ChatSession): boolean {
+  const last = lastMessage(session);
+  if (!last) return true;
+  return last.senderType !== "customer";
+}
+
+/** Prevents duplicate idle prompts when portal + agent bootstraps race. */
+const idleActionLocks = new Set<string>();
+
+function withIdleLock(sessionId: string, action: string, fn: () => void) {
+  const key = `${sessionId}:${action}`;
+  if (idleActionLocks.has(key)) return;
+  idleActionLocks.add(key);
+  try {
+    fn();
+  } finally {
+    globalThis.setTimeout(() => idleActionLocks.delete(key), 8_000);
+  }
 }
 
 function pushToServer(get: () => ChatState, sessionId: string) {
@@ -206,13 +245,15 @@ export const useChatStore = createStore<ChatState>((set, get) => ({
     const session = get().getSession(sessionId);
     if (!session || session.status === "closed") return;
 
-    let next = pushMessage(session, {
-      senderType: "customer",
-      senderName: session.visitorName,
-      text: trimmed,
-      createdAt: nowIso(),
-      isRead: false,
-    });
+    let next = clearIdleCheck(
+      pushMessage(session, {
+        senderType: "customer",
+        senderName: session.visitorName,
+        text: trimmed,
+        createdAt: nowIso(),
+        isRead: false,
+      }),
+    );
 
     set((s) => ({
       sessions: s.sessions.map((x) => (x.id === sessionId ? next : x)),
@@ -274,13 +315,15 @@ export const useChatStore = createStore<ChatState>((set, get) => ({
     const session = get().getSession(sessionId);
     if (!session || session.status === "closed") return;
 
-    let next = pushMessage(session, {
-      senderType: "customer",
-      senderName: session.visitorName,
-      text: label,
-      createdAt: nowIso(),
-      isRead: false,
-    });
+    let next = clearIdleCheck(
+      pushMessage(session, {
+        senderType: "customer",
+        senderName: session.visitorName,
+        text: label,
+        createdAt: nowIso(),
+        isRead: false,
+      }),
+    );
     set((s) => ({
       sessions: s.sessions.map((x) => (x.id === sessionId ? next : x)),
     }));
@@ -415,10 +458,94 @@ export const useChatStore = createStore<ChatState>((set, get) => ({
   closeSession: (sessionId) => {
     set((s) => ({
       sessions: s.sessions.map((x) =>
-        x.id === sessionId ? touch({ ...x, status: "closed" as ChatSessionStatus }) : x,
+        x.id === sessionId
+          ? touch({ ...x, status: "closed" as ChatSessionStatus, idleCheckAt: undefined })
+          : x,
       ),
     }));
     pushToServer(get, sessionId);
+  },
+
+  confirmStillOnline: (sessionId) => {
+    const session = get().getSession(sessionId);
+    if (!session || session.status === "closed") return;
+    get().sendCustomerMessage(sessionId, CHAT_IDLE_STILL_HERE_LABEL, { skipBot: true });
+  },
+
+  processIdleSessions: (nowMs = Date.now()) => {
+    const open = get().sessions.filter((s) => s.status !== "closed");
+    for (const session of open) {
+      if (!waitingOnCustomer(session)) continue;
+
+      const last = lastMessage(session);
+      const idleSinceMs = Date.parse(last?.createdAt ?? session.updatedAt);
+      if (!Number.isFinite(idleSinceMs)) continue;
+
+      // Already prompted — close if the client never replied.
+      if (session.idleCheckAt) {
+        const promptedMs = Date.parse(session.idleCheckAt);
+        if (!Number.isFinite(promptedMs)) continue;
+        if (nowMs - promptedMs < CHAT_IDLE_CLOSE_AFTER_MS) continue;
+
+        withIdleLock(session.id, "close", () => {
+          const current = get().getSession(session.id);
+          if (!current || current.status === "closed" || !current.idleCheckAt) return;
+          const now = nowIso();
+          let next = pushMessage(current, {
+            senderType: "bot",
+            senderName: "Buildesk Assistant",
+            text: CHAT_IDLE_AUTO_CLOSE_MESSAGE,
+            createdAt: now,
+            isRead: false,
+          });
+          next = touch({
+            ...next,
+            status: "closed" as ChatSessionStatus,
+            idleCheckAt: undefined,
+          });
+          set((s) => ({
+            sessions: s.sessions.map((x) => (x.id === current.id ? next : x)),
+          }));
+          pushToServer(get, current.id);
+        });
+        continue;
+      }
+
+      // Waiting for agent — don't nudge the client; they're waiting on us.
+      if (session.status === "waiting-for-agent") continue;
+
+      if (nowMs - idleSinceMs < CHAT_IDLE_PROMPT_AFTER_MS) continue;
+
+      withIdleLock(session.id, "prompt", () => {
+        const current = get().getSession(session.id);
+        if (!current || current.status === "closed" || current.idleCheckAt) return;
+        if (!waitingOnCustomer(current)) return;
+
+        const currentLast = lastMessage(current);
+        if (currentLast?.senderType === "bot" && currentLast.text === CHAT_IDLE_CHECK_MESSAGE) {
+          const next = touch({ ...current, idleCheckAt: currentLast.createdAt });
+          set((s) => ({
+            sessions: s.sessions.map((x) => (x.id === current.id ? next : x)),
+          }));
+          pushToServer(get, current.id);
+          return;
+        }
+
+        const now = nowIso();
+        let next = pushMessage(current, {
+          senderType: "bot",
+          senderName: "Buildesk Assistant",
+          text: CHAT_IDLE_CHECK_MESSAGE,
+          createdAt: now,
+          isRead: false,
+        });
+        next = touch({ ...next, idleCheckAt: now });
+        set((s) => ({
+          sessions: s.sessions.map((x) => (x.id === current.id ? next : x)),
+        }));
+        pushToServer(get, current.id);
+      });
+    }
   },
 
   markSessionRead: (sessionId, reader) => {

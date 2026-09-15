@@ -301,6 +301,7 @@ const EXTRA_COLUMNS = [
   { table: "erp_meetings", name: "meet_url", ddl: "TEXT" },
   { table: "erp_meetings", name: "google_sync_status", ddl: "TEXT NOT NULL DEFAULT 'none'" },
   { table: "erp_meetings", name: "google_sync_error", ddl: "TEXT" },
+  { table: "chat_sessions", name: "idle_check_at", ddl: "TEXT" },
 ];
 
 for (const col of EXTRA_COLUMNS) {
@@ -765,6 +766,7 @@ function ensureCrmTables() {
         assigned_agent_name TEXT,
         linked_ticket_id TEXT,
         bot_attempts INTEGER NOT NULL DEFAULT 0,
+        idle_check_at TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );

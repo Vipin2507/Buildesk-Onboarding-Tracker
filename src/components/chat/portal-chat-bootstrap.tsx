@@ -10,6 +10,7 @@ const POLL_MS = 3_000;
 export function PortalChatBootstrap({ access }: { access: CompanyPortalAccess }) {
   const syncSessionsFromServer = useChatStore((s) => s.syncSessionsFromServer);
   const setActivePortalSession = useChatStore((s) => s.setActivePortalSession);
+  const processIdleSessions = useChatStore((s) => s.processIdleSessions);
 
   useEffect(() => {
     let cancelled = false;
@@ -23,6 +24,7 @@ export function PortalChatBootstrap({ access }: { access: CompanyPortalAccess })
         syncSessionsFromServer(sessions);
         const open = sessions.find((s) => s.status !== "closed");
         if (open) setActivePortalSession(open.id);
+        processIdleSessions();
       } catch (e) {
         console.warn("[portal chat bootstrap]", e);
       }
@@ -34,7 +36,13 @@ export function PortalChatBootstrap({ access }: { access: CompanyPortalAccess })
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [access.slug, access.contactName, syncSessionsFromServer, setActivePortalSession]);
+  }, [
+    access.slug,
+    access.contactName,
+    syncSessionsFromServer,
+    setActivePortalSession,
+    processIdleSessions,
+  ]);
 
   return null;
 }
