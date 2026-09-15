@@ -11,6 +11,7 @@ export const CRM_PAYMENT_STATUS_TAB_IDS = [
   "due_in_90_days",
   "upcoming",
   "fully_paid",
+  "renewal",
   "lost",
 ] as const;
 
@@ -26,7 +27,7 @@ export const crmPaymentsSearchSchema = z.object({
   search: z.string().optional(),
   page: z.coerce.number().int().min(1).optional(),
   pageSize: z.coerce.number().int().min(1).max(100).optional(),
-  sortBy: z.enum(["nextDueDate", "overdueAmount", "collectionPercent"]).optional(),
+  sortBy: z.enum(["nextDueDate", "overdueAmount", "collectionPercent", "renewalDate"]).optional(),
   sortDir: z.enum(["asc", "desc"]).optional(),
 });
 

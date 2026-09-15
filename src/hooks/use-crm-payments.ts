@@ -1,8 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
+  createCrmPaymentRemark,
+  deleteCrmPaymentRemark,
   getCrmPaymentInstallments,
   getCrmPaymentsSummary,
+  listCrmPaymentRemarks,
   listCrmPaymentTransactions,
   listCrmPayments,
   recordCrmPaymentTransaction,
@@ -26,6 +29,7 @@ export const crmPaymentsKeys = {
     [...crmPaymentsKeys.all, "installments", accountId] as const,
   transactions: (accountId: string) =>
     [...crmPaymentsKeys.all, "transactions", accountId] as const,
+  remarks: (accountId: string) => [...crmPaymentsKeys.all, "remarks", accountId] as const,
 };
 
 function toFilters(search: CrmPaymentsSearch) {
@@ -68,17 +72,97 @@ export function useCrmPaymentTransactions(accountId: string, enabled: boolean) {
   });
 }
 
+export function useCrmPaymentRemarks(accountId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: crmPaymentsKeys.remarks(accountId),
+    queryFn: () => listCrmPaymentRemarks({ data: { accountId } }),
+    enabled,
+    staleTime: 15_000,
+  });
+}
+
+function fileToBase64(file: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== "string") {
+        reject(new Error("Failed to read image"));
+        return;
+      }
+      resolve(result);
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Failed to read image"));
+    reader.readAsDataURL(file);
+  });
+}
+
+export function useCreateCrmPaymentRemark(accountId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { body: string; image?: File }) => {
+      let image:
+        | { fileName: string; mimeType: string; dataBase64: string }
+        | undefined;
+      if (input.image) {
+        image = {
+          fileName: input.image.name,
+          mimeType: input.image.type || "image/jpeg",
+          dataBase64: await fileToBase64(input.image),
+        };
+      }
+      return createCrmPaymentRemark({
+        data: { accountId, body: input.body, image },
+      });
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: crmPaymentsKeys.remarks(accountId) });
+    },
+  });
+}
+
+export function useDeleteCrmPaymentRemark(accountId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteCrmPaymentRemark({ data: { id, accountId } }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: crmPaymentsKeys.remarks(accountId) });
+    },
+  });
+}
+
 export function useRecordCrmPayment(search: CrmPaymentsSearch) {
   const queryClient = useQueryClient();
   const filters = toFilters(search);
 
   return useMutation({
-    mutationFn: (input: {
+    mutationFn: async (input: {
       accountId: string;
       amount: number;
       paidDate: string;
       note?: string;
-    }) => recordCrmPaymentTransaction({ data: input }),
+      image?: File;
+    }) => {
+      let image:
+        | { fileName: string; mimeType: string; dataBase64: string }
+        | undefined;
+      if (input.image) {
+        image = {
+          fileName: input.image.name,
+          mimeType: input.image.type || "image/jpeg",
+          dataBase64: await fileToBase64(input.image),
+        };
+      }
+      return recordCrmPaymentTransaction({
+        data: {
+          accountId: input.accountId,
+          amount: input.amount,
+          paidDate: input.paidDate,
+          note: input.note,
+          image,
+        },
+      });
+    },
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: crmPaymentsKeys.list(filters) });
       void queryClient.invalidateQueries({ queryKey: crmPaymentsKeys.summary(filters) });

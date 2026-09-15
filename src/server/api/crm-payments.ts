@@ -19,9 +19,12 @@ import {
 import {
   buildAccountPaymentSnapshot,
   getAccountPaymentReceived,
+  insertPaymentRemark,
   insertPaymentTransaction,
   listAccountInstallmentsWithStatus,
+  listAccountPaymentRemarks,
   listAccountPaymentTransactions,
+  deletePaymentRemark,
   queryPaymentListItems,
   summarizePaymentList,
   type PaymentsListFilters,
@@ -38,6 +41,7 @@ const paymentStatusSchema = z.enum([
   "fully_paid",
   "not_started",
   "lost",
+  "renewal",
 ]);
 
 const listFiltersSchema = z.object({
@@ -50,7 +54,7 @@ const listFiltersSchema = z.object({
   search: z.string().optional(),
   page: z.coerce.number().int().min(1).optional(),
   pageSize: z.coerce.number().int().min(1).max(100).optional(),
-  sortBy: z.enum(["nextDueDate", "overdueAmount", "collectionPercent"]).optional(),
+  sortBy: z.enum(["nextDueDate", "overdueAmount", "collectionPercent", "renewalDate"]).optional(),
   sortDir: z.enum(["asc", "desc"]).optional(),
 });
 
@@ -151,6 +155,64 @@ export const listCrmPaymentTransactions = createServerFn({ method: "GET" })
     return listAccountPaymentTransactions(db, data.accountId);
   });
 
+export const listCrmPaymentRemarks = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => z.object({ accountId: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    assertCanViewAccountId(user, data.accountId);
+    const db = getDb();
+    return listAccountPaymentRemarks(db, data.accountId);
+  });
+
+export const createCrmPaymentRemark = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        accountId: z.string().min(1),
+        body: z.string().min(1).max(4000),
+        image: z
+          .object({
+            fileName: z.string().min(1).max(255),
+            mimeType: z.string().min(1).max(200),
+            dataBase64: z.string().min(1),
+          })
+          .optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    assertCanViewAccountId(user, data.accountId);
+    const db = getDb();
+    return insertPaymentRemark(db, {
+      accountId: data.accountId,
+      body: data.body,
+      createdByUserId: user.id,
+      createdByName: user.name,
+      image: data.image,
+    });
+  });
+
+export const deleteCrmPaymentRemark = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ id: z.string().min(1), accountId: z.string().min(1) }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    assertCanViewAccountId(user, data.accountId);
+    const db = getDb();
+    const row = db
+      .select()
+      .from(t.paymentRemarks)
+      .where(eq(t.paymentRemarks.id, data.id))
+      .get();
+    if (!row || row.accountId !== data.accountId) {
+      throw new ApiError(404, "Remark not found");
+    }
+    deletePaymentRemark(db, data.id);
+    return { ok: true as const };
+  });
+
 export const recordCrmPaymentTransaction = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z
@@ -159,6 +221,13 @@ export const recordCrmPaymentTransaction = createServerFn({ method: "POST" })
         amount: z.coerce.number().positive(),
         paidDate: z.string().min(1),
         note: z.string().optional(),
+        image: z
+          .object({
+            fileName: z.string().min(1).max(255),
+            mimeType: z.string().min(1).max(200),
+            dataBase64: z.string().min(1),
+          })
+          .optional(),
       })
       .parse(data),
   )
@@ -172,6 +241,7 @@ export const recordCrmPaymentTransaction = createServerFn({ method: "POST" })
       paidDate: data.paidDate,
       note: data.note,
       createdBy: user.id,
+      image: data.image,
     });
     const account = db
       .select()

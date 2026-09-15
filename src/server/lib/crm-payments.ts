@@ -1,9 +1,10 @@
-import { eq, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 
 import { parseInstallmentsJson, roundMoney } from "@/lib/crm-account-commercial";
 import {
   allocateAccountPayments,
   isInactiveCrmAccountForPayments,
+  isRenewalPaymentAccount,
   matchesPaymentDueFilter,
   PAYMENT_BACKFILL_NOTE,
   sumPaymentTransactions,
@@ -12,6 +13,14 @@ import {
   type PaymentStatus,
 } from "@/lib/crm-payment-allocation";
 import type { CrmAccount } from "@/types/crm-account";
+import type { PaymentRemark, PaymentRemarkImage } from "@/types/payment-remark";
+import {
+  deletePaymentRemarkImageFromDisk,
+  decodePaymentRemarkImagePayload,
+  decodePaymentTransactionImagePayload,
+  savePaymentRemarkImage,
+  savePaymentTransactionImage,
+} from "@/server/lib/crm-payment-remark-storage";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { newId, nowIso } from "@/types";
@@ -24,6 +33,7 @@ export type PaymentTransactionRow = {
   paidDate: string;
   note?: string;
   createdBy?: string;
+  image?: PaymentRemarkImage;
   createdAt: string;
   updatedAt: string;
 };
@@ -64,12 +74,37 @@ export function insertPaymentTransaction(
     paidDate: string;
     note?: string;
     createdBy?: string;
+    image?: {
+      fileName: string;
+      mimeType: string;
+      dataBase64: string;
+    };
   },
 ): PaymentTransactionRow {
   const now = nowIso();
   const id = newId();
   const amount = roundMoney(input.amount);
   if (amount <= 0) throw new Error("Payment amount must be greater than zero");
+
+  let imageFileName: string | null = null;
+  let imageMimeType: string | null = null;
+  let imageSizeBytes: number | null = null;
+  let imageStorageKey: string | null = null;
+
+  if (input.image) {
+    const buffer = decodePaymentTransactionImagePayload(input.image.dataBase64);
+    const saved = savePaymentTransactionImage({
+      accountId: input.accountId,
+      transactionId: id,
+      fileName: input.image.fileName,
+      mimeType: input.image.mimeType,
+      buffer,
+    });
+    imageFileName = input.image.fileName.trim();
+    imageMimeType = input.image.mimeType.trim();
+    imageSizeBytes = buffer.length;
+    imageStorageKey = saved.storageKey;
+  }
 
   db.insert(t.paymentTransactions)
     .values({
@@ -79,6 +114,10 @@ export function insertPaymentTransaction(
       paidDate: input.paidDate.slice(0, 10),
       note: input.note?.trim() || null,
       createdBy: input.createdBy ?? null,
+      imageFileName,
+      imageMimeType,
+      imageSizeBytes,
+      imageStorageKey,
       createdAt: now,
       updatedAt: now,
     })
@@ -95,9 +134,24 @@ export function insertPaymentTransaction(
   return mapTransactionRow(row);
 }
 
+function publicTransactionImageUrl(storageKey: string) {
+  return `/api/crm-payment-transaction-files/${encodeURIComponent(storageKey).replace(/%2F/g, "/")}`;
+}
+
 export function mapTransactionRow(
   row: typeof t.paymentTransactions.$inferSelect,
 ): PaymentTransactionRow {
+  const image =
+    row.imageStorageKey && row.imageFileName && row.imageMimeType
+      ? {
+          fileName: row.imageFileName,
+          mimeType: row.imageMimeType,
+          sizeBytes: row.imageSizeBytes ?? 0,
+          storageKey: row.imageStorageKey,
+          url: publicTransactionImageUrl(row.imageStorageKey),
+        }
+      : undefined;
+
   return {
     id: row.id,
     accountId: row.accountId,
@@ -105,6 +159,7 @@ export function mapTransactionRow(
     paidDate: row.paidDate,
     note: row.note ?? undefined,
     createdBy: row.createdBy ?? undefined,
+    image,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -280,7 +335,7 @@ export type PaymentsListFilters = {
   search?: string;
   page?: number;
   pageSize?: number;
-  sortBy?: "nextDueDate" | "overdueAmount" | "collectionPercent";
+  sortBy?: "nextDueDate" | "overdueAmount" | "collectionPercent" | "renewalDate";
   sortDir?: "asc" | "desc";
 };
 
@@ -326,19 +381,30 @@ function applyPaymentsToolbarFilters(
     );
   }
 
+  const useRenewalDates = filters.status === "renewal";
   if (filters.dueDateFrom) {
-    rows = rows.filter(
-      (row) =>
+    const from = filters.dueDateFrom.slice(0, 10);
+    rows = rows.filter((row) => {
+      if (useRenewalDates) {
+        return Boolean(row.renewalDate && row.renewalDate.slice(0, 10) >= from);
+      }
+      return (
         row.nextDueInstallment &&
-        row.nextDueInstallment.dueDate.slice(0, 10) >= filters.dueDateFrom!.slice(0, 10),
-    );
+        row.nextDueInstallment.dueDate.slice(0, 10) >= from
+      );
+    });
   }
   if (filters.dueDateTo) {
-    rows = rows.filter(
-      (row) =>
+    const to = filters.dueDateTo.slice(0, 10);
+    rows = rows.filter((row) => {
+      if (useRenewalDates) {
+        return Boolean(row.renewalDate && row.renewalDate.slice(0, 10) <= to);
+      }
+      return (
         row.nextDueInstallment &&
-        row.nextDueInstallment.dueDate.slice(0, 10) <= filters.dueDateTo!.slice(0, 10),
-    );
+        row.nextDueInstallment.dueDate.slice(0, 10) <= to
+      );
+    });
   }
 
   return rows;
@@ -355,6 +421,9 @@ function applyPaymentsStatusFilter(
 
   const active = items.filter((row) => !isInactiveCrmAccountForPayments(row.accountStatus));
   if (status === "all") return active;
+  if (status === "renewal") {
+    return active.filter((row) => isRenewalPaymentAccount(row));
+  }
   return active.filter((row) => matchesPaymentDueFilter(row, status, today));
 }
 
@@ -383,6 +452,8 @@ export type PaymentListItem = {
     remainingAmount: number;
     dueDate: string;
   } | null;
+  /** Account end date — used as renewal date for fully paid accounts. */
+  renewalDate?: string;
   overdueAmount: number;
   overdueDays: number | null;
   collectionPercent: number;
@@ -397,6 +468,7 @@ function mapAccountsToPaymentListItems(
   return accounts.map((account) => {
     const received = receivedByAccount.get(account.id) ?? 0;
     const snap = buildAccountPaymentSnapshot(account, received, today);
+    const endDate = account.endDate?.slice(0, 10) || undefined;
     return {
       id: account.id,
       accountName: account.name,
@@ -408,6 +480,7 @@ function mapAccountsToPaymentListItems(
       paymentReceived: snap.paymentReceived,
       pendingAmount: snap.pendingAmount,
       nextDueInstallment: snap.nextDueInstallment,
+      renewalDate: endDate,
       overdueAmount: snap.overdueAmount,
       overdueDays: snap.overdueDays,
       collectionPercent: snap.collectionPercent,
@@ -454,7 +527,8 @@ export function queryPaymentListItems(
 
   items = applyPaymentsListFilters(items, filters, today);
 
-  const sortBy = filters.sortBy ?? "nextDueDate";
+  const sortBy =
+    filters.sortBy ?? (filters.status === "renewal" ? "renewalDate" : "nextDueDate");
   const sortDir = filters.sortDir ?? "asc";
   const dir = sortDir === "desc" ? -1 : 1;
 
@@ -464,6 +538,11 @@ export function queryPaymentListItems(
     }
     if (sortBy === "collectionPercent") {
       return (a.collectionPercent - b.collectionPercent) * dir;
+    }
+    if (sortBy === "renewalDate" || filters.status === "renewal") {
+      const ad = a.renewalDate ?? "9999-12-31";
+      const bd = b.renewalDate ?? "9999-12-31";
+      return ad.localeCompare(bd) * dir;
     }
     const ad = a.nextDueInstallment?.dueDate ?? "9999-12-31";
     const bd = b.nextDueInstallment?.dueDate ?? "9999-12-31";
@@ -558,6 +637,7 @@ export function summarizePaymentList(
       fully_paid: countByStatusTab(countScope, "fully_paid", today),
       not_started: countByStatusTab(countScope, "not_started", today),
       lost: countByStatusTab(countScope, "lost", today),
+      renewal: countByStatusTab(countScope, "renewal", today),
     },
   };
 }
@@ -584,4 +664,126 @@ export function listAccountPaymentTransactions(
     .orderBy(sql`${t.paymentTransactions.paidDate} DESC, ${t.paymentTransactions.createdAt} DESC`)
     .all()
     .map(mapTransactionRow);
+}
+
+function publicRemarkImageUrl(storageKey: string) {
+  return `/api/crm-payment-remark-files/${encodeURIComponent(storageKey).replace(/%2F/g, "/")}`;
+}
+
+function mapRemarkRow(row: typeof t.paymentRemarks.$inferSelect): PaymentRemark {
+  const image =
+    row.imageStorageKey && row.imageFileName && row.imageMimeType
+      ? {
+          fileName: row.imageFileName,
+          mimeType: row.imageMimeType,
+          sizeBytes: row.imageSizeBytes ?? 0,
+          storageKey: row.imageStorageKey,
+          url: publicRemarkImageUrl(row.imageStorageKey),
+        }
+      : undefined;
+
+  return {
+    id: row.id,
+    accountId: row.accountId,
+    body: row.body,
+    image,
+    createdByUserId: row.createdByUserId ?? undefined,
+    createdByName: row.createdByName,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+export function listAccountPaymentRemarks(
+  db: ReturnType<typeof getDb>,
+  accountId: string,
+): PaymentRemark[] {
+  return db
+    .select()
+    .from(t.paymentRemarks)
+    .where(eq(t.paymentRemarks.accountId, accountId))
+    .orderBy(desc(t.paymentRemarks.createdAt))
+    .all()
+    .map(mapRemarkRow);
+}
+
+export function insertPaymentRemark(
+  db: ReturnType<typeof getDb>,
+  input: {
+    accountId: string;
+    body: string;
+    createdByUserId?: string;
+    createdByName: string;
+    image?: {
+      fileName: string;
+      mimeType: string;
+      dataBase64: string;
+    };
+  },
+): PaymentRemark {
+  const body = input.body.trim();
+  if (!body) throw new Error("Remark cannot be empty");
+
+  const account = db
+    .select({ id: t.crmAccounts.id })
+    .from(t.crmAccounts)
+    .where(eq(t.crmAccounts.id, input.accountId))
+    .get();
+  if (!account) throw new Error("CRM account not found");
+
+  const id = newId();
+  const now = nowIso();
+  let imageFileName: string | null = null;
+  let imageMimeType: string | null = null;
+  let imageSizeBytes: number | null = null;
+  let imageStorageKey: string | null = null;
+
+  if (input.image) {
+    const buffer = decodePaymentRemarkImagePayload(input.image.dataBase64);
+    const saved = savePaymentRemarkImage({
+      accountId: input.accountId,
+      remarkId: id,
+      fileName: input.image.fileName,
+      mimeType: input.image.mimeType,
+      buffer,
+    });
+    imageFileName = input.image.fileName.trim();
+    imageMimeType = input.image.mimeType.trim();
+    imageSizeBytes = buffer.length;
+    imageStorageKey = saved.storageKey;
+  }
+
+  db.insert(t.paymentRemarks)
+    .values({
+      id,
+      accountId: input.accountId,
+      body,
+      imageFileName,
+      imageMimeType,
+      imageSizeBytes,
+      imageStorageKey,
+      createdByUserId: input.createdByUserId ?? null,
+      createdByName: input.createdByName.trim() || "Unknown",
+      createdAt: now,
+      updatedAt: now,
+    })
+    .run();
+
+  const row = db.select().from(t.paymentRemarks).where(eq(t.paymentRemarks.id, id)).get();
+  if (!row) throw new Error("Failed to save payment remark");
+  return mapRemarkRow(row);
+}
+
+export function deletePaymentRemark(db: ReturnType<typeof getDb>, remarkId: string) {
+  const existing = db
+    .select()
+    .from(t.paymentRemarks)
+    .where(eq(t.paymentRemarks.id, remarkId))
+    .get();
+  if (!existing) return false;
+  db.delete(t.paymentRemarks).where(eq(t.paymentRemarks.id, remarkId)).run();
+  if (existing.imageStorageKey) {
+    deletePaymentRemarkImageFromDisk(existing.imageStorageKey);
+  }
+  return true;
 }

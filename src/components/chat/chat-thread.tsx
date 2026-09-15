@@ -3,8 +3,7 @@ import { motion } from "framer-motion";
 import { Bot, Headphones, UserRound } from "lucide-react";
 
 import type { ChatMessage } from "@/types/chat";
-import { cn } from "@/lib/utils";
-import { formatDate } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -76,7 +75,7 @@ export function ChatThread({
             </div>
             <div className={cn("max-w-[85%]", isCustomer ? "text-right" : "text-left")}>
               <div className="mb-0.5 text-[10px] text-muted-foreground">
-                {m.senderName} · {formatDate(m.createdAt)}
+                {m.senderName} · {formatDateTime(m.createdAt)}
               </div>
               <div
                 className={cn(

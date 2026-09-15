@@ -2,6 +2,7 @@ import { Bell, Mail, Plus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { CrmPaymentRemarksPanel } from "@/components/crm/crm-payment-remarks-panel";
 import { CrmRecordPaymentDialog } from "@/components/crm/crm-record-payment-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -188,11 +189,25 @@ export function CrmPaymentsExpandedRow({ row, search }: Props) {
           <ul className="divide-y divide-border rounded-md border border-border bg-card">
             {transactions.map((txn) => (
               <li key={txn.id} className="flex items-start justify-between gap-2 px-2.5 py-2">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="text-xs font-medium tabular-nums">{formatInr(txn.amount)}</div>
                   <div className="text-[10px] text-muted-foreground">{formatDate(txn.paidDate)}</div>
                   {txn.note ? (
                     <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{txn.note}</div>
+                  ) : null}
+                  {txn.image ? (
+                    <a
+                      href={txn.image.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1.5 block overflow-hidden rounded border border-border"
+                    >
+                      <img
+                        src={txn.image.url}
+                        alt={txn.image.fileName}
+                        className="max-h-28 w-full object-contain bg-muted/20"
+                      />
+                    </a>
                   ) : null}
                 </div>
               </li>
@@ -200,6 +215,8 @@ export function CrmPaymentsExpandedRow({ row, search }: Props) {
           </ul>
         )}
       </div>
+
+      <CrmPaymentRemarksPanel accountId={row.id} />
 
       <CrmRecordPaymentDialog
         open={recordOpen}

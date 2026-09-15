@@ -302,6 +302,10 @@ const EXTRA_COLUMNS = [
   { table: "erp_meetings", name: "google_sync_status", ddl: "TEXT NOT NULL DEFAULT 'none'" },
   { table: "erp_meetings", name: "google_sync_error", ddl: "TEXT" },
   { table: "chat_sessions", name: "idle_check_at", ddl: "TEXT" },
+  { table: "payment_transactions", name: "image_file_name", ddl: "TEXT" },
+  { table: "payment_transactions", name: "image_mime_type", ddl: "TEXT" },
+  { table: "payment_transactions", name: "image_size_bytes", ddl: "INTEGER" },
+  { table: "payment_transactions", name: "image_storage_key", ddl: "TEXT" },
 ];
 
 for (const col of EXTRA_COLUMNS) {
@@ -1143,6 +1147,10 @@ if (!tableExists("payment_transactions")) {
       paid_date TEXT NOT NULL,
       note TEXT,
       created_by TEXT,
+      image_file_name TEXT,
+      image_mime_type TEXT,
+      image_size_bytes INTEGER,
+      image_storage_key TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -1150,6 +1158,27 @@ if (!tableExists("payment_transactions")) {
     CREATE INDEX IF NOT EXISTS payment_transactions_paid_date_idx ON payment_transactions(paid_date);
   `);
   console.log("+ CREATE TABLE payment_transactions");
+}
+
+if (!tableExists("payment_remarks")) {
+  sqlite.exec(`
+    CREATE TABLE payment_remarks (
+      id TEXT PRIMARY KEY NOT NULL,
+      account_id TEXT NOT NULL REFERENCES crm_accounts(id) ON DELETE CASCADE,
+      body TEXT NOT NULL,
+      image_file_name TEXT,
+      image_mime_type TEXT,
+      image_size_bytes INTEGER,
+      image_storage_key TEXT,
+      created_by_user_id TEXT,
+      created_by_name TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS payment_remarks_account_idx ON payment_remarks(account_id);
+    CREATE INDEX IF NOT EXISTS payment_remarks_created_idx ON payment_remarks(created_at);
+  `);
+  console.log("+ CREATE TABLE payment_remarks");
 }
 
 if (tableExists("crm_accounts")) {

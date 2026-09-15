@@ -55,6 +55,7 @@ const STATUS_TABS: { id: CrmPaymentStatusTabId; label: string }[] = [
   { id: "due_in_90_days", label: "90 days" },
   { id: "upcoming", label: "Later" },
   { id: "fully_paid", label: "Fully paid" },
+  { id: "renewal", label: "Renewal" },
   { id: "lost", label: "Lost" },
 ];
 
@@ -67,6 +68,7 @@ const STATUS_TAB_TONE: Record<CrmPaymentStatusTabId, string> = {
   due_in_90_days: "text-sky-600 dark:text-sky-400",
   upcoming: "text-muted-foreground",
   fully_paid: "text-emerald-600 dark:text-emerald-400",
+  renewal: "text-violet-600 dark:text-violet-400",
   lost: "text-muted-foreground",
 };
 
@@ -495,33 +497,45 @@ function CrmPaymentsPage() {
           </DesignTicketFilterField>
           <DesignTicketDateField
             compact
-            label="Due from"
+            label={statusTab === "renewal" ? "Renewal from" : "Due from"}
             value={search.dueDateFrom ?? ""}
             onChange={(v) => patchSearch({ dueDateFrom: v || undefined })}
           />
           <DesignTicketDateField
             compact
-            label="Due to"
+            label={statusTab === "renewal" ? "Renewal to" : "Due to"}
             value={search.dueDateTo ?? ""}
             onChange={(v) => patchSearch({ dueDateTo: v || undefined })}
           />
           <DesignTicketFilterField label="Sort" className="min-w-[9rem]">
             <DesignTicketSelect
               compact
-              value={`${search.sortBy ?? "nextDueDate"}:${search.sortDir ?? "asc"}`}
+              value={`${search.sortBy ?? (statusTab === "renewal" ? "renewalDate" : "nextDueDate")}:${search.sortDir ?? "asc"}`}
               onChange={(v) => {
                 const [sortBy, sortDir] = v.split(":") as [
-                  "nextDueDate" | "overdueAmount" | "collectionPercent",
+                  "nextDueDate" | "overdueAmount" | "collectionPercent" | "renewalDate",
                   "asc" | "desc",
                 ];
                 patchSearch({
-                  sortBy: sortBy === "nextDueDate" ? undefined : sortBy,
+                  sortBy:
+                    sortBy === "nextDueDate" && statusTab !== "renewal"
+                      ? undefined
+                      : sortBy === "renewalDate" && statusTab === "renewal"
+                        ? undefined
+                        : sortBy,
                   sortDir: sortDir === "asc" ? undefined : sortDir,
                 });
               }}
               options={[
-                { value: "nextDueDate:asc", label: "Next due ↑" },
-                { value: "nextDueDate:desc", label: "Next due ↓" },
+                ...(statusTab === "renewal"
+                  ? [
+                      { value: "renewalDate:asc", label: "Renewal ↑" },
+                      { value: "renewalDate:desc", label: "Renewal ↓" },
+                    ]
+                  : [
+                      { value: "nextDueDate:asc", label: "Next due ↑" },
+                      { value: "nextDueDate:desc", label: "Next due ↓" },
+                    ]),
                 { value: "overdueAmount:desc", label: "Overdue ↓" },
                 { value: "collectionPercent:asc", label: "Collected % ↑" },
                 { value: "collectionPercent:desc", label: "Collected % ↓" },
@@ -635,9 +649,15 @@ function CrmPaymentsPage() {
               },
               {
                 key: "nextDue",
-                header: "Next due",
+                header: statusTab === "renewal" ? "Renewal date" : "Next due",
                 render: (r) =>
-                  r.nextDueInstallment ? (
+                  statusTab === "renewal" ? (
+                    r.renewalDate ? (
+                      <span className="text-xs tabular-nums">{formatDate(r.renewalDate)}</span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No end date</span>
+                    )
+                  ) : r.nextDueInstallment ? (
                     <div className="text-xs">
                       <div className="tabular-nums font-medium">
                         {formatInr(r.nextDueInstallment.remainingAmount)}

@@ -183,11 +183,38 @@ export const paymentTransactions = sqliteTable(
     paidDate: text("paid_date").notNull(),
     note: text("note"),
     createdBy: text("created_by"),
+    imageFileName: text("image_file_name"),
+    imageMimeType: text("image_mime_type"),
+    imageSizeBytes: integer("image_size_bytes"),
+    imageStorageKey: text("image_storage_key"),
     ...timestamps,
   },
   (t) => [
     index("payment_transactions_account_idx").on(t.accountId),
     index("payment_transactions_paid_date_idx").on(t.paidDate),
+  ],
+);
+
+/** Collection follow-up remarks on a CRM account (optional image attachment). */
+export const paymentRemarks = sqliteTable(
+  "payment_remarks",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => crmAccounts.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    imageFileName: text("image_file_name"),
+    imageMimeType: text("image_mime_type"),
+    imageSizeBytes: integer("image_size_bytes"),
+    imageStorageKey: text("image_storage_key"),
+    createdByUserId: text("created_by_user_id"),
+    createdByName: text("created_by_name").notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    index("payment_remarks_account_idx").on(t.accountId),
+    index("payment_remarks_created_idx").on(t.createdAt),
   ],
 );
 

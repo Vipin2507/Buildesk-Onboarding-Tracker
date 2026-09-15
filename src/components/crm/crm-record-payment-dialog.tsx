@@ -1,17 +1,28 @@
-import { useEffect, useState } from "react";
+import { ImagePlus, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { DatePickerField } from "@/components/date-picker-field";
 import { EntityFormModal } from "@/components/entity-form-modal";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  isPaymentRemarkImageMime,
+  PAYMENT_REMARK_MAX_IMAGE_BYTES,
+} from "@/types/payment-remark";
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   accountName: string;
-  onSubmit: (input: { amount: number; paidDate: string; note?: string }) => Promise<void>;
+  onSubmit: (input: {
+    amount: number;
+    paidDate: string;
+    note?: string;
+    image?: File;
+  }) => Promise<void>;
 };
 
 export function CrmRecordPaymentDialog({
@@ -21,18 +32,50 @@ export function CrmRecordPaymentDialog({
   onSubmit,
 }: Props) {
   const today = new Date().toISOString().slice(0, 10);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [amount, setAmount] = useState("");
   const [paidDate, setPaidDate] = useState(today);
   const [note, setNote] = useState("");
+  const [image, setImage] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  function clearImage() {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setImage(null);
+    setPreviewUrl(null);
+    if (fileRef.current) fileRef.current.value = "";
+  }
 
   useEffect(() => {
     if (open) {
       setAmount("");
       setPaidDate(today);
       setNote("");
+      clearImage();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only when dialog opens
   }, [open, today]);
+
+  function onPickImage(file: File | null) {
+    if (!file) {
+      clearImage();
+      return;
+    }
+    if (!isPaymentRemarkImageMime(file.type)) {
+      toast.error("Choose a JPEG, PNG, WebP, or GIF image");
+      return;
+    }
+    if (file.size > PAYMENT_REMARK_MAX_IMAGE_BYTES) {
+      toast.error(
+        `Image must be under ${Math.round(PAYMENT_REMARK_MAX_IMAGE_BYTES / 1024 / 1024)}MB`,
+      );
+      return;
+    }
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setImage(file);
+    setPreviewUrl(URL.createObjectURL(file));
+  }
 
   async function handleSave() {
     const parsed = Number(amount.replace(/[,₹]/g, "").trim());
@@ -50,6 +93,7 @@ export function CrmRecordPaymentDialog({
         amount: parsed,
         paidDate,
         note: note.trim() || undefined,
+        image: image ?? undefined,
       });
       toast.success("Payment recorded");
       onOpenChange(false);
@@ -97,6 +141,49 @@ export function CrmRecordPaymentDialog({
             className="resize-none text-sm"
             placeholder="Cheque ref, UTR, etc."
           />
+        </div>
+        <div>
+          <Label>Receipt image (optional)</Label>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="hidden"
+              onChange={(e) => onPickImage(e.target.files?.[0] ?? null)}
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5"
+              onClick={() => fileRef.current?.click()}
+            >
+              <ImagePlus className="h-3.5 w-3.5" />
+              {image ? "Change image" : "Add image"}
+            </Button>
+            {image ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-8 gap-1 text-muted-foreground"
+                onClick={clearImage}
+              >
+                <X className="h-3.5 w-3.5" />
+                Remove
+              </Button>
+            ) : null}
+          </div>
+          {previewUrl ? (
+            <div className="mt-2 overflow-hidden rounded-md border border-border">
+              <img
+                src={previewUrl}
+                alt="Payment receipt preview"
+                className="max-h-40 w-full object-contain bg-muted/30"
+              />
+            </div>
+          ) : null}
         </div>
       </div>
     </EntityFormModal>

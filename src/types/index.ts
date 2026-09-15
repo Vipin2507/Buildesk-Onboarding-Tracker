@@ -23,3 +23,4 @@ export * from "./crm-master";
 export * from "./booking";
 export * from "./erp-meeting";
 export * from "./project-file";
+export * from "./payment-remark";
