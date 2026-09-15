@@ -23,6 +23,7 @@ import { calcChecklistProgress, isChecklistItemComplete } from "@/lib/checklist"
 import {
   buildCrmStageLabelMap,
   CRM_DEFAULT_IMPLEMENTATION_STAGES,
+  isCrmGoLiveStage,
 } from "@/lib/crm-implementation-stages";
 
 /** Integration modules delivered via a third-party provider, with the vendor options for each. */
@@ -1244,8 +1245,11 @@ export function getCrmModuleProgressWeights(
  * Overall account progress — weighted by opted modules.
  * Sales CRM holds the remainder after 10% per other core module (e.g. 90% with one other, 80% with two).
  * Integrations roll into Sales CRM progress, not overall weights.
+ * Go-Live / Post Go-Live stages always count as 100%.
  */
 export function calcCrmOnboardingProgress(record: CrmOnboardingRecord): number {
+  if (isCrmGoLiveStage(record.tracker.stage)) return 100;
+
   const enabled = record.productModules.filter(
     (m) => m.enabled && !isCrmIntegrationModule(m.key),
   );

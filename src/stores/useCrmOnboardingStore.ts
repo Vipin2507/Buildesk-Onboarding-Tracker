@@ -1157,12 +1157,14 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
     if (stageChanged && patch.stage) {
       const accountName = useCrmAccountStore.getState().getById(companyId)?.name ?? "CRM account";
       notifyCrmStageChange(companyId, accountName, patch.stage, who);
-      // Keep account status in sync with go-live stages (same as Approve Go-Live actions).
+      // Keep account status in sync with implementation stage.
+      const account = useCrmAccountStore.getState().getById(companyId);
       if (isCrmGoLiveStage(patch.stage)) {
-        const account = useCrmAccountStore.getState().getById(companyId);
         if (account?.status === "onboarding") {
           useCrmAccountStore.getState().markLive(companyId, who);
         }
+      } else if (account?.status === "live") {
+        useCrmAccountStore.getState().setAccountStatus(companyId, "onboarding", { who });
       }
     }
   },

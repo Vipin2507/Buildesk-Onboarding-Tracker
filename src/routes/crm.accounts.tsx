@@ -449,11 +449,13 @@ function CrmAccountsPage() {
     for (const a of accounts) ensure(a.id, a.companyType);
   }, [accounts, ensure]);
 
-  // Heal accounts already at go-live stages but still marked onboarding.
+  // Keep status aligned with stage: go-live stages → live, earlier stages → onboarding.
   useEffect(() => {
     for (const row of overview.rows) {
       if (row.status === "onboarding" && isCrmGoLiveStage(row.stage)) {
         updateAccount(row.id, { status: "live" });
+      } else if (row.status === "live" && !isCrmGoLiveStage(row.stage)) {
+        updateAccount(row.id, { status: "onboarding" });
       }
     }
   }, [overview.rows, updateAccount]);

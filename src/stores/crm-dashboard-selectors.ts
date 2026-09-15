@@ -218,13 +218,14 @@ export function useCrmDashboardOverview() {
 
     const rows: CrmAccountRow[] = accounts.map((account) => {
       const record = recordFor(account, records);
-      const progress = calcCrmOnboardingProgress(record);
+      const isLive =
+        account.status === "live" || isCrmGoLiveStage(record.tracker.stage);
+      const progress = isLive ? 100 : calcCrmOnboardingProgress(record);
       const openTickets = tickets.filter(
         (t) => t.companyId === account.id && isTicketOpen(t),
       ).length;
       const openTasks = scopedOpenTasks.filter((t) => t.companyId === account.id).length;
       const openQueries = scopedOpenQueries.filter((q) => q.companyId === account.id).length;
-      const isLive = account.status === "live";
       const resolvedHealth = resolveHealth(account, progress, isLive, openTickets);
       const overdue = Boolean(
         record.tracker.expectedCompletionDate &&
