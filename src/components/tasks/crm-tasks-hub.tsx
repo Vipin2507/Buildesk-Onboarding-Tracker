@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import {
   DesignTicketDateField,
   DesignTicketFilterField,
+  DesignTicketSearchableSelect,
   DesignTicketSelect,
 } from "@/components/design-ticket/design-ticket-fields";
 import { inDateRange } from "@/components/list-toolbar";
@@ -849,23 +850,16 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
                 This task is for your team only and is not linked to a customer account.
               </p>
             ) : (
-              <label className="block text-xs font-medium">
-                Account
-                <select
-                  className="mt-1 h-9 w-full rounded-md border px-3 text-sm"
+              <div className="space-y-1.5">
+                <div className="text-xs font-medium">Account</div>
+                <DesignTicketSearchableSelect
                   value={createAccountId}
-                  onChange={(e) => {
-                    setCreateAccountId(e.target.value);
-                  }}
-                >
-                  <option value="">Select account</option>
-                  {visibleAccounts.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  placeholder="Search account…"
+                  emptyLabel="No accounts found"
+                  options={visibleAccounts.map((a) => ({ value: a.id, label: a.name }))}
+                  onChange={setCreateAccountId}
+                />
+              </div>
             )}
             {createMode === "reminder" ? (
               <p className="rounded-lg border border-dashed bg-muted/10 px-3 py-2 text-xs text-muted-foreground">

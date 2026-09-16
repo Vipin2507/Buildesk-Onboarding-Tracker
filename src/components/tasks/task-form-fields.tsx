@@ -30,6 +30,7 @@ import {
   type FollowUpTaskType,
   type TaskProductScope,
 } from "@/types";
+import { DesignTicketSearchableSelect } from "@/components/design-ticket/design-ticket-fields";
 
 export type TaskFormValues = {
   title: string;
@@ -340,24 +341,19 @@ export function TaskFormFields(props: Props & ReturnType<typeof useTaskFormState
   return (
     <div className="space-y-3">
       {showCompanyField ? (
-        <label className="block text-xs font-medium">
-          Company
-          <select
-            className={cn(selectClass, "mt-1 w-full")}
+        <div className="space-y-1.5">
+          <div className="text-xs font-medium">Company</div>
+          <DesignTicketSearchableSelect
             value={companyId}
-            onChange={(e) => {
-              setCompanyId(e.target.value);
-              onCompanyIdChange?.(e.target.value);
+            placeholder="Search company…"
+            emptyLabel="No companies found"
+            options={(companies ?? []).map((c) => ({ value: c.id, label: c.name }))}
+            onChange={(id) => {
+              setCompanyId(id);
+              onCompanyIdChange?.(id);
             }}
-          >
-            <option value="">Select company</option>
-            {companies?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
+          />
+        </div>
       ) : null}
 
       <label className="block text-xs font-medium">

@@ -3,6 +3,7 @@ import { desc, eq, sql } from "drizzle-orm";
 import { parseInstallmentsJson, roundMoney } from "@/lib/crm-account-commercial";
 import {
   allocateAccountPayments,
+  classifyPaymentTransactionRenewal,
   isInactiveCrmAccountForPayments,
   isRenewalPaymentAccount,
   matchesPaymentDueFilter,
@@ -36,6 +37,12 @@ export type PaymentTransactionRow = {
   image?: PaymentRemarkImage;
   createdAt: string;
   updatedAt: string;
+  /** Portion of this payment that applies to the original deal. */
+  dealAmount?: number;
+  /** Portion beyond deal value (renewal). */
+  renewalAmount?: number;
+  /** True when any part of this payment is beyond deal value. */
+  isRenewal?: boolean;
 };
 
 export function getAccountPaymentReceived(db: ReturnType<typeof getDb>, accountId: string): number {
@@ -424,6 +431,9 @@ function applyPaymentsStatusFilter(
   if (status === "renewal") {
     return active.filter((row) => isRenewalPaymentAccount(row));
   }
+  if (status === "fully_paid") {
+    return active.filter((row) => row.paymentStatus === "fully_paid");
+  }
   return active.filter((row) => matchesPaymentDueFilter(row, status, today));
 }
 
@@ -458,6 +468,8 @@ export type PaymentListItem = {
   overdueDays: number | null;
   collectionPercent: number;
   paymentStatus: PaymentStatus;
+  /** Collections beyond deal value. */
+  renewalAmount: number;
 };
 
 function mapAccountsToPaymentListItems(
@@ -485,6 +497,7 @@ function mapAccountsToPaymentListItems(
       overdueDays: snap.overdueDays,
       collectionPercent: snap.collectionPercent,
       paymentStatus: snap.paymentStatus,
+      renewalAmount: snap.renewalAmount,
     };
   });
 }
@@ -657,13 +670,27 @@ export function listAccountPaymentTransactions(
   db: ReturnType<typeof getDb>,
   accountId: string,
 ): PaymentTransactionRow[] {
-  return db
+  const account = db.select().from(t.crmAccounts).where(eq(t.crmAccounts.id, accountId)).get();
+  const dealValue = roundMoney(Number(account?.dealSize) || 0);
+  const rows = db
     .select()
     .from(t.paymentTransactions)
     .where(eq(t.paymentTransactions.accountId, accountId))
     .orderBy(sql`${t.paymentTransactions.paidDate} DESC, ${t.paymentTransactions.createdAt} DESC`)
     .all()
     .map(mapTransactionRow);
+
+  const classification = classifyPaymentTransactionRenewal(rows, dealValue);
+  return rows.map((row) => {
+    const parts = classification.get(row.id);
+    const renewalAmount = parts?.renewalAmount ?? 0;
+    return {
+      ...row,
+      dealAmount: parts?.dealAmount ?? row.amount,
+      renewalAmount,
+      isRenewal: renewalAmount > 0.01,
+    };
+  });
 }
 
 function publicRemarkImageUrl(storageKey: string) {

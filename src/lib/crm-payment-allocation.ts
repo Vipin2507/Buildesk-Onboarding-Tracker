@@ -8,6 +8,7 @@ export type PaymentStatus =
   | "due_this_week"
   | "upcoming"
   | "fully_paid"
+  | "renewal"
   | "not_started";
 
 export type InstallmentDerivedStatus = "paid" | "partially_paid" | "pending" | "overdue";
@@ -32,6 +33,8 @@ export type PaymentAllocationResult = {
   overdueDays: number | null;
   overdueAmount: number;
   collectionPercent: number;
+  /** Amount collected beyond deal value (renewal). */
+  renewalAmount: number;
 };
 
 function daysBetween(fromYmd: string, toYmd: string): number {
@@ -77,24 +80,67 @@ export function endOfMonthYmd(ymd: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** List filter tabs — superset of row-level PaymentStatus. */
+/** List filter tabs — includes lost + due-window filters beyond row PaymentStatus. */
 export type PaymentListFilterStatus =
   | PaymentStatus
   | "all"
   | "due_this_month"
   | "due_in_45_days"
   | "due_in_90_days"
-  | "lost"
-  | "renewal";
+  | "lost";
 
 export function isInactiveCrmAccountForPayments(accountStatus: string): boolean {
   return accountStatus === "inactive";
 }
 
+/** Accounts with collections beyond deal value (renewal payments). */
 export function isRenewalPaymentAccount(row: {
   paymentStatus: PaymentStatus;
+  renewalAmount?: number;
+  paymentReceived?: number;
+  totalDealValue?: number;
 }): boolean {
-  return row.paymentStatus === "fully_paid";
+  if (row.paymentStatus === "renewal") return true;
+  if (typeof row.renewalAmount === "number") return row.renewalAmount > 0.01;
+  if (
+    typeof row.paymentReceived === "number" &&
+    typeof row.totalDealValue === "number" &&
+    row.totalDealValue > 0
+  ) {
+    return row.paymentReceived > row.totalDealValue + 0.01;
+  }
+  return false;
+}
+
+export function renewalAmountFromTotals(paymentReceived: number, totalDealValue: number): number {
+  const received = roundMoney(Math.max(0, paymentReceived));
+  const deal = roundMoney(Math.max(0, totalDealValue));
+  return roundMoney(Math.max(0, received - deal));
+}
+
+/**
+ * Classify ledger rows chronologically: amounts that fill the deal first, then excess = renewal.
+ */
+export function classifyPaymentTransactionRenewal<
+  T extends { id: string; amount: number; paidDate: string; createdAt: string },
+>(transactions: T[], totalDealValue: number): Map<string, { dealAmount: number; renewalAmount: number }> {
+  const deal = roundMoney(Math.max(0, totalDealValue));
+  let remainingDeal = deal;
+  const ordered = [...transactions].sort((a, b) => {
+    const byDate = a.paidDate.slice(0, 10).localeCompare(b.paidDate.slice(0, 10));
+    if (byDate !== 0) return byDate;
+    return a.createdAt.localeCompare(b.createdAt);
+  });
+
+  const result = new Map<string, { dealAmount: number; renewalAmount: number }>();
+  for (const txn of ordered) {
+    const amount = roundMoney(Math.max(0, Number(txn.amount) || 0));
+    const towardDeal = roundMoney(Math.min(amount, remainingDeal));
+    const towardRenewal = roundMoney(amount - towardDeal);
+    remainingDeal = roundMoney(Math.max(0, remainingDeal - towardDeal));
+    result.set(txn.id, { dealAmount: towardDeal, renewalAmount: towardRenewal });
+  }
+  return result;
 }
 
 export function matchesPaymentDueFilter(
@@ -106,12 +152,13 @@ export function matchesPaymentDueFilter(
   todayYmd?: string,
 ): boolean {
   if (filter === "all") return true;
-  if (filter === "lost" || filter === "renewal") return false;
+  if (filter === "lost") return false;
 
   const today = (todayYmd ?? new Date().toISOString()).slice(0, 10);
   const due = row.nextDueInstallment?.dueDate.slice(0, 10);
 
   if (filter === "fully_paid") return row.paymentStatus === "fully_paid";
+  if (filter === "renewal") return row.paymentStatus === "renewal";
   if (filter === "not_started") return row.paymentStatus === "not_started";
 
   if (!due) return false;
@@ -232,7 +279,10 @@ export function allocateAccountPayments(input: {
   }
 
   let paymentStatus: PaymentStatus;
-  if (totalDealValue > 0 && totalReceived >= totalDealValue - 0.01) {
+  const renewalAmount = renewalAmountFromTotals(totalReceived, totalDealValue);
+  if (renewalAmount > 0.01) {
+    paymentStatus = "renewal";
+  } else if (totalDealValue > 0 && totalReceived >= totalDealValue - 0.01) {
     paymentStatus = "fully_paid";
   } else if (totalReceived <= 0 && !nextDueInstallment) {
     paymentStatus = "not_started";
@@ -262,6 +312,7 @@ export function allocateAccountPayments(input: {
     overdueDays,
     overdueAmount: roundMoney(overdueAmount),
     collectionPercent,
+    renewalAmount,
   };
 }
 

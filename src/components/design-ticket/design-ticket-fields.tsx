@@ -155,16 +155,20 @@ export function DesignTicketSearchableSelect({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-        <Command shouldFilter>
-          <CommandInput placeholder={placeholder} />
+      <PopoverContent
+        className="w-[--radix-popover-trigger-width] border-border bg-popover p-0 text-popover-foreground"
+        align="start"
+      >
+        <Command shouldFilter className="bg-popover text-popover-foreground">
+          <CommandInput placeholder={placeholder} className="text-foreground" />
           <CommandList>
-            <CommandEmpty>{emptyLabel}</CommandEmpty>
+            <CommandEmpty className="text-muted-foreground">{emptyLabel}</CommandEmpty>
             {options.map((option) => (
               <CommandItem
                 key={option.value}
                 value={option.label}
                 onSelect={() => onChange(option.value)}
+                className="text-foreground data-[selected=true]:bg-muted data-[selected=true]:text-foreground"
               >
                 <Check
                   className={cn(

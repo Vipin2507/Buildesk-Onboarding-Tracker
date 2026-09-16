@@ -55,7 +55,7 @@ const STATUS_TABS: { id: CrmPaymentStatusTabId; label: string }[] = [
   { id: "due_in_90_days", label: "90 days" },
   { id: "upcoming", label: "Later" },
   { id: "fully_paid", label: "Fully paid" },
-  { id: "renewal", label: "Renewal" },
+  { id: "renewal", label: "Renewal payments" },
   { id: "lost", label: "Lost" },
 ];
 
@@ -116,6 +116,10 @@ function paymentStatusBadge(status: PaymentStatus) {
     fully_paid: {
       label: "Fully paid",
       className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+    },
+    renewal: {
+      label: "Renewal",
+      className: "border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-400",
     },
     not_started: {
       label: "Not started",
@@ -444,27 +448,39 @@ function CrmPaymentsPage() {
           })}
         </div>
 
+        <div className="mt-2">
+          <div className="relative max-w-md">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              placeholder="Search account…"
+              aria-label="Search account"
+              className="h-9 pl-8 text-xs"
+            />
+          </div>
+        </div>
+
         <DesignTicketFilterBar
           className="mt-2"
           variant="inline"
           onClear={() =>
             void navigate({
-              search: {},
+              search: (prev) => ({
+                ...prev,
+                salesManager: undefined,
+                supportManager1: undefined,
+                supportManager2: undefined,
+                dueDateFrom: undefined,
+                dueDateTo: undefined,
+                sortBy: undefined,
+                sortDir: undefined,
+                page: undefined,
+              }),
               replace: true,
             })
           }
         >
-          <DesignTicketFilterField label="Search" className="min-w-[10rem] flex-1">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={searchDraft}
-                onChange={(e) => setSearchDraft(e.target.value)}
-                placeholder="Account name…"
-                className="h-8 pl-8 text-xs"
-              />
-            </div>
-          </DesignTicketFilterField>
           <DesignTicketFilterField label="Support 1" className="min-w-[8.5rem]">
             <DesignTicketSelect
               compact
@@ -637,7 +653,14 @@ function CrmPaymentsPage() {
                 key: "paymentReceived",
                 header: "Received",
                 render: (r) => (
-                  <span className="tabular-nums text-xs">{formatInr(r.paymentReceived)}</span>
+                  <div className="text-xs">
+                    <div className="tabular-nums">{formatInr(r.paymentReceived)}</div>
+                    {r.renewalAmount > 0.01 ? (
+                      <div className="text-[10px] text-violet-600 dark:text-violet-400">
+                        Renewal {formatInr(r.renewalAmount)}
+                      </div>
+                    ) : null}
+                  </div>
                 ),
               },
               {
@@ -697,9 +720,10 @@ function CrmPaymentsPage() {
                 render: (r) => (
                   <div className="min-w-[5rem]">
                     <div className="mb-0.5 text-[10px] tabular-nums text-muted-foreground">
-                      {r.collectionPercent}%
+                      {Math.min(r.collectionPercent, 100)}%
+                      {r.renewalAmount > 0.01 ? " + renewal" : ""}
                     </div>
-                    <ProgressBar value={r.collectionPercent} className="h-1.5" />
+                    <ProgressBar value={Math.min(r.collectionPercent, 100)} className="h-1.5" />
                   </div>
                 ),
               },
