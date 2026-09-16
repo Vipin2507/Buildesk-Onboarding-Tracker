@@ -22,6 +22,7 @@ import {
 } from "@/lib/task-scheduling";
 import { cn } from "@/lib/utils";
 import { checkErpTaskScheduleConflicts, checkTaskScheduleConflicts } from "@/lib/api";
+import { isCrmReminderTaskType } from "@/lib/crm-reminder-task";
 import {
   FOLLOW_UP_TASK_TYPES,
   FOLLOW_UP_TASK_TYPE_LABEL,
@@ -54,6 +55,8 @@ type Props = {
   onMarkCompleteOnCreateChange?: (checked: boolean) => void;
   productScope?: TaskProductScope;
   internalMeeting?: boolean;
+  /** Soft nudge — no calendar blocking. */
+  reminderMode?: boolean;
 };
 
 const fieldClass = cn(ticketFieldClass, "h-8 text-xs");
@@ -217,6 +220,9 @@ export function useTaskFormState(props: Props) {
       toast.error(isCreate ? "Assign at least one user" : "Assign at least one user for a scheduled task");
       return false;
     }
+    const isReminder =
+      props.reminderMode || isCrmReminderTaskType(taskType) || props.editing?.taskType === "reminder";
+    if (isReminder) return true;
     try {
       const checkConflicts =
         props.productScope === "erp" ? checkErpTaskScheduleConflicts : checkTaskScheduleConflicts;
@@ -315,6 +321,7 @@ export function TaskFormFields(props: Props & ReturnType<typeof useTaskFormState
     markCompleteOnCreate,
     onMarkCompleteOnCreateChange,
     internalMeeting,
+    reminderMode,
   } = props;
 
   const readOnlyBooking = editing?.source === "booking";
@@ -327,6 +334,8 @@ export function TaskFormFields(props: Props & ReturnType<typeof useTaskFormState
     blockPastSchedule && dueDate
       ? minEndTimeForSchedule({ dueDate, startTime: startTime || undefined })
       : undefined;
+  const isReminder =
+    reminderMode || isCrmReminderTaskType(taskType) || editing?.taskType === "reminder";
 
   return (
     <div className="space-y-3">
@@ -377,8 +386,14 @@ export function TaskFormFields(props: Props & ReturnType<typeof useTaskFormState
         <select
           className={cn(selectClass, "mt-1 w-full")}
           value={taskType}
-          onChange={(e) => setTaskType(e.target.value as FollowUpTaskType | "")}
-          disabled={readOnlyBooking}
+          onChange={(e) => {
+            const next = e.target.value as FollowUpTaskType | "";
+            setTaskType(next);
+            if (isCrmReminderTaskType(next) && durationMinutes > 15) {
+              onDurationChange(5);
+            }
+          }}
+          disabled={readOnlyBooking || reminderMode}
         >
           <option value="">Select type (optional)</option>
           {FOLLOW_UP_TASK_TYPES.map((type) => (
@@ -455,7 +470,12 @@ export function TaskFormFields(props: Props & ReturnType<typeof useTaskFormState
         </label>
       </div>
 
-      {internalMeeting ? (
+      {isReminder ? (
+        <p className="rounded-lg border border-dashed bg-muted/10 px-3 py-2 text-[11px] text-muted-foreground">
+          Reminder only — notifies the assignee in-app / push at the selected time. Does not block
+          their calendar or collide with other meetings.
+        </p>
+      ) : internalMeeting ? (
         <p className="rounded-lg border border-dashed bg-muted/10 px-3 py-2 text-[11px] text-muted-foreground">
           Assignees must be free at the selected time. Conflicts with other tasks and meetings
           are blocked automatically.

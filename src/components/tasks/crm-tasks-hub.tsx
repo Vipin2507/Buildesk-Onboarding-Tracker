@@ -45,6 +45,7 @@ import {
   isInternalCrmTask,
   resolveCrmTaskAccountLabel,
 } from "@/lib/crm-internal-task";
+import { isCrmReminderTask } from "@/lib/crm-reminder-task";
 import {
   crmTaskAssigneeUsers,
   resolveDefaultTaskAssigneeIds,
@@ -276,13 +277,15 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<FollowUpTask | null>(null);
   const [createAccountId, setCreateAccountId] = useState("");
-  const [createMode, setCreateMode] = useState<"account" | "internal">("account");
+  const [createMode, setCreateMode] = useState<"account" | "internal" | "reminder">("account");
   const [remark, setRemark] = useState("");
   const [markCompleteOnCreate, setMarkCompleteOnCreate] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<FollowUpTask | null>(null);
 
   const createAccount = visibleAccounts.find((a) => a.id === createAccountId);
   const isInternalCreate = !editing && createMode === "internal";
+  const isReminderCreate = !editing && createMode === "reminder";
+  const isReminderEdit = Boolean(editing && isCrmReminderTask(editing));
   const assignees = useMemo(() => {
     if (isInternalCreate || (editing && isInternalCrmTask(editing))) {
       return crmTaskAssigneeUsers(users);
@@ -308,6 +311,7 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
     editing,
     companyId: createAccountId,
     markCompleteOnCreate,
+    reminderMode: isReminderCreate || isReminderEdit,
   });
 
   function canManageTask(task?: FollowUpTask) {
@@ -350,6 +354,18 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
     setModalOpen(true);
   }
 
+  function openCreateReminder() {
+    setEditing(null);
+    setCreateMode("reminder");
+    setCreateAccountId(visibleAccounts[0]?.id ?? "");
+    form.reset();
+    form.setTaskType("reminder");
+    form.onDurationChange(5);
+    setRemark("");
+    setMarkCompleteOnCreate(false);
+    setModalOpen(true);
+  }
+
   function openEdit(task: FollowUpTask) {
     setEditing(task);
     setCreateAccountId(task.companyId);
@@ -383,7 +399,11 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
       title: form.title.trim(),
       description: form.description.trim() || undefined,
       dueDate: form.dueDate || undefined,
-      taskType: internalTask ? (form.taskType || "internal_meeting") : form.taskType || undefined,
+      taskType: internalTask
+        ? form.taskType || "internal_meeting"
+        : isReminderCreate || isReminderEdit
+          ? "reminder"
+          : form.taskType || undefined,
       startTime: form.startTime || undefined,
       endTime: form.endTime || undefined,
       durationMinutes: form.durationMinutes || undefined,
@@ -541,6 +561,15 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
                     Internal meeting
                   </Button>
                 ) : null}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1 px-3 text-xs"
+                  onClick={openCreateReminder}
+                >
+                  <Clock className="h-3.5 w-3.5" />
+                  Reminder
+                </Button>
               </>
             ) : null}
           </div>
@@ -795,8 +824,31 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
               >
                 Internal meeting
               </button>
+              <button
+                type="button"
+                className={cn(
+                  "flex-1 rounded-md px-3 py-2 text-xs font-medium transition-colors",
+                  createMode === "reminder"
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => {
+                  setCreateMode("reminder");
+                  form.setTaskType("reminder");
+                  form.onDurationChange(5);
+                  if (!createAccountId && visibleAccounts[0]?.id) {
+                    setCreateAccountId(visibleAccounts[0].id);
+                  }
+                }}
+              >
+                Reminder
+              </button>
             </div>
-            {createMode === "account" ? (
+            {createMode === "internal" ? (
+              <p className="rounded-lg border border-dashed bg-muted/10 px-3 py-2 text-xs text-muted-foreground">
+                This task is for your team only and is not linked to a customer account.
+              </p>
+            ) : (
               <label className="block text-xs font-medium">
                 Account
                 <select
@@ -814,11 +866,13 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
                   ))}
                 </select>
               </label>
-            ) : (
-              <p className="rounded-lg border border-dashed bg-muted/10 px-3 py-2 text-xs text-muted-foreground">
-                This task is for your team only and is not linked to a customer account.
-              </p>
             )}
+            {createMode === "reminder" ? (
+              <p className="rounded-lg border border-dashed bg-muted/10 px-3 py-2 text-xs text-muted-foreground">
+                Soft nudge for the assignee — in-app and push notification only. Does not block
+                availability.
+              </p>
+            ) : null}
           </div>
         ) : isInternalCrmTask(editing) ? (
           <p className="mb-3 text-xs text-muted-foreground">
@@ -840,6 +894,7 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
           onMarkCompleteOnCreateChange={setMarkCompleteOnCreate}
           productScope="crm"
           internalMeeting={isInternalCreate || Boolean(editing && isInternalCrmTask(editing))}
+          reminderMode={isReminderCreate || isReminderEdit}
         />
 
         {editing ? (

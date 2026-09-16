@@ -1,5 +1,6 @@
 import { and, eq, gte, inArray, lte, ne } from "drizzle-orm";
 
+import { isCrmReminderTaskType } from "@/lib/crm-reminder-task";
 import {
   buildTaskScheduleWindow,
   resolveAutoTaskStatus,
@@ -93,7 +94,13 @@ export function collectTaskBusyRanges(userId: string, fromYmd: string, toYmd: st
     .all();
 
   return rows
-    .filter((row) => row.startsAt && row.endsAt && taskAssigneeIds(row).includes(userId))
+    .filter(
+      (row) =>
+        row.startsAt &&
+        row.endsAt &&
+        !isCrmReminderTaskType(row.taskType) &&
+        taskAssigneeIds(row).includes(userId),
+    )
     .map((row) => ({ startsAt: row.startsAt!, endsAt: row.endsAt! }));
 }
 
@@ -131,6 +138,7 @@ export function findScheduleConflicts(input: {
 
     for (const task of tasks) {
       if (!task.startsAt || !task.endsAt) continue;
+      if (isCrmReminderTaskType(task.taskType)) continue;
       if (!taskAssigneeIds(task).includes(userId)) continue;
       if (scheduleRangesOverlap(input.startsAt, input.endsAt, task.startsAt, task.endsAt)) {
         conflicts.push({

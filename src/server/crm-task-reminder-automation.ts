@@ -4,6 +4,7 @@ import { DEFAULT_TASK_REMINDER_OFFSET_MINUTES } from "@/data/crm-automation-defa
 import { N8N_EMAIL_SEGMENT } from "@/data/crm-automation-defaults";
 import { phoneToWahaChatId } from "@/lib/automationEndpoints";
 import { localWallClockIso } from "@/lib/booking-slots";
+import { isCrmReminderTask } from "@/lib/crm-reminder-task";
 import { subtractWallClockMinutes } from "@/lib/task-scheduling";
 import { resolveUserWorkEmail } from "@/lib/user-email";
 import {
@@ -340,6 +341,8 @@ export async function processTaskReminderAutomations(
 
   for (const row of taskRows) {
     const task = mapTaskRow(row);
+    // Soft nudges are in-app / web-push only — skip email/WhatsApp rules.
+    if (isCrmReminderTask(task)) continue;
     const startsAt = task.startsAt!.slice(0, 19);
     if (now >= startsAt) continue;
 

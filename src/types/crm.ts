@@ -76,7 +76,8 @@ export type FollowUpTaskType =
   | "on_call_gmeet_teams"
   | "offline_site_visit"
   | "offline_office"
-  | "internal_meeting";
+  | "internal_meeting"
+  | "reminder";
 
 export const FOLLOW_UP_TASK_TYPES: FollowUpTaskType[] = [
   "on_call_phone",
@@ -84,6 +85,7 @@ export const FOLLOW_UP_TASK_TYPES: FollowUpTaskType[] = [
   "offline_site_visit",
   "offline_office",
   "internal_meeting",
+  "reminder",
 ];
 
 export const FOLLOW_UP_TASK_TYPE_LABEL: Record<FollowUpTaskType, string> = {
@@ -92,6 +94,7 @@ export const FOLLOW_UP_TASK_TYPE_LABEL: Record<FollowUpTaskType, string> = {
   offline_site_visit: "Offline - Site Visit",
   offline_office: "Offline - Office",
   internal_meeting: "Internal meeting",
+  reminder: "Reminder",
 };
 
 export type FollowUpTaskSource = "manual" | "booking";

@@ -3,12 +3,14 @@ import type { AppNotification } from "@/types";
 import type { FollowUpTask } from "@/types";
 
 export const TASK_REMINDER_NOTIFICATION_TITLE = "Upcoming task reminder";
+export const TASK_NUDGE_NOTIFICATION_TITLE = "Task reminder";
 
 export function isTaskReminderNotification(
   notification: Pick<AppNotification, "title" | "href">,
 ): boolean {
   return (
     notification.title === TASK_REMINDER_NOTIFICATION_TITLE ||
+    notification.title === TASK_NUDGE_NOTIFICATION_TITLE ||
     Boolean(notification.href?.startsWith("/crm/tasks?taskId="))
   );
 }

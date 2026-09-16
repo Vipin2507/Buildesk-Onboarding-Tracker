@@ -3,6 +3,8 @@ import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { canViewCrmAccount } from "@/lib/crm-account-access";
+import { INTERNAL_CRM_TASK_COMPANY_ID } from "@/lib/crm-internal-task";
+import { isCrmReminderTaskType } from "@/lib/crm-reminder-task";
 import { roleHasPermission } from "@/lib/permissions";
 import {
   buildTaskScheduleWithExtra,
@@ -14,6 +16,7 @@ import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { logActivity } from "@/server/api/mappers";
+import { ensureInternalCrmCompanyRow } from "@/server/lib/ensure-internal-crm-company";
 import {
   findScheduleConflicts,
   mapTaskRow,
@@ -456,6 +459,7 @@ const taskInput = z.object({
       "offline_site_visit",
       "offline_office",
       "internal_meeting",
+      "reminder",
     ])
     .optional()
     .nullable(),
@@ -541,9 +545,10 @@ export const createFollowUpTask = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = requireUser();
     const isInternal = Boolean(data.isInternal);
-    const companyId = isInternal ? "__crm_internal__" : data.companyId;
+    const companyId = isInternal ? INTERNAL_CRM_TASK_COMPANY_ID : data.companyId;
     assertCanManageFollowUpTask(user, companyId, isInternal);
     const db = getDb();
+    if (isInternal) ensureInternalCrmCompanyRow();
     const id = data.id ?? newId();
     const now = nowIso();
     const completedAt = data.status === "completed" ? now : null;
@@ -570,7 +575,9 @@ export const createFollowUpTask = createServerFn({ method: "POST" })
       endsAt: schedule.endsAt,
       assigneeUserIds: resolveAssigneeIdsFromTaskInput(data),
       excludeBookingId: data.bookingAppointmentId ?? undefined,
-      skipConflictCheck: data.source === "booking" ? data.skipConflictCheck : false,
+      skipConflictCheck:
+        isCrmReminderTaskType(data.taskType) ||
+        (data.source === "booking" ? Boolean(data.skipConflictCheck) : false),
     });
 
     const assigneeUserIdsJson = serializeAssigneeIds(
@@ -749,7 +756,8 @@ export const updateFollowUpTask = createServerFn({ method: "POST" })
         assigneeUserIds: assigneeIdsForConflict,
         excludeTaskId: data.id,
         excludeBookingId: existing.bookingAppointmentId ?? undefined,
-        skipConflictCheck: patch.skipConflictCheck,
+        skipConflictCheck:
+          isCrmReminderTaskType(taskType) || Boolean(patch.skipConflictCheck),
       });
     }
 

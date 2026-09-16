@@ -8,6 +8,7 @@ import {
   isValidPortalSlug,
   normalizePortalSlug,
 } from "@/lib/design-ticket-portal";
+import { INTERNAL_CRM_TASK_COMPANY_ID } from "@/lib/crm-internal-task";
 import { formatPortalSlugInUseMessage, type PortalSlugOwner } from "@/lib/portal-slug-conflict";
 import {
   isSameCrmAccountIdentity,
@@ -254,6 +255,7 @@ export const ensureCompanyPortals = createServerFn({ method: "POST" }).handler(a
   const now = nowIso();
 
   for (const company of companies) {
+    if (company.id === INTERNAL_CRM_TASK_COMPANY_ID) continue;
     const current = byCompany.get(company.id);
     if (!current) {
       const slug = generatePortalSlug([...usedSlugs]);

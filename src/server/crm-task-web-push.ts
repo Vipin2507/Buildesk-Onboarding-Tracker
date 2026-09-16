@@ -1,6 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 
-import { isTaskInReminderWindow, TASK_REMINDER_NOTIFICATION_TITLE } from "@/lib/task-reminder-window";
+import { isTaskInReminderWindow, TASK_NUDGE_NOTIFICATION_TITLE, TASK_REMINDER_NOTIFICATION_TITLE } from "@/lib/task-reminder-window";
+import { isCrmReminderTask } from "@/lib/crm-reminder-task";
 import { localWallClockIso } from "@/lib/booking-slots";
 import {
   isInCrmQuietHours,
@@ -195,18 +196,23 @@ export async function processTaskWebPushReminders(
     const assigneeIds = taskAssigneeIds(row);
     if (assigneeIds.length === 0) continue;
 
+    const isNudge = isCrmReminderTask(task);
+    const when = formatTaskWhen(startsAt);
+    const title = isNudge ? TASK_NUDGE_NOTIFICATION_TITLE : TASK_REMINDER_NOTIFICATION_TITLE;
+    const body = isNudge
+      ? `${task.title} for ${accountName} — remind at ${when}`
+      : `${task.title} for ${accountName} starts at ${when} (in ${offsetMinutes} min)`;
+
     for (const assigneeId of assigneeIds) {
       if (reminderAlreadySent(db, task.id, assigneeId, startsAt)) continue;
 
       const assignee = db.select().from(t.users).where(eq(t.users.id, assigneeId)).get();
       if (!assignee || assignee.active === false) continue;
 
-      const when = formatTaskWhen(startsAt);
       const taskUrl = `/crm/tasks?taskId=${encodeURIComponent(task.id)}`;
-      const body = `${task.title} for ${accountName} starts at ${when} (in ${offsetMinutes} min)`;
 
       const delivered = await sendPushToUser(db, assigneeId, {
-        title: TASK_REMINDER_NOTIFICATION_TITLE,
+        title,
         body,
         url: taskUrl,
       });
