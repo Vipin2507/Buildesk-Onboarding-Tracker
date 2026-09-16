@@ -5,10 +5,10 @@ import { DatePickerField } from "@/components/date-picker-field";
 import {
   buildInstallmentSchedule,
   calcDealExGst,
-  calcDealFromPerUser,
+  calcDealInclGstFromPerUser,
   calcGstAmount,
   calcInstallmentAmount,
-  calcValuePerUser,
+  calcValuePerUserExGst,
   installmentBaseAmount,
   roundMoney,
   sumInstallments,
@@ -109,15 +109,15 @@ export function CrmAccountCommercialFields({
     const driver = driverRef.current;
     if (!driver) return;
 
-    if (driver === "dealSize" || driver === "usersPurchased") {
-      const nextPerUser = calcValuePerUser(dealSize, usersPurchased);
+    if (driver === "dealSize" || driver === "usersPurchased" || driver === "gstPercent") {
+      const nextPerUser = calcValuePerUserExGst(dealSize, gstPercent, usersPurchased);
       if (nextPerUser !== valuePerUser) {
         setCommercial({ valuePerUser: nextPerUser });
       }
     }
 
     if (driver === "valuePerUser") {
-      const nextDeal = calcDealFromPerUser(valuePerUser, usersPurchased);
+      const nextDeal = calcDealInclGstFromPerUser(valuePerUser, usersPurchased, gstPercent);
       if (nextDeal !== dealSize) {
         setCommercial({ dealSize: nextDeal });
       }
@@ -138,6 +138,7 @@ export function CrmAccountCommercialFields({
     driverRef.current = null;
   }, [
     dealSize,
+    gstPercent,
     usersPurchased,
     valuePerUser,
     pendingAmount,
@@ -197,7 +198,7 @@ export function CrmAccountCommercialFields({
           <FieldError message={errors.gstPercent?.message} />
         </div>
         <div>
-          <Label>Value per user incl. GST (₹)</Label>
+          <Label>Value per user excl. GST (₹)</Label>
           <input
             type="number"
             min={0}
@@ -210,7 +211,7 @@ export function CrmAccountCommercialFields({
           />
           <FieldError message={errors.valuePerUser?.message} />
           <p className="mt-1 text-[10px] text-muted-foreground">
-            Per-user amount is based on deal value incl. GST.
+            Based on taxable value (deal excl. GST) ÷ users purchased.
           </p>
         </div>
         <div>

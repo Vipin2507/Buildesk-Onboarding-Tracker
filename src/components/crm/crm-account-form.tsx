@@ -9,7 +9,7 @@ import { CrmAccountProductModulesPicker } from "@/components/crm/crm-account-pro
 import {
   buildInstallmentSchedule,
   calcInstallmentAmount,
-  calcValuePerUser,
+  calcValuePerUserExGst,
   installmentBaseAmount,
   roundMoney,
   validateInstallmentTotal,
@@ -159,7 +159,9 @@ export function crmAccountToFormValues(
     usersPurchased: users,
     dealSize: deal,
     gstPercent: account.gstPercent ?? 18,
-    valuePerUser: account.valuePerUser ?? calcValuePerUser(deal, users),
+    valuePerUser:
+      account.valuePerUser ??
+      calcValuePerUserExGst(deal, account.gstPercent ?? 18, users),
     pendingAmount: pending,
     installmentCount,
     installmentAmount:
@@ -180,10 +182,11 @@ export function normalizeCrmAccountForm(data: CrmAccountFormValues) {
   const dealSize = Number(data.dealSize) || 0;
   const usersPurchased = Number(data.usersPurchased) || 1;
   const pendingAmount = Number(data.pendingAmount) || 0;
+  const gstPercent = Math.max(0, Number(data.gstPercent) || 0);
   const valuePerUser =
     data.valuePerUser != null && !Number.isNaN(Number(data.valuePerUser))
       ? roundMoney(Number(data.valuePerUser))
-      : calcValuePerUser(dealSize, usersPurchased);
+      : calcValuePerUserExGst(dealSize, gstPercent, usersPurchased);
   const installmentCount = Math.max(0, Math.floor(Number(data.installmentCount) || 0));
   const installments = (data.installments ?? []).map((row) => ({
     amount: roundMoney(Number(row.amount) || 0),
@@ -213,7 +216,7 @@ export function normalizeCrmAccountForm(data: CrmAccountFormValues) {
     dealSize,
     valuePerUser,
     totalCost: dealSize,
-    gstPercent: Math.max(0, Number(data.gstPercent) || 0),
+    gstPercent,
     pendingAmount,
     paymentReceived: Math.max(0, roundMoney(dealSize - pendingAmount)),
     installmentCount: installmentCount || undefined,

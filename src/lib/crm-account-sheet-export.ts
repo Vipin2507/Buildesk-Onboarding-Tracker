@@ -92,7 +92,7 @@ export const CRM_ACCOUNT_EXPORT_COLUMNS: CrmAccountExportColumnDef[] = [
   { id: "paymentReceived", label: "Payment Received", group: "Commercial" },
   { id: "pendingAmount", label: "Pending Amount", group: "Commercial" },
   { id: "totalCost", label: "Total Cost", group: "Commercial" },
-  { id: "valuePerUser", label: "Value per user", group: "Commercial" },
+  { id: "valuePerUser", label: "Value per user excl. GST", group: "Commercial" },
   { id: "annualLicense", label: "Annual License", group: "Commercial" },
   { id: "installmentCount", label: "Installment count", group: "Commercial" },
   { id: "installments", label: "Installments", group: "Commercial" },

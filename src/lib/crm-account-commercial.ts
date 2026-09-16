@@ -27,6 +27,26 @@ export function calcGstAmount(dealInclGst: number, gstPercent: number): number {
   return roundMoney(dealInclGst - calcDealExGst(dealInclGst, gstPercent));
 }
 
+/** Value per user from GST-inclusive deal (excludes GST). */
+export function calcValuePerUserExGst(
+  dealInclGst: number,
+  gstPercent: number,
+  usersPurchased: number,
+): number {
+  return calcValuePerUser(calcDealExGst(dealInclGst, gstPercent), usersPurchased);
+}
+
+/** GST-inclusive deal from per-user price that excludes GST. */
+export function calcDealInclGstFromPerUser(
+  valuePerUserExGst: number,
+  usersPurchased: number,
+  gstPercent: number,
+): number {
+  const dealExGst = calcDealFromPerUser(valuePerUserExGst, usersPurchased);
+  const rate = Math.max(0, gstPercent) / 100;
+  return roundMoney(dealExGst * (1 + rate));
+}
+
 export function sumInstallments(installments: CrmAccountInstallment[]): number {
   return roundMoney(installments.reduce((sum, row) => sum + (Number(row.amount) || 0), 0));
 }
