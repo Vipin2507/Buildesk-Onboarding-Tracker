@@ -1431,9 +1431,25 @@ export const updateBookingAppointmentStatus = createServerFn({ method: "POST" })
     assertCanManageAppointment(user, row);
     const previousStatus = row.status as BookingAppointmentStatus;
     const now = nowIso();
+    const hostTimezone = resolveHostTimezone(row.hostUserId);
+    const wallNow = localWallClockIso(hostTimezone).slice(0, 19);
+
+    let nextEndsAt = row.endsAt.slice(0, 19);
+    if (data.status === "completed") {
+      if (row.status !== "confirmed" && row.status !== "postponed") {
+        throw new ApiError(400, "Only approved or postponed meetings can be completed");
+      }
+      // End early: free the remaining reserved window for new bookings.
+      const startsAt = row.startsAt.slice(0, 19);
+      if (wallNow > startsAt && wallNow < nextEndsAt) {
+        nextEndsAt = wallNow;
+      }
+    }
+
     db.update(t.bookingAppointments)
       .set({
         status: data.status,
+        endsAt: nextEndsAt,
         hostNote: data.hostNote?.trim() ?? row.hostNote,
         updatedAt: now,
       })
@@ -1457,6 +1473,17 @@ export const updateBookingAppointmentStatus = createServerFn({ method: "POST" })
     } else if (data.status === "cancelled" || data.status === "declined") {
       await syncGoogleCalendarForAppointment(updated, "delete", user);
       cancelLinkedTaskForBooking(data.id);
+    } else if (data.status === "completed") {
+      // Shorten (or clear) Google event so FreeBusy no longer blocks leftover time.
+      if (updated.googleEventId) {
+        await syncGoogleCalendarForAppointment(updated, "upsert", user);
+      }
+      const fresh = db
+        .select()
+        .from(t.bookingAppointments)
+        .where(eq(t.bookingAppointments.id, data.id))
+        .get()!;
+      syncTaskFromBookingAppointment(fresh);
     }
 
     const finalRow = db
@@ -1471,7 +1498,8 @@ export const updateBookingAppointmentStatus = createServerFn({ method: "POST" })
       (data.status === "confirmed" ||
         data.status === "cancelled" ||
         data.status === "postponed" ||
-        data.status === "declined")
+        data.status === "declined" ||
+        data.status === "completed")
     ) {
       const eventRow = db
         .select({ title: t.bookingEventTypes.title })

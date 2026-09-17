@@ -101,6 +101,7 @@ type BookingState = {
   declineAppointment: (id: string, hostNote?: string) => Promise<BookingAppointment>;
   cancelAppointment: (id: string, hostNote?: string) => Promise<BookingAppointment>;
   postponeAppointment: (id: string, hostNote?: string) => Promise<BookingAppointment>;
+  completeAppointment: (id: string, hostNote?: string) => Promise<BookingAppointment>;
   rescheduleAppointment: (id: string, startsAt: string) => Promise<BookingAppointment>;
   retryGoogleCalendarSync: (id: string) => Promise<BookingAppointment>;
   listSlotsForEvent: (
@@ -280,6 +281,15 @@ export const useBookingStore = createStore<BookingState>((set, get) => ({
   postponeAppointment: async (id, hostNote) => {
     const updated = await updateBookingAppointmentStatus({
       data: { id, status: "postponed", hostNote },
+    });
+    get().mergeAppointment(updated);
+    void refreshCrmAutomationLogsFromServer();
+    return updated;
+  },
+
+  completeAppointment: async (id, hostNote) => {
+    const updated = await updateBookingAppointmentStatus({
+      data: { id, status: "completed", hostNote },
     });
     get().mergeAppointment(updated);
     void refreshCrmAutomationLogsFromServer();

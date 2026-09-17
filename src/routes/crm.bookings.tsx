@@ -4,6 +4,7 @@ import {
   Calendar,
   CalendarOff,
   Check,
+  CheckCircle2,
   Clock,
   Inbox,
   Mail,
@@ -279,6 +280,7 @@ function CrmBookingsPage() {
   const declineAppointment = useBookingStore((s) => s.declineAppointment);
   const cancelAppointment = useBookingStore((s) => s.cancelAppointment);
   const postponeAppointment = useBookingStore((s) => s.postponeAppointment);
+  const completeAppointment = useBookingStore((s) => s.completeAppointment);
   const rescheduleAppointment = useBookingStore((s) => s.rescheduleAppointment);
   const retryGoogleCalendarSync = useBookingStore((s) => s.retryGoogleCalendarSync);
   const listSlotsForEvent = useBookingStore((s) => s.listSlotsForEvent);
@@ -610,7 +612,7 @@ function CrmBookingsPage() {
     }
     if (
       (appt.status === "confirmed" || appt.status === "postponed") &&
-      appt.startsAt >= now
+      appt.startsAt > now
     ) {
       return (
         <div className="flex flex-wrap items-center gap-1">
@@ -653,6 +655,31 @@ function CrmBookingsPage() {
             }}
           >
             Cancel
+          </Button>
+        </div>
+      );
+    }
+    if (
+      (appt.status === "confirmed" || appt.status === "postponed") &&
+      appt.startsAt <= now
+    ) {
+      return (
+        <div className="flex flex-wrap items-center gap-1">
+          {meetBtn}
+          <Button
+            size="sm"
+            className="h-7 gap-1 px-2 text-[10px]"
+            onClick={(e) => {
+              e.stopPropagation();
+              void completeAppointment(appt.id)
+                .then(() =>
+                  toast.success("Meeting ended — remaining time is free for another meeting"),
+                )
+                .catch((err) => toast.error(err instanceof Error ? err.message : "Failed"));
+            }}
+          >
+            <CheckCircle2 className="h-3 w-3" />
+            End meeting
           </Button>
         </div>
       );
@@ -1056,6 +1083,17 @@ function CrmBookingsPage() {
                               toast.error(err instanceof Error ? err.message : "Failed"),
                             )
                         }
+                        onComplete={() =>
+                          void completeAppointment(appt.id)
+                            .then(() =>
+                              toast.success(
+                                "Meeting ended — remaining time is free for another meeting",
+                              ),
+                            )
+                            .catch((err) =>
+                              toast.error(err instanceof Error ? err.message : "Failed"),
+                            )
+                        }
                         onRetrySync={() =>
                           void retryGoogleCalendarSync(appt.id)
                             .then((updated) => {
@@ -1210,6 +1248,7 @@ function BookingDetailPanel({
   onDecline,
   onPostpone,
   onCancel,
+  onComplete,
   onRetrySync,
   rescheduleDate,
   rescheduleSlots,
@@ -1229,6 +1268,7 @@ function BookingDetailPanel({
   onDecline: () => void;
   onPostpone: () => void;
   onCancel: () => void;
+  onComplete: () => void;
   onRetrySync: () => void;
   rescheduleDate: string;
   rescheduleSlots: { startsAt: string; endsAt: string }[];
@@ -1236,7 +1276,9 @@ function BookingDetailPanel({
   onRescheduleSlot: (startsAt: string) => void;
 }) {
   const canReschedule =
-    (appt.status === "confirmed" || appt.status === "postponed") && appt.startsAt >= now;
+    (appt.status === "confirmed" || appt.status === "postponed") && appt.startsAt > now;
+  const canEndMeeting =
+    (appt.status === "confirmed" || appt.status === "postponed") && appt.startsAt <= now;
 
   return (
     <div className="card-soft overflow-hidden">
@@ -1289,6 +1331,15 @@ function BookingDetailPanel({
                 Cancel
               </Button>
             </>
+          ) : canEndMeeting ? (
+            <Button
+              size="sm"
+              className="h-7 gap-1 px-2.5 text-[10px]"
+              onClick={onComplete}
+            >
+              <CheckCircle2 className="h-3 w-3" />
+              End meeting
+            </Button>
           ) : null}
         </div>
       </div>
