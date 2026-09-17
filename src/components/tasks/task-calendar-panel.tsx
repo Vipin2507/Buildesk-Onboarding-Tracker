@@ -16,7 +16,7 @@ import { formatTaskPreviewTitle } from "@/lib/task-display";
 import { formatTimeRange12h, formatTaskDurationDisplay, resolveTaskAssigneeIds } from "@/lib/task-scheduling";
 import { taskStatusTone } from "@/hooks/use-task-time-status";
 import { isInternalCrmTask, resolveCrmTaskAccountLabel } from "@/lib/crm-internal-task";
-import { cn, formatDate } from "@/lib/utils";
+import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import { resolveAssigneeLabel } from "@/lib/managers";
 import { TaskRowRemark } from "@/components/tasks/task-detail-panel";
 import type { User } from "@/types";
@@ -61,8 +61,19 @@ function taskDate(task: FollowUpTask): string | undefined {
   return task.startsAt?.slice(0, 10) ?? task.dueDate;
 }
 
+/** Scheduled tasks sort by schedule; unscheduled (no date/duration) by createdAt. */
 function taskSortKey(task: FollowUpTask): string {
-  return task.startsAt ?? `${task.dueDate ?? "9999"}T23:59:59`;
+  if (task.startsAt) return `1:${task.startsAt}`;
+  if (task.dueDate) {
+    const time = task.startTime?.trim() || "00:00";
+    return `1:${task.dueDate}T${time.length === 5 ? `${time}:00` : time}`;
+  }
+  return `0:${task.createdAt ?? ""}`;
+}
+
+function compareTasksBySchedule(a: FollowUpTask, b: FollowUpTask, descending = false): number {
+  const cmp = taskSortKey(a).localeCompare(taskSortKey(b));
+  return descending ? -cmp : cmp;
 }
 
 function statusTone(status: FollowUpTask["status"]) {
@@ -108,7 +119,7 @@ export function TaskCalendarPanel({
 
   const dayTasks = filtered
     .filter((t) => taskDate(t) === cursorDate)
-    .sort((a, b) => taskSortKey(a).localeCompare(taskSortKey(b)));
+    .sort((a, b) => compareTasksBySchedule(a, b));
 
   const weekTasksByDay = useMemo(() => {
     const map = new Map<string, FollowUpTask[]>();
@@ -117,7 +128,7 @@ export function TaskCalendarPanel({
       const d = taskDate(task);
       if (d && map.has(d)) map.get(d)!.push(task);
     }
-    for (const [, list] of map) list.sort((a, b) => taskSortKey(a).localeCompare(taskSortKey(b)));
+    for (const [, list] of map) list.sort((a, b) => compareTasksBySchedule(a, b));
     return map;
   }, [filtered, weekDays]);
 
@@ -232,7 +243,7 @@ export function TaskCalendarPanel({
 
       {view === "list" ? (
         <TaskListTable
-          tasks={[...filtered].sort((a, b) => taskSortKey(b).localeCompare(taskSortKey(a)))}
+          tasks={[...filtered].sort((a, b) => compareTasksBySchedule(a, b, true))}
           users={users}
           companies={companies}
           onTaskClick={onTaskClick}
@@ -276,7 +287,7 @@ export function TaskCalendarPanel({
       {view === "month" ? (
         <div className="space-y-2">
           {[...monthTasks]
-            .sort((a, b) => taskSortKey(a).localeCompare(taskSortKey(b)))
+            .sort((a, b) => compareTasksBySchedule(a, b))
             .map((task) => (
               <TaskScheduleRow
                 key={task.id}
@@ -369,6 +380,15 @@ function TaskListTable({
                 {formatTimeRange12h(task.startTime, task.endTime)}
               </div>
             </div>
+          ),
+        },
+        {
+          key: "createdAt",
+          header: "Created",
+          render: (task) => (
+            <span className="text-xs tabular-nums text-muted-foreground">
+              {task.createdAt ? formatDateTime(task.createdAt) || "—" : "—"}
+            </span>
           ),
         },
         {
