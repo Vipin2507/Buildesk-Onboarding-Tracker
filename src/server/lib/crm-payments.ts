@@ -21,6 +21,7 @@ import {
   decodePaymentTransactionImagePayload,
   savePaymentRemarkImage,
   savePaymentTransactionImage,
+  deletePaymentTransactionImageFromDisk,
 } from "@/server/lib/crm-payment-remark-storage";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
@@ -139,6 +140,111 @@ export function insertPaymentTransaction(
     .get();
   if (!row) throw new Error("Failed to save payment transaction");
   return mapTransactionRow(row);
+}
+
+export function updatePaymentTransaction(
+  db: ReturnType<typeof getDb>,
+  input: {
+    id: string;
+    accountId: string;
+    amount: number;
+    paidDate: string;
+    note?: string | null;
+    image?: {
+      fileName: string;
+      mimeType: string;
+      dataBase64: string;
+    };
+    /** Clear existing receipt image when no new image is provided. */
+    clearImage?: boolean;
+  },
+): PaymentTransactionRow {
+  const existing = db
+    .select()
+    .from(t.paymentTransactions)
+    .where(eq(t.paymentTransactions.id, input.id))
+    .get();
+  if (!existing || existing.accountId !== input.accountId) {
+    throw new Error("Payment not found");
+  }
+
+  const amount = roundMoney(input.amount);
+  if (amount <= 0) throw new Error("Payment amount must be greater than zero");
+
+  let imageFileName = existing.imageFileName;
+  let imageMimeType = existing.imageMimeType;
+  let imageSizeBytes = existing.imageSizeBytes;
+  let imageStorageKey = existing.imageStorageKey;
+
+  if (input.image) {
+    if (existing.imageStorageKey) {
+      deletePaymentTransactionImageFromDisk(existing.imageStorageKey);
+    }
+    const buffer = decodePaymentTransactionImagePayload(input.image.dataBase64);
+    const saved = savePaymentTransactionImage({
+      accountId: input.accountId,
+      transactionId: input.id,
+      fileName: input.image.fileName,
+      mimeType: input.image.mimeType,
+      buffer,
+    });
+    imageFileName = input.image.fileName.trim();
+    imageMimeType = input.image.mimeType.trim();
+    imageSizeBytes = buffer.length;
+    imageStorageKey = saved.storageKey;
+  } else if (input.clearImage) {
+    if (existing.imageStorageKey) {
+      deletePaymentTransactionImageFromDisk(existing.imageStorageKey);
+    }
+    imageFileName = null;
+    imageMimeType = null;
+    imageSizeBytes = null;
+    imageStorageKey = null;
+  }
+
+  db.update(t.paymentTransactions)
+    .set({
+      amount,
+      paidDate: input.paidDate.slice(0, 10),
+      note: input.note?.trim() || null,
+      imageFileName,
+      imageMimeType,
+      imageSizeBytes,
+      imageStorageKey,
+      updatedAt: nowIso(),
+    })
+    .where(eq(t.paymentTransactions.id, input.id))
+    .run();
+
+  syncAccountPaymentTotals(db, input.accountId);
+
+  const row = db
+    .select()
+    .from(t.paymentTransactions)
+    .where(eq(t.paymentTransactions.id, input.id))
+    .get();
+  if (!row) throw new Error("Failed to update payment transaction");
+  return mapTransactionRow(row);
+}
+
+export function deletePaymentTransaction(
+  db: ReturnType<typeof getDb>,
+  id: string,
+  accountId: string,
+): void {
+  const existing = db
+    .select()
+    .from(t.paymentTransactions)
+    .where(eq(t.paymentTransactions.id, id))
+    .get();
+  if (!existing || existing.accountId !== accountId) {
+    throw new Error("Payment not found");
+  }
+  if (existing.imageStorageKey) {
+    deletePaymentTransactionImageFromDisk(existing.imageStorageKey);
+  }
+  db.delete(t.paymentTransactions).where(eq(t.paymentTransactions.id, id)).run();
+  syncAccountPaymentTotals(db, accountId);
 }
 
 function publicTransactionImageUrl(storageKey: string) {

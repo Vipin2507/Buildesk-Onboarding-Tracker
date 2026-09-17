@@ -174,6 +174,8 @@ export {
   createCrmPaymentRemark,
   deleteCrmPaymentRemark,
   recordCrmPaymentTransaction,
+  updateCrmPaymentTransaction,
+  deleteCrmPaymentTransaction,
   remindCrmPaymentAccount,
   remindCrmPaymentExecutive,
   remindCrmPaymentsBulk,

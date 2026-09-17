@@ -9,6 +9,8 @@ import {
   listCrmPaymentTransactions,
   listCrmPayments,
   recordCrmPaymentTransaction,
+  updateCrmPaymentTransaction,
+  deleteCrmPaymentTransaction,
   remindCrmPaymentAccount,
   remindCrmPaymentExecutive,
   remindCrmPaymentsBulk,
@@ -131,6 +133,21 @@ export function useDeleteCrmPaymentRemark(accountId: string) {
   });
 }
 
+function invalidatePaymentAccount(
+  queryClient: ReturnType<typeof useQueryClient>,
+  filters: ReturnType<typeof toFilters>,
+  accountId: string,
+) {
+  void queryClient.invalidateQueries({ queryKey: crmPaymentsKeys.list(filters) });
+  void queryClient.invalidateQueries({ queryKey: crmPaymentsKeys.summary(filters) });
+  void queryClient.invalidateQueries({
+    queryKey: crmPaymentsKeys.transactions(accountId),
+  });
+  void queryClient.invalidateQueries({
+    queryKey: crmPaymentsKeys.installments(accountId),
+  });
+}
+
 export function useRecordCrmPayment(search: CrmPaymentsSearch) {
   const queryClient = useQueryClient();
   const filters = toFilters(search);
@@ -164,14 +181,62 @@ export function useRecordCrmPayment(search: CrmPaymentsSearch) {
       });
     },
     onSuccess: (_data, variables) => {
-      void queryClient.invalidateQueries({ queryKey: crmPaymentsKeys.list(filters) });
-      void queryClient.invalidateQueries({ queryKey: crmPaymentsKeys.summary(filters) });
-      void queryClient.invalidateQueries({
-        queryKey: crmPaymentsKeys.transactions(variables.accountId),
+      invalidatePaymentAccount(queryClient, filters, variables.accountId);
+    },
+  });
+}
+
+export function useUpdateCrmPayment(search: CrmPaymentsSearch) {
+  const queryClient = useQueryClient();
+  const filters = toFilters(search);
+
+  return useMutation({
+    mutationFn: async (input: {
+      id: string;
+      accountId: string;
+      amount: number;
+      paidDate: string;
+      note?: string | null;
+      image?: File;
+      clearImage?: boolean;
+    }) => {
+      let image:
+        | { fileName: string; mimeType: string; dataBase64: string }
+        | undefined;
+      if (input.image) {
+        image = {
+          fileName: input.image.name,
+          mimeType: input.image.type || "image/jpeg",
+          dataBase64: await fileToBase64(input.image),
+        };
+      }
+      return updateCrmPaymentTransaction({
+        data: {
+          id: input.id,
+          accountId: input.accountId,
+          amount: input.amount,
+          paidDate: input.paidDate,
+          note: input.note,
+          image,
+          clearImage: input.clearImage,
+        },
       });
-      void queryClient.invalidateQueries({
-        queryKey: crmPaymentsKeys.installments(variables.accountId),
-      });
+    },
+    onSuccess: (_data, variables) => {
+      invalidatePaymentAccount(queryClient, filters, variables.accountId);
+    },
+  });
+}
+
+export function useDeleteCrmPayment(search: CrmPaymentsSearch) {
+  const queryClient = useQueryClient();
+  const filters = toFilters(search);
+
+  return useMutation({
+    mutationFn: (input: { id: string; accountId: string }) =>
+      deleteCrmPaymentTransaction({ data: input }),
+    onSuccess: (_data, variables) => {
+      invalidatePaymentAccount(queryClient, filters, variables.accountId);
     },
   });
 }

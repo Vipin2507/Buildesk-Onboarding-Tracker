@@ -1,17 +1,23 @@
-import { Bell, Mail, Plus } from "lucide-react";
+import { Bell, Mail, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { CrmPaymentRemarksPanel } from "@/components/crm/crm-payment-remarks-panel";
-import { CrmRecordPaymentDialog } from "@/components/crm/crm-record-payment-dialog";
+import {
+  CrmRecordPaymentDialog,
+  type PaymentDialogInitial,
+} from "@/components/crm/crm-record-payment-dialog";
+import { ConfirmDeleteDialog } from "@/components/entity-form-modal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   useCrmPaymentInstallments,
   useCrmPaymentTransactions,
+  useDeleteCrmPayment,
   useRecordCrmPayment,
   useRemindCrmPayment,
   useRemindCrmPaymentExecutive,
+  useUpdateCrmPayment,
 } from "@/hooks/use-crm-payments";
 import { refreshAutomationLogsInStore } from "@/lib/automation-log-sync";
 import type { CrmPaymentsSearch } from "@/lib/crm-payments-search";
@@ -52,12 +58,40 @@ type Props = {
 };
 
 export function CrmPaymentsExpandedRow({ row, search }: Props) {
-  const [recordOpen, setRecordOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editInitial, setEditInitial] = useState<PaymentDialogInitial | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; amount: number } | null>(
+    null,
+  );
   const installmentsQuery = useCrmPaymentInstallments(row.id, true);
   const transactionsQuery = useCrmPaymentTransactions(row.id, true);
   const recordPayment = useRecordCrmPayment(search);
+  const updatePayment = useUpdateCrmPayment(search);
+  const deletePayment = useDeleteCrmPayment(search);
   const remindClient = useRemindCrmPayment();
   const remindExecutive = useRemindCrmPaymentExecutive();
+
+  function openCreate() {
+    setEditInitial(null);
+    setDialogOpen(true);
+  }
+
+  function openEdit(txn: {
+    id: string;
+    amount: number;
+    paidDate: string;
+    note?: string;
+    image?: PaymentDialogInitial["image"];
+  }) {
+    setEditInitial({
+      id: txn.id,
+      amount: txn.amount,
+      paidDate: txn.paidDate,
+      note: txn.note,
+      image: txn.image,
+    });
+    setDialogOpen(true);
+  }
 
   async function handleRemindClient() {
     try {
@@ -80,6 +114,17 @@ export function CrmPaymentsExpandedRow({ row, search }: Props) {
       void refreshAutomationLogsInStore("crm-automation");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to send executive reminder");
+    }
+  }
+
+  async function handleDeleteConfirm() {
+    if (!deleteTarget) return;
+    try {
+      await deletePayment.mutateAsync({ id: deleteTarget.id, accountId: row.id });
+      toast.success("Payment deleted");
+      setDeleteTarget(null);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to delete payment");
     }
   }
 
@@ -175,7 +220,7 @@ export function CrmPaymentsExpandedRow({ row, search }: Props) {
             size="sm"
             variant="outline"
             className="h-7 gap-1 px-2 text-[11px]"
-            onClick={() => setRecordOpen(true)}
+            onClick={openCreate}
           >
             <Plus className="h-3 w-3" />
             Record payment
@@ -222,6 +267,28 @@ export function CrmPaymentsExpandedRow({ row, search }: Props) {
                     </a>
                   ) : null}
                 </div>
+                <div className="flex shrink-0 gap-0.5">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 p-0 text-muted-foreground"
+                    aria-label="Edit payment"
+                    onClick={() => openEdit(txn)}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                    aria-label="Delete payment"
+                    onClick={() => setDeleteTarget({ id: txn.id, amount: txn.amount })}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </li>
             ))}
           </ul>
@@ -231,12 +298,43 @@ export function CrmPaymentsExpandedRow({ row, search }: Props) {
       <CrmPaymentRemarksPanel accountId={row.id} />
 
       <CrmRecordPaymentDialog
-        open={recordOpen}
-        onOpenChange={setRecordOpen}
-        accountName={row.accountName}
-        onSubmit={async (input) => {
-          await recordPayment.mutateAsync({ accountId: row.id, ...input });
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) setEditInitial(null);
         }}
+        accountName={row.accountName}
+        initial={editInitial}
+        onSubmit={async (input) => {
+          if (editInitial) {
+            await updatePayment.mutateAsync({
+              id: editInitial.id,
+              accountId: row.id,
+              amount: input.amount,
+              paidDate: input.paidDate,
+              note: input.note,
+              image: input.image,
+              clearImage: input.clearImage,
+            });
+          } else {
+            await recordPayment.mutateAsync({ accountId: row.id, ...input });
+          }
+        }}
+      />
+
+      <ConfirmDeleteDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title="Delete payment?"
+        description={
+          deleteTarget
+            ? `Remove the ${formatInr(deleteTarget.amount)} payment from this account? Totals will be recalculated.`
+            : undefined
+        }
+        onConfirm={() => void handleDeleteConfirm()}
+        confirmLabel={deletePayment.isPending ? "Deleting…" : "Delete"}
       />
     </div>
   );

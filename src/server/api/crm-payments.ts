@@ -21,6 +21,8 @@ import {
   getAccountPaymentReceived,
   insertPaymentRemark,
   insertPaymentTransaction,
+  updatePaymentTransaction,
+  deletePaymentTransaction,
   listAccountInstallmentsWithStatus,
   listAccountPaymentRemarks,
   listAccountPaymentTransactions,
@@ -251,6 +253,82 @@ export const recordCrmPaymentTransaction = createServerFn({ method: "POST" })
     const received = getAccountPaymentReceived(db, data.accountId);
     const snapshot = buildAccountPaymentSnapshot(account, received);
     return { transaction: txn, snapshot };
+  });
+
+export const updateCrmPaymentTransaction = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string().min(1),
+        accountId: z.string().min(1),
+        amount: z.coerce.number().positive(),
+        paidDate: z.string().min(1),
+        note: z.string().optional().nullable(),
+        image: z
+          .object({
+            fileName: z.string().min(1).max(255),
+            mimeType: z.string().min(1).max(200),
+            dataBase64: z.string().min(1),
+          })
+          .optional(),
+        clearImage: z.boolean().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    assertCanViewAccountId(user, data.accountId);
+    const db = getDb();
+    try {
+      const txn = updatePaymentTransaction(db, {
+        id: data.id,
+        accountId: data.accountId,
+        amount: data.amount,
+        paidDate: data.paidDate,
+        note: data.note,
+        image: data.image,
+        clearImage: data.clearImage,
+      });
+      const account = db
+        .select()
+        .from(t.crmAccounts)
+        .where(eq(t.crmAccounts.id, data.accountId))
+        .get()!;
+      const received = getAccountPaymentReceived(db, data.accountId);
+      const snapshot = buildAccountPaymentSnapshot(account, received);
+      return { transaction: txn, snapshot };
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to update payment";
+      if (message === "Payment not found") throw new ApiError(404, message);
+      throw new ApiError(400, message);
+    }
+  });
+
+export const deleteCrmPaymentTransaction = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ id: z.string().min(1), accountId: z.string().min(1) }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    assertCanViewAccountId(user, data.accountId);
+    const db = getDb();
+    try {
+      deletePaymentTransaction(db, data.id, data.accountId);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to delete payment";
+      if (message === "Payment not found") throw new ApiError(404, message);
+      throw new ApiError(400, message);
+    }
+    const account = db
+      .select()
+      .from(t.crmAccounts)
+      .where(eq(t.crmAccounts.id, data.accountId))
+      .get();
+    const received = account ? getAccountPaymentReceived(db, data.accountId) : 0;
+    const snapshot = account
+      ? buildAccountPaymentSnapshot(account, received)
+      : null;
+    return { ok: true as const, snapshot };
   });
 
 async function sendPaymentReminderForAccount(accountId: string, userId: string) {
