@@ -90,7 +90,7 @@ export function CompanyHistoryTab({ companyId }: { companyId: string }) {
   const [query, setQuery] = useState("");
 
   const openTasks = tasks.filter(
-    (t) => t.companyId === companyId && ["open", "in_progress", "blocked"].includes(t.status),
+    (t) => t.companyId === companyId && ["open", "in_progress", "blocked", "overdue"].includes(t.status),
   ).length;
   const visitCount = visits.filter((v) => v.companyId === companyId).length;
   const completedVisits = visits.filter(

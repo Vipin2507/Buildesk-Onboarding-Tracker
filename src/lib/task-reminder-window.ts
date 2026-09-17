@@ -15,7 +15,12 @@ export function isTaskReminderNotification(
   );
 }
 
-const ACTIVE_STATUSES = new Set<FollowUpTask["status"]>(["open", "in_progress", "blocked"]);
+const ACTIVE_STATUSES = new Set<FollowUpTask["status"]>([
+  "open",
+  "in_progress",
+  "blocked",
+  "overdue",
+]);
 
 /** True when wall-clock now is inside the pre-start reminder window. */
 export function isTaskInReminderWindow(

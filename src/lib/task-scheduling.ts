@@ -319,8 +319,10 @@ export function isTaskInActiveWindow(
 }
 
 /**
- * Auto status from schedule: open → in_progress when the slot starts.
- * in_progress stays until manually completed (even after the slot ends).
+ * Auto status from schedule:
+ * - open → in_progress when the slot starts
+ * - open / in_progress → overdue after the slot ends (until manually completed)
+ * - overdue can return to in_progress if extra time extends the window
  */
 export function resolveAutoTaskStatus(
   task: {
@@ -345,9 +347,11 @@ export function resolveAutoTaskStatus(
   const now = nowWallClock.slice(0, 19);
   const inWindow = now >= bounds.startsAt && now < bounds.endsAt;
   const beforeWindow = now < bounds.startsAt;
+  const afterWindow = now >= bounds.endsAt;
 
-  if (inWindow && task.status === "open") return "in_progress";
-  if (beforeWindow && task.status === "in_progress") return "open";
+  if (afterWindow) return "overdue";
+  if (inWindow && (task.status === "open" || task.status === "overdue")) return "in_progress";
+  if (beforeWindow && (task.status === "in_progress" || task.status === "overdue")) return "open";
   return task.status;
 }
 

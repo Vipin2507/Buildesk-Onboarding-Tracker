@@ -64,13 +64,13 @@ export function CompanyTasksPanel({ companyId }: { companyId: string }) {
   });
 
   const openCount = companyTasks.filter((t) =>
-    ["open", "in_progress", "blocked"].includes(t.status),
+    ["open", "in_progress", "blocked", "overdue"].includes(t.status),
   ).length;
   const overdueCount = companyTasks.filter(
     (t) =>
-      ["open", "in_progress", "blocked"].includes(t.status) &&
-      t.dueDate &&
-      t.dueDate < new Date().toISOString().slice(0, 10),
+      t.status === "overdue" ||
+      (["open", "in_progress", "blocked", "overdue"].includes(t.status) &&
+        Boolean(t.dueDate && t.dueDate < new Date().toISOString().slice(0, 10))),
   ).length;
 
   function openCreate() {

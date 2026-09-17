@@ -22,8 +22,10 @@ function ErpTasksPage() {
       search: (prev) => ({
         ...prev,
         tab: next === "all" ? undefined : next,
+        taskId: undefined,
       }),
       replace: true,
+      resetScroll: false,
     });
   }
 
@@ -34,6 +36,7 @@ function ErpTasksPage() {
         taskId: taskId || undefined,
       }),
       replace: true,
+      resetScroll: false,
     });
   }
 

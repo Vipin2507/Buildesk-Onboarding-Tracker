@@ -233,6 +233,7 @@ export function TaskCalendarPanel({
               { value: "all", label: "All statuses" },
               { value: "open", label: "Open" },
               { value: "in_progress", label: "In progress" },
+              { value: "overdue", label: "Overdue" },
               { value: "completed", label: "Completed" },
               { value: "cancelled", label: "Cancelled" },
             ],
@@ -419,7 +420,9 @@ function TaskListTable({
         {
           key: "status",
           header: "Status",
-          render: (task) => <Pill tone={statusTone(task.status)}>{task.status}</Pill>,
+          render: (task) => (
+            <Pill tone={statusTone(task.status)}>{task.status.replace(/_/g, " ")}</Pill>
+          ),
         },
         {
           key: "source",

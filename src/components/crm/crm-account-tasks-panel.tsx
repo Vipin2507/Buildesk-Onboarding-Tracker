@@ -39,7 +39,7 @@ import {
   type FollowUpTaskType,
 } from "@/types";
 
-const OPEN_STATUSES: FollowUpTaskStatus[] = ["open", "in_progress", "blocked"];
+const OPEN_STATUSES: FollowUpTaskStatus[] = ["open", "in_progress", "blocked", "overdue"];
 
 function statusTone(status: FollowUpTaskStatus): "success" | "warning" | "danger" | "muted" | "info" {
   return taskStatusTone(status);
@@ -243,6 +243,7 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
                 { value: "all", label: "All statuses" },
                 { value: "open", label: "Open" },
                 { value: "in_progress", label: "In progress" },
+                { value: "overdue", label: "Overdue" },
                 { value: "completed", label: "Completed" },
                 { value: "cancelled", label: "Cancelled" },
               ],

@@ -136,7 +136,7 @@ export function useDashboardOverview() {
     }
 
     const openFollowUps = followUpTasks.filter((t) =>
-      ["open", "in_progress", "blocked"].includes(t.status),
+      ["open", "in_progress", "blocked", "overdue"].includes(t.status),
     );
 
     const renewalRows = companies

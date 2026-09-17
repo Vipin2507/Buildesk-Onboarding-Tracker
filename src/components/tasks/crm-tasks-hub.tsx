@@ -65,7 +65,7 @@ import type { CrmTasksTabId } from "@/lib/crm-route-search";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 
-const OPEN_STATUSES: FollowUpTaskStatus[] = ["open", "in_progress", "blocked"];
+const OPEN_STATUSES: FollowUpTaskStatus[] = ["open", "in_progress", "blocked", "overdue"];
 
 const TASK_FILTER_CHIPS = [
   { id: "all", label: "All" },
@@ -120,7 +120,10 @@ function matchesTaskListTab(
     return OPEN_STATUSES.includes(task.status) && task.dueDate === today;
   }
   if (tabId === "overdue") {
-    return OPEN_STATUSES.includes(task.status) && Boolean(task.dueDate && task.dueDate < today);
+    return (
+      task.status === "overdue" ||
+      (OPEN_STATUSES.includes(task.status) && Boolean(task.dueDate && task.dueDate < today))
+    );
   }
   return true;
 }
@@ -708,6 +711,7 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
                       { value: "open", label: "Open" },
                       { value: "in_progress", label: "In progress" },
                       { value: "blocked", label: "Blocked" },
+                      { value: "overdue", label: "Overdue" },
                       { value: "completed", label: "Completed" },
                       { value: "cancelled", label: "Cancelled" },
                     ]}

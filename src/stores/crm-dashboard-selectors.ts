@@ -121,7 +121,12 @@ export type CrmDashboardQueryItem = {
   category?: string;
 };
 
-const OPEN_TASK_STATUSES = new Set<FollowUpTask["status"]>(["open", "in_progress", "blocked"]);
+const OPEN_TASK_STATUSES = new Set<FollowUpTask["status"]>([
+  "open",
+  "in_progress",
+  "blocked",
+  "overdue",
+]);
 
 function isOpenCrmTask(task: FollowUpTask) {
   return task.productScope !== "erp" && OPEN_TASK_STATUSES.has(task.status);

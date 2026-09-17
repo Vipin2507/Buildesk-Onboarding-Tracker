@@ -52,7 +52,7 @@ const taskInput = z.object({
   sourceVisitId: z.string().optional().nullable(),
   title: z.string().min(1),
   description: z.string().optional().nullable(),
-  status: z.enum(["open", "in_progress", "blocked", "completed", "cancelled"]).default("open"),
+  status: z.enum(["open", "in_progress", "blocked", "overdue", "completed", "cancelled"]).default("open"),
   priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
   progressPercent: z.number().int().min(0).max(100).default(0),
   dueDate: z.string().optional().nullable(),
@@ -319,7 +319,7 @@ export const updateErpFollowUpTask = createServerFn({ method: "POST" })
       schedule.endsAt &&
       !patch.skipConflictCheck &&
       assigneeIdsForConflict.length > 0 &&
-      ["open", "in_progress", "blocked"].includes(nextStatus)
+      ["open", "in_progress", "blocked", "overdue"].includes(nextStatus)
     ) {
       assertNoScheduleConflicts({
         userIds: assigneeIdsForConflict,

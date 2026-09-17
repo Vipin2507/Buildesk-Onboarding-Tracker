@@ -61,6 +61,7 @@ export function taskStatusTone(
 ): "success" | "warning" | "danger" | "muted" | "info" {
   if (status === "completed") return "success";
   if (status === "cancelled") return "danger";
+  if (status === "overdue") return "danger";
   if (status === "blocked") return "warning";
   if (status === "in_progress") return "info";
   return "muted";

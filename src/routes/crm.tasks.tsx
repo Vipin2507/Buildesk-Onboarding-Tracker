@@ -22,8 +22,10 @@ function CrmTasksPage() {
       search: (prev) => ({
         ...prev,
         tab: next === "all" ? undefined : next,
+        taskId: undefined,
       }),
       replace: true,
+      resetScroll: false,
     });
   }
 
@@ -34,6 +36,7 @@ function CrmTasksPage() {
         taskId: taskId || undefined,
       }),
       replace: true,
+      resetScroll: false,
     });
   }
 

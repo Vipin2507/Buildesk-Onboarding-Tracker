@@ -51,6 +51,7 @@ export type FollowUpTaskStatus =
   | "open"
   | "in_progress"
   | "blocked"
+  | "overdue"
   | "completed"
   | "cancelled";
 
@@ -60,6 +61,7 @@ export const FOLLOW_UP_TASK_STATUSES: FollowUpTaskStatus[] = [
   "open",
   "in_progress",
   "blocked",
+  "overdue",
   "completed",
   "cancelled",
 ];

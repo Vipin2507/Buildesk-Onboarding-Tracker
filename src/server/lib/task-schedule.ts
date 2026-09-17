@@ -17,7 +17,7 @@ import { newId, nowIso } from "@/types";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 
-const OCCUPIED_TASK_STATUSES = ["open", "in_progress", "blocked"];
+const OCCUPIED_TASK_STATUSES = ["open", "in_progress", "blocked", "overdue"];
 
 export function parseAssigneeIdsJson(json: string | null | undefined): string[] {
   if (!json) return [];
@@ -351,7 +351,7 @@ export function syncTaskFromBookingAppointment(
   return mapTaskRow(db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, id)).get()!);
 }
 
-/** Persist open ↔ in_progress transitions when scheduled start/end times elapse. */
+/** Persist open ↔ in_progress ↔ overdue transitions when scheduled times elapse. */
 export function syncFollowUpTaskStatusesByTime(
   db: ReturnType<typeof getDb>,
   timezone = DEFAULT_BOOKING_TIMEZONE,
@@ -360,7 +360,7 @@ export function syncFollowUpTaskStatusesByTime(
   const rows = db
     .select()
     .from(t.followUpTasks)
-    .where(inArray(t.followUpTasks.status, ["open", "in_progress"]))
+    .where(inArray(t.followUpTasks.status, ["open", "in_progress", "overdue"]))
     .all();
 
   const updated: FollowUpTask[] = [];

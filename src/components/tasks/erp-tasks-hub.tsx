@@ -45,7 +45,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import type { ErpTasksTabId } from "@/lib/erp-route-search";
 import { motion } from "framer-motion";
 
-const OPEN_STATUSES: FollowUpTaskStatus[] = ["open", "in_progress", "blocked"];
+const OPEN_STATUSES: FollowUpTaskStatus[] = ["open", "in_progress", "blocked", "overdue"];
 
 const TASK_TABS = [
   { id: "all", label: "All tasks", icon: LayoutList },
@@ -99,7 +99,9 @@ export function ErpTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
       (t) => OPEN_STATUSES.includes(t.status) && t.dueDate === today,
     ).length;
     const overdue = erpTasks.filter(
-      (t) => OPEN_STATUSES.includes(t.status) && t.dueDate && t.dueDate < today,
+      (t) =>
+        t.status === "overdue" ||
+        (OPEN_STATUSES.includes(t.status) && Boolean(t.dueDate && t.dueDate < today)),
     ).length;
     const myOpen = erpTasks.filter((t) => {
       if (!OPEN_STATUSES.includes(t.status) || !currentUser?.id) return false;
@@ -120,7 +122,9 @@ export function ErpTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
         return erpTasks.filter((t) => OPEN_STATUSES.includes(t.status) && t.dueDate === today);
       case "overdue":
         return erpTasks.filter(
-          (t) => OPEN_STATUSES.includes(t.status) && t.dueDate && t.dueDate < today,
+          (t) =>
+            t.status === "overdue" ||
+            (OPEN_STATUSES.includes(t.status) && Boolean(t.dueDate && t.dueDate < today)),
         );
       default:
         return erpTasks;
@@ -460,6 +464,7 @@ export function ErpTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
                   { value: "all", label: "All statuses" },
                   { value: "open", label: "Open" },
                   { value: "in_progress", label: "In progress" },
+                  { value: "overdue", label: "Overdue" },
                   { value: "completed", label: "Completed" },
                   { value: "cancelled", label: "Cancelled" },
                 ],

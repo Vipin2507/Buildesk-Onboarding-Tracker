@@ -88,7 +88,7 @@ import { nowIso } from "@/types/common";
 import type { TicketPriority, TicketStatus, TicketType } from "@/types/ticket";
 import type { FollowUpTaskStatus } from "@/types";
 
-const OPEN_TASK_STATUSES: FollowUpTaskStatus[] = ["open", "in_progress", "blocked"];
+const OPEN_TASK_STATUSES: FollowUpTaskStatus[] = ["open", "in_progress", "blocked", "overdue"];
 
 const TABS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },

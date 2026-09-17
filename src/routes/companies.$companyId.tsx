@@ -186,7 +186,7 @@ function CompanyDetailContent() {
   const managerName = resolveAssigneeName(company.onboardingManagerId, users, employees);
   const salesAgentName = resolveAssigneeName(company.salesAgentId, users, employees);
   const openTasks = companyTasks.filter((t) =>
-    ["open", "in_progress", "blocked"].includes(t.status),
+    ["open", "in_progress", "blocked", "overdue"].includes(t.status),
   ).length;
   const visitCount = companyVisits.length;
   const meetingCount = companyMeetings.length;

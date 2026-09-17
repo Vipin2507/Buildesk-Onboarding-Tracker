@@ -247,7 +247,7 @@ export function useDashboardKpis() {
     const openTickets = tickets.filter((t) => isTicketOpen(t)).length;
     const today = new Date().toISOString().slice(0, 10);
     const openFollowUps = followUpTasks.filter((t) =>
-      ["open", "in_progress", "blocked"].includes(t.status),
+      ["open", "in_progress", "blocked", "overdue"].includes(t.status),
     );
     const overdueFollowUps = openFollowUps.filter((t) => t.dueDate && t.dueDate < today).length;
     const tasksDueToday = openFollowUps.filter((t) => t.dueDate === today).length;

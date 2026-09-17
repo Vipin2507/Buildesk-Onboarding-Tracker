@@ -448,7 +448,7 @@ const taskInput = z.object({
   sourceVisitId: z.string().optional().nullable(),
   title: z.string().min(1),
   description: z.string().optional().nullable(),
-  status: z.enum(["open", "in_progress", "blocked", "completed", "cancelled"]).default("open"),
+  status: z.enum(["open", "in_progress", "blocked", "overdue", "completed", "cancelled"]).default("open"),
   priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
   progressPercent: z.number().int().min(0).max(100).default(0),
   dueDate: z.string().optional().nullable(),
@@ -748,7 +748,7 @@ export const updateFollowUpTask = createServerFn({ method: "POST" })
     if (
       schedule.startsAt &&
       schedule.endsAt &&
-      ["open", "in_progress", "blocked"].includes(nextStatus)
+      ["open", "in_progress", "blocked", "overdue"].includes(nextStatus)
     ) {
       assertCrmAssigneeAvailability({
         startsAt: schedule.startsAt,
@@ -1183,8 +1183,16 @@ export const getCrmDashboardSummary = createServerFn({ method: "GET" }).handler(
   const today = nowIso().slice(0, 10);
   const tasks = db.select().from(t.followUpTasks).all();
   const visits = db.select().from(t.clientVisits).all();
-  const openTasks = tasks.filter((t) => t.status === "open" || t.status === "in_progress" || t.status === "blocked");
-  const overdueTasks = openTasks.filter((t) => t.dueDate && t.dueDate < today);
+  const openTasks = tasks.filter(
+    (t) =>
+      t.status === "open" ||
+      t.status === "in_progress" ||
+      t.status === "blocked" ||
+      t.status === "overdue",
+  );
+  const overdueTasks = openTasks.filter(
+    (t) => t.status === "overdue" || Boolean(t.dueDate && t.dueDate < today),
+  );
   const dueToday = openTasks.filter((t) => t.dueDate === today);
   const upcomingVisits = visits.filter(
     (v) => v.status === "scheduled" && v.scheduledAt.slice(0, 10) >= today,
