@@ -380,13 +380,13 @@ export function DataTable<T>({
                     </tr>
                     <AnimatePresence initial={false}>
                       {expanded && renderExpandedRow ? (
-                        <tr key={`${id}-expanded`}>
+                        <tr key={`${id}-expanded`} className="border-t-0">
                           <td colSpan={colSpan} className="p-0">
                             <motion.div
                               initial={{ height: 0, opacity: 0 }}
                               animate={{ height: "auto", opacity: 1 }}
                               exit={{ height: 0, opacity: 0 }}
-                              transition={{ duration: 0.24, ease }}
+                              transition={{ duration: 0.28, ease }}
                               className="overflow-hidden"
                             >
                               {renderExpandedRow(row)}
