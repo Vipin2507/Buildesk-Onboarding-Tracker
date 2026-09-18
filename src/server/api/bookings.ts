@@ -289,8 +289,50 @@ function resolveEventHost(event: BookingEventType): string {
   throw new ApiError(400, "No meeting host configured for this account");
 }
 
+/**
+ * Mark approved/postponed meetings as completed once their scheduled end time has passed.
+ * Uses each host's wall-clock timezone (same as booking slots).
+ */
+function syncBookingAppointmentsByTime(db: ReturnType<typeof getDb>): number {
+  const open = db
+    .select()
+    .from(t.bookingAppointments)
+    .where(inArray(t.bookingAppointments.status, ["confirmed", "postponed"]))
+    .all();
+  if (open.length === 0) return 0;
+
+  const wallNowByHost = new Map<string, string>();
+  const stamp = nowIso();
+  let completed = 0;
+
+  for (const row of open) {
+    let wallNow = wallNowByHost.get(row.hostUserId);
+    if (!wallNow) {
+      wallNow = localWallClockIso(resolveHostTimezone(row.hostUserId)).slice(0, 19);
+      wallNowByHost.set(row.hostUserId, wallNow);
+    }
+    if (row.endsAt.slice(0, 19) > wallNow) continue;
+
+    db.update(t.bookingAppointments)
+      .set({ status: "completed", updatedAt: stamp })
+      .where(eq(t.bookingAppointments.id, row.id))
+      .run();
+
+    const fresh = db
+      .select()
+      .from(t.bookingAppointments)
+      .where(eq(t.bookingAppointments.id, row.id))
+      .get();
+    if (fresh) syncTaskFromBookingAppointment(fresh);
+    completed += 1;
+  }
+
+  return completed;
+}
+
 async function collectBusyRanges(hostUserId: string, fromYmd: string, toYmd: string) {
   const db = getDb();
+  syncBookingAppointmentsByTime(db);
   const rangeStart = `${fromYmd}T00:00:00`;
   const rangeEnd = `${toYmd}T23:59:59`;
 
@@ -678,6 +720,7 @@ export const listPortalBookings = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const db = getDb();
     const portal = resolveActivePortal(db, data.slug);
+    syncBookingAppointmentsByTime(db);
     let rows = db
       .select()
       .from(t.bookingAppointments)
@@ -1091,6 +1134,7 @@ export const listBookingAppointments = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const user = requireUser();
     const db = getDb();
+    syncBookingAppointmentsByTime(db);
     let rows = db.select().from(t.bookingAppointments).all();
 
     if (!isAdminRoleKey(user.role)) {
@@ -1641,6 +1685,7 @@ export const getBookingSummaryForCompany = createServerFn({ method: "GET" })
     requireUser();
     ensureDefaultEventType(data.companyId);
     const db = getDb();
+    syncBookingAppointmentsByTime(db);
     const now = nowIso();
     const appts = db
       .select()
