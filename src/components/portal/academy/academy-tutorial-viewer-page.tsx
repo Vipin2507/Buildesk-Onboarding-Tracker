@@ -20,6 +20,10 @@ import {
   ticketSectionVariants,
 } from "@/components/design-ticket/design-ticket-shared";
 import { AcademyTutorialCard } from "@/components/portal/academy/academy-tutorial-card";
+import {
+  AcademyYouTubePlayer,
+  type AcademyYouTubePlayerHandle,
+} from "@/components/portal/academy/academy-youtube-player";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -33,7 +37,7 @@ import {
   markTutorialComplete,
   markTutorialInProgress,
 } from "@/lib/buildesk-academy";
-import { getYouTubeEmbedUrl, getYouTubeVideoId, seekYouTubeIframe } from "@/lib/youtube";
+import { getYouTubeVideoId } from "@/lib/youtube";
 import { cn } from "@/lib/utils";
 import type { AcademyProgressMap, AcademyTutorial } from "@/types/buildesk-academy";
 
@@ -80,7 +84,7 @@ export function AcademyTutorialViewerPage({
   );
   const [transcriptQuery, setTranscriptQuery] = useState("");
   const [panel, setPanel] = useState<"transcript" | "related">("transcript");
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const playerRef = useRef<AcademyYouTubePlayerHandle>(null);
 
   useEffect(() => {
     if (!tutorial) return;
@@ -141,7 +145,7 @@ export function AcademyTutorialViewerPage({
   }
 
   function handleSeek(seconds: number) {
-    const ok = seekYouTubeIframe(iframeRef.current, seconds);
+    const ok = playerRef.current?.seekTo(seconds) ?? false;
     if (!ok) {
       toast.message("Open the video and try again to jump to this timestamp");
     }
@@ -177,32 +181,26 @@ export function AcademyTutorialViewerPage({
           className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.9fr)]"
         >
           <div className="space-y-3">
-            <div className="overflow-hidden rounded-2xl border border-border/80 bg-zinc-950 shadow-sm ring-1 ring-amber-500/10">
-              <div className="relative aspect-video w-full bg-black">
-                {videoId ? (
-                  <iframe
-                    ref={iframeRef}
-                    key={videoId}
-                    title={tutorial.title}
-                    src={getYouTubeEmbedUrl(videoId)}
-                    className="absolute inset-0 h-full w-full"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowFullScreen
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center text-sm text-zinc-300">
-                    <p>Unable to load this video.</p>
-                    <p className="text-xs text-zinc-500">Invalid or missing YouTube URL.</p>
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center gap-1.5 border-t border-white/10 bg-zinc-900/90 px-3 py-2">
+            <div className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm ring-1 ring-primary/10">
+              {videoId ? (
+                <AcademyYouTubePlayer
+                  ref={playerRef}
+                  key={videoId}
+                  videoId={videoId}
+                  title={tutorial.title}
+                />
+              ) : (
+                <div className="flex aspect-video flex-col items-center justify-center gap-2 bg-zinc-950 px-4 text-center text-sm text-zinc-300">
+                  <p>Unable to load this video.</p>
+                  <p className="text-xs text-zinc-500">Invalid or missing YouTube URL.</p>
+                </div>
+              )}
+              <div className="flex flex-wrap items-center gap-1.5 border-t border-border/70 bg-muted/40 px-3 py-2">
                 <Button
                   type="button"
                   size="sm"
-                  variant={panel === "transcript" ? "secondary" : "ghost"}
-                  className="h-7 px-2.5 text-[11px] text-zinc-100 hover:bg-white/10 hover:text-white"
+                  variant={panel === "transcript" ? "default" : "ghost"}
+                  className="h-7 rounded-full px-3 text-[11px]"
                   onClick={() => setPanel("transcript")}
                 >
                   Transcript
@@ -210,13 +208,13 @@ export function AcademyTutorialViewerPage({
                 <Button
                   type="button"
                   size="sm"
-                  variant={panel === "related" ? "secondary" : "ghost"}
-                  className="h-7 px-2.5 text-[11px] text-zinc-100 hover:bg-white/10 hover:text-white"
+                  variant={panel === "related" ? "default" : "ghost"}
+                  className="h-7 rounded-full px-3 text-[11px]"
                   onClick={() => setPanel("related")}
                 >
                   Related
                 </Button>
-                <span className="ml-auto text-[10px] tabular-nums text-zinc-400">
+                <span className="ml-auto text-[10px] tabular-nums text-muted-foreground">
                   {tutorial.duration}
                 </span>
                 {videoId ? (
@@ -224,7 +222,7 @@ export function AcademyTutorialViewerPage({
                     href={`https://www.youtube.com/watch?v=${videoId}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-[11px] text-zinc-300 hover:bg-white/10 hover:text-white"
+                    className="inline-flex h-7 items-center gap-1 rounded-full px-2 text-[11px] text-muted-foreground transition hover:bg-muted hover:text-foreground"
                   >
                     YouTube
                     <ExternalLink className="h-3 w-3" />
