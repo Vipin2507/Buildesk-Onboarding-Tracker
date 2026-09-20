@@ -487,7 +487,11 @@ export const listPortalAcademyTutorials = createServerFn({ method: "GET" }).hand
   try {
     const parsed = JSON.parse(row.valueJson) as { academyTutorials?: unknown };
     if (Array.isArray(parsed.academyTutorials)) {
-      return normalizeAcademyTutorials(parsed.academyTutorials as never);
+      const normalized = normalizeAcademyTutorials(parsed.academyTutorials as never);
+      const hasCurrentCatalog = normalized.some((t) =>
+        String(t.youtubeUrl ?? "").includes("pxn5pte7PIU"),
+      );
+      if (normalized.length > 0 && hasCurrentCatalog) return normalized;
     }
   } catch {
     /* fall through */

@@ -346,7 +346,18 @@ export function getCrmMasterBookingHostHours(): CrmBookingHostHoursDef[] {
 }
 
 export function getCrmMasterAcademyTutorials(): AcademyTutorial[] {
-  return normalizeAcademyTutorials(useCrmMasterStore.getState().academyTutorials);
+  const state = useCrmMasterStore.getState();
+  const current = state.academyTutorials;
+  const seed = seedAcademyTutorials();
+  // Migrate older demo seeds to the production Buildesk Academy catalog once.
+  const hasCurrentCatalog =
+    Array.isArray(current) &&
+    current.some((t) => String(t.youtubeUrl ?? "").includes("pxn5pte7PIU"));
+  if (!Array.isArray(current) || current.length === 0 || !hasCurrentCatalog) {
+    useCrmMasterStore.setState({ academyTutorials: seed });
+    return seed;
+  }
+  return normalizeAcademyTutorials(current);
 }
 
 /** Core modules are always available; integrations respect Master → Integrations toggles. */
