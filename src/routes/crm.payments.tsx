@@ -153,7 +153,7 @@ function CrmPaymentsPage() {
       const trimmed = searchDraft.trim();
       if ((search.search ?? "") === trimmed) return;
       void navigate({
-        search: (prev) => ({
+        search: (prev: typeof search) => ({
           ...prev,
           search: trimmed || undefined,
           page: undefined,
@@ -189,7 +189,7 @@ function CrmPaymentsPage() {
   const patchSearch = useCallback(
     (patch: Partial<typeof search>) => {
       void navigate({
-        search: (prev) => {
+        search: (prev: typeof search) => {
           const next = { ...prev, ...patch };
           const resetsPage =
             "status" in patch ||
@@ -205,7 +205,7 @@ function CrmPaymentsPage() {
         replace: true,
       });
     },
-    [navigate],
+    [navigate, search],
   );
 
   function toggleExpanded(id: string) {
@@ -466,7 +466,7 @@ function CrmPaymentsPage() {
           variant="inline"
           onClear={() =>
             void navigate({
-              search: (prev) => ({
+              search: (prev: typeof search) => ({
                 ...prev,
                 salesManager: undefined,
                 supportManager1: undefined,

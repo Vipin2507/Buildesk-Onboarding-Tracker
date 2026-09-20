@@ -15,7 +15,7 @@ function DprTrackerPage() {
 
   function onSearchChange(patch: Partial<typeof search>) {
     void navigate({
-      search: (prev) => {
+      search: (prev: typeof search) => {
         const next = { ...prev, ...patch };
         for (const [k, v] of Object.entries(next)) {
           if (v === undefined || v === "") delete (next as Record<string, unknown>)[k];

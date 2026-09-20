@@ -98,14 +98,14 @@ function ErpMeetingsPage() {
   useEffect(() => {
     if (!google) return;
     void navigate({
-      search: (prev) => ({
+      search: (prev: typeof search) => ({
         ...prev,
         google: undefined,
         googleError: undefined,
       }),
       replace: true,
     });
-  }, [google, navigate]);
+  }, [google, navigate, search]);
 
   const today = new Date().toISOString().slice(0, 10);
   const assignees = assignableManagerUsers(users);
@@ -209,7 +209,7 @@ function ErpMeetingsPage() {
 
   function setViewTab(next: "all" | "calendar") {
     void navigate({
-      search: (prev) => ({
+      search: (prev: typeof search) => ({
         ...prev,
         tab: next === "all" ? undefined : next,
       }),

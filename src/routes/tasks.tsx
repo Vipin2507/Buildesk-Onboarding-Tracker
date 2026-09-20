@@ -19,7 +19,7 @@ function ErpTasksPage() {
 
   function setTab(next: ErpTasksTabId) {
     void navigate({
-      search: (prev) => ({
+      search: (prev: typeof search) => ({
         ...prev,
         tab: next === "all" ? undefined : next,
         taskId: undefined,
@@ -31,7 +31,7 @@ function ErpTasksPage() {
 
   function setSelectedTask(taskId: string | undefined) {
     void navigate({
-      search: (prev) => ({
+      search: (prev: typeof search) => ({
         ...prev,
         taskId: taskId || undefined,
       }),

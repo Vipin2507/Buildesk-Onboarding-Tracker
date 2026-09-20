@@ -18,7 +18,7 @@ function CrmQueriesPage() {
 
   function setStatusFilter(next: "all" | "open" | "resolved" | "archived") {
     void navigate({
-      search: (prev) => ({
+      search: (prev: typeof search) => ({
         ...prev,
         status: next === "all" ? undefined : next,
       }),

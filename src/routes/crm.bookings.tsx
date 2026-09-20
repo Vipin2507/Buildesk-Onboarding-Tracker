@@ -380,7 +380,7 @@ function CrmBookingsPage() {
 
     if (tab !== "all") {
       void navigate({
-        search: (prev) => ({ ...prev, tab: "all", appointmentId: linkedId }),
+        search: (prev: typeof search) => ({ ...prev, tab: "all", appointmentId: linkedId }),
         replace: true,
       });
       return;
