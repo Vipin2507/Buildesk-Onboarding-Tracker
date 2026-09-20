@@ -89,6 +89,11 @@ export type YouTubePlayerInstance = {
   getCurrentTime: () => number;
   getDuration: () => number;
   getPlayerState: () => number;
+  loadModule?: (module: string) => void;
+  unloadModule?: (module: string) => void;
+  setOption?: (module: string, option: string, value: unknown) => void;
+  getOption?: (module: string, option: string) => unknown;
+  getOptions?: (module?: string) => unknown;
   destroy: () => void;
 };
 

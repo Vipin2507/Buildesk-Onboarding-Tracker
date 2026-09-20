@@ -83,6 +83,29 @@ export function normalizeAcademyTutorials(
   return out.sort((a, b) => a.order - b.order || a.title.localeCompare(b.title));
 }
 
+/**
+ * Fill empty transcripts from the seed catalog (by tutorial id) without
+ * overwriting admin-edited transcript text.
+ */
+export function mergeAcademySeedTranscripts(tutorials: AcademyTutorial[]): {
+  tutorials: AcademyTutorial[];
+  changed: boolean;
+} {
+  const seedById = new Map(seedAcademyTutorials().map((t) => [t.id, t]));
+  let changed = false;
+  const next = tutorials.map((t) => {
+    if (t.transcript && t.transcript.length > 0) return t;
+    const seed = seedById.get(t.id);
+    if (!seed?.transcript?.length) return t;
+    changed = true;
+    return {
+      ...t,
+      transcript: seed.transcript.map((s) => ({ ...s })),
+    };
+  });
+  return { tutorials: next, changed };
+}
+
 export function createAcademyTutorialId(title: string, existing: AcademyTutorial[]): string {
   const base = slugifyTutorialId(title) || "tutorial";
   if (!existing.some((t) => t.id === base)) return base;

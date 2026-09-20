@@ -38,7 +38,7 @@ import {
   seedCrmBookingCallTypes,
   seedCrmBookingHostHours,
 } from "@/data/crm-booking-defaults";
-import { normalizeAcademyTutorials, seedAcademyTutorials } from "@/lib/academy-catalog";
+import { mergeAcademySeedTranscripts, normalizeAcademyTutorials, seedAcademyTutorials } from "@/lib/academy-catalog";
 import { createPersistedStore, touch } from "./persist";
 
 type CrmMasterState = {
@@ -357,7 +357,12 @@ export function getCrmMasterAcademyTutorials(): AcademyTutorial[] {
     useCrmMasterStore.setState({ academyTutorials: seed });
     return seed;
   }
-  return normalizeAcademyTutorials(current);
+  const normalized = normalizeAcademyTutorials(current);
+  const { tutorials, changed } = mergeAcademySeedTranscripts(normalized);
+  if (changed) {
+    useCrmMasterStore.setState({ academyTutorials: tutorials });
+  }
+  return tutorials;
 }
 
 /** Core modules are always available; integrations respect Master → Integrations toggles. */

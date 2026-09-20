@@ -1,4 +1,26 @@
-import type { AcademyTutorial } from "@/types/buildesk-academy";
+import type { AcademyTranscriptSegment, AcademyTutorial } from "@/types/buildesk-academy";
+
+/** Split spoken lines into seekable transcript segments with estimated timings. */
+function tx(...lines: string[]): AcademyTranscriptSegment[] {
+  const segments: AcademyTranscriptSegment[] = [];
+  let elapsed = 0;
+  const wordsPerSecond = 2.35;
+
+  for (const raw of lines) {
+    const text = raw.replace(/^["']|["']$/g, "").trim();
+    if (!text) continue;
+    const mins = Math.floor(elapsed / 60);
+    const secs = Math.floor(elapsed % 60);
+    segments.push({
+      startSeconds: Math.floor(elapsed),
+      timestamp: `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`,
+      text,
+    });
+    const words = text.split(/\s+/).filter(Boolean).length;
+    elapsed += Math.max(3.5, words / wordsPerSecond);
+  }
+  return segments;
+}
 
 /**
  * Central Buildesk Academy catalog (seed / Master defaults).
@@ -16,6 +38,18 @@ export const ACADEMY_TUTORIALS: AcademyTutorial[] = [
     featured: true,
     order: 1,
     difficulty: "beginner",
+    transcript: tx(
+      "Welcome to Buildesk. In this video, we'll learn how to update your company information in Buildesk.",
+      "To begin, navigate to the settings section and open company info. Here you can manage your organization's details and branding.",
+      "Enter or update the company name and other required information.",
+      "Next, provide the contact details and address.",
+      "To update your branding, click on the logo section and select the image from your device.",
+      "Once the logo is uploaded, you can preview the changes before saving.",
+      "Review all the information carefully to ensure everything is correct.",
+      "Your company information and logo have now been successfully updated.",
+      "Keeping your company information and branding up to date helps maintain accurate records and ensures a consistent identity across the system.",
+      "Thank you for watching.",
+    ),
   },
   {
     id: "how-to-create-a-user",
@@ -27,6 +61,22 @@ export const ACADEMY_TUTORIALS: AcademyTutorial[] = [
     tags: ["users", "settings", "team"],
     order: 2,
     difficulty: "beginner",
+    transcript: tx(
+      "Welcome to Buildesk. In this video, we'll learn how to create a new user in Buildesk.",
+      "To begin, navigate to the settings section and open user management.",
+      "Here you can view all existing users and manage their access.",
+      "To add a new user, click Add New.",
+      "Enter the user's basic information, including the name, email address, and mobile number.",
+      "Next, provide the login credentials required for accessing the system.",
+      "You can also assign a username and set the appropriate password.",
+      "Now, select the user's role based on the level of access required.",
+      "Depending on the role assigned, you can configure permissions and define the modules that the user can access.",
+      "Review all the details carefully to ensure the information is accurate.",
+      "Once everything has been verified, click Save.",
+      "The new user has now been successfully created.",
+      "The user can now log in to Buildesk and access the assigned modules based on the permissions provided.",
+      "Thank you for watching.",
+    ),
   },
   {
     id: "how-to-update-user-rights",
@@ -38,6 +88,7 @@ export const ACADEMY_TUTORIALS: AcademyTutorial[] = [
     tags: ["users", "rights", "permissions", "roles"],
     order: 3,
     difficulty: "intermediate",
+    // Transcript pending
   },
   {
     id: "check-crm-subscription",
@@ -49,6 +100,7 @@ export const ACADEMY_TUTORIALS: AcademyTutorial[] = [
     tags: ["subscription", "billing", "plan"],
     order: 4,
     difficulty: "beginner",
+    // Transcript pending (provided create-team text did not match this title)
   },
   {
     id: "team-hierarchy-chart",
@@ -60,6 +112,17 @@ export const ACADEMY_TUTORIALS: AcademyTutorial[] = [
     tags: ["team", "hierarchy", "organisation"],
     order: 5,
     difficulty: "beginner",
+    transcript: tx(
+      "Welcome to Buildesk. In this video, we will learn how to view your team hierarchy chart in Buildesk.",
+      "To begin, navigate to the settings section and open team management.",
+      "Here, you can view all the teams available in the system.",
+      "Select the team for which you want to view the hierarchy.",
+      "Click on the action menu and choose Team Hierarchy Chart.",
+      "The hierarchy chart will now be displayed.",
+      "Here, you can view the reporting structure and relationships between team members.",
+      "This helps you understand the organizational structure and manage responsibilities more effectively.",
+      "Thank you for watching.",
+    ),
   },
   {
     id: "add-lead-distribution",
@@ -71,6 +134,20 @@ export const ACADEMY_TUTORIALS: AcademyTutorial[] = [
     tags: ["leads", "distribution", "assignment"],
     order: 6,
     difficulty: "intermediate",
+    transcript: tx(
+      "Welcome to Buildesk. In this video, we'll learn how to add lead distribution in Buildesk CRM and open lead distribution.",
+      "Here you can view all existing lead distribution records.",
+      "Select the distribution type.",
+      "Next, choose the distribution rule type.",
+      "Now, select the required project.",
+      "Once the filter criteria are applied, click Apply to view the results.",
+      "To add a new distribution, click Add Distribution.",
+      "Select the sales agent who will receive the leads.",
+      "Next, choose the project for which the distribution needs to be configured.",
+      "After entering the required details, click Submit.",
+      "The lead distribution has now been successfully created.",
+      "Thank you for watching.",
+    ),
   },
   {
     id: "update-your-masters",
@@ -82,6 +159,16 @@ export const ACADEMY_TUTORIALS: AcademyTutorial[] = [
     tags: ["masters", "settings", "catalog"],
     order: 7,
     difficulty: "intermediate",
+    transcript: tx(
+      "Welcome to Buildesk. In this video, we'll learn how to update your masters in Buildesk.",
+      "To begin, navigate to the settings section and open masters.",
+      "Here you can view all the available master categories.",
+      "Select the master category that you want to update.",
+      "The existing records for the selected master will now be displayed.",
+      "For adding a new record, click create.",
+      "Update the required information and click save to apply the changes to list.",
+      "Keeping your master data updated helps maintain accurate and consistent information across the system.",
+    ),
   },
   {
     id: "customized-offline-whatsapp-template",
@@ -93,6 +180,20 @@ export const ACADEMY_TUTORIALS: AcademyTutorial[] = [
     tags: ["whatsapp", "templates", "messaging"],
     order: 8,
     difficulty: "intermediate",
+    transcript: tx(
+      "Welcome to Buildesk. In this video, we'll learn how to create an offline WhatsApp template in Buildesk.",
+      "To begin, navigate to the settings section and open templates.",
+      "From the available template options, select offline WhatsApp template.",
+      "Here you can view all the templates that have already been created.",
+      "To create a new template, click Add Template.",
+      "Enter a suitable name for your template.",
+      "Next, enter the message content that will be sent to your customers.",
+      "You can customize the message according to your business needs and include the required information.",
+      "Review the template content carefully before saving.",
+      "Once everything has been verified, click Save.",
+      "The offline WhatsApp template has now been created successfully.",
+      "Thank you for watching.",
+    ),
   },
   {
     id: "api-doc",
@@ -104,6 +205,17 @@ export const ACADEMY_TUTORIALS: AcademyTutorial[] = [
     tags: ["api", "docs", "integration", "advanced"],
     order: 9,
     difficulty: "advanced",
+    transcript: tx(
+      "Welcome to Buildesk. In this video, we'll learn how to access the API documentation in Buildesk.",
+      "To begin, navigate to the manage section and select API docs.",
+      "Here you can view the complete list of available API endpoints.",
+      "Select the required API to view its documentation.",
+      "Each API includes the request method, endpoint URL, required parameters, sample request, and sample response.",
+      "You can scroll through the documentation to review the implementation details.",
+      "This documentation helps developers understand how to integrate Buildesk with external applications and services.",
+      "Use the provided examples as a reference while implementing the APIs in your application.",
+      "Thank you for watching.",
+    ),
   },
   {
     id: "dashboard",
@@ -115,6 +227,17 @@ export const ACADEMY_TUTORIALS: AcademyTutorial[] = [
     tags: ["dashboard", "overview", "getting started"],
     order: 10,
     difficulty: "beginner",
+    transcript: tx(
+      "Welcome to Buildesk. In this video, we'll take a quick look at the dashboard in Buildesk.",
+      "The dashboard provides a complete overview of your daily business activities in one place.",
+      "At the top, you can view key lead statistics and monitor your team's overall performance.",
+      "You can also use the available filters to view data for specific teams or sales agents.",
+      "Scroll down to access today's activities, including tasks, meetings, and site visits.",
+      "Switch between the available tabs to view detailed information for each activity.",
+      "The dashboard also displays analytical reports and visual charts, helping you track performance and make informed decisions.",
+      "The dashboard helps you stay organized and monitor your operations more efficiently.",
+      "Thank you for watching.",
+    ),
   },
   {
     id: "crm-contact-contact-analysis",
@@ -126,6 +249,16 @@ export const ACADEMY_TUTORIALS: AcademyTutorial[] = [
     tags: ["contacts", "analysis", "reports", "crm"],
     order: 11,
     difficulty: "intermediate",
+    transcript: tx(
+      "Welcome to Buildesk. In this video, we'll learn how to use contact analysis in Buildesk.",
+      "To begin, navigate to the CRM section and open contact analysis.",
+      "The dashboard provides a complete overview of your contact data along with key performance insights.",
+      "At the top, you can view important contact statistics and graphical reports for quick analysis.",
+      "Use the available filters to search and analyze contacts based on your business requirements.",
+      "Select the required filter values and click search to view the updated results.",
+      "The dashboard will instantly display the filtered contact information along with the corresponding analytics.",
+      "Thank you for watching.",
+    ),
   },
   {
     id: "crm-contact-contact-detailed-list",
@@ -137,6 +270,23 @@ export const ACADEMY_TUTORIALS: AcademyTutorial[] = [
     tags: ["contacts", "list", "crm"],
     order: 12,
     difficulty: "beginner",
+    transcript: tx(
+      "Welcome to Buildesk. In this video, we'll learn how to use the contact detailed list in Buildesk.",
+      "To begin, navigate to the CRM module and open contact detailed list.",
+      "Here you can view all your contacts along with a complete summary of their current status.",
+      "At the top of the page, contact analytics provide a quick overview of your contact distribution across different stages.",
+      "Use the available filters to search for contacts based on team, sales agent, source, stage, or other criteria.",
+      "Once the required filters are applied, click apply to view the updated results.",
+      "The contact list displays key details, making it easy to identify and manage your records.",
+      "To view complete information, select the required contact from the list.",
+      "The contact information page displays personal details, contact information, assigned sales executive, and the current contact stage.",
+      "To schedule the next interaction, click update next follow-up.",
+      "Select the follow-up date, enter the required remarks, and click submit.",
+      "The updated follow-up will be reflected in the contact timeline.",
+      "Once you've finished reviewing the contact details, return to the contact detailed list to continue managing other contacts.",
+      "The contact detailed list helps you organize customer information, track activities, and manage follow-ups efficiently.",
+      "Thank you for watching.",
+    ),
   },
   {
     id: "crm-contact-detailed-list-add-contact",
@@ -148,6 +298,7 @@ export const ACADEMY_TUTORIALS: AcademyTutorial[] = [
     tags: ["contacts", "add", "crm"],
     order: 13,
     difficulty: "beginner",
+    // Transcript pending
   },
   {
     id: "explore-lead-management-dashboard",
@@ -159,6 +310,7 @@ export const ACADEMY_TUTORIALS: AcademyTutorial[] = [
     tags: ["leads", "dashboard", "pipeline"],
     order: 14,
     difficulty: "beginner",
+    // Transcript pending
   },
   {
     id: "crm-bulk-update-lead",
@@ -170,6 +322,19 @@ export const ACADEMY_TUTORIALS: AcademyTutorial[] = [
     tags: ["leads", "bulk", "update"],
     order: 15,
     difficulty: "intermediate",
+    transcript: tx(
+      "Welcome to Buildesk. In this video, we'll learn how to bulk update leads in Buildesk.",
+      "To begin, navigate to the CRM module and open leads.",
+      "Here you can view all the leads available in the system.",
+      "Select the leads that you want to update.",
+      "Once the required leads are selected, click bulk update.",
+      "Choose the field that you want to update from the available options.",
+      "Next, select or enter the new value that should be applied to all the selected leads.",
+      "Review the selected field and updated value to ensure the information is correct.",
+      "Once everything has been verified, click submit.",
+      "The selected leads have now been updated successfully.",
+      "Thank you for watching.",
+    ),
   },
   {
     id: "transfer-leads-more-actions",
@@ -181,6 +346,19 @@ export const ACADEMY_TUTORIALS: AcademyTutorial[] = [
     tags: ["leads", "transfer", "more actions"],
     order: 16,
     difficulty: "intermediate",
+    transcript: tx(
+      "Welcome to Buildesk. In this video, we'll learn how to transfer leads using the More Actions menu in Buildesk.",
+      "To begin, navigate to the CRM module and open Leads.",
+      "Use the available filters to search for the leads you want to transfer.",
+      "Once the required leads are displayed, choose Transfer Leads.",
+      "The Transfer Leads window will now open.",
+      "Select the sales executive to whom the selected leads will be transferred.",
+      "If required, enter remarks for the transfer to maintain a clear record of the activity.",
+      "Review the selected leads and verify the transfer details carefully.",
+      "Once everything has been confirmed, click submit.",
+      "The selected leads have now been successfully transferred to the chosen sales executive.",
+      "Thank you for watching.",
+    ),
   },
   {
     id: "crm-lead-more-action-bulk-upload",
@@ -192,6 +370,23 @@ export const ACADEMY_TUTORIALS: AcademyTutorial[] = [
     tags: ["leads", "bulk upload", "import"],
     order: 17,
     difficulty: "intermediate",
+    transcript: tx(
+      "Welcome to Buildesk. In this video, we'll learn how to upload leads in bulk using Buildesk.",
+      "To begin, navigate to the CRM module and open Leads.",
+      "Click on More Actions and select Bulk Upload.",
+      "The bulk upload window will now open.",
+      "To ensure your data is uploaded correctly, first download the sample Excel file.",
+      "Open the downloaded file and enter the required lead details in the specified format.",
+      "Once you have completed the data entry, save the Excel file.",
+      "Return to Buildesk and click Choose File to upload the completed spreadsheet.",
+      "Select the file from your computer and upload it.",
+      "The system will validate the uploaded data before processing it.",
+      "If any errors are found, review the highlighted records, make the necessary corrections, and upload the file again.",
+      "Once the data has been validated successfully, click Import to complete the bulk upload process.",
+      "The imported leads will now be added to the lead management list and will be available for further follow-up and management.",
+      "Using the bulk upload feature helps you save time and efficiently add multiple leads into Buildesk in a single process.",
+      "Thank you for watching.",
+    ),
   },
   {
     id: "bulk-download-for-update-delete",
@@ -204,6 +399,23 @@ export const ACADEMY_TUTORIALS: AcademyTutorial[] = [
     tags: ["bulk", "download", "update", "delete", "crm"],
     order: 18,
     difficulty: "advanced",
+    transcript: tx(
+      "Welcome to Buildesk. In this video, we'll learn how to use the bulk download for update/delete feature in Buildesk.",
+      "To begin, navigate to the CRM module and open leads.",
+      "Use the available filters to search for the lead records you want to update or delete.",
+      "Once the required records are displayed, click More Actions and select Bulk Download for Update/Edit.",
+      "The system will generate and download an Excel file containing the selected lead records.",
+      "Open the downloaded Excel file and make the necessary updates.",
+      "You can modify the required lead information or mark the records that need to be deleted following the prescribed format.",
+      "After completing the changes, save the Excel file.",
+      "Return to Buildesk and open the bulk download for update/delete option.",
+      "Click Choose File and select the updated Excel file from your computer.",
+      "Upload the file and allow the system to validate the data.",
+      "Once the validation is completed successfully, click Submit to process the changes.",
+      "The selected lead records will now be updated or deleted based on the information provided in the uploaded file.",
+      "Using the bulk download for update/delete feature helps you manage multiple lead records quickly and efficiently.",
+      "Thank you for watching.",
+    ),
   },
 ];
 

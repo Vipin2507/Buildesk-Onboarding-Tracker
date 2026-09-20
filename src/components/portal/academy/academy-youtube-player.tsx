@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import {
+  Captions,
   Maximize,
   Minimize,
   Pause,
@@ -49,6 +50,7 @@ export const AcademyYouTubePlayer = forwardRef<
   const [playing, setPlaying] = useState(false);
   const [started, setStarted] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [captionsOn, setCaptionsOn] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -116,6 +118,7 @@ export const AcademyYouTubePlayer = forwardRef<
     setError(null);
     setPlaying(false);
     setStarted(false);
+    setCaptionsOn(false);
     setCurrent(0);
     setDuration(0);
     setControlsVisible(true);
@@ -141,7 +144,7 @@ export const AcademyYouTubePlayer = forwardRef<
             modestbranding: 1,
             playsinline: 1,
             rel: 0,
-            cc_load_policy: 0,
+            cc_load_policy: 1,
             origin: window.location.origin,
           },
           events: {
@@ -152,6 +155,9 @@ export const AcademyYouTubePlayer = forwardRef<
               try {
                 setDuration(e.target.getDuration() || 0);
                 setMuted(e.target.isMuted());
+                // Start with captions off; user can toggle via CC control
+                e.target.unloadModule?.("captions");
+                setCaptionsOn(false);
               } catch {
                 /* ignore */
               }
@@ -236,6 +242,29 @@ export const AcademyYouTubePlayer = forwardRef<
     } catch {
       /* ignore */
     }
+  }
+
+  function setCaptionsEnabled(on: boolean) {
+    const p = playerRef.current;
+    if (!p) return false;
+    try {
+      if (on) {
+        p.loadModule?.("captions");
+        p.setOption?.("captions", "reload", true);
+        p.setOption?.("captions", "fontSize", 1);
+      } else {
+        p.unloadModule?.("captions");
+      }
+      setCaptionsOn(on);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function toggleCaptions() {
+    revealControls();
+    setCaptionsEnabled(!captionsOn);
   }
 
   async function toggleFullscreen() {
@@ -417,6 +446,21 @@ export const AcademyYouTubePlayer = forwardRef<
               disabled={!ready}
             >
               {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+            </button>
+
+            <button
+              type="button"
+              onClick={toggleCaptions}
+              className={cn(
+                "flex h-8 w-8 shrink-0 items-center justify-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                captionsOn ? "text-primary" : "text-white/70 hover:text-white",
+              )}
+              aria-label={captionsOn ? "Hide subtitles" : "Show subtitles"}
+              aria-pressed={captionsOn}
+              disabled={!ready}
+              title={captionsOn ? "Subtitles on" : "Subtitles off"}
+            >
+              <Captions className="h-4 w-4" />
             </button>
 
             <button
