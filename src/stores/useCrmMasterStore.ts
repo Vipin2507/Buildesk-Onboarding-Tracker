@@ -9,6 +9,7 @@ import type {
   CrmMigrationFieldDef,
   CrmTrainingFieldDef,
 } from "@/types/crm-master";
+import type { AcademyTutorial } from "@/types/buildesk-academy";
 import { newId, nowIso } from "@/types/common";
 import {
   CRM_SEED_ACCOUNT_FIELDS,
@@ -37,6 +38,7 @@ import {
   seedCrmBookingCallTypes,
   seedCrmBookingHostHours,
 } from "@/data/crm-booking-defaults";
+import { normalizeAcademyTutorials, seedAcademyTutorials } from "@/lib/academy-catalog";
 import { createPersistedStore, touch } from "./persist";
 
 type CrmMasterState = {
@@ -59,6 +61,8 @@ type CrmMasterState = {
   bookingHostHours: CrmBookingHostHoursDef[];
   /** Account implementation pipeline stages (editable in Master). */
   implementationStages: CrmImplementationStageDef[];
+  /** Buildesk Academy tutorials shown in the client portal (editable in Master). */
+  academyTutorials: AcademyTutorial[];
 
   updatePlatform: (data: Partial<CrmMasterPlatformSettings>) => void;
 
@@ -81,6 +85,7 @@ type CrmMasterState = {
   setBookingCallTypes: (fields: CrmBookingCallTypeDef[]) => void;
   setBookingHostHours: (hours: CrmBookingHostHoursDef[]) => void;
   setImplementationStages: (stages: CrmImplementationStageDef[]) => void;
+  setAcademyTutorials: (tutorials: AcademyTutorial[]) => void;
 
   resetAll: () => void;
 };
@@ -99,6 +104,7 @@ function seedState() {
     bookingCallTypes: seedCrmBookingCallTypes(),
     bookingHostHours: seedCrmBookingHostHours(),
     implementationStages: seedCrmImplementationStages(),
+    academyTutorials: seedAcademyTutorials(),
   };
 }
 
@@ -284,6 +290,10 @@ export const useCrmMasterStore = createPersistedStore<CrmMasterState>(
       set({ implementationStages: normalizeCrmImplementationStages(stages) });
     },
 
+    setAcademyTutorials: (tutorials) => {
+      set({ academyTutorials: normalizeAcademyTutorials(tutorials) });
+    },
+
     resetAll: () => {
       set(seedState());
     },
@@ -335,6 +345,10 @@ export function getCrmMasterBookingHostHours(): CrmBookingHostHoursDef[] {
   return normalizeCrmBookingHostHours(useCrmMasterStore.getState().bookingHostHours);
 }
 
+export function getCrmMasterAcademyTutorials(): AcademyTutorial[] {
+  return normalizeAcademyTutorials(useCrmMasterStore.getState().academyTutorials);
+}
+
 /** Core modules are always available; integrations respect Master → Integrations toggles. */
 export function getCrmMasterProductModuleCatalog(): { key: string; label: string }[] {
   ensureCrmMasterModulesCatalog();
@@ -363,6 +377,7 @@ export function crmMasterSnapshot() {
     bookingCallTypes: s.bookingCallTypes,
     bookingHostHours: s.bookingHostHours,
     implementationStages: s.implementationStages,
+    academyTutorials: s.academyTutorials,
   };
 }
 
@@ -409,6 +424,13 @@ export function hydrateCrmMasterFromServer(raw: Record<string, unknown>) {
       ? {
           implementationStages: normalizeCrmImplementationStages(
             raw.implementationStages as CrmImplementationStageDef[],
+          ),
+        }
+      : {}),
+    ...(Array.isArray(raw.academyTutorials)
+      ? {
+          academyTutorials: normalizeAcademyTutorials(
+            raw.academyTutorials as AcademyTutorial[],
           ),
         }
       : {}),

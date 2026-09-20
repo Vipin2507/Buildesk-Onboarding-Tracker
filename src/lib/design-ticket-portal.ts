@@ -58,8 +58,22 @@ export function portalBookPath(slug: string) {
   return `/portal/${slug}/book`;
 }
 
-export function portalPublicBookUrl(slug: string): string {
+export function portalAcademyPath(slug: string) {
+  return `/portal/${slug}/academy`;
+}
+
+export function portalAcademyTutorialPath(slug: string, tutorialId: string) {
+  return `/portal/${slug}/academy/${tutorialId}`;
+}
+
+export function portalPublicBookUrl(slug: string) {
   const path = portalBookPath(slug);
+  const base = getPortalBaseUrl();
+  return base ? `${base}${path}` : path;
+}
+
+export function portalPublicAcademyUrl(slug: string) {
+  const path = portalAcademyPath(slug);
   const base = getPortalBaseUrl();
   return base ? `${base}${path}` : path;
 }

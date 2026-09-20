@@ -476,3 +476,21 @@ export const updateCompanyPortalContact = createServerFn({ method: "POST" })
       .run();
     return mapPortalRow({ ...current, ...patch });
   });
+
+/** Public — Buildesk Academy tutorials for the client portal (from CRM Master catalog). */
+export const listPortalAcademyTutorials = createServerFn({ method: "GET" }).handler(async () => {
+  const { normalizeAcademyTutorials, seedAcademyTutorials } = await import(
+    "@/lib/academy-catalog"
+  );
+  const row = getDb().select().from(t.appConfig).where(eq(t.appConfig.key, "crm-master")).get();
+  if (!row?.valueJson) return seedAcademyTutorials();
+  try {
+    const parsed = JSON.parse(row.valueJson) as { academyTutorials?: unknown };
+    if (Array.isArray(parsed.academyTutorials)) {
+      return normalizeAcademyTutorials(parsed.academyTutorials as never);
+    }
+  } catch {
+    /* fall through */
+  }
+  return seedAcademyTutorials();
+});

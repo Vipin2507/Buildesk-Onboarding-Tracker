@@ -9,194 +9,76 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as VendorsRouteImport } from './routes/vendors'
-import { Route as TrainingRouteImport } from './routes/training'
-import { Route as TicketsRouteImport } from './routes/tickets'
-import { Route as TasksRouteImport } from './routes/tasks'
-import { Route as SupportRouteImport } from './routes/support'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as ReportsRouteImport } from './routes/reports'
-import { Route as RenewalsRouteImport } from './routes/renewals'
-import { Route as ProjectsRouteImport } from './routes/projects'
-import { Route as OnboardingRouteImport } from './routes/onboarding'
-import { Route as ModulesRouteImport } from './routes/modules'
-import { Route as MeetingsRouteImport } from './routes/meetings'
-import { Route as MasterRouteImport } from './routes/master'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as LiveChatRouteImport } from './routes/live-chat'
-import { Route as LaborRouteImport } from './routes/labor'
-import { Route as IntegrationsRouteImport } from './routes/integrations'
-import { Route as EmployeesRouteImport } from './routes/employees'
-import { Route as DprRouteImport } from './routes/dpr'
-import { Route as DocumentsRouteImport } from './routes/documents'
-import { Route as DataMigrationRouteImport } from './routes/data-migration'
-import { Route as CustomerAppRouteImport } from './routes/customer-app'
-import { Route as CrmRouteImport } from './routes/crm'
-import { Route as CompaniesRouteImport } from './routes/companies'
-import { Route as ClientVisitsRouteImport } from './routes/client-visits'
-import { Route as AutomationRouteImport } from './routes/automation'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as CrmIndexRouteImport } from './routes/crm.index'
-import { Route as TicketsLinksRouteImport } from './routes/tickets.links'
-import { Route as TicketsTicketIdRouteImport } from './routes/tickets.$ticketId'
-import { Route as SupportTicketIdRouteImport } from './routes/support.$ticketId'
-import { Route as ProjectsProjectIdRouteImport } from './routes/projects.$projectId'
-import { Route as PortalSlugRouteImport } from './routes/portal.$slug'
-import { Route as DprTrackerRouteImport } from './routes/dpr.tracker'
-import { Route as CrmTicketsRouteImport } from './routes/crm.tickets'
-import { Route as CrmTasksRouteImport } from './routes/crm.tasks'
-import { Route as CrmSupportRouteImport } from './routes/crm.support'
-import { Route as CrmSettingsRouteImport } from './routes/crm.settings'
-import { Route as CrmQueriesRouteImport } from './routes/crm.queries'
-import { Route as CrmPaymentsRouteImport } from './routes/crm.payments'
-import { Route as CrmMasterRouteImport } from './routes/crm.master'
-import { Route as CrmLiveChatRouteImport } from './routes/crm.live-chat'
-import { Route as CrmBookingsRouteImport } from './routes/crm.bookings'
-import { Route as CrmAutomationRouteImport } from './routes/crm.automation'
-import { Route as CrmActivityRouteImport } from './routes/crm.activity'
-import { Route as CrmAccountsRouteImport } from './routes/crm.accounts'
+import { Route as AutomationRouteImport } from './routes/automation'
+import { Route as ClientVisitsRouteImport } from './routes/client-visits'
+import { Route as CompaniesRouteImport } from './routes/companies'
+import { Route as CrmRouteImport } from './routes/crm'
+import { Route as CustomerAppRouteImport } from './routes/customer-app'
+import { Route as DataMigrationRouteImport } from './routes/data-migration'
+import { Route as DocumentsRouteImport } from './routes/documents'
+import { Route as DprRouteImport } from './routes/dpr'
+import { Route as EmployeesRouteImport } from './routes/employees'
+import { Route as IntegrationsRouteImport } from './routes/integrations'
+import { Route as LaborRouteImport } from './routes/labor'
+import { Route as LiveChatRouteImport } from './routes/live-chat'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as MasterRouteImport } from './routes/master'
+import { Route as MeetingsRouteImport } from './routes/meetings'
+import { Route as ModulesRouteImport } from './routes/modules'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
+import { Route as ProjectsRouteImport } from './routes/projects'
+import { Route as RenewalsRouteImport } from './routes/renewals'
+import { Route as ReportsRouteImport } from './routes/reports'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SupportRouteImport } from './routes/support'
+import { Route as TasksRouteImport } from './routes/tasks'
+import { Route as TicketsRouteImport } from './routes/tickets'
+import { Route as TrainingRouteImport } from './routes/training'
+import { Route as VendorsRouteImport } from './routes/vendors'
 import { Route as CompaniesCompanyIdRouteImport } from './routes/companies.$companyId'
-import { Route as PortalSlugIndexRouteImport } from './routes/portal.$slug.index'
-import { Route as PortalSlugTicketsRouteImport } from './routes/portal.$slug.tickets'
-import { Route as PortalSlugSolvedRouteImport } from './routes/portal.$slug.solved'
-import { Route as PortalSlugProfileRouteImport } from './routes/portal.$slug.profile'
-import { Route as PortalSlugDashboardRouteImport } from './routes/portal.$slug.dashboard'
-import { Route as PortalSlugCreateTicketRouteImport } from './routes/portal.$slug.create-ticket'
-import { Route as PortalSlugBookRouteImport } from './routes/portal.$slug.book'
-import { Route as CrmTicketsLinksRouteImport } from './routes/crm.tickets.links'
-import { Route as CrmTicketsTicketIdRouteImport } from './routes/crm.tickets.$ticketId'
-import { Route as CrmSupportTicketIdRouteImport } from './routes/crm.support.$ticketId'
+import { Route as CrmIndexRouteImport } from './routes/crm.index'
+import { Route as CrmAccountsRouteImport } from './routes/crm.accounts'
+import { Route as CrmActivityRouteImport } from './routes/crm.activity'
+import { Route as CrmAutomationRouteImport } from './routes/crm.automation'
+import { Route as CrmBookingsRouteImport } from './routes/crm.bookings'
+import { Route as CrmLiveChatRouteImport } from './routes/crm.live-chat'
+import { Route as CrmMasterRouteImport } from './routes/crm.master'
+import { Route as CrmPaymentsRouteImport } from './routes/crm.payments'
+import { Route as CrmQueriesRouteImport } from './routes/crm.queries'
+import { Route as CrmSettingsRouteImport } from './routes/crm.settings'
+import { Route as CrmSupportRouteImport } from './routes/crm.support'
+import { Route as CrmTasksRouteImport } from './routes/crm.tasks'
+import { Route as CrmTicketsRouteImport } from './routes/crm.tickets'
+import { Route as DprTrackerRouteImport } from './routes/dpr.tracker'
+import { Route as PortalSlugRouteImport } from './routes/portal.$slug'
+import { Route as ProjectsProjectIdRouteImport } from './routes/projects.$projectId'
+import { Route as SupportTicketIdRouteImport } from './routes/support.$ticketId'
+import { Route as TicketsTicketIdRouteImport } from './routes/tickets.$ticketId'
+import { Route as TicketsLinksRouteImport } from './routes/tickets.links'
 import { Route as CrmAccountsAccountIdRouteImport } from './routes/crm.accounts.$accountId'
-import { Route as CrmAccountsAccountIdIndexRouteImport } from './routes/crm.accounts.$accountId.index'
-import { Route as PortalSlugTicketsTicketIdRouteImport } from './routes/portal.$slug.tickets.$ticketId'
-import { Route as CompaniesCompanyIdModulesModuleKeyRouteImport } from './routes/companies.$companyId.modules.$moduleKey'
+import { Route as CrmSupportTicketIdRouteImport } from './routes/crm.support.$ticketId'
+import { Route as CrmTicketsTicketIdRouteImport } from './routes/crm.tickets.$ticketId'
+import { Route as CrmTicketsLinksRouteImport } from './routes/crm.tickets.links'
+import { Route as PortalSlugIndexRouteImport } from './routes/portal.$slug.index'
+import { Route as PortalSlugAcademyRouteImport } from './routes/portal.$slug.academy'
+import { Route as PortalSlugBookRouteImport } from './routes/portal.$slug.book'
+import { Route as PortalSlugCreateTicketRouteImport } from './routes/portal.$slug.create-ticket'
+import { Route as PortalSlugDashboardRouteImport } from './routes/portal.$slug.dashboard'
+import { Route as PortalSlugProfileRouteImport } from './routes/portal.$slug.profile'
+import { Route as PortalSlugSolvedRouteImport } from './routes/portal.$slug.solved'
+import { Route as PortalSlugTicketsRouteImport } from './routes/portal.$slug.tickets'
 import { Route as AuthGoogleCalendarCallbackRouteImport } from './routes/auth.google.calendar.callback'
+import { Route as CompaniesCompanyIdModulesModuleKeyRouteImport } from './routes/companies.$companyId.modules.$moduleKey'
+import { Route as CrmAccountsAccountIdIndexRouteImport } from './routes/crm.accounts.$accountId.index'
+import { Route as PortalSlugAcademyTutorialIdRouteImport } from './routes/portal.$slug.academy.$tutorialId'
+import { Route as PortalSlugTicketsTicketIdRouteImport } from './routes/portal.$slug.tickets.$ticketId'
 import { Route as CrmAccountsAccountIdModulesModuleKeyRouteImport } from './routes/crm.accounts.$accountId.modules.$moduleKey'
 import { Route as CompaniesCompanyIdModulesPostSalesProjectsProjectIdRouteImport } from './routes/companies.$companyId.modules.post-sales.projects.$projectId'
 
-const VendorsRoute = VendorsRouteImport.update({
-  id: '/vendors',
-  path: '/vendors',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TrainingRoute = TrainingRouteImport.update({
-  id: '/training',
-  path: '/training',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TicketsRoute = TicketsRouteImport.update({
-  id: '/tickets',
-  path: '/tickets',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TasksRoute = TasksRouteImport.update({
-  id: '/tasks',
-  path: '/tasks',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SupportRoute = SupportRouteImport.update({
-  id: '/support',
-  path: '/support',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReportsRoute = ReportsRouteImport.update({
-  id: '/reports',
-  path: '/reports',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RenewalsRoute = RenewalsRouteImport.update({
-  id: '/renewals',
-  path: '/renewals',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProjectsRoute = ProjectsRouteImport.update({
-  id: '/projects',
-  path: '/projects',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OnboardingRoute = OnboardingRouteImport.update({
-  id: '/onboarding',
-  path: '/onboarding',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ModulesRoute = ModulesRouteImport.update({
-  id: '/modules',
-  path: '/modules',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MeetingsRoute = MeetingsRouteImport.update({
-  id: '/meetings',
-  path: '/meetings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MasterRoute = MasterRouteImport.update({
-  id: '/master',
-  path: '/master',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LiveChatRoute = LiveChatRouteImport.update({
-  id: '/live-chat',
-  path: '/live-chat',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LaborRoute = LaborRouteImport.update({
-  id: '/labor',
-  path: '/labor',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const IntegrationsRoute = IntegrationsRouteImport.update({
-  id: '/integrations',
-  path: '/integrations',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EmployeesRoute = EmployeesRouteImport.update({
-  id: '/employees',
-  path: '/employees',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DprRoute = DprRouteImport.update({
-  id: '/dpr',
-  path: '/dpr',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DocumentsRoute = DocumentsRouteImport.update({
-  id: '/documents',
-  path: '/documents',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DataMigrationRoute = DataMigrationRouteImport.update({
-  id: '/data-migration',
-  path: '/data-migration',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CustomerAppRoute = CustomerAppRouteImport.update({
-  id: '/customer-app',
-  path: '/customer-app',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CrmRoute = CrmRouteImport.update({
-  id: '/crm',
-  path: '/crm',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CompaniesRoute = CompaniesRouteImport.update({
-  id: '/companies',
-  path: '/companies',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ClientVisitsRoute = ClientVisitsRouteImport.update({
-  id: '/client-visits',
-  path: '/client-visits',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AutomationRoute = AutomationRouteImport.update({
@@ -204,99 +86,139 @@ const AutomationRoute = AutomationRouteImport.update({
   path: '/automation',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const ClientVisitsRoute = ClientVisitsRouteImport.update({
+  id: '/client-visits',
+  path: '/client-visits',
   getParentRoute: () => rootRouteImport,
+} as any)
+const CompaniesRoute = CompaniesRouteImport.update({
+  id: '/companies',
+  path: '/companies',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CrmRoute = CrmRouteImport.update({
+  id: '/crm',
+  path: '/crm',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CustomerAppRoute = CustomerAppRouteImport.update({
+  id: '/customer-app',
+  path: '/customer-app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DataMigrationRoute = DataMigrationRouteImport.update({
+  id: '/data-migration',
+  path: '/data-migration',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocumentsRoute = DocumentsRouteImport.update({
+  id: '/documents',
+  path: '/documents',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DprRoute = DprRouteImport.update({
+  id: '/dpr',
+  path: '/dpr',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EmployeesRoute = EmployeesRouteImport.update({
+  id: '/employees',
+  path: '/employees',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IntegrationsRoute = IntegrationsRouteImport.update({
+  id: '/integrations',
+  path: '/integrations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LaborRoute = LaborRouteImport.update({
+  id: '/labor',
+  path: '/labor',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LiveChatRoute = LiveChatRouteImport.update({
+  id: '/live-chat',
+  path: '/live-chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MasterRoute = MasterRouteImport.update({
+  id: '/master',
+  path: '/master',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MeetingsRoute = MeetingsRouteImport.update({
+  id: '/meetings',
+  path: '/meetings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ModulesRoute = ModulesRouteImport.update({
+  id: '/modules',
+  path: '/modules',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsRoute = ProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RenewalsRoute = RenewalsRouteImport.update({
+  id: '/renewals',
+  path: '/renewals',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsRoute = ReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SupportRoute = SupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TasksRoute = TasksRouteImport.update({
+  id: '/tasks',
+  path: '/tasks',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TicketsRoute = TicketsRouteImport.update({
+  id: '/tickets',
+  path: '/tickets',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrainingRoute = TrainingRouteImport.update({
+  id: '/training',
+  path: '/training',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VendorsRoute = VendorsRouteImport.update({
+  id: '/vendors',
+  path: '/vendors',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompaniesCompanyIdRoute = CompaniesCompanyIdRouteImport.update({
+  id: '/$companyId',
+  path: '/$companyId',
+  getParentRoute: () => CompaniesRoute,
 } as any)
 const CrmIndexRoute = CrmIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => CrmRoute,
-} as any)
-const TicketsLinksRoute = TicketsLinksRouteImport.update({
-  id: '/links',
-  path: '/links',
-  getParentRoute: () => TicketsRoute,
-} as any)
-const TicketsTicketIdRoute = TicketsTicketIdRouteImport.update({
-  id: '/$ticketId',
-  path: '/$ticketId',
-  getParentRoute: () => TicketsRoute,
-} as any)
-const SupportTicketIdRoute = SupportTicketIdRouteImport.update({
-  id: '/$ticketId',
-  path: '/$ticketId',
-  getParentRoute: () => SupportRoute,
-} as any)
-const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
-  id: '/$projectId',
-  path: '/$projectId',
-  getParentRoute: () => ProjectsRoute,
-} as any)
-const PortalSlugRoute = PortalSlugRouteImport.update({
-  id: '/portal/$slug',
-  path: '/portal/$slug',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DprTrackerRoute = DprTrackerRouteImport.update({
-  id: '/tracker',
-  path: '/tracker',
-  getParentRoute: () => DprRoute,
-} as any)
-const CrmTicketsRoute = CrmTicketsRouteImport.update({
-  id: '/tickets',
-  path: '/tickets',
-  getParentRoute: () => CrmRoute,
-} as any)
-const CrmTasksRoute = CrmTasksRouteImport.update({
-  id: '/tasks',
-  path: '/tasks',
-  getParentRoute: () => CrmRoute,
-} as any)
-const CrmSupportRoute = CrmSupportRouteImport.update({
-  id: '/support',
-  path: '/support',
-  getParentRoute: () => CrmRoute,
-} as any)
-const CrmSettingsRoute = CrmSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => CrmRoute,
-} as any)
-const CrmQueriesRoute = CrmQueriesRouteImport.update({
-  id: '/queries',
-  path: '/queries',
-  getParentRoute: () => CrmRoute,
-} as any)
-const CrmPaymentsRoute = CrmPaymentsRouteImport.update({
-  id: '/payments',
-  path: '/payments',
-  getParentRoute: () => CrmRoute,
-} as any)
-const CrmMasterRoute = CrmMasterRouteImport.update({
-  id: '/master',
-  path: '/master',
-  getParentRoute: () => CrmRoute,
-} as any)
-const CrmLiveChatRoute = CrmLiveChatRouteImport.update({
-  id: '/live-chat',
-  path: '/live-chat',
-  getParentRoute: () => CrmRoute,
-} as any)
-const CrmBookingsRoute = CrmBookingsRouteImport.update({
-  id: '/bookings',
-  path: '/bookings',
-  getParentRoute: () => CrmRoute,
-} as any)
-const CrmAutomationRoute = CrmAutomationRouteImport.update({
-  id: '/automation',
-  path: '/automation',
-  getParentRoute: () => CrmRoute,
-} as any)
-const CrmActivityRoute = CrmActivityRouteImport.update({
-  id: '/activity',
-  path: '/activity',
   getParentRoute: () => CrmRoute,
 } as any)
 const CrmAccountsRoute = CrmAccountsRouteImport.update({
@@ -304,39 +226,119 @@ const CrmAccountsRoute = CrmAccountsRouteImport.update({
   path: '/accounts',
   getParentRoute: () => CrmRoute,
 } as any)
-const CompaniesCompanyIdRoute = CompaniesCompanyIdRouteImport.update({
-  id: '/$companyId',
-  path: '/$companyId',
-  getParentRoute: () => CompaniesRoute,
+const CrmActivityRoute = CrmActivityRouteImport.update({
+  id: '/activity',
+  path: '/activity',
+  getParentRoute: () => CrmRoute,
+} as any)
+const CrmAutomationRoute = CrmAutomationRouteImport.update({
+  id: '/automation',
+  path: '/automation',
+  getParentRoute: () => CrmRoute,
+} as any)
+const CrmBookingsRoute = CrmBookingsRouteImport.update({
+  id: '/bookings',
+  path: '/bookings',
+  getParentRoute: () => CrmRoute,
+} as any)
+const CrmLiveChatRoute = CrmLiveChatRouteImport.update({
+  id: '/live-chat',
+  path: '/live-chat',
+  getParentRoute: () => CrmRoute,
+} as any)
+const CrmMasterRoute = CrmMasterRouteImport.update({
+  id: '/master',
+  path: '/master',
+  getParentRoute: () => CrmRoute,
+} as any)
+const CrmPaymentsRoute = CrmPaymentsRouteImport.update({
+  id: '/payments',
+  path: '/payments',
+  getParentRoute: () => CrmRoute,
+} as any)
+const CrmQueriesRoute = CrmQueriesRouteImport.update({
+  id: '/queries',
+  path: '/queries',
+  getParentRoute: () => CrmRoute,
+} as any)
+const CrmSettingsRoute = CrmSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => CrmRoute,
+} as any)
+const CrmSupportRoute = CrmSupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => CrmRoute,
+} as any)
+const CrmTasksRoute = CrmTasksRouteImport.update({
+  id: '/tasks',
+  path: '/tasks',
+  getParentRoute: () => CrmRoute,
+} as any)
+const CrmTicketsRoute = CrmTicketsRouteImport.update({
+  id: '/tickets',
+  path: '/tickets',
+  getParentRoute: () => CrmRoute,
+} as any)
+const DprTrackerRoute = DprTrackerRouteImport.update({
+  id: '/tracker',
+  path: '/tracker',
+  getParentRoute: () => DprRoute,
+} as any)
+const PortalSlugRoute = PortalSlugRouteImport.update({
+  id: '/portal/$slug',
+  path: '/portal/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
+  id: '/$projectId',
+  path: '/$projectId',
+  getParentRoute: () => ProjectsRoute,
+} as any)
+const SupportTicketIdRoute = SupportTicketIdRouteImport.update({
+  id: '/$ticketId',
+  path: '/$ticketId',
+  getParentRoute: () => SupportRoute,
+} as any)
+const TicketsTicketIdRoute = TicketsTicketIdRouteImport.update({
+  id: '/$ticketId',
+  path: '/$ticketId',
+  getParentRoute: () => TicketsRoute,
+} as any)
+const TicketsLinksRoute = TicketsLinksRouteImport.update({
+  id: '/links',
+  path: '/links',
+  getParentRoute: () => TicketsRoute,
+} as any)
+const CrmAccountsAccountIdRoute = CrmAccountsAccountIdRouteImport.update({
+  id: '/$accountId',
+  path: '/$accountId',
+  getParentRoute: () => CrmAccountsRoute,
+} as any)
+const CrmSupportTicketIdRoute = CrmSupportTicketIdRouteImport.update({
+  id: '/$ticketId',
+  path: '/$ticketId',
+  getParentRoute: () => CrmSupportRoute,
+} as any)
+const CrmTicketsTicketIdRoute = CrmTicketsTicketIdRouteImport.update({
+  id: '/$ticketId',
+  path: '/$ticketId',
+  getParentRoute: () => CrmTicketsRoute,
+} as any)
+const CrmTicketsLinksRoute = CrmTicketsLinksRouteImport.update({
+  id: '/links',
+  path: '/links',
+  getParentRoute: () => CrmTicketsRoute,
 } as any)
 const PortalSlugIndexRoute = PortalSlugIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => PortalSlugRoute,
 } as any)
-const PortalSlugTicketsRoute = PortalSlugTicketsRouteImport.update({
-  id: '/tickets',
-  path: '/tickets',
-  getParentRoute: () => PortalSlugRoute,
-} as any)
-const PortalSlugSolvedRoute = PortalSlugSolvedRouteImport.update({
-  id: '/solved',
-  path: '/solved',
-  getParentRoute: () => PortalSlugRoute,
-} as any)
-const PortalSlugProfileRoute = PortalSlugProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => PortalSlugRoute,
-} as any)
-const PortalSlugDashboardRoute = PortalSlugDashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => PortalSlugRoute,
-} as any)
-const PortalSlugCreateTicketRoute = PortalSlugCreateTicketRouteImport.update({
-  id: '/create-ticket',
-  path: '/create-ticket',
+const PortalSlugAcademyRoute = PortalSlugAcademyRouteImport.update({
+  id: '/academy',
+  path: '/academy',
   getParentRoute: () => PortalSlugRoute,
 } as any)
 const PortalSlugBookRoute = PortalSlugBookRouteImport.update({
@@ -344,37 +346,36 @@ const PortalSlugBookRoute = PortalSlugBookRouteImport.update({
   path: '/book',
   getParentRoute: () => PortalSlugRoute,
 } as any)
-const CrmTicketsLinksRoute = CrmTicketsLinksRouteImport.update({
-  id: '/links',
-  path: '/links',
-  getParentRoute: () => CrmTicketsRoute,
+const PortalSlugCreateTicketRoute = PortalSlugCreateTicketRouteImport.update({
+  id: '/create-ticket',
+  path: '/create-ticket',
+  getParentRoute: () => PortalSlugRoute,
 } as any)
-const CrmTicketsTicketIdRoute = CrmTicketsTicketIdRouteImport.update({
-  id: '/$ticketId',
-  path: '/$ticketId',
-  getParentRoute: () => CrmTicketsRoute,
+const PortalSlugDashboardRoute = PortalSlugDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => PortalSlugRoute,
 } as any)
-const CrmSupportTicketIdRoute = CrmSupportTicketIdRouteImport.update({
-  id: '/$ticketId',
-  path: '/$ticketId',
-  getParentRoute: () => CrmSupportRoute,
+const PortalSlugProfileRoute = PortalSlugProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => PortalSlugRoute,
 } as any)
-const CrmAccountsAccountIdRoute = CrmAccountsAccountIdRouteImport.update({
-  id: '/$accountId',
-  path: '/$accountId',
-  getParentRoute: () => CrmAccountsRoute,
+const PortalSlugSolvedRoute = PortalSlugSolvedRouteImport.update({
+  id: '/solved',
+  path: '/solved',
+  getParentRoute: () => PortalSlugRoute,
 } as any)
-const CrmAccountsAccountIdIndexRoute =
-  CrmAccountsAccountIdIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => CrmAccountsAccountIdRoute,
-  } as any)
-const PortalSlugTicketsTicketIdRoute =
-  PortalSlugTicketsTicketIdRouteImport.update({
-    id: '/$ticketId',
-    path: '/$ticketId',
-    getParentRoute: () => PortalSlugTicketsRoute,
+const PortalSlugTicketsRoute = PortalSlugTicketsRouteImport.update({
+  id: '/tickets',
+  path: '/tickets',
+  getParentRoute: () => PortalSlugRoute,
+} as any)
+const AuthGoogleCalendarCallbackRoute =
+  AuthGoogleCalendarCallbackRouteImport.update({
+    id: '/auth/google/calendar/callback',
+    path: '/auth/google/calendar/callback',
+    getParentRoute: () => rootRouteImport,
   } as any)
 const CompaniesCompanyIdModulesModuleKeyRoute =
   CompaniesCompanyIdModulesModuleKeyRouteImport.update({
@@ -382,11 +383,23 @@ const CompaniesCompanyIdModulesModuleKeyRoute =
     path: '/modules/$moduleKey',
     getParentRoute: () => CompaniesCompanyIdRoute,
   } as any)
-const AuthGoogleCalendarCallbackRoute =
-  AuthGoogleCalendarCallbackRouteImport.update({
-    id: '/auth/google/calendar/callback',
-    path: '/auth/google/calendar/callback',
-    getParentRoute: () => rootRouteImport,
+const CrmAccountsAccountIdIndexRoute =
+  CrmAccountsAccountIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => CrmAccountsAccountIdRoute,
+  } as any)
+const PortalSlugAcademyTutorialIdRoute =
+  PortalSlugAcademyTutorialIdRouteImport.update({
+    id: '/$tutorialId',
+    path: '/$tutorialId',
+    getParentRoute: () => PortalSlugAcademyRoute,
+  } as any)
+const PortalSlugTicketsTicketIdRoute =
+  PortalSlugTicketsTicketIdRouteImport.update({
+    id: '/$ticketId',
+    path: '/$ticketId',
+    getParentRoute: () => PortalSlugTicketsRoute,
   } as any)
 const CrmAccountsAccountIdModulesModuleKeyRoute =
   CrmAccountsAccountIdModulesModuleKeyRouteImport.update({
@@ -453,6 +466,7 @@ export interface FileRoutesByFullPath {
   '/crm/support/$ticketId': typeof CrmSupportTicketIdRoute
   '/crm/tickets/$ticketId': typeof CrmTicketsTicketIdRoute
   '/crm/tickets/links': typeof CrmTicketsLinksRoute
+  '/portal/$slug/academy': typeof PortalSlugAcademyRouteWithChildren
   '/portal/$slug/book': typeof PortalSlugBookRoute
   '/portal/$slug/create-ticket': typeof PortalSlugCreateTicketRoute
   '/portal/$slug/dashboard': typeof PortalSlugDashboardRoute
@@ -462,6 +476,7 @@ export interface FileRoutesByFullPath {
   '/portal/$slug/': typeof PortalSlugIndexRoute
   '/auth/google/calendar/callback': typeof AuthGoogleCalendarCallbackRoute
   '/companies/$companyId/modules/$moduleKey': typeof CompaniesCompanyIdModulesModuleKeyRoute
+  '/portal/$slug/academy/$tutorialId': typeof PortalSlugAcademyTutorialIdRoute
   '/portal/$slug/tickets/$ticketId': typeof PortalSlugTicketsTicketIdRoute
   '/crm/accounts/$accountId/': typeof CrmAccountsAccountIdIndexRoute
   '/crm/accounts/$accountId/modules/$moduleKey': typeof CrmAccountsAccountIdModulesModuleKeyRoute
@@ -516,6 +531,7 @@ export interface FileRoutesByTo {
   '/crm/support/$ticketId': typeof CrmSupportTicketIdRoute
   '/crm/tickets/$ticketId': typeof CrmTicketsTicketIdRoute
   '/crm/tickets/links': typeof CrmTicketsLinksRoute
+  '/portal/$slug/academy': typeof PortalSlugAcademyRouteWithChildren
   '/portal/$slug/book': typeof PortalSlugBookRoute
   '/portal/$slug/create-ticket': typeof PortalSlugCreateTicketRoute
   '/portal/$slug/dashboard': typeof PortalSlugDashboardRoute
@@ -525,6 +541,7 @@ export interface FileRoutesByTo {
   '/portal/$slug': typeof PortalSlugIndexRoute
   '/auth/google/calendar/callback': typeof AuthGoogleCalendarCallbackRoute
   '/companies/$companyId/modules/$moduleKey': typeof CompaniesCompanyIdModulesModuleKeyRoute
+  '/portal/$slug/academy/$tutorialId': typeof PortalSlugAcademyTutorialIdRoute
   '/portal/$slug/tickets/$ticketId': typeof PortalSlugTicketsTicketIdRoute
   '/crm/accounts/$accountId': typeof CrmAccountsAccountIdIndexRoute
   '/crm/accounts/$accountId/modules/$moduleKey': typeof CrmAccountsAccountIdModulesModuleKeyRoute
@@ -583,6 +600,7 @@ export interface FileRoutesById {
   '/crm/support/$ticketId': typeof CrmSupportTicketIdRoute
   '/crm/tickets/$ticketId': typeof CrmTicketsTicketIdRoute
   '/crm/tickets/links': typeof CrmTicketsLinksRoute
+  '/portal/$slug/academy': typeof PortalSlugAcademyRouteWithChildren
   '/portal/$slug/book': typeof PortalSlugBookRoute
   '/portal/$slug/create-ticket': typeof PortalSlugCreateTicketRoute
   '/portal/$slug/dashboard': typeof PortalSlugDashboardRoute
@@ -592,6 +610,7 @@ export interface FileRoutesById {
   '/portal/$slug/': typeof PortalSlugIndexRoute
   '/auth/google/calendar/callback': typeof AuthGoogleCalendarCallbackRoute
   '/companies/$companyId/modules/$moduleKey': typeof CompaniesCompanyIdModulesModuleKeyRoute
+  '/portal/$slug/academy/$tutorialId': typeof PortalSlugAcademyTutorialIdRoute
   '/portal/$slug/tickets/$ticketId': typeof PortalSlugTicketsTicketIdRoute
   '/crm/accounts/$accountId/': typeof CrmAccountsAccountIdIndexRoute
   '/crm/accounts/$accountId/modules/$moduleKey': typeof CrmAccountsAccountIdModulesModuleKeyRoute
@@ -651,6 +670,7 @@ export interface FileRouteTypes {
     | '/crm/support/$ticketId'
     | '/crm/tickets/$ticketId'
     | '/crm/tickets/links'
+    | '/portal/$slug/academy'
     | '/portal/$slug/book'
     | '/portal/$slug/create-ticket'
     | '/portal/$slug/dashboard'
@@ -660,6 +680,7 @@ export interface FileRouteTypes {
     | '/portal/$slug/'
     | '/auth/google/calendar/callback'
     | '/companies/$companyId/modules/$moduleKey'
+    | '/portal/$slug/academy/$tutorialId'
     | '/portal/$slug/tickets/$ticketId'
     | '/crm/accounts/$accountId/'
     | '/crm/accounts/$accountId/modules/$moduleKey'
@@ -714,6 +735,7 @@ export interface FileRouteTypes {
     | '/crm/support/$ticketId'
     | '/crm/tickets/$ticketId'
     | '/crm/tickets/links'
+    | '/portal/$slug/academy'
     | '/portal/$slug/book'
     | '/portal/$slug/create-ticket'
     | '/portal/$slug/dashboard'
@@ -723,6 +745,7 @@ export interface FileRouteTypes {
     | '/portal/$slug'
     | '/auth/google/calendar/callback'
     | '/companies/$companyId/modules/$moduleKey'
+    | '/portal/$slug/academy/$tutorialId'
     | '/portal/$slug/tickets/$ticketId'
     | '/crm/accounts/$accountId'
     | '/crm/accounts/$accountId/modules/$moduleKey'
@@ -780,6 +803,7 @@ export interface FileRouteTypes {
     | '/crm/support/$ticketId'
     | '/crm/tickets/$ticketId'
     | '/crm/tickets/links'
+    | '/portal/$slug/academy'
     | '/portal/$slug/book'
     | '/portal/$slug/create-ticket'
     | '/portal/$slug/dashboard'
@@ -789,6 +813,7 @@ export interface FileRouteTypes {
     | '/portal/$slug/'
     | '/auth/google/calendar/callback'
     | '/companies/$companyId/modules/$moduleKey'
+    | '/portal/$slug/academy/$tutorialId'
     | '/portal/$slug/tickets/$ticketId'
     | '/crm/accounts/$accountId/'
     | '/crm/accounts/$accountId/modules/$moduleKey'
@@ -829,179 +854,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/vendors': {
-      id: '/vendors'
-      path: '/vendors'
-      fullPath: '/vendors'
-      preLoaderRoute: typeof VendorsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/training': {
-      id: '/training'
-      path: '/training'
-      fullPath: '/training'
-      preLoaderRoute: typeof TrainingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/tickets': {
-      id: '/tickets'
-      path: '/tickets'
-      fullPath: '/tickets'
-      preLoaderRoute: typeof TicketsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/tasks': {
-      id: '/tasks'
-      path: '/tasks'
-      fullPath: '/tasks'
-      preLoaderRoute: typeof TasksRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/support': {
-      id: '/support'
-      path: '/support'
-      fullPath: '/support'
-      preLoaderRoute: typeof SupportRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reports': {
-      id: '/reports'
-      path: '/reports'
-      fullPath: '/reports'
-      preLoaderRoute: typeof ReportsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/renewals': {
-      id: '/renewals'
-      path: '/renewals'
-      fullPath: '/renewals'
-      preLoaderRoute: typeof RenewalsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/projects': {
-      id: '/projects'
-      path: '/projects'
-      fullPath: '/projects'
-      preLoaderRoute: typeof ProjectsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/onboarding': {
-      id: '/onboarding'
-      path: '/onboarding'
-      fullPath: '/onboarding'
-      preLoaderRoute: typeof OnboardingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/modules': {
-      id: '/modules'
-      path: '/modules'
-      fullPath: '/modules'
-      preLoaderRoute: typeof ModulesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/meetings': {
-      id: '/meetings'
-      path: '/meetings'
-      fullPath: '/meetings'
-      preLoaderRoute: typeof MeetingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/master': {
-      id: '/master'
-      path: '/master'
-      fullPath: '/master'
-      preLoaderRoute: typeof MasterRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/live-chat': {
-      id: '/live-chat'
-      path: '/live-chat'
-      fullPath: '/live-chat'
-      preLoaderRoute: typeof LiveChatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/labor': {
-      id: '/labor'
-      path: '/labor'
-      fullPath: '/labor'
-      preLoaderRoute: typeof LaborRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/integrations': {
-      id: '/integrations'
-      path: '/integrations'
-      fullPath: '/integrations'
-      preLoaderRoute: typeof IntegrationsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/employees': {
-      id: '/employees'
-      path: '/employees'
-      fullPath: '/employees'
-      preLoaderRoute: typeof EmployeesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dpr': {
-      id: '/dpr'
-      path: '/dpr'
-      fullPath: '/dpr'
-      preLoaderRoute: typeof DprRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/documents': {
-      id: '/documents'
-      path: '/documents'
-      fullPath: '/documents'
-      preLoaderRoute: typeof DocumentsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/data-migration': {
-      id: '/data-migration'
-      path: '/data-migration'
-      fullPath: '/data-migration'
-      preLoaderRoute: typeof DataMigrationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/customer-app': {
-      id: '/customer-app'
-      path: '/customer-app'
-      fullPath: '/customer-app'
-      preLoaderRoute: typeof CustomerAppRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/crm': {
-      id: '/crm'
-      path: '/crm'
-      fullPath: '/crm'
-      preLoaderRoute: typeof CrmRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/companies': {
-      id: '/companies'
-      path: '/companies'
-      fullPath: '/companies'
-      preLoaderRoute: typeof CompaniesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/client-visits': {
-      id: '/client-visits'
-      path: '/client-visits'
-      fullPath: '/client-visits'
-      preLoaderRoute: typeof ClientVisitsRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/automation': {
@@ -1011,137 +868,193 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AutomationRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/client-visits': {
+      id: '/client-visits'
+      path: '/client-visits'
+      fullPath: '/client-visits'
+      preLoaderRoute: typeof ClientVisitsRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/companies': {
+      id: '/companies'
+      path: '/companies'
+      fullPath: '/companies'
+      preLoaderRoute: typeof CompaniesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/crm': {
+      id: '/crm'
+      path: '/crm'
+      fullPath: '/crm'
+      preLoaderRoute: typeof CrmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/customer-app': {
+      id: '/customer-app'
+      path: '/customer-app'
+      fullPath: '/customer-app'
+      preLoaderRoute: typeof CustomerAppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/data-migration': {
+      id: '/data-migration'
+      path: '/data-migration'
+      fullPath: '/data-migration'
+      preLoaderRoute: typeof DataMigrationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/documents': {
+      id: '/documents'
+      path: '/documents'
+      fullPath: '/documents'
+      preLoaderRoute: typeof DocumentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dpr': {
+      id: '/dpr'
+      path: '/dpr'
+      fullPath: '/dpr'
+      preLoaderRoute: typeof DprRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/employees': {
+      id: '/employees'
+      path: '/employees'
+      fullPath: '/employees'
+      preLoaderRoute: typeof EmployeesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/integrations': {
+      id: '/integrations'
+      path: '/integrations'
+      fullPath: '/integrations'
+      preLoaderRoute: typeof IntegrationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/labor': {
+      id: '/labor'
+      path: '/labor'
+      fullPath: '/labor'
+      preLoaderRoute: typeof LaborRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/live-chat': {
+      id: '/live-chat'
+      path: '/live-chat'
+      fullPath: '/live-chat'
+      preLoaderRoute: typeof LiveChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/master': {
+      id: '/master'
+      path: '/master'
+      fullPath: '/master'
+      preLoaderRoute: typeof MasterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/meetings': {
+      id: '/meetings'
+      path: '/meetings'
+      fullPath: '/meetings'
+      preLoaderRoute: typeof MeetingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/modules': {
+      id: '/modules'
+      path: '/modules'
+      fullPath: '/modules'
+      preLoaderRoute: typeof ModulesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects': {
+      id: '/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof ProjectsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/renewals': {
+      id: '/renewals'
+      path: '/renewals'
+      fullPath: '/renewals'
+      preLoaderRoute: typeof RenewalsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports': {
+      id: '/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof ReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/support': {
+      id: '/support'
+      path: '/support'
+      fullPath: '/support'
+      preLoaderRoute: typeof SupportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tasks': {
+      id: '/tasks'
+      path: '/tasks'
+      fullPath: '/tasks'
+      preLoaderRoute: typeof TasksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tickets': {
+      id: '/tickets'
+      path: '/tickets'
+      fullPath: '/tickets'
+      preLoaderRoute: typeof TicketsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/training': {
+      id: '/training'
+      path: '/training'
+      fullPath: '/training'
+      preLoaderRoute: typeof TrainingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vendors': {
+      id: '/vendors'
+      path: '/vendors'
+      fullPath: '/vendors'
+      preLoaderRoute: typeof VendorsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/companies/$companyId': {
+      id: '/companies/$companyId'
+      path: '/$companyId'
+      fullPath: '/companies/$companyId'
+      preLoaderRoute: typeof CompaniesCompanyIdRouteImport
+      parentRoute: typeof CompaniesRoute
     }
     '/crm/': {
       id: '/crm/'
       path: '/'
       fullPath: '/crm/'
       preLoaderRoute: typeof CrmIndexRouteImport
-      parentRoute: typeof CrmRoute
-    }
-    '/tickets/links': {
-      id: '/tickets/links'
-      path: '/links'
-      fullPath: '/tickets/links'
-      preLoaderRoute: typeof TicketsLinksRouteImport
-      parentRoute: typeof TicketsRoute
-    }
-    '/tickets/$ticketId': {
-      id: '/tickets/$ticketId'
-      path: '/$ticketId'
-      fullPath: '/tickets/$ticketId'
-      preLoaderRoute: typeof TicketsTicketIdRouteImport
-      parentRoute: typeof TicketsRoute
-    }
-    '/support/$ticketId': {
-      id: '/support/$ticketId'
-      path: '/$ticketId'
-      fullPath: '/support/$ticketId'
-      preLoaderRoute: typeof SupportTicketIdRouteImport
-      parentRoute: typeof SupportRoute
-    }
-    '/projects/$projectId': {
-      id: '/projects/$projectId'
-      path: '/$projectId'
-      fullPath: '/projects/$projectId'
-      preLoaderRoute: typeof ProjectsProjectIdRouteImport
-      parentRoute: typeof ProjectsRoute
-    }
-    '/portal/$slug': {
-      id: '/portal/$slug'
-      path: '/portal/$slug'
-      fullPath: '/portal/$slug'
-      preLoaderRoute: typeof PortalSlugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dpr/tracker': {
-      id: '/dpr/tracker'
-      path: '/tracker'
-      fullPath: '/dpr/tracker'
-      preLoaderRoute: typeof DprTrackerRouteImport
-      parentRoute: typeof DprRoute
-    }
-    '/crm/tickets': {
-      id: '/crm/tickets'
-      path: '/tickets'
-      fullPath: '/crm/tickets'
-      preLoaderRoute: typeof CrmTicketsRouteImport
-      parentRoute: typeof CrmRoute
-    }
-    '/crm/tasks': {
-      id: '/crm/tasks'
-      path: '/tasks'
-      fullPath: '/crm/tasks'
-      preLoaderRoute: typeof CrmTasksRouteImport
-      parentRoute: typeof CrmRoute
-    }
-    '/crm/support': {
-      id: '/crm/support'
-      path: '/support'
-      fullPath: '/crm/support'
-      preLoaderRoute: typeof CrmSupportRouteImport
-      parentRoute: typeof CrmRoute
-    }
-    '/crm/settings': {
-      id: '/crm/settings'
-      path: '/settings'
-      fullPath: '/crm/settings'
-      preLoaderRoute: typeof CrmSettingsRouteImport
-      parentRoute: typeof CrmRoute
-    }
-    '/crm/queries': {
-      id: '/crm/queries'
-      path: '/queries'
-      fullPath: '/crm/queries'
-      preLoaderRoute: typeof CrmQueriesRouteImport
-      parentRoute: typeof CrmRoute
-    }
-    '/crm/payments': {
-      id: '/crm/payments'
-      path: '/payments'
-      fullPath: '/crm/payments'
-      preLoaderRoute: typeof CrmPaymentsRouteImport
-      parentRoute: typeof CrmRoute
-    }
-    '/crm/master': {
-      id: '/crm/master'
-      path: '/master'
-      fullPath: '/crm/master'
-      preLoaderRoute: typeof CrmMasterRouteImport
-      parentRoute: typeof CrmRoute
-    }
-    '/crm/live-chat': {
-      id: '/crm/live-chat'
-      path: '/live-chat'
-      fullPath: '/crm/live-chat'
-      preLoaderRoute: typeof CrmLiveChatRouteImport
-      parentRoute: typeof CrmRoute
-    }
-    '/crm/bookings': {
-      id: '/crm/bookings'
-      path: '/bookings'
-      fullPath: '/crm/bookings'
-      preLoaderRoute: typeof CrmBookingsRouteImport
-      parentRoute: typeof CrmRoute
-    }
-    '/crm/automation': {
-      id: '/crm/automation'
-      path: '/automation'
-      fullPath: '/crm/automation'
-      preLoaderRoute: typeof CrmAutomationRouteImport
-      parentRoute: typeof CrmRoute
-    }
-    '/crm/activity': {
-      id: '/crm/activity'
-      path: '/activity'
-      fullPath: '/crm/activity'
-      preLoaderRoute: typeof CrmActivityRouteImport
       parentRoute: typeof CrmRoute
     }
     '/crm/accounts': {
@@ -1151,12 +1064,152 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CrmAccountsRouteImport
       parentRoute: typeof CrmRoute
     }
-    '/companies/$companyId': {
-      id: '/companies/$companyId'
-      path: '/$companyId'
-      fullPath: '/companies/$companyId'
-      preLoaderRoute: typeof CompaniesCompanyIdRouteImport
-      parentRoute: typeof CompaniesRoute
+    '/crm/activity': {
+      id: '/crm/activity'
+      path: '/activity'
+      fullPath: '/crm/activity'
+      preLoaderRoute: typeof CrmActivityRouteImport
+      parentRoute: typeof CrmRoute
+    }
+    '/crm/automation': {
+      id: '/crm/automation'
+      path: '/automation'
+      fullPath: '/crm/automation'
+      preLoaderRoute: typeof CrmAutomationRouteImport
+      parentRoute: typeof CrmRoute
+    }
+    '/crm/bookings': {
+      id: '/crm/bookings'
+      path: '/bookings'
+      fullPath: '/crm/bookings'
+      preLoaderRoute: typeof CrmBookingsRouteImport
+      parentRoute: typeof CrmRoute
+    }
+    '/crm/live-chat': {
+      id: '/crm/live-chat'
+      path: '/live-chat'
+      fullPath: '/crm/live-chat'
+      preLoaderRoute: typeof CrmLiveChatRouteImport
+      parentRoute: typeof CrmRoute
+    }
+    '/crm/master': {
+      id: '/crm/master'
+      path: '/master'
+      fullPath: '/crm/master'
+      preLoaderRoute: typeof CrmMasterRouteImport
+      parentRoute: typeof CrmRoute
+    }
+    '/crm/payments': {
+      id: '/crm/payments'
+      path: '/payments'
+      fullPath: '/crm/payments'
+      preLoaderRoute: typeof CrmPaymentsRouteImport
+      parentRoute: typeof CrmRoute
+    }
+    '/crm/queries': {
+      id: '/crm/queries'
+      path: '/queries'
+      fullPath: '/crm/queries'
+      preLoaderRoute: typeof CrmQueriesRouteImport
+      parentRoute: typeof CrmRoute
+    }
+    '/crm/settings': {
+      id: '/crm/settings'
+      path: '/settings'
+      fullPath: '/crm/settings'
+      preLoaderRoute: typeof CrmSettingsRouteImport
+      parentRoute: typeof CrmRoute
+    }
+    '/crm/support': {
+      id: '/crm/support'
+      path: '/support'
+      fullPath: '/crm/support'
+      preLoaderRoute: typeof CrmSupportRouteImport
+      parentRoute: typeof CrmRoute
+    }
+    '/crm/tasks': {
+      id: '/crm/tasks'
+      path: '/tasks'
+      fullPath: '/crm/tasks'
+      preLoaderRoute: typeof CrmTasksRouteImport
+      parentRoute: typeof CrmRoute
+    }
+    '/crm/tickets': {
+      id: '/crm/tickets'
+      path: '/tickets'
+      fullPath: '/crm/tickets'
+      preLoaderRoute: typeof CrmTicketsRouteImport
+      parentRoute: typeof CrmRoute
+    }
+    '/dpr/tracker': {
+      id: '/dpr/tracker'
+      path: '/tracker'
+      fullPath: '/dpr/tracker'
+      preLoaderRoute: typeof DprTrackerRouteImport
+      parentRoute: typeof DprRoute
+    }
+    '/portal/$slug': {
+      id: '/portal/$slug'
+      path: '/portal/$slug'
+      fullPath: '/portal/$slug'
+      preLoaderRoute: typeof PortalSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects/$projectId': {
+      id: '/projects/$projectId'
+      path: '/$projectId'
+      fullPath: '/projects/$projectId'
+      preLoaderRoute: typeof ProjectsProjectIdRouteImport
+      parentRoute: typeof ProjectsRoute
+    }
+    '/support/$ticketId': {
+      id: '/support/$ticketId'
+      path: '/$ticketId'
+      fullPath: '/support/$ticketId'
+      preLoaderRoute: typeof SupportTicketIdRouteImport
+      parentRoute: typeof SupportRoute
+    }
+    '/tickets/$ticketId': {
+      id: '/tickets/$ticketId'
+      path: '/$ticketId'
+      fullPath: '/tickets/$ticketId'
+      preLoaderRoute: typeof TicketsTicketIdRouteImport
+      parentRoute: typeof TicketsRoute
+    }
+    '/tickets/links': {
+      id: '/tickets/links'
+      path: '/links'
+      fullPath: '/tickets/links'
+      preLoaderRoute: typeof TicketsLinksRouteImport
+      parentRoute: typeof TicketsRoute
+    }
+    '/crm/accounts/$accountId': {
+      id: '/crm/accounts/$accountId'
+      path: '/$accountId'
+      fullPath: '/crm/accounts/$accountId'
+      preLoaderRoute: typeof CrmAccountsAccountIdRouteImport
+      parentRoute: typeof CrmAccountsRoute
+    }
+    '/crm/support/$ticketId': {
+      id: '/crm/support/$ticketId'
+      path: '/$ticketId'
+      fullPath: '/crm/support/$ticketId'
+      preLoaderRoute: typeof CrmSupportTicketIdRouteImport
+      parentRoute: typeof CrmSupportRoute
+    }
+    '/crm/tickets/$ticketId': {
+      id: '/crm/tickets/$ticketId'
+      path: '/$ticketId'
+      fullPath: '/crm/tickets/$ticketId'
+      preLoaderRoute: typeof CrmTicketsTicketIdRouteImport
+      parentRoute: typeof CrmTicketsRoute
+    }
+    '/crm/tickets/links': {
+      id: '/crm/tickets/links'
+      path: '/links'
+      fullPath: '/crm/tickets/links'
+      preLoaderRoute: typeof CrmTicketsLinksRouteImport
+      parentRoute: typeof CrmTicketsRoute
     }
     '/portal/$slug/': {
       id: '/portal/$slug/'
@@ -1165,39 +1218,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortalSlugIndexRouteImport
       parentRoute: typeof PortalSlugRoute
     }
-    '/portal/$slug/tickets': {
-      id: '/portal/$slug/tickets'
-      path: '/tickets'
-      fullPath: '/portal/$slug/tickets'
-      preLoaderRoute: typeof PortalSlugTicketsRouteImport
-      parentRoute: typeof PortalSlugRoute
-    }
-    '/portal/$slug/solved': {
-      id: '/portal/$slug/solved'
-      path: '/solved'
-      fullPath: '/portal/$slug/solved'
-      preLoaderRoute: typeof PortalSlugSolvedRouteImport
-      parentRoute: typeof PortalSlugRoute
-    }
-    '/portal/$slug/profile': {
-      id: '/portal/$slug/profile'
-      path: '/profile'
-      fullPath: '/portal/$slug/profile'
-      preLoaderRoute: typeof PortalSlugProfileRouteImport
-      parentRoute: typeof PortalSlugRoute
-    }
-    '/portal/$slug/dashboard': {
-      id: '/portal/$slug/dashboard'
-      path: '/dashboard'
-      fullPath: '/portal/$slug/dashboard'
-      preLoaderRoute: typeof PortalSlugDashboardRouteImport
-      parentRoute: typeof PortalSlugRoute
-    }
-    '/portal/$slug/create-ticket': {
-      id: '/portal/$slug/create-ticket'
-      path: '/create-ticket'
-      fullPath: '/portal/$slug/create-ticket'
-      preLoaderRoute: typeof PortalSlugCreateTicketRouteImport
+    '/portal/$slug/academy': {
+      id: '/portal/$slug/academy'
+      path: '/academy'
+      fullPath: '/portal/$slug/academy'
+      preLoaderRoute: typeof PortalSlugAcademyRouteImport
       parentRoute: typeof PortalSlugRoute
     }
     '/portal/$slug/book': {
@@ -1207,47 +1232,47 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortalSlugBookRouteImport
       parentRoute: typeof PortalSlugRoute
     }
-    '/crm/tickets/links': {
-      id: '/crm/tickets/links'
-      path: '/links'
-      fullPath: '/crm/tickets/links'
-      preLoaderRoute: typeof CrmTicketsLinksRouteImport
-      parentRoute: typeof CrmTicketsRoute
+    '/portal/$slug/create-ticket': {
+      id: '/portal/$slug/create-ticket'
+      path: '/create-ticket'
+      fullPath: '/portal/$slug/create-ticket'
+      preLoaderRoute: typeof PortalSlugCreateTicketRouteImport
+      parentRoute: typeof PortalSlugRoute
     }
-    '/crm/tickets/$ticketId': {
-      id: '/crm/tickets/$ticketId'
-      path: '/$ticketId'
-      fullPath: '/crm/tickets/$ticketId'
-      preLoaderRoute: typeof CrmTicketsTicketIdRouteImport
-      parentRoute: typeof CrmTicketsRoute
+    '/portal/$slug/dashboard': {
+      id: '/portal/$slug/dashboard'
+      path: '/dashboard'
+      fullPath: '/portal/$slug/dashboard'
+      preLoaderRoute: typeof PortalSlugDashboardRouteImport
+      parentRoute: typeof PortalSlugRoute
     }
-    '/crm/support/$ticketId': {
-      id: '/crm/support/$ticketId'
-      path: '/$ticketId'
-      fullPath: '/crm/support/$ticketId'
-      preLoaderRoute: typeof CrmSupportTicketIdRouteImport
-      parentRoute: typeof CrmSupportRoute
+    '/portal/$slug/profile': {
+      id: '/portal/$slug/profile'
+      path: '/profile'
+      fullPath: '/portal/$slug/profile'
+      preLoaderRoute: typeof PortalSlugProfileRouteImport
+      parentRoute: typeof PortalSlugRoute
     }
-    '/crm/accounts/$accountId': {
-      id: '/crm/accounts/$accountId'
-      path: '/$accountId'
-      fullPath: '/crm/accounts/$accountId'
-      preLoaderRoute: typeof CrmAccountsAccountIdRouteImport
-      parentRoute: typeof CrmAccountsRoute
+    '/portal/$slug/solved': {
+      id: '/portal/$slug/solved'
+      path: '/solved'
+      fullPath: '/portal/$slug/solved'
+      preLoaderRoute: typeof PortalSlugSolvedRouteImport
+      parentRoute: typeof PortalSlugRoute
     }
-    '/crm/accounts/$accountId/': {
-      id: '/crm/accounts/$accountId/'
-      path: '/'
-      fullPath: '/crm/accounts/$accountId/'
-      preLoaderRoute: typeof CrmAccountsAccountIdIndexRouteImport
-      parentRoute: typeof CrmAccountsAccountIdRoute
+    '/portal/$slug/tickets': {
+      id: '/portal/$slug/tickets'
+      path: '/tickets'
+      fullPath: '/portal/$slug/tickets'
+      preLoaderRoute: typeof PortalSlugTicketsRouteImport
+      parentRoute: typeof PortalSlugRoute
     }
-    '/portal/$slug/tickets/$ticketId': {
-      id: '/portal/$slug/tickets/$ticketId'
-      path: '/$ticketId'
-      fullPath: '/portal/$slug/tickets/$ticketId'
-      preLoaderRoute: typeof PortalSlugTicketsTicketIdRouteImport
-      parentRoute: typeof PortalSlugTicketsRoute
+    '/auth/google/calendar/callback': {
+      id: '/auth/google/calendar/callback'
+      path: '/auth/google/calendar/callback'
+      fullPath: '/auth/google/calendar/callback'
+      preLoaderRoute: typeof AuthGoogleCalendarCallbackRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/companies/$companyId/modules/$moduleKey': {
       id: '/companies/$companyId/modules/$moduleKey'
@@ -1256,12 +1281,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CompaniesCompanyIdModulesModuleKeyRouteImport
       parentRoute: typeof CompaniesCompanyIdRoute
     }
-    '/auth/google/calendar/callback': {
-      id: '/auth/google/calendar/callback'
-      path: '/auth/google/calendar/callback'
-      fullPath: '/auth/google/calendar/callback'
-      preLoaderRoute: typeof AuthGoogleCalendarCallbackRouteImport
-      parentRoute: typeof rootRouteImport
+    '/crm/accounts/$accountId/': {
+      id: '/crm/accounts/$accountId/'
+      path: '/'
+      fullPath: '/crm/accounts/$accountId/'
+      preLoaderRoute: typeof CrmAccountsAccountIdIndexRouteImport
+      parentRoute: typeof CrmAccountsAccountIdRoute
+    }
+    '/portal/$slug/academy/$tutorialId': {
+      id: '/portal/$slug/academy/$tutorialId'
+      path: '/$tutorialId'
+      fullPath: '/portal/$slug/academy/$tutorialId'
+      preLoaderRoute: typeof PortalSlugAcademyTutorialIdRouteImport
+      parentRoute: typeof PortalSlugAcademyRoute
+    }
+    '/portal/$slug/tickets/$ticketId': {
+      id: '/portal/$slug/tickets/$ticketId'
+      path: '/$ticketId'
+      fullPath: '/portal/$slug/tickets/$ticketId'
+      preLoaderRoute: typeof PortalSlugTicketsTicketIdRouteImport
+      parentRoute: typeof PortalSlugTicketsRoute
     }
     '/crm/accounts/$accountId/modules/$moduleKey': {
       id: '/crm/accounts/$accountId/modules/$moduleKey'
@@ -1439,6 +1478,17 @@ const TicketsRouteChildren: TicketsRouteChildren = {
 const TicketsRouteWithChildren =
   TicketsRoute._addFileChildren(TicketsRouteChildren)
 
+interface PortalSlugAcademyRouteChildren {
+  PortalSlugAcademyTutorialIdRoute: typeof PortalSlugAcademyTutorialIdRoute
+}
+
+const PortalSlugAcademyRouteChildren: PortalSlugAcademyRouteChildren = {
+  PortalSlugAcademyTutorialIdRoute: PortalSlugAcademyTutorialIdRoute,
+}
+
+const PortalSlugAcademyRouteWithChildren =
+  PortalSlugAcademyRoute._addFileChildren(PortalSlugAcademyRouteChildren)
+
 interface PortalSlugTicketsRouteChildren {
   PortalSlugTicketsTicketIdRoute: typeof PortalSlugTicketsTicketIdRoute
 }
@@ -1451,6 +1501,7 @@ const PortalSlugTicketsRouteWithChildren =
   PortalSlugTicketsRoute._addFileChildren(PortalSlugTicketsRouteChildren)
 
 interface PortalSlugRouteChildren {
+  PortalSlugAcademyRoute: typeof PortalSlugAcademyRouteWithChildren
   PortalSlugBookRoute: typeof PortalSlugBookRoute
   PortalSlugCreateTicketRoute: typeof PortalSlugCreateTicketRoute
   PortalSlugDashboardRoute: typeof PortalSlugDashboardRoute
@@ -1461,6 +1512,7 @@ interface PortalSlugRouteChildren {
 }
 
 const PortalSlugRouteChildren: PortalSlugRouteChildren = {
+  PortalSlugAcademyRoute: PortalSlugAcademyRouteWithChildren,
   PortalSlugBookRoute: PortalSlugBookRoute,
   PortalSlugCreateTicketRoute: PortalSlugCreateTicketRoute,
   PortalSlugDashboardRoute: PortalSlugDashboardRoute,
@@ -1508,13 +1560,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

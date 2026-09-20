@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  BookOpen,
   Building2,
   Boxes,
   Calendar,
@@ -21,6 +22,7 @@ import {
 import { toast } from "sonner";
 
 import { CrmMasterDataControl } from "@/components/crm/crm-master-data-control";
+import { CrmMasterAcademyPanel } from "@/components/crm/crm-master-academy-panel";
 import {
   DesignTicketPageHeader,
   TICKET_EASE,
@@ -36,6 +38,7 @@ import { CRM_MODULE_PROVIDERS, CRM_INTEGRATION_MODULES, isCrmIntegrationModule }
 import { normalizeCrmBookingHostHours } from "@/data/crm-booking-defaults";
 import {
   ensureCrmMasterModulesCatalog,
+  getCrmMasterAcademyTutorials,
   getCrmMasterBookingCallTypes,
   getCrmMasterBookingHostHours,
   getCrmMasterMigrationFields,
@@ -69,6 +72,7 @@ const SECTIONS = [
   { id: "integrations", label: "Integrations", icon: Link2 },
   { id: "migration", label: "Migration", icon: Upload },
   { id: "training", label: "Training", icon: GraduationCap },
+  { id: "academy", label: "Academy", icon: BookOpen },
   { id: "bookings", label: "Meetings", icon: Calendar },
   { id: "data-control", label: "Data Control", icon: Table2 },
   { id: "danger", label: "Reset & Safety", icon: ShieldAlert },
@@ -170,6 +174,7 @@ function CrmMasterPage() {
             {section === "integrations" ? <IntegrationsPanel /> : null}
             {section === "migration" ? <MigrationPanel /> : null}
             {section === "training" ? <TrainingPanel /> : null}
+            {section === "academy" ? <CrmMasterAcademyPanel /> : null}
             {section === "bookings" ? <BookingsPanel /> : null}
             {section === "data-control" ? <CrmMasterDataControl /> : null}
             {section === "danger" ? <DangerPanel /> : null}
@@ -191,6 +196,7 @@ function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) 
   const trainingFieldsBroker = useCrmMasterStore((s) => s.trainingFieldsBroker);
   const bookingCallTypes = useCrmMasterStore((s) => s.bookingCallTypes);
   const implementationStages = useCrmMasterStore((s) => s.implementationStages);
+  const academyTutorials = useCrmMasterStore((s) => s.academyTutorials);
 
   const cards = [
     {
@@ -237,6 +243,12 @@ function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) 
         (trainingFieldsBroker?.length ?? getCrmMasterTrainingFields("broker_cp").length),
       total: "catalog items",
       to: "training" as const,
+    },
+    {
+      label: "Academy",
+      value: (academyTutorials?.length ?? getCrmMasterAcademyTutorials().length),
+      total: "tutorials",
+      to: "academy" as const,
     },
     {
       label: "Meetings",
@@ -1528,7 +1540,7 @@ function DangerPanel() {
         <h3 className="text-sm font-semibold text-destructive">Reset CRM Master Config</h3>
         <p className="mt-1 text-[10px] text-muted-foreground">
           Restores seeded account fields, project fields, picklists, modules, providers, migration,
-          training, and meeting catalogs. Does not delete CRM accounts or onboarding checklists.
+          training, Academy tutorials, and meeting catalogs. Does not delete CRM accounts or onboarding checklists.
         </p>
         <Button
           size="sm"
@@ -1544,7 +1556,7 @@ function DangerPanel() {
         open={open}
         onOpenChange={setOpen}
         title="Reset CRM Master Config?"
-        description="All field catalogs, picklists, modules, providers, migration, training, and meeting fields will revert to seed defaults."
+        description="All field catalogs, picklists, modules, providers, migration, training, Academy tutorials, and meeting fields will revert to seed defaults."
         confirmLabel="Reset"
         onConfirm={() => {
           resetAll();

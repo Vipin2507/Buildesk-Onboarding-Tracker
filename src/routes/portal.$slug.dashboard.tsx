@@ -257,7 +257,11 @@ function EmptyPortalCurrent({ slug }: { slug: string }) {
     <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-muted/20 px-6 py-12 text-center">
       <h3 className="font-semibold">No open tickets yet</h3>
       <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-        Submit a design or support request and track replies here.
+        Submit a design or support request and track replies here. Explore{" "}
+        <Link to="/portal/$slug/academy" params={{ slug }} className="portal-content-link">
+          Buildesk Academy
+        </Link>{" "}
+        for product tutorials.
       </p>
       <Button className="mt-4 gap-1.5" asChild>
         <Link to="/portal/$slug/create-ticket" params={{ slug }}>

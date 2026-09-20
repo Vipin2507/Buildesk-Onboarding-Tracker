@@ -198,6 +198,7 @@ export {
   updateCompanyPortalSlug,
   setCompanyPortalActive,
   updateCompanyPortalContact,
+  listPortalAcademyTutorials,
 } from "@/server/api/portal";
 
 export {
