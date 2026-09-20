@@ -85,12 +85,12 @@ export function TaskDetailPanel({
       className={cn(
         "text-xs",
         embedded
-          ? "border-t border-primary/10 bg-muted/25 px-2.5 py-2"
+          ? "border-t border-primary/10 bg-muted/25 px-3 py-3"
           : "card-soft overflow-hidden p-3",
       )}
     >
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0 flex-1 space-y-1.5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1 space-y-2">
           {!embedded ? (
             <div className="flex flex-wrap items-center gap-1.5">
               <Pill tone={statusTone(task.status)}>{task.status.replace(/_/g, " ")}</Pill>
@@ -143,67 +143,86 @@ export function TaskDetailPanel({
           </div>
 
           {task.description ? (
-            <p className="line-clamp-2 text-[11px] leading-snug text-foreground/90">
+            <p className="mt-1 max-w-3xl rounded-lg border border-border/60 bg-background/50 px-3 py-2 text-[12px] leading-relaxed text-foreground/90">
               {task.description}
             </p>
           ) : null}
 
-          {remarks.length ? (
-            <div className="space-y-1">
-              <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="mt-2 max-w-3xl space-y-2.5 border-t border-border/50 pt-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Remarks
-              </div>
-              <div className="max-h-28 space-y-1 overflow-y-auto">
-                {remarks.map((item, index) => (
-                  <div
-                    key={`${item.createdAt}-${index}`}
-                    className="rounded-md bg-muted/40 px-2 py-1 text-[11px]"
-                  >
-                    <p className="leading-snug text-foreground/90">{item.text}</p>
-                    <p className="mt-0.5 text-[10px] text-muted-foreground">
-                      {item.authorName ? `${item.authorName} · ` : ""}
-                      {formatDateTime(item.createdAt)}
-                    </p>
-                  </div>
-                ))}
+                {remarks.length ? (
+                  <span className="ml-1.5 tabular-nums text-muted-foreground/80">
+                    ({remarks.length})
+                  </span>
+                ) : null}
               </div>
             </div>
-          ) : null}
 
-          {canManage && onAddRemark ? (
-            <div className="flex max-w-md gap-1.5 pt-0.5" onClick={(e) => e.stopPropagation()}>
-              <Input
-                value={remarkDraft}
-                onChange={(e) => setRemarkDraft(e.target.value)}
-                placeholder="Add remark…"
-                className="h-7 flex-1 text-[11px]"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    submitRemark();
-                  }
-                }}
-              />
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-7 shrink-0 gap-1 px-2 text-[10px]"
-                disabled={!remarkDraft.trim()}
-                onClick={submitRemark}
-              >
-                <Plus className="h-3 w-3" />
-                Add
-              </Button>
-            </div>
-          ) : null}
+            {remarks.length ? (
+              <ul className="max-h-52 space-y-2 overflow-y-auto pr-0.5">
+                {remarks.map((item, index) => (
+                  <li
+                    key={`${item.createdAt}-${index}`}
+                    className="rounded-lg border border-border/70 bg-card px-3 py-2.5 shadow-sm"
+                  >
+                    <p className="text-[12px] font-medium leading-relaxed text-foreground">
+                      {item.text}
+                    </p>
+                    <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground">
+                      {item.authorName ? (
+                        <span className="font-medium text-foreground/70">{item.authorName}</span>
+                      ) : null}
+                      {item.authorName ? (
+                        <span className="mx-1.5 text-border">·</span>
+                      ) : null}
+                      <span className="tabular-nums">{formatDateTime(item.createdAt)}</span>
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-3 py-3 text-[11px] text-muted-foreground">
+                No remarks yet.
+              </p>
+            )}
+
+            {canManage && onAddRemark ? (
+              <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                <Input
+                  value={remarkDraft}
+                  onChange={(e) => setRemarkDraft(e.target.value)}
+                  placeholder="Add remark…"
+                  className="h-8 flex-1 text-[12px]"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      submitRemark();
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8 shrink-0 gap-1 px-2.5 text-[11px]"
+                  disabled={!remarkDraft.trim()}
+                  onClick={submitRemark}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add
+                </Button>
+              </div>
+            ) : null}
+          </div>
 
           {scheduled && canManage && onAdjustExtraTime ? (
             <div
-              className="flex flex-wrap items-center gap-1.5 pt-0.5"
+              className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-border/40 pt-2.5"
               onClick={(e) => e.stopPropagation()}
             >
-              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Extra
               </span>
               {EXTRA_TIME_OPTIONS.map((mins) => (
@@ -212,7 +231,7 @@ export function TaskDetailPanel({
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="h-6 px-2 text-[10px] tabular-nums"
+                  className="h-7 px-2.5 text-[10px] tabular-nums"
                   onClick={() => onAdjustExtraTime(mins)}
                 >
                   +{mins}m
@@ -226,7 +245,7 @@ export function TaskDetailPanel({
                       type="button"
                       size="sm"
                       variant="outline"
-                      className="h-6 px-2 text-[10px] tabular-nums text-destructive hover:text-destructive"
+                      className="h-7 px-2.5 text-[10px] tabular-nums text-destructive hover:text-destructive"
                       onClick={() => onAdjustExtraTime(-mins)}
                     >
                       −{mins}m
@@ -236,7 +255,7 @@ export function TaskDetailPanel({
                     type="button"
                     size="sm"
                     variant="ghost"
-                    className="h-6 px-2 text-[10px] text-destructive hover:text-destructive"
+                    className="h-7 px-2 text-[10px] text-destructive hover:text-destructive"
                     onClick={() => onAdjustExtraTime(-extraTime)}
                   >
                     Clear extra
