@@ -11,6 +11,7 @@ import {
   calcInstallmentAmount,
   calcValuePerUserExGst,
   installmentBaseAmount,
+  originalInstallments,
   roundMoney,
   validateInstallmentTotal,
 } from "@/lib/crm-account-commercial";
@@ -56,8 +57,10 @@ export const crmAccountSchema = z.object({
   installments: z
     .array(
       z.object({
+        id: z.string().optional(),
         amount: z.coerce.number().min(0),
         dueDate: z.string(),
+        kind: z.enum(["renewal"]).optional(),
       }),
     )
     .optional(),
@@ -138,7 +141,8 @@ export function crmAccountToFormValues(
   const users = account.usersPurchased ?? 1;
   const pending = account.pendingAmount ?? 0;
   const installments = account.installments ?? [];
-  const installmentCount = account.installmentCount ?? installments.length;
+  const original = originalInstallments(installments);
+  const installmentCount = original.length || account.installmentCount || 0;
   return {
     name: account.name,
     userId: account.userId ?? "",
@@ -187,10 +191,11 @@ export function normalizeCrmAccountForm(data: CrmAccountFormValues) {
     data.valuePerUser != null && !Number.isNaN(Number(data.valuePerUser))
       ? roundMoney(Number(data.valuePerUser))
       : calcValuePerUserExGst(dealSize, gstPercent, usersPurchased);
-  const installmentCount = Math.max(0, Math.floor(Number(data.installmentCount) || 0));
   const installments = (data.installments ?? []).map((row) => ({
+    id: row.id?.trim() || undefined,
     amount: roundMoney(Number(row.amount) || 0),
     dueDate: row.dueDate.slice(0, 10),
+    ...(row.kind === "renewal" ? { kind: "renewal" as const } : {}),
   }));
   return {
     name: data.name.trim(),
@@ -219,7 +224,7 @@ export function normalizeCrmAccountForm(data: CrmAccountFormValues) {
     gstPercent,
     pendingAmount,
     paymentReceived: Math.max(0, roundMoney(dealSize - pendingAmount)),
-    installmentCount: installmentCount || undefined,
+    installmentCount: originalInstallments(installments).length || undefined,
     installments: installments.length > 0 ? installments : undefined,
     annualLicense: true,
     startDate: data.startDate,

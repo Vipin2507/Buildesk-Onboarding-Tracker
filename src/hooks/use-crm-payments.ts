@@ -3,6 +3,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createCrmPaymentRemark,
   deleteCrmPaymentRemark,
+  addCrmPaymentInstallment,
+  updateCrmPaymentInstallment,
+  deleteCrmPaymentInstallment,
   getCrmPaymentInstallments,
   getCrmPaymentsSummary,
   listCrmPaymentRemarks,
@@ -235,6 +238,49 @@ export function useDeleteCrmPayment(search: CrmPaymentsSearch) {
   return useMutation({
     mutationFn: (input: { id: string; accountId: string }) =>
       deleteCrmPaymentTransaction({ data: input }),
+    onSuccess: (_data, variables) => {
+      invalidatePaymentAccount(queryClient, filters, variables.accountId);
+    },
+  });
+}
+
+export function useAddCrmPaymentInstallment(search: CrmPaymentsSearch) {
+  const queryClient = useQueryClient();
+  const filters = toFilters(search);
+
+  return useMutation({
+    mutationFn: (input: { accountId: string; amount: number; dueDate: string }) =>
+      addCrmPaymentInstallment({ data: input }),
+    onSuccess: (_data, variables) => {
+      invalidatePaymentAccount(queryClient, filters, variables.accountId);
+    },
+  });
+}
+
+export function useUpdateCrmPaymentInstallment(search: CrmPaymentsSearch) {
+  const queryClient = useQueryClient();
+  const filters = toFilters(search);
+
+  return useMutation({
+    mutationFn: (input: {
+      accountId: string;
+      installmentId: string;
+      amount: number;
+      dueDate: string;
+    }) => updateCrmPaymentInstallment({ data: input }),
+    onSuccess: (_data, variables) => {
+      invalidatePaymentAccount(queryClient, filters, variables.accountId);
+    },
+  });
+}
+
+export function useDeleteCrmPaymentInstallment(search: CrmPaymentsSearch) {
+  const queryClient = useQueryClient();
+  const filters = toFilters(search);
+
+  return useMutation({
+    mutationFn: (input: { accountId: string; installmentId: string }) =>
+      deleteCrmPaymentInstallment({ data: input }),
     onSuccess: (_data, variables) => {
       invalidatePaymentAccount(queryClient, filters, variables.accountId);
     },

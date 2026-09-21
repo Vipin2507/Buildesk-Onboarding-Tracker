@@ -4,6 +4,10 @@ import { toast } from "sonner";
 
 import { CrmPaymentRemarksPanel } from "@/components/crm/crm-payment-remarks-panel";
 import {
+  CrmPaymentInstallmentDialog,
+  type InstallmentDialogInitial,
+} from "@/components/crm/crm-payment-installment-dialog";
+import {
   CrmRecordPaymentDialog,
   type PaymentDialogInitial,
 } from "@/components/crm/crm-record-payment-dialog";
@@ -11,13 +15,16 @@ import { ConfirmDeleteDialog } from "@/components/entity-form-modal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  useAddCrmPaymentInstallment,
   useCrmPaymentInstallments,
   useCrmPaymentTransactions,
   useDeleteCrmPayment,
+  useDeleteCrmPaymentInstallment,
   useRecordCrmPayment,
   useRemindCrmPayment,
   useRemindCrmPaymentExecutive,
   useUpdateCrmPayment,
+  useUpdateCrmPaymentInstallment,
 } from "@/hooks/use-crm-payments";
 import { refreshAutomationLogsInStore } from "@/lib/automation-log-sync";
 import type { CrmPaymentsSearch } from "@/lib/crm-payments-search";
@@ -60,20 +67,42 @@ type Props = {
 export function CrmPaymentsExpandedRow({ row, search }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editInitial, setEditInitial] = useState<PaymentDialogInitial | null>(null);
+  const [installmentDialogOpen, setInstallmentDialogOpen] = useState(false);
+  const [installmentInitial, setInstallmentInitial] = useState<InstallmentDialogInitial | null>(
+    null,
+  );
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; amount: number } | null>(
     null,
   );
+  const [deleteInstallment, setDeleteInstallment] = useState<{
+    id: string;
+    amount: number;
+  } | null>(null);
   const installmentsQuery = useCrmPaymentInstallments(row.id, true);
   const transactionsQuery = useCrmPaymentTransactions(row.id, true);
   const recordPayment = useRecordCrmPayment(search);
   const updatePayment = useUpdateCrmPayment(search);
   const deletePayment = useDeleteCrmPayment(search);
+  const addInstallment = useAddCrmPaymentInstallment(search);
+  const updateInstallment = useUpdateCrmPaymentInstallment(search);
+  const removeInstallment = useDeleteCrmPaymentInstallment(search);
   const remindClient = useRemindCrmPayment();
   const remindExecutive = useRemindCrmPaymentExecutive();
 
   function openCreate() {
     setEditInitial(null);
     setDialogOpen(true);
+  }
+
+  function openAddInstallment() {
+    setInstallmentInitial(null);
+    setInstallmentDialogOpen(true);
+  }
+
+  function openEditInstallment(inst: { id?: string; amount: number; dueDate: string }) {
+    if (!inst.id) return;
+    setInstallmentInitial({ id: inst.id, amount: inst.amount, dueDate: inst.dueDate });
+    setInstallmentDialogOpen(true);
   }
 
   function openEdit(txn: {
@@ -144,6 +173,16 @@ export function CrmPaymentsExpandedRow({ row, search }: Props) {
               size="sm"
               variant="outline"
               className="h-7 gap-1 px-2 text-[11px]"
+              onClick={openAddInstallment}
+            >
+              <Plus className="h-3 w-3" />
+              Add installment
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1 px-2 text-[11px]"
               disabled={remindClient.isPending}
               onClick={() => void handleRemindClient()}
             >
@@ -166,7 +205,9 @@ export function CrmPaymentsExpandedRow({ row, search }: Props) {
         {installmentsQuery.isLoading ? (
           <p className="py-2 text-xs text-muted-foreground">Loading schedule…</p>
         ) : installments.length === 0 ? (
-          <p className="py-2 text-xs text-muted-foreground">No installments configured.</p>
+          <p className="py-2 text-xs text-muted-foreground">
+            No installments configured. Add a renewal installment to schedule the next due.
+          </p>
         ) : (
           <div className="overflow-x-auto rounded-md border border-border">
             <table className="w-full min-w-[280px] text-xs">
@@ -176,6 +217,7 @@ export function CrmPaymentsExpandedRow({ row, search }: Props) {
                   <th className="px-2 py-1.5 text-left font-medium">Amount</th>
                   <th className="px-2 py-1.5 text-left font-medium">Due</th>
                   <th className="px-2 py-1.5 text-left font-medium">Status</th>
+                  <th className="px-2 py-1.5 text-right font-medium"> </th>
                 </tr>
               </thead>
               <tbody>
@@ -192,15 +234,53 @@ export function CrmPaymentsExpandedRow({ row, search }: Props) {
                     </td>
                     <td className="px-2 py-1.5">{formatDate(inst.dueDate)}</td>
                     <td className="px-2 py-1.5">
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "rounded-md px-1.5 py-0 text-[10px] font-medium",
-                          installmentStatusClass(inst.status),
-                        )}
-                      >
-                        {installmentStatusLabel(inst.status)}
-                      </Badge>
+                      <div className="flex flex-wrap items-center gap-1">
+                        {inst.kind === "renewal" ? (
+                          <Badge
+                            variant="outline"
+                            className="rounded-md border-violet-500/30 bg-violet-500/10 px-1.5 py-0 text-[10px] font-medium text-violet-700 dark:text-violet-400"
+                          >
+                            Renewal
+                          </Badge>
+                        ) : null}
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "rounded-md px-1.5 py-0 text-[10px] font-medium",
+                            installmentStatusClass(inst.status),
+                          )}
+                        >
+                          {installmentStatusLabel(inst.status)}
+                        </Badge>
+                      </div>
+                    </td>
+                    <td className="px-2 py-1.5 text-right">
+                      {inst.id && inst.kind === "renewal" ? (
+                        <div className="flex justify-end gap-0.5">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0 text-muted-foreground"
+                            aria-label="Edit installment"
+                            onClick={() => openEditInstallment(inst)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                            aria-label="Delete installment"
+                            onClick={() =>
+                              setDeleteInstallment({ id: inst.id!, amount: inst.amount })
+                            }
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      ) : null}
                     </td>
                   </tr>
                 ))}
@@ -322,6 +402,32 @@ export function CrmPaymentsExpandedRow({ row, search }: Props) {
         }}
       />
 
+      <CrmPaymentInstallmentDialog
+        open={installmentDialogOpen}
+        onOpenChange={(open) => {
+          setInstallmentDialogOpen(open);
+          if (!open) setInstallmentInitial(null);
+        }}
+        accountName={row.accountName}
+        initial={installmentInitial}
+        onSubmit={async (input) => {
+          if (installmentInitial) {
+            await updateInstallment.mutateAsync({
+              accountId: row.id,
+              installmentId: installmentInitial.id,
+              amount: input.amount,
+              dueDate: input.dueDate,
+            });
+          } else {
+            await addInstallment.mutateAsync({
+              accountId: row.id,
+              amount: input.amount,
+              dueDate: input.dueDate,
+            });
+          }
+        }}
+      />
+
       <ConfirmDeleteDialog
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => {
@@ -335,6 +441,32 @@ export function CrmPaymentsExpandedRow({ row, search }: Props) {
         }
         onConfirm={() => void handleDeleteConfirm()}
         confirmLabel={deletePayment.isPending ? "Deleting…" : "Delete"}
+      />
+
+      <ConfirmDeleteDialog
+        open={Boolean(deleteInstallment)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteInstallment(null);
+        }}
+        title="Delete installment?"
+        description={
+          deleteInstallment
+            ? `Remove the ${formatInr(deleteInstallment.amount)} renewal installment from this schedule?`
+            : undefined
+        }
+        onConfirm={() => {
+          if (!deleteInstallment) return;
+          void removeInstallment
+            .mutateAsync({ accountId: row.id, installmentId: deleteInstallment.id })
+            .then(() => {
+              toast.success("Installment deleted");
+              setDeleteInstallment(null);
+            })
+            .catch((e) => {
+              toast.error(e instanceof Error ? e.message : "Failed to delete installment");
+            });
+        }}
+        confirmLabel={removeInstallment.isPending ? "Deleting…" : "Delete"}
       />
     </div>
   );

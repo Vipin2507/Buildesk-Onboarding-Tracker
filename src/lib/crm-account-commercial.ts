@@ -47,6 +47,18 @@ export function calcDealInclGstFromPerUser(
   return roundMoney(dealExGst * (1 + rate));
 }
 
+export function isRenewalInstallment(row: CrmAccountInstallment): boolean {
+  return row.kind === "renewal";
+}
+
+export function originalInstallments(installments: CrmAccountInstallment[]): CrmAccountInstallment[] {
+  return installments.filter((row) => !isRenewalInstallment(row));
+}
+
+export function renewalInstallments(installments: CrmAccountInstallment[]): CrmAccountInstallment[] {
+  return installments.filter((row) => isRenewalInstallment(row));
+}
+
 export function sumInstallments(installments: CrmAccountInstallment[]): number {
   return roundMoney(installments.reduce((sum, row) => sum + (Number(row.amount) || 0), 0));
 }
@@ -62,14 +74,14 @@ export type InstallmentTotalValidation = {
   message?: string;
 };
 
-/** Installments must sum exactly to pending (or full deal if pending is zero). */
+/** Original-cycle installments must sum exactly to pending (or full deal if pending is zero). Renewal rows are excluded. */
 export function validateInstallmentTotal(
   dealSize: number,
   pendingAmount: number,
   installments: CrmAccountInstallment[],
 ): InstallmentTotalValidation {
   const target = installmentScheduleTarget(dealSize, pendingAmount);
-  const total = sumInstallments(installments);
+  const total = sumInstallments(originalInstallments(installments));
   if (installments.length === 0 || target <= 0) {
     return { ok: true, total, target };
   }
@@ -157,10 +169,17 @@ export function parseInstallmentsJson(raw: string | null | undefined): CrmAccoun
     return parsed
       .map((row) => {
         if (!row || typeof row !== "object") return null;
-        const amount = Number((row as { amount?: unknown }).amount);
-        const dueDate = String((row as { dueDate?: unknown }).dueDate ?? "").slice(0, 10);
+        const rec = row as { id?: unknown; amount?: unknown; dueDate?: unknown; kind?: unknown };
+        const amount = Number(rec.amount);
+        const dueDate = String(rec.dueDate ?? "").slice(0, 10);
         if (!dueDate || Number.isNaN(amount)) return null;
-        return { amount: roundMoney(amount), dueDate };
+        const id = String(rec.id ?? "").trim();
+        return {
+          ...(id ? { id } : {}),
+          amount: roundMoney(amount),
+          dueDate,
+          ...(rec.kind === "renewal" ? { kind: "renewal" as const } : {}),
+        };
       })
       .filter((row): row is CrmAccountInstallment => row != null);
   } catch {

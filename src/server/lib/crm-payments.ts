@@ -1,6 +1,6 @@
 import { desc, eq, sql } from "drizzle-orm";
 
-import { parseInstallmentsJson, roundMoney } from "@/lib/crm-account-commercial";
+import { parseInstallmentsJson, originalInstallments, roundMoney, serializeInstallments } from "@/lib/crm-account-commercial";
 import {
   allocateAccountPayments,
   classifyPaymentTransactionRenewal,
@@ -770,6 +770,79 @@ export function listAccountInstallmentsWithStatus(
   const received = getAccountPaymentReceived(db, accountId);
   const snap = buildAccountPaymentSnapshot(account, received);
   return snap.installments;
+}
+
+function persistAccountInstallments(
+  db: ReturnType<typeof getDb>,
+  accountId: string,
+  installments: CrmAccountInstallment[],
+) {
+  const account = db.select().from(t.crmAccounts).where(eq(t.crmAccounts.id, accountId)).get();
+  if (!account) throw new Error("CRM account not found");
+  db.update(t.crmAccounts)
+    .set({
+      installmentsJson: serializeInstallments(installments),
+      installmentCount: originalInstallments(installments).length || null,
+      updatedAt: nowIso(),
+    })
+    .where(eq(t.crmAccounts.id, accountId))
+    .run();
+  syncAccountPaymentTotals(db, accountId);
+  return listAccountInstallmentsWithStatus(db, accountId) ?? [];
+}
+
+export function addAccountRenewalInstallment(
+  db: ReturnType<typeof getDb>,
+  accountId: string,
+  input: { amount: number; dueDate: string },
+) {
+  const account = db.select().from(t.crmAccounts).where(eq(t.crmAccounts.id, accountId)).get();
+  if (!account) throw new Error("CRM account not found");
+  const amount = roundMoney(input.amount);
+  if (amount <= 0) throw new Error("Installment amount must be greater than zero");
+  const dueDate = input.dueDate.slice(0, 10);
+  if (!dueDate) throw new Error("Due date is required");
+  const existing = parseInstallmentsJson(account.installmentsJson);
+  return persistAccountInstallments(db, accountId, [
+    ...existing,
+    { id: newId(), amount, dueDate, kind: "renewal" },
+  ]);
+}
+
+export function updateAccountInstallment(
+  db: ReturnType<typeof getDb>,
+  accountId: string,
+  input: { installmentId: string; amount: number; dueDate: string },
+) {
+  const account = db.select().from(t.crmAccounts).where(eq(t.crmAccounts.id, accountId)).get();
+  if (!account) throw new Error("CRM account not found");
+  const existing = parseInstallmentsJson(account.installmentsJson);
+  const idx = existing.findIndex((row) => row.id === input.installmentId);
+  if (idx < 0) throw new Error("Installment not found");
+  const amount = roundMoney(input.amount);
+  if (amount <= 0) throw new Error("Installment amount must be greater than zero");
+  const dueDate = input.dueDate.slice(0, 10);
+  if (!dueDate) throw new Error("Due date is required");
+  const next = [...existing];
+  next[idx] = { ...next[idx], amount, dueDate };
+  return persistAccountInstallments(db, accountId, next);
+}
+
+export function deleteAccountInstallment(
+  db: ReturnType<typeof getDb>,
+  accountId: string,
+  installmentId: string,
+) {
+  const account = db.select().from(t.crmAccounts).where(eq(t.crmAccounts.id, accountId)).get();
+  if (!account) throw new Error("CRM account not found");
+  const existing = parseInstallmentsJson(account.installmentsJson);
+  const target = existing.find((row) => row.id === installmentId);
+  if (!target) throw new Error("Installment not found");
+  return persistAccountInstallments(
+    db,
+    accountId,
+    existing.filter((row) => row.id !== installmentId),
+  );
 }
 
 export function listAccountPaymentTransactions(

@@ -46,6 +46,9 @@ export type CrmAccount = Timestamps & {
 };
 
 export type CrmAccountInstallment = {
+  id?: string;
   amount: number;
   dueDate: string;
+  /** Extra dues after the original deal is collected. */
+  kind?: "renewal";
 };

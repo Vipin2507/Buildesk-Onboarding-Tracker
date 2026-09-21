@@ -24,6 +24,9 @@ import {
   updatePaymentTransaction,
   deletePaymentTransaction,
   listAccountInstallmentsWithStatus,
+  addAccountRenewalInstallment,
+  updateAccountInstallment,
+  deleteAccountInstallment,
   listAccountPaymentRemarks,
   listAccountPaymentTransactions,
   deletePaymentRemark,
@@ -146,6 +149,64 @@ export const getCrmPaymentInstallments = createServerFn({ method: "GET" })
     const rows = listAccountInstallmentsWithStatus(db, data.accountId);
     if (!rows) throw new ApiError(404, "CRM account not found");
     return rows;
+  });
+
+export const addCrmPaymentInstallment = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        accountId: z.string().min(1),
+        amount: z.coerce.number().positive(),
+        dueDate: z.string().min(1),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    assertCanViewAccountId(user, data.accountId);
+    const db = getDb();
+    return addAccountRenewalInstallment(db, data.accountId, {
+      amount: data.amount,
+      dueDate: data.dueDate,
+    });
+  });
+
+export const updateCrmPaymentInstallment = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        accountId: z.string().min(1),
+        installmentId: z.string().min(1),
+        amount: z.coerce.number().positive(),
+        dueDate: z.string().min(1),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    assertCanViewAccountId(user, data.accountId);
+    const db = getDb();
+    return updateAccountInstallment(db, data.accountId, {
+      installmentId: data.installmentId,
+      amount: data.amount,
+      dueDate: data.dueDate,
+    });
+  });
+
+export const deleteCrmPaymentInstallment = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        accountId: z.string().min(1),
+        installmentId: z.string().min(1),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    assertCanViewAccountId(user, data.accountId);
+    const db = getDb();
+    return deleteAccountInstallment(db, data.accountId, data.installmentId);
   });
 
 export const listCrmPaymentTransactions = createServerFn({ method: "GET" })

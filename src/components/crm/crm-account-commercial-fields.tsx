@@ -10,6 +10,8 @@ import {
   calcInstallmentAmount,
   calcValuePerUserExGst,
   installmentBaseAmount,
+  originalInstallments,
+  renewalInstallments,
   roundMoney,
   sumInstallments,
   validateInstallmentTotal,
@@ -70,9 +72,11 @@ export function CrmAccountCommercialFields({
   const dealExGst = calcDealExGst(dealSize, gstPercent);
   const gstAmount = calcGstAmount(dealSize, gstPercent);
   const installmentTarget = installmentBaseAmount(dealSize, pendingAmount);
-  const installmentTotal = sumInstallments(installments);
+  const originalRows = originalInstallments(installments);
+  const renewalRows = renewalInstallments(installments);
+  const installmentTotal = sumInstallments(originalRows);
   const installmentCheck =
-    installments.length > 0 && installmentTarget > 0
+    originalRows.length > 0 && installmentTarget > 0
       ? validateInstallmentTotal(dealSize, pendingAmount, installments)
       : null;
 
@@ -99,7 +103,7 @@ export function CrmAccountCommercialFields({
     });
     setCommercial({
       installmentCount: count,
-      installments: rows,
+      installments: [...rows, ...renewalInstallments(installments)],
       installmentAmount:
         amountEach ?? (rows[0]?.amount ?? calcInstallmentAmount(base, count)),
     });
@@ -289,7 +293,10 @@ export function CrmAccountCommercialFields({
                   markDriver("installmentCount");
                   const count = Math.max(0, Math.floor(Number(e.target.value) || 0));
                   if (count === 0) {
-                    setCommercial({ installments: [], installmentAmount: 0 });
+                    setCommercial({
+                      installments: renewalInstallments(installments),
+                      installmentAmount: 0,
+                    });
                   }
                 },
               })}
@@ -317,7 +324,7 @@ export function CrmAccountCommercialFields({
           </div>
         </div>
 
-        {installments.length > 0 ? (
+        {originalRows.length > 0 ? (
           <div className="mt-3 overflow-hidden rounded-lg border">
             <table className="w-full text-xs">
               <thead className="bg-muted/60 text-[10px] uppercase tracking-wide text-muted-foreground">
@@ -328,8 +335,8 @@ export function CrmAccountCommercialFields({
                 </tr>
               </thead>
               <tbody>
-                {installments.map((row, index) => (
-                  <tr key={index} className="border-t">
+                {originalRows.map((row, index) => (
+                  <tr key={row.id ?? `orig-${index}`} className="border-t">
                     <td className="px-2 py-1.5 tabular-nums text-muted-foreground">{index + 1}</td>
                     <td className="px-2 py-1.5">
                       <input
@@ -338,12 +345,12 @@ export function CrmAccountCommercialFields({
                         step="any"
                         value={row.amount}
                         onChange={(e) => {
-                          const next = [...installments];
-                          next[index] = {
-                            ...next[index],
+                          const nextOriginal = [...originalRows];
+                          nextOriginal[index] = {
+                            ...nextOriginal[index],
                             amount: roundMoney(Number(e.target.value) || 0),
                           };
-                          setCommercial({ installments: next });
+                          setCommercial({ installments: [...nextOriginal, ...renewalRows] });
                           void form.trigger("installments");
                         }}
                         className={cn(fieldClass(), "mt-0 h-8")}
@@ -355,9 +362,9 @@ export function CrmAccountCommercialFields({
                         modal
                         value={row.dueDate}
                         onChange={(v) => {
-                          const next = [...installments];
-                          next[index] = { ...next[index], dueDate: v };
-                          setCommercial({ installments: next });
+                          const nextOriginal = [...originalRows];
+                          nextOriginal[index] = { ...nextOriginal[index], dueDate: v };
+                          setCommercial({ installments: [...nextOriginal, ...renewalRows] });
                         }}
                       />
                     </td>
@@ -381,7 +388,7 @@ export function CrmAccountCommercialFields({
                 </>
               ) : null}
               {" · "}
-              First due {installments[0]?.dueDate ? formatDate(installments[0].dueDate) : "—"}
+              First due {originalRows[0]?.dueDate ? formatDate(originalRows[0].dueDate) : "—"}
               {installmentCheck && !installmentCheck.ok ? (
                 <div className="mt-1 font-medium">{installmentCheck.message}</div>
               ) : null}
@@ -391,6 +398,110 @@ export function CrmAccountCommercialFields({
         ) : (
           <p className="mt-2 text-[11px] text-muted-foreground">
             Set the number of installments to generate due dates from the contract start date.
+          </p>
+        )}
+      </div>
+
+      <div className="rounded-lg border border-dashed border-violet-500/30 bg-violet-500/5 p-3">
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <div className="text-xs font-semibold">Renewal installments</div>
+          <button
+            type="button"
+            className="text-[11px] font-medium text-primary hover:underline"
+            onClick={() => {
+              const today = new Date().toISOString().slice(0, 10);
+              const lastDue =
+                renewalRows[renewalRows.length - 1]?.dueDate ||
+                originalRows[originalRows.length - 1]?.dueDate ||
+                startDate ||
+                today;
+              const nextDue = lastDue ? lastDue : today;
+              setCommercial({
+                installments: [
+                  ...originalRows,
+                  ...renewalRows,
+                  { amount: 0, dueDate: nextDue, kind: "renewal" },
+                ],
+              });
+            }}
+          >
+            + Add installment
+          </button>
+        </div>
+        <p className="mb-2 text-[10px] text-muted-foreground">
+          Schedule extra dues after the original deal is paid. These are not counted against deal value.
+        </p>
+        {renewalRows.length > 0 ? (
+          <div className="overflow-hidden rounded-lg border bg-background">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/60 text-[10px] uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th className="px-2 py-1.5 text-left font-medium">#</th>
+                  <th className="px-2 py-1.5 text-left font-medium">Amount (₹)</th>
+                  <th className="px-2 py-1.5 text-left font-medium">Due date</th>
+                  <th className="px-2 py-1.5 text-right font-medium"> </th>
+                </tr>
+              </thead>
+              <tbody>
+                {renewalRows.map((row, index) => (
+                  <tr key={row.id ?? `ren-${index}`} className="border-t">
+                    <td className="px-2 py-1.5 tabular-nums text-muted-foreground">{index + 1}</td>
+                    <td className="px-2 py-1.5">
+                      <input
+                        type="number"
+                        min={0}
+                        step="any"
+                        value={row.amount}
+                        onChange={(e) => {
+                          const nextRenewal = [...renewalRows];
+                          nextRenewal[index] = {
+                            ...nextRenewal[index],
+                            amount: roundMoney(Number(e.target.value) || 0),
+                          };
+                          setCommercial({ installments: [...originalRows, ...nextRenewal] });
+                        }}
+                        className={cn(fieldClass(), "mt-0 h-8")}
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <DatePickerField
+                        compact
+                        modal
+                        value={row.dueDate}
+                        onChange={(v) => {
+                          const nextRenewal = [...renewalRows];
+                          nextRenewal[index] = { ...nextRenewal[index], dueDate: v };
+                          setCommercial({ installments: [...originalRows, ...nextRenewal] });
+                        }}
+                      />
+                    </td>
+                    <td className="px-2 py-1.5 text-right">
+                      <button
+                        type="button"
+                        className="text-[11px] text-destructive hover:underline"
+                        onClick={() => {
+                          setCommercial({
+                            installments: [
+                              ...originalRows,
+                              ...renewalRows.filter((_, i) => i !== index),
+                            ],
+                          });
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="border-t bg-muted/20 px-2 py-1.5 text-[10px] text-muted-foreground">
+              Renewal total: ₹{sumInstallments(renewalRows).toLocaleString("en-IN")}
+            </div>
+          </div>
+        ) : (
+          <p className="text-[11px] text-muted-foreground">
+            No renewal installments yet. Add dues for the next billing cycle.
           </p>
         )}
       </div>

@@ -1,4 +1,4 @@
-import { roundMoney } from "@/lib/crm-account-commercial";
+import { isRenewalInstallment, originalInstallments, roundMoney } from "@/lib/crm-account-commercial";
 import type { CrmAccountInstallment } from "@/types/crm-account";
 
 export const PAYMENT_BACKFILL_NOTE = "migration:initial-backfill";
@@ -218,14 +218,18 @@ export function allocateAccountPayments(input: {
   const totalReceived = roundMoney(Math.max(0, input.totalReceived));
   const totalDealValue = roundMoney(Math.max(0, input.totalDealValue));
   const ordered = [...input.installments].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  const originalRows = originalInstallments(ordered);
 
-  let pool = installmentAllocatablePool(totalReceived, totalDealValue, ordered);
+  let originalPool = installmentAllocatablePool(totalReceived, totalDealValue, originalRows);
+  let renewalPool = renewalAmountFromTotals(totalReceived, totalDealValue);
   const allocated: AllocatedInstallment[] = [];
   let overdueAmount = 0;
 
   for (let i = 0; i < ordered.length; i++) {
     const row = ordered[i]!;
     const amount = roundMoney(Number(row.amount) || 0);
+    const isRenewal = isRenewalInstallment(row);
+    let pool = isRenewal ? renewalPool : originalPool;
     let paidAmount = 0;
     let remainingAmount = amount;
     let status: InstallmentDerivedStatus = "pending";
@@ -242,6 +246,9 @@ export function allocateAccountPayments(input: {
       status = "partially_paid";
     }
 
+    if (isRenewal) renewalPool = pool;
+    else originalPool = pool;
+
     if (remainingAmount > 0) {
       const isOverdue = row.dueDate.slice(0, 10) < today;
       if (isOverdue) {
@@ -256,6 +263,8 @@ export function allocateAccountPayments(input: {
 
     allocated.push({
       index: i + 1,
+      id: row.id,
+      kind: row.kind,
       amount,
       dueDate: row.dueDate,
       status,
@@ -282,7 +291,7 @@ export function allocateAccountPayments(input: {
   const renewalAmount = renewalAmountFromTotals(totalReceived, totalDealValue);
   if (renewalAmount > 0.01) {
     paymentStatus = "renewal";
-  } else if (totalDealValue > 0 && totalReceived >= totalDealValue - 0.01) {
+  } else if (totalDealValue > 0 && totalReceived >= totalDealValue - 0.01 && !nextDueInstallment) {
     paymentStatus = "fully_paid";
   } else if (totalReceived <= 0 && !nextDueInstallment) {
     paymentStatus = "not_started";
