@@ -384,9 +384,9 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
               masterFollowUps: r.masterFollowUps ?? [],
               masterTeams: r.masterTeams ?? [],
               tracker: {
-                stage: "new_account",
                 priority: "medium",
-                ...r.tracker,
+                ...(r.tracker ?? {}),
+                stage: normalizeCrmImplementationStage(r.tracker?.stage),
               },
             }),
           ),
