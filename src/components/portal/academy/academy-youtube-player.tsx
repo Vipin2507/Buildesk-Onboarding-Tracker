@@ -26,7 +26,6 @@ import {
   pauseYouTubePlayer,
   playYouTubePlayer,
   postYouTubeCommand,
-  readYouTubeMuted,
   unmuteYouTubePlayer,
   YT_PLAYER_STATE,
   type YouTubePlayerInstance,
@@ -53,6 +52,8 @@ export const AcademyYouTubePlayer = forwardRef<
   const playerRef = useRef<YouTubePlayerInstance | null>(null);
   const pollRef = useRef<number | null>(null);
   const playKickRef = useRef<number | null>(null);
+  /** Explicit user mute preference — never overwrite from YouTube autoplay mute. */
+  const userMutedRef = useRef(false);
 
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,7 +83,6 @@ export const AcademyYouTubePlayer = forwardRef<
         setCurrent(p.getCurrentTime() || 0);
         const d = p.getDuration();
         if (d && Number.isFinite(d)) setDuration(d);
-        setMuted(p.isMuted() || (p.getVolume?.() ?? 1) <= 0);
       } catch {
         /* player mid-destroy — keep previous UI */
       }
@@ -119,27 +119,43 @@ export const AcademyYouTubePlayer = forwardRef<
       const p = playerRef.current;
       if (!p) return;
       clearPlayKick();
-      // Prefer unmuted play on the user gesture; mute only if caller asks or kickstart retries.
-      playYouTubePlayer(p, { muteFirst: Boolean(opts?.muteFirst) });
-      if (opts?.muteFirst) {
+      const timeAtRequest = (() => {
         try {
-          setMuted(p.isMuted());
+          return p.getCurrentTime() || 0;
         } catch {
-          setMuted(true);
+          return 0;
         }
+      })();
+
+      // Prefer unmuted play on the user gesture.
+      if (opts?.muteFirst) {
+        muteYouTubePlayer(p);
+        playYouTubePlayer(p, { muteFirst: true });
+      } else if (!userMutedRef.current) {
+        unmuteYouTubePlayer(p);
+        playYouTubePlayer(p);
+        setMuted(false);
+      } else {
+        playYouTubePlayer(p);
       }
       markPlayingOptimistic();
 
-      // Nested CRM iframes often block unmuted play — retry muted if still idle.
+      // Only mute-kickstart if playback never actually started (don't mute a working video).
       playKickRef.current = window.setTimeout(() => {
         playKickRef.current = null;
         const player = playerRef.current;
-        if (!player || isYouTubePlayerActivelyPlaying(player)) return;
+        if (!player) return;
+        if (isYouTubePlayerActivelyPlaying(player)) return;
+        try {
+          if ((player.getCurrentTime() || 0) > timeAtRequest + 0.2) return;
+        } catch {
+          /* ignore */
+        }
         muteYouTubePlayer(player);
         playYouTubePlayer(player, { muteFirst: true });
-        setMuted(true);
+        // Keep UI unmuted unless the user muted — restore sound once PLAYING if allowed.
         markPlayingOptimistic();
-      }, 400);
+      }, 600);
     },
     [clearPlayKick, markPlayingOptimistic],
   );
@@ -184,6 +200,8 @@ export const AcademyYouTubePlayer = forwardRef<
     setError(null);
     setPlaying(false);
     setStarted(false);
+    setMuted(false);
+    userMutedRef.current = false;
     setCaptionsOn(false);
     setCurrent(0);
     setDuration(0);
@@ -222,7 +240,8 @@ export const AcademyYouTubePlayer = forwardRef<
               setReady(true);
               try {
                 setDuration(e.target.getDuration() || 0);
-                setMuted(readYouTubeMuted(e.target, false));
+                // Don't mirror YouTube's initial muted flag — it flips on for autoplay policy.
+                setMuted(userMutedRef.current);
                 // Start with captions off; user can toggle via CC control
                 e.target.unloadModule?.("captions");
                 setCaptionsOn(false);
@@ -243,6 +262,11 @@ export const AcademyYouTubePlayer = forwardRef<
                 onPlayingChange?.(true);
                 startPoll();
                 revealControls();
+                // Restore sound after play (including mute-kickstart) unless user muted.
+                if (!userMutedRef.current) {
+                  unmuteYouTubePlayer(e.target);
+                  setMuted(false);
+                }
               } else if (isPaused) {
                 // Don't cancel mute kickstart — autoplay policies often pause unmuted play first.
                 if (playKickRef.current != null) return;
@@ -302,13 +326,14 @@ export const AcademyYouTubePlayer = forwardRef<
     const p = playerRef.current;
     if (!p || !ready) return;
     revealControls();
-    // Prefer React state — isMuted() is unreliable in nested CRM iframes.
-    const currentlyMuted = muted || readYouTubeMuted(p, false);
-    if (currentlyMuted) {
+    // Drive from UI state only — YouTube reports muted during autoplay even when we want sound.
+    if (muted) {
       unmuteYouTubePlayer(p);
+      userMutedRef.current = false;
       setMuted(false);
     } else {
       muteYouTubePlayer(p);
+      userMutedRef.current = true;
       setMuted(true);
     }
   }
