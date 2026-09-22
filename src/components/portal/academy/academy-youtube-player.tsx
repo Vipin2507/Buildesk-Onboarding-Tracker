@@ -19,7 +19,12 @@ import {
 import {
   formatYouTubeTime,
   getYouTubeThumbnailUrl,
+  hardenYouTubeIframe,
+  isYouTubePlayerActivelyPlaying,
   loadYouTubeIframeApi,
+  pauseYouTubePlayer,
+  playYouTubePlayer,
+  postYouTubeCommand,
   YT_PLAYER_STATE,
   type YouTubePlayerInstance,
 } from "@/lib/youtube";
@@ -44,6 +49,7 @@ export const AcademyYouTubePlayer = forwardRef<
   const hostRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YouTubePlayerInstance | null>(null);
   const pollRef = useRef<number | null>(null);
+  const playKickRef = useRef<number | null>(null);
 
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,6 +95,65 @@ export const AcademyYouTubePlayer = forwardRef<
     }, 2800);
   }, []);
 
+  const clearPlayKick = useCallback(() => {
+    if (playKickRef.current != null) {
+      window.clearTimeout(playKickRef.current);
+      playKickRef.current = null;
+    }
+  }, []);
+
+  const markPlayingOptimistic = useCallback(() => {
+    setPlaying(true);
+    setStarted(true);
+    onPlayingChange?.(true);
+    startPoll();
+    revealControls();
+  }, [onPlayingChange, revealControls, startPoll]);
+
+  const requestPlay = useCallback(
+    (opts?: { muteFirst?: boolean }) => {
+      const p = playerRef.current;
+      if (!p) return;
+      clearPlayKick();
+      // Prefer unmuted play on the user gesture; mute only if caller asks or kickstart retries.
+      playYouTubePlayer(p, { muteFirst: Boolean(opts?.muteFirst) });
+      if (opts?.muteFirst) {
+        try {
+          setMuted(p.isMuted());
+        } catch {
+          setMuted(true);
+        }
+      }
+      markPlayingOptimistic();
+
+      // Nested CRM iframes often block unmuted play — retry muted if still idle.
+      playKickRef.current = window.setTimeout(() => {
+        playKickRef.current = null;
+        const player = playerRef.current;
+        if (!player || isYouTubePlayerActivelyPlaying(player)) return;
+        playYouTubePlayer(player, { muteFirst: true });
+        try {
+          setMuted(true);
+        } catch {
+          /* ignore */
+        }
+        markPlayingOptimistic();
+      }, 400);
+    },
+    [clearPlayKick, markPlayingOptimistic],
+  );
+
+  const requestPause = useCallback(() => {
+    const p = playerRef.current;
+    if (!p) return;
+    clearPlayKick();
+    pauseYouTubePlayer(p);
+    setPlaying(false);
+    onPlayingChange?.(false);
+    stopPoll();
+    setControlsVisible(true);
+  }, [clearPlayKick, onPlayingChange, stopPoll]);
+
   useImperativeHandle(
     ref,
     () => ({
@@ -96,18 +161,18 @@ export const AcademyYouTubePlayer = forwardRef<
         const p = playerRef.current;
         if (!p) return false;
         try {
-          p.seekTo(Math.max(0, seconds), true);
-          p.playVideo();
-          setPlaying(true);
-          onPlayingChange?.(true);
-          revealControls();
+          const next = Math.max(0, seconds);
+          p.seekTo(next, true);
+          postYouTubeCommand(p, "seekTo", [next, true]);
+          setCurrent(next);
+          requestPlay();
           return true;
         } catch {
           return false;
         }
       },
     }),
-    [onPlayingChange, revealControls],
+    [requestPlay],
   );
 
   useEffect(() => {
@@ -139,6 +204,7 @@ export const AcademyYouTubePlayer = forwardRef<
             autoplay: 0,
             controls: 0,
             disablekb: 1,
+            enablejsapi: 1,
             fs: 0,
             iv_load_policy: 3,
             modestbranding: 1,
@@ -151,6 +217,7 @@ export const AcademyYouTubePlayer = forwardRef<
             onReady: (e) => {
               if (cancelled) return;
               playerRef.current = e.target;
+              hardenYouTubeIframe(e.target);
               setReady(true);
               try {
                 setDuration(e.target.getDuration() || 0);
@@ -164,16 +231,20 @@ export const AcademyYouTubePlayer = forwardRef<
             },
             onStateChange: (e) => {
               if (cancelled) return;
-              const isPlaying = e.data === YT_PLAYER_STATE.PLAYING;
+              const isPlaying =
+                e.data === YT_PLAYER_STATE.PLAYING || e.data === YT_PLAYER_STATE.BUFFERING;
               const isPaused =
                 e.data === YT_PLAYER_STATE.PAUSED || e.data === YT_PLAYER_STATE.ENDED;
               if (isPlaying) {
+                clearPlayKick();
                 setPlaying(true);
                 setStarted(true);
                 onPlayingChange?.(true);
                 startPoll();
                 revealControls();
               } else if (isPaused) {
+                // Don't cancel mute kickstart — autoplay policies often pause unmuted play first.
+                if (playKickRef.current != null) return;
                 setPlaying(false);
                 onPlayingChange?.(false);
                 stopPoll();
@@ -199,6 +270,7 @@ export const AcademyYouTubePlayer = forwardRef<
     return () => {
       cancelled = true;
       stopPoll();
+      clearPlayKick();
       if (hideTimerRef.current != null) window.clearTimeout(hideTimerRef.current);
       try {
         player?.destroy();
@@ -207,7 +279,7 @@ export const AcademyYouTubePlayer = forwardRef<
       }
       playerRef.current = null;
     };
-  }, [videoId, onPlayingChange, revealControls, startPoll, stopPoll]);
+  }, [videoId, onPlayingChange, revealControls, startPoll, stopPoll, clearPlayKick]);
 
   useEffect(() => {
     const onFs = () => setFullscreen(Boolean(document.fullscreenElement));
@@ -217,14 +289,12 @@ export const AcademyYouTubePlayer = forwardRef<
 
   function togglePlay() {
     const p = playerRef.current;
-    if (!p) return;
+    if (!p || !ready) return;
     revealControls();
-    try {
-      if (playing) p.pauseVideo();
-      else p.playVideo();
-    } catch {
-      /* ignore */
-    }
+    // Prefer live player state — React `playing` can desync inside nested CRM iframes.
+    const activelyPlaying = isYouTubePlayerActivelyPlaying(p) || playing;
+    if (activelyPlaying) requestPause();
+    else requestPlay();
   }
 
   function toggleMute() {
@@ -234,9 +304,11 @@ export const AcademyYouTubePlayer = forwardRef<
     try {
       if (p.isMuted()) {
         p.unMute();
+        postYouTubeCommand(p, "unMute");
         setMuted(false);
       } else {
         p.mute();
+        postYouTubeCommand(p, "mute");
         setMuted(true);
       }
     } catch {
@@ -287,8 +359,9 @@ export const AcademyYouTubePlayer = forwardRef<
     const next = ratio * duration;
     try {
       p.seekTo(next, true);
+      postYouTubeCommand(p, "seekTo", [next, true]);
       setCurrent(next);
-      if (!playing) p.playVideo();
+      if (!isYouTubePlayerActivelyPlaying(p) && !playing) requestPlay();
     } catch {
       /* ignore */
     }
@@ -415,10 +488,16 @@ export const AcademyYouTubePlayer = forwardRef<
                 const step = e.shiftKey ? 10 : 5;
                 if (e.key === "ArrowRight") {
                   e.preventDefault();
-                  p.seekTo(Math.min(duration, current + step), true);
+                  const next = Math.min(duration, current + step);
+                  p.seekTo(next, true);
+                  postYouTubeCommand(p, "seekTo", [next, true]);
+                  setCurrent(next);
                 } else if (e.key === "ArrowLeft") {
                   e.preventDefault();
-                  p.seekTo(Math.max(0, current - step), true);
+                  const next = Math.max(0, current - step);
+                  p.seekTo(next, true);
+                  postYouTubeCommand(p, "seekTo", [next, true]);
+                  setCurrent(next);
                 }
               }}
             >

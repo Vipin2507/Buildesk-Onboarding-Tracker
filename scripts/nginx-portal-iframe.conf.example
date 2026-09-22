@@ -15,6 +15,9 @@
 # Iframe src must be a /portal/ URL, not the site root:
 #   https://track.cravingcodetech.in/portal/{slug}/dashboard?embed=1
 #
+# Parent page iframe should allow media playback (Academy YouTube):
+#   <iframe src="..." allow="autoplay; encrypted-media; fullscreen; picture-in-picture"></iframe>
+#
 # Verify after deploy:
 #   bash scripts/verify-portal-iframe-headers.sh https://track.cravingcodetech.in {slug}
 #

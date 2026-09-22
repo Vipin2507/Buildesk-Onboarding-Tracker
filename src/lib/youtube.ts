@@ -89,6 +89,7 @@ export type YouTubePlayerInstance = {
   getCurrentTime: () => number;
   getDuration: () => number;
   getPlayerState: () => number;
+  getIframe?: () => HTMLIFrameElement;
   loadModule?: (module: string) => void;
   unloadModule?: (module: string) => void;
   setOption?: (module: string, option: string, value: unknown) => void;
@@ -184,27 +185,70 @@ export const YT_PLAYER_STATE = {
   CUED: 5,
 } as const;
 
-/** @deprecated Prefer AcademyYouTubePlayer seek handle */
-export function seekYouTubeIframe(iframe: HTMLIFrameElement | null, seconds: number) {
-  if (!iframe?.contentWindow) return false;
+/** postMessage fallback when Player API play/pause is blocked (nested iframes). */
+export function postYouTubeCommand(
+  player: YouTubePlayerInstance | null | undefined,
+  func: string,
+  args: unknown[] = [],
+) {
   try {
-    iframe.contentWindow.postMessage(
-      JSON.stringify({
-        event: "command",
-        func: "seekTo",
-        args: [Math.max(0, Math.floor(seconds)), true],
-      }),
+    const iframe = player?.getIframe?.();
+    iframe?.contentWindow?.postMessage(
+      JSON.stringify({ event: "command", func, args }),
       "*",
     );
-    iframe.contentWindow.postMessage(
-      JSON.stringify({
-        event: "command",
-        func: "playVideo",
-        args: [],
-      }),
-      "*",
-    );
-    return true;
+    return Boolean(iframe?.contentWindow);
+  } catch {
+    return false;
+  }
+}
+
+const YOUTUBE_IFRAME_ALLOW =
+  "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen";
+
+/** Ensure the YT iframe declares autoplay/fullscreen permissions (needed inside parent embeds). */
+export function hardenYouTubeIframe(player: YouTubePlayerInstance | null | undefined) {
+  try {
+    const iframe = player?.getIframe?.();
+    if (!iframe) return;
+    iframe.setAttribute("allow", YOUTUBE_IFRAME_ALLOW);
+    iframe.setAttribute("allowfullscreen", "true");
+    iframe.setAttribute("playsinline", "true");
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Play via API + postMessage; optional mute kickstart for nested-iframe autoplay policies. */
+export function playYouTubePlayer(
+  player: YouTubePlayerInstance | null | undefined,
+  opts?: { muteFirst?: boolean },
+) {
+  if (!player) return;
+  try {
+    if (opts?.muteFirst && !player.isMuted()) player.mute();
+    player.playVideo();
+  } catch {
+    /* fall through to postMessage */
+  }
+  postYouTubeCommand(player, "playVideo");
+}
+
+export function pauseYouTubePlayer(player: YouTubePlayerInstance | null | undefined) {
+  if (!player) return;
+  try {
+    player.pauseVideo();
+  } catch {
+    /* fall through */
+  }
+  postYouTubeCommand(player, "pauseVideo");
+}
+
+export function isYouTubePlayerActivelyPlaying(player: YouTubePlayerInstance | null | undefined) {
+  if (!player) return false;
+  try {
+    const state = player.getPlayerState();
+    return state === YT_PLAYER_STATE.PLAYING || state === YT_PLAYER_STATE.BUFFERING;
   } catch {
     return false;
   }

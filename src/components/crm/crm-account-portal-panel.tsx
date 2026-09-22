@@ -211,7 +211,12 @@ export function CrmAccountPortalPanel({ accountId }: { accountId: string }) {
         <p className="text-[10px] text-muted-foreground">
           If embedding fails with <span className="font-mono">X-Frame-Options: sameorigin</span>,
           apply <code className="rounded bg-muted px-1">scripts/nginx-portal-iframe.conf.example</code>{" "}
-          on the VPS and disable Hostinger security headers that force SAMEORIGIN.
+          on the VPS and disable Hostinger security headers that force SAMEORIGIN. For Academy
+          video playback, the parent iframe also needs{" "}
+          <code className="rounded bg-muted px-1">
+            allow=&quot;autoplay; encrypted-media; fullscreen; picture-in-picture&quot;
+          </code>
+          .
         </p>
       </motion.div>
 
