@@ -3,6 +3,10 @@ import { asc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { canViewCrmAccount } from "@/lib/crm-account-access";
+import {
+  countCrmOnboardingCompletionSignals,
+  isCrmOnboardingPayloadBlank,
+} from "@/data/crm-onboarding-defaults";
 import { isAdminRoleKey } from "@/lib/permissions";
 import { ApiError, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
@@ -102,6 +106,29 @@ export const upsertCrmOnboardingRecord = createServerFn({ method: "POST" })
       .get();
 
     if (existing) {
+      let previous: CrmOnboardingRecord | null = null;
+      try {
+        previous = parsePayload(existing.payloadJson);
+      } catch {
+        previous = null;
+      }
+      if (previous) {
+        const prevScore = countCrmOnboardingCompletionSignals(previous);
+        const nextScore = countCrmOnboardingCompletionSignals(data);
+        // Never let a blank/default client seed wipe restored checklist progress.
+        if (prevScore > 0 && (nextScore === 0 || isCrmOnboardingPayloadBlank(data))) {
+          console.warn(
+            `[crm-onboarding] rejected blank overwrite for ${data.companyId} (kept ${prevScore} completion signals)`,
+          );
+          return previous;
+        }
+        if (prevScore >= 5 && nextScore < Math.ceil(prevScore * 0.25)) {
+          console.warn(
+            `[crm-onboarding] rejected severe progress regression for ${data.companyId} (${prevScore} → ${nextScore})`,
+          );
+          return previous;
+        }
+      }
       db.update(t.crmOnboardingRecords)
         .set({
           payloadJson: payload,

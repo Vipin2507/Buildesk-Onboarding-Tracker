@@ -303,3 +303,10 @@ export {
   updateProjectFileMeta,
   deleteProjectFile,
 } from "@/server/api/project-files";
+
+export {
+  getDbBackupStatus,
+  listDbBackups,
+  createDbBackup,
+  deleteDbBackup,
+} from "@/server/api/db-backups";

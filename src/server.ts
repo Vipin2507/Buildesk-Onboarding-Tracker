@@ -8,10 +8,13 @@ import {
   handlePaymentRemarkFileRequest,
   handlePaymentTransactionFileRequest,
 } from "./server/lib/crm-payment-remark-storage";
+import { handleDbBackupRequest } from "./server/lib/db-backup-storage";
 import { handleProjectFileRequest } from "./server/lib/project-file-storage";
 import { startCrmReminderScheduler } from "./server/crm-reminder-scheduler";
+import { startDbBackupScheduler } from "./server/db-backup-scheduler";
 
 startCrmReminderScheduler();
+startDbBackupScheduler();
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -69,6 +72,9 @@ export default {
       }
       if (url.pathname.startsWith("/api/project-files/")) {
         return handleProjectFileRequest(request);
+      }
+      if (url.pathname.startsWith("/api/db-backups/")) {
+        return handleDbBackupRequest(request);
       }
 
       const handler = await getServerEntry();

@@ -32,6 +32,7 @@ import {
   defaultTrainingSessions,
   ensureMasterDataFields,
   isCrmIntegrationModule,
+  isCrmOnboardingPayloadBlank,
   isDeveloperCompanyType,
   mergeCrmGoLiveChecklist,
   mergeCrmMasterChecklist,
@@ -318,6 +319,8 @@ function needsGoLiveUpgrade(items: CrmGoLiveChecklistItem[]) {
 }
 
 let hydratingCrmOnboarding = false;
+/** In-memory default seeds — never upsert these to SQLite until they gain real progress. */
+const ephemeralOnboardingCompanyIds = new Set<string>();
 
 function normalizeTrackerStage(record: CrmOnboardingRecord): CrmOnboardingRecord {
   const tracker = record.tracker ?? { stage: "new_account" as const, priority: "medium" as const };
@@ -351,6 +354,11 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
           if (!get().serverHydrated) return;
           const latest = get().getByCompanyId(companyId);
           if (!latest) return;
+          // Default seeds from ensureForCompany must not wipe restored SQLite progress.
+          if (ephemeralOnboardingCompanyIds.has(companyId)) {
+            if (isCrmOnboardingPayloadBlank(latest)) return;
+            ephemeralOnboardingCompanyIds.delete(companyId);
+          }
           await apiUpsertCrmOnboardingRecord({ data: latest });
         });
       }
@@ -372,6 +380,7 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
   hydrateRecords: (records) => {
     hydratingCrmOnboarding = true;
     try {
+      ephemeralOnboardingCompanyIds.clear();
       rawSet({
         serverHydrated: true,
         records: records.map((r) =>
@@ -591,16 +600,11 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
       resolveCrmTrainingCatalogForCompany(companyType),
       moduleCatalog as { key: CrmProductModuleKey; label: string }[],
     );
-    const account = useCrmAccountStore.getState().getById(companyId);
-    const seeded =
-      account?.status === "live"
-        ? {
-            ...created,
-            tracker: { ...created.tracker, stage: "go_live" as const },
-          }
-        : created;
-    set((s) => ({ records: [seeded, ...s.records] }));
-    return seeded;
+    // Keep stage at new_account — live status comes from crm_accounts, not a blank seed.
+    // Persist only in memory; never upsert blank defaults over restored checklist data.
+    ephemeralOnboardingCompanyIds.add(companyId);
+    rawSet((s) => ({ records: [created, ...s.records.filter((r) => r.companyId !== companyId)] }));
+    return created;
   },
 
   setProductModuleEnabled: (companyId, key, enabled) => {

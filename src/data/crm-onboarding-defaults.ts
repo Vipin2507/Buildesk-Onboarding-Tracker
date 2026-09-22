@@ -371,11 +371,7 @@ export function syncGoLiveChecklistFromTabs(record: CrmOnboardingRecord): CrmOnb
       };
     }
 
-    if (item.status === "completed") {
-      changed = true;
-      return { ...item, status: "pending" as const, completedAt: undefined };
-    }
-
+    // Promote-only: never demote manually completed go-live rows when tab progress dips.
     return item;
   });
 
@@ -1263,6 +1259,58 @@ export function calcCrmOnboardingProgress(record: CrmOnboardingRecord): number {
   }, 0);
 
   return Math.round(weighted);
+}
+
+/**
+ * Count completed checklist / training / workflow signals.
+ * Used to detect blank default payloads so they cannot overwrite real progress.
+ */
+export function countCrmOnboardingCompletionSignals(record: CrmOnboardingRecord): number {
+  let n = 0;
+
+  for (const item of record.masterChecklist ?? []) {
+    if (item.notApplicable) continue;
+    if (item.collected) n += 1;
+    if (item.uploaded) n += 1;
+    if (item.live) n += 1;
+  }
+  for (const item of record.migrationChecklist ?? []) {
+    if (item.notApplicable) continue;
+    if (item.collected) n += 1;
+    if (item.uploaded) n += 1;
+    if (item.live) n += 1;
+  }
+  for (const item of record.trainingSessions ?? []) {
+    if (item.notApplicable) continue;
+    if (item.completed || (item.sessionCount ?? 0) > 0) n += 1;
+  }
+  for (const item of record.reportChecklist ?? []) {
+    if (item.notApplicable) continue;
+    if (item.status === "explained") n += 1;
+  }
+  for (const item of record.goLiveChecklist ?? []) {
+    if (item.notApplicable) continue;
+    if (isCrmGoLiveItemComplete(item)) n += 1;
+  }
+  for (const module of record.productModules ?? []) {
+    if (!module.enabled) continue;
+    n += 1;
+    for (const step of module.workflow ?? []) {
+      if (isModuleWorkflowStepComplete(step)) n += 1;
+    }
+    if (module.provider) n += 1;
+  }
+  if ((record.commLog?.length ?? 0) > 0) n += record.commLog.length;
+  if (record.tracker?.assigneeUserId) n += 1;
+  if (record.tracker?.expectedCompletionDate) n += 1;
+  if (record.tracker?.remarks?.trim()) n += 1;
+
+  return n;
+}
+
+/** True when the payload looks like an untouched default seed (no real progress). */
+export function isCrmOnboardingPayloadBlank(record: CrmOnboardingRecord): boolean {
+  return countCrmOnboardingCompletionSignals(record) === 0;
 }
 
 export function crmPendingActivityCount(record: CrmOnboardingRecord): number {

@@ -4,11 +4,15 @@ import { motion } from "framer-motion";
 import {
   Bell,
   Building2,
+  Database,
+  Download,
+  HardDrive,
   KeyRound,
   Monitor,
   Palette,
   Pencil,
   Plus,
+  RefreshCw,
   Shield,
   Trash2,
   UserRound,
@@ -29,12 +33,15 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
+  createDbBackup,
   createUser as apiCreateUser,
+  deleteDbBackup,
+  listDbBackups,
   setUserPassword as apiSetUserPassword,
   setAppConfig,
   updateUser as apiUpdateUser,
 } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 import type { ThemeMode } from "@/lib/theme";
 import {
   useAuthStore,
@@ -54,6 +61,7 @@ type SectionId =
   | "notifications"
   | "users"
   | "roles"
+  | "backups"
   | "profile";
 
 const SECTION_IDS: SectionId[] = [
@@ -62,6 +70,7 @@ const SECTION_IDS: SectionId[] = [
   "notifications",
   "users",
   "roles",
+  "backups",
   "profile",
 ];
 
@@ -73,6 +82,21 @@ const CRM_ROLES = [
 
 const FIELD =
   "mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/25";
+
+type DbBackupRow = {
+  filename: string;
+  sizeBytes: number;
+  createdAt: string;
+  kind: "auto" | "manual";
+  downloadUrl: string;
+};
+
+function formatBackupSize(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes < 0) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 export const Route = createFileRoute("/crm/settings")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -118,6 +142,13 @@ const SECTIONS: {
     title: "Roles",
     desc: "What Admin, Manager, and Viewer can do in CRM.",
     icon: Shield,
+    adminOnly: true,
+  },
+  {
+    id: "backups",
+    title: "Database backups",
+    desc: "Dated full-database snapshots you can download after an incident.",
+    icon: HardDrive,
     adminOnly: true,
   },
   { id: "profile", title: "My Profile", desc: "Your account details and password.", icon: UserRound },
@@ -166,7 +197,7 @@ function CrmSettingsPage() {
       <DesignTicketPageHeader
         compact
         title="CRM Settings"
-        subtitle="Configure the CRM workspace — users, branding, alerts, and your profile."
+        subtitle="Configure the CRM workspace — users, branding, alerts, backups, and your profile."
       />
 
       {!section ? (
@@ -209,6 +240,7 @@ function CrmSettingsPage() {
             <UsersSection initialInviteOpen={Boolean(search.invite)} />
           ) : null}
           {section === "roles" && isAdmin ? <RolesSection /> : null}
+          {section === "backups" && isAdmin ? <DatabaseBackupsSection /> : null}
           {section === "profile" ? <ProfileSection /> : null}
         </AnimatedSection>
       )}
@@ -1144,6 +1176,198 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
           setDeleteOpen(false);
           setEditing(null);
         }}
+      />
+    </div>
+  );
+}
+
+function DatabaseBackupsSection() {
+  const [rows, setRows] = useState<DbBackupRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<DbBackupRow | null>(null);
+
+  async function refresh() {
+    setLoading(true);
+    try {
+      const list = (await listDbBackups()) as DbBackupRow[];
+      setRows(list);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to load backups");
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void refresh();
+  }, []);
+
+  async function handleCreate() {
+    setCreating(true);
+    try {
+      const created = (await createDbBackup({ data: { kind: "manual" } })) as DbBackupRow;
+      toast.success(`Backup saved · ${created.filename}`);
+      await refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Backup failed");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    try {
+      await deleteDbBackup({ data: { filename: deleteTarget.filename } });
+      toast.success("Backup deleted");
+      setDeleteTarget(null);
+      await refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Delete failed");
+    }
+  }
+
+  function handleDownload(row: DbBackupRow) {
+    const a = document.createElement("a");
+    a.href = row.downloadUrl;
+    a.download = row.filename;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  const latest = rows[0];
+
+  return (
+    <div className="card-soft space-y-3 p-3">
+      <SectionTitle
+        title="Database backups"
+        subtitle="Full SQLite snapshots of accounts, onboarding, tickets, and all CRM data. Kept by date next to the live database (last 30 files)."
+      />
+
+      <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
+        <p>
+          The server creates an automatic backup about once per day. After an incident, download a
+          dated file from this list, stop the app, replace the live{" "}
+          <code className="rounded bg-muted px-1 font-mono text-[10px]">buildesk.db</code>, then
+          restart.
+        </p>
+        {latest ? (
+          <p className="mt-1.5 text-foreground/80">
+            Latest: <span className="font-medium">{formatDateTime(latest.createdAt)}</span>
+            <span className="mx-1 text-border">·</span>
+            {formatBackupSize(latest.sizeBytes)}
+            <span className="mx-1 text-border">·</span>
+            {latest.kind === "manual" ? "Manual" : "Automatic"}
+          </p>
+        ) : (
+          <p className="mt-1.5">No backups yet — create one now so you have a restore point.</p>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          size="sm"
+          className="h-8 gap-1.5"
+          disabled={creating || loading}
+          onClick={() => void handleCreate()}
+        >
+          <Database className="h-3.5 w-3.5" />
+          {creating ? "Creating…" : "Backup now"}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-8 gap-1.5"
+          disabled={loading || creating}
+          onClick={() => void refresh()}
+        >
+          <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+          Refresh
+        </Button>
+      </div>
+
+      <div className="overflow-hidden rounded-lg border border-border/80">
+        <div className="grid grid-cols-[1fr_auto_auto] gap-2 border-b bg-muted/40 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:grid-cols-[1.4fr_0.7fr_0.5fr_auto]">
+          <span>Backup</span>
+          <span className="hidden sm:inline">When</span>
+          <span className="hidden sm:inline">Size</span>
+          <span className="text-right">Actions</span>
+        </div>
+        {loading && rows.length === 0 ? (
+          <div className="px-3 py-6 text-center text-xs text-muted-foreground">Loading backups…</div>
+        ) : rows.length === 0 ? (
+          <div className="px-3 py-6 text-center text-xs text-muted-foreground">
+            No dated backups on disk yet.
+          </div>
+        ) : (
+          <ul className="divide-y divide-border/70">
+            {rows.map((row) => (
+              <li
+                key={row.filename}
+                className="grid grid-cols-[1fr_auto] items-center gap-2 px-3 py-2 sm:grid-cols-[1.4fr_0.7fr_0.5fr_auto]"
+              >
+                <div className="min-w-0">
+                  <div className="truncate font-mono text-[11px] font-medium">{row.filename}</div>
+                  <div className="mt-0.5 text-[10px] text-muted-foreground sm:hidden">
+                    {formatDateTime(row.createdAt)} · {formatBackupSize(row.sizeBytes)} ·{" "}
+                    {row.kind === "manual" ? "Manual" : "Auto"}
+                  </div>
+                  <div className="mt-0.5 hidden text-[10px] text-muted-foreground sm:block">
+                    {row.kind === "manual" ? "Manual" : "Automatic"}
+                  </div>
+                </div>
+                <div className="hidden text-[11px] tabular-nums text-muted-foreground sm:block">
+                  {formatDateTime(row.createdAt)}
+                </div>
+                <div className="hidden text-[11px] tabular-nums text-muted-foreground sm:block">
+                  {formatBackupSize(row.sizeBytes)}
+                </div>
+                <div className="flex items-center justify-end gap-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1 px-2 text-[11px]"
+                    onClick={() => handleDownload(row)}
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Download
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                    aria-label={`Delete ${row.filename}`}
+                    onClick={() => setDeleteTarget(row)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <ConfirmDeleteDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title="Delete this backup?"
+        description={
+          deleteTarget
+            ? `Remove ${deleteTarget.filename} from the server. You will not be able to download it later.`
+            : undefined
+        }
+        onConfirm={() => void handleDelete()}
       />
     </div>
   );

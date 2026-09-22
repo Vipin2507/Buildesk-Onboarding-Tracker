@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import {
@@ -43,7 +43,6 @@ import {
   useCrmDashboardOverview,
   type CrmDashboardDrillDownFilter,
 } from "@/stores/crm-dashboard-selectors";
-import { useCrmAccountStore, useCrmOnboardingStore } from "@/stores";
 
 export const Route = createFileRoute("/crm/")({
   beforeLoad: ({ search }) => {
@@ -59,16 +58,9 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 
 function CrmDashboardPage() {
   const navigate = useNavigate();
-  const accounts = useCrmAccountStore((s) => s.accounts);
-  const ensure = useCrmOnboardingStore((s) => s.ensureForCompany);
   const overview = useCrmDashboardOverview();
 
   const [drillDown, setDrillDown] = useState<CrmDashboardDrillDownFilter | null>(null);
-
-  useEffect(() => {
-    for (const a of accounts) ensure(a.id, a.companyType);
-  }, [accounts, ensure]);
-
   const drillDownData = useMemo(
     () => (drillDown ? overview.resolveDrillDown(drillDown) : null),
     [drillDown, overview],

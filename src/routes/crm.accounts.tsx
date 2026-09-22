@@ -446,19 +446,14 @@ function CrmAccountsPage() {
   });
 
   useEffect(() => {
-    for (const a of accounts) ensure(a.id, a.companyType);
-  }, [accounts, ensure]);
-
-      // Keep live status when stage is go-live. Never auto-demote live → onboarding
-      // from a stage mismatch (that previously wiped go-live progress after stage resets).
-      useEffect(() => {
-        for (const row of overview.rows) {
-          if (row.status === "onboarding" && isCrmGoLiveStage(row.stage)) {
-            updateAccount(row.id, { status: "live" });
-          }
-        }
-      }, [overview.rows, updateAccount]);
-
+    // Keep live status when stage is go-live. Never auto-demote live → onboarding
+    // from a stage mismatch (that previously wiped go-live progress after stage resets).
+    for (const row of overview.rows) {
+      if (row.status === "onboarding" && isCrmGoLiveStage(row.stage)) {
+        updateAccount(row.id, { status: "live" });
+      }
+    }
+  }, [overview.rows, updateAccount]);
   const rows = overview.rows;
 
   const cities = useMemo(() => {
