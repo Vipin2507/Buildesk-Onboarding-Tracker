@@ -122,7 +122,8 @@ export async function createDbBackupFile(opts?: {
 
   const sqlite = getSqlite();
   try {
-    const backupFn = (sqlite as { backup?: (dest: string) => Promise<void> | void }).backup;
+    const backupFn = (sqlite as unknown as { backup?: (dest: string) => Promise<void> | void })
+      .backup;
     if (typeof backupFn === "function") {
       await Promise.resolve(backupFn.call(sqlite, dest));
     } else {

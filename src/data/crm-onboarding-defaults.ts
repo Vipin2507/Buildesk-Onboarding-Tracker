@@ -1301,9 +1301,9 @@ export function countCrmOnboardingCompletionSignals(record: CrmOnboardingRecord)
     if (module.provider) n += 1;
   }
   if ((record.commLog?.length ?? 0) > 0) n += record.commLog.length;
-  if (record.tracker?.assigneeUserId) n += 1;
+  if (record.tracker?.assignedExecutiveId) n += 1;
   if (record.tracker?.expectedCompletionDate) n += 1;
-  if (record.tracker?.remarks?.trim()) n += 1;
+  if (record.tracker?.delayReason?.trim()) n += 1;
 
   return n;
 }

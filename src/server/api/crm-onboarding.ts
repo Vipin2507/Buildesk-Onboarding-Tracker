@@ -113,10 +113,11 @@ export const upsertCrmOnboardingRecord = createServerFn({ method: "POST" })
         previous = null;
       }
       if (previous) {
+        const incoming = data as CrmOnboardingRecord;
         const prevScore = countCrmOnboardingCompletionSignals(previous);
-        const nextScore = countCrmOnboardingCompletionSignals(data);
+        const nextScore = countCrmOnboardingCompletionSignals(incoming);
         // Never let a blank/default client seed wipe restored checklist progress.
-        if (prevScore > 0 && (nextScore === 0 || isCrmOnboardingPayloadBlank(data))) {
+        if (prevScore > 0 && (nextScore === 0 || isCrmOnboardingPayloadBlank(incoming))) {
           console.warn(
             `[crm-onboarding] rejected blank overwrite for ${data.companyId} (kept ${prevScore} completion signals)`,
           );
