@@ -45,7 +45,12 @@ function CrmAccountHubPage() {
 
   if (!account) return null;
 
-  const progress = record ? calcCrmOnboardingProgress(record) : 0;
+  const progress =
+    account.status === "live"
+      ? 100
+      : record
+        ? calcCrmOnboardingProgress(record)
+        : 0;
 
   function setTab(next: CrmAccountTabId) {
     void navigate({

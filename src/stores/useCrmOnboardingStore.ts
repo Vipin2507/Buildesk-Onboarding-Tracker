@@ -17,7 +17,11 @@ import type {
   CrmTrainingSession,
 } from "@/types/crm-onboarding";
 import type { ChecklistPhase } from "@/types/onboarding";
-import { isCrmGoLiveStage } from "@/lib/crm-implementation-stages";
+import {
+  inferCrmGoLiveStageFromChecklist,
+  isCrmGoLiveStage,
+  normalizeCrmImplementationStage,
+} from "@/lib/crm-implementation-stages";
 import {
   createCrmOnboardingRecord,
   CRM_GO_LIVE_CHECKLIST_LABELS,
@@ -55,7 +59,6 @@ import type {
 import { notifyCrmStageChange,
   notifyCrmTrainingLogged,
 } from "@/lib/crm-notify";
-import { normalizeCrmImplementationStage } from "@/lib/crm-implementation-stages";
 import {
   deleteCrmOnboardingRecord as apiDeleteCrmOnboardingRecord,
   upsertCrmOnboardingRecord as apiUpsertCrmOnboardingRecord,
@@ -71,7 +74,11 @@ import {
 
 type CrmOnboardingState = {
   records: CrmOnboardingRecord[];
+  /** True after a successful server hydrate (or explicit empty hydrate). Blocks destructive blank upserts. */
+  serverHydrated: boolean;
   hydrateRecords: (records: CrmOnboardingRecord[]) => void;
+  /** Repair stages reset to new_account when account is live or go-live checklist is complete. */
+  repairResetStagesFromAccountStatus: () => number;
   applyProductModulesCatalogToAllAccounts: () => number;
   ensureForCompany: (companyId: string, companyType?: CompanyType) => CrmOnboardingRecord;
   getByCompanyId: (companyId: string) => CrmOnboardingRecord | undefined;
@@ -312,6 +319,18 @@ function needsGoLiveUpgrade(items: CrmGoLiveChecklistItem[]) {
 
 let hydratingCrmOnboarding = false;
 
+function normalizeTrackerStage(record: CrmOnboardingRecord): CrmOnboardingRecord {
+  const tracker = record.tracker ?? { stage: "new_account" as const, priority: "medium" as const };
+  const stage = normalizeCrmImplementationStage(tracker.stage);
+  if (stage === tracker.stage) {
+    return record.tracker ? record : { ...record, tracker };
+  }
+  return {
+    ...record,
+    tracker: { ...tracker, stage },
+  };
+}
+
 export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, get) => {
   const set: typeof rawSet = (partial, ...rest) => {
     const prev = get().records;
@@ -319,7 +338,8 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
     const prevIds = new Set(prev.map((r) => r.companyId));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (rawSet as any)(partial, ...rest);
-    if (hydratingCrmOnboarding) return;
+    // Never push blank/ephemeral records to SQLite until we've loaded server state.
+    if (hydratingCrmOnboarding || !get().serverHydrated) return;
 
     const next = get().records;
     const nextIds = new Set(next.map((r) => r.companyId));
@@ -328,6 +348,7 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
       if (prevUpdated.get(record.companyId) !== record.updatedAt) {
         const companyId = record.companyId;
         serverSyncDebounced(`crm-onboarding:${companyId}`, 400, async () => {
+          if (!get().serverHydrated) return;
           const latest = get().getByCompanyId(companyId);
           if (!latest) return;
           await apiUpsertCrmOnboardingRecord({ data: latest });
@@ -346,29 +367,59 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
 
   return {
   records: [],
+  serverHydrated: false,
 
   hydrateRecords: (records) => {
     hydratingCrmOnboarding = true;
     try {
       rawSet({
+        serverHydrated: true,
         records: records.map((r) =>
-          syncGoLiveChecklistFromTabs({
-            ...r,
-            masterProjects: r.masterProjects ?? [],
-            masterSources: r.masterSources ?? [],
-            masterStatuses: r.masterStatuses ?? [],
-            masterFollowUps: r.masterFollowUps ?? [],
-            masterTeams: r.masterTeams ?? [],
-            tracker: {
-              ...r.tracker,
-              stage: normalizeCrmImplementationStage(r.tracker.stage),
-            },
-          }),
+          syncGoLiveChecklistFromTabs(
+            normalizeTrackerStage({
+              ...r,
+              masterProjects: r.masterProjects ?? [],
+              masterSources: r.masterSources ?? [],
+              masterStatuses: r.masterStatuses ?? [],
+              masterFollowUps: r.masterFollowUps ?? [],
+              masterTeams: r.masterTeams ?? [],
+              tracker: {
+                stage: "new_account",
+                priority: "medium",
+                ...r.tracker,
+              },
+            }),
+          ),
         ),
       });
     } finally {
       hydratingCrmOnboarding = false;
     }
+  },
+
+  repairResetStagesFromAccountStatus: () => {
+    const accounts = useCrmAccountStore.getState().accounts;
+    const byId = new Map(accounts.map((a) => [a.id, a]));
+    let repaired = 0;
+    set((s) => ({
+      records: s.records.map((r) => {
+        if (isCrmGoLiveStage(r.tracker.stage)) return r;
+        const account = byId.get(r.companyId);
+        const fromChecklist = inferCrmGoLiveStageFromChecklist(r.goLiveChecklist);
+        const shouldBeGoLive = account?.status === "live" || fromChecklist === "go_live";
+        if (!shouldBeGoLive) return r;
+        repaired += 1;
+        return touch({
+          ...r,
+          tracker: {
+            ...r.tracker,
+            stage: "go_live",
+            stageUpdatedAt: nowIso(),
+          },
+        });
+      }),
+    }));
+    return repaired;
   },
 
   getByCompanyId: (companyId) => get().records.find((r) => r.companyId === companyId),
@@ -540,8 +591,16 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
       resolveCrmTrainingCatalogForCompany(companyType),
       moduleCatalog as { key: CrmProductModuleKey; label: string }[],
     );
-    set((s) => ({ records: [created, ...s.records] }));
-    return created;
+    const account = useCrmAccountStore.getState().getById(companyId);
+    const seeded =
+      account?.status === "live"
+        ? {
+            ...created,
+            tracker: { ...created.tracker, stage: "go_live" as const },
+          }
+        : created;
+    set((s) => ({ records: [seeded, ...s.records] }));
+    return seeded;
   },
 
   setProductModuleEnabled: (companyId, key, enabled) => {
@@ -1157,14 +1216,11 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
     if (stageChanged && patch.stage) {
       const accountName = useCrmAccountStore.getState().getById(companyId)?.name ?? "CRM account";
       notifyCrmStageChange(companyId, accountName, patch.stage, who);
-      // Keep account status in sync with implementation stage.
+      // Promote to live when entering go-live stages. Do not auto-demote live accounts
+      // when stage moves earlier — that previously wiped go-live status after stage resets.
       const account = useCrmAccountStore.getState().getById(companyId);
-      if (isCrmGoLiveStage(patch.stage)) {
-        if (account?.status === "onboarding") {
-          useCrmAccountStore.getState().markLive(companyId, who);
-        }
-      } else if (account?.status === "live") {
-        useCrmAccountStore.getState().setAccountStatus(companyId, "onboarding", { who });
+      if (isCrmGoLiveStage(patch.stage) && account?.status === "onboarding") {
+        useCrmAccountStore.getState().markLive(companyId, who);
       }
     }
   },

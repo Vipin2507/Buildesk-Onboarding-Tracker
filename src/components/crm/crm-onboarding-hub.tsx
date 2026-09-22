@@ -171,7 +171,8 @@ export function CrmOnboardingHub({
       resolveCrmTrainingCatalogForCompany(account?.companyType),
     );
   }, [account?.companyType, accountId, record]);
-  const pct = calcCrmOnboardingProgress(liveRecord);
+  const pct =
+    account?.status === "live" ? 100 : calcCrmOnboardingProgress(liveRecord);
   const pending = crmPendingActivityCount(liveRecord);
   const visibleTabs = TABS;
 

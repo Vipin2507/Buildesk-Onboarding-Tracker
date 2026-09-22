@@ -341,6 +341,15 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
               /* ignore */
             }
           }
+          const repaired = useCrmOnboardingStore.getState().repairResetStagesFromAccountStatus();
+          if (repaired > 0) {
+            console.info(`[bootstrap] Restored go-live stage on ${repaired} CRM account(s)`);
+          }
+        } else {
+          // Fetch failed — do not mark hydrated; blank ensure() must not wipe SQLite.
+          console.warn(
+            "[bootstrap] CRM onboarding records unavailable; progress sync paused until reload",
+          );
         }
         if (designTickets) {
           useDesignTicketStore.getState().hydrateTickets(designTickets);

@@ -23,6 +23,22 @@ export const LEGACY_CRM_STAGE_MAP: Record<string, CrmImplementationStage> = {
   client_signoff: "testing_uat",
   ticket_support: "post_go_live_handover",
   customer_success: "post_go_live_handover",
+  // Label / alias variants seen in older payloads
+  "new account": "new_account",
+  "account created": "account_created",
+  "data collection": "data_collection",
+  "data setup / migration": "data_setup_migration",
+  "data setup": "data_setup_migration",
+  "testing / uat": "testing_uat",
+  "testing uat": "testing_uat",
+  "go-live": "go_live",
+  golive: "go_live",
+  "go live": "go_live",
+  live: "go_live",
+  "post go-live / handover": "post_go_live_handover",
+  "post go-live": "post_go_live_handover",
+  "post go live / handover": "post_go_live_handover",
+  "post go live": "post_go_live_handover",
 };
 
 export function seedCrmImplementationStages(): CrmImplementationStageDef[] {
@@ -39,8 +55,14 @@ export function normalizeCrmImplementationStage(stage: string | undefined): CrmI
   const raw = stage?.trim();
   if (!raw) return "new_account";
   if (LEGACY_CRM_STAGE_MAP[raw]) return LEGACY_CRM_STAGE_MAP[raw];
+  const lower = raw.toLowerCase();
+  if (LEGACY_CRM_STAGE_MAP[lower]) return LEGACY_CRM_STAGE_MAP[lower];
   const known = CRM_DEFAULT_IMPLEMENTATION_STAGES.some((s) => s.key === raw);
   if (known) return raw as CrmImplementationStage;
+  const knownInsensitive = CRM_DEFAULT_IMPLEMENTATION_STAGES.find(
+    (s) => s.key === lower || s.label.toLowerCase() === lower,
+  );
+  if (knownInsensitive) return knownInsensitive.key as CrmImplementationStage;
   return "new_account";
 }
 
@@ -63,4 +85,15 @@ export function normalizeCrmImplementationStages(
 export function isCrmGoLiveStage(stage: string | undefined): boolean {
   const normalized = normalizeCrmImplementationStage(stage);
   return normalized === "go_live" || normalized === "post_go_live_handover";
+}
+
+/** Infer go-live stage when checklist is complete but tracker was reset. */
+export function inferCrmGoLiveStageFromChecklist(
+  goLiveChecklist: Array<{ status?: string; notApplicable?: boolean }> | undefined,
+): "go_live" | null {
+  if (!Array.isArray(goLiveChecklist) || goLiveChecklist.length === 0) return null;
+  const complete = goLiveChecklist.every(
+    (item) => item.notApplicable === true || item.status === "completed",
+  );
+  return complete ? "go_live" : null;
 }
