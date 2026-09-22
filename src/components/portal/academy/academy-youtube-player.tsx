@@ -22,9 +22,12 @@ import {
   hardenYouTubeIframe,
   isYouTubePlayerActivelyPlaying,
   loadYouTubeIframeApi,
+  muteYouTubePlayer,
   pauseYouTubePlayer,
   playYouTubePlayer,
   postYouTubeCommand,
+  readYouTubeMuted,
+  unmuteYouTubePlayer,
   YT_PLAYER_STATE,
   type YouTubePlayerInstance,
 } from "@/lib/youtube";
@@ -79,8 +82,9 @@ export const AcademyYouTubePlayer = forwardRef<
         setCurrent(p.getCurrentTime() || 0);
         const d = p.getDuration();
         if (d && Number.isFinite(d)) setDuration(d);
+        setMuted(p.isMuted() || (p.getVolume?.() ?? 1) <= 0);
       } catch {
-        /* player mid-destroy */
+        /* player mid-destroy — keep previous UI */
       }
     }, 250);
   }, [stopPoll]);
@@ -131,12 +135,9 @@ export const AcademyYouTubePlayer = forwardRef<
         playKickRef.current = null;
         const player = playerRef.current;
         if (!player || isYouTubePlayerActivelyPlaying(player)) return;
+        muteYouTubePlayer(player);
         playYouTubePlayer(player, { muteFirst: true });
-        try {
-          setMuted(true);
-        } catch {
-          /* ignore */
-        }
+        setMuted(true);
         markPlayingOptimistic();
       }, 400);
     },
@@ -221,7 +222,7 @@ export const AcademyYouTubePlayer = forwardRef<
               setReady(true);
               try {
                 setDuration(e.target.getDuration() || 0);
-                setMuted(e.target.isMuted());
+                setMuted(readYouTubeMuted(e.target, false));
                 // Start with captions off; user can toggle via CC control
                 e.target.unloadModule?.("captions");
                 setCaptionsOn(false);
@@ -299,20 +300,16 @@ export const AcademyYouTubePlayer = forwardRef<
 
   function toggleMute() {
     const p = playerRef.current;
-    if (!p) return;
+    if (!p || !ready) return;
     revealControls();
-    try {
-      if (p.isMuted()) {
-        p.unMute();
-        postYouTubeCommand(p, "unMute");
-        setMuted(false);
-      } else {
-        p.mute();
-        postYouTubeCommand(p, "mute");
-        setMuted(true);
-      }
-    } catch {
-      /* ignore */
+    // Prefer React state — isMuted() is unreliable in nested CRM iframes.
+    const currentlyMuted = muted || readYouTubeMuted(p, false);
+    if (currentlyMuted) {
+      unmuteYouTubePlayer(p);
+      setMuted(false);
+    } else {
+      muteYouTubePlayer(p);
+      setMuted(true);
     }
   }
 

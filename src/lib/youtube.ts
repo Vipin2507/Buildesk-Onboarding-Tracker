@@ -86,6 +86,8 @@ export type YouTubePlayerInstance = {
   mute: () => void;
   unMute: () => void;
   isMuted: () => boolean;
+  setVolume?: (volume: number) => void;
+  getVolume?: () => number;
   getCurrentTime: () => number;
   getDuration: () => number;
   getPlayerState: () => number;
@@ -226,10 +228,17 @@ export function playYouTubePlayer(
 ) {
   if (!player) return;
   try {
-    if (opts?.muteFirst && !player.isMuted()) player.mute();
+    if (opts?.muteFirst) {
+      player.mute();
+      player.setVolume?.(0);
+    }
     player.playVideo();
   } catch {
     /* fall through to postMessage */
+  }
+  if (opts?.muteFirst) {
+    postYouTubeCommand(player, "mute");
+    postYouTubeCommand(player, "setVolume", [0]);
   }
   postYouTubeCommand(player, "playVideo");
 }
@@ -251,5 +260,46 @@ export function isYouTubePlayerActivelyPlaying(player: YouTubePlayerInstance | n
     return state === YT_PLAYER_STATE.PLAYING || state === YT_PLAYER_STATE.BUFFERING;
   } catch {
     return false;
+  }
+}
+
+/** Mute via API + postMessage + volume 0 (nested iframes often ignore mute alone). */
+export function muteYouTubePlayer(player: YouTubePlayerInstance | null | undefined) {
+  if (!player) return;
+  try {
+    player.mute();
+    player.setVolume?.(0);
+  } catch {
+    /* fall through */
+  }
+  postYouTubeCommand(player, "mute");
+  postYouTubeCommand(player, "setVolume", [0]);
+}
+
+/** Unmute via API + postMessage + restore volume (needed after mute-to-play kickstarts). */
+export function unmuteYouTubePlayer(player: YouTubePlayerInstance | null | undefined) {
+  if (!player) return;
+  try {
+    player.unMute();
+    player.setVolume?.(100);
+  } catch {
+    /* fall through */
+  }
+  postYouTubeCommand(player, "unMute");
+  postYouTubeCommand(player, "setVolume", [100]);
+}
+
+export function readYouTubeMuted(
+  player: YouTubePlayerInstance | null | undefined,
+  fallback = false,
+) {
+  if (!player) return fallback;
+  try {
+    if (player.isMuted()) return true;
+    const volume = player.getVolume?.();
+    if (typeof volume === "number" && volume <= 0) return true;
+    return false;
+  } catch {
+    return fallback;
   }
 }
