@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ButtonHTMLAttributes } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import {
   Archive,
@@ -50,7 +51,7 @@ import {
   DesignTicketSelect,
 } from "@/components/design-ticket/design-ticket-fields";
 import { inDateRange } from "@/components/list-toolbar";
-import { cn, formatDate, formatTime } from "@/lib/utils";
+import { cn, formatChatDateLabel, formatDate, formatTime, localDateKey } from "@/lib/utils";
 import { formatRelativeTime } from "@/types/common";
 import {
   useAuthStore,
@@ -467,10 +468,29 @@ function QueryThread({
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
 
-  const sorted = useMemo(
-    () => [...query.messages].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
-    [query.messages],
-  );
+  const grouped = useMemo(() => {
+    const sorted = [...query.messages].sort((a, b) => {
+      const ta = new Date(a.createdAt).getTime();
+      const tb = new Date(b.createdAt).getTime();
+      if (Number.isFinite(ta) && Number.isFinite(tb) && ta !== tb) return ta - tb;
+      return a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
+    });
+    const groups: { dateKey: string; label: string; messages: CrmAccountQueryMessage[] }[] = [];
+    for (const msg of sorted) {
+      const dateKey = localDateKey(msg.createdAt) || msg.createdAt.slice(0, 10);
+      const last = groups[groups.length - 1];
+      if (last && last.dateKey === dateKey) {
+        last.messages.push(msg);
+      } else {
+        groups.push({
+          dateKey,
+          label: formatChatDateLabel(msg.createdAt),
+          messages: [msg],
+        });
+      }
+    }
+    return groups;
+  }, [query.messages]);
 
   const composerDisabled = sending || uploadingAttachment || query.status === "archived";
 
@@ -669,13 +689,22 @@ function QueryThread({
       </div>
 
       <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto bg-muted/10 p-2">
-        {sorted.length === 0 ? (
+        {grouped.length === 0 ? (
           <p className="py-6 text-center text-xs text-muted-foreground">
             No messages yet. Start the discussion below.
           </p>
         ) : (
-          sorted.map((msg) => (
-            <MessageBubble key={msg.id} msg={msg} isSelf={msg.authorUserId === currentUserId} />
+          grouped.map((group) => (
+            <div key={group.dateKey} className="space-y-1.5">
+              <div className="sticky top-0 z-[1] flex justify-center py-1">
+                <span className="rounded-full border border-border/80 bg-card px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground shadow-sm">
+                  {group.label}
+                </span>
+              </div>
+              {group.messages.map((msg) => (
+                <MessageBubble key={msg.id} msg={msg} isSelf={msg.authorUserId === currentUserId} />
+              ))}
+            </div>
           ))
         )}
         <TypingIndicator users={typingUsers} />
@@ -804,6 +833,7 @@ export function CrmAccountQueriesPanel({
   const setQueryTyping = useCrmAccountQueryStore((s) => s.setQueryTyping);
 
   const [selectedId, setSelectedId] = useState<string | null>(initialQueryId ?? null);
+  const navigate = useNavigate();
   const [createOpen, setCreateOpen] = useState(false);
   const [createTitle, setCreateTitle] = useState("");
   const [createCategory, setCreateCategory] = useState<CrmAccountQueryCategory>("requirement");
@@ -831,6 +861,16 @@ export function CrmAccountQueriesPanel({
   useEffect(() => {
     if (initialQueryId) setSelectedId(initialQueryId);
   }, [initialQueryId]);
+
+  function selectQuery(id: string) {
+    setSelectedId(id);
+    void navigate({
+      to: "/crm/accounts/$accountId",
+      params: { accountId },
+      search: { tab: "queries", queryId: id },
+      replace: true,
+    });
+  }
 
   useEffect(() => {
     void refreshCompanyQueries(accountId).catch((err) => {
@@ -900,16 +940,14 @@ export function CrmAccountQueriesPanel({
 
   useEffect(() => {
     if (!filteredQueries.length) {
-      setSelectedId(null);
+      if (selectedId !== null) setSelectedId(null);
       return;
     }
-    if (initialQueryId && filteredQueries.some((q) => q.id === initialQueryId)) {
-      setSelectedId(initialQueryId);
-      return;
-    }
-    if (!selectedId || !filteredQueries.some((q) => q.id === selectedId)) {
-      setSelectedId(filteredQueries[0]!.id);
-    }
+    if (selectedId && filteredQueries.some((q) => q.id === selectedId)) return;
+    const fallback =
+      (initialQueryId && filteredQueries.find((q) => q.id === initialQueryId)?.id) ||
+      filteredQueries[0]!.id;
+    setSelectedId(fallback);
   }, [filteredQueries, initialQueryId, selectedId]);
 
   async function handleCreate() {
@@ -929,7 +967,7 @@ export function CrmAccountQueriesPanel({
       setCreateTitle("");
       setCreateMessage("");
       setCreateCategory("requirement");
-      setSelectedId(created.id);
+      selectQuery(created.id);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create query");
     }
@@ -1055,7 +1093,7 @@ export function CrmAccountQueriesPanel({
                   <button
                     key={query.id}
                     type="button"
-                    onClick={() => setSelectedId(query.id)}
+                    onClick={() => selectQuery(query.id)}
                     className={cn(
                       "w-full rounded-md border px-2 py-1.5 text-left transition-colors",
                       active

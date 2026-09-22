@@ -8,12 +8,15 @@ import {
   mergeCrmAutomationRules,
   N8N_EMAIL_SEGMENT,
 } from "@/data/crm-automation-defaults";
+import { absoluteAppUrl } from "@/lib/app-base-url";
+import { phoneToWahaChatId } from "@/lib/automationEndpoints";
 import { localWallClockIso } from "@/lib/booking-slots";
 import {
   renderAutomationSubject,
   renderAutomationTemplate,
 } from "@/services/automationTemplate";
 import { appendAutomationLogToConfig } from "@/server/automation-log-persistence";
+import { resolveCrmQueryResponseRecipientUserIds } from "@/server/api/notifications";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { nowIso } from "@/types";
@@ -86,6 +89,70 @@ function serverLogId() {
   return `CAL-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
+function defaultBookingReviewUrl(appointmentId: string) {
+  return absoluteAppUrl(
+    `/crm/bookings?tab=pending&appointmentId=${encodeURIComponent(appointmentId)}`,
+  );
+}
+
+async function sendServerWahaText(waha: WahaConfig, chatId: string, text: string) {
+  const res = await fetch(`${trimSlash(waha.apiUrl)}/api/sendText`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "X-Api-Key": waha.apiKey,
+    },
+    body: JSON.stringify({
+      session: waha.sessionName,
+      chatId,
+      text,
+    }),
+  });
+  const body = await res.text();
+  return { ok: res.ok, status: res.status, text: body };
+}
+
+function buildBookingCreatedVars(opts: {
+  appointment: BookingAppointment;
+  eventTitle: string;
+  accountName: string;
+  hostName: string;
+  recipientName: string;
+  bookingUrl: string;
+  salesManagerName?: string | null;
+  supportManager1?: string | null;
+  supportManager2?: string | null;
+}): Record<string, string> {
+  const statusLabel = BOOKING_STATUS_LABEL[opts.appointment.status] ?? opts.appointment.status;
+  return {
+    customerName: opts.recipientName,
+    recipientName: opts.recipientName,
+    executiveName: opts.recipientName,
+    assigneeName: opts.recipientName,
+    accountName: opts.accountName,
+    companyName: opts.accountName,
+    salesManagerName: opts.salesManagerName?.trim() || opts.hostName,
+    supportManager1: opts.supportManager1?.trim() || "—",
+    supportManager2: opts.supportManager2?.trim() || "—",
+    status: opts.appointment.status === "pending" ? "Pending" : statusLabel,
+    guestName: opts.appointment.guestName,
+    guestEmail: opts.appointment.guestEmail,
+    hostName: opts.hostName,
+    eventTypeTitle: opts.eventTitle,
+    title: opts.eventTitle,
+    subject: opts.eventTitle,
+    startsAt: formatBookingWhen(opts.appointment.startsAt),
+    endsAt: formatBookingWhen(opts.appointment.endsAt),
+    bookingId: opts.appointment.id,
+    bookingUrl: opts.bookingUrl,
+    ticketNumber: opts.appointment.id,
+    ticketUrl: opts.bookingUrl,
+    meetUrl: opts.appointment.meetUrl ?? "",
+    meetUrlLine: opts.appointment.meetUrl ? `Google Meet: ${opts.appointment.meetUrl}\n` : "",
+  };
+}
+
 async function dispatchServerBookingEmail(
   db: ReturnType<typeof getDb>,
   opts: {
@@ -110,7 +177,11 @@ async function dispatchServerBookingEmail(
   const emailEndpoint = config.endpoints.find((e) => e.channel === "email" && e.isEnabled);
   if (!emailEndpoint) return;
 
-  const bookingUrl = opts.bookingUrl ?? "/crm/bookings?tab=pending";
+  const bookingUrl =
+    opts.bookingUrl ??
+    (opts.trigger === "booking-created"
+      ? defaultBookingReviewUrl(opts.appointment.id)
+      : absoluteAppUrl("/crm/bookings"));
   const statusLabel = BOOKING_STATUS_LABEL[opts.appointment.status] ?? opts.appointment.status;
   const previousStatusLabel = opts.previousStatus
     ? (BOOKING_STATUS_LABEL[opts.previousStatus] ?? opts.previousStatus)
@@ -223,6 +294,104 @@ async function dispatchServerBookingEmail(
   }
 }
 
+async function dispatchBookingCreatedWhatsAppForRule(
+  db: ReturnType<typeof getDb>,
+  config: ReturnType<typeof loadCrmAutomationConfig>,
+  rule: AutomationRule,
+  input: {
+    appointment: BookingAppointment;
+    eventTitle: string;
+    accountName: string;
+    hostName: string;
+    bookingUrl: string;
+    salesManagerName?: string | null;
+    supportManager1?: string | null;
+    supportManager2?: string | null;
+    recipient: { id: string; name: string; phone?: string | null };
+  },
+): Promise<boolean> {
+  const vars = buildBookingCreatedVars({
+    appointment: input.appointment,
+    eventTitle: input.eventTitle,
+    accountName: input.accountName,
+    hostName: input.hostName,
+    recipientName: input.recipient.name,
+    bookingUrl: input.bookingUrl,
+    salesManagerName: input.salesManagerName,
+    supportManager1: input.supportManager1,
+    supportManager2: input.supportManager2,
+  });
+  const message = renderAutomationTemplate(rule.templateBody, vars);
+
+  const userRow = db.select().from(t.users).where(eq(t.users.id, input.recipient.id)).get();
+  const recipientPhone = userRow?.phone ?? input.recipient.phone ?? undefined;
+
+  const attemptedAt = nowIso();
+  const baseLog: AutomationLog = {
+    id: serverLogId(),
+    ticketNumber: input.appointment.id,
+    companyId: input.appointment.companyId,
+    channel: "whatsapp",
+    trigger: "booking-created",
+    status: "retrying",
+    requestPayload: {
+      bookingId: input.appointment.id,
+      ruleId: rule.id,
+      recipientUserId: input.recipient.id,
+    },
+    attemptedAt,
+    retryCount: 0,
+  };
+
+  const wahaEndpoint = config.endpoints.find((e) => e.channel === "whatsapp" && e.isEnabled);
+  if (!wahaEndpoint || !config.waha.isEnabled) {
+    appendServerCrmAutomationLog(db, {
+      ...baseLog,
+      status: "failed",
+      errorMessage: "WhatsApp endpoint disabled",
+    });
+    return false;
+  }
+
+  const chatId = phoneToWahaChatId(recipientPhone ?? undefined);
+  if (!chatId) {
+    appendServerCrmAutomationLog(db, {
+      ...baseLog,
+      status: "failed",
+      errorMessage: "Recipient has no valid phone for WhatsApp",
+    });
+    return false;
+  }
+
+  try {
+    const res = await sendServerWahaText(config.waha, chatId, message);
+    if (!res.ok) {
+      appendServerCrmAutomationLog(db, {
+        ...baseLog,
+        status: "failed",
+        errorMessage: `HTTP ${res.status}: ${summarizeResponse(res.text, 240)}`,
+        responseSummary: summarizeResponse(res.text),
+        requestPayload: { chatId, message },
+      });
+      return false;
+    }
+    appendServerCrmAutomationLog(db, {
+      ...baseLog,
+      status: "success",
+      responseSummary: summarizeResponse(res.text),
+      requestPayload: { chatId, message },
+    });
+    return true;
+  } catch (err) {
+    appendServerCrmAutomationLog(db, {
+      ...baseLog,
+      status: "failed",
+      errorMessage: err instanceof Error ? err.message : "Network error",
+    });
+    return false;
+  }
+}
+
 /** Server-side executive email when a portal guest books (no CRM session required). */
 export async function dispatchServerBookingCreatedEmail(
   db: ReturnType<typeof getDb>,
@@ -242,8 +411,67 @@ export async function dispatchServerBookingCreatedEmail(
     accountName: opts.accountName,
     hostName: opts.hostName,
     hostEmail: opts.hostEmail,
-    bookingUrl: opts.bookingUrl,
+    bookingUrl: opts.bookingUrl ?? defaultBookingReviewUrl(opts.appointment.id),
   });
+}
+
+/**
+ * WhatsApp host + related CRM executives when a client books a call from the portal.
+ * Link opens CRM Meetings so they can approve, reject, or postpone.
+ */
+export async function dispatchServerBookingCreatedWhatsApp(
+  db: ReturnType<typeof getDb>,
+  opts: {
+    appointment: BookingAppointment;
+    eventTitle: string;
+    accountName: string;
+    hostName: string;
+    bookingUrl?: string;
+  },
+): Promise<void> {
+  const config = loadCrmAutomationConfig(db);
+  if (!config.settings.automationsEnabled) return;
+
+  const rules = config.rules.filter(
+    (r) => r.isActive && r.trigger === "booking-created" && r.channel === "whatsapp",
+  );
+  if (rules.length === 0) return;
+
+  const account = db
+    .select()
+    .from(t.crmAccounts)
+    .where(eq(t.crmAccounts.id, opts.appointment.companyId))
+    .get();
+
+  const recipientIds = new Set<string>(
+    resolveCrmQueryResponseRecipientUserIds(db, opts.appointment.companyId),
+  );
+  if (opts.appointment.hostUserId) recipientIds.add(opts.appointment.hostUserId);
+  if (!recipientIds.size) return;
+
+  const users = db.select().from(t.users).all();
+  const recipients = [...recipientIds]
+    .map((id) => users.find((u) => u.id === id))
+    .filter((u): u is NonNullable<typeof u> => Boolean(u && u.active !== false))
+    .map((u) => ({ id: u.id, name: u.name, phone: u.phone }));
+
+  const bookingUrl = opts.bookingUrl ?? defaultBookingReviewUrl(opts.appointment.id);
+
+  for (const rule of rules) {
+    for (const recipient of recipients) {
+      await dispatchBookingCreatedWhatsAppForRule(db, config, rule, {
+        appointment: opts.appointment,
+        eventTitle: opts.eventTitle,
+        accountName: opts.accountName,
+        hostName: opts.hostName,
+        bookingUrl,
+        salesManagerName: account?.salesManagerName,
+        supportManager1: account?.supportManager1,
+        supportManager2: account?.supportManager2,
+        recipient,
+      });
+    }
+  }
 }
 
 /** Server-side guest email when a booking is approved, declined, cancelled, or postponed. */
@@ -267,7 +495,7 @@ export async function dispatchServerBookingStatusChangedEmail(
     accountName: opts.accountName,
     hostName: opts.hostName,
     hostEmail: opts.hostEmail,
-    bookingUrl: opts.bookingUrl,
+    bookingUrl: opts.bookingUrl ?? absoluteAppUrl("/crm/bookings"),
   });
 }
 

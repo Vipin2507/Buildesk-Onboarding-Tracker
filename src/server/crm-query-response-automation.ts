@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 
 import { N8N_EMAIL_SEGMENT } from "@/data/crm-automation-defaults";
+import { absoluteAppUrl } from "@/lib/app-base-url";
 import { phoneToWahaChatId } from "@/lib/automationEndpoints";
 import { resolveUserWorkEmail } from "@/lib/user-email";
 import {
@@ -8,7 +9,7 @@ import {
   loadCrmAutomationConfig,
 } from "@/server/crm-booking-automation";
 import { buildServerCrmN8nEmailBody } from "@/server/crm-n8n-email-payload";
-import { resolveCrmQueryResponseRecipientUserIds } from "@/server/api/notifications";
+import { resolveCrmQueryMentionedUserIds, resolveCrmQueryResponseRecipientUserIds } from "@/server/api/notifications";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import {
@@ -292,23 +293,37 @@ export async function dispatchCrmQueryResponseAutomation(
     .get();
   if (!account) return;
 
-  const recipientIds = resolveCrmQueryResponseRecipientUserIds(
+  const teamRecipientIds = resolveCrmQueryResponseRecipientUserIds(
     db,
     input.accountId,
     input.excludeUserId,
   );
-  if (!recipientIds.length) return;
+  const mentionedIds = new Set(
+    resolveCrmQueryMentionedUserIds(db, {
+      companyId: input.accountId,
+      body: input.messageBody,
+      excludeUserId: input.excludeUserId,
+    }),
+  );
 
   const users = db.select().from(t.users).all();
-  const recipients = recipientIds
-    .map((id) => users.find((u) => u.id === id))
-    .filter((u): u is NonNullable<typeof u> => Boolean(u && u.active !== false))
-    .map((u) => ({ id: u.id, name: u.name, phone: u.phone }));
+  function recipientsForChannel(channel: AutomationRule["channel"]) {
+    const ids =
+      channel === "whatsapp" && mentionedIds.size > 0 ? [...mentionedIds] : teamRecipientIds;
+    return ids
+      .map((id) => users.find((u) => u.id === id))
+      .filter((u): u is NonNullable<typeof u> => Boolean(u && u.active !== false))
+      .map((u) => ({ id: u.id, name: u.name, phone: u.phone }));
+  }
 
-  const queryUrl = `/crm/accounts/${input.accountId}?tab=queries&queryId=${input.queryId}`;
+  const queryUrl = absoluteAppUrl(
+    `/crm/accounts/${input.accountId}?tab=queries&queryId=${input.queryId}`,
+  );
   const messageSnippet = input.messageBody.trim().slice(0, 160);
 
   for (const rule of rules) {
+    const recipients = recipientsForChannel(rule.channel);
+    if (!recipients.length) continue;
     for (const recipient of recipients) {
       await dispatchQueryResponseForRule(db, config, rule, {
         accountId: input.accountId,

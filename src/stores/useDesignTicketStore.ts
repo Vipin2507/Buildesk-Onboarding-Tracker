@@ -39,7 +39,11 @@ type DesignTicketState = {
   mergeTicket: (ticket: DesignTicket) => void;
   createPortalTicket: (
     slug: string,
-    input: Omit<CreateDesignTicketInput, "companyId" | "createdBy"> & { authorName: string },
+    input: Omit<CreateDesignTicketInput, "companyId" | "createdBy"> & {
+      authorName: string;
+      authorEmail: string;
+      authorPhone: string;
+    },
   ) => Promise<DesignTicket>;
   createTeamTicket: (
     input: Omit<CreateDesignTicketInput, "createdBy">,
@@ -161,6 +165,8 @@ export const useDesignTicketStore = createStore<DesignTicketState>((set, get) =>
           category: input.category,
           priority: input.priority,
           authorName: input.authorName,
+          authorEmail: input.authorEmail,
+          authorPhone: input.authorPhone,
           attachments: input.attachments,
         },
       });

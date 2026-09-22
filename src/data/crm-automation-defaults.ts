@@ -82,6 +82,8 @@ export const CRM_QUERY_AUTOMATION_TRIGGERS = ["query-response"] as const;
 
 export const CRM_LIVE_CHAT_AUTOMATION_TRIGGERS = ["live-chat-started"] as const;
 
+export const CRM_PORTAL_TICKET_AUTOMATION_TRIGGERS = ["portal-ticket-created"] as const;
+
 export const DEFAULT_TASK_REMINDER_OFFSET_MINUTES = 15;
 
 const CRM_AUTOMATION_SEED_SYNC_RULE_IDS = new Set([
@@ -246,7 +248,18 @@ export const DEFAULT_CRM_AUTOMATION_RULES: AutomationRule[] = [
     isActive: true,
     templateSubject: "New meeting request — {{eventTypeTitle}} · {{accountName}}",
     templateBody:
-      "Hi {{hostName}},\n\n{{guestName}} requested a {{eventTypeTitle}} for {{accountName}}.\n\nWhen: {{startsAt}} – {{endsAt}}\nGuest: {{guestName}} ({{guestEmail}})\nStatus: {{status}}\n\nReview in CRM Meetings: {{bookingUrl}}",
+      "Hi {{hostName}},\n\n{{guestName}} requested a {{eventTypeTitle}} for {{accountName}}.\n\nWhen: {{startsAt}} – {{endsAt}}\nGuest: {{guestName}} ({{guestEmail}})\nStatus: {{status}}\n\nApprove, reject, or postpone in CRM Meetings: {{bookingUrl}}",
+  }),
+  rule({
+    id: "crm-rule-booking-created-whatsapp",
+    name: "Meeting request — Executive WhatsApp",
+    description:
+      "WhatsApp the host and related CRM executives when a portal client books a call, with a link to approve, reject, or postpone",
+    trigger: "booking-created",
+    channel: "whatsapp",
+    isActive: true,
+    templateBody:
+      "Hi {{recipientName}}, {{guestName}} booked a {{eventTypeTitle}} for {{accountName}}.\n\nWhen: {{startsAt}} – {{endsAt}}\nGuest: {{guestName}} ({{guestEmail}})\nStatus: {{status}}\n\nApprove / reject / postpone: {{bookingUrl}}",
   }),
   rule({
     id: "crm-rule-booking-status-email",
@@ -319,7 +332,7 @@ export const DEFAULT_CRM_AUTOMATION_RULES: AutomationRule[] = [
     id: "crm-rule-query-response-whatsapp",
     name: "Account query reply — Executive WhatsApp",
     description:
-      "WhatsApp CRM admins and the account sales manager and support managers when someone replies on a query",
+      "WhatsApp @mentioned people when a query message has mentions; otherwise CRM admins and the account sales manager and support managers",
     trigger: "query-response",
     channel: "whatsapp",
     isActive: true,
@@ -348,6 +361,17 @@ export const DEFAULT_CRM_AUTOMATION_RULES: AutomationRule[] = [
     isActive: true,
     templateBody:
       "Hi {{recipientName}}, {{visitorName}} started a live chat for {{accountName}}.\n\nOpen Live Chat: {{chatUrl}}",
+  }),
+  rule({
+    id: "crm-rule-portal-ticket-created-whatsapp",
+    name: "Portal ticket created — Executive WhatsApp",
+    description:
+      "WhatsApp CRM admins and the account sales manager and support managers when a client creates a ticket from the portal",
+    trigger: "portal-ticket-created",
+    channel: "whatsapp",
+    isActive: true,
+    templateBody:
+      "Hi {{recipientName}}, {{authorName}} created portal ticket {{ticketNumber}} for {{accountName}}.\n\n{{title}}\nPriority: {{priority}}\n\nOpen in CRM: {{ticketUrl}}",
   }),
 ];
 
@@ -387,15 +411,16 @@ export const CRM_AUTOMATION_TEMPLATE_VARS = [
   "{{supportManager1}}",
   "{{supportManager2}}",
   "{{executiveName}}",
+  "{{recipientName}}",
+  "{{authorName}}",
+  "{{priority}}",
   "{{accountCount}}",
   "{{digestDetails}}",
   "{{digestBody}}",
   "{{digestBodyWhatsapp}}",
   "{{totalOutstanding}}",
-  "{{authorName}}",
   "{{messageSnippet}}",
   "{{queryUrl}}",
-  "{{recipientName}}",
   "{{visitorName}}",
   "{{chatUrl}}",
   "{{sessionId}}",
@@ -419,7 +444,7 @@ export const CRM_AUTOMATION_SAMPLE_VARS: Record<string, string> = {
   endsAt: "2026-08-20 10:15",
   previousStatus: "pending",
   bookingId: "bk-1001",
-  bookingUrl: "https://track.example.com/crm/bookings",
+  bookingUrl: "https://track.example.com/crm/bookings?tab=pending&appointmentId=bk-1001",
   meetUrl: "https://meet.google.com/abc-defg-hij",
   meetUrlLine: "Google Meet: https://meet.google.com/abc-defg-hij\n",
   taskId: "task-9001",
@@ -446,6 +471,7 @@ export const CRM_AUTOMATION_SAMPLE_VARS: Record<string, string> = {
     "Hi *Priya Sales*,\n\n*🔔 PAYMENT REMINDER — 2 ACCOUNTS*\n\n_Please find below the accounts with overdue payments:_\n\n…\n\n📌 *TOTAL OUTSTANDING: ₹3,70,000*\n\n_Request you to please review…_\n\n*🔗 CRM → Payments*",
   totalOutstanding: "370000",
   authorName: "Amit Verma",
+  priority: "medium",
   messageSnippet: "Can we get an update on the onboarding checklist?",
   queryUrl: "https://track.example.com/crm/accounts/acme?tab=queries&queryId=q-1001",
   recipientName: "Priya Sales",

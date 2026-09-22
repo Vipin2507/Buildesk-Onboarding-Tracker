@@ -13,7 +13,8 @@ import { computeOpenSlots, localWallClockIso } from "@/lib/booking-slots";
 import { canViewCrmAccount } from "@/lib/crm-account-access";
 import { isAdminRoleKey } from "@/lib/permissions";
 import { resolveUserWorkEmail } from "@/lib/user-email";
-import { dispatchServerBookingCreatedEmail, dispatchServerBookingStatusChangedEmail, isBookingSlotInPast } from "@/server/crm-booking-automation";
+import { isPlaceholderContactName, isValidPortalPhone } from "@/lib/utils";
+import { dispatchServerBookingCreatedEmail, dispatchServerBookingCreatedWhatsApp, dispatchServerBookingStatusChangedEmail, isBookingSlotInPast } from "@/server/crm-booking-automation";
 import { insertBookingRequestNotification } from "@/server/api/notifications";
 import { ApiError, getSessionUser, newId, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
@@ -778,10 +779,10 @@ export const createPortalBooking = createServerFn({ method: "POST" })
         slug: z.string().min(1),
         eventTypeId: z.string().min(1),
         startsAt: z.string().min(10),
-        guestName: z.string().min(1),
+        guestName: z.string().min(2),
         guestEmail: z.string().email(),
         additionalGuestEmails: z.array(z.string().email()).optional(),
-        guestPhone: z.string().optional(),
+        guestPhone: z.string().min(8),
         notes: z.string().optional(),
         durationMinutes: z.number().int().min(5).optional(),
       })
@@ -790,6 +791,12 @@ export const createPortalBooking = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const db = getDb();
     const portal = resolveActivePortal(db, data.slug);
+    if (isPlaceholderContactName(data.guestName)) {
+      throw new ApiError(400, "Enter your real name");
+    }
+    if (!isValidPortalPhone(data.guestPhone)) {
+      throw new ApiError(400, "Enter a valid phone number (at least 10 digits)");
+    }
     const row = db
       .select()
       .from(t.bookingEventTypes)
@@ -834,7 +841,7 @@ export const createPortalBooking = createServerFn({ method: "POST" })
         guestName: data.guestName.trim(),
         guestEmail,
         additionalGuestEmailsJson: serializeAdditionalGuestEmails(additionalGuestEmails),
-        guestPhone: data.guestPhone?.trim() || null,
+        guestPhone: data.guestPhone.trim(),
         notes: data.notes?.trim() || null,
         hostNote: null,
         createdVia: "portal",
@@ -872,6 +879,14 @@ export const createPortalBooking = createServerFn({ method: "POST" })
       accountName: account?.name ?? "CRM account",
       hostName: host?.name ?? "Host",
       hostEmail: resolveUserWorkEmail(host ?? undefined),
+    });
+    void dispatchServerBookingCreatedWhatsApp(db, {
+      appointment: mapped,
+      eventTitle: event.title,
+      accountName: account?.name ?? "CRM account",
+      hostName: host?.name ?? "Host",
+    }).catch((err) => {
+      console.warn("[booking-created whatsapp]", err);
     });
 
     return mapped;

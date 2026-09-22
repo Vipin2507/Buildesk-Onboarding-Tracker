@@ -3,6 +3,7 @@ import { and, desc, eq, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { crmSalesManagerNamesMatch } from "@/lib/crm-account-access";
+import { resolveCrmQueryMentionUserIds } from "@/lib/crm-query-mentions";
 import { isAdminRoleKey } from "@/lib/permissions";
 import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
@@ -95,6 +96,32 @@ export function resolveCrmQueryResponseRecipientUserIds(
 
   if (excludeUserId?.trim()) ids.delete(excludeUserId.trim());
   return [...ids];
+}
+
+/** Users who can be @mentioned on an account query (CRM admins + account executives). */
+export function listCrmQueryMentionCandidates(
+  db: ReturnType<typeof getDb>,
+  companyId: string,
+): { id: string; name: string }[] {
+  const recipientIds = resolveNotificationRecipientIds(db, {
+    companyId,
+    productScope: "crm",
+  });
+  const users = db.select().from(t.users).all();
+  return users
+    .filter((u) => recipientIds.includes(u.id) && u.active !== false)
+    .map((u) => ({ id: u.id, name: u.name }));
+}
+
+/** User ids @mentioned in a query message, excluding the author. */
+export function resolveCrmQueryMentionedUserIds(
+  db: ReturnType<typeof getDb>,
+  opts: { companyId: string; body: string; excludeUserId?: string },
+): string[] {
+  const candidates = listCrmQueryMentionCandidates(db, opts.companyId);
+  return resolveCrmQueryMentionUserIds(opts.body, candidates).filter(
+    (id) => id !== opts.excludeUserId,
+  );
 }
 
 /**

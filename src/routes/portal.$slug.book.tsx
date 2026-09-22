@@ -27,7 +27,7 @@ import {
   ticketTextareaClass,
 } from "@/components/design-ticket/design-ticket-shared";
 import { Button } from "@/components/ui/button";
-import { cn, isValidEmail } from "@/lib/utils";
+import { cn, isValidEmail, isValidPortalPhone, usableContactName } from "@/lib/utils";
 import { formatGuestEmailsLabel } from "@/lib/booking-guest-emails";
 import { browserWallClockIso } from "@/lib/booking-slots";
 import { getCrmMasterBookingCallTypes } from "@/stores/useCrmMasterStore";
@@ -347,7 +347,8 @@ function PortalBookCall() {
       : selectedType?.durationMinutes ?? selectedMeta?.durationMinutes;
 
   const minDate = todayYmd();
-  const canContinueContact = guestName.trim().length >= 2 && isValidEmail(guestEmail);
+  const canContinueContact =
+    guestName.trim().length >= 2 && isValidEmail(guestEmail) && isValidPortalPhone(guestPhone);
 
   function pickDate(next: string) {
     if (!next || next < minDate) {
@@ -359,22 +360,15 @@ function PortalBookCall() {
 
   useEffect(() => {
     if (!access) return;
-    const name = access.contactName?.trim() || "";
+    const name = usableContactName(access.contactName);
     const email = access.contactEmail?.trim() || "";
     setGuestName(name);
     setGuestEmail(email);
-    const startAtContact = !isValidEmail(email) || name.length < 2;
+    // Phone is required and never autofilled — always collect contact first.
     void listPortalEventTypes(slug)
       .then((rows) => {
         setEventTypes(rows);
-        if (startAtContact) {
-          setStep("contact");
-        } else if (rows.length === 1) {
-          setSelectedType(rows[0]);
-          setStep("slot");
-        } else {
-          setStep("type");
-        }
+        setStep("contact");
       })
       .catch((err) => {
         toast.error(err instanceof Error ? err.message : "Failed to load meeting types");
@@ -440,6 +434,10 @@ function PortalBookCall() {
       toast.error("A valid email address is required");
       return;
     }
+    if (!isValidPortalPhone(guestPhone)) {
+      toast.error("Enter a valid phone number (at least 10 digits)");
+      return;
+    }
     if (allowsCustom && !specifyTopic.trim()) {
       toast.error("Please specify what the call is about");
       return;
@@ -461,7 +459,7 @@ function PortalBookCall() {
         guestName: guestName.trim(),
         guestEmail: guestEmail.trim().toLowerCase(),
         additionalGuestEmails,
-        guestPhone: guestPhone.trim() || undefined,
+        guestPhone: guestPhone.trim(),
         notes: noteParts.length > 0 ? noteParts.join("\n") : undefined,
         durationMinutes: allowsCustom ? effectiveDuration : undefined,
       });
@@ -502,7 +500,7 @@ function PortalBookCall() {
             >
               <DesignTicketFormCard>
                 <p className="text-xs text-muted-foreground">
-                  Add your email and any colleagues who should receive confirmations and Meet links.
+                  Add your details and any colleagues who should receive confirmations and Meet links.
                 </p>
                 <DesignTicketFormField label="Your name" required>
                   <div className="relative">
@@ -525,6 +523,20 @@ function PortalBookCall() {
                   emailTouched={emailTouched}
                   onEmailTouched={() => setEmailTouched(true)}
                 />
+                <DesignTicketFormField label="Phone" required>
+                  <div className="relative">
+                    <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      value={guestPhone}
+                      onChange={(e) => setGuestPhone(e.target.value)}
+                      className={cn(ticketFieldClass, "pl-9")}
+                      placeholder="10-digit mobile number"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      required
+                    />
+                  </div>
+                </DesignTicketFormField>
                 <Button
                   type="button"
                   disabled={!canContinueContact}
@@ -532,7 +544,7 @@ function PortalBookCall() {
                   onClick={() => {
                     setEmailTouched(true);
                     if (!canContinueContact) {
-                      toast.error("Name and a valid email are required");
+                      toast.error("Name, a valid email, and phone number are required");
                       return;
                     }
                     if (eventTypes.length === 1) {
@@ -810,15 +822,17 @@ function PortalBookCall() {
                   </DesignTicketFormField>
                 ) : null}
 
-                <DesignTicketFormField label="Phone" hint="Optional">
+                <DesignTicketFormField label="Phone" required>
                   <div className="relative">
                     <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <input
                       value={guestPhone}
                       onChange={(e) => setGuestPhone(e.target.value)}
                       className={cn(ticketFieldClass, "pl-9")}
+                      placeholder="10-digit mobile number"
                       inputMode="tel"
                       autoComplete="tel"
+                      required
                     />
                   </div>
                 </DesignTicketFormField>
@@ -835,7 +849,12 @@ function PortalBookCall() {
 
                 <Button
                   type="submit"
-                  disabled={submitting || !isValidEmail(guestEmail) || guestName.trim().length < 2}
+                  disabled={
+                    submitting ||
+                    !isValidEmail(guestEmail) ||
+                    guestName.trim().length < 2 ||
+                    !isValidPortalPhone(guestPhone)
+                  }
                   className="w-full"
                 >
                   {submitting ? "Submitting…" : "Request meeting"}

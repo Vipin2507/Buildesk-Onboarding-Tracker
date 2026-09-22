@@ -325,7 +325,7 @@ export function AutomationRulesPanel() {
           )}
           {renderRulesSection(
             "Meetings",
-            "Portal call requests and approval / status emails to executives and guests.",
+            "Portal call requests — email and WhatsApp to executives with a link to approve, reject, or postpone; status emails to guests.",
             <CalendarDays className="h-3.5 w-3.5" />,
             bookingRules,
           )}
@@ -349,7 +349,7 @@ export function AutomationRulesPanel() {
           )}
           {renderRulesSection(
             "Support tickets",
-            "CRM ticket lifecycle notifications to account contacts.",
+            "Portal ticket WhatsApp to related executives, plus CRM ticket lifecycle notifications to account contacts.",
             <Ticket className="h-3.5 w-3.5" />,
             ticketRules,
           )}

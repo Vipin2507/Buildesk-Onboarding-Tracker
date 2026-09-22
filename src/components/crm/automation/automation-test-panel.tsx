@@ -32,6 +32,7 @@ const TRIGGER_SHORT: Record<AutomationRule["trigger"], string> = {
   "payment-executive-remind": "Payment (executive)",
   "query-response": "Query reply",
   "live-chat-started": "Live chat",
+  "portal-ticket-created": "Portal ticket",
 };
 
 export function AutomationTestPanel({ className }: { className?: string }) {

@@ -6,7 +6,9 @@ import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { insertNotificationsForAdmins } from "@/server/api/notifications";
+import { dispatchCrmPortalTicketCreatedAutomation } from "@/server/crm-portal-ticket-automation";
 import { isCrmAccountCompanyStub } from "@/lib/design-ticket-portal";
+import { isPlaceholderContactName, isValidEmail, isValidPortalPhone } from "@/lib/utils";
 import type {
   DesignTicket,
   DesignTicketAttachment,
@@ -460,8 +462,22 @@ export const createPortalDesignTicket = createServerFn({ method: "POST" })
         description: z.string().min(1),
         category: z.string().optional(),
         priority: z.enum(["low", "medium", "high"]).optional(),
-        authorName: z.string().min(1),
+        authorName: z.string().min(2),
+        authorEmail: z.string().email(),
+        authorPhone: z.string().min(8),
         attachments: z.array(attachmentSchema).optional(),
+      })
+      .refine((v) => !isPlaceholderContactName(v.authorName), {
+        message: "Enter your real name",
+        path: ["authorName"],
+      })
+      .refine((v) => isValidEmail(v.authorEmail), {
+        message: "Enter a valid email",
+        path: ["authorEmail"],
+      })
+      .refine((v) => isValidPortalPhone(v.authorPhone), {
+        message: "Enter a valid phone number (at least 10 digits)",
+        path: ["authorPhone"],
       })
       .parse(data),
   )
@@ -471,6 +487,16 @@ export const createPortalDesignTicket = createServerFn({ method: "POST" })
     const now = nowIso();
     const id = newId();
     const ticketNumber = nextDesignTicketNumber(db);
+    const authorName = data.authorName.trim();
+    const authorEmail = data.authorEmail.trim().toLowerCase();
+    const authorPhone = data.authorPhone.trim();
+    const description = [
+      `Contact: ${authorName}`,
+      `Phone: ${authorPhone}`,
+      `Email: ${authorEmail}`,
+      "",
+      data.description.trim(),
+    ].join("\n");
 
     db.insert(t.designTickets)
       .values({
@@ -478,13 +504,13 @@ export const createPortalDesignTicket = createServerFn({ method: "POST" })
         ticketNumber,
         companyId: portal.companyId,
         subject: data.subject.trim(),
-        description: data.description.trim(),
+        description,
         category: data.category ?? null,
         priority: data.priority ?? "medium",
         status: "open",
         assigneeId: null,
         createdByType: "client",
-        createdByName: data.authorName,
+        createdByName: authorName,
         resolvedAt: null,
         createdAt: now,
         updatedAt: now,
@@ -497,15 +523,30 @@ export const createPortalDesignTicket = createServerFn({ method: "POST" })
         ticketId: id,
         kind: "message",
         authorType: "client",
-        authorName: data.authorName,
-        message: data.description.trim(),
+        authorName,
+        message: description,
         attachmentsJson: serializeAttachments(data.attachments),
         createdAt: now,
       })
       .run();
 
+    // Keep portal contact in sync with the person who submitted.
+    if (!isPlaceholderContactName(authorName) || authorEmail) {
+      db.update(t.companyPortalAccess)
+        .set({
+          contactName: authorName,
+          contactEmail: authorEmail,
+          updatedAt: now,
+        })
+        .where(eq(t.companyPortalAccess.companyId, portal.companyId))
+        .run();
+    }
+
     const created = loadTicket(db, id)!;
     insertPortalTicketNotification(db, created);
+    void dispatchCrmPortalTicketCreatedAutomation(db, created).catch((err) => {
+      console.warn("[portal-ticket-created automation]", err);
+    });
     return created;
   });
 

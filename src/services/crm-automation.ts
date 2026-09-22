@@ -23,6 +23,7 @@ import {
 } from "@/services/automationTemplate";
 import { checkWahaSession, phoneToWahaChatId, sendWahaText } from "@/services/waha";
 import { fetchN8nHealth, fetchN8nWebhook, normalizeIndiaPhone } from "@/lib/automationEndpoints";
+import { absoluteAppUrl } from "@/lib/app-base-url";
 import {
   CRM_AUTOMATION_SAMPLE_VARS,
   N8N_EMAIL_SEGMENT,
@@ -364,10 +365,7 @@ export async function checkCrmAutomationHealth(): Promise<{
 function buildCrmTicketContext(ticket: Ticket) {
   const account = useCrmAccountStore.getState().getById(ticket.companyId);
   const portal = useCompanyPortalStore.getState().access.find((a) => a.companyId === ticket.companyId);
-  const ticketUrl =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/crm/support/${ticket.id}`
-      : undefined;
+  const ticketUrl = absoluteAppUrl(`/crm/support/${ticket.id}`);
 
   const accountName = account?.name ?? portal?.companyName ?? "CRM account";
   const customerName =
@@ -580,10 +578,9 @@ export function dispatchCrmBookingAutomationTrigger(
     const accountName = account?.name ?? "CRM account";
     const eventTitle = eventType?.title ?? "Call";
     const statusLabel = BOOKING_STATUS_LABEL[appointment.status] ?? appointment.status;
-    const bookingUrl =
-      typeof window !== "undefined"
-        ? `${window.location.origin}/crm/bookings`
-        : "/crm/bookings";
+    const bookingUrl = absoluteAppUrl(
+      `/crm/bookings?tab=pending&appointmentId=${encodeURIComponent(appointment.id)}`,
+    );
 
     const hostName = host?.name ?? "Host";
     const hostEmail = resolveUserWorkEmail(host);

@@ -378,16 +378,27 @@ function CrmBookingsPage() {
     const linkedId = search.appointmentId;
     if (!linkedId) return;
 
-    if (tab !== "all") {
+    const appt = appointments.find((a) => a.id === linkedId);
+    if (!appt) return;
+
+    const preferredTab =
+      appt.status === "pending"
+        ? "pending"
+        : tab === "pending" || tab === "availability"
+          ? "all"
+          : tab;
+
+    if (tab !== preferredTab) {
       void navigate({
-        search: (prev: typeof search) => ({ ...prev, tab: "all", appointmentId: linkedId }),
+        search: (prev: typeof search) => ({
+          ...prev,
+          tab: preferredTab,
+          appointmentId: linkedId,
+        }),
         replace: true,
       });
       return;
     }
-
-    const appt = appointments.find((a) => a.id === linkedId);
-    if (!appt) return;
 
     setExpandedId(linkedId);
     const timer = window.setTimeout(() => {

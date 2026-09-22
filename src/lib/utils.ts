@@ -12,6 +12,38 @@ export function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 }
 
+const PLACEHOLDER_CONTACT_NAMES = new Set([
+  "to be assigned",
+  "owner tbd",
+  "tbd",
+  "n/a",
+  "na",
+  "none",
+  "unassigned",
+  "-",
+  "--",
+]);
+
+/** Seed / import placeholders that should not autofill portal guest name. */
+export function isPlaceholderContactName(name: string | null | undefined): boolean {
+  const n = name?.trim().toLowerCase() ?? "";
+  if (!n) return true;
+  return PLACEHOLDER_CONTACT_NAMES.has(n);
+}
+
+/** Real contact name for portal autofill; empty when missing or placeholder. */
+export function usableContactName(name: string | null | undefined): string {
+  const n = name?.trim() ?? "";
+  return isPlaceholderContactName(n) ? "" : n;
+}
+
+/** Portal phone: at least 10 digits (India mobile or similar). */
+export function isValidPortalPhone(phone: string | null | undefined): boolean {
+  if (!phone?.trim()) return false;
+  const digits = phone.replace(/\D/g, "");
+  return digits.length >= 10;
+}
+
 /** Display YYYY-MM-DD (or ISO) as a readable local date. */
 export function formatDate(value?: string | null) {
   if (!value) return "—";
@@ -39,6 +71,35 @@ export function formatTime(value?: string | null) {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
+
+/** Local calendar day key (YYYY-MM-DD) for grouping chat messages. */
+export function localDateKey(value?: string | null) {
+  if (!value) return "";
+  const d = new Date(value.length <= 10 ? `${value}T00:00:00` : value);
+  if (Number.isNaN(d.getTime())) return value.slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Chat date chip: Today / Yesterday / weekday + date. */
+export function formatChatDateLabel(value?: string | null, now = new Date()) {
+  if (!value) return "—";
+  const d = new Date(value.length <= 10 ? `${value}T00:00:00` : value);
+  if (Number.isNaN(d.getTime())) return formatDate(value);
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startMsg = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diffDays = Math.round((startToday.getTime() - startMsg.getTime()) / 86_400_000);
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 /** Display ISO as short date + time for checklist phase stamps. */

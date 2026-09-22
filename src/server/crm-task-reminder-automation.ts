@@ -2,6 +2,7 @@ import { and, eq, inArray } from "drizzle-orm";
 
 import { DEFAULT_TASK_REMINDER_OFFSET_MINUTES } from "@/data/crm-automation-defaults";
 import { N8N_EMAIL_SEGMENT } from "@/data/crm-automation-defaults";
+import { absoluteAppUrl } from "@/lib/app-base-url";
 import { phoneToWahaChatId } from "@/lib/automationEndpoints";
 import { localWallClockIso } from "@/lib/booking-slots";
 import { isCrmReminderTask } from "@/lib/crm-reminder-task";
@@ -160,7 +161,7 @@ async function dispatchTaskReminderForRule(
   startsAt: string,
   offsetMinutes: number,
 ): Promise<boolean> {
-  const taskUrl = `/crm/tasks?task=${task.id}`;
+  const taskUrl = absoluteAppUrl(`/crm/tasks?task=${task.id}`);
   const vars = buildTaskReminderVars({
     task,
     assigneeName: assignee.name,

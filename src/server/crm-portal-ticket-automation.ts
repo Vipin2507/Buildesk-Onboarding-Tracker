@@ -2,16 +2,17 @@ import { eq } from "drizzle-orm";
 
 import { absoluteAppUrl } from "@/lib/app-base-url";
 import { phoneToWahaChatId } from "@/lib/automationEndpoints";
+import { resolveCrmQueryResponseRecipientUserIds } from "@/server/api/notifications";
 import {
   appendServerCrmAutomationLog,
   loadCrmAutomationConfig,
 } from "@/server/crm-booking-automation";
-import { resolveCrmQueryResponseRecipientUserIds } from "@/server/api/notifications";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { renderAutomationTemplate } from "@/services/automationTemplate";
 import { nowIso } from "@/types";
 import type { AutomationLog, AutomationRule, WahaConfig } from "@/types/automation";
+import type { DesignTicket } from "@/types/design-ticket";
 
 function trimSlash(url: string) {
   return url.replace(/\/+$/, "");
@@ -24,7 +25,7 @@ function summarizeResponse(text: string, max = 200) {
 }
 
 function serverLogId() {
-  return `CHAT-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  return `PTK-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
 async function sendServerWahaText(waha: WahaConfig, chatId: string, text: string) {
@@ -45,56 +46,64 @@ async function sendServerWahaText(waha: WahaConfig, chatId: string, text: string
   return { ok: res.ok, status: res.status, text: body };
 }
 
-function buildLiveChatStartedVars(input: {
+function buildPortalTicketVars(input: {
   accountName: string;
-  visitorName: string;
-  sessionId: string;
-  chatUrl: string;
+  ticketNumber: string;
+  title: string;
+  priority: string;
+  authorName: string;
+  ticketUrl: string;
   recipientName: string;
   salesManagerName?: string | null;
   supportManager1?: string | null;
   supportManager2?: string | null;
 }): Record<string, string> {
   return {
-    customerName: input.visitorName,
-    visitorName: input.visitorName,
+    customerName: input.authorName,
+    authorName: input.authorName,
     recipientName: input.recipientName,
     executiveName: input.recipientName,
     assigneeName: input.recipientName,
     accountName: input.accountName,
     companyName: input.accountName,
-    sessionId: input.sessionId,
-    chatUrl: input.chatUrl,
-    ticketUrl: input.chatUrl,
-    ticketNumber: input.sessionId,
-    status: "bot-handling",
+    ticketNumber: input.ticketNumber,
+    title: input.title,
+    subject: input.title,
+    status: "open",
+    priority: input.priority,
+    ticketUrl: input.ticketUrl,
     salesManagerName: input.salesManagerName?.trim() || "—",
     supportManager1: input.supportManager1?.trim() || "—",
     supportManager2: input.supportManager2?.trim() || "—",
   };
 }
 
-async function dispatchLiveChatStartedForRule(
+async function dispatchPortalTicketCreatedForRule(
   db: ReturnType<typeof getDb>,
   config: ReturnType<typeof loadCrmAutomationConfig>,
   rule: AutomationRule,
   input: {
     accountId: string;
     accountName: string;
-    sessionId: string;
-    visitorName: string;
-    chatUrl: string;
+    ticketId: string;
+    ticketNumber: string;
+    title: string;
+    priority: string;
+    authorName: string;
+    ticketUrl: string;
     salesManagerName?: string | null;
     supportManager1?: string | null;
     supportManager2?: string | null;
     recipient: { id: string; name: string; phone?: string | null };
   },
 ): Promise<boolean> {
-  const vars = buildLiveChatStartedVars({
+  const vars = buildPortalTicketVars({
     accountName: input.accountName,
-    visitorName: input.visitorName,
-    sessionId: input.sessionId,
-    chatUrl: input.chatUrl,
+    ticketNumber: input.ticketNumber,
+    title: input.title,
+    priority: input.priority,
+    authorName: input.authorName,
+    ticketUrl: input.ticketUrl,
     recipientName: input.recipient.name,
     salesManagerName: input.salesManagerName,
     supportManager1: input.supportManager1,
@@ -106,16 +115,16 @@ async function dispatchLiveChatStartedForRule(
   const recipientPhone = userRow?.phone ?? input.recipient.phone ?? undefined;
 
   const attemptedAt = nowIso();
-  const logId = serverLogId();
   const baseLog: AutomationLog = {
-    id: logId,
-    ticketNumber: input.sessionId,
+    id: serverLogId(),
+    ticketId: input.ticketId,
+    ticketNumber: input.ticketNumber,
     companyId: input.accountId,
     channel: rule.channel,
-    trigger: "live-chat-started",
+    trigger: "portal-ticket-created",
     status: "retrying",
     requestPayload: {
-      sessionId: input.sessionId,
+      ticketId: input.ticketId,
       ruleId: rule.id,
       recipientUserId: input.recipient.id,
     },
@@ -127,7 +136,7 @@ async function dispatchLiveChatStartedForRule(
     appendServerCrmAutomationLog(db, {
       ...baseLog,
       status: "failed",
-      errorMessage: "Live chat started automation currently supports WhatsApp only",
+      errorMessage: "Portal ticket created automation currently supports WhatsApp only",
     });
     return false;
   }
@@ -181,31 +190,27 @@ async function dispatchLiveChatStartedForRule(
   }
 }
 
-/** WhatsApp CRM admins + account executives when a customer starts a portal live chat. */
-export async function dispatchCrmLiveChatStartedAutomation(
+/** WhatsApp CRM admins + account executives when a client creates a portal ticket. */
+export async function dispatchCrmPortalTicketCreatedAutomation(
   db: ReturnType<typeof getDb>,
-  input: {
-    accountId: string;
-    sessionId: string;
-    visitorName: string;
-  },
+  ticket: DesignTicket,
 ): Promise<void> {
   const config = loadCrmAutomationConfig(db);
   if (!config.settings.automationsEnabled) return;
 
   const rules = config.rules.filter(
-    (r) => r.isActive && r.trigger === "live-chat-started" && r.channel === "whatsapp",
+    (r) => r.isActive && r.trigger === "portal-ticket-created" && r.channel === "whatsapp",
   );
   if (rules.length === 0) return;
 
   const account = db
     .select()
     .from(t.crmAccounts)
-    .where(eq(t.crmAccounts.id, input.accountId))
+    .where(eq(t.crmAccounts.id, ticket.companyId))
     .get();
   if (!account) return;
 
-  const recipientIds = resolveCrmQueryResponseRecipientUserIds(db, input.accountId);
+  const recipientIds = resolveCrmQueryResponseRecipientUserIds(db, ticket.companyId);
   if (!recipientIds.length) return;
 
   const users = db.select().from(t.users).all();
@@ -214,16 +219,19 @@ export async function dispatchCrmLiveChatStartedAutomation(
     .filter((u): u is NonNullable<typeof u> => Boolean(u && u.active !== false))
     .map((u) => ({ id: u.id, name: u.name, phone: u.phone }));
 
-  const chatUrl = absoluteAppUrl("/crm/live-chat");
+  const ticketUrl = absoluteAppUrl(`/crm/tickets/${ticket.id}`);
 
   for (const rule of rules) {
     for (const recipient of recipients) {
-      await dispatchLiveChatStartedForRule(db, config, rule, {
-        accountId: input.accountId,
+      await dispatchPortalTicketCreatedForRule(db, config, rule, {
+        accountId: ticket.companyId,
         accountName: account.name,
-        sessionId: input.sessionId,
-        visitorName: input.visitorName,
-        chatUrl,
+        ticketId: ticket.id,
+        ticketNumber: ticket.ticketNumber,
+        title: ticket.subject,
+        priority: ticket.priority,
+        authorName: ticket.createdBy.name,
+        ticketUrl,
         salesManagerName: account.salesManagerName,
         supportManager1: account.supportManager1,
         supportManager2: account.supportManager2,

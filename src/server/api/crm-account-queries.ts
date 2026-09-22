@@ -3,12 +3,11 @@ import { asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { canViewCrmAccount } from "@/lib/crm-account-access";
-import { resolveCrmQueryMentionUserIds } from "@/lib/crm-query-mentions";
 import { isAdminRoleKey } from "@/lib/permissions";
 import {
   insertNotificationsForUserIds,
+  resolveCrmQueryMentionedUserIds,
   resolveCrmQueryResponseRecipientUserIds,
-  resolveNotificationRecipientIds,
 } from "@/server/api/notifications";
 import { dispatchCrmQueryResponseAutomation } from "@/server/crm-query-response-automation";
 import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
@@ -183,17 +182,6 @@ function mapQuerySummary(
   };
 }
 
-function loadMentionCandidatesForCompany(db: ReturnType<typeof getDb>, companyId: string) {
-  const recipientIds = resolveNotificationRecipientIds(db, {
-    companyId,
-    productScope: "crm",
-  });
-  const users = db.select().from(t.users).all();
-  return users
-    .filter((u) => recipientIds.includes(u.id) && u.active !== false)
-    .map((u) => ({ id: u.id, name: u.name }));
-}
-
 function notifyAccountQueryMentions(
   db: ReturnType<typeof getDb>,
   opts: {
@@ -205,10 +193,11 @@ function notifyAccountQueryMentions(
     authorUserId: string;
   },
 ): string[] {
-  const candidates = loadMentionCandidatesForCompany(db, opts.companyId);
-  const mentionedIds = resolveCrmQueryMentionUserIds(opts.body, candidates).filter(
-    (id) => id !== opts.authorUserId,
-  );
+  const mentionedIds = resolveCrmQueryMentionedUserIds(db, {
+    companyId: opts.companyId,
+    body: opts.body,
+    excludeUserId: opts.authorUserId,
+  });
   if (!mentionedIds.length) return [];
 
   const users = db.select().from(t.users).all();
@@ -536,6 +525,18 @@ export const createCrmAccountQuery = createServerFn({ method: "POST" })
       excludeUserId: user.id,
       alsoExcludeUserIds: mentionedIds,
     });
+
+    if (initialBody) {
+      void dispatchCrmQueryResponseAutomation(db, {
+        accountId: data.companyId,
+        queryId: id,
+        queryTitle: data.title.trim(),
+        queryStatus: "open",
+        authorName: user.name,
+        messageBody: initialBody,
+        excludeUserId: user.id,
+      });
+    }
 
     return loadQuery(db, id)!;
   });

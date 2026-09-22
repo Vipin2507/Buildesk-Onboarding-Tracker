@@ -1,7 +1,7 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Paperclip, X } from "lucide-react";
+import { ArrowLeft, Mail, Paperclip, Phone, User, X } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -16,6 +16,7 @@ import {
 } from "@/components/design-ticket/design-ticket-shared";
 import { DesignTicketSelect } from "@/components/design-ticket/design-ticket-fields";
 import { Button } from "@/components/ui/button";
+import { cn, isValidEmail, isValidPortalPhone, usableContactName } from "@/lib/utils";
 import { DESIGN_TICKET_CATEGORIES } from "@/types/design-ticket";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
 import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
@@ -65,6 +66,9 @@ function PortalCreateTicket() {
   const access = useCompanyPortalStore((s) => s.getBySlug(slug));
   const createPortalTicket = useDesignTicketStore((s) => s.createPortalTicket);
 
+  const [authorName, setAuthorName] = useState(() => usableContactName(access?.contactName));
+  const [authorEmail, setAuthorEmail] = useState(() => access?.contactEmail?.trim() || "");
+  const [authorPhone, setAuthorPhone] = useState("");
   const [subject, setSubject] = useState("");
   const [category, setCategory] = useState<string>(
     PORTAL_CATEGORY_OPTIONS[0]?.value ?? DESIGN_TICKET_CATEGORIES[0],
@@ -75,10 +79,21 @@ function PortalCreateTicket() {
   const [submitting, setSubmitting] = useState(false);
 
   if (!access) return null;
-  const portal = access;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!authorName.trim() || authorName.trim().length < 2) {
+      toast.error("Enter your name");
+      return;
+    }
+    if (!isValidEmail(authorEmail)) {
+      toast.error("Enter a valid email address");
+      return;
+    }
+    if (!isValidPortalPhone(authorPhone)) {
+      toast.error("Enter a valid phone number (at least 10 digits)");
+      return;
+    }
     if (!subject.trim() || !description.trim()) {
       toast.error("Subject and description are required");
       return;
@@ -90,7 +105,9 @@ function PortalCreateTicket() {
         description,
         category,
         priority,
-        authorName: portal.contactName,
+        authorName: authorName.trim(),
+        authorEmail: authorEmail.trim().toLowerCase(),
+        authorPhone: authorPhone.trim(),
         attachments,
       });
       toast.success(`Ticket created — ${ticket.ticketNumber}`);
@@ -108,6 +125,13 @@ function PortalCreateTicket() {
   function removeAttachment(name: string) {
     setAttachments((prev) => prev.filter((f) => f.name !== name));
   }
+
+  const canSubmit =
+    authorName.trim().length >= 2 &&
+    isValidEmail(authorEmail) &&
+    isValidPortalPhone(authorPhone) &&
+    subject.trim().length > 0 &&
+    description.trim().length > 0;
 
   return (
     <PortalPageWrap>
@@ -133,7 +157,50 @@ function PortalCreateTicket() {
 
         <motion.form variants={ticketSectionVariants} onSubmit={onSubmit}>
           <DesignTicketFormCard>
-            <DesignTicketFormField label="Subject">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <DesignTicketFormField label="Your name" required>
+                <div className="relative">
+                  <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    value={authorName}
+                    onChange={(e) => setAuthorName(e.target.value)}
+                    className={cn(ticketFieldClass, "pl-9")}
+                    placeholder="Full name"
+                    autoComplete="name"
+                    required
+                  />
+                </div>
+              </DesignTicketFormField>
+              <DesignTicketFormField label="Phone" required>
+                <div className="relative">
+                  <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    value={authorPhone}
+                    onChange={(e) => setAuthorPhone(e.target.value)}
+                    className={cn(ticketFieldClass, "pl-9")}
+                    placeholder="10-digit mobile number"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    required
+                  />
+                </div>
+              </DesignTicketFormField>
+            </div>
+            <DesignTicketFormField label="Email" required>
+              <div className="relative">
+                <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="email"
+                  value={authorEmail}
+                  onChange={(e) => setAuthorEmail(e.target.value)}
+                  className={cn(ticketFieldClass, "pl-9")}
+                  placeholder="you@company.com"
+                  autoComplete="email"
+                  required
+                />
+              </div>
+            </DesignTicketFormField>
+            <DesignTicketFormField label="Subject" required>
               <input
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
@@ -168,7 +235,7 @@ function PortalCreateTicket() {
                 />
               </DesignTicketFormField>
             </div>
-            <DesignTicketFormField label="Description">
+            <DesignTicketFormField label="Description" required>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -227,7 +294,7 @@ function PortalCreateTicket() {
               >
                 Cancel
               </Button>
-              <Button type="submit" className="w-full sm:w-auto" disabled={submitting}>
+              <Button type="submit" className="w-full sm:w-auto" disabled={submitting || !canSubmit}>
                 {submitting ? "Submitting…" : "Submit Ticket"}
               </Button>
             </div>

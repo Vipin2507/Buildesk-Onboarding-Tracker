@@ -14,6 +14,7 @@ export const AUTOMATION_TRIGGER_VALUES = [
   "payment-executive-remind",
   "query-response",
   "live-chat-started",
+  "portal-ticket-created",
 ] as const satisfies readonly AutomationTrigger[];
 
 const jsonLiteralSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
