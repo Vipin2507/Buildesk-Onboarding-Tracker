@@ -247,8 +247,16 @@ function AutoGrowTextarea({
   );
 }
 
-function MessageBodyWithMentions({ body, isSelf }: { body: string; isSelf: boolean }) {
-  const parts = splitCrmQueryMessageMentions(body);
+function MessageBodyWithMentions({
+  body,
+  isSelf,
+  mentionCandidates,
+}: {
+  body: string;
+  isSelf: boolean;
+  mentionCandidates?: CrmQueryMentionCandidate[];
+}) {
+  const parts = splitCrmQueryMessageMentions(body, mentionCandidates);
   return (
     <p className="whitespace-pre-wrap break-words leading-snug">
       {parts.map((part, index) =>
@@ -342,9 +350,11 @@ function QueryMessageAttachment({
 function MessageBubble({
   msg,
   isSelf,
+  mentionCandidates,
 }: {
   msg: CrmAccountQueryMessage;
   isSelf: boolean;
+  mentionCandidates?: CrmQueryMentionCandidate[];
 }) {
   if (msg.messageType === "system") {
     return (
@@ -385,7 +395,13 @@ function MessageBubble({
           />
         ) : null}
 
-        {msg.body.trim() ? <MessageBodyWithMentions body={msg.body} isSelf={isSelf} /> : null}
+        {msg.body.trim() ? (
+          <MessageBodyWithMentions
+            body={msg.body}
+            isSelf={isSelf}
+            mentionCandidates={mentionCandidates}
+          />
+        ) : null}
       </div>
     </div>
   );
@@ -702,7 +718,12 @@ function QueryThread({
                 </span>
               </div>
               {group.messages.map((msg) => (
-                <MessageBubble key={msg.id} msg={msg} isSelf={msg.authorUserId === currentUserId} />
+                <MessageBubble
+                  key={msg.id}
+                  msg={msg}
+                  isSelf={msg.authorUserId === currentUserId}
+                  mentionCandidates={mentionCandidates}
+                />
               ))}
             </div>
           ))
