@@ -13,6 +13,7 @@ import {
   N8N_HEALTH_SEGMENT,
 } from "@/data/automationDefaults";
 import { useCrmAutomationStore } from "@/stores/useCrmAutomationStore";
+import { WahaConnectedGroups } from "@/components/crm/automation/waha-connected-groups";
 
 export function AutomationWebhookSettings() {
   const settings = useCrmAutomationStore((s) => s.settings);
@@ -163,6 +164,7 @@ export function AutomationWebhookSettings() {
             Restore defaults
           </Button>
         </div>
+        <WahaConnectedGroups />
       </div>
 
       <div className="card-soft p-3">

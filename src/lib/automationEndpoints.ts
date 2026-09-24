@@ -201,3 +201,51 @@ export async function fetchWahaSession(config: WahaConfig): Promise<IntegrationF
   });
   return readResponse(res);
 }
+
+/** List groups for the WAHA session (`GET /api/{session}/groups`). */
+export async function fetchWahaGroups(
+  config: WahaConfig,
+  opts?: { limit?: number; offset?: number },
+): Promise<IntegrationFetchResult> {
+  const params = new URLSearchParams({
+    exclude: "participants",
+    sortBy: "subject",
+    sortOrder: "asc",
+  });
+  if (opts?.limit != null) params.set("limit", String(opts.limit));
+  if (opts?.offset != null) params.set("offset", String(opts.offset));
+  const groupsPath = `/api/${encodeURIComponent(config.sessionName)}/groups?${params}`;
+
+  if (isDevClient()) {
+    const res = await fetch(`/waha${groupsPath}`, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "X-Api-Key": config.apiKey,
+      },
+    });
+    return readResponse(res);
+  }
+
+  if (isHttpsClient()) {
+    const { proxyWahaGroups } = await import("@/server/api/integrations");
+    return proxyWahaGroups({
+      data: {
+        apiUrl: config.apiUrl,
+        apiKey: config.apiKey,
+        sessionName: config.sessionName,
+        limit: opts?.limit,
+        offset: opts?.offset,
+      },
+    });
+  }
+
+  const res = await fetch(`${trimSlash(config.apiUrl)}${groupsPath}`, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+      "X-Api-Key": config.apiKey,
+    },
+  });
+  return readResponse(res);
+}
