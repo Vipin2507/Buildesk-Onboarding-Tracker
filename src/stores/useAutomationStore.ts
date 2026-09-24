@@ -21,6 +21,12 @@ import {
   syncAutomationLogToServer,
 } from "@/lib/automation-log-sync";
 
+function flushAutomationToggles() {
+  void import("@/lib/config-persistence").then(({ flushAutomationConfigPersistence }) => {
+    flushAutomationConfigPersistence();
+  });
+}
+
 type AutomationState = {
   settings: AutomationSettings;
   endpoints: AutomationEndpoint[];
@@ -120,6 +126,9 @@ export const useAutomationStore = createPersistedStore<AutomationState>(
           n8nWebhookBase: partial.n8nWebhookBase?.trim() ?? s.settings.n8nWebhookBase,
         },
       }));
+      if (partial.automationsEnabled !== undefined) {
+        flushAutomationToggles();
+      }
     },
 
     restoreDefaultSettings: () => {
@@ -139,6 +148,7 @@ export const useAutomationStore = createPersistedStore<AutomationState>(
         endpoints: s.endpoints.map((e) => (e.channel === channel ? { ...e, isEnabled } : e)),
         waha: channel === "whatsapp" ? { ...s.waha, isEnabled } : s.waha,
       }));
+      flushAutomationToggles();
     },
 
     restoreDefaultEndpoints: () => {
@@ -225,9 +235,18 @@ export const useAutomationStore = createPersistedStore<AutomationState>(
     },
 
     toggleRule: (id, isActive) => {
-      set((s) => ({
-        rules: s.rules.map((r) => (r.id === id ? touch({ ...r, isActive }) : r)),
-      }));
+      set((s) => {
+        const exists = s.rules.some((r) => r.id === id);
+        if (exists) {
+          return {
+            rules: s.rules.map((r) => (r.id === id ? touch({ ...r, isActive }) : r)),
+          };
+        }
+        const seed = DEFAULT_AUTOMATION_RULES.find((r) => r.id === id);
+        if (!seed) return s;
+        return { rules: [...s.rules, touch({ ...seed, isActive })] };
+      });
+      flushAutomationToggles();
     },
 
     upsertLog: (log) => {
@@ -254,13 +273,36 @@ export const useAutomationStore = createPersistedStore<AutomationState>(
 export function hydrateAutomationFromServer(snapshot: AutomationSnapshot | null | undefined) {
   if (!snapshot || typeof snapshot !== "object") return;
   const patch: Partial<AutomationState> = {};
-  if (snapshot.settings) patch.settings = snapshot.settings;
-  if (Array.isArray(snapshot.endpoints) && snapshot.endpoints.length > 0) {
-    patch.endpoints = snapshot.endpoints;
+  if (snapshot.settings) {
+    patch.settings = {
+      ...DEFAULT_AUTOMATION_SETTINGS,
+      ...snapshot.settings,
+      automationsEnabled: snapshot.settings.automationsEnabled ?? true,
+    };
   }
-  if (snapshot.waha) patch.waha = snapshot.waha;
+  if (Array.isArray(snapshot.endpoints) && snapshot.endpoints.length > 0) {
+    patch.endpoints = mergeAutomationEndpoints(snapshot.endpoints).map((e) => ({
+      ...e,
+      isEnabled: typeof e.isEnabled === "boolean" ? e.isEnabled : true,
+    }));
+  }
+  if (snapshot.waha) {
+    patch.waha = {
+      ...DEFAULT_WAHA_CONFIG,
+      ...snapshot.waha,
+      isEnabled:
+        typeof snapshot.waha.isEnabled === "boolean"
+          ? snapshot.waha.isEnabled
+          : DEFAULT_WAHA_CONFIG.isEnabled,
+    };
+  }
   if (snapshot.healthCheck) patch.healthCheck = snapshot.healthCheck;
-  if (Array.isArray(snapshot.rules)) patch.rules = snapshot.rules;
+  if (Array.isArray(snapshot.rules) && snapshot.rules.length > 0) {
+    patch.rules = snapshot.rules.map((r) => ({
+      ...r,
+      isActive: typeof r.isActive === "boolean" ? r.isActive : true,
+    }));
+  }
   // Logs are loaded separately from SQLite via getAutomationLogs.
   if (Object.keys(patch).length === 0) return;
   useAutomationStore.setState((s) => ({

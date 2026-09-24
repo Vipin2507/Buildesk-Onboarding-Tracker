@@ -45,7 +45,11 @@ import {
   listBookingAvailability,
   listBookingBlocks,
 } from "@/lib/api";
-import { wireConfigPersistence } from "@/lib/config-persistence";
+import {
+  markAutomationConfigPersistReady,
+  resetAutomationConfigPersistReady,
+  wireConfigPersistence,
+} from "@/lib/config-persistence";
 import { mapTicket, mapTicketActivity } from "@/lib/tickets";
 import {
   useActivityStore,
@@ -121,12 +125,15 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!user) {
+      resetAutomationConfigPersistReady();
       setReady(true);
       return;
     }
     let cancelled = false;
     setReady(false);
     setError(null);
+    // Block automation config writes until SQLite hydrate/seed finishes.
+    resetAutomationConfigPersistReady();
 
     (async () => {
       try {
@@ -425,6 +432,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           hydrateAutomationFromServer(automation as Record<string, unknown>);
           useAutomationStore.getState().ensureDefaults();
         } else if (user.role === "Admin") {
+          useAutomationStore.getState().ensureDefaults();
           const localAutomation = useAutomationStore.getState();
           await setAppConfig({
             data: {
@@ -450,6 +458,9 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           hydrateCrmAutomationFromServer(crmAutomation as Record<string, unknown>);
           useCrmAutomationStore.getState().ensureDefaults();
         } else if (user.role === "Admin") {
+          // Empty server only — seed from local after ensureDefaults so missing seed
+          // rules exist, but never overwrite a non-empty SQLite row (handled above).
+          useCrmAutomationStore.getState().ensureDefaults();
           const localCrmAutomation = useCrmAutomationStore.getState();
           await setAppConfig({
             data: {
@@ -464,6 +475,9 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
             },
           }).catch(() => {});
         }
+
+        // Allow toggle/settings writes only after authoritative hydrate (or empty seed).
+        if (!cancelled) markAutomationConfigPersistReady();
 
         if (user.role === "Admin") {
           const emptyLogs: AutomationLogWire[] = [];

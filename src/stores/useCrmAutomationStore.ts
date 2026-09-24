@@ -23,6 +23,12 @@ import {
   syncAutomationLogToServer,
 } from "@/lib/automation-log-sync";
 
+function flushAutomationToggles() {
+  void import("@/lib/config-persistence").then(({ flushAutomationConfigPersistence }) => {
+    flushAutomationConfigPersistence();
+  });
+}
+
 type AutomationState = {
   settings: AutomationSettings;
   endpoints: AutomationEndpoint[];
@@ -152,6 +158,9 @@ export const useCrmAutomationStore = createPersistedStore<AutomationState>(
           n8nWebhookBase: partial.n8nWebhookBase?.trim() ?? s.settings.n8nWebhookBase,
         },
       }));
+      if (partial.automationsEnabled !== undefined) {
+        flushAutomationToggles();
+      }
     },
 
     restoreDefaultSettings: () => {
@@ -171,6 +180,7 @@ export const useCrmAutomationStore = createPersistedStore<AutomationState>(
         endpoints: s.endpoints.map((e) => (e.channel === channel ? { ...e, isEnabled } : e)),
         waha: channel === "whatsapp" ? { ...s.waha, isEnabled } : s.waha,
       }));
+      flushAutomationToggles();
     },
 
     restoreDefaultEndpoints: () => {
@@ -257,9 +267,19 @@ export const useCrmAutomationStore = createPersistedStore<AutomationState>(
     },
 
     toggleRule: (id, isActive) => {
-      set((s) => ({
-        rules: s.rules.map((r) => (r.id === id ? touch({ ...r, isActive }) : r)),
-      }));
+      set((s) => {
+        const exists = s.rules.some((r) => r.id === id);
+        if (exists) {
+          return {
+            rules: s.rules.map((r) => (r.id === id ? touch({ ...r, isActive }) : r)),
+          };
+        }
+        // Panel may show a seed-merged rule that isn't in the store yet — upsert so the toggle sticks.
+        const seed = DEFAULT_CRM_AUTOMATION_RULES.find((r) => r.id === id);
+        if (!seed) return s;
+        return { rules: [...s.rules, touch({ ...seed, isActive })] };
+      });
+      flushAutomationToggles();
     },
 
     upsertLog: (log) => {
@@ -286,13 +306,37 @@ export const useCrmAutomationStore = createPersistedStore<AutomationState>(
 export function hydrateCrmAutomationFromServer(snapshot: CrmAutomationSnapshot | null | undefined) {
   if (!snapshot || typeof snapshot !== "object") return;
   const patch: Partial<AutomationState> = {};
-  if (snapshot.settings) patch.settings = snapshot.settings;
-  if (Array.isArray(snapshot.endpoints) && snapshot.endpoints.length > 0) {
-    patch.endpoints = snapshot.endpoints;
+  if (snapshot.settings) {
+    patch.settings = {
+      ...DEFAULT_CRM_AUTOMATION_SETTINGS,
+      ...snapshot.settings,
+      automationsEnabled: snapshot.settings.automationsEnabled ?? true,
+    };
   }
-  if (snapshot.waha) patch.waha = snapshot.waha;
+  if (Array.isArray(snapshot.endpoints) && snapshot.endpoints.length > 0) {
+    patch.endpoints = mergeCrmAutomationEndpoints(snapshot.endpoints).map((e) => ({
+      ...e,
+      isEnabled: typeof e.isEnabled === "boolean" ? e.isEnabled : true,
+    }));
+  }
+  if (snapshot.waha) {
+    patch.waha = {
+      ...DEFAULT_CRM_WAHA_CONFIG,
+      ...snapshot.waha,
+      isEnabled:
+        typeof snapshot.waha.isEnabled === "boolean"
+          ? snapshot.waha.isEnabled
+          : DEFAULT_CRM_WAHA_CONFIG.isEnabled,
+    };
+  }
   if (snapshot.healthCheck) patch.healthCheck = snapshot.healthCheck;
-  if (Array.isArray(snapshot.rules)) patch.rules = mergeCrmAutomationRules(snapshot.rules);
+  if (Array.isArray(snapshot.rules)) {
+    patch.rules = mergeCrmAutomationRules(snapshot.rules).map((r) => ({
+      ...r,
+      // Coerce so a missing field never flips the Switch into an uncontrolled/default state.
+      isActive: typeof r.isActive === "boolean" ? r.isActive : true,
+    }));
+  }
   // Logs are loaded separately from SQLite via getAutomationLogs.
   if (Object.keys(patch).length === 0) return;
   useCrmAutomationStore.setState((s) => ({

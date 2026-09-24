@@ -150,3 +150,11 @@ export function flushServerSyncDebounced(key: string) {
   pendingFns.delete(key);
   if (run) serverSync(key, run);
 }
+
+/** Drop a pending debounced sync without running it (e.g. before authoritative hydrate). */
+export function cancelServerSyncDebounced(key: string) {
+  const prev = timers.get(key);
+  if (prev) clearTimeout(prev);
+  timers.delete(key);
+  pendingFns.delete(key);
+}

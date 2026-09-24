@@ -166,7 +166,12 @@ export function crmAutomationRuleNeedsSeedSync(
 }
 
 function applyCrmAutomationSeedSync(existing: AutomationRule, seed: AutomationRule): AutomationRule {
-  if (!crmAutomationRuleNeedsSeedSync(existing, seed)) return existing;
+  if (!crmAutomationRuleNeedsSeedSync(existing, seed)) {
+    return {
+      ...existing,
+      isActive: typeof existing.isActive === "boolean" ? existing.isActive : seed.isActive,
+    };
+  }
   return {
     ...existing,
     name: seed.name,
@@ -174,7 +179,7 @@ function applyCrmAutomationSeedSync(existing: AutomationRule, seed: AutomationRu
     templateSubject: seed.templateSubject,
     templateBody: seed.templateBody,
     // Operator toggle must survive deploys / seed template sync.
-    isActive: existing.isActive,
+    isActive: typeof existing.isActive === "boolean" ? existing.isActive : seed.isActive,
     updatedAt: nowIso(),
   };
 }
@@ -204,7 +209,8 @@ export function crmAutomationRulesDifferFromMerge(existing: AutomationRule[]): b
       prev.name !== r.name ||
       prev.description !== r.description ||
       prev.templateSubject !== r.templateSubject ||
-      prev.templateBody !== r.templateBody
+      prev.templateBody !== r.templateBody ||
+      typeof prev.isActive !== "boolean"
     );
   });
 }

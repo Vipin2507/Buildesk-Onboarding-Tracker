@@ -1,7 +1,11 @@
 import { setAppConfig } from "@/lib/api";
 import { slimAutomationLogs } from "@/lib/automation-log-sync";
 import { isAdminRoleKey } from "@/lib/permissions";
-import { flushServerSyncDebounced, serverSyncDebounced } from "@/lib/sync";
+import {
+  cancelServerSyncDebounced,
+  flushServerSyncDebounced,
+  serverSyncDebounced,
+} from "@/lib/sync";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useAutomationStore } from "@/stores/useAutomationStore";
 import { useCrmAutomationStore } from "@/stores/useCrmAutomationStore";
@@ -13,6 +17,35 @@ import { useSettingsStore } from "@/stores/useSettingsStore";
 function canPersistAppConfig() {
   const user = useAuthStore.getState().user;
   return Boolean(user && isAdminRoleKey(user.role));
+}
+
+/**
+ * Block writing automation config until ServerDataBootstrap has applied the
+ * authoritative SQLite snapshot. Otherwise seed defaults / local rehydrate can
+ * race ahead and overwrite durable isActive / isEnabled toggles on deploy.
+ */
+let automationConfigPersistReady = false;
+
+/** True once bootstrap has finished hydrating (or seeding) automation app_config. */
+export function isAutomationConfigPersistReady() {
+  return automationConfigPersistReady;
+}
+
+/**
+ * Drop any queued automation writes, then allow subsequent toggles to persist.
+ * Call after hydrateCrmAutomationFromServer / hydrateAutomationFromServer (or empty seed).
+ */
+export function markAutomationConfigPersistReady() {
+  cancelServerSyncDebounced("automation-config");
+  cancelServerSyncDebounced("crm-automation-config");
+  automationConfigPersistReady = true;
+}
+
+/** Used when the session ends so the next login re-gates against server state. */
+export function resetAutomationConfigPersistReady() {
+  automationConfigPersistReady = false;
+  cancelServerSyncDebounced("automation-config");
+  cancelServerSyncDebounced("crm-automation-config");
 }
 
 function masterSnapshot() {
@@ -69,14 +102,14 @@ function crmAutomationSnapshot() {
 let wired = false;
 
 function persistAutomationConfig() {
-  if (!canPersistAppConfig()) return;
+  if (!canPersistAppConfig() || !automationConfigPersistReady) return;
   serverSyncDebounced("automation-config", 400, () =>
     setAppConfig({ data: { key: "automation", value: automationSnapshot() } }),
   );
 }
 
 function persistCrmAutomationConfig() {
-  if (!canPersistAppConfig()) return;
+  if (!canPersistAppConfig() || !automationConfigPersistReady) return;
   serverSyncDebounced("crm-automation-config", 400, () =>
     setAppConfig({ data: { key: "crm-automation", value: crmAutomationSnapshot() } }),
   );
@@ -103,7 +136,7 @@ export function flushCrmMasterConfigPersistence() {
 
 /** Force pending automation config to SQLite now (settings/rules — logs sync separately). */
 export function flushAutomationConfigPersistence() {
-  if (!canPersistAppConfig()) return;
+  if (!canPersistAppConfig() || !automationConfigPersistReady) return;
   persistAutomationConfig();
   persistCrmAutomationConfig();
   flushServerSyncDebounced("automation-config");
