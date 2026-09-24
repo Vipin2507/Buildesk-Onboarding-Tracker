@@ -1,19 +1,23 @@
 import { useState } from "react";
-import { Copy, Loader2, RefreshCw, Users } from "lucide-react";
+import { Copy, Loader2, RefreshCw, Send, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { listWahaGroups, type WahaGroupSummary } from "@/services/waha";
+import { listWahaGroups, sendWahaText, type WahaGroupSummary } from "@/services/waha";
 import { useCrmAutomationStore } from "@/stores/useCrmAutomationStore";
 
 export function WahaConnectedGroups() {
   const waha = useCrmAutomationStore((s) => s.waha);
   const [loading, setLoading] = useState(false);
+  const [sendingId, setSendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
   const [groups, setGroups] = useState<WahaGroupSummary[] | null>(null);
   const [query, setQuery] = useState("");
+  const [testMessage, setTestMessage] = useState(
+    "Buildesk test — WAHA group delivery check",
+  );
 
   const filtered = (groups ?? []).filter((g) => {
     const q = query.trim().toLowerCase();
@@ -66,6 +70,33 @@ export function WahaConnectedGroups() {
     }
   }
 
+  async function sendTest(group: WahaGroupSummary) {
+    if (!waha.isEnabled) {
+      toast.error("Enable WAHA first");
+      return;
+    }
+    const text = testMessage.trim();
+    if (!text) {
+      toast.error("Enter a test message");
+      return;
+    }
+    setSendingId(group.id);
+    try {
+      const stamp = new Date().toLocaleString();
+      const body = `${text}\n\nGroup: ${group.subject}\nSent: ${stamp}`;
+      const result = await sendWahaText(waha, group.id, body);
+      if (!result.ok) {
+        toast.error(`Send failed (HTTP ${result.status}): ${result.body.slice(0, 160)}`);
+        return;
+      }
+      toast.success(`Test message sent to ${group.subject}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to send test message");
+    } finally {
+      setSendingId(null);
+    }
+  }
+
   return (
     <div className="mt-3 border-t pt-3">
       <div className="mb-2 flex items-start justify-between gap-2">
@@ -75,8 +106,8 @@ export function WahaConnectedGroups() {
             Connected WhatsApp groups
           </div>
           <p className="mt-0.5 text-[10px] text-muted-foreground">
-            Groups where this WAHA session is a member. Use the <code className="rounded bg-muted px-1">@g.us</code>{" "}
-            ID to send messages.
+            Groups where this WAHA session is a member. Use Send test to verify delivery, or copy the{" "}
+            <code className="rounded bg-muted px-1">@g.us</code> ID.
           </p>
         </div>
         <Button
@@ -91,6 +122,18 @@ export function WahaConnectedGroups() {
           {groups == null ? "Fetch groups" : "Refresh"}
         </Button>
       </div>
+
+      {groups != null && groups.length > 0 ? (
+        <div className="mb-2">
+          <label className="mb-1 block text-[10px] text-muted-foreground">Test message</label>
+          <Input
+            value={testMessage}
+            onChange={(e) => setTestMessage(e.target.value)}
+            className="h-8 text-xs"
+            placeholder="Message to send to a group…"
+          />
+        </div>
+      ) : null}
 
       {groups != null && groups.length > 4 ? (
         <Input
@@ -118,34 +161,51 @@ export function WahaConnectedGroups() {
       ) : null}
 
       {filtered.length > 0 ? (
-        <ul className="max-h-56 space-y-1.5 overflow-y-auto">
-          {filtered.map((group) => (
-            <li
-              key={group.id}
-              className="flex items-center gap-2 rounded-md border bg-background/60 px-2 py-1.5"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-xs font-medium">{group.subject}</div>
-                <div className="truncate font-mono text-[10px] text-muted-foreground">{group.id}</div>
-                {group.participantsCount != null ? (
-                  <div className="text-[10px] text-muted-foreground">
-                    {group.participantsCount} participant{group.participantsCount === 1 ? "" : "s"}
-                  </div>
-                ) : null}
-              </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                type="button"
-                className="h-7 shrink-0 gap-1 px-2 text-xs"
-                onClick={() => void copyId(group.id)}
-                title="Copy group chat ID"
+        <ul className="max-h-64 space-y-1.5 overflow-y-auto">
+          {filtered.map((group) => {
+            const busy = sendingId === group.id;
+            return (
+              <li
+                key={group.id}
+                className="flex items-center gap-2 rounded-md border bg-background/60 px-2 py-1.5"
               >
-                <Copy className="h-3 w-3" />
-                Copy ID
-              </Button>
-            </li>
-          ))}
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-xs font-medium">{group.subject}</div>
+                  <div className="truncate font-mono text-[10px] text-muted-foreground">{group.id}</div>
+                  {group.participantsCount != null ? (
+                    <div className="text-[10px] text-muted-foreground">
+                      {group.participantsCount} participant{group.participantsCount === 1 ? "" : "s"}
+                    </div>
+                  ) : null}
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    type="button"
+                    className="h-7 gap-1 px-2 text-xs"
+                    disabled={busy || !!sendingId}
+                    onClick={() => void sendTest(group)}
+                    title="Send test WhatsApp message to this group"
+                  >
+                    {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                    Send test
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    type="button"
+                    className="h-7 gap-1 px-2 text-xs"
+                    onClick={() => void copyId(group.id)}
+                    title="Copy group chat ID"
+                  >
+                    <Copy className="h-3 w-3" />
+                    Copy ID
+                  </Button>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       ) : null}
     </div>
