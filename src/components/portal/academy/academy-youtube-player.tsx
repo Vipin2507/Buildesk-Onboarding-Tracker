@@ -43,6 +43,15 @@ type AcademyYouTubePlayerProps = {
   onPlayingChange?: (playing: boolean) => void;
 };
 
+/**
+ * Chromeless YouTube player for Buildesk Academy (works inside portal / CRM iframes).
+ *
+ * Interaction model (intentional — avoids double-click + surprise pauses):
+ * - One poster Play starts playback (user gesture → try sound, mute fallback only if blocked)
+ * - Click video while playing with controls hidden → show controls only (no pause)
+ * - Pause / play only via center button or control bar
+ * - Mute is driven by user preference only — never auto-unmuted by PLAYING events
+ */
 export const AcademyYouTubePlayer = forwardRef<
   AcademyYouTubePlayerHandle,
   AcademyYouTubePlayerProps
@@ -52,8 +61,9 @@ export const AcademyYouTubePlayer = forwardRef<
   const playerRef = useRef<YouTubePlayerInstance | null>(null);
   const pollRef = useRef<number | null>(null);
   const playKickRef = useRef<number | null>(null);
-  /** Explicit user mute preference — never overwrite from YouTube autoplay mute. */
+  /** Explicit user mute preference — never overwritten by YouTube autoplay policy. */
   const userMutedRef = useRef(false);
+  const playingRef = useRef(false);
 
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,6 +76,15 @@ export const AcademyYouTubePlayer = forwardRef<
   const [duration, setDuration] = useState(0);
   const [controlsVisible, setControlsVisible] = useState(true);
   const hideTimerRef = useRef<number | null>(null);
+
+  const setPlayingState = useCallback(
+    (next: boolean) => {
+      playingRef.current = next;
+      setPlaying(next);
+      onPlayingChange?.(next);
+    },
+    [onPlayingChange],
+  );
 
   const stopPoll = useCallback(() => {
     if (pollRef.current != null) {
@@ -84,7 +103,7 @@ export const AcademyYouTubePlayer = forwardRef<
         const d = p.getDuration();
         if (d && Number.isFinite(d)) setDuration(d);
       } catch {
-        /* player mid-destroy — keep previous UI */
+        /* player mid-destroy */
       }
     }, 250);
   }, [stopPoll]);
@@ -93,9 +112,7 @@ export const AcademyYouTubePlayer = forwardRef<
     setControlsVisible(true);
     if (hideTimerRef.current != null) window.clearTimeout(hideTimerRef.current);
     hideTimerRef.current = window.setTimeout(() => {
-      if (playerRef.current?.getPlayerState() === YT_PLAYER_STATE.PLAYING) {
-        setControlsVisible(false);
-      }
+      if (playingRef.current) setControlsVisible(false);
     }, 2800);
   }, []);
 
@@ -106,70 +123,88 @@ export const AcademyYouTubePlayer = forwardRef<
     }
   }, []);
 
-  const markPlayingOptimistic = useCallback(() => {
-    setPlaying(true);
+  const applyMutePreference = useCallback((player: YouTubePlayerInstance) => {
+    if (userMutedRef.current) {
+      muteYouTubePlayer(player);
+      setMuted(true);
+    } else {
+      unmuteYouTubePlayer(player);
+      setMuted(false);
+    }
+  }, []);
+
+  const requestPlay = useCallback(() => {
+    const p = playerRef.current;
+    if (!p) return;
+    clearPlayKick();
+
+    const timeAtRequest = (() => {
+      try {
+        return p.getCurrentTime() || 0;
+      } catch {
+        return 0;
+      }
+    })();
+
+    // User gesture: honor mute preference (unmuted by default).
+    if (userMutedRef.current) {
+      muteYouTubePlayer(p);
+      playYouTubePlayer(p, { muteFirst: true });
+    } else {
+      unmuteYouTubePlayer(p);
+      playYouTubePlayer(p);
+    }
     setStarted(true);
-    onPlayingChange?.(true);
+    setPlayingState(true);
     startPoll();
     revealControls();
-  }, [onPlayingChange, revealControls, startPoll]);
 
-  const requestPlay = useCallback(
-    (opts?: { muteFirst?: boolean }) => {
-      const p = playerRef.current;
-      if (!p) return;
-      clearPlayKick();
-      const timeAtRequest = (() => {
-        try {
-          return p.getCurrentTime() || 0;
-        } catch {
-          return 0;
-        }
-      })();
-
-      // Prefer unmuted play on the user gesture.
-      if (opts?.muteFirst) {
-        muteYouTubePlayer(p);
-        playYouTubePlayer(p, { muteFirst: true });
-      } else if (!userMutedRef.current) {
-        unmuteYouTubePlayer(p);
-        playYouTubePlayer(p);
-        setMuted(false);
-      } else {
-        playYouTubePlayer(p);
+    // Nested-iframe autoplay may reject unmuted play — one muted fallback, then stay muted
+    // until the user taps unmute (do NOT auto-unmute on PLAYING; that breaks mute + UX).
+    playKickRef.current = window.setTimeout(() => {
+      playKickRef.current = null;
+      const player = playerRef.current;
+      if (!player) return;
+      if (isYouTubePlayerActivelyPlaying(player)) {
+        applyMutePreference(player);
+        return;
       }
-      markPlayingOptimistic();
-
-      // Only mute-kickstart if playback never actually started (don't mute a working video).
-      playKickRef.current = window.setTimeout(() => {
-        playKickRef.current = null;
-        const player = playerRef.current;
-        if (!player) return;
-        if (isYouTubePlayerActivelyPlaying(player)) return;
-        try {
-          if ((player.getCurrentTime() || 0) > timeAtRequest + 0.2) return;
-        } catch {
-          /* ignore */
+      try {
+        if ((player.getCurrentTime() || 0) > timeAtRequest + 0.15) {
+          applyMutePreference(player);
+          return;
         }
-        muteYouTubePlayer(player);
-        playYouTubePlayer(player, { muteFirst: true });
-        // Keep UI unmuted unless the user muted — restore sound once PLAYING if allowed.
-        markPlayingOptimistic();
-      }, 600);
-    },
-    [clearPlayKick, markPlayingOptimistic],
-  );
+      } catch {
+        /* ignore */
+      }
+      if (!userMutedRef.current) {
+        userMutedRef.current = true;
+        setMuted(true);
+      }
+      muteYouTubePlayer(player);
+      playYouTubePlayer(player, { muteFirst: true });
+      setStarted(true);
+      setPlayingState(true);
+      startPoll();
+      revealControls();
+    }, 450);
+  }, [
+    applyMutePreference,
+    clearPlayKick,
+    revealControls,
+    setPlayingState,
+    startPoll,
+  ]);
 
   const requestPause = useCallback(() => {
     const p = playerRef.current;
     if (!p) return;
     clearPlayKick();
     pauseYouTubePlayer(p);
-    setPlaying(false);
-    onPlayingChange?.(false);
+    setPlayingState(false);
     stopPoll();
     setControlsVisible(true);
-  }, [clearPlayKick, onPlayingChange, stopPoll]);
+  }, [clearPlayKick, setPlayingState, stopPoll]);
 
   useImperativeHandle(
     ref,
@@ -198,7 +233,7 @@ export const AcademyYouTubePlayer = forwardRef<
 
     setReady(false);
     setError(null);
-    setPlaying(false);
+    setPlayingState(false);
     setStarted(false);
     setMuted(false);
     userMutedRef.current = false;
@@ -210,7 +245,6 @@ export const AcademyYouTubePlayer = forwardRef<
     void loadYouTubeIframeApi()
       .then((YT) => {
         if (cancelled || !hostRef.current) return;
-        // Clear previous iframe host contents before creating a new player
         hostRef.current.replaceChildren();
         const mount = document.createElement("div");
         hostRef.current.appendChild(mount);
@@ -229,7 +263,7 @@ export const AcademyYouTubePlayer = forwardRef<
             modestbranding: 1,
             playsinline: 1,
             rel: 0,
-            cc_load_policy: 1,
+            cc_load_policy: 0,
             origin: window.location.origin,
           },
           events: {
@@ -240,9 +274,7 @@ export const AcademyYouTubePlayer = forwardRef<
               setReady(true);
               try {
                 setDuration(e.target.getDuration() || 0);
-                // Don't mirror YouTube's initial muted flag — it flips on for autoplay policy.
                 setMuted(userMutedRef.current);
-                // Start with captions off; user can toggle via CC control
                 e.target.unloadModule?.("captions");
                 setCaptionsOn(false);
               } catch {
@@ -255,23 +287,19 @@ export const AcademyYouTubePlayer = forwardRef<
                 e.data === YT_PLAYER_STATE.PLAYING || e.data === YT_PLAYER_STATE.BUFFERING;
               const isPaused =
                 e.data === YT_PLAYER_STATE.PAUSED || e.data === YT_PLAYER_STATE.ENDED;
+
               if (isPlaying) {
                 clearPlayKick();
-                setPlaying(true);
                 setStarted(true);
-                onPlayingChange?.(true);
+                setPlayingState(true);
                 startPoll();
                 revealControls();
-                // Restore sound after play (including mute-kickstart) unless user muted.
-                if (!userMutedRef.current) {
-                  unmuteYouTubePlayer(e.target);
-                  setMuted(false);
-                }
+                // Re-assert mute preference only — never force-unmute (breaks mute in iframes).
+                applyMutePreference(e.target);
               } else if (isPaused) {
-                // Don't cancel mute kickstart — autoplay policies often pause unmuted play first.
+                // Ignore transient pause while muted fallback is pending.
                 if (playKickRef.current != null) return;
-                setPlaying(false);
-                onPlayingChange?.(false);
+                setPlayingState(false);
                 stopPoll();
                 setControlsVisible(true);
                 try {
@@ -304,7 +332,15 @@ export const AcademyYouTubePlayer = forwardRef<
       }
       playerRef.current = null;
     };
-  }, [videoId, onPlayingChange, revealControls, startPoll, stopPoll, clearPlayKick]);
+  }, [
+    videoId,
+    applyMutePreference,
+    clearPlayKick,
+    revealControls,
+    setPlayingState,
+    startPoll,
+    stopPoll,
+  ]);
 
   useEffect(() => {
     const onFs = () => setFullscreen(Boolean(document.fullscreenElement));
@@ -316,9 +352,7 @@ export const AcademyYouTubePlayer = forwardRef<
     const p = playerRef.current;
     if (!p || !ready) return;
     revealControls();
-    // Prefer live player state — React `playing` can desync inside nested CRM iframes.
-    const activelyPlaying = isYouTubePlayerActivelyPlaying(p) || playing;
-    if (activelyPlaying) requestPause();
+    if (isYouTubePlayerActivelyPlaying(p) || playingRef.current) requestPause();
     else requestPlay();
   }
 
@@ -326,14 +360,13 @@ export const AcademyYouTubePlayer = forwardRef<
     const p = playerRef.current;
     if (!p || !ready) return;
     revealControls();
-    // Drive from UI state only — YouTube reports muted during autoplay even when we want sound.
-    if (muted) {
-      unmuteYouTubePlayer(p);
+    if (userMutedRef.current) {
       userMutedRef.current = false;
+      unmuteYouTubePlayer(p);
       setMuted(false);
     } else {
-      muteYouTubePlayer(p);
       userMutedRef.current = true;
+      muteYouTubePlayer(p);
       setMuted(true);
     }
   }
@@ -383,7 +416,7 @@ export const AcademyYouTubePlayer = forwardRef<
       p.seekTo(next, true);
       postYouTubeCommand(p, "seekTo", [next, true]);
       setCurrent(next);
-      if (!isYouTubePlayerActivelyPlaying(p) && !playing) requestPlay();
+      if (!isYouTubePlayerActivelyPlaying(p) && !playingRef.current) requestPlay();
     } catch {
       /* ignore */
     }
@@ -402,26 +435,29 @@ export const AcademyYouTubePlayer = forwardRef<
       )}
       onMouseMove={revealControls}
       onMouseLeave={() => {
-        if (playing) setControlsVisible(false);
+        if (playingRef.current) setControlsVisible(false);
       }}
     >
-      {/* Chromeless YouTube host — pointer events off so YT chrome never captures hover */}
+      {/* Chromeless YouTube host — pointer-events none so our overlays own all clicks */}
       <div
         ref={hostRef}
         className="absolute inset-0 [&_iframe]:pointer-events-none [&_iframe]:h-full [&_iframe]:w-full"
         aria-hidden
       />
 
-      {/* Poster until first play (keeps YT chrome covered before interaction) */}
-      {!started && ready ? (
+      {/* Single start overlay — one click to play (no competing center button) */}
+      {!started && ready && !error ? (
         <button
           type="button"
           onClick={togglePlay}
-          className="absolute inset-0 z-[1] bg-cover bg-center"
+          className="absolute inset-0 z-[3] bg-cover bg-center"
           style={{ backgroundImage: `url(${thumb})` }}
           aria-label={`Play ${title}`}
         >
-          <span className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/30" />
+          <span className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-black/35" />
+          <span className="absolute left-1/2 top-1/2 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/25 transition hover:scale-105">
+            <Play className="ml-0.5 h-6 w-6 fill-current" />
+          </span>
         </button>
       ) : null}
 
@@ -438,8 +474,18 @@ export const AcademyYouTubePlayer = forwardRef<
         </div>
       ) : null}
 
-      {/* Center play affordance */}
-      {ready && !error && (!playing || controlsVisible) ? (
+      {/* After start: click empty video = show controls only (never pause) */}
+      {started && playing && !controlsVisible ? (
+        <button
+          type="button"
+          className="absolute inset-0 z-[2] cursor-pointer bg-transparent"
+          aria-label="Show controls"
+          onClick={revealControls}
+        />
+      ) : null}
+
+      {/* Center play/pause — only after playback has started */}
+      {started && ready && !error && controlsVisible ? (
         <button
           type="button"
           onClick={togglePlay}
@@ -447,7 +493,6 @@ export const AcademyYouTubePlayer = forwardRef<
             "absolute left-1/2 top-1/2 z-[3] flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full",
             "bg-primary text-primary-foreground shadow-lg shadow-primary/25 transition duration-200",
             "hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-            playing && "opacity-90",
           )}
           aria-label={playing ? "Pause" : "Play"}
         >
@@ -459,20 +504,6 @@ export const AcademyYouTubePlayer = forwardRef<
         </button>
       ) : null}
 
-      {/* Click-catcher while playing (pause) when controls hidden */}
-      {playing && !controlsVisible ? (
-        <button
-          type="button"
-          className="absolute inset-0 z-[2] cursor-pointer bg-transparent"
-          aria-label="Show controls"
-          onClick={() => {
-            revealControls();
-            togglePlay();
-          }}
-        />
-      ) : null}
-
-      {/* Custom control bar — portal primary accents */}
       <div
         className={cn(
           "pointer-events-none absolute inset-x-0 bottom-0 z-[4] transition duration-300",
