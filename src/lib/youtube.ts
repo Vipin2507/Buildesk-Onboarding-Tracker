@@ -49,6 +49,7 @@ export function getYouTubeEmbedUrl(videoId: string, opts?: { startSeconds?: numb
     modestbranding: "1",
     enablejsapi: "1",
     playsinline: "1",
+    fs: "1",
   });
   if (opts?.chromeless) {
     params.set("controls", "0");
