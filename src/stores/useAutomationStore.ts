@@ -13,6 +13,7 @@ import {
   DEFAULT_AUTOMATION_SETTINGS,
   DEFAULT_HEALTH_CONFIG,
   DEFAULT_WAHA_CONFIG,
+  mergeAutomationEndpoints,
 } from "@/data/automationDefaults";
 import { createPersistedStore, touch } from "./persist";
 import {
@@ -82,11 +83,29 @@ export const useAutomationStore = createPersistedStore<AutomationState>(
       const needsWaha = !s.waha?.apiUrl;
       const needsProvider = s.endpoints.some((e) => !e.provider);
       const needsSettings = !s.settings?.n8nWebhookBase;
+      const mergedEndpoints = mergeAutomationEndpoints(
+        s.endpoints.length > 0 ? s.endpoints : DEFAULT_AUTOMATION_ENDPOINTS,
+      );
       if (s.seeded && s.rules.length > 0 && !needsWaha && !needsProvider && !needsSettings) return;
       set({
-        settings: s.settings?.n8nWebhookBase ? s.settings : { ...DEFAULT_AUTOMATION_SETTINGS },
-        endpoints: DEFAULT_AUTOMATION_ENDPOINTS.map((e) => ({ ...e })),
-        waha: s.waha?.apiUrl ? s.waha : { ...DEFAULT_WAHA_CONFIG },
+        settings: s.settings?.n8nWebhookBase
+          ? s.settings
+          : {
+              ...DEFAULT_AUTOMATION_SETTINGS,
+              automationsEnabled: s.settings?.automationsEnabled ?? true,
+            },
+        endpoints: mergedEndpoints,
+        waha: s.waha?.apiUrl
+          ? {
+              ...s.waha,
+              apiKey: s.waha.apiKey || DEFAULT_WAHA_CONFIG.apiKey,
+              sessionName: s.waha.sessionName || DEFAULT_WAHA_CONFIG.sessionName,
+              isEnabled: s.waha.isEnabled,
+            }
+          : {
+              ...DEFAULT_WAHA_CONFIG,
+              isEnabled: s.waha?.isEnabled ?? DEFAULT_WAHA_CONFIG.isEnabled,
+            },
         healthCheck: s.healthCheck?.webhookUrl ? s.healthCheck : { ...DEFAULT_HEALTH_CONFIG },
         rules: s.rules.length > 0 ? s.rules : DEFAULT_AUTOMATION_RULES,
         seeded: true,

@@ -47,6 +47,27 @@ export const DEFAULT_AUTOMATION_ENDPOINTS: AutomationEndpoint[] = [
   },
 ];
 
+/** Merge seed endpoints; preserve isEnabled and custom webhook URLs across deploys. */
+export function mergeAutomationEndpoints(
+  existing: AutomationEndpoint[],
+  seeds: AutomationEndpoint[] = DEFAULT_AUTOMATION_ENDPOINTS,
+): AutomationEndpoint[] {
+  const byChannel = new Map(existing.map((e) => [e.channel, e]));
+  return seeds.map((seed) => {
+    const current = byChannel.get(seed.channel);
+    if (!current) return { ...seed };
+    return {
+      ...seed,
+      ...current,
+      label: current.label || seed.label,
+      provider: current.provider || seed.provider,
+      webhookUrl: current.webhookUrl?.trim() ? current.webhookUrl : seed.webhookUrl,
+      isEnabled: current.isEnabled,
+      lastHealthCheck: current.lastHealthCheck ?? seed.lastHealthCheck,
+    };
+  });
+}
+
 export const DEFAULT_HEALTH_CONFIG: AutomationHealthConfig = {
   label: "Health Check (n8n)",
   webhookUrl: DEFAULT_HEALTH_WEBHOOK,

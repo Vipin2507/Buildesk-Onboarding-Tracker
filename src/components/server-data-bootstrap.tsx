@@ -193,8 +193,14 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           listPostSalesProjects({ data: {} }),
           getAppConfig({ data: { key: "master" } }).catch(() => ({})),
           getAppConfig({ data: { key: "settings" } }).catch(() => ({})),
-          getAppConfig({ data: { key: "automation" } }).catch(() => ({})),
-          getAppConfig({ data: { key: "crm-automation" } }).catch(() => ({})),
+          getAppConfig({ data: { key: "automation" } }).catch((err) => {
+            console.warn("[bootstrap] getAppConfig(automation) failed", err);
+            return null;
+          }),
+          getAppConfig({ data: { key: "crm-automation" } }).catch((err) => {
+            console.warn("[bootstrap] getAppConfig(crm-automation) failed", err);
+            return null;
+          }),
           getAppConfig({ data: { key: "crm-settings" } }).catch(() => ({})),
           getAppConfig({ data: { key: "crm-master" } }).catch(() => ({})),
           listAllNotes().catch(() => []),
@@ -412,9 +418,13 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
             data: { key: "crm-master", value: crmMasterSnapshot() },
           }).catch(() => {});
         }
-        if (automation && typeof automation === "object" && Object.keys(automation).length > 0) {
+        if (automation === null) {
+          // Fetch failed — do not overwrite durable server toggles with local defaults.
+          console.warn("[bootstrap] ERP automation config unavailable; keeping local store only");
+        } else if (automation && typeof automation === "object" && Object.keys(automation).length > 0) {
           hydrateAutomationFromServer(automation as Record<string, unknown>);
-        } else {
+          useAutomationStore.getState().ensureDefaults();
+        } else if (user.role === "Admin") {
           const localAutomation = useAutomationStore.getState();
           await setAppConfig({
             data: {
@@ -430,10 +440,16 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           }).catch(() => {});
         }
 
-        if (crmAutomation && typeof crmAutomation === "object" && Object.keys(crmAutomation).length > 0) {
+        if (crmAutomation === null) {
+          console.warn("[bootstrap] CRM automation config unavailable; keeping local store only");
+        } else if (
+          crmAutomation &&
+          typeof crmAutomation === "object" &&
+          Object.keys(crmAutomation).length > 0
+        ) {
           hydrateCrmAutomationFromServer(crmAutomation as Record<string, unknown>);
           useCrmAutomationStore.getState().ensureDefaults();
-        } else {
+        } else if (user.role === "Admin") {
           const localCrmAutomation = useCrmAutomationStore.getState();
           await setAppConfig({
             data: {

@@ -56,6 +56,34 @@ export const DEFAULT_CRM_AUTOMATION_ENDPOINTS: AutomationEndpoint[] = [
   },
 ];
 
+/**
+ * Merge seed endpoints onto saved ones.
+ * Never reset channel toggles (isEnabled) or custom webhook URLs on deploy/seed sync.
+ */
+export function mergeCrmAutomationEndpoints(
+  existing: AutomationEndpoint[],
+  seeds: AutomationEndpoint[] = DEFAULT_CRM_AUTOMATION_ENDPOINTS,
+  opts?: { replaceLegacyUrls?: boolean },
+): AutomationEndpoint[] {
+  const byChannel = new Map(existing.map((e) => [e.channel, e]));
+  return seeds.map((seed) => {
+    const current = byChannel.get(seed.channel);
+    if (!current) return { ...seed };
+    const legacyUrl =
+      opts?.replaceLegacyUrls &&
+      (current.webhookUrl.includes("buildesk-crm-") || !current.webhookUrl?.trim());
+    return {
+      ...seed,
+      ...current,
+      label: current.label || seed.label,
+      provider: current.provider || seed.provider,
+      webhookUrl: legacyUrl || !current.webhookUrl?.trim() ? seed.webhookUrl : current.webhookUrl,
+      isEnabled: current.isEnabled,
+      lastHealthCheck: current.lastHealthCheck ?? seed.lastHealthCheck,
+    };
+  });
+}
+
 export const DEFAULT_CRM_HEALTH_CONFIG: AutomationHealthConfig = {
   label: "Health Check (n8n)",
   webhookUrl: DEFAULT_CRM_HEALTH_WEBHOOK,
@@ -123,6 +151,10 @@ export function crmAutomationRuleNeedsSeedSync(
     if (!existing.description?.includes("replied on a query") && seed.description?.includes("replied on a query")) {
       return true;
     }
+    // Keep WhatsApp/email bodies unique per send ({{sentAt}}) so follow-up mentions aren't dropped.
+    if (seed.templateBody?.includes("{{sentAt}}") && !existing.templateBody?.includes("{{sentAt}}")) {
+      return true;
+    }
   }
 
   return (
@@ -141,6 +173,8 @@ function applyCrmAutomationSeedSync(existing: AutomationRule, seed: AutomationRu
     description: seed.description,
     templateSubject: seed.templateSubject,
     templateBody: seed.templateBody,
+    // Operator toggle must survive deploys / seed template sync.
+    isActive: existing.isActive,
     updatedAt: nowIso(),
   };
 }
@@ -337,7 +371,7 @@ export const DEFAULT_CRM_AUTOMATION_RULES: AutomationRule[] = [
     channel: "whatsapp",
     isActive: true,
     templateBody:
-      "Hi {{recipientName}}, {{authorName}} replied on \"{{title}}\" ({{accountName}}): {{messageSnippet}}\n\nOpen in CRM: {{queryUrl}}",
+      "Hi {{recipientName}}, {{authorName}} replied on \"{{title}}\" ({{accountName}}) at {{sentAt}}:\n{{messageSnippet}}\n\nOpen in CRM: {{queryUrl}}",
   }),
   rule({
     id: "crm-rule-query-response-email",
@@ -349,7 +383,7 @@ export const DEFAULT_CRM_AUTOMATION_RULES: AutomationRule[] = [
     isActive: false,
     templateSubject: "New reply on {{title}} — {{accountName}}",
     templateBody:
-      "Hi {{recipientName}},\n\n{{authorName}} replied on the account query \"{{title}}\" for {{accountName}}.\n\n{{messageSnippet}}\n\nOpen in CRM: {{queryUrl}}",
+      "Hi {{recipientName}},\n\n{{authorName}} replied on the account query \"{{title}}\" for {{accountName}} at {{sentAt}}.\n\n{{messageSnippet}}\n\nOpen in CRM: {{queryUrl}}",
   }),
   rule({
     id: "crm-rule-live-chat-started-whatsapp",

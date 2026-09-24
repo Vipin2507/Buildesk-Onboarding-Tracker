@@ -14,6 +14,7 @@ import {
   DEFAULT_CRM_HEALTH_CONFIG,
   DEFAULT_CRM_WAHA_CONFIG,
   crmAutomationRulesDifferFromMerge,
+  mergeCrmAutomationEndpoints,
   mergeCrmAutomationRules,
 } from "@/data/crm-automation-defaults";
 import { createPersistedStore, touch } from "./persist";
@@ -91,24 +92,49 @@ export const useCrmAutomationStore = createPersistedStore<AutomationState>(
       const existingRules = s.rules.length > 0 ? s.rules : DEFAULT_CRM_AUTOMATION_RULES;
       const mergedRules = mergeCrmAutomationRules(existingRules);
       const rulesNeedUpdate = crmAutomationRulesDifferFromMerge(existingRules);
+      const mergedEndpoints = mergeCrmAutomationEndpoints(
+        s.endpoints.length > 0 ? s.endpoints : DEFAULT_CRM_AUTOMATION_ENDPOINTS,
+        DEFAULT_CRM_AUTOMATION_ENDPOINTS,
+        { replaceLegacyUrls: usesLegacyCrmSegment },
+      );
+      const endpointsNeedMeta =
+        needsProvider ||
+        !s.seeded ||
+        usesLegacyCrmSegment ||
+        s.endpoints.length === 0 ||
+        DEFAULT_CRM_AUTOMATION_ENDPOINTS.some((seed) => !s.endpoints.some((e) => e.channel === seed.channel));
 
       if (
         s.seeded &&
         s.rules.length > 0 &&
         !needsWaha &&
-        !needsProvider &&
         !needsSettings &&
-        !usesLegacyCrmSegment &&
-        !rulesNeedUpdate
+        !rulesNeedUpdate &&
+        !endpointsNeedMeta
       ) {
         return;
       }
+
       set({
-        settings: s.settings?.n8nWebhookBase ? s.settings : { ...DEFAULT_CRM_AUTOMATION_SETTINGS },
-        endpoints: usesLegacyCrmSegment || needsProvider || !s.seeded
-          ? DEFAULT_CRM_AUTOMATION_ENDPOINTS.map((e) => ({ ...e }))
-          : s.endpoints,
-        waha: s.waha?.apiUrl ? s.waha : { ...DEFAULT_CRM_WAHA_CONFIG },
+        settings: s.settings?.n8nWebhookBase
+          ? s.settings
+          : {
+              ...DEFAULT_CRM_AUTOMATION_SETTINGS,
+              automationsEnabled: s.settings?.automationsEnabled ?? true,
+            },
+        endpoints: mergedEndpoints,
+        waha: s.waha?.apiUrl
+          ? {
+              ...s.waha,
+              apiUrl: s.waha.apiUrl,
+              apiKey: s.waha.apiKey || DEFAULT_CRM_WAHA_CONFIG.apiKey,
+              sessionName: s.waha.sessionName || DEFAULT_CRM_WAHA_CONFIG.sessionName,
+              isEnabled: s.waha.isEnabled,
+            }
+          : {
+              ...DEFAULT_CRM_WAHA_CONFIG,
+              isEnabled: s.waha?.isEnabled ?? DEFAULT_CRM_WAHA_CONFIG.isEnabled,
+            },
         healthCheck:
           usesLegacyCrmSegment || !s.healthCheck?.webhookUrl
             ? { ...DEFAULT_CRM_HEALTH_CONFIG }

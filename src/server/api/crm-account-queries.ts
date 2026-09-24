@@ -492,10 +492,12 @@ export const createCrmAccountQuery = createServerFn({ method: "POST" })
       })
       .run();
 
+    let initialMessageId: string | undefined;
     if (initialBody) {
+      initialMessageId = newId();
       db.insert(t.crmAccountQueryMessages)
         .values({
-          id: newId(),
+          id: initialMessageId,
           queryId: id,
           authorUserId: user.id,
           authorName: user.name,
@@ -528,15 +530,21 @@ export const createCrmAccountQuery = createServerFn({ method: "POST" })
     });
 
     if (initialBody) {
-      void dispatchCrmQueryResponseAutomation(db, {
-        accountId: data.companyId,
-        queryId: id,
-        queryTitle: data.title.trim(),
-        queryStatus: "open",
-        authorName: user.name,
-        messageBody: initialBody,
-        excludeUserId: user.id,
-      });
+      try {
+        await dispatchCrmQueryResponseAutomation(db, {
+          accountId: data.companyId,
+          queryId: id,
+          queryTitle: data.title.trim(),
+          queryStatus: "open",
+          authorName: user.name,
+          messageBody: initialBody,
+          excludeUserId: user.id,
+          messageId: initialMessageId,
+          sentAt: now,
+        });
+      } catch (err) {
+        console.warn("[crm-account-queries] query-response automation failed on create", err);
+      }
     }
 
     return loadQuery(db, id)!;
@@ -573,9 +581,10 @@ export const addCrmAccountQueryMessage = createServerFn({ method: "POST" })
         .run();
     }
 
+    const messageId = newId();
     db.insert(t.crmAccountQueryMessages)
       .values({
-        id: newId(),
+        id: messageId,
         queryId: data.queryId,
         authorUserId: user.id,
         authorName: user.name,
@@ -615,15 +624,21 @@ export const addCrmAccountQueryMessage = createServerFn({ method: "POST" })
       alsoExcludeUserIds: mentionedIds,
     });
 
-    void dispatchCrmQueryResponseAutomation(db, {
-      accountId: existing.companyId,
-      queryId: data.queryId,
-      queryTitle: existing.title,
-      queryStatus: wasResolved ? "open" : existing.status,
-      authorName: user.name,
-      messageBody: data.body.trim(),
-      excludeUserId: user.id,
-    });
+    try {
+      await dispatchCrmQueryResponseAutomation(db, {
+        accountId: existing.companyId,
+        queryId: data.queryId,
+        queryTitle: existing.title,
+        queryStatus: wasResolved ? "open" : existing.status,
+        authorName: user.name,
+        messageBody: data.body.trim(),
+        excludeUserId: user.id,
+        messageId,
+        sentAt: now,
+      });
+    } catch (err) {
+      console.warn("[crm-account-queries] query-response automation failed on reply", err);
+    }
 
     setCrmQueryTyping(data.queryId, user.id, user.name, false);
 

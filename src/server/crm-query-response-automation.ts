@@ -63,6 +63,8 @@ function buildQueryResponseVars(input: {
   messageSnippet: string;
   queryUrl: string;
   recipientName: string;
+  sentAt: string;
+  messageId?: string;
   salesManagerName?: string | null;
   supportManager1?: string | null;
   supportManager2?: string | null;
@@ -82,6 +84,8 @@ function buildQueryResponseVars(input: {
     queryUrl: input.queryUrl,
     ticketUrl: input.queryUrl,
     ticketNumber: input.queryTitle,
+    sentAt: input.sentAt,
+    messageId: input.messageId ?? "",
     salesManagerName: input.salesManagerName?.trim() || "—",
     supportManager1: input.supportManager1?.trim() || "—",
     supportManager2: input.supportManager2?.trim() || "—",
@@ -101,6 +105,8 @@ async function dispatchQueryResponseForRule(
     authorName: string;
     messageSnippet: string;
     queryUrl: string;
+    sentAt: string;
+    messageId?: string;
     salesManagerName?: string | null;
     supportManager1?: string | null;
     supportManager2?: string | null;
@@ -115,6 +121,8 @@ async function dispatchQueryResponseForRule(
     messageSnippet: input.messageSnippet,
     queryUrl: input.queryUrl,
     recipientName: input.recipient.name,
+    sentAt: input.sentAt,
+    messageId: input.messageId,
     salesManagerName: input.salesManagerName,
     supportManager1: input.supportManager1,
     supportManager2: input.supportManager2,
@@ -278,6 +286,8 @@ export async function dispatchCrmQueryResponseAutomation(
     authorName: string;
     messageBody: string;
     excludeUserId: string;
+    messageId?: string;
+    sentAt?: string;
   },
 ): Promise<void> {
   const config = loadCrmAutomationConfig(db);
@@ -320,10 +330,27 @@ export async function dispatchCrmQueryResponseAutomation(
     `/crm/accounts/${input.accountId}?tab=queries&queryId=${input.queryId}`,
   );
   const messageSnippet = input.messageBody.trim().slice(0, 160);
+  const sentAtRaw = input.sentAt ?? nowIso();
+  const sentAtDate = new Date(sentAtRaw);
+  const sentAt = Number.isNaN(sentAtDate.getTime())
+    ? sentAtRaw
+    : sentAtDate.toLocaleString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+      });
 
   for (const rule of rules) {
     const recipients = recipientsForChannel(rule.channel);
-    if (!recipients.length) continue;
+    if (!recipients.length) {
+      console.warn(
+        `[crm-query-response] no recipients for ${rule.channel} query=${input.queryId} mentioned=${mentionedIds.size}`,
+      );
+      continue;
+    }
     for (const recipient of recipients) {
       await dispatchQueryResponseForRule(db, config, rule, {
         accountId: input.accountId,
@@ -334,6 +361,8 @@ export async function dispatchCrmQueryResponseAutomation(
         authorName: input.authorName,
         messageSnippet,
         queryUrl,
+        sentAt,
+        messageId: input.messageId,
         salesManagerName: account.salesManagerName,
         supportManager1: account.supportManager1,
         supportManager2: account.supportManager2,
