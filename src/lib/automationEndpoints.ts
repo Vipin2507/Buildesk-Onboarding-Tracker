@@ -249,3 +249,84 @@ export async function fetchWahaGroups(
   });
   return readResponse(res);
 }
+
+/** Force WAHA to re-sync groups from WhatsApp (`POST /api/{session}/groups/refresh`). */
+export async function fetchWahaGroupsRefresh(config: WahaConfig): Promise<IntegrationFetchResult> {
+  const path = `/api/${encodeURIComponent(config.sessionName)}/groups/refresh`;
+
+  if (isDevClient()) {
+    const res = await fetch(`/waha${path}`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "X-Api-Key": config.apiKey,
+      },
+    });
+    return readResponse(res);
+  }
+
+  if (isHttpsClient()) {
+    const { proxyWahaGroupsRefresh } = await import("@/server/api/integrations");
+    return proxyWahaGroupsRefresh({
+      data: {
+        apiUrl: config.apiUrl,
+        apiKey: config.apiKey,
+        sessionName: config.sessionName,
+      },
+    });
+  }
+
+  const res = await fetch(`${trimSlash(config.apiUrl)}${path}`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "X-Api-Key": config.apiKey,
+    },
+  });
+  return readResponse(res);
+}
+
+/** Chats overview — used as a fallback to discover `@g.us` groups. */
+export async function fetchWahaChatsOverview(
+  config: WahaConfig,
+  opts?: { limit?: number; offset?: number },
+): Promise<IntegrationFetchResult> {
+  const params = new URLSearchParams();
+  if (opts?.limit != null) params.set("limit", String(opts.limit));
+  if (opts?.offset != null) params.set("offset", String(opts.offset));
+  const qs = params.toString();
+  const path = `/api/${encodeURIComponent(config.sessionName)}/chats/overview${qs ? `?${qs}` : ""}`;
+
+  if (isDevClient()) {
+    const res = await fetch(`/waha${path}`, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "X-Api-Key": config.apiKey,
+      },
+    });
+    return readResponse(res);
+  }
+
+  if (isHttpsClient()) {
+    const { proxyWahaChatsOverview } = await import("@/server/api/integrations");
+    return proxyWahaChatsOverview({
+      data: {
+        apiUrl: config.apiUrl,
+        apiKey: config.apiKey,
+        sessionName: config.sessionName,
+        limit: opts?.limit,
+        offset: opts?.offset,
+      },
+    });
+  }
+
+  const res = await fetch(`${trimSlash(config.apiUrl)}${path}`, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+      "X-Api-Key": config.apiKey,
+    },
+  });
+  return readResponse(res);
+}

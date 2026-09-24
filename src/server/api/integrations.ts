@@ -149,3 +149,59 @@ export const proxyWahaGroups = createServerFn({ method: "POST" })
     );
     return readProxyResponse(res);
   });
+
+export const proxyWahaGroupsRefresh = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        apiUrl: z.string().min(1),
+        apiKey: z.string().min(1),
+        sessionName: z.string().min(1),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    requireUser();
+    const res = await fetch(
+      `${trimSlash(data.apiUrl)}/api/${encodeURIComponent(data.sessionName)}/groups/refresh`,
+      {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "X-Api-Key": data.apiKey,
+        },
+      },
+    );
+    return readProxyResponse(res);
+  });
+
+export const proxyWahaChatsOverview = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        apiUrl: z.string().min(1),
+        apiKey: z.string().min(1),
+        sessionName: z.string().min(1),
+        limit: z.number().int().positive().max(500).optional(),
+        offset: z.number().int().min(0).optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    requireUser();
+    const params = new URLSearchParams();
+    if (data.limit != null) params.set("limit", String(data.limit));
+    if (data.offset != null) params.set("offset", String(data.offset));
+    const qs = params.toString();
+    const res = await fetch(
+      `${trimSlash(data.apiUrl)}/api/${encodeURIComponent(data.sessionName)}/chats/overview${qs ? `?${qs}` : ""}`,
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "X-Api-Key": data.apiKey,
+        },
+      },
+    );
+    return readProxyResponse(res);
+  });

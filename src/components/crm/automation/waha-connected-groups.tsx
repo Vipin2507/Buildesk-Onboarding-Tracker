@@ -11,6 +11,7 @@ export function WahaConnectedGroups() {
   const waha = useCrmAutomationStore((s) => s.waha);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hint, setHint] = useState<string | null>(null);
   const [groups, setGroups] = useState<WahaGroupSummary[] | null>(null);
   const [query, setQuery] = useState("");
 
@@ -27,6 +28,7 @@ export function WahaConnectedGroups() {
     }
     setLoading(true);
     setError(null);
+    setHint(null);
     try {
       const result = await listWahaGroups(waha);
       if (!result.ok) {
@@ -37,9 +39,18 @@ export function WahaConnectedGroups() {
       }
       setGroups(result.groups);
       if (result.groups.length === 0) {
-        toast.message("No groups found — add the WAHA session number to a group, then refresh");
+        setHint(
+          "WAHA returned no groups after refresh + chats fallback. Confirm session name matches the linked phone, wait 1–2 minutes after joining, and ensure NOWEB Store is enabled if you use that engine.",
+        );
+        toast.message("Still no groups — check session / WAHA store sync");
       } else {
-        toast.success(`Loaded ${result.groups.length} group${result.groups.length === 1 ? "" : "s"}`);
+        const via =
+          result.source === "chats-overview"
+            ? " (via chats)"
+            : result.source === "groups-refresh"
+              ? " (after refresh)"
+              : "";
+        toast.success(`Loaded ${result.groups.length} group${result.groups.length === 1 ? "" : "s"}${via}`);
       }
     } finally {
       setLoading(false);
@@ -96,11 +107,13 @@ export function WahaConnectedGroups() {
         </p>
       ) : null}
 
-      {groups != null && !error && filtered.length === 0 ? (
+      {hint && !error ? (
+        <p className="rounded-md border border-dashed px-2 py-1.5 text-[10px] text-muted-foreground">{hint}</p>
+      ) : null}
+
+      {groups != null && !error && !hint && filtered.length === 0 ? (
         <p className="rounded-md border border-dashed px-2 py-3 text-center text-[10px] text-muted-foreground">
-          {groups.length === 0
-            ? "No connected groups yet. Add the WAHA WhatsApp number to a group, then refresh."
-            : "No groups match your filter."}
+          No groups match your filter.
         </p>
       ) : null}
 

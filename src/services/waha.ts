@@ -1,6 +1,8 @@
 import type { WahaConfig } from "@/types/automation";
 import {
+  fetchWahaChatsOverview,
   fetchWahaGroups,
+  fetchWahaGroupsRefresh,
   fetchWahaSendText,
   fetchWahaSession,
   phoneToWahaChatId,
@@ -36,13 +38,27 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-function pickGroupId(row: Record<string, unknown>): string {
-  const raw =
-    (typeof row.id === "string" && row.id) ||
-    (typeof row.groupId === "string" && row.groupId) ||
-    (typeof row.jid === "string" && row.jid) ||
-    "";
-  return raw.trim();
+/** WEBJS often returns `id: { _serialized: "…@g.us" }`; NOWEB uses plain strings. */
+function coerceWahaId(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  const rec = asRecord(value);
+  if (!rec) return "";
+  if (typeof rec._serialized === "string") return rec._serialized.trim();
+  if (typeof rec.id === "string") return rec.id.trim();
+  if (typeof rec.user === "string" && typeof rec.server === "string") {
+    return `${rec.user}@${rec.server}`.trim();
+  }
+  return "";
+}
+
+function pickGroupId(row: Record<string, unknown>, fallbackKey?: string): string {
+  return (
+    coerceWahaId(row.id) ||
+    coerceWahaId(row.groupId) ||
+    coerceWahaId(row.jid) ||
+    coerceWahaId(row.chatId) ||
+    (fallbackKey?.includes("@") ? fallbackKey.trim() : "")
+  );
 }
 
 function pickGroupSubject(row: Record<string, unknown>): string {
@@ -64,7 +80,65 @@ function pickParticipantsCount(row: Record<string, unknown>): number | undefined
   return undefined;
 }
 
-/** Normalize WAHA group list payloads across engines into a stable UI shape. */
+function pushGroup(
+  groups: WahaGroupSummary[],
+  seen: Set<string>,
+  row: Record<string, unknown>,
+  fallbackKey?: string,
+) {
+  const id = pickGroupId(row, fallbackKey);
+  if (!id || seen.has(id)) return;
+  // Prefer real WhatsApp group JIDs; still keep unknown ids from engines that omit suffix.
+  if (id.includes("@") && !id.includes("@g.us")) return;
+  seen.add(id);
+  groups.push({
+    id,
+    subject: pickGroupSubject(row),
+    participantsCount: pickParticipantsCount(row),
+  });
+}
+
+function collectGroupRows(parsed: unknown): Array<{ row: Record<string, unknown>; key?: string }> {
+  if (Array.isArray(parsed)) {
+    return parsed
+      .map((item) => asRecord(item))
+      .filter((r): r is Record<string, unknown> => !!r)
+      .map((row) => ({ row }));
+  }
+
+  const root = asRecord(parsed);
+  if (!root) return [];
+
+  for (const key of ["groups", "data", "chats", "result"] as const) {
+    const nested = root[key];
+    if (Array.isArray(nested)) {
+      return nested
+        .map((item) => asRecord(item))
+        .filter((r): r is Record<string, unknown> => !!r)
+        .map((row) => ({ row }));
+    }
+    const nestedObj = asRecord(nested);
+    if (nestedObj) {
+      return Object.entries(nestedObj).map(([mapKey, value]) => {
+        const row = asRecord(value) ?? { id: mapKey };
+        return { row, key: mapKey };
+      });
+    }
+  }
+
+  // Baileys / some WAHA builds return a map keyed by group JID.
+  const entries = Object.entries(root);
+  if (entries.some(([k]) => k.includes("@g.us") || k.includes("@c.us"))) {
+    return entries.map(([mapKey, value]) => {
+      const row = asRecord(value) ?? { id: mapKey };
+      return { row, key: mapKey };
+    });
+  }
+
+  return [];
+}
+
+/** Normalize WAHA group / chat list payloads across engines into a stable UI shape. */
 export function parseWahaGroupsPayload(text: string): WahaGroupSummary[] {
   let parsed: unknown;
   try {
@@ -73,28 +147,18 @@ export function parseWahaGroupsPayload(text: string): WahaGroupSummary[] {
     throw new Error("WAHA returned invalid JSON for groups");
   }
 
-  const rows: unknown[] = Array.isArray(parsed)
-    ? parsed
-    : Array.isArray(asRecord(parsed)?.groups)
-      ? (asRecord(parsed)!.groups as unknown[])
-      : Array.isArray(asRecord(parsed)?.data)
-        ? (asRecord(parsed)!.data as unknown[])
-        : [];
-
   const groups: WahaGroupSummary[] = [];
-  for (const row of rows) {
-    const rec = asRecord(row);
-    if (!rec) continue;
-    const id = pickGroupId(rec);
-    if (!id) continue;
-    groups.push({
-      id,
-      subject: pickGroupSubject(rec),
-      participantsCount: pickParticipantsCount(rec),
-    });
+  const seen = new Set<string>();
+  for (const { row, key } of collectGroupRows(parsed)) {
+    pushGroup(groups, seen, row, key);
   }
 
   return groups.sort((a, b) => a.subject.localeCompare(b.subject));
+}
+
+/** Keep only `@g.us` chats from chats/overview payloads. */
+export function parseWahaGroupChatsPayload(text: string): WahaGroupSummary[] {
+  return parseWahaGroupsPayload(text).filter((g) => g.id.includes("@g.us"));
 }
 
 export async function listWahaGroups(config: WahaConfig): Promise<{
@@ -103,20 +167,61 @@ export async function listWahaGroups(config: WahaConfig): Promise<{
   groups: WahaGroupSummary[];
   error?: string;
   raw?: string;
+  source?: "groups" | "groups-refresh" | "chats-overview";
 }> {
   try {
-    const result = await fetchWahaGroups(config, { limit: 200, offset: 0 });
-    if (!result.ok) {
+    const first = await fetchWahaGroups(config, { limit: 200, offset: 0 });
+    if (!first.ok) {
       return {
         ok: false,
-        status: result.status,
+        status: first.status,
         groups: [],
-        error: `HTTP ${result.status}: ${result.text.slice(0, 240)}`,
-        raw: result.text.slice(0, 400),
+        error: `HTTP ${first.status}: ${first.text.slice(0, 240)}`,
+        raw: first.text.slice(0, 400),
       };
     }
-    const groups = parseWahaGroupsPayload(result.text);
-    return { ok: true, status: result.status, groups };
+
+    let groups = parseWahaGroupsPayload(first.text);
+    if (groups.length > 0) {
+      return { ok: true, status: first.status, groups, source: "groups" };
+    }
+
+    // Empty list is common right after joining a group — force WAHA to re-sync once.
+    await fetchWahaGroupsRefresh(config).catch(() => null);
+    const refreshed = await fetchWahaGroups(config, { limit: 200, offset: 0 });
+    if (refreshed.ok) {
+      groups = parseWahaGroupsPayload(refreshed.text);
+      if (groups.length > 0) {
+        return {
+          ok: true,
+          status: refreshed.status,
+          groups,
+          source: "groups-refresh",
+        };
+      }
+    }
+
+    // Fallback: chats overview often lists groups even when /groups is empty (NOWEB store lag).
+    const chats = await fetchWahaChatsOverview(config, { limit: 200, offset: 0 });
+    if (chats.ok) {
+      groups = parseWahaGroupChatsPayload(chats.text);
+      if (groups.length > 0) {
+        return {
+          ok: true,
+          status: chats.status,
+          groups,
+          source: "chats-overview",
+        };
+      }
+    }
+
+    return {
+      ok: true,
+      status: first.status,
+      groups: [],
+      raw: (refreshed.ok ? refreshed.text : first.text).slice(0, 400),
+      source: "groups",
+    };
   } catch (err) {
     return {
       ok: false,
