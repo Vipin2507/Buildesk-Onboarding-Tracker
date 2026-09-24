@@ -17,7 +17,7 @@ import {
 import { DesignTicketSelect } from "@/components/design-ticket/design-ticket-fields";
 import { Button } from "@/components/ui/button";
 import { cn, isValidEmail, isValidPortalPhone, usableContactName } from "@/lib/utils";
-import { filesToDesignTicketAttachments } from "@/lib/design-ticket-attachments";
+import { filesToDesignTicketAttachments, isImageAttachment, snapshotFiles } from "@/lib/design-ticket-attachments";
 import { DESIGN_TICKET_CATEGORIES } from "@/types/design-ticket";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
 import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
@@ -77,6 +77,7 @@ function PortalCreateTicket() {
   const [priority, setPriority] = useState<DesignTicketPriority>("medium");
   const [description, setDescription] = useState("");
   const [attachments, setAttachments] = useState<DesignTicketAttachment[]>([]);
+  const [attaching, setAttaching] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   if (!access) return null;
@@ -249,44 +250,62 @@ function PortalCreateTicket() {
             <DesignTicketFormField label="Attachments">
               <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-input bg-muted/20 px-4 py-4 text-center transition-colors hover:bg-muted/40">
                 <Paperclip className="mb-2 h-5 w-5 text-muted-foreground" />
-                <span className="text-sm font-medium">Click to attach files</span>
+                <span className="text-sm font-medium">
+                  {attaching ? "Reading file…" : "Click to attach files"}
+                </span>
                 <span className="mt-1 text-xs text-muted-foreground">
-                  Images, PDFs, or supporting documents
+                  Images, PDFs, or supporting documents (max 8MB)
                 </span>
                 <input
                   type="file"
                   multiple
-                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.png,.jpg,.jpeg,.webp"
                   className="hidden"
+                  disabled={attaching}
                   onChange={(e) => {
-                    const list = e.target.files;
+                    const files = snapshotFiles(e.target.files);
                     e.target.value = "";
-                    if (!list?.length) return;
-                    void filesToDesignTicketAttachments(list).then(({ attachments: added, errors }) => {
-                      if (errors.length) toast.error(errors.join("; "));
-                      if (added.length) setAttachments((prev) => [...prev, ...added]);
-                    });
+                    if (!files.length) return;
+                    setAttaching(true);
+                    void filesToDesignTicketAttachments(files)
+                      .then(({ attachments: added, errors }) => {
+                        if (errors.length) toast.error(errors.join("; "));
+                        if (added.length) {
+                          setAttachments((prev) => [...prev, ...added]);
+                          toast.success(
+                            added.length === 1
+                              ? `Attached ${added[0].name}`
+                              : `Attached ${added.length} files`,
+                          );
+                        }
+                      })
+                      .finally(() => setAttaching(false));
                   }}
                 />
               </label>
               {attachments.length > 0 ? (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {attachments.map((f, i) => (
-                    <span
+                    <div
                       key={`${f.name}-${i}`}
-                      className="inline-flex items-center gap-1 rounded-md border bg-card px-2 py-1 text-xs"
+                      className="relative overflow-hidden rounded-md border bg-card"
                     >
-                      <Paperclip className="h-3 w-3 text-muted-foreground" />
-                      {f.name}
-                      <button
-                        type="button"
-                        className="ml-0.5 rounded p-0.5 hover:bg-muted"
-                        onClick={() => removeAttachment(i)}
-                        aria-label={`Remove ${f.name}`}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
+                      {isImageAttachment(f) && f.url ? (
+                        <img src={f.url} alt={f.name} className="h-20 w-28 object-cover" />
+                      ) : null}
+                      <div className="flex max-w-[9rem] items-center gap-1 px-2 py-1 text-xs">
+                        <Paperclip className="h-3 w-3 shrink-0 text-muted-foreground" />
+                        <span className="truncate">{f.name}</span>
+                        <button
+                          type="button"
+                          className="ml-0.5 shrink-0 rounded p-0.5 hover:bg-muted"
+                          onClick={() => removeAttachment(i)}
+                          aria-label={`Remove ${f.name}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
                   ))}
                 </div>
               ) : null}

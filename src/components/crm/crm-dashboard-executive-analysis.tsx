@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { MapPin, Users, CalendarRange } from "lucide-react";
+import { Headphones, UserRound } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -11,58 +11,42 @@ import {
   YAxis,
 } from "recharts";
 
-import { buildCrmExecutiveAnalysis } from "@/lib/crm-executive-analysis";
+import {
+  buildCrmExecutiveAnalysis,
+  type ExecutiveAccountRow,
+} from "@/lib/crm-executive-analysis";
 import { cn } from "@/lib/utils";
 import type { CrmAccount } from "@/types/crm-account";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
-type TabId = "users" | "location" | "year";
+type TabId = "sales" | "support1" | "support2";
+
+function toChart(rows: ExecutiveAccountRow[]) {
+  return rows.slice(0, 12).map((r) => ({
+    name: r.name.length > 12 ? `${r.name.slice(0, 11)}…` : r.name,
+    fullName: r.name,
+    accounts: r.accounts,
+  }));
+}
 
 export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccount[] }) {
   const analysis = useMemo(() => buildCrmExecutiveAnalysis(accounts), [accounts]);
-  const [tab, setTab] = useState<TabId>("users");
+  const [tab, setTab] = useState<TabId>("sales");
 
-  const chartUsers = useMemo(
-    () =>
-      analysis.activeUsersByExecutive.slice(0, 12).map((r) => ({
-        name: r.executive.length > 12 ? `${r.executive.slice(0, 11)}…` : r.executive,
-        fullName: r.executive,
-        users: r.activeUsers,
-        accounts: r.accounts,
-      })),
-    [analysis.activeUsersByExecutive],
-  );
+  const rows =
+    tab === "sales"
+      ? analysis.bySalesManager
+      : tab === "support1"
+        ? analysis.bySupport1
+        : analysis.bySupport2;
 
-  const chartLocations = useMemo(
-    () =>
-      analysis.usersByLocation.slice(0, 12).map((r) => ({
-        name: r.location.length > 12 ? `${r.location.slice(0, 11)}…` : r.location,
-        fullName: r.location,
-        users: r.users,
-        accounts: r.accounts,
-      })),
-    [analysis.usersByLocation],
-  );
+  const chartData = useMemo(() => toChart(rows), [rows]);
 
-  const chartYears = useMemo(
-    () =>
-      [...analysis.clientsByYear]
-        .filter((r) => r.year !== "Unknown")
-        .slice(0, 10)
-        .reverse()
-        .map((r) => ({
-          name: r.year,
-          fullName: r.year,
-          clients: r.clients,
-        })),
-    [analysis.clientsByYear],
-  );
-
-  const tabs: { id: TabId; label: string; icon: typeof Users }[] = [
-    { id: "users", label: "Active users", icon: Users },
-    { id: "location", label: "Location-wise", icon: MapPin },
-    { id: "year", label: "Year-wise clients", icon: CalendarRange },
+  const tabs: { id: TabId; label: string; icon: typeof UserRound }[] = [
+    { id: "sales", label: "Sales manager", icon: UserRound },
+    { id: "support1", label: "Support 1", icon: Headphones },
+    { id: "support2", label: "Support 2", icon: Headphones },
   ];
 
   return (
@@ -76,8 +60,8 @@ export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccou
         <div>
           <h3 className="text-xs font-semibold">Executive analysis</h3>
           <p className="text-[10px] text-muted-foreground">
-            Licensed seats &amp; accounts by sales executive · {analysis.totals.executives} executives ·{" "}
-            {analysis.totals.activeUsers} active users · {analysis.totals.accounts} open accounts
+            Active accounts by sales manager / support · {analysis.totals.activeAccounts} active
+            accounts
           </p>
         </div>
         <div className="flex flex-wrap gap-1">
@@ -106,147 +90,60 @@ export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccou
       <div className="grid gap-2.5 lg:grid-cols-2">
         <div className="h-44">
           <ResponsiveContainer>
-            {tab === "users" ? (
-              <BarChart data={chartUsers.length ? chartUsers : [{ name: "—", users: 0 }]} margin={{ top: 4, right: 4, bottom: 0, left: -18 }}>
-                <CartesianGrid vertical={false} stroke="var(--color-border)" />
-                <XAxis dataKey="name" tick={{ fontSize: 8 }} stroke="var(--color-muted-foreground)" interval={0} angle={-25} textAnchor="end" height={44} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 9 }} stroke="var(--color-muted-foreground)" />
-                <Tooltip
-                  cursor={{ fill: "var(--color-muted)" }}
-                  formatter={(value: number, _n, item) => [
-                    value,
-                    (item?.payload as { fullName?: string })?.fullName ?? "Users",
-                  ]}
-                />
-                <Bar dataKey="users" fill="var(--color-primary)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            ) : tab === "location" ? (
-              <BarChart data={chartLocations.length ? chartLocations : [{ name: "—", users: 0 }]} margin={{ top: 4, right: 4, bottom: 0, left: -18 }}>
-                <CartesianGrid vertical={false} stroke="var(--color-border)" />
-                <XAxis dataKey="name" tick={{ fontSize: 8 }} stroke="var(--color-muted-foreground)" interval={0} angle={-25} textAnchor="end" height={44} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 9 }} stroke="var(--color-muted-foreground)" />
-                <Tooltip
-                  cursor={{ fill: "var(--color-muted)" }}
-                  formatter={(value: number, _n, item) => [
-                    value,
-                    (item?.payload as { fullName?: string })?.fullName ?? "Users",
-                  ]}
-                />
-                <Bar dataKey="users" fill="var(--color-chart-2, #0d9488)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            ) : (
-              <BarChart data={chartYears.length ? chartYears : [{ name: "—", clients: 0 }]} margin={{ top: 4, right: 4, bottom: 0, left: -18 }}>
-                <CartesianGrid vertical={false} stroke="var(--color-border)" />
-                <XAxis dataKey="name" tick={{ fontSize: 9 }} stroke="var(--color-muted-foreground)" />
-                <YAxis allowDecimals={false} tick={{ fontSize: 9 }} stroke="var(--color-muted-foreground)" />
-                <Tooltip cursor={{ fill: "var(--color-muted)" }} />
-                <Bar dataKey="clients" fill="var(--color-chart-3, #ca8a04)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            )}
+            <BarChart
+              data={chartData.length ? chartData : [{ name: "—", accounts: 0 }]}
+              margin={{ top: 4, right: 4, bottom: 0, left: -18 }}
+            >
+              <CartesianGrid vertical={false} stroke="var(--color-border)" />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 8 }}
+                stroke="var(--color-muted-foreground)"
+                interval={0}
+                angle={-25}
+                textAnchor="end"
+                height={44}
+              />
+              <YAxis allowDecimals={false} tick={{ fontSize: 9 }} stroke="var(--color-muted-foreground)" />
+              <Tooltip
+                cursor={{ fill: "var(--color-muted)" }}
+                formatter={(value: number, _n, item) => [
+                  value,
+                  (item?.payload as { fullName?: string })?.fullName ?? "Accounts",
+                ]}
+              />
+              <Bar dataKey="accounts" fill="var(--color-primary)" radius={[4, 4, 0, 0]} />
+            </BarChart>
           </ResponsiveContainer>
         </div>
 
         <div className="max-h-44 overflow-y-auto rounded-md border">
-          {tab === "users" ? (
-            <table className="w-full text-left text-[10px]">
-              <thead className="sticky top-0 bg-muted/90 text-muted-foreground">
+          <table className="w-full text-left text-[10px]">
+            <thead className="sticky top-0 bg-muted/90 text-muted-foreground">
+              <tr>
+                <th className="px-2 py-1.5 font-medium">
+                  {tab === "sales" ? "Sales manager" : tab === "support1" ? "Support 1" : "Support 2"}
+                </th>
+                <th className="px-2 py-1.5 text-right font-medium">Active accounts</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
                 <tr>
-                  <th className="px-2 py-1.5 font-medium">Executive</th>
-                  <th className="px-2 py-1.5 text-right font-medium">Active users</th>
-                  <th className="px-2 py-1.5 text-right font-medium">Accounts</th>
+                  <td colSpan={2} className="px-2 py-4 text-center text-muted-foreground">
+                    No active accounts
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {analysis.activeUsersByExecutive.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="px-2 py-4 text-center text-muted-foreground">
-                      No active accounts
-                    </td>
+              ) : (
+                rows.map((r) => (
+                  <tr key={r.name} className="border-t">
+                    <td className="px-2 py-1.5 font-medium">{r.name}</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums">{r.accounts}</td>
                   </tr>
-                ) : (
-                  analysis.activeUsersByExecutive.map((r) => (
-                    <tr key={r.executive} className="border-t">
-                      <td className="px-2 py-1.5 font-medium">{r.executive}</td>
-                      <td className="px-2 py-1.5 text-right tabular-nums">{r.activeUsers}</td>
-                      <td className="px-2 py-1.5 text-right tabular-nums text-muted-foreground">
-                        {r.accounts}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          ) : null}
-
-          {tab === "location" ? (
-            <table className="w-full text-left text-[10px]">
-              <thead className="sticky top-0 bg-muted/90 text-muted-foreground">
-                <tr>
-                  <th className="px-2 py-1.5 font-medium">Location</th>
-                  <th className="px-2 py-1.5 text-right font-medium">Users</th>
-                  <th className="px-2 py-1.5 font-medium">By executive</th>
-                </tr>
-              </thead>
-              <tbody>
-                {analysis.usersByLocation.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="px-2 py-4 text-center text-muted-foreground">
-                      No location data
-                    </td>
-                  </tr>
-                ) : (
-                  analysis.usersByLocation.map((r) => (
-                    <tr key={r.location} className="border-t align-top">
-                      <td className="px-2 py-1.5 font-medium">{r.location}</td>
-                      <td className="px-2 py-1.5 text-right tabular-nums">{r.users}</td>
-                      <td className="px-2 py-1.5 text-muted-foreground">
-                        {r.byExecutive
-                          .slice(0, 4)
-                          .map((e) => `${e.executive} (${e.users})`)
-                          .join(" · ")}
-                        {r.byExecutive.length > 4 ? "…" : ""}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          ) : null}
-
-          {tab === "year" ? (
-            <table className="w-full text-left text-[10px]">
-              <thead className="sticky top-0 bg-muted/90 text-muted-foreground">
-                <tr>
-                  <th className="px-2 py-1.5 font-medium">Year</th>
-                  <th className="px-2 py-1.5 text-right font-medium">Clients</th>
-                  <th className="px-2 py-1.5 font-medium">By executive</th>
-                </tr>
-              </thead>
-              <tbody>
-                {analysis.clientsByYear.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="px-2 py-4 text-center text-muted-foreground">
-                      No client data
-                    </td>
-                  </tr>
-                ) : (
-                  analysis.clientsByYear.map((r) => (
-                    <tr key={r.year} className="border-t align-top">
-                      <td className="px-2 py-1.5 font-medium">{r.year}</td>
-                      <td className="px-2 py-1.5 text-right tabular-nums">{r.clients}</td>
-                      <td className="px-2 py-1.5 text-muted-foreground">
-                        {r.byExecutive
-                          .slice(0, 4)
-                          .map((e) => `${e.executive} (${e.clients})`)
-                          .join(" · ")}
-                        {r.byExecutive.length > 4 ? "…" : ""}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          ) : null}
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </motion.div>

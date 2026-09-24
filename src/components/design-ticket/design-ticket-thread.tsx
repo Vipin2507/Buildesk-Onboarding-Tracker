@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import {
   filesToDesignTicketAttachments,
   isImageAttachment,
+  snapshotFiles,
 } from "@/lib/design-ticket-attachments";
 import type { DesignTicket, DesignTicketAttachment, DesignTicketMessage } from "@/types/design-ticket";
 import { formatDate } from "@/lib/utils";
@@ -191,12 +192,12 @@ export function DesignTicketThread({
   }
 
   async function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
-    const list = e.target.files;
+    const files = snapshotFiles(e.target.files);
     e.target.value = "";
-    if (!list?.length) return;
+    if (!files.length) return;
     setPicking(true);
     try {
-      const { attachments, errors } = await filesToDesignTicketAttachments(list);
+      const { attachments, errors } = await filesToDesignTicketAttachments(files);
       if (errors.length) toast.error(errors.join("; "));
       if (attachments.length) setFiles((prev) => [...prev, ...attachments]);
     } finally {
