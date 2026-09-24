@@ -113,6 +113,7 @@ export type WahaSendTextRequest = {
   session: string;
   chatId: string;
   text: string;
+  reply_to?: string;
 };
 
 /** WhatsApp text → WAHA sendText. */
@@ -120,11 +121,13 @@ export async function fetchWahaSendText(
   config: WahaConfig,
   chatId: string,
   text: string,
+  opts?: { replyTo?: string },
 ): Promise<IntegrationFetchResult & { request: WahaSendTextRequest }> {
   const request: WahaSendTextRequest = {
     session: config.sessionName,
     chatId,
     text,
+    ...(opts?.replyTo ? { reply_to: opts.replyTo } : {}),
   };
 
   if (isDevClient()) {
@@ -149,6 +152,7 @@ export async function fetchWahaSendText(
         session: config.sessionName,
         chatId,
         text,
+        replyTo: opts?.replyTo,
       },
     });
     return { ...result, request };
@@ -327,6 +331,182 @@ export async function fetchWahaChatsOverview(
       Accept: "application/json",
       "X-Api-Key": config.apiKey,
     },
+  });
+  return readResponse(res);
+}
+
+export type WahaMediaKind = "image" | "file" | "voice" | "video";
+
+export type WahaMediaFile = {
+  mimetype: string;
+  filename: string;
+  data: string;
+};
+
+function wahaSendMediaPath(kind: WahaMediaKind) {
+  switch (kind) {
+    case "image":
+      return "/api/sendImage";
+    case "file":
+      return "/api/sendFile";
+    case "voice":
+      return "/api/sendVoice";
+    case "video":
+      return "/api/sendVideo";
+  }
+}
+
+/** Fetch chat messages (`GET /api/{session}/chats/{chatId}/messages`). */
+export async function fetchWahaChatMessages(
+  config: WahaConfig,
+  chatId: string,
+  opts?: { limit?: number; downloadMedia?: boolean },
+): Promise<IntegrationFetchResult> {
+  const params = new URLSearchParams({
+    limit: String(opts?.limit ?? 50),
+    downloadMedia: opts?.downloadMedia ? "true" : "false",
+  });
+  const path = `/api/${encodeURIComponent(config.sessionName)}/chats/${encodeURIComponent(chatId)}/messages?${params}`;
+
+  if (isDevClient()) {
+    const res = await fetch(`/waha${path}`, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "X-Api-Key": config.apiKey,
+      },
+    });
+    return readResponse(res);
+  }
+
+  if (isHttpsClient()) {
+    const { proxyWahaChatMessages } = await import("@/server/api/integrations");
+    return proxyWahaChatMessages({
+      data: {
+        apiUrl: config.apiUrl,
+        apiKey: config.apiKey,
+        sessionName: config.sessionName,
+        chatId,
+        limit: opts?.limit,
+        downloadMedia: opts?.downloadMedia,
+      },
+    });
+  }
+
+  const res = await fetch(`${trimSlash(config.apiUrl)}${path}`, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+      "X-Api-Key": config.apiKey,
+    },
+  });
+  return readResponse(res);
+}
+
+/** Mark chat as seen (`POST /api/sendSeen`). */
+export async function fetchWahaSendSeen(
+  config: WahaConfig,
+  chatId: string,
+): Promise<IntegrationFetchResult> {
+  const body = { session: config.sessionName, chatId };
+
+  if (isDevClient()) {
+    const res = await fetch("/waha/api/sendSeen", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-Api-Key": config.apiKey,
+      },
+      body: JSON.stringify(body),
+    });
+    return readResponse(res);
+  }
+
+  if (isHttpsClient()) {
+    const { proxyWahaSendSeen } = await import("@/server/api/integrations");
+    return proxyWahaSendSeen({
+      data: {
+        apiUrl: config.apiUrl,
+        apiKey: config.apiKey,
+        session: config.sessionName,
+        chatId,
+      },
+    });
+  }
+
+  const res = await fetch(`${trimSlash(config.apiUrl)}/api/sendSeen`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "X-Api-Key": config.apiKey,
+    },
+    body: JSON.stringify(body),
+  });
+  return readResponse(res);
+}
+
+/** Send image / file / voice / video via WAHA. */
+export async function fetchWahaSendMedia(
+  config: WahaConfig,
+  kind: WahaMediaKind,
+  chatId: string,
+  file: WahaMediaFile,
+  opts?: { caption?: string; replyTo?: string; convert?: boolean },
+): Promise<IntegrationFetchResult> {
+  const path = wahaSendMediaPath(kind);
+  const body: Record<string, unknown> = {
+    session: config.sessionName,
+    chatId,
+    file: {
+      mimetype: file.mimetype,
+      filename: file.filename,
+      data: file.data,
+    },
+  };
+  if (opts?.caption) body.caption = opts.caption;
+  if (opts?.replyTo) body.reply_to = opts.replyTo;
+  if (kind === "voice" || kind === "video") body.convert = opts?.convert ?? true;
+
+  if (isDevClient()) {
+    const res = await fetch(`/waha${path}`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-Api-Key": config.apiKey,
+      },
+      body: JSON.stringify(body),
+    });
+    return readResponse(res);
+  }
+
+  if (isHttpsClient()) {
+    const { proxyWahaSendMedia } = await import("@/server/api/integrations");
+    return proxyWahaSendMedia({
+      data: {
+        apiUrl: config.apiUrl,
+        apiKey: config.apiKey,
+        session: config.sessionName,
+        kind,
+        chatId,
+        file,
+        caption: opts?.caption,
+        replyTo: opts?.replyTo,
+        convert: opts?.convert,
+      },
+    });
+  }
+
+  const res = await fetch(`${trimSlash(config.apiUrl)}${path}`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "X-Api-Key": config.apiKey,
+    },
+    body: JSON.stringify(body),
   });
   return readResponse(res);
 }

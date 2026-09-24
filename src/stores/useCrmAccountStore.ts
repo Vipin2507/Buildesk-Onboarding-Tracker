@@ -72,6 +72,8 @@ function toApiPayload(account: CrmAccount) {
     healthScore: account.healthScore,
     status: account.status,
     statusRemarks: account.statusRemarks ?? null,
+    whatsappGroupId: account.whatsappGroupId ?? null,
+    whatsappGroupName: account.whatsappGroupName ?? null,
     createdAt: account.createdAt,
     updatedAt: account.updatedAt,
   };

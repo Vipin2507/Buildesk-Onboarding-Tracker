@@ -56,6 +56,8 @@ function mapRow(row: typeof t.crmAccounts.$inferSelect): CrmAccount {
     healthScore: row.healthScore ?? undefined,
     status: status as CrmAccount["status"],
     statusRemarks: row.statusRemarks ?? undefined,
+    whatsappGroupId: row.whatsappGroupId ?? undefined,
+    whatsappGroupName: row.whatsappGroupName ?? undefined,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -98,6 +100,8 @@ const accountInput = z.object({
   healthScore: z.number().int().optional().nullable(),
   status: z.enum(["active", "onboarding", "live", "suspended", "inactive", "closed"]).optional(),
   statusRemarks: z.string().optional().nullable(),
+  whatsappGroupId: z.string().optional().nullable(),
+  whatsappGroupName: z.string().optional().nullable(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });
@@ -145,6 +149,8 @@ function toRowValues(
     healthScore: data.healthScore ?? null,
     status: data.status ?? "onboarding",
     statusRemarks: data.statusRemarks?.trim() || null,
+    whatsappGroupId: data.whatsappGroupId?.trim() || null,
+    whatsappGroupName: data.whatsappGroupName?.trim() || null,
     createdAt,
     updatedAt,
   };

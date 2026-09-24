@@ -162,6 +162,8 @@ export const crmAccounts = sqliteTable(
     healthScore: integer("health_score"),
     status: text("status").notNull().default("onboarding"),
     statusRemarks: text("status_remarks"),
+    whatsappGroupId: text("whatsapp_group_id"),
+    whatsappGroupName: text("whatsapp_group_name"),
     ...timestamps,
   },
   (t) => [

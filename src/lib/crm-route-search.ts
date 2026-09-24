@@ -69,6 +69,7 @@ export const CRM_ACCOUNT_TAB_IDS = [
   "meetings",
   "tickets",
   "queries",
+  "whatsapp",
   "comms",
 ] as const;
 

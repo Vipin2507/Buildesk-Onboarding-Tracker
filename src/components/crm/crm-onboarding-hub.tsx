@@ -7,6 +7,7 @@ import {
   ClipboardList,
   HelpCircle,
   LayoutDashboard,
+  MessageCircle,
   MessageSquare,
   Package,
   Pencil,
@@ -29,6 +30,7 @@ import {
   type CrmAccountFormValues,
 } from "@/components/crm/crm-account-form";
 import { CrmAccountQueriesPanel } from "@/components/crm/crm-account-queries-panel";
+import { CrmAccountWhatsappGroupPanel } from "@/components/crm/crm-account-whatsapp-group-panel";
 import { CrmAccountMeetingsPanel } from "@/components/crm/crm-account-meetings-panel";
 import { CrmAccountModulesOverview } from "@/components/crm/crm-account-modules-overview";
 import { CrmAccountModulesTab } from "@/components/crm/crm-account-modules-tab";
@@ -98,6 +100,7 @@ const TABS = [
   { id: "meetings", label: "Meetings", icon: Calendar },
   { id: "tickets", label: "Tickets", icon: Ticket },
   { id: "queries", label: "Queries", icon: HelpCircle },
+  { id: "whatsapp", label: "WhatsApp", icon: MessageCircle },
   { id: "comms", label: "Comms", icon: MessageSquare },
 ] as const;
 
@@ -316,6 +319,7 @@ export function CrmOnboardingHub({
           {tab === "queries" ? (
             <QueriesTab companyId={accountId} initialQueryId={initialQueryId} />
           ) : null}
+          {tab === "whatsapp" ? <CrmAccountWhatsappGroupPanel accountId={accountId} /> : null}
           {tab === "comms" ? <CommsTab companyId={accountId} /> : null}
         </motion.div>
       </AnimatePresence>

@@ -297,6 +297,8 @@ const EXTRA_COLUMNS = [
   },
   { table: "crm_accounts", name: "status_remarks", ddl: "TEXT" },
   { table: "crm_accounts", name: "gst_percent", ddl: "REAL" },
+  { table: "crm_accounts", name: "whatsapp_group_id", ddl: "TEXT" },
+  { table: "crm_accounts", name: "whatsapp_group_name", ddl: "TEXT" },
   { table: "erp_meetings", name: "google_event_id", ddl: "TEXT" },
   { table: "erp_meetings", name: "meet_url", ddl: "TEXT" },
   { table: "erp_meetings", name: "google_sync_status", ddl: "TEXT NOT NULL DEFAULT 'none'" },
@@ -844,6 +846,8 @@ if (!tableExists("crm_accounts")) {
       health_score INTEGER,
       status TEXT NOT NULL DEFAULT 'onboarding',
       status_remarks TEXT,
+      whatsapp_group_id TEXT,
+      whatsapp_group_name TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );

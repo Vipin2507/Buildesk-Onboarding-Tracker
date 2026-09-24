@@ -43,6 +43,10 @@ export type CrmAccount = Timestamps & {
   status: "active" | "onboarding" | "live" | "suspended" | "inactive" | "closed";
   /** Reason noted when marking suspended or inactive */
   statusRemarks?: string;
+  /** WAHA WhatsApp group JID (`…@g.us`) bound for the account chat tab */
+  whatsappGroupId?: string;
+  /** Cached group subject / display name */
+  whatsappGroupName?: string;
 };
 
 export type CrmAccountInstallment = {
