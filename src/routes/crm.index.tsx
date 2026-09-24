@@ -27,6 +27,7 @@ import {
 
 import { CrmDashboardActivityFeed } from "@/components/crm/crm-dashboard-activity-feed";
 import { CrmDashboardDrillDownSheet } from "@/components/crm/crm-dashboard-drill-down";
+import { CrmDashboardExecutiveAnalysis } from "@/components/crm/crm-dashboard-executive-analysis";
 import { CrmDashboardOpsPanel } from "@/components/crm/crm-dashboard-ops-panel";
 import { DashboardKpiCard } from "@/components/dashboard/dashboard-kpi-card";
 import { PageWrap } from "@/components/page-header";
@@ -269,6 +270,8 @@ function CrmDashboardPage() {
           }}
           queryTotal={kpis.openQueries}
         />
+
+        <CrmDashboardExecutiveAnalysis accounts={rows} />
 
         <div className="grid gap-2.5 lg:grid-cols-2">
           <motion.div

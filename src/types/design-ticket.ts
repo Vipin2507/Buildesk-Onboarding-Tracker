@@ -8,7 +8,9 @@ export type DesignTicketMessageKind = "message" | "system";
 
 export type DesignTicketAttachment = {
   name: string;
+  /** Data URL or hosted file URL — required to open/preview */
   url?: string;
+  mimeType?: string;
 };
 
 export type DesignTicketMessage = {

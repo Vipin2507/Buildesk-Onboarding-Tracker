@@ -20,6 +20,7 @@ import type {
 const attachmentSchema = z.object({
   name: z.string(),
   url: z.string().optional(),
+  mimeType: z.string().optional(),
 });
 
 function parseAttachments(json: string | null | undefined): DesignTicketAttachment[] | undefined {

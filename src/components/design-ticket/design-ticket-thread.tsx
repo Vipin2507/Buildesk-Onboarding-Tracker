@@ -1,16 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Paperclip, Send } from "lucide-react";
+import { ExternalLink, Paperclip, Send, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { TICKET_EASE, ticketTextareaClass } from "@/components/design-ticket/design-ticket-shared";
 import { Button } from "@/components/ui/button";
-import type { DesignTicket, DesignTicketMessage } from "@/types/design-ticket";
+import {
+  filesToDesignTicketAttachments,
+  isImageAttachment,
+} from "@/lib/design-ticket-attachments";
+import type { DesignTicket, DesignTicketAttachment, DesignTicketMessage } from "@/types/design-ticket";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 type ReplyProps = {
   placeholder?: string;
-  onSend: (message: string, attachments: { name: string }[]) => void;
+  onSend: (message: string, attachments: DesignTicketAttachment[]) => void;
   disabled?: boolean;
 };
 
@@ -21,6 +26,76 @@ type ThreadProps = {
   contactName?: string;
   showResolvedBanner?: boolean;
 };
+
+function AttachmentChip({
+  file,
+  isTeam,
+}: {
+  file: DesignTicketAttachment;
+  isTeam: boolean;
+}) {
+  const canOpen = Boolean(file.url);
+  const isImage = isImageAttachment(file);
+
+  if (canOpen && isImage) {
+    return (
+      <a
+        href={file.url}
+        target="_blank"
+        rel="noreferrer"
+        className={cn(
+          "block overflow-hidden rounded-md border",
+          isTeam ? "border-primary-foreground/25" : "border-border",
+        )}
+        title={`Open ${file.name}`}
+      >
+        <img src={file.url} alt={file.name} className="max-h-40 max-w-full object-contain" />
+        <div
+          className={cn(
+            "flex items-center gap-1 px-2 py-1 text-[10px]",
+            isTeam ? "bg-primary-foreground/15" : "bg-muted",
+          )}
+        >
+          <ExternalLink className="h-3 w-3 shrink-0" />
+          <span className="truncate">{file.name}</span>
+        </div>
+      </a>
+    );
+  }
+
+  if (canOpen) {
+    return (
+      <a
+        href={file.url}
+        target="_blank"
+        rel="noreferrer"
+        download={file.name}
+        className={cn(
+          "inline-flex max-w-full items-center gap-1 truncate rounded-md px-2 py-0.5 text-xs underline-offset-2 hover:underline",
+          isTeam ? "bg-primary-foreground/15" : "bg-muted",
+        )}
+      >
+        <Paperclip className="h-3 w-3 shrink-0" />
+        <span className="truncate">{file.name}</span>
+        <ExternalLink className="h-3 w-3 shrink-0 opacity-70" />
+      </a>
+    );
+  }
+
+  return (
+    <span
+      className={cn(
+        "inline-flex max-w-full items-center gap-1 truncate rounded-md px-2 py-0.5 text-xs",
+        isTeam ? "bg-primary-foreground/15" : "bg-muted",
+      )}
+      title="File was attached as name only — content was not stored"
+    >
+      <Paperclip className="h-3 w-3 shrink-0" />
+      <span className="truncate">{file.name}</span>
+      <span className="shrink-0 opacity-60">(unavailable)</span>
+    </span>
+  );
+}
 
 function MessageBubble({
   msg,
@@ -59,17 +134,8 @@ function MessageBubble({
         <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.message}</p>
         {msg.attachments?.length ? (
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {msg.attachments.map((file) => (
-              <span
-                key={file.name}
-                className={cn(
-                  "inline-flex max-w-full items-center gap-1 truncate rounded-md px-2 py-0.5 text-xs",
-                  isTeam ? "bg-primary-foreground/15" : "bg-muted",
-                )}
-              >
-                <Paperclip className="h-3 w-3 shrink-0" />
-                <span className="truncate">{file.name}</span>
-              </span>
+            {msg.attachments.map((file, i) => (
+              <AttachmentChip key={`${file.name}-${i}`} file={file} isTeam={isTeam} />
             ))}
           </div>
         ) : null}
@@ -103,7 +169,8 @@ export function DesignTicketThread({
   showResolvedBanner = true,
 }: ThreadProps) {
   const [text, setText] = useState("");
-  const [files, setFiles] = useState<{ name: string }[]>([]);
+  const [files, setFiles] = useState<DesignTicketAttachment[]>([]);
+  const [picking, setPicking] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const initialMessageCount = useRef<number | null>(null);
   const sorted = [...ticket.messages].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -123,10 +190,18 @@ export function DesignTicketThread({
     setFiles([]);
   }
 
-  function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
-    const names = Array.from(e.target.files ?? []).map((f) => ({ name: f.name }));
-    if (names.length) setFiles((prev) => [...prev, ...names]);
+  async function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const list = e.target.files;
     e.target.value = "";
+    if (!list?.length) return;
+    setPicking(true);
+    try {
+      const { attachments, errors } = await filesToDesignTicketAttachments(list);
+      if (errors.length) toast.error(errors.join("; "));
+      if (attachments.length) setFiles((prev) => [...prev, ...attachments]);
+    } finally {
+      setPicking(false);
+    }
   }
 
   return (
@@ -179,21 +254,35 @@ export function DesignTicketThread({
         >
           {files.length > 0 ? (
             <div className="flex flex-wrap gap-2">
-              {files.map((f) => (
+              {files.map((f, i) => (
                 <span
-                  key={f.name}
+                  key={`${f.name}-${i}`}
                   className="inline-flex max-w-full items-center gap-1 truncate rounded-md border px-2 py-1 text-xs"
                 >
                   <Paperclip className="h-3 w-3 shrink-0" />
-                  {f.name}
+                  <span className="truncate">{f.name}</span>
+                  <button
+                    type="button"
+                    className="shrink-0 rounded p-0.5 hover:bg-muted"
+                    onClick={() => setFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                    aria-label={`Remove ${f.name}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
                 </span>
               ))}
             </div>
           ) : null}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
             <label className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center self-start rounded-lg border bg-card transition-colors hover:bg-muted sm:self-auto">
-              <Paperclip className="h-4 w-4 text-muted-foreground" />
-              <input type="file" className="hidden" multiple onChange={onPickFiles} />
+              <Paperclip className={cn("h-4 w-4 text-muted-foreground", picking && "animate-pulse")} />
+              <input
+                type="file"
+                className="hidden"
+                multiple
+                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+                onChange={(e) => void onPickFiles(e)}
+              />
             </label>
             <textarea
               value={text}
@@ -209,7 +298,7 @@ export function DesignTicketThread({
               type="button"
               className="w-full shrink-0 gap-1.5 sm:w-auto"
               onClick={handleSend}
-              disabled={!text.trim()}
+              disabled={!text.trim() || picking}
             >
               <Send className="h-4 w-4" />
               Send

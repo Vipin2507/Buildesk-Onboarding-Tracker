@@ -17,10 +17,11 @@ import {
 import { DesignTicketSelect } from "@/components/design-ticket/design-ticket-fields";
 import { Button } from "@/components/ui/button";
 import { cn, isValidEmail, isValidPortalPhone, usableContactName } from "@/lib/utils";
+import { filesToDesignTicketAttachments } from "@/lib/design-ticket-attachments";
 import { DESIGN_TICKET_CATEGORIES } from "@/types/design-ticket";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
 import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
-import type { DesignTicketPriority } from "@/types/design-ticket";
+import type { DesignTicketAttachment, DesignTicketPriority } from "@/types/design-ticket";
 import { DESIGN_TICKET_PRIORITY_LABEL } from "@/types/design-ticket";
 
 const PORTAL_CATEGORY_OPTIONS: { value: string; label: string; hint: string }[] = [
@@ -75,7 +76,7 @@ function PortalCreateTicket() {
   );
   const [priority, setPriority] = useState<DesignTicketPriority>("medium");
   const [description, setDescription] = useState("");
-  const [attachments, setAttachments] = useState<{ name: string }[]>([]);
+  const [attachments, setAttachments] = useState<DesignTicketAttachment[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   if (!access) return null;
@@ -122,8 +123,8 @@ function PortalCreateTicket() {
     }
   }
 
-  function removeAttachment(name: string) {
-    setAttachments((prev) => prev.filter((f) => f.name !== name));
+  function removeAttachment(index: number) {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
   }
 
   const canSubmit =
@@ -255,19 +256,24 @@ function PortalCreateTicket() {
                 <input
                   type="file"
                   multiple
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
                   className="hidden"
                   onChange={(e) => {
-                    const added = Array.from(e.target.files ?? []).map((f) => ({ name: f.name }));
-                    if (added.length) setAttachments((prev) => [...prev, ...added]);
+                    const list = e.target.files;
                     e.target.value = "";
+                    if (!list?.length) return;
+                    void filesToDesignTicketAttachments(list).then(({ attachments: added, errors }) => {
+                      if (errors.length) toast.error(errors.join("; "));
+                      if (added.length) setAttachments((prev) => [...prev, ...added]);
+                    });
                   }}
                 />
               </label>
               {attachments.length > 0 ? (
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {attachments.map((f) => (
+                  {attachments.map((f, i) => (
                     <span
-                      key={f.name}
+                      key={`${f.name}-${i}`}
                       className="inline-flex items-center gap-1 rounded-md border bg-card px-2 py-1 text-xs"
                     >
                       <Paperclip className="h-3 w-3 text-muted-foreground" />
@@ -275,7 +281,7 @@ function PortalCreateTicket() {
                       <button
                         type="button"
                         className="ml-0.5 rounded p-0.5 hover:bg-muted"
-                        onClick={() => removeAttachment(f.name)}
+                        onClick={() => removeAttachment(i)}
                         aria-label={`Remove ${f.name}`}
                       >
                         <X className="h-3 w-3" />
