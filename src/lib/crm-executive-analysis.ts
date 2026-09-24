@@ -8,18 +8,18 @@ export type ExecutiveAccountRow = {
   accounts: number;
 };
 
-export type GroupedAccountRow = {
-  key: string;
+export type ExecutiveDetailRow = {
+  name: string;
   accounts: number;
-  byRole: { name: string; accounts: number }[];
+  breakdown: { label: string; accounts: number }[];
 };
 
 export type CrmExecutiveAnalysis = {
   bySalesManager: ExecutiveAccountRow[];
   bySupport1: ExecutiveAccountRow[];
   bySupport2: ExecutiveAccountRow[];
-  byLocation: GroupedAccountRow[];
-  byYear: GroupedAccountRow[];
+  byLocation: ExecutiveDetailRow[];
+  byYear: ExecutiveDetailRow[];
   totals: {
     activeAccounts: number;
   };
@@ -72,27 +72,41 @@ function countBy(
     .sort((a, b) => b.accounts - a.accounts || a.name.localeCompare(b.name));
 }
 
-function countByKeyWithRole(
+/** Group by executive first; nested breakdown is location or year. */
+function executivesWithBreakdown(
   accounts: CrmAccount[],
-  pickKey: (a: CrmAccount) => string,
   role: ExecutiveRole,
-): GroupedAccountRow[] {
-  const map = new Map<string, { accounts: number; roles: Map<string, number> }>();
+  pickBreakdown: (a: CrmAccount) => string,
+  sortBreakdown: (a: string, b: string) => number,
+): ExecutiveDetailRow[] {
+  const map = new Map<string, { accounts: number; parts: Map<string, number> }>();
   for (const a of accounts) {
-    const key = pickKey(a);
     const person = roleName(a, role);
-    const entry = map.get(key) ?? { accounts: 0, roles: new Map() };
+    const part = pickBreakdown(a);
+    const entry = map.get(person) ?? { accounts: 0, parts: new Map() };
     entry.accounts += 1;
-    entry.roles.set(person, (entry.roles.get(person) ?? 0) + 1);
-    map.set(key, entry);
+    entry.parts.set(part, (entry.parts.get(part) ?? 0) + 1);
+    map.set(person, entry);
   }
-  return [...map.entries()].map(([key, v]) => ({
-    key,
-    accounts: v.accounts,
-    byRole: [...v.roles.entries()]
-      .map(([name, accounts]) => ({ name, accounts }))
-      .sort((a, b) => b.accounts - a.accounts || a.name.localeCompare(b.name)),
-  }));
+  return [...map.entries()]
+    .map(([name, v]) => ({
+      name,
+      accounts: v.accounts,
+      breakdown: [...v.parts.entries()]
+        .map(([label, accounts]) => ({ label, accounts }))
+        .sort((a, b) => sortBreakdown(a.label, b.label) || b.accounts - a.accounts),
+    }))
+    .sort((a, b) => b.accounts - a.accounts || a.name.localeCompare(b.name));
+}
+
+function sortYearLabel(a: string, b: string) {
+  if (a === "Unknown") return 1;
+  if (b === "Unknown") return -1;
+  return b.localeCompare(a);
+}
+
+function sortLocationLabel(a: string, b: string) {
+  return a.localeCompare(b);
 }
 
 /** Active accounts (not closed/suspended/inactive) by manager, location, and year. */
@@ -104,22 +118,12 @@ export function buildCrmExecutiveAnalysis(
   const locationRole = opts?.locationRole ?? "sales";
   const yearRole = opts?.yearRole ?? "sales";
 
-  const byLocation = countByKeyWithRole(active, locationOf, locationRole).sort(
-    (a, b) => b.accounts - a.accounts || a.key.localeCompare(b.key),
-  );
-
-  const byYear = countByKeyWithRole(active, yearOf, yearRole).sort((a, b) => {
-    if (a.key === "Unknown") return 1;
-    if (b.key === "Unknown") return -1;
-    return b.key.localeCompare(a.key);
-  });
-
   return {
     bySalesManager: countBy(active, (a) => a.salesManagerName),
     bySupport1: countBy(active, (a) => a.supportManager1),
     bySupport2: countBy(active, (a) => a.supportManager2),
-    byLocation,
-    byYear,
+    byLocation: executivesWithBreakdown(active, locationRole, locationOf, sortLocationLabel),
+    byYear: executivesWithBreakdown(active, yearRole, yearOf, sortYearLabel),
     totals: { activeAccounts: active.length },
   };
 }

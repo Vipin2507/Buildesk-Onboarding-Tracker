@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { CalendarRange, Headphones, MapPin, UserRound } from "lucide-react";
+import { CalendarRange, ChevronDown, Headphones, MapPin, UserRound } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -15,6 +15,7 @@ import {
   buildCrmExecutiveAnalysis,
   EXECUTIVE_ROLE_LABEL,
   type ExecutiveAccountRow,
+  type ExecutiveDetailRow,
   type ExecutiveRole,
 } from "@/lib/crm-executive-analysis";
 import { cn } from "@/lib/utils";
@@ -33,6 +34,90 @@ function toChart(rows: { name: string; accounts: number }[]) {
 }
 
 const ROLE_OPTIONS: ExecutiveRole[] = ["sales", "support1", "support2"];
+
+function ExpandableExecutiveTable({
+  rows,
+  personLabel,
+  breakdownLabel,
+}: {
+  rows: ExecutiveDetailRow[];
+  personLabel: string;
+  breakdownLabel: string;
+}) {
+  const [open, setOpen] = useState<string | null>(null);
+
+  if (rows.length === 0) {
+    return (
+      <div className="px-2 py-6 text-center text-[10px] text-muted-foreground">No active accounts</div>
+    );
+  }
+
+  return (
+    <table className="w-full text-left text-[10px]">
+      <thead className="sticky top-0 bg-muted/90 text-muted-foreground">
+        <tr>
+          <th className="w-6 px-1 py-1.5" />
+          <th className="px-2 py-1.5 font-medium">{personLabel}</th>
+          <th className="px-2 py-1.5 text-right font-medium">Active accounts</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => {
+          const expanded = open === r.name;
+          return (
+            <Fragment key={r.name}>
+              <tr
+                className={cn(
+                  "cursor-pointer border-t hover:bg-muted/50",
+                  expanded && "bg-muted/40",
+                )}
+                onClick={() => setOpen(expanded ? null : r.name)}
+              >
+                <td className="px-1 py-1.5">
+                  <ChevronDown
+                    className={cn(
+                      "h-3.5 w-3.5 text-muted-foreground transition-transform",
+                      expanded && "rotate-180",
+                    )}
+                  />
+                </td>
+                <td className="px-2 py-1.5 font-medium">{r.name}</td>
+                <td className="px-2 py-1.5 text-right font-semibold tabular-nums">{r.accounts}</td>
+              </tr>
+              {expanded ? (
+                <tr className="border-t bg-background/80">
+                  <td colSpan={3} className="px-2 py-2">
+                    <div className="mb-1 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                      {breakdownLabel}
+                    </div>
+                    <div className="max-h-32 overflow-y-auto rounded border">
+                      <table className="w-full text-[10px]">
+                        <thead className="bg-muted/60 text-muted-foreground">
+                          <tr>
+                            <th className="px-2 py-1 text-left font-medium">{breakdownLabel}</th>
+                            <th className="px-2 py-1 text-right font-medium">Accounts</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {r.breakdown.map((b) => (
+                            <tr key={b.label} className="border-t">
+                              <td className="px-2 py-1">{b.label}</td>
+                              <td className="px-2 py-1 text-right tabular-nums">{b.accounts}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </td>
+                </tr>
+              ) : null}
+            </Fragment>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
 
 export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccount[] }) {
   const [tab, setTab] = useState<TabId>("sales");
@@ -53,21 +138,14 @@ export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccou
           ? analysis.bySupport2
           : [];
 
+  const detailRows = tab === "location" ? analysis.byLocation : analysis.byYear;
+
   const chartData = useMemo(() => {
-    if (tab === "location") {
-      return toChart(analysis.byLocation.map((r) => ({ name: r.key, accounts: r.accounts })));
-    }
-    if (tab === "year") {
-      return toChart(
-        [...analysis.byYear]
-          .filter((r) => r.key !== "Unknown")
-          .slice()
-          .reverse()
-          .map((r) => ({ name: r.key, accounts: r.accounts })),
-      );
+    if (tab === "location" || tab === "year") {
+      return toChart(detailRows.map((r) => ({ name: r.name, accounts: r.accounts })));
     }
     return toChart(managerRows);
-  }, [tab, analysis.byLocation, analysis.byYear, managerRows]);
+  }, [tab, detailRows, managerRows]);
 
   const tabs: { id: TabId; label: string; icon: typeof UserRound }[] = [
     { id: "sales", label: "Sales manager", icon: UserRound },
@@ -85,12 +163,11 @@ export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccou
         : tab === "support2"
           ? "Support 2"
           : tab === "location"
-            ? "Location"
-            : "Year";
+            ? EXECUTIVE_ROLE_LABEL[locationRole]
+            : EXECUTIVE_ROLE_LABEL[yearRole];
 
   const subRole = tab === "location" ? locationRole : yearRole;
   const setSubRole = tab === "location" ? setLocationRole : setYearRole;
-  const breakdownLabel = `By ${EXECUTIVE_ROLE_LABEL[subRole].toLowerCase()}`;
 
   return (
     <motion.div
@@ -132,7 +209,7 @@ export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccou
 
       {tab === "location" || tab === "year" ? (
         <div className="mb-2 flex flex-wrap items-center gap-1.5">
-          <span className="text-[10px] text-muted-foreground">Break down by</span>
+          <span className="text-[10px] text-muted-foreground">Show executives as</span>
           {ROLE_OPTIONS.map((role) => (
             <button
               key={role}
@@ -148,6 +225,9 @@ export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccou
               {EXECUTIVE_ROLE_LABEL[role]}
             </button>
           ))}
+          <span className="text-[10px] text-muted-foreground">
+            · click a row to expand {tab === "location" ? "locations" : "years"}
+          </span>
         </div>
       ) : null}
 
@@ -164,9 +244,9 @@ export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccou
                 tick={{ fontSize: 8 }}
                 stroke="var(--color-muted-foreground)"
                 interval={0}
-                angle={tab === "year" ? 0 : -25}
-                textAnchor={tab === "year" ? "middle" : "end"}
-                height={tab === "year" ? 28 : 44}
+                angle={-25}
+                textAnchor="end"
+                height={44}
               />
               <YAxis allowDecimals={false} tick={{ fontSize: 9 }} stroke="var(--color-muted-foreground)" />
               <Tooltip
@@ -181,75 +261,21 @@ export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccou
           </ResponsiveContainer>
         </div>
 
-        <div className="max-h-44 overflow-y-auto rounded-md border">
+        <div className="max-h-52 overflow-y-auto rounded-md border">
           {tab === "location" ? (
-            <table className="w-full text-left text-[10px]">
-              <thead className="sticky top-0 bg-muted/90 text-muted-foreground">
-                <tr>
-                  <th className="px-2 py-1.5 font-medium">Location</th>
-                  <th className="px-2 py-1.5 text-right font-medium">Active accounts</th>
-                  <th className="px-2 py-1.5 font-medium">{breakdownLabel}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {analysis.byLocation.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="px-2 py-4 text-center text-muted-foreground">
-                      No active accounts
-                    </td>
-                  </tr>
-                ) : (
-                  analysis.byLocation.map((r) => (
-                    <tr key={r.key} className="border-t align-top">
-                      <td className="px-2 py-1.5 font-medium">{r.key}</td>
-                      <td className="px-2 py-1.5 text-right tabular-nums">{r.accounts}</td>
-                      <td className="px-2 py-1.5 text-muted-foreground">
-                        {r.byRole
-                          .slice(0, 4)
-                          .map((m) => `${m.name} (${m.accounts})`)
-                          .join(" · ")}
-                        {r.byRole.length > 4 ? "…" : ""}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+            <ExpandableExecutiveTable
+              rows={analysis.byLocation}
+              personLabel={tableTitle}
+              breakdownLabel="Location"
+            />
           ) : null}
 
           {tab === "year" ? (
-            <table className="w-full text-left text-[10px]">
-              <thead className="sticky top-0 bg-muted/90 text-muted-foreground">
-                <tr>
-                  <th className="px-2 py-1.5 font-medium">Year</th>
-                  <th className="px-2 py-1.5 text-right font-medium">Active accounts</th>
-                  <th className="px-2 py-1.5 font-medium">{breakdownLabel}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {analysis.byYear.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="px-2 py-4 text-center text-muted-foreground">
-                      No active accounts
-                    </td>
-                  </tr>
-                ) : (
-                  analysis.byYear.map((r) => (
-                    <tr key={r.key} className="border-t align-top">
-                      <td className="px-2 py-1.5 font-medium">{r.key}</td>
-                      <td className="px-2 py-1.5 text-right tabular-nums">{r.accounts}</td>
-                      <td className="px-2 py-1.5 text-muted-foreground">
-                        {r.byRole
-                          .slice(0, 4)
-                          .map((m) => `${m.name} (${m.accounts})`)
-                          .join(" · ")}
-                        {r.byRole.length > 4 ? "…" : ""}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+            <ExpandableExecutiveTable
+              rows={analysis.byYear}
+              personLabel={tableTitle}
+              breakdownLabel="Year"
+            />
           ) : null}
 
           {tab === "sales" || tab === "support1" || tab === "support2" ? (
