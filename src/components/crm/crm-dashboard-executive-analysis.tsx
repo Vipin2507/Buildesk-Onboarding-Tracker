@@ -18,7 +18,9 @@ import {
   type ExecutiveDetailRow,
   type ExecutiveRole,
 } from "@/lib/crm-executive-analysis";
+import { isAdminRoleKey } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/stores";
 import type { CrmAccount } from "@/types/crm-account";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -120,13 +122,21 @@ function ExpandableExecutiveTable({
 }
 
 export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccount[] }) {
+  const currentUser = useAuthStore((s) => s.user);
+  const isAdmin = isAdminRoleKey(currentUser?.role);
   const [tab, setTab] = useState<TabId>("sales");
   const [locationRole, setLocationRole] = useState<ExecutiveRole>("sales");
   const [yearRole, setYearRole] = useState<ExecutiveRole>("sales");
 
   const analysis = useMemo(
-    () => buildCrmExecutiveAnalysis(accounts, { locationRole, yearRole }),
-    [accounts, locationRole, yearRole],
+    () =>
+      buildCrmExecutiveAnalysis(accounts, {
+        locationRole,
+        yearRole,
+        viewerName: currentUser?.name,
+        isAdmin,
+      }),
+    [accounts, locationRole, yearRole, currentUser?.name, isAdmin],
   );
 
   const managerRows: ExecutiveAccountRow[] =
@@ -180,8 +190,9 @@ export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccou
         <div>
           <h3 className="text-xs font-semibold">Executive analysis</h3>
           <p className="text-[10px] text-muted-foreground">
-            Active accounts by manager, location, and year · {analysis.totals.activeAccounts}{" "}
-            active accounts
+            {isAdmin
+              ? `Active accounts by manager, location, and year · ${analysis.totals.activeAccounts} active accounts`
+              : `Your active accounts only · ${analysis.totals.activeAccounts} assigned active accounts`}
           </p>
         </div>
         <div className="flex flex-wrap gap-1">
@@ -209,7 +220,9 @@ export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccou
 
       {tab === "location" || tab === "year" ? (
         <div className="mb-2 flex flex-wrap items-center gap-1.5">
-          <span className="text-[10px] text-muted-foreground">Show executives as</span>
+          <span className="text-[10px] text-muted-foreground">
+            {isAdmin ? "Show executives as" : "View your role as"}
+          </span>
           {ROLE_OPTIONS.map((role) => (
             <button
               key={role}

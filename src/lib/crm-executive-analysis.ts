@@ -1,4 +1,5 @@
 import type { CrmAccount } from "@/types/crm-account";
+import { crmSalesManagerNamesMatch } from "@/lib/crm-account-access";
 import { isCrmAccountEnded } from "@/lib/crm-account-status";
 
 export type ExecutiveRole = "sales" | "support1" | "support2";
@@ -23,6 +24,8 @@ export type CrmExecutiveAnalysis = {
   totals: {
     activeAccounts: number;
   };
+  /** When set, analysis is scoped to this executive only (non-admin). */
+  scopedToName?: string;
 };
 
 export const EXECUTIVE_ROLE_LABEL: Record<ExecutiveRole, string> = {
@@ -109,21 +112,52 @@ function sortLocationLabel(a: string, b: string) {
   return a.localeCompare(b);
 }
 
-/** Active accounts (not closed/suspended/inactive) by manager, location, and year. */
+function keepOwnRows<T extends { name: string }>(rows: T[], viewerName: string | undefined): T[] {
+  if (!viewerName?.trim()) return [];
+  return rows.filter((r) => crmSalesManagerNamesMatch(r.name, viewerName));
+}
+
+/**
+ * Active accounts by manager / location / year.
+ * Admins see everyone; non-admins only see rows matching their own name.
+ */
 export function buildCrmExecutiveAnalysis(
   accounts: CrmAccount[],
-  opts?: { locationRole?: ExecutiveRole; yearRole?: ExecutiveRole },
+  opts?: {
+    locationRole?: ExecutiveRole;
+    yearRole?: ExecutiveRole;
+    /** Logged-in user name — used when `isAdmin` is false */
+    viewerName?: string;
+    isAdmin?: boolean;
+  },
 ): CrmExecutiveAnalysis {
   const active = accounts.filter((a) => !isCrmAccountEnded(a.status));
   const locationRole = opts?.locationRole ?? "sales";
   const yearRole = opts?.yearRole ?? "sales";
+  const isAdmin = opts?.isAdmin ?? true;
+  const viewerName = opts?.viewerName?.trim();
+
+  let bySalesManager = countBy(active, (a) => a.salesManagerName);
+  let bySupport1 = countBy(active, (a) => a.supportManager1);
+  let bySupport2 = countBy(active, (a) => a.supportManager2);
+  let byLocation = executivesWithBreakdown(active, locationRole, locationOf, sortLocationLabel);
+  let byYear = executivesWithBreakdown(active, yearRole, yearOf, sortYearLabel);
+
+  if (!isAdmin) {
+    bySalesManager = keepOwnRows(bySalesManager, viewerName);
+    bySupport1 = keepOwnRows(bySupport1, viewerName);
+    bySupport2 = keepOwnRows(bySupport2, viewerName);
+    byLocation = keepOwnRows(byLocation, viewerName);
+    byYear = keepOwnRows(byYear, viewerName);
+  }
 
   return {
-    bySalesManager: countBy(active, (a) => a.salesManagerName),
-    bySupport1: countBy(active, (a) => a.supportManager1),
-    bySupport2: countBy(active, (a) => a.supportManager2),
-    byLocation: executivesWithBreakdown(active, locationRole, locationOf, sortLocationLabel),
-    byYear: executivesWithBreakdown(active, yearRole, yearOf, sortYearLabel),
+    bySalesManager,
+    bySupport1,
+    bySupport2,
+    byLocation,
+    byYear,
     totals: { activeAccounts: active.length },
+    scopedToName: isAdmin ? undefined : viewerName || undefined,
   };
 }
