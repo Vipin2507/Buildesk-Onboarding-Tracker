@@ -166,21 +166,11 @@ export function CrmOnboardingHub({
     if ((useCrmAccountQueryStore.getState().queriesByCompany[accountId]?.length ?? 0) > 0) {
       return;
     }
-    const idle =
-      typeof window !== "undefined" && "requestIdleCallback" in window
-        ? window.requestIdleCallback(() => {
-            void refreshAccountQueries(accountId).catch(() => {});
-          }, { timeout: 2500 })
-        : window.setTimeout(() => {
-            void refreshAccountQueries(accountId).catch(() => {});
-          }, 400);
-    return () => {
-      if (typeof window !== "undefined" && "cancelIdleCallback" in window && typeof idle === "number") {
-        window.cancelIdleCallback(idle);
-      } else {
-        window.clearTimeout(idle as number);
-      }
-    };
+    // Defer so account dashboard paints before query hydrate.
+    const timer = window.setTimeout(() => {
+      void refreshAccountQueries(accountId).catch(() => {});
+    }, 400);
+    return () => window.clearTimeout(timer);
   }, [accountId, refreshAccountQueries]);
 
   const liveRecord = useMemo(() => {
