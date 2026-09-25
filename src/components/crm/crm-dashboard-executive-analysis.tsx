@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { CalendarRange, ChevronDown, Headphones, MapPin, UserRound } from "lucide-react";
 
@@ -38,73 +38,72 @@ function ExpandableExecutiveTable({
   }
 
   return (
-    <table className="w-full text-left text-sm">
-      <thead className="sticky top-0 z-[1] bg-muted/95 text-xs text-muted-foreground">
-        <tr>
-          <th className="w-10 px-3 py-3" />
-          <th className="px-4 py-3 font-medium">{personLabel}</th>
-          <th className="px-4 py-3 text-right font-medium">Active accounts</th>
-        </tr>
-      </thead>
-      <tbody>
+    <div className="w-full">
+      <div className="sticky top-0 z-[1] grid grid-cols-[1fr_auto] gap-4 border-b border-border/70 bg-muted/95 px-4 py-3 text-xs font-medium text-muted-foreground">
+        <span className="pl-7">{personLabel}</span>
+        <span className="text-right">Active accounts</span>
+      </div>
+
+      <ul className="divide-y divide-border/70">
         {rows.map((r) => {
           const expanded = open === r.name;
           return (
-            <Fragment key={r.name}>
-              <tr
-                className={cn(
-                  "cursor-pointer border-t border-border/70 hover:bg-muted/40",
-                  expanded && "bg-muted/30",
-                )}
+            <li key={r.name} className={cn(expanded && "bg-muted/20")}>
+              <button
+                type="button"
                 onClick={() => setOpen(expanded ? null : r.name)}
+                className="grid w-full grid-cols-[1fr_auto] items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/40"
+                aria-expanded={expanded}
               >
-                <td className="px-3 py-3">
+                <span className="flex min-w-0 items-center gap-2.5">
                   <ChevronDown
                     className={cn(
-                      "h-4 w-4 text-muted-foreground transition-transform",
+                      "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
                       expanded && "rotate-180",
                     )}
                   />
-                </td>
-                <td className="px-4 py-3 font-medium text-foreground">{r.name}</td>
-                <td className="px-4 py-3 text-right text-base font-semibold tabular-nums">
+                  <span className="truncate text-sm font-medium text-foreground">{r.name}</span>
+                </span>
+                <span className="text-base font-semibold tabular-nums text-foreground">
                   {r.accounts}
-                </td>
-              </tr>
-              {expanded ? (
-                <tr className="border-t border-border/70 bg-background/80">
-                  <td colSpan={3} className="px-4 py-3">
-                    <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                      {breakdownLabel}
-                    </div>
-                    <div className="max-h-56 overflow-y-auto rounded-lg border">
-                      <table className="w-full text-sm">
-                        <thead className="bg-muted/60 text-xs text-muted-foreground">
-                          <tr>
-                            <th className="px-4 py-2.5 text-left font-medium">{breakdownLabel}</th>
-                            <th className="px-4 py-2.5 text-right font-medium">Accounts</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {r.breakdown.map((b) => (
-                            <tr key={b.label} className="border-t border-border/60">
-                              <td className="px-4 py-2.5">{b.label}</td>
-                              <td className="px-4 py-2.5 text-right tabular-nums font-medium">
-                                {b.accounts}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </td>
-                </tr>
-              ) : null}
-            </Fragment>
+                </span>
+              </button>
+
+              <motion.div
+                initial={false}
+                animate={{
+                  height: expanded ? "auto" : 0,
+                  opacity: expanded ? 1 : 0,
+                }}
+                transition={{ duration: 0.28, ease: EASE }}
+                className="overflow-hidden"
+              >
+                <div className="space-y-1.5 px-4 pb-3 pl-11">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {breakdownLabel}
+                  </p>
+                  <ul className="max-h-56 space-y-1 overflow-y-auto pr-1">
+                    {r.breakdown.map((b) => (
+                      <li
+                        key={b.label}
+                        className="flex items-baseline justify-between gap-4 py-1 text-sm"
+                      >
+                        <span className="min-w-0 truncate text-muted-foreground">
+                          {b.label === "—" ? "Unspecified" : b.label}
+                        </span>
+                        <span className="shrink-0 tabular-nums font-medium text-foreground">
+                          {b.accounts}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </motion.div>
+            </li>
           );
         })}
-      </tbody>
-    </table>
+      </ul>
+    </div>
   );
 }
 
