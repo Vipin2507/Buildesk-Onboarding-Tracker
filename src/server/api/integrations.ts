@@ -244,6 +244,37 @@ export const proxyWahaChatMessages = createServerFn({ method: "POST" })
     return readProxyResponse(res);
   });
 
+export const proxyWahaChatMessage = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        apiUrl: z.string().min(1),
+        apiKey: z.string().min(1),
+        sessionName: z.string().min(1),
+        chatId: z.string().min(1),
+        messageId: z.string().min(1),
+        downloadMedia: z.boolean().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    requireUser();
+    const params = new URLSearchParams({
+      downloadMedia: data.downloadMedia === false ? "false" : "true",
+    });
+    const res = await fetch(
+      `${trimSlash(data.apiUrl)}/api/${encodeURIComponent(data.sessionName)}/chats/${encodeURIComponent(data.chatId)}/messages/${encodeURIComponent(data.messageId)}?${params}`,
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "X-Api-Key": data.apiKey,
+        },
+      },
+    );
+    return readProxyResponse(res);
+  });
+
 export const proxyWahaSendSeen = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z

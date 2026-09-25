@@ -407,6 +407,53 @@ export async function fetchWahaChatMessages(
   return readResponse(res);
 }
 
+/** Fetch one chat message (`GET /api/{session}/chats/{chatId}/messages/{messageId}`). */
+export async function fetchWahaChatMessage(
+  config: WahaConfig,
+  chatId: string,
+  messageId: string,
+  opts?: { downloadMedia?: boolean },
+): Promise<IntegrationFetchResult> {
+  const params = new URLSearchParams({
+    downloadMedia: opts?.downloadMedia === false ? "false" : "true",
+  });
+  const path = `/api/${encodeURIComponent(config.sessionName)}/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}?${params}`;
+
+  if (isDevClient()) {
+    const res = await fetch(`/waha${path}`, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "X-Api-Key": config.apiKey,
+      },
+    });
+    return readResponse(res);
+  }
+
+  if (isHttpsClient()) {
+    const { proxyWahaChatMessage } = await import("@/server/api/integrations");
+    return proxyWahaChatMessage({
+      data: {
+        apiUrl: config.apiUrl,
+        apiKey: config.apiKey,
+        sessionName: config.sessionName,
+        chatId,
+        messageId,
+        downloadMedia: opts?.downloadMedia !== false,
+      },
+    });
+  }
+
+  const res = await fetch(`${trimSlash(config.apiUrl)}${path}`, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+      "X-Api-Key": config.apiKey,
+    },
+  });
+  return readResponse(res);
+}
+
 /** Mark chat as seen (`POST /api/sendSeen`). */
 export async function fetchWahaSendSeen(
   config: WahaConfig,

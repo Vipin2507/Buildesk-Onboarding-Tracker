@@ -25,6 +25,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   fileToWahaMedia,
+  getWahaChatMessage,
   listWahaChatMessages,
   listWahaGroups,
   markWahaChatSeen,
@@ -72,7 +73,24 @@ function storedToUiMessage(row: {
   };
 }
 
+function persistableMediaUrl(url: string | undefined | null): string | null {
+  if (!url) return null;
+  // blob: dies when the tab unmounts — never write it to SQLite.
+  if (url.startsWith("blob:")) return null;
+  // Keep compact data-URLs and remote URLs.
+  if (url.startsWith("data:")) {
+    return url.length <= 180_000 ? url : null;
+  }
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  return null;
+}
+
 function uiToStoredPayload(msg: WahaChatMessage) {
+  const mediaUrl =
+    persistableMediaUrl(msg.mediaUrl) ||
+    (msg.mediaData && msg.mimetype && msg.mediaData.length <= 120_000
+      ? `data:${msg.mimetype};base64,${msg.mediaData}`
+      : null);
   return {
     wahaMessageId: msg.id,
     timestamp: msg.timestamp,
@@ -81,14 +99,51 @@ function uiToStoredPayload(msg: WahaChatMessage) {
     participantName: msg.participantName ?? null,
     body: msg.body,
     hasMedia: msg.hasMedia,
-    // Skip base64 mediaData — too large for SQLite; keep URL when WAHA provides one.
     mediaType: msg.mediaType ?? null,
     mimetype: msg.mimetype ?? null,
-    mediaUrl: msg.mediaUrl ?? null,
+    mediaUrl,
     filename: msg.filename ?? null,
     ack: msg.ack ?? null,
     replyTo: msg.replyTo ?? null,
   };
+}
+
+/** Drop blank outgoing shells that otherwise render as empty green bubbles. */
+function stripEmptyMessageShells(messages: WahaChatMessage[]): WahaChatMessage[] {
+  return messages.filter(
+    (m) => Boolean(m.body?.trim()) || m.hasMedia || Boolean(m.filename) || Boolean(m.mediaUrl),
+  );
+}
+
+/** Build a compact JPEG data-URL so image previews survive tab remounts. */
+async function fileToPersistedPreview(file: File): Promise<string | null> {
+  if (!file.type.startsWith("image/")) return null;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxEdge = 480;
+    const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+    const w = Math.max(1, Math.round(bitmap.width * scale));
+    const h = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      bitmap.close();
+      return null;
+    }
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    bitmap.close();
+    let quality = 0.72;
+    let dataUrl = canvas.toDataURL("image/jpeg", quality);
+    while (dataUrl.length > 160_000 && quality > 0.35) {
+      quality -= 0.12;
+      dataUrl = canvas.toDataURL("image/jpeg", quality);
+    }
+    return dataUrl.length <= 180_000 ? dataUrl : null;
+  } catch {
+    return null;
+  }
 }
 
 function mergeMessages(existing: WahaChatMessage[], incoming: WahaChatMessage[]) {
@@ -106,7 +161,7 @@ function mergeMessages(existing: WahaChatMessage[], incoming: WahaChatMessage[])
       body: msg.body || prev.body,
       mediaUrl: msg.mediaUrl || prev.mediaUrl,
       mediaData: msg.mediaData || prev.mediaData,
-      mediaType: msg.mediaType && msg.mediaType !== "unknown" ? msg.mediaType : prev.mediaType,
+      mediaType: betterMediaType(msg.mediaType, prev.mediaType),
       mimetype: msg.mimetype || prev.mimetype,
       filename: msg.filename || prev.filename,
       participantName: msg.participantName || prev.participantName,
@@ -115,6 +170,99 @@ function mergeMessages(existing: WahaChatMessage[], incoming: WahaChatMessage[])
   return [...byId.values()].sort(
     (a, b) => a.timestamp - b.timestamp || a.id.localeCompare(b.id),
   );
+}
+
+/** Prefer concrete types (image/video/…) over generic document/unknown stubs from WAHA. */
+function betterMediaType(
+  a?: WahaChatMessage["mediaType"],
+  b?: WahaChatMessage["mediaType"],
+): WahaChatMessage["mediaType"] | undefined {
+  const score = (t?: WahaChatMessage["mediaType"]) => {
+    if (!t || t === "unknown") return 0;
+    if (t === "document") return 1;
+    if (t === "sticker") return 2;
+    return 3;
+  };
+  return score(a) >= score(b) ? a ?? b : b;
+}
+
+function messageHasLocalPreview(
+  msg: WahaChatMessage,
+  localPreviews: Map<string, string>,
+): boolean {
+  return Boolean(msg.mediaUrl || msg.mediaData || localPreviews.get(msg.id));
+}
+
+/**
+ * After send, WAHA often adds a second stub (no media bytes → "Document") alongside our
+ * optimistic preview. Keep one bubble and transfer the local preview onto the survivor.
+ */
+function collapseDuplicateOutgoingMedia(
+  messages: WahaChatMessage[],
+  localPreviews: Map<string, string>,
+  aroundTs: number,
+): WahaChatMessage[] {
+  const window = messages.filter(
+    (m) => m.fromMe && m.hasMedia && Math.abs(m.timestamp - aroundTs) <= 120,
+  );
+  if (window.length < 2) return messages;
+
+  const ranked = [...window].sort((a, b) => {
+    const previewDiff =
+      Number(messageHasLocalPreview(b, localPreviews)) -
+      Number(messageHasLocalPreview(a, localPreviews));
+    if (previewDiff !== 0) return previewDiff;
+    const tempDiff =
+      Number(a.id.startsWith("local-media-")) - Number(b.id.startsWith("local-media-"));
+    if (tempDiff !== 0) return tempDiff;
+    return (b.ack ?? 0) - (a.ack ?? 0);
+  });
+
+  const keeper = ranked[0]!;
+  const dropIds = new Set(ranked.slice(1).map((m) => m.id));
+
+  let merged: WahaChatMessage = { ...keeper };
+  for (const other of ranked.slice(1)) {
+    const preview =
+      localPreviews.get(other.id) || other.mediaUrl || localPreviews.get(merged.id);
+    if (preview) localPreviews.set(merged.id, preview);
+    localPreviews.delete(other.id);
+    merged = {
+      ...merged,
+      body: merged.body || other.body,
+      mediaUrl: merged.mediaUrl || other.mediaUrl || preview || undefined,
+      mediaData: merged.mediaData || other.mediaData,
+      mediaType: betterMediaType(merged.mediaType, other.mediaType),
+      mimetype: merged.mimetype || other.mimetype,
+      filename: merged.filename || other.filename,
+      ack: Math.max(merged.ack ?? 0, other.ack ?? 0) || merged.ack,
+      replyTo: merged.replyTo || other.replyTo,
+    };
+  }
+
+  // Prefer a real WAHA id as the survivor key when the keeper was only local.
+  const realCandidate = ranked.find((m) => !m.id.startsWith("local-media-"));
+  if (realCandidate && keeper.id.startsWith("local-media-")) {
+    const preview = localPreviews.get(keeper.id) || merged.mediaUrl;
+    if (preview) {
+      localPreviews.set(realCandidate.id, preview);
+      localPreviews.delete(keeper.id);
+    }
+    dropIds.add(keeper.id);
+    dropIds.delete(realCandidate.id);
+    merged = {
+      ...merged,
+      id: realCandidate.id,
+      mediaUrl: merged.mediaUrl || preview || undefined,
+      mediaType: betterMediaType(merged.mediaType, realCandidate.mediaType),
+      ack: Math.max(merged.ack ?? 0, realCandidate.ack ?? 0) || merged.ack,
+    };
+  }
+
+  return messages
+    .filter((m) => !dropIds.has(m.id))
+    .map((m) => (m.id === merged.id ? merged : m))
+    .sort((a, b) => a.timestamp - b.timestamp || a.id.localeCompare(b.id));
 }
 
 function formatMsgTime(ts: number) {
@@ -149,11 +297,14 @@ function mediaSrc(
   msg: WahaChatMessage,
   localPreviews?: Map<string, string>,
 ): string | null {
+  // Prefer session blob previews (sharper) over persisted thumbnails.
+  const local = localPreviews?.get(msg.id);
+  if (local) return local;
   if (msg.mediaUrl) return msg.mediaUrl;
   if (msg.mediaData && msg.mimetype) {
     return `data:${msg.mimetype};base64,${msg.mediaData}`;
   }
-  return localPreviews?.get(msg.id) ?? null;
+  return null;
 }
 
 function mediaPlaceholderLabel(msg: WahaChatMessage) {
@@ -241,6 +392,8 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
   const attachKindRef = useRef<WahaMediaKind>("file");
   /** Session-only previews so sent media still shows after WAHA sync without downloadMedia. */
   const localMediaPreviewRef = useRef<Map<string, string>>(new Map());
+  const mediaHydrateInFlight = useRef<Set<string>>(new Set());
+  const mediaHydrateFailed = useRef<Set<string>>(new Set());
 
   const groupId = account?.whatsappGroupId?.trim() || "";
   const groupName = account?.whatsappGroupName?.trim() || groupId;
@@ -291,7 +444,11 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
               data: { accountId, groupId },
             });
             if (stored.length > 0) {
-              const ui = stored.map(storedToUiMessage);
+              const ui = stripEmptyMessageShells(
+                stored
+                  .map(storedToUiMessage)
+                  .filter((m) => !m.id.startsWith("local-media-")),
+              );
               setMessages(ui);
               setHasMoreHistory(true);
               for (const m of ui) lastSeenIds.current.add(m.id);
@@ -314,7 +471,19 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
         setPollError(null);
 
         if (result.messages.length > 0) {
-          setMessages((prev) => mergeMessages(prev, result.messages));
+          setMessages((prev) => {
+            let next = stripEmptyMessageShells(mergeMessages(prev, result.messages));
+            for (const m of next) {
+              if (m.id.startsWith("local-media-")) {
+                next = collapseDuplicateOutgoingMedia(
+                  next,
+                  localMediaPreviewRef.current,
+                  m.timestamp,
+                );
+              }
+            }
+            return stripEmptyMessageShells(next);
+          });
           setHasMoreHistory(!opts?.recentOnly ? result.messages.length >= 100 : true);
           void upsertCrmWhatsappGroupMessages({
             data: {
@@ -380,6 +549,8 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
 
   useEffect(() => {
     lastSeenIds.current = new Set();
+    mediaHydrateInFlight.current = new Set();
+    mediaHydrateFailed.current = new Set();
     setMessages([]);
     setPollError(null);
     setHasMoreHistory(true);
@@ -409,6 +580,93 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
     );
     return () => window.clearInterval(id);
   }, [groupId, editing, loadMessages]);
+
+  /** Backfill media bytes for messages that only have stubs (e.g. after leaving the tab). */
+  useEffect(() => {
+    if (!groupId || editing || !waha.apiUrl || !waha.apiKey || !waha.sessionName) return;
+
+    const missing = messages.filter((m) => {
+      if (!m.hasMedia || m.id.startsWith("local-media-")) return false;
+      if (mediaHydrateInFlight.current.has(m.id)) return false;
+      if (mediaHydrateFailed.current.has(m.id)) return false;
+      return !mediaSrc(m, localMediaPreviewRef.current);
+    });
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+    const batch = missing.slice(-8);
+
+    void (async () => {
+      for (const msg of batch) {
+        if (cancelled) break;
+        mediaHydrateInFlight.current.add(msg.id);
+        try {
+          const result = await getWahaChatMessage(waha, groupId, msg.id, {
+            downloadMedia: true,
+          });
+          if (cancelled) continue;
+          if (!result.ok || !result.message) {
+            mediaHydrateFailed.current.add(msg.id);
+            continue;
+          }
+
+          const fetched = result.message;
+          let durableUrl = persistableMediaUrl(fetched.mediaUrl);
+          if (
+            !durableUrl &&
+            fetched.mediaData &&
+            fetched.mimetype &&
+            fetched.mediaData.length <= 120_000
+          ) {
+            durableUrl = `data:${fetched.mimetype};base64,${fetched.mediaData}`;
+          }
+
+          const hasBytes = Boolean(
+            durableUrl || fetched.mediaUrl || (fetched.mediaData && fetched.mimetype),
+          );
+          if (!hasBytes) {
+            mediaHydrateFailed.current.add(msg.id);
+            continue;
+          }
+
+          setMessages((prev) =>
+            mergeMessages(prev, [
+              {
+                ...fetched,
+                mediaUrl: durableUrl || fetched.mediaUrl,
+                mediaType: betterMediaType(fetched.mediaType, msg.mediaType),
+                hasMedia: true,
+              },
+            ]),
+          );
+
+          void upsertCrmWhatsappGroupMessages({
+            data: {
+              accountId,
+              groupId,
+              messages: [
+                uiToStoredPayload({
+                  ...msg,
+                  ...fetched,
+                  mediaUrl: durableUrl || fetched.mediaUrl,
+                  hasMedia: true,
+                  mediaType: betterMediaType(fetched.mediaType, msg.mediaType),
+                }),
+              ],
+            },
+          }).catch(() => null);
+        } catch {
+          mediaHydrateFailed.current.add(msg.id);
+        } finally {
+          mediaHydrateInFlight.current.delete(msg.id);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [messages, groupId, editing, waha, accountId]);
 
   useEffect(() => {
     const el = threadRef.current;
@@ -530,7 +788,10 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
     const { file, kind, previewUrl } = pendingMedia;
     setSending(true);
     try {
-      const media = await fileToWahaMedia(file);
+      const [media, persistedPreview] = await Promise.all([
+        fileToWahaMedia(file),
+        fileToPersistedPreview(file),
+      ]);
       const caption = draft.trim() || undefined;
       const result = await sendWahaMedia(waha, kind, groupId, media, {
         caption,
@@ -543,7 +804,8 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
 
       const parsed = parseSentMessage(result.body);
       const mediaType = mediaTypeFromKind(kind);
-      const optimisticId = parsed?.id || `local-media-${Date.now()}`;
+      // Always use a temp id so we can collapse against the real WAHA message after poll.
+      const optimisticId = `local-media-${Date.now()}`;
       localMediaPreviewRef.current.set(optimisticId, previewUrl);
 
       const optimistic: WahaChatMessage = {
@@ -553,8 +815,9 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
         from: parsed?.from || "",
         body: caption || "",
         hasMedia: true,
-        mediaType: parsed?.mediaType && parsed.mediaType !== "unknown" ? parsed.mediaType : mediaType,
+        mediaType,
         mimetype: file.type || media.mimetype,
+        // Keep blob for live display; persistedPreview is written to SQLite after collapse.
         mediaUrl: previewUrl,
         filename: file.name,
         ack: parsed?.ack ?? 1,
@@ -562,13 +825,6 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
       };
 
       setMessages((prev) => mergeMessages(prev, [optimistic]));
-      void upsertCrmWhatsappGroupMessages({
-        data: {
-          accountId,
-          groupId,
-          messages: [uiToStoredPayload(optimistic)],
-        },
-      }).catch(() => null);
 
       // Keep previewUrl alive via localMediaPreviewRef; clear pending without revoking.
       setPendingMedia(null);
@@ -578,43 +834,54 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
       toast.success("Media sent");
       await loadMessages({ silent: true, recentOnly: true });
 
-      // If WAHA returned no id, adopt the real message id from the poll and drop the temp bubble.
-      if (optimisticId.startsWith("local-media-")) {
-        setMessages((prev) => {
-          const temp = prev.find((m) => m.id === optimisticId);
-          if (!temp) return prev;
-          const real = prev
-            .filter(
-              (m) =>
-                m.fromMe &&
-                m.hasMedia &&
-                !m.id.startsWith("local-media-") &&
-                Math.abs(m.timestamp - temp.timestamp) <= 60,
-            )
-            .sort((a, b) => b.timestamp - a.timestamp)[0];
-          if (!real) return prev;
-          const preview = localMediaPreviewRef.current.get(optimisticId) || temp.mediaUrl;
-          if (preview) {
-            localMediaPreviewRef.current.set(real.id, preview);
-            localMediaPreviewRef.current.delete(optimisticId);
-          }
-          return prev
-            .filter((m) => m.id !== optimisticId)
-            .map((m) =>
-              m.id === real.id
-                ? {
-                    ...m,
-                    mediaUrl: m.mediaUrl || preview || undefined,
-                    mediaType:
-                      m.mediaType && m.mediaType !== "unknown" ? m.mediaType : temp.mediaType,
-                    mimetype: m.mimetype || temp.mimetype,
-                    filename: m.filename || temp.filename,
-                    body: m.body || temp.body,
-                  }
-                : m,
-            );
-        });
-      }
+      setMessages((prev) => {
+        const collapsed = stripEmptyMessageShells(
+          collapseDuplicateOutgoingMedia(
+            prev,
+            localMediaPreviewRef.current,
+            optimistic.timestamp,
+          ),
+        );
+        const kept =
+          collapsed.find(
+            (m) =>
+              m.fromMe &&
+              m.hasMedia &&
+              Math.abs(m.timestamp - optimistic.timestamp) <= 120 &&
+              !m.id.startsWith("local-media-"),
+          ) ?? collapsed.find((m) => m.id === optimisticId);
+
+        if (!kept) return collapsed;
+
+        const durableUrl = persistableMediaUrl(persistedPreview);
+        const blobPreview =
+          localMediaPreviewRef.current.get(optimisticId) ||
+          localMediaPreviewRef.current.get(kept.id) ||
+          previewUrl;
+        if (blobPreview) {
+          localMediaPreviewRef.current.set(kept.id, blobPreview);
+          localMediaPreviewRef.current.delete(optimisticId);
+        }
+
+        const enriched: WahaChatMessage = {
+          ...kept,
+          mediaType: betterMediaType(kept.mediaType, mediaType),
+          mimetype: kept.mimetype || file.type || media.mimetype,
+          filename: kept.filename || file.name,
+          hasMedia: true,
+          mediaUrl: durableUrl || persistableMediaUrl(kept.mediaUrl) || kept.mediaUrl,
+        };
+
+        void upsertCrmWhatsappGroupMessages({
+          data: {
+            accountId,
+            groupId,
+            messages: [uiToStoredPayload(enriched)],
+          },
+        }).catch(() => null);
+
+        return collapsed.map((m) => (m.id === kept.id ? enriched : m));
+      });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to send media");
     } finally {

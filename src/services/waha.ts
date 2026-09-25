@@ -1,5 +1,6 @@
 import type { WahaConfig } from "@/types/automation";
 import {
+  fetchWahaChatMessage,
   fetchWahaChatMessages,
   fetchWahaChatsOverview,
   fetchWahaGroups,
@@ -507,6 +508,46 @@ export async function listWahaChatMessages(
 export async function markWahaChatSeen(config: WahaConfig, chatId: string) {
   const result = await fetchWahaSendSeen(config, chatId);
   return { ok: result.ok, status: result.status, body: result.text };
+}
+
+/** Fetch a single message (optionally with media bytes) for chat previews after reload. */
+export async function getWahaChatMessage(
+  config: WahaConfig,
+  chatId: string,
+  messageId: string,
+  opts?: { downloadMedia?: boolean },
+): Promise<{
+  ok: boolean;
+  status: number;
+  message: WahaChatMessage | null;
+  error?: string;
+}> {
+  try {
+    const result = await fetchWahaChatMessage(config, chatId, messageId, {
+      downloadMedia: opts?.downloadMedia !== false,
+    });
+    if (!result.ok) {
+      return {
+        ok: false,
+        status: result.status,
+        message: null,
+        error: result.text.slice(0, 200) || `HTTP ${result.status}`,
+      };
+    }
+    const parsed = parseWahaMessagesPayload(result.text);
+    return {
+      ok: true,
+      status: result.status,
+      message: parsed[0] ?? null,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      status: 0,
+      message: null,
+      error: err instanceof Error ? err.message : "Failed to load message",
+    };
+  }
 }
 
 export async function sendWahaMedia(
