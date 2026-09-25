@@ -33,28 +33,32 @@ function ExpandableExecutiveTable({
 
   if (rows.length === 0) {
     return (
-      <div className="px-4 py-10 text-center text-xs text-muted-foreground">No active accounts</div>
+      <div className="bg-white px-4 py-10 text-center text-xs text-muted-foreground">
+        No active accounts
+      </div>
     );
   }
 
   return (
-    <div className="w-full">
-      <div className="sticky top-0 z-[1] grid grid-cols-[1fr_auto] gap-4 border-b border-border/70 bg-muted/95 px-4 py-3 text-xs font-medium text-muted-foreground">
+    <div className="w-full bg-white">
+      <div className="sticky top-0 z-[1] grid grid-cols-[2.5rem_1fr_auto] gap-3 border-b border-border bg-white px-4 py-3 text-xs font-medium text-muted-foreground">
+        <span className="tabular-nums">S.No.</span>
         <span className="pl-7">{personLabel}</span>
         <span className="text-right">Active accounts</span>
       </div>
 
-      <ul className="divide-y divide-border/70">
-        {rows.map((r) => {
+      <ul>
+        {rows.map((r, index) => {
           const expanded = open === r.name;
           return (
-            <li key={r.name} className={cn(expanded && "bg-muted/20")}>
+            <li key={r.name} className="border-b border-border bg-white last:border-b-0">
               <button
                 type="button"
                 onClick={() => setOpen(expanded ? null : r.name)}
-                className="grid w-full grid-cols-[1fr_auto] items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/40"
+                className="grid w-full grid-cols-[2.5rem_1fr_auto] items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30"
                 aria-expanded={expanded}
               >
+                <span className="tabular-nums text-xs text-muted-foreground">{index + 1}</span>
                 <span className="flex min-w-0 items-center gap-2.5">
                   <ChevronDown
                     className={cn(
@@ -78,15 +82,15 @@ function ExpandableExecutiveTable({
                 transition={{ duration: 0.28, ease: EASE }}
                 className="overflow-hidden"
               >
-                <div className="space-y-1.5 px-4 pb-3 pl-11">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                <div className="border-t border-border bg-white px-4 pb-1 pl-[4.25rem] pt-1">
+                  <p className="py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     {breakdownLabel}
                   </p>
-                  <ul className="max-h-56 space-y-1 overflow-y-auto pr-1">
+                  <ul className="max-h-56 overflow-y-auto">
                     {r.breakdown.map((b) => (
                       <li
                         key={b.label}
-                        className="flex items-baseline justify-between gap-4 py-1 text-sm"
+                        className="flex items-center justify-between gap-4 border-t border-border/80 py-2.5 text-sm first:border-t-0"
                       >
                         <span className="min-w-0 truncate text-muted-foreground">
                           {b.label === "—" ? "Unspecified" : b.label}
@@ -221,7 +225,7 @@ export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccou
         </div>
       ) : null}
 
-      <div className="max-h-[28rem] overflow-y-auto rounded-xl border border-border/80">
+      <div className="max-h-[28rem] overflow-y-auto rounded-xl border border-border bg-white">
         {tab === "location" ? (
           <ExpandableExecutiveTable
             rows={analysis.byLocation}
@@ -239,9 +243,10 @@ export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccou
         ) : null}
 
         {tab === "sales" || tab === "support1" || tab === "support2" ? (
-          <table className="w-full text-left text-sm">
-            <thead className="sticky top-0 z-[1] bg-muted/95 text-xs text-muted-foreground">
-              <tr>
+          <table className="w-full bg-white text-left text-sm">
+            <thead className="sticky top-0 z-[1] bg-white text-xs text-muted-foreground">
+              <tr className="border-b border-border">
+                <th className="w-14 px-4 py-3 font-medium">S.No.</th>
                 <th className="px-4 py-3 font-medium">{tableTitle}</th>
                 <th className="px-4 py-3 text-right font-medium">Active accounts</th>
               </tr>
@@ -249,13 +254,19 @@ export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccou
             <tbody>
               {managerRows.length === 0 ? (
                 <tr>
-                  <td colSpan={2} className="px-4 py-10 text-center text-xs text-muted-foreground">
+                  <td colSpan={3} className="px-4 py-10 text-center text-xs text-muted-foreground">
                     No active accounts
                   </td>
                 </tr>
               ) : (
-                managerRows.map((r) => (
-                  <tr key={r.name} className="border-t border-border/70 hover:bg-muted/30">
+                managerRows.map((r, index) => (
+                  <tr
+                    key={r.name}
+                    className="border-b border-border last:border-b-0 hover:bg-muted/30"
+                  >
+                    <td className="px-4 py-3 tabular-nums text-xs text-muted-foreground">
+                      {index + 1}
+                    </td>
                     <td className="px-4 py-3 font-medium text-foreground">{r.name}</td>
                     <td className="px-4 py-3 text-right text-base font-semibold tabular-nums">
                       {r.accounts}
