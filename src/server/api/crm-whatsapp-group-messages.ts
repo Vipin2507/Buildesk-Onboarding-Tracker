@@ -56,7 +56,19 @@ function assertAccountAccess(accountId: string) {
   const db = getDb();
   const account = db.select().from(t.crmAccounts).where(eq(t.crmAccounts.id, accountId)).get();
   if (!account) throw new ApiError(404, "Account not found");
-  if (!canViewCrmAccount(user, account)) throw new ApiError(403, "Forbidden");
+  if (
+    !canViewCrmAccount(
+      {
+        salesManagerName: account.salesManagerName ?? undefined,
+        supportManager1: account.supportManager1 ?? undefined,
+        supportManager2: account.supportManager2 ?? undefined,
+        accountManagerName: account.accountManagerName ?? undefined,
+      },
+      user,
+    )
+  ) {
+    throw new ApiError(403, "Forbidden");
+  }
   return { user, db, account };
 }
 

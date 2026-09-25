@@ -889,7 +889,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                       </div>
                     )
                   ) : null}
-                  {showMedia && (effectiveType === "document" || effectiveType === "sticker" || effectiveType === "unknown") ? (
+                  {showMedia && (effectiveType === "document" || effectiveType === "sticker") ? (
                     src ? (
                       <a
                         href={src}
