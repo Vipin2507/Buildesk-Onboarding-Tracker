@@ -381,7 +381,10 @@ export function DataTable<T>({
                     <AnimatePresence initial={false}>
                       {expanded && renderExpandedRow ? (
                         <tr key={`${id}-expanded`} className="border-t-0">
-                          <td colSpan={colSpan} className="p-0">
+                          <td
+                            colSpan={colSpan}
+                            className="border-b border-border bg-white p-0 dark:bg-card"
+                          >
                             <motion.div
                               initial={{ height: 0, opacity: 0 }}
                               animate={{ height: "auto", opacity: 1 }}

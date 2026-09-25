@@ -575,7 +575,12 @@ function CrmBookingsPage() {
   }
 
   function renderActions(appt: BookingAppointment) {
-    const meetBtn = appt.meetUrl ? renderMeetButton(appt.meetUrl) : null;
+    const showMeet =
+      Boolean(appt.meetUrl) &&
+      appt.status !== "completed" &&
+      appt.status !== "cancelled" &&
+      appt.status !== "declined";
+    const meetBtn = showMeet && appt.meetUrl ? renderMeetButton(appt.meetUrl) : null;
 
     if (appt.status === "pending") {
       return (
@@ -1289,40 +1294,40 @@ function BookingDetailPanel({
 
   return (
     <div
-      className="border-t border-border/70 bg-muted/20 px-3 py-2 dark:bg-muted/10"
+      className="border-t border-border bg-white px-4 py-4 dark:bg-card"
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="flex flex-wrap items-center justify-between gap-1.5">
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <Pill tone={statusTone(appt.status)}>{BOOKING_STATUS_LABEL[appt.status]}</Pill>
-          <span className="font-medium text-foreground/80">{callType}</span>
+          <span className="font-medium text-foreground">{callType}</span>
           <span className="text-border">·</span>
           <span className="truncate">{accountName}</span>
           <span className="text-border">·</span>
           <span>{executiveName}</span>
         </div>
-        <div className="flex flex-wrap items-center gap-1">
-          {appt.meetUrl ? (
-            <Button size="sm" className="h-6 gap-1 px-2 text-[10px]" asChild>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {appt.meetUrl && appt.status !== "cancelled" && appt.status !== "declined" ? (
+            <Button size="sm" className="h-7 gap-1.5 px-2.5 text-[11px]" asChild>
               <a href={appt.meetUrl} target="_blank" rel="noreferrer">
-                <Video className="h-3 w-3" />
-                Join
+                <Video className="h-3.5 w-3.5" />
+                Join Meet
               </a>
             </Button>
           ) : null}
           {appt.status === "pending" ? (
             <>
-              <Button size="sm" className="h-6 gap-1 px-2 text-[10px]" onClick={onAccept}>
-                <Check className="h-3 w-3" />
+              <Button size="sm" className="h-7 gap-1.5 px-2.5 text-[11px]" onClick={onAccept}>
+                <Check className="h-3.5 w-3.5" />
                 Approve
               </Button>
               <Button
                 size="sm"
                 variant="outline"
-                className="h-6 gap-1 px-2 text-[10px]"
+                className="h-7 gap-1.5 px-2.5 text-[11px]"
                 onClick={onDecline}
               >
-                <X className="h-3 w-3" />
+                <X className="h-3.5 w-3.5" />
                 Decline
               </Button>
             </>
@@ -1331,7 +1336,7 @@ function BookingDetailPanel({
               <Button
                 size="sm"
                 variant="outline"
-                className="h-6 px-2 text-[10px]"
+                className="h-7 px-2.5 text-[11px]"
                 onClick={onPostpone}
               >
                 Postpone
@@ -1339,66 +1344,66 @@ function BookingDetailPanel({
               <Button
                 size="sm"
                 variant="outline"
-                className="h-6 px-2 text-[10px]"
+                className="h-7 px-2.5 text-[11px]"
                 onClick={onCancel}
               >
                 Cancel
               </Button>
             </>
           ) : canEndMeeting ? (
-            <Button size="sm" className="h-6 gap-1 px-2 text-[10px]" onClick={onComplete}>
-              <CheckCircle2 className="h-3 w-3" />
-              End
+            <Button size="sm" className="h-7 gap-1.5 px-2.5 text-[11px]" onClick={onComplete}>
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              End meeting
             </Button>
           ) : null}
         </div>
       </div>
 
-      <div className="mt-1.5 grid gap-x-4 gap-y-1.5 sm:grid-cols-2">
-        <div className="min-w-0 text-[11px]">
-          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+      <div className="mt-3 grid gap-4 sm:grid-cols-2">
+        <div className="min-w-0 text-sm">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             Guest
           </div>
-          <div className="mt-0.5 font-medium text-foreground">{appt.guestName}</div>
+          <div className="mt-1 font-medium text-foreground">{appt.guestName}</div>
           <a
             href={`mailto:${appt.guestEmail}`}
-            className="inline-flex items-center gap-1 text-primary hover:underline"
+            className="mt-0.5 inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
           >
-            <Mail className="h-3 w-3 shrink-0" />
+            <Mail className="h-3.5 w-3.5 shrink-0" />
             <span className="truncate">{appt.guestEmail}</span>
           </a>
           {appt.guestPhone ? (
-            <div className="mt-0.5 flex items-center gap-1 text-muted-foreground">
-              <Phone className="h-3 w-3 shrink-0" />
+            <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Phone className="h-3.5 w-3.5 shrink-0" />
               {appt.guestPhone}
             </div>
           ) : null}
         </div>
 
-        <div className="min-w-0 text-[11px]">
-          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        <div className="min-w-0 text-sm">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             Schedule
           </div>
-          <div className="mt-0.5 font-medium tabular-nums text-foreground">
+          <div className="mt-1 font-medium tabular-nums text-foreground">
             {formatWhen(appt.startsAt, appt.endsAt)}
           </div>
-          <div className="text-muted-foreground">
+          <div className="mt-0.5 text-xs text-muted-foreground">
             {slotDurationMinutes(appt.startsAt, appt.endsAt)}
           </div>
         </div>
       </div>
 
       {appt.meetUrl ? (
-        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 rounded-md border border-primary/15 bg-primary/5 px-2 py-1.5">
-          <Video className="h-3 w-3 shrink-0 text-primary" />
-          <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-primary">
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-white px-3 py-2.5 dark:bg-card">
+          <Video className="h-3.5 w-3.5 shrink-0 text-primary" />
+          <span className="min-w-0 flex-1 truncate font-mono text-xs text-foreground">
             {appt.meetUrl}
           </span>
           <Button
             type="button"
             size="sm"
             variant="outline"
-            className="h-6 px-2 text-[10px]"
+            className="h-7 px-2.5 text-[11px]"
             onClick={() => {
               void navigator.clipboard.writeText(appt.meetUrl!);
               toast.success("Meet link copied");
@@ -1408,8 +1413,8 @@ function BookingDetailPanel({
           </Button>
         </div>
       ) : appt.googleSyncStatus === "error" && appt.googleSyncError ? (
-        <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-md border border-destructive/25 bg-destructive/5 px-2 py-1.5">
-          <p className="min-w-0 flex-1 text-[10px] leading-snug text-destructive">
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-2.5">
+          <p className="min-w-0 flex-1 text-xs leading-snug text-destructive">
             {appt.googleSyncError}
           </p>
           {(appt.status === "confirmed" || appt.status === "postponed") && (
@@ -1417,7 +1422,7 @@ function BookingDetailPanel({
               type="button"
               size="sm"
               variant="outline"
-              className="h-6 text-[10px]"
+              className="h-7 text-[11px]"
               onClick={onRetrySync}
             >
               Retry sync
@@ -1425,8 +1430,8 @@ function BookingDetailPanel({
           )}
         </div>
       ) : needsMeetSync ? (
-        <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-md border border-dashed px-2 py-1.5">
-          <p className="min-w-0 flex-1 text-[10px] text-muted-foreground">
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-border px-3 py-2.5">
+          <p className="min-w-0 flex-1 text-xs text-muted-foreground">
             No Meet link yet.
             {!googleConnected && appt.hostUserId === userId
               ? " Connect Google Calendar under Calendar."
@@ -1436,7 +1441,7 @@ function BookingDetailPanel({
             type="button"
             size="sm"
             variant="outline"
-            className="h-6 text-[10px]"
+            className="h-7 text-[11px]"
             onClick={onRetrySync}
           >
             Retry sync
@@ -1445,7 +1450,7 @@ function BookingDetailPanel({
       ) : null}
 
       {appt.notes ? (
-        <p className="mt-1.5 line-clamp-2 whitespace-pre-wrap text-[10px] leading-snug text-muted-foreground">
+        <p className="mt-3 whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">
           {appt.notes}
         </p>
       ) : null}
@@ -1453,16 +1458,16 @@ function BookingDetailPanel({
       {appt.status === "pending" ? (
         <Input
           placeholder="Optional note to guest"
-          className="mt-1.5 h-7 text-[11px]"
+          className="mt-3 h-9 text-sm"
           value={note}
           onChange={(e) => onNoteChange(e.target.value)}
         />
       ) : null}
 
       {canReschedule ? (
-        <div className="mt-1.5 rounded-md border border-dashed bg-background/60 px-2 py-1.5">
-          <div className="mb-1 flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-            <Clock className="h-3 w-3" />
+        <div className="mt-3 rounded-lg border border-border bg-white px-3 py-3 dark:bg-card">
+          <div className="mb-2.5 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <Clock className="h-3.5 w-3.5" />
             Reschedule
           </div>
           <DatePickerField
@@ -1470,22 +1475,20 @@ function BookingDetailPanel({
             onChange={onRescheduleDateChange}
             yearsBack={0}
             yearsForward={1}
-            className="h-7"
+            className="h-9"
           />
-          <div className="mt-1.5">
+          <div className="mt-2.5">
             {!rescheduleDate ? (
-              <p className="text-[10px] text-muted-foreground">Pick a date for open slots.</p>
+              <p className="text-xs text-muted-foreground">Pick a date for open slots.</p>
             ) : rescheduleSlots.length === 0 ? (
-              <p className="text-[10px] text-muted-foreground">
-                No open slots on {rescheduleDate}.
-              </p>
+              <p className="text-xs text-muted-foreground">No open slots on {rescheduleDate}.</p>
             ) : (
-              <div className="flex flex-wrap gap-1">
+              <div className="flex flex-wrap gap-1.5">
                 {rescheduleSlots.map((slot) => (
                   <button
                     key={slot.startsAt}
                     type="button"
-                    className="rounded border bg-background px-2 py-1 text-[10px] font-medium tabular-nums transition-colors hover:border-primary hover:bg-primary/5"
+                    className="rounded-md border border-border bg-white px-2.5 py-1.5 text-xs font-medium tabular-nums transition-colors hover:border-primary hover:bg-primary/5 dark:bg-card"
                     onClick={() => onRescheduleSlot(slot.startsAt)}
                   >
                     {slot.startsAt.slice(11, 16)}
