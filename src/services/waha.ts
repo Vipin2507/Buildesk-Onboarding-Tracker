@@ -322,7 +322,12 @@ function detectMediaType(
 }
 
 function parseOneMessage(row: Record<string, unknown>): WahaChatMessage | null {
-  const id = coerceWahaId(row.id) || (typeof row.messageId === "string" ? row.messageId : "");
+  const key = asRecord(row.key);
+  const id =
+    coerceWahaId(row.id) ||
+    (typeof row.messageId === "string" ? row.messageId : "") ||
+    (key && typeof key.id === "string" ? key.id : "") ||
+    "";
   if (!id) return null;
 
   const media = asRecord(row.media);
@@ -338,17 +343,32 @@ function parseOneMessage(row: Record<string, unknown>): WahaChatMessage | null {
     (typeof row.body === "string" && row.hasMedia && row.body.startsWith("/9j") ? row.body : undefined) ||
     (media && typeof media.data === "string" ? media.data : undefined);
   const hasMedia = Boolean(row.hasMedia) || Boolean(mediaUrl) || Boolean(mediaData) || Boolean(mimetype);
+
+  const message = asRecord(row.message);
+  const conversation =
+    (message && typeof message.conversation === "string" && message.conversation) ||
+    (message &&
+      asRecord(message.extendedTextMessage) &&
+      typeof asRecord(message.extendedTextMessage)!.text === "string" &&
+      (asRecord(message.extendedTextMessage)!.text as string)) ||
+    "";
+
   const body =
     typeof row.body === "string" && !row.body.startsWith("/9j")
       ? row.body
       : typeof row.caption === "string"
         ? row.caption
-        : "";
+        : conversation;
 
-  const from = coerceWahaId(row.from) || coerceWahaId(row.participant) || "";
+  const from =
+    coerceWahaId(row.from) ||
+    coerceWahaId(row.participant) ||
+    (key ? coerceWahaId(key.participant) || coerceWahaId(key.remoteJid) : "") ||
+    "";
   const participantName =
     (typeof row.notifyName === "string" && row.notifyName) ||
     (typeof row.senderName === "string" && row.senderName) ||
+    (typeof row.pushName === "string" && row.pushName) ||
     (typeof row._data === "object" &&
       asRecord(row._data) &&
       typeof asRecord(row._data)!.pushName === "string" &&
@@ -362,17 +382,25 @@ function parseOneMessage(row: Record<string, unknown>): WahaChatMessage | null {
       : coerceWahaId(replyRaw) || undefined;
 
   let timestamp = 0;
-  if (typeof row.timestamp === "number") {
-    timestamp = row.timestamp > 1e12 ? Math.floor(row.timestamp / 1000) : row.timestamp;
-  } else if (typeof row.timestamp === "string") {
-    const n = Number(row.timestamp);
+  const rawTs = row.timestamp ?? row.messageTimestamp;
+  if (typeof rawTs === "number") {
+    timestamp = rawTs > 1e12 ? Math.floor(rawTs / 1000) : rawTs;
+  } else if (typeof rawTs === "string") {
+    const n = Number(rawTs);
     if (!Number.isNaN(n)) timestamp = n > 1e12 ? Math.floor(n / 1000) : n;
   }
+
+  const fromMe =
+    typeof row.fromMe === "boolean"
+      ? row.fromMe
+      : key && typeof key.fromMe === "boolean"
+        ? key.fromMe
+        : false;
 
   return {
     id,
     timestamp,
-    fromMe: Boolean(row.fromMe),
+    fromMe,
     from,
     participantName: participantName || undefined,
     body,
@@ -398,13 +426,17 @@ export function parseWahaMessagesPayload(text: string): WahaChatMessage[] {
     throw new Error("WAHA returned invalid JSON for messages");
   }
 
+  const root = asRecord(parsed);
   const rows: unknown[] = Array.isArray(parsed)
     ? parsed
-    : Array.isArray(asRecord(parsed)?.messages)
-      ? (asRecord(parsed)!.messages as unknown[])
-      : Array.isArray(asRecord(parsed)?.data)
-        ? (asRecord(parsed)!.data as unknown[])
-        : [];
+    : Array.isArray(root?.messages)
+      ? (root!.messages as unknown[])
+      : Array.isArray(root?.data)
+        ? (root!.data as unknown[])
+        : // Single message object (common on send* responses)
+          root && (coerceWahaId(root.id) || coerceWahaId(root.key) || typeof root.messageId === "string")
+          ? [parsed]
+          : [];
 
   const messages: WahaChatMessage[] = [];
   const seen = new Set<string>();
@@ -423,36 +455,53 @@ export function parseWahaMessagesPayload(text: string): WahaChatMessage[] {
 export async function listWahaChatMessages(
   config: WahaConfig,
   chatId: string,
-  opts?: { limit?: number; downloadMedia?: boolean },
+  opts?: { limit?: number; offset?: number; downloadMedia?: boolean },
 ): Promise<{
   ok: boolean;
   status: number;
   messages: WahaChatMessage[];
   error?: string;
 }> {
-  try {
-    const result = await fetchWahaChatMessages(config, chatId, opts);
-    if (!result.ok) {
-      return {
-        ok: false,
-        status: result.status,
-        messages: [],
-        error: `HTTP ${result.status}: ${result.text.slice(0, 240)}`,
-      };
-    }
-    return {
-      ok: true,
-      status: result.status,
-      messages: parseWahaMessagesPayload(result.text),
-    };
-  } catch (err) {
-    return {
-      ok: false,
-      status: 0,
-      messages: [],
-      error: err instanceof Error ? err.message : "Failed to load messages",
-    };
+  // Group history often times out when downloadMedia=true (WAHA/GOWS). Prefer text history first.
+  const attempts: Array<{ limit: number; downloadMedia: boolean }> = [
+    { limit: opts?.limit ?? 100, downloadMedia: opts?.downloadMedia ?? false },
+  ];
+  if (opts?.downloadMedia !== true) {
+    attempts.push({ limit: 40, downloadMedia: false });
+    attempts.push({ limit: 15, downloadMedia: false });
   }
+
+  let lastError = "Failed to load messages";
+  let lastStatus = 0;
+
+  for (const attempt of attempts) {
+    try {
+      const result = await fetchWahaChatMessages(config, chatId, {
+        limit: attempt.limit,
+        offset: opts?.offset,
+        downloadMedia: attempt.downloadMedia,
+      });
+      lastStatus = result.status;
+      if (!result.ok) {
+        lastError = `HTTP ${result.status}: ${result.text.slice(0, 240)}`;
+        continue;
+      }
+      return {
+        ok: true,
+        status: result.status,
+        messages: parseWahaMessagesPayload(result.text),
+      };
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : "Failed to load messages";
+    }
+  }
+
+  return {
+    ok: false,
+    status: lastStatus,
+    messages: [],
+    error: lastError,
+  };
 }
 
 export async function markWahaChatSeen(config: WahaConfig, chatId: string) {

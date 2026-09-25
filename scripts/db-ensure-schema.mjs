@@ -1296,5 +1296,35 @@ if (!tableExists("project_files")) {
   console.log("+ CREATE TABLE project_files");
 }
 
+if (!tableExists("crm_whatsapp_group_messages")) {
+  sqlite.exec(`
+    CREATE TABLE crm_whatsapp_group_messages (
+      id TEXT PRIMARY KEY NOT NULL,
+      account_id TEXT NOT NULL REFERENCES crm_accounts(id) ON DELETE CASCADE,
+      group_id TEXT NOT NULL,
+      waha_message_id TEXT NOT NULL,
+      timestamp INTEGER NOT NULL DEFAULT 0,
+      from_me INTEGER NOT NULL DEFAULT 0,
+      from_jid TEXT NOT NULL DEFAULT '',
+      participant_name TEXT,
+      body TEXT NOT NULL DEFAULT '',
+      has_media INTEGER NOT NULL DEFAULT 0,
+      media_type TEXT,
+      mimetype TEXT,
+      media_url TEXT,
+      filename TEXT,
+      ack INTEGER,
+      reply_to TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS crm_wa_group_msgs_account_idx ON crm_whatsapp_group_messages(account_id);
+    CREATE INDEX IF NOT EXISTS crm_wa_group_msgs_group_idx ON crm_whatsapp_group_messages(group_id);
+    CREATE INDEX IF NOT EXISTS crm_wa_group_msgs_ts_idx ON crm_whatsapp_group_messages(account_id, group_id, timestamp);
+    CREATE UNIQUE INDEX IF NOT EXISTS crm_wa_group_msgs_account_waha_uidx ON crm_whatsapp_group_messages(account_id, waha_message_id);
+  `);
+  console.log("+ CREATE TABLE crm_whatsapp_group_messages");
+}
+
 sqlite.close();
 console.log("db:ensure complete");

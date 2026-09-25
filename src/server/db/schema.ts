@@ -173,6 +173,38 @@ export const crmAccounts = sqliteTable(
   ],
 );
 
+/** Cached WAHA WhatsApp group messages for CRM accounts (avoid full re-fetch on every load). */
+export const crmWhatsappGroupMessages = sqliteTable(
+  "crm_whatsapp_group_messages",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => crmAccounts.id, { onDelete: "cascade" }),
+    groupId: text("group_id").notNull(),
+    wahaMessageId: text("waha_message_id").notNull(),
+    timestamp: integer("timestamp").notNull().default(0),
+    fromMe: integer("from_me", { mode: "boolean" }).notNull().default(false),
+    fromJid: text("from_jid").notNull().default(""),
+    participantName: text("participant_name"),
+    body: text("body").notNull().default(""),
+    hasMedia: integer("has_media", { mode: "boolean" }).notNull().default(false),
+    mediaType: text("media_type"),
+    mimetype: text("mimetype"),
+    mediaUrl: text("media_url"),
+    filename: text("filename"),
+    ack: integer("ack"),
+    replyTo: text("reply_to"),
+    ...timestamps,
+  },
+  (t) => [
+    index("crm_wa_group_msgs_account_idx").on(t.accountId),
+    index("crm_wa_group_msgs_group_idx").on(t.groupId),
+    index("crm_wa_group_msgs_ts_idx").on(t.accountId, t.groupId, t.timestamp),
+    uniqueIndex("crm_wa_group_msgs_account_waha_uidx").on(t.accountId, t.wahaMessageId),
+  ],
+);
+
 /** CRM account payment ledger — source of truth for collections. */
 export const paymentTransactions = sqliteTable(
   "payment_transactions",

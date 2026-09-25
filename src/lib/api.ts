@@ -166,6 +166,11 @@ export {
 } from "@/server/api/crm-accounts";
 
 export {
+  listCrmWhatsappGroupMessages,
+  upsertCrmWhatsappGroupMessages,
+} from "@/server/api/crm-whatsapp-group-messages";
+
+export {
   listCrmPayments,
   getCrmPaymentsSummary,
   getCrmPaymentInstallments,

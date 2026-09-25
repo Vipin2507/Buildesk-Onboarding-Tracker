@@ -360,12 +360,15 @@ function wahaSendMediaPath(kind: WahaMediaKind) {
 export async function fetchWahaChatMessages(
   config: WahaConfig,
   chatId: string,
-  opts?: { limit?: number; downloadMedia?: boolean },
+  opts?: { limit?: number; offset?: number; downloadMedia?: boolean },
 ): Promise<IntegrationFetchResult> {
   const params = new URLSearchParams({
     limit: String(opts?.limit ?? 50),
     downloadMedia: opts?.downloadMedia ? "true" : "false",
   });
+  if (opts?.offset != null && opts.offset > 0) {
+    params.set("offset", String(opts.offset));
+  }
   const path = `/api/${encodeURIComponent(config.sessionName)}/chats/${encodeURIComponent(chatId)}/messages?${params}`;
 
   if (isDevClient()) {
@@ -388,6 +391,7 @@ export async function fetchWahaChatMessages(
         sessionName: config.sessionName,
         chatId,
         limit: opts?.limit,
+        offset: opts?.offset,
         downloadMedia: opts?.downloadMedia,
       },
     });

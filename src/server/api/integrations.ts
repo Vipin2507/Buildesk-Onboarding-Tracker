@@ -217,6 +217,7 @@ export const proxyWahaChatMessages = createServerFn({ method: "POST" })
         sessionName: z.string().min(1),
         chatId: z.string().min(1),
         limit: z.number().int().positive().max(200).optional(),
+        offset: z.number().int().min(0).max(5000).optional(),
         downloadMedia: z.boolean().optional(),
       })
       .parse(data),
@@ -227,6 +228,9 @@ export const proxyWahaChatMessages = createServerFn({ method: "POST" })
       limit: String(data.limit ?? 50),
       downloadMedia: data.downloadMedia ? "true" : "false",
     });
+    if (data.offset != null && data.offset > 0) {
+      params.set("offset", String(data.offset));
+    }
     const res = await fetch(
       `${trimSlash(data.apiUrl)}/api/${encodeURIComponent(data.sessionName)}/chats/${encodeURIComponent(data.chatId)}/messages?${params}`,
       {

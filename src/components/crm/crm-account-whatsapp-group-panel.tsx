@@ -8,6 +8,7 @@ import {
   Paperclip,
   Pencil,
   Reply,
+  Search,
   Send,
   Video,
   Mic,
@@ -17,12 +18,17 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  listCrmWhatsappGroupMessages,
+  upsertCrmWhatsappGroupMessages,
+} from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
   fileToWahaMedia,
   listWahaChatMessages,
   listWahaGroups,
   markWahaChatSeen,
+  parseWahaMessagesPayload,
   sendWahaMedia,
   sendWahaText,
   type WahaChatMessage,
@@ -33,6 +39,83 @@ import { useCrmAccountStore } from "@/stores/useCrmAccountStore";
 import { useCrmAutomationStore } from "@/stores/useCrmAutomationStore";
 
 const POLL_MS = 2500;
+
+function storedToUiMessage(row: {
+  wahaMessageId: string;
+  timestamp: number;
+  fromMe: boolean;
+  from: string;
+  participantName?: string;
+  body: string;
+  hasMedia: boolean;
+  mediaType?: string;
+  mimetype?: string;
+  mediaUrl?: string;
+  filename?: string;
+  ack?: number;
+  replyTo?: string;
+}): WahaChatMessage {
+  return {
+    id: row.wahaMessageId,
+    timestamp: row.timestamp,
+    fromMe: row.fromMe,
+    from: row.from,
+    participantName: row.participantName,
+    body: row.body,
+    hasMedia: row.hasMedia,
+    mediaType: row.mediaType as WahaChatMessage["mediaType"],
+    mimetype: row.mimetype,
+    mediaUrl: row.mediaUrl,
+    filename: row.filename,
+    ack: row.ack,
+    replyTo: row.replyTo,
+  };
+}
+
+function uiToStoredPayload(msg: WahaChatMessage) {
+  return {
+    wahaMessageId: msg.id,
+    timestamp: msg.timestamp,
+    fromMe: msg.fromMe,
+    from: msg.from,
+    participantName: msg.participantName ?? null,
+    body: msg.body,
+    hasMedia: msg.hasMedia,
+    // Skip base64 mediaData — too large for SQLite; keep URL when WAHA provides one.
+    mediaType: msg.mediaType ?? null,
+    mimetype: msg.mimetype ?? null,
+    mediaUrl: msg.mediaUrl ?? null,
+    filename: msg.filename ?? null,
+    ack: msg.ack ?? null,
+    replyTo: msg.replyTo ?? null,
+  };
+}
+
+function mergeMessages(existing: WahaChatMessage[], incoming: WahaChatMessage[]) {
+  const byId = new Map(existing.map((m) => [m.id, m]));
+  for (const msg of incoming) {
+    const prev = byId.get(msg.id);
+    if (!prev) {
+      byId.set(msg.id, msg);
+      continue;
+    }
+    byId.set(msg.id, {
+      ...prev,
+      ...msg,
+      // Prefer non-empty media URL / body from either side
+      body: msg.body || prev.body,
+      mediaUrl: msg.mediaUrl || prev.mediaUrl,
+      mediaData: msg.mediaData || prev.mediaData,
+      mediaType: msg.mediaType && msg.mediaType !== "unknown" ? msg.mediaType : prev.mediaType,
+      mimetype: msg.mimetype || prev.mimetype,
+      filename: msg.filename || prev.filename,
+      participantName: msg.participantName || prev.participantName,
+    });
+  }
+  return [...byId.values()].sort(
+    (a, b) => a.timestamp - b.timestamp || a.id.localeCompare(b.id),
+  );
+}
 
 function formatMsgTime(ts: number) {
   if (!ts) return "";
@@ -62,12 +145,57 @@ function AckIcon({ ack }: { ack?: number }) {
   return <Check className="h-3 w-3 text-muted-foreground" />;
 }
 
-function mediaSrc(msg: WahaChatMessage): string | null {
+function mediaSrc(
+  msg: WahaChatMessage,
+  localPreviews?: Map<string, string>,
+): string | null {
   if (msg.mediaUrl) return msg.mediaUrl;
   if (msg.mediaData && msg.mimetype) {
     return `data:${msg.mimetype};base64,${msg.mediaData}`;
   }
-  return null;
+  return localPreviews?.get(msg.id) ?? null;
+}
+
+function mediaPlaceholderLabel(msg: WahaChatMessage) {
+  switch (msg.mediaType) {
+    case "image":
+      return "Photo";
+    case "video":
+      return "Video";
+    case "voice":
+    case "audio":
+      return "Audio";
+    case "document":
+      return msg.filename || "Document";
+    case "sticker":
+      return "Sticker";
+    default:
+      return msg.filename || "Media";
+  }
+}
+
+function resolveAttachKind(file: File, preferred: WahaMediaKind): WahaMediaKind {
+  if (preferred !== "file") return preferred;
+  if (file.type.startsWith("image/")) return "image";
+  if (file.type.startsWith("video/")) return "video";
+  if (file.type.startsWith("audio/")) return "voice";
+  return "file";
+}
+
+function mediaTypeFromKind(kind: WahaMediaKind): WahaChatMessage["mediaType"] {
+  if (kind === "image") return "image";
+  if (kind === "video") return "video";
+  if (kind === "voice") return "voice";
+  return "document";
+}
+
+function parseSentMessage(body: string): WahaChatMessage | null {
+  try {
+    const msgs = parseWahaMessagesPayload(body);
+    return msgs[0] ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function normalizeGroupId(raw: string) {
@@ -80,6 +208,7 @@ function normalizeGroupId(raw: string) {
 
 export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string }) {
   const account = useCrmAccountStore((s) => s.accounts.find((a) => a.id === accountId));
+  const accounts = useCrmAccountStore((s) => s.accounts);
   const updateAccount = useCrmAccountStore((s) => s.updateAccount);
   const waha = useCrmAutomationStore((s) => s.waha);
 
@@ -88,20 +217,30 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
   const [groupNameInput, setGroupNameInput] = useState(account?.whatsappGroupName ?? "");
   const [pickerGroups, setPickerGroups] = useState<WahaGroupSummary[] | null>(null);
   const [loadingPicker, setLoadingPicker] = useState(false);
+  const [groupSearch, setGroupSearch] = useState("");
 
   const [messages, setMessages] = useState<WahaChatMessage[]>([]);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [pollError, setPollError] = useState<string | null>(null);
+  const [hasMoreHistory, setHasMoreHistory] = useState(true);
   const [draft, setDraft] = useState("");
   const [replyTo, setReplyTo] = useState<WahaChatMessage | null>(null);
   const [sending, setSending] = useState(false);
   const [attachOpen, setAttachOpen] = useState(false);
+  const [pendingMedia, setPendingMedia] = useState<{
+    file: File;
+    kind: WahaMediaKind;
+    previewUrl: string;
+  } | null>(null);
 
   const threadRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const lastSeenIds = useRef<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachKindRef = useRef<WahaMediaKind>("file");
+  /** Session-only previews so sent media still shows after WAHA sync without downloadMedia. */
+  const localMediaPreviewRef = useRef<Map<string, string>>(new Map());
 
   const groupId = account?.whatsappGroupId?.trim() || "";
   const groupName = account?.whatsappGroupName?.trim() || groupId;
@@ -111,18 +250,80 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
     return messages.find((m) => m.id === replyTo.id) ?? replyTo;
   }, [replyTo, messages]);
 
+  const takenGroupIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const a of accounts) {
+      const id = a.whatsappGroupId?.trim();
+      if (!id) continue;
+      ids.add(normalizeGroupId(id));
+    }
+    return ids;
+  }, [accounts]);
+
+  const availablePickerGroups = useMemo(() => {
+    if (!pickerGroups) return null;
+    return pickerGroups.filter((g) => !takenGroupIds.has(normalizeGroupId(g.id)));
+  }, [pickerGroups, takenGroupIds]);
+
+  const filteredPickerGroups = useMemo(() => {
+    if (!availablePickerGroups) return null;
+    const q = groupSearch.trim().toLowerCase();
+    if (!q) return availablePickerGroups;
+    return availablePickerGroups.filter(
+      (g) => g.subject.toLowerCase().includes(q) || g.id.toLowerCase().includes(q),
+    );
+  }, [availablePickerGroups, groupSearch]);
+
   const loadMessages = useCallback(
-    async (opts?: { silent?: boolean }) => {
-      if (!groupId || !waha.apiUrl || !waha.apiKey || !waha.sessionName) return;
+    async (opts?: { silent?: boolean; recentOnly?: boolean }) => {
+      if (!groupId || !waha.apiUrl || !waha.apiKey || !waha.sessionName) {
+        if (!opts?.silent && groupId) {
+          setPollError("WAHA is not configured — set API URL, key, and session in Automation.");
+        }
+        return;
+      }
       if (!opts?.silent) setLoadingMsgs(true);
       try {
-        const result = await listWahaChatMessages(waha, groupId, { limit: 80, downloadMedia: true });
+        // 1) Hydrate from SQLite once (skip on silent polls that only want WAHA delta).
+        if (!opts?.recentOnly) {
+          try {
+            const stored = await listCrmWhatsappGroupMessages({
+              data: { accountId, groupId },
+            });
+            if (stored.length > 0) {
+              const ui = stored.map(storedToUiMessage);
+              setMessages(ui);
+              setHasMoreHistory(true);
+              for (const m of ui) lastSeenIds.current.add(m.id);
+            }
+          } catch {
+            /* table may not exist yet — continue with WAHA */
+          }
+        }
+
+        // 2) Fetch from WAHA — full history on first sync, recent-only on poll.
+        const result = await listWahaChatMessages(waha, groupId, {
+          limit: opts?.recentOnly ? 40 : 100,
+          downloadMedia: false,
+        });
         if (!result.ok) {
-          setPollError(result.error ?? "Failed to load messages");
+          // Keep DB messages if WAHA fails mid-session.
+          if (!opts?.silent) setPollError(result.error ?? "Failed to load messages");
           return;
         }
         setPollError(null);
-        setMessages(result.messages);
+
+        if (result.messages.length > 0) {
+          setMessages((prev) => mergeMessages(prev, result.messages));
+          setHasMoreHistory(!opts?.recentOnly ? result.messages.length >= 100 : true);
+          void upsertCrmWhatsappGroupMessages({
+            data: {
+              accountId,
+              groupId,
+              messages: result.messages.map(uiToStoredPayload),
+            },
+          }).catch(() => null);
+        }
 
         const inboundNew = result.messages.filter((m) => !m.fromMe && !lastSeenIds.current.has(m.id));
         for (const m of result.messages) lastSeenIds.current.add(m.id);
@@ -130,13 +331,46 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
           void markWahaChatSeen(waha, groupId).catch(() => null);
         }
       } catch (err) {
-        setPollError(err instanceof Error ? err.message : "Failed to load messages");
+        if (!opts?.silent) {
+          setPollError(err instanceof Error ? err.message : "Failed to load messages");
+        }
       } finally {
         if (!opts?.silent) setLoadingMsgs(false);
       }
     },
-    [groupId, waha],
+    [accountId, groupId, waha],
   );
+
+  const loadOlderMessages = useCallback(async () => {
+    if (!groupId || !waha.apiUrl || !waha.apiKey || !waha.sessionName || loadingOlder) return;
+    setLoadingOlder(true);
+    try {
+      const result = await listWahaChatMessages(waha, groupId, {
+        limit: 100,
+        offset: messages.length,
+        downloadMedia: false,
+      });
+      if (!result.ok) {
+        toast.error(result.error ?? "Failed to load older messages");
+        return;
+      }
+      if (result.messages.length === 0) {
+        setHasMoreHistory(false);
+        return;
+      }
+      setMessages((prev) => mergeMessages(prev, result.messages));
+      setHasMoreHistory(result.messages.length >= 100);
+      void upsertCrmWhatsappGroupMessages({
+        data: {
+          accountId,
+          groupId,
+          messages: result.messages.map(uiToStoredPayload),
+        },
+      }).catch(() => null);
+    } finally {
+      setLoadingOlder(false);
+    }
+  }, [accountId, groupId, waha, messages.length, loadingOlder]);
 
   useEffect(() => {
     setEditing(!account?.whatsappGroupId);
@@ -145,9 +379,34 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
   }, [account?.whatsappGroupId, account?.whatsappGroupName]);
 
   useEffect(() => {
+    lastSeenIds.current = new Set();
+    setMessages([]);
+    setPollError(null);
+    setHasMoreHistory(true);
+    setPendingMedia((prev) => {
+      if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
+      return null;
+    });
+  }, [groupId]);
+
+  const pendingPreviewUrlRef = useRef<string | null>(null);
+  useEffect(() => {
+    pendingPreviewUrlRef.current = pendingMedia?.previewUrl ?? null;
+  }, [pendingMedia]);
+  useEffect(() => {
+    return () => {
+      if (pendingPreviewUrlRef.current) URL.revokeObjectURL(pendingPreviewUrlRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!groupId || editing) return;
     void loadMessages();
-    const id = window.setInterval(() => void loadMessages({ silent: true }), POLL_MS);
+    // Polls only pull recent WAHA messages and upsert new ones into SQLite.
+    const id = window.setInterval(
+      () => void loadMessages({ silent: true, recentOnly: true }),
+      POLL_MS,
+    );
     return () => window.clearInterval(id);
   }, [groupId, editing, loadMessages]);
 
@@ -186,6 +445,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
 
   async function loadPicker() {
     setLoadingPicker(true);
+    setGroupSearch("");
     try {
       const result = await listWahaGroups(waha);
       if (!result.ok) {
@@ -218,7 +478,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
       setDraft("");
       setReplyTo(null);
       stickToBottom.current = true;
-      await loadMessages({ silent: true });
+      await loadMessages({ silent: true, recentOnly: true });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Send failed");
     } finally {
@@ -239,22 +499,38 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
     input.click();
   }
 
-  async function onFilePicked(fileList: FileList | null) {
+  function clearPendingMedia() {
+    setPendingMedia((prev) => {
+      if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
+      return null;
+    });
+  }
+
+  function onFilePicked(fileList: FileList | null) {
     const file = fileList?.[0];
-    if (!file || !groupId) return;
+    if (!file) return;
+    const kind = resolveAttachKind(file, attachKindRef.current);
+    setPendingMedia((prev) => {
+      if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
+      return {
+        file,
+        kind,
+        previewUrl: URL.createObjectURL(file),
+      };
+    });
+    setAttachOpen(false);
+  }
+
+  async function confirmSendMedia() {
+    if (!pendingMedia || !groupId) return;
     if (!waha.isEnabled) {
       toast.error("Enable WAHA in Automation settings first");
       return;
     }
+    const { file, kind, previewUrl } = pendingMedia;
     setSending(true);
     try {
       const media = await fileToWahaMedia(file);
-      let kind = attachKindRef.current;
-      if (kind === "file") {
-        if (file.type.startsWith("image/")) kind = "image";
-        else if (file.type.startsWith("video/")) kind = "video";
-        else if (file.type.startsWith("audio/")) kind = "voice";
-      }
       const caption = draft.trim() || undefined;
       const result = await sendWahaMedia(waha, kind, groupId, media, {
         caption,
@@ -264,16 +540,94 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
         toast.error(`Send failed (HTTP ${result.status}): ${result.body.slice(0, 120)}`);
         return;
       }
+
+      const parsed = parseSentMessage(result.body);
+      const mediaType = mediaTypeFromKind(kind);
+      const optimisticId = parsed?.id || `local-media-${Date.now()}`;
+      localMediaPreviewRef.current.set(optimisticId, previewUrl);
+
+      const optimistic: WahaChatMessage = {
+        id: optimisticId,
+        timestamp: parsed?.timestamp || Math.floor(Date.now() / 1000),
+        fromMe: true,
+        from: parsed?.from || "",
+        body: caption || "",
+        hasMedia: true,
+        mediaType: parsed?.mediaType && parsed.mediaType !== "unknown" ? parsed.mediaType : mediaType,
+        mimetype: file.type || media.mimetype,
+        mediaUrl: previewUrl,
+        filename: file.name,
+        ack: parsed?.ack ?? 1,
+        replyTo: replyTo?.id,
+      };
+
+      setMessages((prev) => mergeMessages(prev, [optimistic]));
+      void upsertCrmWhatsappGroupMessages({
+        data: {
+          accountId,
+          groupId,
+          messages: [uiToStoredPayload(optimistic)],
+        },
+      }).catch(() => null);
+
+      // Keep previewUrl alive via localMediaPreviewRef; clear pending without revoking.
+      setPendingMedia(null);
       setDraft("");
       setReplyTo(null);
       stickToBottom.current = true;
       toast.success("Media sent");
-      await loadMessages({ silent: true });
+      await loadMessages({ silent: true, recentOnly: true });
+
+      // If WAHA returned no id, adopt the real message id from the poll and drop the temp bubble.
+      if (optimisticId.startsWith("local-media-")) {
+        setMessages((prev) => {
+          const temp = prev.find((m) => m.id === optimisticId);
+          if (!temp) return prev;
+          const real = prev
+            .filter(
+              (m) =>
+                m.fromMe &&
+                m.hasMedia &&
+                !m.id.startsWith("local-media-") &&
+                Math.abs(m.timestamp - temp.timestamp) <= 60,
+            )
+            .sort((a, b) => b.timestamp - a.timestamp)[0];
+          if (!real) return prev;
+          const preview = localMediaPreviewRef.current.get(optimisticId) || temp.mediaUrl;
+          if (preview) {
+            localMediaPreviewRef.current.set(real.id, preview);
+            localMediaPreviewRef.current.delete(optimisticId);
+          }
+          return prev
+            .filter((m) => m.id !== optimisticId)
+            .map((m) =>
+              m.id === real.id
+                ? {
+                    ...m,
+                    mediaUrl: m.mediaUrl || preview || undefined,
+                    mediaType:
+                      m.mediaType && m.mediaType !== "unknown" ? m.mediaType : temp.mediaType,
+                    mimetype: m.mimetype || temp.mimetype,
+                    filename: m.filename || temp.filename,
+                    body: m.body || temp.body,
+                  }
+                : m,
+            );
+        });
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to send media");
     } finally {
       setSending(false);
     }
+  }
+
+  async function sendComposer() {
+    if (pendingMedia) {
+      await confirmSendMedia();
+      return;
+    }
+    await sendText();
   }
 
   if (!account) {
@@ -328,28 +682,48 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
             Fetch connected groups
           </Button>
         </div>
-        {pickerGroups != null ? (
-          <ul className="max-h-48 space-y-1 overflow-y-auto rounded-md border p-1.5">
-            {pickerGroups.length === 0 ? (
-              <li className="px-2 py-3 text-center text-[10px] text-muted-foreground">No groups found</li>
-            ) : (
-              pickerGroups.map((g) => (
-                <li key={g.id}>
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted"
-                    onClick={() => {
-                      setGroupIdInput(g.id);
-                      setGroupNameInput(g.subject);
-                    }}
-                  >
-                    <span className="truncate font-medium">{g.subject}</span>
-                    <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{g.id}</span>
-                  </button>
+        {filteredPickerGroups != null ? (
+          <div className="space-y-2">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={groupSearch}
+                onChange={(e) => setGroupSearch(e.target.value)}
+                className="h-8 pl-8 text-xs"
+                placeholder="Search groups by name or ID…"
+                aria-label="Search connected groups"
+              />
+            </div>
+            <ul className="max-h-48 space-y-1 overflow-y-auto rounded-md border p-1.5">
+              {filteredPickerGroups.length === 0 ? (
+                <li className="px-2 py-3 text-center text-[10px] text-muted-foreground">
+                  {groupSearch.trim()
+                    ? `No available groups match “${groupSearch.trim()}”`
+                    : availablePickerGroups?.length === 0 && (pickerGroups?.length ?? 0) > 0
+                      ? "All connected groups are already linked to accounts"
+                      : "No groups found"}
                 </li>
-              ))
-            )}
-          </ul>
+              ) : (
+                filteredPickerGroups.map((g) => (
+                  <li key={g.id}>
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted"
+                      onClick={() => {
+                        setGroupIdInput(g.id);
+                        setGroupNameInput(g.subject);
+                      }}
+                    >
+                      <span className="truncate font-medium">{g.subject}</span>
+                      <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                        {g.id}
+                      </span>
+                    </button>
+                  </li>
+                ))
+              )}
+            </ul>
+          </div>
         ) : null}
       </div>
     );
@@ -371,6 +745,15 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {loadingMsgs ? <Loader2 className="h-3.5 w-3.5 animate-spin opacity-80" /> : null}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-xs text-white hover:bg-white/10 hover:text-white"
+            disabled={loadingMsgs}
+            onClick={() => void loadMessages()}
+          >
+            Refresh
+          </Button>
           <Button
             size="sm"
             variant="ghost"
@@ -411,13 +794,45 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
         }}
       >
         {messages.length === 0 && !loadingMsgs ? (
-          <p className="py-8 text-center text-xs text-muted-foreground">No messages yet</p>
+          <p className="py-8 text-center text-xs text-muted-foreground">
+            {pollError
+              ? "Could not load chat history — check the error above."
+              : "No messages yet. If this group has history, tap Refresh or Load older."}
+          </p>
+        ) : null}
+        {messages.length > 0 && hasMoreHistory ? (
+          <div className="mb-2 flex justify-center">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="h-7 text-[11px]"
+              disabled={loadingOlder}
+              onClick={() => void loadOlderMessages()}
+            >
+              {loadingOlder ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+              Load older messages
+            </Button>
+          </div>
         ) : null}
         {messages.map((msg, idx) => {
           const prev = messages[idx - 1];
           const showDay = !prev || dayKey(prev.timestamp) !== dayKey(msg.timestamp);
           const quoted = msg.replyTo ? messages.find((m) => m.id === msg.replyTo) : undefined;
-          const src = mediaSrc(msg);
+          const src = mediaSrc(msg, localMediaPreviewRef.current);
+          const showMedia = Boolean(msg.hasMedia || src);
+          const effectiveType =
+            msg.mediaType && msg.mediaType !== "unknown"
+              ? msg.mediaType
+              : msg.mimetype?.startsWith("image/")
+                ? "image"
+                : msg.mimetype?.startsWith("video/")
+                  ? "video"
+                  : msg.mimetype?.startsWith("audio/")
+                    ? "audio"
+                    : showMedia
+                      ? "document"
+                      : undefined;
           return (
             <div key={msg.id}>
               {showDay ? (
@@ -444,24 +859,52 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                       {quoted?.body?.slice(0, 120) || "Replied message"}
                     </div>
                   ) : null}
-                  {msg.hasMedia && msg.mediaType === "image" && src ? (
-                    <img src={src} alt="" className="mb-1 max-h-48 max-w-full rounded-md object-cover" />
+                  {showMedia && effectiveType === "image" ? (
+                    src ? (
+                      <img src={src} alt="" className="mb-1 max-h-48 max-w-full rounded-md object-cover" />
+                    ) : (
+                      <div className="mb-1 flex min-h-[72px] min-w-[140px] items-center justify-center gap-1.5 rounded-md bg-black/10 px-3 py-4 text-[11px] text-muted-foreground">
+                        <ImageIcon className="h-4 w-4" />
+                        Photo
+                      </div>
+                    )
                   ) : null}
-                  {msg.hasMedia && msg.mediaType === "video" && src ? (
-                    <video src={src} controls className="mb-1 max-h-48 max-w-full rounded-md" />
+                  {showMedia && effectiveType === "video" ? (
+                    src ? (
+                      <video src={src} controls className="mb-1 max-h-48 max-w-full rounded-md" />
+                    ) : (
+                      <div className="mb-1 flex min-h-[72px] min-w-[140px] items-center justify-center gap-1.5 rounded-md bg-black/10 px-3 py-4 text-[11px] text-muted-foreground">
+                        <Video className="h-4 w-4" />
+                        Video
+                      </div>
+                    )
                   ) : null}
-                  {msg.hasMedia && (msg.mediaType === "audio" || msg.mediaType === "voice") && src ? (
-                    <audio src={src} controls className="mb-1 max-w-full" />
+                  {showMedia && (effectiveType === "audio" || effectiveType === "voice") ? (
+                    src ? (
+                      <audio src={src} controls className="mb-1 max-w-full" />
+                    ) : (
+                      <div className="mb-1 flex items-center gap-1.5 rounded-md bg-black/10 px-2 py-1.5 text-[11px] text-muted-foreground">
+                        <Mic className="h-3.5 w-3.5" />
+                        Audio
+                      </div>
+                    )
                   ) : null}
-                  {msg.hasMedia && msg.mediaType === "document" ? (
-                    <a
-                      href={src ?? undefined}
-                      download={msg.filename}
-                      className="mb-1 flex items-center gap-1.5 rounded bg-black/5 px-2 py-1.5 text-[11px] underline"
-                    >
-                      <FileIcon className="h-3.5 w-3.5" />
-                      {msg.filename || "Document"}
-                    </a>
+                  {showMedia && (effectiveType === "document" || effectiveType === "sticker" || effectiveType === "unknown") ? (
+                    src ? (
+                      <a
+                        href={src}
+                        download={msg.filename}
+                        className="mb-1 flex items-center gap-1.5 rounded bg-black/5 px-2 py-1.5 text-[11px] underline"
+                      >
+                        <FileIcon className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{mediaPlaceholderLabel(msg)}</span>
+                      </a>
+                    ) : (
+                      <div className="mb-1 flex items-center gap-1.5 rounded bg-black/5 px-2 py-1.5 text-[11px]">
+                        <FileIcon className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{mediaPlaceholderLabel(msg)}</span>
+                      </div>
+                    )
                   ) : null}
                   {msg.body ? <div className="whitespace-pre-wrap break-words">{msg.body}</div> : null}
                   <div className="mt-0.5 flex items-center justify-end gap-1">
@@ -492,6 +935,36 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
           </div>
           <button type="button" onClick={() => setReplyTo(null)}>
             <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ) : null}
+
+      {/* Pending media preview */}
+      {pendingMedia ? (
+        <div className="flex items-start gap-2 border-t bg-white px-3 py-2">
+          <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md bg-muted">
+            {pendingMedia.kind === "image" ? (
+              <img src={pendingMedia.previewUrl} alt="" className="h-full w-full object-cover" />
+            ) : pendingMedia.kind === "video" ? (
+              <video src={pendingMedia.previewUrl} className="h-full w-full object-cover" muted />
+            ) : (
+              <div className="flex h-full w-full flex-col items-center justify-center gap-0.5 px-1 text-center">
+                {pendingMedia.kind === "voice" ? (
+                  <Mic className="h-5 w-5 text-muted-foreground" />
+                ) : (
+                  <FileIcon className="h-5 w-5 text-muted-foreground" />
+                )}
+              </div>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-xs font-medium">{pendingMedia.file.name}</div>
+            <div className="text-[10px] text-muted-foreground">
+              {(pendingMedia.file.size / 1024).toFixed(0)} KB · Add a caption below, then send
+            </div>
+          </div>
+          <button type="button" className="shrink-0 rounded-full p-1 hover:bg-muted" onClick={clearPendingMedia}>
+            <X className="h-4 w-4" />
           </button>
         </div>
       ) : null}
@@ -546,7 +1019,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
           ref={fileInputRef}
           type="file"
           className="hidden"
-          onChange={(e) => void onFilePicked(e.target.files)}
+          onChange={(e) => onFilePicked(e.target.files)}
         />
         <textarea
           value={draft}
@@ -554,11 +1027,11 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              void sendText();
+              void sendComposer();
             }
           }}
           rows={1}
-          placeholder="Type a message"
+          placeholder={pendingMedia ? "Add a caption…" : "Type a message"}
           className="max-h-28 min-h-[36px] flex-1 resize-none rounded-2xl border-0 bg-white px-3 py-2 text-xs shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-teal-600"
           disabled={sending}
         />
@@ -567,8 +1040,8 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
           type="button"
           className="h-9 w-9 shrink-0 rounded-full p-0"
           style={{ background: "#075e54" }}
-          disabled={sending || !draft.trim()}
-          onClick={() => void sendText()}
+          disabled={sending || (!pendingMedia && !draft.trim())}
+          onClick={() => void sendComposer()}
         >
           {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
         </Button>
