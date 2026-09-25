@@ -39,7 +39,7 @@ import {
 import { useCrmAccountStore } from "@/stores/useCrmAccountStore";
 import { useCrmAutomationStore } from "@/stores/useCrmAutomationStore";
 
-const POLL_MS = 2500;
+const POLL_MS = 5000;
 
 function storedToUiMessage(row: {
   wahaMessageId: string;
@@ -481,7 +481,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
         if (!opts?.recentOnly) {
           try {
             const stored = await listCrmWhatsappGroupMessages({
-              data: { accountId, groupId },
+              data: { accountId, groupId, limit: 120 },
             });
             if (stored.length > 0) {
               const ui = stripEmptyMessageShells(
@@ -498,9 +498,9 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
           }
         }
 
-        // 2) Fetch from WAHA — full history on first sync, recent-only on poll.
+        // 2) Fetch from WAHA — recent window only; full history via "Load older".
         const result = await listWahaChatMessages(waha, groupId, {
-          limit: opts?.recentOnly ? 40 : 100,
+          limit: opts?.recentOnly ? 30 : 50,
           downloadMedia: false,
         });
         if (!result.ok) {
@@ -632,18 +632,37 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
 
   useEffect(() => {
     if (!groupId || editing) return;
-    void loadMessages();
-    // Polls only pull recent WAHA messages and upsert new ones into SQLite.
-    const id = window.setInterval(
-      () => void loadMessages({ silent: true, recentOnly: true }),
-      POLL_MS,
-    );
-    return () => window.clearInterval(id);
+
+    let cancelled = false;
+    // Paint DB cache first; pull WAHA on the next tick so the tab feels instant.
+    const boot = window.setTimeout(() => {
+      if (!cancelled) void loadMessages();
+    }, 0);
+
+    const id = window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      void loadMessages({ silent: true, recentOnly: true });
+    }, POLL_MS);
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void loadMessages({ silent: true, recentOnly: true });
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(boot);
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [groupId, editing, loadMessages]);
 
   /** Backfill media bytes for messages that only have stubs (e.g. after leaving the tab). */
   useEffect(() => {
     if (!groupId || editing || !waha.apiUrl || !waha.apiKey || !waha.sessionName) return;
+    if (document.visibilityState === "hidden") return;
 
     const missing = messages.filter((m) => {
       if (!m.hasMedia || m.id.startsWith("local-media-")) return false;
@@ -654,11 +673,11 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
     if (missing.length === 0) return;
 
     let cancelled = false;
-    const batch = missing.slice(-8);
+    const batch = missing.slice(-3); // keep account UI responsive — small batches only
 
     void (async () => {
       for (const msg of batch) {
-        if (cancelled) break;
+        if (cancelled || document.visibilityState === "hidden") break;
         mediaHydrateInFlight.current.add(msg.id);
         try {
           const result = await getWahaChatMessage(waha, groupId, msg.id, {

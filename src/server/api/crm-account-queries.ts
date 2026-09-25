@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { asc, desc, eq } from "drizzle-orm";
+import { asc, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { canViewCrmAccount } from "@/lib/crm-account-access";
@@ -136,15 +136,24 @@ function loadQueriesForCompany(db: ReturnType<typeof getDb>, companyId: string):
     .where(eq(t.crmAccountQueries.companyId, companyId))
     .orderBy(desc(t.crmAccountQueries.updatedAt))
     .all();
-  return rows.map((row) => {
-    const messages = db
-      .select()
-      .from(t.crmAccountQueryMessages)
-      .where(eq(t.crmAccountQueryMessages.queryId, row.id))
-      .orderBy(asc(t.crmAccountQueryMessages.createdAt))
-      .all();
-    return mapQuery(row, messages);
-  });
+  if (rows.length === 0) return [];
+
+  const queryIds = rows.map((row) => row.id);
+  const allMessages = db
+    .select()
+    .from(t.crmAccountQueryMessages)
+    .where(inArray(t.crmAccountQueryMessages.queryId, queryIds))
+    .orderBy(asc(t.crmAccountQueryMessages.createdAt))
+    .all();
+
+  const messagesByQuery = new Map<string, typeof allMessages>();
+  for (const message of allMessages) {
+    const list = messagesByQuery.get(message.queryId);
+    if (list) list.push(message);
+    else messagesByQuery.set(message.queryId, [message]);
+  }
+
+  return rows.map((row) => mapQuery(row, messagesByQuery.get(row.id) ?? []));
 }
 
 function lastMessagePreview(messages: CrmAccountQueryMessage[]) {

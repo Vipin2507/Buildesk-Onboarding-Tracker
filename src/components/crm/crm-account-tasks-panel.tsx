@@ -58,7 +58,8 @@ type Props = {
 export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: Props) {
   const account = useCrmAccountStore((s) => s.getById(accountId));
   const tasks = useCrmTaskStore((s) => s.tasks);
-  useTaskTimeStatusSync(true, "crm");
+  // Compact dashboard mount should not block account open with an immediate server sync.
+  useTaskTimeStatusSync(!compact, "crm");
   const timeAwareTasks = useTasksWithTimeStatus(tasks);
   const addTask = useCrmTaskStore((s) => s.addTask);
   const updateTask = useCrmTaskStore((s) => s.updateTask);

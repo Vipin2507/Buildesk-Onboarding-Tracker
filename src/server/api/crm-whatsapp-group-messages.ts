@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -94,11 +94,14 @@ export const listCrmWhatsappGroupMessages = createServerFn({ method: "GET" })
       .object({
         accountId: z.string().min(1),
         groupId: z.string().min(1),
+        /** Newest N messages (default 120). Keeps account/WhatsApp open fast when history is large. */
+        limit: z.number().int().positive().max(500).optional(),
       })
       .parse(data),
   )
   .handler(async ({ data }) => {
     const { db } = assertAccountAccess(data.accountId);
+    const limit = data.limit ?? 120;
     try {
       const rows = db
         .select()
@@ -109,9 +112,11 @@ export const listCrmWhatsappGroupMessages = createServerFn({ method: "GET" })
             eq(t.crmWhatsappGroupMessages.groupId, data.groupId),
           ),
         )
-        .orderBy(asc(t.crmWhatsappGroupMessages.timestamp))
+        .orderBy(desc(t.crmWhatsappGroupMessages.timestamp))
+        .limit(limit)
         .all();
-      return rows.map(mapRow);
+      // Return chronological (oldest → newest) for the chat UI.
+      return rows.reverse().map(mapRow);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes("no such table")) return [];

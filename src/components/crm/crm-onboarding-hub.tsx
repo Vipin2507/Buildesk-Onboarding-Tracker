@@ -162,7 +162,25 @@ export function CrmOnboardingHub({
   }, [accountId, account?.companyType, ensureForCompany]);
 
   useEffect(() => {
-    void refreshAccountQueries(accountId).catch(() => {});
+    // Badge-only: skip network if we already have this company's queries cached.
+    if ((useCrmAccountQueryStore.getState().queriesByCompany[accountId]?.length ?? 0) > 0) {
+      return;
+    }
+    const idle =
+      typeof window !== "undefined" && "requestIdleCallback" in window
+        ? window.requestIdleCallback(() => {
+            void refreshAccountQueries(accountId).catch(() => {});
+          }, { timeout: 2500 })
+        : window.setTimeout(() => {
+            void refreshAccountQueries(accountId).catch(() => {});
+          }, 400);
+    return () => {
+      if (typeof window !== "undefined" && "cancelIdleCallback" in window && typeof idle === "number") {
+        window.cancelIdleCallback(idle);
+      } else {
+        window.clearTimeout(idle as number);
+      }
+    };
   }, [accountId, refreshAccountQueries]);
 
   const liveRecord = useMemo(() => {
