@@ -82,20 +82,25 @@ function ExpandableExecutiveTable({
                 transition={{ duration: 0.28, ease: EASE }}
                 className="overflow-hidden"
               >
-                <div className="border-t border-border bg-white px-4 pb-1 pl-[4.25rem] pt-1">
-                  <p className="py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    {breakdownLabel}
-                  </p>
+                <div className="border-t border-border bg-white px-4 pb-1 pt-1">
+                  <div className="grid grid-cols-[2.5rem_1fr_auto] gap-3 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <span className="normal-case tracking-normal">S.No.</span>
+                    <span>{breakdownLabel}</span>
+                    <span className="text-right normal-case tracking-normal">Accounts</span>
+                  </div>
                   <ul className="max-h-56 overflow-y-auto">
-                    {r.breakdown.map((b) => (
+                    {r.breakdown.map((b, locIndex) => (
                       <li
                         key={b.label}
-                        className="flex items-center justify-between gap-4 border-t border-border/80 py-2.5 text-sm first:border-t-0"
+                        className="grid grid-cols-[2.5rem_1fr_auto] items-center gap-3 border-t border-border/80 py-2.5 text-sm"
                       >
+                        <span className="tabular-nums text-xs text-muted-foreground">
+                          {locIndex + 1}
+                        </span>
                         <span className="min-w-0 truncate text-muted-foreground">
                           {b.label === "—" ? "Unspecified" : b.label}
                         </span>
-                        <span className="shrink-0 tabular-nums font-medium text-foreground">
+                        <span className="shrink-0 text-right tabular-nums font-medium text-foreground">
                           {b.accounts}
                         </span>
                       </li>
