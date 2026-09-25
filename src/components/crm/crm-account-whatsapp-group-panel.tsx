@@ -79,7 +79,7 @@ function persistableMediaUrl(url: string | undefined | null): string | null {
   if (url.startsWith("blob:")) return null;
   // Keep compact data-URLs and remote URLs.
   if (url.startsWith("data:")) {
-    return url.length <= 180_000 ? url : null;
+    return url.length <= 350_000 ? url : null;
   }
   if (url.startsWith("http://") || url.startsWith("https://")) return url;
   return null;
@@ -88,7 +88,7 @@ function persistableMediaUrl(url: string | undefined | null): string | null {
 function uiToStoredPayload(msg: WahaChatMessage) {
   const mediaUrl =
     persistableMediaUrl(msg.mediaUrl) ||
-    (msg.mediaData && msg.mimetype && msg.mediaData.length <= 120_000
+    (msg.mediaData && msg.mimetype && msg.mediaData.length <= 250_000
       ? `data:${msg.mimetype};base64,${msg.mediaData}`
       : null);
   return {
@@ -98,7 +98,7 @@ function uiToStoredPayload(msg: WahaChatMessage) {
     from: msg.from,
     participantName: msg.participantName ?? null,
     body: msg.body,
-    hasMedia: msg.hasMedia,
+    hasMedia: msg.hasMedia || Boolean(mediaUrl),
     mediaType: msg.mediaType ?? null,
     mimetype: msg.mimetype ?? null,
     mediaUrl,
@@ -115,32 +115,54 @@ function stripEmptyMessageShells(messages: WahaChatMessage[]): WahaChatMessage[]
   );
 }
 
-/** Build a compact JPEG data-URL so image previews survive tab remounts. */
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(reader.error ?? new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+}
+
+/** Build a durable data-URL so media previews survive tab remounts (stored in SQLite). */
 async function fileToPersistedPreview(file: File): Promise<string | null> {
-  if (!file.type.startsWith("image/")) return null;
   try {
-    const bitmap = await createImageBitmap(file);
-    const maxEdge = 480;
-    const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
-    const w = Math.max(1, Math.round(bitmap.width * scale));
-    const h = Math.max(1, Math.round(bitmap.height * scale));
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
+    // Small images: store the full file as a data-URL.
+    if (file.type.startsWith("image/") && file.size <= 220_000) {
+      const full = await fileToDataUrl(file);
+      return persistableMediaUrl(full);
+    }
+
+    if (file.type.startsWith("image/")) {
+      const bitmap = await createImageBitmap(file);
+      const maxEdge = 640;
+      const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+      const w = Math.max(1, Math.round(bitmap.width * scale));
+      const h = Math.max(1, Math.round(bitmap.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        bitmap.close();
+        return null;
+      }
+      ctx.drawImage(bitmap, 0, 0, w, h);
       bitmap.close();
-      return null;
+      let quality = 0.8;
+      let dataUrl = canvas.toDataURL("image/jpeg", quality);
+      while (dataUrl.length > 300_000 && quality > 0.4) {
+        quality -= 0.1;
+        dataUrl = canvas.toDataURL("image/jpeg", quality);
+      }
+      return persistableMediaUrl(dataUrl);
     }
-    ctx.drawImage(bitmap, 0, 0, w, h);
-    bitmap.close();
-    let quality = 0.72;
-    let dataUrl = canvas.toDataURL("image/jpeg", quality);
-    while (dataUrl.length > 160_000 && quality > 0.35) {
-      quality -= 0.12;
-      dataUrl = canvas.toDataURL("image/jpeg", quality);
+
+    // Non-image: store a tiny data-URL only when the whole file is small enough.
+    if (file.size <= 120_000) {
+      return persistableMediaUrl(await fileToDataUrl(file));
     }
-    return dataUrl.length <= 180_000 ? dataUrl : null;
+    return null;
   } catch {
     return null;
   }
@@ -305,6 +327,27 @@ function mediaSrc(
     return `data:${msg.mimetype};base64,${msg.mediaData}`;
   }
   return null;
+}
+
+function resolveEffectiveMediaType(
+  msg: WahaChatMessage,
+  src: string | null,
+  showMedia: boolean,
+): WahaChatMessage["mediaType"] | undefined {
+  const mime = msg.mimetype || (src?.startsWith("data:") ? src.slice(5, src.indexOf(";")) : "");
+  if (mime.startsWith("image/") || src?.startsWith("data:image/") || /\.(png|jpe?g|gif|webp)(\?|$)/i.test(src || "")) {
+    return "image";
+  }
+  if (mime.startsWith("video/") || src?.startsWith("data:video/")) return "video";
+  if (mime.startsWith("audio/") || src?.startsWith("data:audio/")) {
+    return msg.mediaType === "voice" ? "voice" : "audio";
+  }
+  if (msg.mediaType && msg.mediaType !== "unknown" && msg.mediaType !== "document") {
+    return msg.mediaType;
+  }
+  if (msg.mediaType === "document" || msg.mediaType === "sticker") return msg.mediaType;
+  if (showMedia) return "document";
+  return undefined;
 }
 
 function mediaPlaceholderLabel(msg: WahaChatMessage) {
@@ -482,16 +525,36 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                 );
               }
             }
-            return stripEmptyMessageShells(next);
+            next = stripEmptyMessageShells(next);
+            const byId = new Map(next.map((m) => [m.id, m]));
+            // Upsert with local media previews preserved so SQLite is not wiped by WAHA stubs.
+            void upsertCrmWhatsappGroupMessages({
+              data: {
+                accountId,
+                groupId,
+                messages: result.messages.map((incoming) => {
+                  const local = byId.get(incoming.id);
+                  return uiToStoredPayload(
+                    local
+                      ? {
+                          ...incoming,
+                          ...local,
+                          body: incoming.body || local.body,
+                          mediaUrl: persistableMediaUrl(local.mediaUrl) || incoming.mediaUrl,
+                          mediaData: local.mediaData || incoming.mediaData,
+                          mediaType: betterMediaType(local.mediaType, incoming.mediaType),
+                          mimetype: local.mimetype || incoming.mimetype,
+                          filename: local.filename || incoming.filename,
+                          hasMedia: local.hasMedia || incoming.hasMedia,
+                        }
+                      : incoming,
+                  );
+                }),
+              },
+            }).catch(() => null);
+            return next;
           });
           setHasMoreHistory(!opts?.recentOnly ? result.messages.length >= 100 : true);
-          void upsertCrmWhatsappGroupMessages({
-            data: {
-              accountId,
-              groupId,
-              messages: result.messages.map(uiToStoredPayload),
-            },
-          }).catch(() => null);
         }
 
         const inboundNew = result.messages.filter((m) => !m.fromMe && !lastSeenIds.current.has(m.id));
@@ -1088,18 +1151,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
           const quoted = msg.replyTo ? messages.find((m) => m.id === msg.replyTo) : undefined;
           const src = mediaSrc(msg, localMediaPreviewRef.current);
           const showMedia = Boolean(msg.hasMedia || src);
-          const effectiveType =
-            msg.mediaType && msg.mediaType !== "unknown"
-              ? msg.mediaType
-              : msg.mimetype?.startsWith("image/")
-                ? "image"
-                : msg.mimetype?.startsWith("video/")
-                  ? "video"
-                  : msg.mimetype?.startsWith("audio/")
-                    ? "audio"
-                    : showMedia
-                      ? "document"
-                      : undefined;
+          const effectiveType = resolveEffectiveMediaType(msg, src, showMedia);
           return (
             <div key={msg.id}>
               {showDay ? (

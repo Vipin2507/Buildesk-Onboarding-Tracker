@@ -141,24 +141,31 @@ export const upsertCrmWhatsappGroupMessages = createServerFn({ method: "POST" })
         for (const m of data.messages) {
           const id = messageRowId(data.accountId, m.wahaMessageId);
           const existing = txDb
-            .select({ id: t.crmWhatsappGroupMessages.id })
+            .select()
             .from(t.crmWhatsappGroupMessages)
             .where(eq(t.crmWhatsappGroupMessages.id, id))
             .get();
+
+          // Never wipe a stored preview when WAHA/poll sends a media stub without bytes.
+          const mediaUrl = m.mediaUrl || existing?.mediaUrl || null;
+          const mediaType = m.mediaType || existing?.mediaType || null;
+          const mimetype = m.mimetype || existing?.mimetype || null;
+          const filename = m.filename || existing?.filename || null;
+          const hasMedia = Boolean(m.hasMedia || existing?.hasMedia || mediaUrl);
 
           const values = {
             timestamp: m.timestamp,
             fromMe: m.fromMe,
             fromJid: m.from ?? "",
-            participantName: m.participantName ?? null,
-            body: m.body ?? "",
-            hasMedia: m.hasMedia ?? false,
-            mediaType: m.mediaType ?? null,
-            mimetype: m.mimetype ?? null,
-            mediaUrl: m.mediaUrl ?? null,
-            filename: m.filename ?? null,
-            ack: m.ack ?? null,
-            replyTo: m.replyTo ?? null,
+            participantName: m.participantName ?? existing?.participantName ?? null,
+            body: (m.body ?? "") || existing?.body || "",
+            hasMedia,
+            mediaType,
+            mimetype,
+            mediaUrl,
+            filename,
+            ack: m.ack ?? existing?.ack ?? null,
+            replyTo: m.replyTo ?? existing?.replyTo ?? null,
             updatedAt: now,
           };
 
