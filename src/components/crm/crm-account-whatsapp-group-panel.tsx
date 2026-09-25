@@ -342,10 +342,7 @@ function resolveEffectiveMediaType(
   if (mime.startsWith("audio/") || src?.startsWith("data:audio/")) {
     return msg.mediaType === "voice" ? "voice" : "audio";
   }
-  if (msg.mediaType && msg.mediaType !== "unknown" && msg.mediaType !== "document") {
-    return msg.mediaType;
-  }
-  if (msg.mediaType === "document" || msg.mediaType === "sticker") return msg.mediaType;
+  if (msg.mediaType && msg.mediaType !== "unknown") return msg.mediaType;
   if (showMedia) return "document";
   return undefined;
 }
