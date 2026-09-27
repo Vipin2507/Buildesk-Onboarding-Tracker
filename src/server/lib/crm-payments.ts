@@ -1,8 +1,8 @@
 import { desc, eq, sql } from "drizzle-orm";
 
-import { parseInstallmentsJson, originalInstallments, renewalInstallments, roundMoney, serializeInstallments } from "@/lib/crm-account-commercial";
+import { parseInstallmentsJson, roundMoney, serializeInstallments } from "@/lib/crm-account-commercial";
 import {
-  allocateAccountPayments,
+  buildCycleAwarePaymentAllocation,
   classifyPaymentTransactionRenewal,
   isInactiveCrmAccountForPayments,
   isRenewalPaymentAccount,
@@ -290,60 +290,24 @@ export function buildAccountPaymentSnapshot(
   pendingAmount: number;
 } {
   const installments = parseInstallmentsJson(account.installmentsJson);
-  const totalDealValue = roundMoney(Number(account.dealSize) || 0);
-  const baseline = roundMoney(Number(account.paymentCycleBaseline) || 0);
-  const lifetimeReceived = roundMoney(totalReceived);
-  const cycleReceived = roundMoney(Math.max(0, lifetimeReceived - baseline));
-  const pendingAmount = roundMoney(Math.max(0, totalDealValue - cycleReceived));
-
-  const renewals = renewalInstallments(installments);
-  const originals = originalInstallments(installments);
-  const useRenewalCycle = baseline > 0.01 && renewals.length > 0;
-
-  const allocation = allocateAccountPayments({
-    installments: useRenewalCycle ? renewals : installments,
-    totalReceived: cycleReceived,
-    totalDealValue,
+  const view = buildCycleAwarePaymentAllocation({
+    installments,
+    lifetimeReceived: totalReceived,
+    totalDealValue: Number(account.dealSize) || 0,
+    paymentCycleBaseline: account.paymentCycleBaseline,
     todayYmd,
   });
-
-  if (useRenewalCycle && originals.length > 0) {
-    const paidOriginals = originals
-      .slice()
-      .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
-      .map((row, i) => {
-        const amount = roundMoney(Number(row.amount) || 0);
-        return {
-          index: i + 1,
-          id: row.id,
-          kind: row.kind,
-          amount,
-          dueDate: row.dueDate,
-          paidAmount: amount,
-          remainingAmount: 0,
-          status: "paid" as const,
-        };
-      });
-    const renewAllocated = allocation.installments.map((row, i) => ({
-      ...row,
-      index: paidOriginals.length + i + 1,
-    }));
-    return {
-      ...allocation,
-      installments: [...paidOriginals, ...renewAllocated],
-      totalDealValue,
-      paymentReceived: cycleReceived,
-      pendingAmount,
-      // Lifetime excess beyond current deal is not "renewal overflow" in a fresh cycle.
-      renewalAmount: roundMoney(Math.max(0, cycleReceived - totalDealValue)),
-    };
-  }
-
   return {
-    ...allocation,
-    totalDealValue,
-    paymentReceived: cycleReceived,
-    pendingAmount,
+    installments: view.installments,
+    nextDueInstallment: view.nextDueInstallment,
+    paymentStatus: view.paymentStatus,
+    overdueDays: view.overdueDays,
+    overdueAmount: view.overdueAmount,
+    collectionPercent: view.collectionPercent,
+    renewalAmount: view.renewalAmount,
+    totalDealValue: view.totalDealValue,
+    paymentReceived: view.paymentReceived,
+    pendingAmount: view.pendingAmount,
   };
 }
 

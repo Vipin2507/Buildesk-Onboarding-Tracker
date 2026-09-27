@@ -15,6 +15,7 @@ import {
 import { useAuthStore, useCurrentUser, useUserStore } from "@/stores";
 import { authChangePassword, authUpdateProfile } from "@/lib/api";
 import { compressImageToDataUrl } from "@/lib/compress-image";
+import { departmentSelectOptions } from "@/data/user-departments";
 import { cn } from "@/lib/utils";
 
 const TIMEZONES = [
@@ -288,11 +289,18 @@ export function EditProfileDialog({
                 />
               </Field>
               <Field label="Department">
-                <input
+                <select
                   value={form.department}
                   onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}
                   className="field"
-                />
+                >
+                  <option value="">Select department</option>
+                  {departmentSelectOptions(form.department).map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
               </Field>
               <Field label="Timezone">
                 <select

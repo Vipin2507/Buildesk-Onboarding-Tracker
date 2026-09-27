@@ -43,6 +43,7 @@ export type AutomationTrigger =
   | "task-before-start"
   | "payment-overdue"
   | "payment-executive-remind"
+  | "account-renewal-remind"
   | "query-response"
   | "live-chat-started"
   | "portal-ticket-created";
@@ -168,6 +169,7 @@ export const AUTOMATION_TRIGGERS: { value: AutomationTrigger; label: string }[] 
   { value: "task-before-start", label: "Before scheduled task" },
   { value: "payment-overdue", label: "Payment reminder (client)" },
   { value: "payment-executive-remind", label: "Payment reminder (executive)" },
+  { value: "account-renewal-remind", label: "Account renewal reminder (admin)" },
   { value: "query-response", label: "Reply on account query" },
   { value: "live-chat-started", label: "Customer starts live chat" },
   { value: "portal-ticket-created", label: "Portal ticket created (executive)" },

@@ -325,6 +325,89 @@ export function allocateAccountPayments(input: {
   };
 }
 
+/**
+ * Same commercial view Payments uses after a renew:
+ * - cycle received = lifetime − paymentCycleBaseline
+ * - prior-cycle installments stay Paid
+ * - only renewal rows are allocated against the new deal
+ */
+export function buildCycleAwarePaymentAllocation(input: {
+  installments: CrmAccountInstallment[];
+  /** Lifetime ledger total (or cycle received when baseline already subtracted). */
+  lifetimeReceived: number;
+  totalDealValue: number;
+  paymentCycleBaseline?: number | null;
+  /** When true, `lifetimeReceived` is already the cycle amount (account.paymentReceived). */
+  receivedIsCycleAmount?: boolean;
+  todayYmd?: string;
+}): PaymentAllocationResult & {
+  totalDealValue: number;
+  paymentReceived: number;
+  pendingAmount: number;
+  lifetimeReceived: number;
+} {
+  const baseline = roundMoney(Number(input.paymentCycleBaseline) || 0);
+  const lifetimeReceived = input.receivedIsCycleAmount
+    ? roundMoney(baseline + Math.max(0, input.lifetimeReceived))
+    : roundMoney(Math.max(0, input.lifetimeReceived));
+  const cycleReceived = input.receivedIsCycleAmount
+    ? roundMoney(Math.max(0, input.lifetimeReceived))
+    : roundMoney(Math.max(0, lifetimeReceived - baseline));
+  const totalDealValue = roundMoney(Math.max(0, input.totalDealValue));
+  const pendingAmount = roundMoney(Math.max(0, totalDealValue - cycleReceived));
+
+  const renewals = input.installments.filter((row) => isRenewalInstallment(row));
+  const originals = originalInstallments(input.installments);
+  const useRenewalCycle = baseline > 0.01 && renewals.length > 0;
+
+  const allocation = allocateAccountPayments({
+    installments: useRenewalCycle ? renewals : input.installments,
+    totalReceived: cycleReceived,
+    totalDealValue,
+    todayYmd: input.todayYmd,
+  });
+
+  if (useRenewalCycle && originals.length > 0) {
+    const paidOriginals: AllocatedInstallment[] = originals
+      .slice()
+      .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+      .map((row, i) => {
+        const amount = roundMoney(Number(row.amount) || 0);
+        return {
+          index: i + 1,
+          id: row.id,
+          kind: row.kind,
+          amount,
+          dueDate: row.dueDate,
+          paidAmount: amount,
+          remainingAmount: 0,
+          status: "paid" as const,
+        };
+      });
+    const renewAllocated = allocation.installments.map((row, i) => ({
+      ...row,
+      index: paidOriginals.length + i + 1,
+    }));
+    return {
+      ...allocation,
+      installments: [...paidOriginals, ...renewAllocated],
+      totalDealValue,
+      paymentReceived: cycleReceived,
+      pendingAmount,
+      lifetimeReceived,
+      renewalAmount: roundMoney(Math.max(0, cycleReceived - totalDealValue)),
+    };
+  }
+
+  return {
+    ...allocation,
+    totalDealValue,
+    paymentReceived: cycleReceived,
+    pendingAmount,
+    lifetimeReceived,
+  };
+}
+
 export function sumPaymentTransactions(
   rows: { amount: number | null | undefined }[],
 ): number {

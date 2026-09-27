@@ -30,6 +30,7 @@ const TRIGGER_SHORT: Record<AutomationRule["trigger"], string> = {
   "task-before-start": "Task reminder",
   "payment-overdue": "Payment (client)",
   "payment-executive-remind": "Payment (executive)",
+  "account-renewal-remind": "Renewal (admin)",
   "query-response": "Query reply",
   "live-chat-started": "Live chat",
   "portal-ticket-created": "Portal ticket",

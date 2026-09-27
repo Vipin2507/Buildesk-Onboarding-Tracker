@@ -20,7 +20,7 @@ export function startCrmReminderScheduler() {
       await processTaskReminderAutomations(db, DEFAULT_BOOKING_TIMEZONE);
       const inAppSent = processTaskInAppReminders(db, DEFAULT_BOOKING_TIMEZONE);
       const pushSent = await processTaskWebPushReminders(db, DEFAULT_BOOKING_TIMEZONE);
-      const renewalSent = processCrmAccountRenewalReminders(db);
+      const renewalSent = await processCrmAccountRenewalReminders(db);
       console.log(
         `[crm-reminder-scheduler] tick inApp=${inAppSent} push=${pushSent} renewal=${renewalSent}`,
       );

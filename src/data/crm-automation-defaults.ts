@@ -106,6 +106,8 @@ export const CRM_PAYMENT_AUTOMATION_TRIGGERS = [
   "payment-executive-remind",
 ] as const;
 
+export const CRM_RENEWAL_AUTOMATION_TRIGGERS = ["account-renewal-remind"] as const;
+
 export const CRM_QUERY_AUTOMATION_TRIGGERS = ["query-response"] as const;
 
 export const CRM_LIVE_CHAT_AUTOMATION_TRIGGERS = ["live-chat-started"] as const;
@@ -369,6 +371,17 @@ export const DEFAULT_CRM_AUTOMATION_RULES: AutomationRule[] = [
     templateBody: "{{digestBodyWhatsapp}}",
   }),
   rule({
+    id: "crm-rule-account-renewal-whatsapp",
+    name: "Account renewal — Admin WhatsApp",
+    description:
+      "WhatsApp CRM admins when an account enters the 30-day renewal window (in-app bell still notifies the account team)",
+    trigger: "account-renewal-remind",
+    channel: "whatsapp",
+    isActive: true,
+    templateBody:
+      "Hi {{recipientName}},\n\n🔄 *Renewal window* — {{accountName}}\n\nService ends {{endDate}}.\nNext period starts {{nextStartDate}}.\n{{renewalWindowLabel}}\n\nOpen Renew in CRM: {{renewUrl}}",
+  }),
+  rule({
     id: "crm-rule-query-response-whatsapp",
     name: "Account query reply — Executive WhatsApp",
     description:
@@ -464,6 +477,11 @@ export const CRM_AUTOMATION_TEMPLATE_VARS = [
   "{{visitorName}}",
   "{{chatUrl}}",
   "{{sessionId}}",
+  "{{endDate}}",
+  "{{nextStartDate}}",
+  "{{renewUrl}}",
+  "{{renewalWindowLabel}}",
+  "{{daysUntilEnd}}",
 ] as const;
 
 export const CRM_AUTOMATION_SAMPLE_VARS: Record<string, string> = {
@@ -518,4 +536,9 @@ export const CRM_AUTOMATION_SAMPLE_VARS: Record<string, string> = {
   visitorName: "Amit Verma",
   chatUrl: "https://track.example.com/crm/live-chat",
   sessionId: "CS-1001",
+  endDate: "9 Sept 2026",
+  nextStartDate: "10 Sept 2026",
+  renewUrl: "https://track.example.com/crm/accounts/horizon",
+  renewalWindowLabel: "Renewal in 12d",
+  daysUntilEnd: "12",
 };

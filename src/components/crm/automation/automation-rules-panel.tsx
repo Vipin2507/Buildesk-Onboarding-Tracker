@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { CalendarDays, ClipboardList, IndianRupee, Mail, MessageCircle, MessageSquare, Pencil, Play, Plus, Power, Trash2, Ticket, Zap } from "lucide-react";
+import { CalendarDays, ClipboardList, IndianRupee, Mail, MessageCircle, MessageSquare, Pencil, Play, Plus, Power, RefreshCw, Trash2, Ticket, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 import { AutomationRuleDialog } from "@/components/crm/automation/automation-rule-dialog";
@@ -14,6 +14,7 @@ import {
   CRM_LIVE_CHAT_AUTOMATION_TRIGGERS,
   CRM_PAYMENT_AUTOMATION_TRIGGERS,
   CRM_QUERY_AUTOMATION_TRIGGERS,
+  CRM_RENEWAL_AUTOMATION_TRIGGERS,
   CRM_TASK_AUTOMATION_TRIGGERS,
   mergeCrmAutomationRules,
 } from "@/data/crm-automation-defaults";
@@ -35,6 +36,7 @@ const TRIGGER_LABEL = Object.fromEntries(AUTOMATION_TRIGGERS.map((t) => [t.value
 const BOOKING_TRIGGER_SET = new Set<string>(CRM_BOOKING_AUTOMATION_TRIGGERS);
 const TASK_TRIGGER_SET = new Set<string>(CRM_TASK_AUTOMATION_TRIGGERS);
 const PAYMENT_TRIGGER_SET = new Set<string>(CRM_PAYMENT_AUTOMATION_TRIGGERS);
+const RENEWAL_TRIGGER_SET = new Set<string>(CRM_RENEWAL_AUTOMATION_TRIGGERS);
 const QUERY_TRIGGER_SET = new Set<string>(CRM_QUERY_AUTOMATION_TRIGGERS);
 const LIVE_CHAT_TRIGGER_SET = new Set<string>(CRM_LIVE_CHAT_AUTOMATION_TRIGGERS);
 
@@ -134,22 +136,24 @@ export function AutomationRulesPanel() {
   const [testingRuleId, setTestingRuleId] = useState<string | null>(null);
   const [editing, setEditing] = useState<AutomationRule | null>(null);
 
-  const { ticketRules, bookingRules, taskRules, paymentRules, queryRules, liveChatRules } = useMemo(() => {
+  const { ticketRules, bookingRules, taskRules, paymentRules, renewalRules, queryRules, liveChatRules } = useMemo(() => {
     const ticketRules: AutomationRule[] = [];
     const bookingRules: AutomationRule[] = [];
     const taskRules: AutomationRule[] = [];
     const paymentRules: AutomationRule[] = [];
+    const renewalRules: AutomationRule[] = [];
     const queryRules: AutomationRule[] = [];
     const liveChatRules: AutomationRule[] = [];
     for (const rule of rules) {
       if (PAYMENT_TRIGGER_SET.has(rule.trigger)) paymentRules.push(rule);
+      else if (RENEWAL_TRIGGER_SET.has(rule.trigger)) renewalRules.push(rule);
       else if (QUERY_TRIGGER_SET.has(rule.trigger)) queryRules.push(rule);
       else if (LIVE_CHAT_TRIGGER_SET.has(rule.trigger)) liveChatRules.push(rule);
       else if (BOOKING_TRIGGER_SET.has(rule.trigger)) bookingRules.push(rule);
       else if (TASK_TRIGGER_SET.has(rule.trigger)) taskRules.push(rule);
       else ticketRules.push(rule);
     }
-    return { ticketRules, bookingRules, taskRules, paymentRules, queryRules, liveChatRules };
+    return { ticketRules, bookingRules, taskRules, paymentRules, renewalRules, queryRules, liveChatRules };
   }, [rules]);
 
   function openCreate() {
@@ -322,6 +326,12 @@ export function AutomationRulesPanel() {
             "Client and executive payment reminders sent from the CRM Payments page.",
             <IndianRupee className="h-3.5 w-3.5" />,
             paymentRules,
+          )}
+          {renderRulesSection(
+            "Account renewals",
+            "WhatsApp CRM admins when an account enters the 30-day renewal window (in-app bell still notifies the account team).",
+            <RefreshCw className="h-3.5 w-3.5" />,
+            renewalRules,
           )}
           {renderRulesSection(
             "Meetings",

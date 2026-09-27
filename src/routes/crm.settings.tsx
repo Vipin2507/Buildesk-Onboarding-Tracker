@@ -54,6 +54,7 @@ import { crmSettingsSnapshot } from "@/stores/useCrmSettingsStore";
 import type { CrmMasterPlatformSettings } from "@/types/crm-master";
 import type { User } from "@/types";
 import { CRM_SEED_PLATFORM } from "@/data/crm-master-seed";
+import { departmentSelectOptions } from "@/data/user-departments";
 
 type SectionId =
   | "appearance"
@@ -1110,12 +1111,18 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
               onChange={(e) => setForm({ ...form, jobTitle: e.target.value })}
             />
           </div>
-          <input
-            placeholder="Department"
+          <select
             className={FIELD}
             value={form.department}
             onChange={(e) => setForm({ ...form, department: e.target.value })}
-          />
+          >
+            <option value="">Department</option>
+            {departmentSelectOptions(form.department).map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
           <select
             className={FIELD}
             value={form.role}
@@ -1478,11 +1485,18 @@ function ProfileSection() {
             />
           </Field>
           <Field label="Department">
-            <input
+            <select
               className={FIELD}
               value={profile.department}
               onChange={(e) => setProfile({ ...profile, department: e.target.value })}
-            />
+            >
+              <option value="">Select department</option>
+              {departmentSelectOptions(profile.department).map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
           </Field>
         </div>
         <div className="mt-3 flex justify-end">

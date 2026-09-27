@@ -12,6 +12,7 @@ export const AUTOMATION_TRIGGER_VALUES = [
   "task-before-start",
   "payment-overdue",
   "payment-executive-remind",
+  "account-renewal-remind",
   "query-response",
   "live-chat-started",
   "portal-ticket-created",

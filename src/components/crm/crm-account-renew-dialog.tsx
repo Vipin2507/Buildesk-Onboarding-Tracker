@@ -6,6 +6,7 @@ import { EntityFormModal } from "@/components/entity-form-modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  roundMoney,
   sumInstallments,
   validateInstallmentTotal,
 } from "@/lib/crm-account-commercial";
@@ -31,6 +32,8 @@ export function CrmAccountRenewDialog({ account, open, onOpenChange, onRenewed }
   const nextStart = account ? nextRenewalStartDate(account.endDate) : null;
 
   const [dealSize, setDealSize] = useState(0);
+  const [paymentReceived, setPaymentReceived] = useState(0);
+  const [pendingAmount, setPendingAmount] = useState(0);
   const [usersPurchased, setUsersPurchased] = useState(0);
   const [gstPercent, setGstPercent] = useState(18);
   const [termMonths, setTermMonths] = useState(12);
@@ -38,6 +41,20 @@ export function CrmAccountRenewDialog({ account, open, onOpenChange, onRenewed }
   const [installmentCount, setInstallmentCount] = useState(1);
   const [rows, setRows] = useState<CrmAccountInstallment[]>([]);
   const [saving, setSaving] = useState(false);
+
+  /** Renewal installments schedule against pending only (never fall back to full deal). */
+  function scheduleTotal(pending: number) {
+    return pending > 0 ? roundMoney(pending) : 0;
+  }
+
+  function syncRows(count: number, pending: number, start: string) {
+    const total = scheduleTotal(pending);
+    if (total <= 0 || count <= 0) {
+      setRows([]);
+      return;
+    }
+    setRows(buildEqualRenewalInstallments({ totalAmount: total, count, startDate: start }));
+  }
 
   useEffect(() => {
     if (!open || !account || !previousEnd || !nextStart) return;
@@ -47,12 +64,14 @@ export function CrmAccountRenewDialog({ account, open, onOpenChange, onRenewed }
     const months = 12;
     const end = defaultRenewalEndDate(previousEnd, months);
     setDealSize(deal);
+    setPaymentReceived(0);
+    setPendingAmount(deal);
     setUsersPurchased(users);
     setGstPercent(gst);
     setTermMonths(months);
     setEndDate(end);
-    setInstallmentCount(1);
-    setRows(buildEqualRenewalInstallments({ dealSize: deal, count: 1, startDate: nextStart }));
+    setInstallmentCount(deal > 0 ? 1 : 0);
+    syncRows(deal > 0 ? 1 : 0, deal, nextStart);
   }, [open, account?.id, previousEnd, nextStart, account]);
 
   useEffect(() => {
@@ -60,20 +79,58 @@ export function CrmAccountRenewDialog({ account, open, onOpenChange, onRenewed }
     setEndDate(defaultRenewalEndDate(previousEnd, termMonths));
   }, [termMonths, open, previousEnd]);
 
-  function syncRows(count: number, deal: number, start: string) {
-    setRows(buildEqualRenewalInstallments({ dealSize: deal, count, startDate: start }));
-  }
-
   const installmentCheck = useMemo(() => {
-    // Treat renewal rows as the "original" schedule for validation against new deal.
+    const target = scheduleTotal(pendingAmount);
+    if (target <= 0) {
+      return { ok: true as const, total: 0, target: 0 };
+    }
     return validateInstallmentTotal(
       dealSize,
-      dealSize,
+      pendingAmount,
       rows.map(({ kind: _k, ...rest }) => rest),
     );
-  }, [dealSize, rows]);
+  }, [dealSize, pendingAmount, rows]);
 
   const renewalTotal = sumInstallments(rows);
+
+  function onDealChange(nextDeal: number) {
+    const deal = roundMoney(Math.max(0, nextDeal));
+    const received = roundMoney(Math.min(deal, paymentReceived));
+    const pending = roundMoney(Math.max(0, deal - received));
+    setDealSize(deal);
+    setPaymentReceived(received);
+    setPendingAmount(pending);
+    if (nextStart) {
+      const count =
+        pending <= 0 ? 0 : installmentCount > 0 ? installmentCount : 1;
+      if (count !== installmentCount) setInstallmentCount(count);
+      syncRows(count, pending, nextStart);
+    }
+  }
+
+  function onReceivedChange(nextReceived: number) {
+    const received = roundMoney(Math.min(dealSize, Math.max(0, nextReceived)));
+    const pending = roundMoney(Math.max(0, dealSize - received));
+    setPaymentReceived(received);
+    setPendingAmount(pending);
+    if (nextStart) {
+      const count = pending <= 0 ? 0 : installmentCount > 0 ? installmentCount : 1;
+      if (count !== installmentCount) setInstallmentCount(count);
+      syncRows(count, pending, nextStart);
+    }
+  }
+
+  function onPendingChange(nextPending: number) {
+    const pending = roundMoney(Math.min(dealSize, Math.max(0, nextPending)));
+    const received = roundMoney(Math.max(0, dealSize - pending));
+    setPendingAmount(pending);
+    setPaymentReceived(received);
+    if (nextStart) {
+      const count = pending <= 0 ? 0 : installmentCount > 0 ? installmentCount : 1;
+      if (count !== installmentCount) setInstallmentCount(count);
+      syncRows(count, pending, nextStart);
+    }
+  }
 
   async function submit() {
     if (!account || !nextStart) return;
@@ -85,13 +142,20 @@ export function CrmAccountRenewDialog({ account, open, onOpenChange, onRenewed }
       toast.error("Enter a renewal deal amount");
       return;
     }
-    if (rows.length === 0) {
-      toast.error("Add at least one installment");
+    if (roundMoney(paymentReceived + pendingAmount) > dealSize + 0.01) {
+      toast.error("Payment received + pending cannot exceed deal amount");
       return;
     }
-    if (!installmentCheck.ok) {
-      toast.error(installmentCheck.message ?? "Installment total must match deal amount");
-      return;
+    const scheduleTarget = scheduleTotal(pendingAmount);
+    if (scheduleTarget > 0) {
+      if (rows.length === 0) {
+        toast.error("Add at least one installment for the pending amount");
+        return;
+      }
+      if (!installmentCheck.ok) {
+        toast.error(installmentCheck.message ?? "Installment total must match pending amount");
+        return;
+      }
     }
 
     setSaving(true);
@@ -103,6 +167,8 @@ export function CrmAccountRenewDialog({ account, open, onOpenChange, onRenewed }
           usersPurchased,
           gstPercent,
           endDate,
+          paymentReceived,
+          pendingAmount,
           renewalInstallments: rows.map((r) => ({
             amount: r.amount,
             dueDate: r.dueDate,
@@ -137,7 +203,7 @@ export function CrmAccountRenewDialog({ account, open, onOpenChange, onRenewed }
     >
       <p className="mb-3 text-[11px] text-muted-foreground">
         {nextStart
-          ? `Current service ends ${formatDate(previousEnd)}. New period starts ${formatDate(nextStart)}. Old collections stay on the ledger; pending resets for this deal.`
+          ? `Current service ends ${formatDate(previousEnd)}. New period starts ${formatDate(nextStart)}. Old collections stay on the ledger.`
           : "Set the next service period commercial terms."}
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -148,11 +214,7 @@ export function CrmAccountRenewDialog({ account, open, onOpenChange, onRenewed }
             min={0}
             step="0.01"
             value={dealSize || ""}
-            onChange={(e) => {
-              const next = Number(e.target.value) || 0;
-              setDealSize(next);
-              if (nextStart) syncRows(installmentCount, next, nextStart);
-            }}
+            onChange={(e) => onDealChange(Number(e.target.value) || 0)}
             className="h-8 text-xs"
           />
         </div>
@@ -166,6 +228,34 @@ export function CrmAccountRenewDialog({ account, open, onOpenChange, onRenewed }
             onChange={(e) => setUsersPurchased(Number(e.target.value) || 0)}
             className="h-8 text-xs"
           />
+        </div>
+        <div>
+          <Label>Payment received (this renewal)</Label>
+          <Input
+            type="number"
+            min={0}
+            step="0.01"
+            value={paymentReceived || ""}
+            onChange={(e) => onReceivedChange(Number(e.target.value) || 0)}
+            className="h-8 text-xs"
+          />
+          <p className="mt-0.5 text-[10px] text-muted-foreground">
+            Initial collection for this deal — added to payment history.
+          </p>
+        </div>
+        <div>
+          <Label>Pending amount</Label>
+          <Input
+            type="number"
+            min={0}
+            step="0.01"
+            value={pendingAmount || ""}
+            onChange={(e) => onPendingChange(Number(e.target.value) || 0)}
+            className="h-8 text-xs"
+          />
+          <p className="mt-0.5 text-[10px] text-muted-foreground">
+            Remaining for this renewal · installments schedule against this.
+          </p>
         </div>
         <div>
           <Label>GST %</Label>
@@ -204,16 +294,17 @@ export function CrmAccountRenewDialog({ account, open, onOpenChange, onRenewed }
           <Label>No. of installments</Label>
           <Input
             type="number"
-            min={1}
+            min={0}
             max={60}
             step={1}
             value={installmentCount}
             onChange={(e) => {
-              const count = Math.max(1, Math.floor(Number(e.target.value) || 1));
+              const count = Math.max(0, Math.floor(Number(e.target.value) || 0));
               setInstallmentCount(count);
-              if (nextStart) syncRows(count, dealSize, nextStart);
+              if (nextStart) syncRows(count, pendingAmount, nextStart);
             }}
             className="h-8 text-xs"
+            disabled={pendingAmount <= 0}
           />
         </div>
         <div className="flex items-end">
@@ -223,38 +314,43 @@ export function CrmAccountRenewDialog({ account, open, onOpenChange, onRenewed }
               installmentCheck.ok ? "text-muted-foreground" : "font-medium text-destructive",
             )}
           >
-            Scheduled ₹{renewalTotal.toLocaleString("en-IN")}
-            {!installmentCheck.ok ? ` · ${installmentCheck.message}` : " (must match deal)"}
+            {pendingAmount <= 0
+              ? "No pending — installments not required"
+              : `Scheduled ₹${renewalTotal.toLocaleString("en-IN")}${
+                  !installmentCheck.ok ? ` · ${installmentCheck.message}` : " (must match pending)"
+                }`}
           </p>
         </div>
       </div>
 
-      <div className="mt-3 space-y-1.5">
-        <div className="text-xs font-semibold">Renewal installments</div>
-        {rows.map((row, idx) => (
-          <div key={`${row.dueDate}-${idx}`} className="grid grid-cols-[1fr_1fr] gap-2">
-            <Input
-              type="number"
-              min={0}
-              step="0.01"
-              value={row.amount || ""}
-              onChange={(e) => {
-                const amount = Number(e.target.value) || 0;
-                setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, amount } : r)));
-              }}
-              className="h-8 text-xs"
-              placeholder="Amount"
-            />
-            <DatePickerField
-              value={row.dueDate}
-              onChange={(dueDate) => {
-                setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, dueDate } : r)));
-              }}
-              compact
-            />
-          </div>
-        ))}
-      </div>
+      {pendingAmount > 0 ? (
+        <div className="mt-3 space-y-1.5">
+          <div className="text-xs font-semibold">Renewal installments</div>
+          {rows.map((row, idx) => (
+            <div key={`${row.dueDate}-${idx}`} className="grid grid-cols-[1fr_1fr] gap-2">
+              <Input
+                type="number"
+                min={0}
+                step="0.01"
+                value={row.amount || ""}
+                onChange={(e) => {
+                  const amount = Number(e.target.value) || 0;
+                  setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, amount } : r)));
+                }}
+                className="h-8 text-xs"
+                placeholder="Amount"
+              />
+              <DatePickerField
+                value={row.dueDate}
+                onChange={(dueDate) => {
+                  setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, dueDate } : r)));
+                }}
+                compact
+              />
+            </div>
+          ))}
+        </div>
+      ) : null}
     </EntityFormModal>
   );
 }

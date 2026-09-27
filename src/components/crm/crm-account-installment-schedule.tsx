@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { allocateAccountPayments } from "@/lib/crm-payment-allocation";
-import { calcDealExGst, calcGstAmount } from "@/lib/crm-account-commercial";
+import { calcDealExGst, calcGstAmount, isRenewalInstallment } from "@/lib/crm-account-commercial";
+import { buildCycleAwarePaymentAllocation } from "@/lib/crm-payment-allocation";
 import { cn, formatDate } from "@/lib/utils";
 import type { CrmAccount } from "@/types/crm-account";
 
@@ -34,16 +34,19 @@ export function CrmAccountInstallmentSchedule({ account }: { account: CrmAccount
   const installments = account.installments ?? [];
   const dealSize = account.dealSize ?? 0;
   const gstPercent = account.gstPercent ?? 0;
-  const received = account.paymentReceived ?? 0;
+  const baseline = account.paymentCycleBaseline ?? 0;
 
-  const allocation = useMemo(
+  const view = useMemo(
     () =>
-      allocateAccountPayments({
+      buildCycleAwarePaymentAllocation({
         installments,
-        totalReceived: received,
+        // Account store holds cycle received after renew; baseline restores lifetime for display.
+        lifetimeReceived: account.paymentReceived ?? 0,
         totalDealValue: dealSize,
+        paymentCycleBaseline: baseline,
+        receivedIsCycleAmount: true,
       }),
-    [installments, received, dealSize],
+    [installments, account.paymentReceived, dealSize, baseline],
   );
 
   if (installments.length === 0 && dealSize <= 0) {
@@ -56,6 +59,7 @@ export function CrmAccountInstallmentSchedule({ account }: { account: CrmAccount
 
   const dealExGst = calcDealExGst(dealSize, gstPercent);
   const gstAmount = calcGstAmount(dealSize, gstPercent);
+  const showLifetime = baseline > 0.01;
 
   return (
     <div className="space-y-3">
@@ -65,24 +69,29 @@ export function CrmAccountInstallmentSchedule({ account }: { account: CrmAccount
           <div className="font-medium tabular-nums">{dealSize > 0 ? formatInr(dealSize) : "—"}</div>
         </div>
         <div>
-          <div className="text-[10px] uppercase text-muted-foreground">Received / Pending</div>
-          <div className="font-medium tabular-nums">
-            {formatInr(received)} / {formatInr(account.pendingAmount ?? 0)}
+          <div className="text-[10px] uppercase text-muted-foreground">
+            {showLifetime ? "This cycle received / pending" : "Received / Pending"}
           </div>
+          <div className="font-medium tabular-nums">
+            {formatInr(view.paymentReceived)} / {formatInr(view.pendingAmount)}
+          </div>
+          {showLifetime ? (
+            <div className="mt-0.5 text-[10px] text-muted-foreground">
+              Lifetime on ledger: {formatInr(view.lifetimeReceived)}
+            </div>
+          ) : null}
         </div>
         {gstPercent > 0 ? (
-          <>
-            <div>
-              <div className="text-[10px] uppercase text-muted-foreground">Ex-GST / GST</div>
-              <div className="font-medium tabular-nums">
-                {formatInr(dealExGst)} / {formatInr(gstAmount)} ({gstPercent}%)
-              </div>
+          <div>
+            <div className="text-[10px] uppercase text-muted-foreground">Ex-GST / GST</div>
+            <div className="font-medium tabular-nums">
+              {formatInr(dealExGst)} / {formatInr(gstAmount)} ({gstPercent}%)
             </div>
-          </>
+          </div>
         ) : null}
         <div>
-          <div className="text-[10px] uppercase text-muted-foreground">Collected</div>
-          <div className="font-medium tabular-nums">{allocation.collectionPercent}%</div>
+          <div className="text-[10px] uppercase text-muted-foreground">Collected (this cycle)</div>
+          <div className="font-medium tabular-nums">{view.collectionPercent}%</div>
         </div>
       </div>
 
@@ -100,11 +109,16 @@ export function CrmAccountInstallmentSchedule({ account }: { account: CrmAccount
               </tr>
             </thead>
             <tbody>
-              {allocation.installments.map((row) => (
-                <tr key={row.index} className="border-t border-border/60">
+              {view.installments.map((row) => (
+                <tr key={`${row.index}-${row.dueDate}-${row.amount}`} className="border-t border-border/60">
                   <td className="px-2 py-1.5 tabular-nums">{row.index}</td>
                   <td className="px-2 py-1.5 tabular-nums">
                     {formatInr(row.amount)}
+                    {isRenewalInstallment(row) ? (
+                      <span className="ml-1 text-[10px] font-medium text-violet-600 dark:text-violet-400">
+                        Renewal
+                      </span>
+                    ) : null}
                     {row.remainingAmount > 0 && row.remainingAmount < row.amount ? (
                       <span className="ml-1 text-[10px] text-muted-foreground">
                         ({formatInr(row.remainingAmount)} due)

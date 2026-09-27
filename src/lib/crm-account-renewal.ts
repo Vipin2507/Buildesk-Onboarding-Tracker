@@ -74,6 +74,10 @@ export type CrmAccountRenewInput = {
   gstPercent: number;
   /** New service end date (editable term). */
   endDate: string;
+  /** Amount already collected toward this renewal deal (creates a ledger entry). */
+  initialPaymentReceived?: number;
+  /** Remaining for this renewal deal (defaults to deal − initial received). */
+  pendingAmount?: number;
   /** Renewal installment plan (will be tagged kind: "renewal"). */
   renewalInstallments: CrmAccountInstallment[];
   /** Lifetime ledger total at renew time (sets payment cycle baseline). */
@@ -99,6 +103,15 @@ export function buildCrmAccountRenewPatch(
     Math.max(lifetime, existingBaseline + cycleSoFar, existingBaseline),
   );
 
+  const initialReceived = roundMoney(
+    Math.min(dealSize, Math.max(0, Number(input.initialPaymentReceived) || 0)),
+  );
+  const pendingAmount = roundMoney(
+    input.pendingAmount != null
+      ? Math.max(0, Math.min(dealSize, Number(input.pendingAmount) || 0))
+      : Math.max(0, dealSize - initialReceived),
+  );
+
   const kept = originalInstallments(account.installments ?? []).concat(
     renewalInstallments(account.installments ?? []),
   );
@@ -117,8 +130,8 @@ export function buildCrmAccountRenewPatch(
     usersPurchased,
     gstPercent,
     valuePerUser,
-    paymentReceived: 0,
-    pendingAmount: dealSize,
+    paymentReceived: initialReceived,
+    pendingAmount,
     paymentCycleBaseline,
     installments: [...kept, ...freshRenewalRows],
     annualLicense: true,
@@ -127,12 +140,13 @@ export function buildCrmAccountRenewPatch(
 }
 
 export function buildEqualRenewalInstallments(input: {
-  dealSize: number;
+  /** Amount to schedule (usually pending for the new deal). */
+  totalAmount: number;
   count: number;
   startDate: string;
 }): CrmAccountInstallment[] {
   return buildInstallmentSchedule({
-    totalAmount: input.dealSize,
+    totalAmount: input.totalAmount,
     count: input.count,
     startDate: input.startDate,
   }).map((row) => ({ ...row, kind: "renewal" as const }));

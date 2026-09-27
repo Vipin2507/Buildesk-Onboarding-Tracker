@@ -31,6 +31,7 @@ import { Switch } from "@/components/ui/switch";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useAuthStore, useSettingsStore, useUserStore } from "@/stores";
 import { createUser as apiCreateUser, setUserPassword as apiSetUserPassword, updateUser as apiUpdateUser } from "@/lib/api";
+import { departmentSelectOptions } from "@/data/user-departments";
 import { cn } from "@/lib/utils";
 import type { ThemeMode } from "@/lib/theme";
 import { motion } from "framer-motion";
@@ -1346,12 +1347,18 @@ function UsersSection({ initialInviteOpen = false }: { initialInviteOpen?: boole
               onChange={(e) => setForm({ ...form, jobTitle: e.target.value })}
             />
           </div>
-          <input
-            placeholder="Department"
+          <select
             className={FIELD}
             value={form.department ?? ""}
             onChange={(e) => setForm({ ...form, department: e.target.value })}
-          />
+          >
+            <option value="">Department</option>
+            {departmentSelectOptions(form.department).map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
           <select
             className={FIELD}
             value={form.role}

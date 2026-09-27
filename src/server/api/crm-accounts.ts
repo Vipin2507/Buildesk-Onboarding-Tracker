@@ -12,6 +12,7 @@ import { parseInstallmentsJson } from "@/lib/crm-account-commercial";
 import {
   ensureInitialPaymentOnAccountCreate,
   getAccountPaymentReceived,
+  insertPaymentTransaction,
   replaceAccountPaymentLedgerForImport,
   syncAccountPaymentTotals,
 } from "@/server/lib/crm-payments";
@@ -394,6 +395,9 @@ export const renewCrmAccount = createServerFn({ method: "POST" })
         usersPurchased: z.number().int().nonnegative(),
         gstPercent: z.number().min(0).max(100),
         endDate: z.string().min(8),
+        /** Initial collection toward this renewal deal (optional). */
+        paymentReceived: z.number().min(0).optional(),
+        pendingAmount: z.number().min(0).optional(),
         renewalInstallments: z
           .array(
             z.object({
@@ -416,18 +420,33 @@ export const renewCrmAccount = createServerFn({ method: "POST" })
       throw new ApiError(400, "Account has no end date to renew from");
     }
 
+    const dealSize = roundMoney(data.dealSize);
+    const initialReceived = roundMoney(
+      Math.min(dealSize, Math.max(0, Number(data.paymentReceived) || 0)),
+    );
+    const pendingAmount = roundMoney(
+      data.pendingAmount != null
+        ? Math.max(0, Math.min(dealSize, Number(data.pendingAmount) || 0))
+        : Math.max(0, dealSize - initialReceived),
+    );
+    if (roundMoney(initialReceived + pendingAmount) > dealSize + 0.01) {
+      throw new ApiError(400, "Payment received + pending cannot exceed deal amount");
+    }
+
     const account = mapRow(existing);
-    const lifetime = getAccountPaymentReceived(db, data.accountId);
+    const lifetimeBefore = getAccountPaymentReceived(db, data.accountId);
     const patch = buildCrmAccountRenewPatch(account, {
-      dealSize: data.dealSize,
+      dealSize,
       usersPurchased: data.usersPurchased,
       gstPercent: data.gstPercent,
       endDate: data.endDate,
+      initialPaymentReceived: initialReceived,
+      pendingAmount,
       renewalInstallments: data.renewalInstallments.map((r) => ({
         ...r,
         kind: "renewal" as const,
       })),
-      lifetimePaymentReceived: lifetime,
+      lifetimePaymentReceived: lifetimeBefore,
     });
 
     const now = nowIso();
@@ -435,23 +454,27 @@ export const renewCrmAccount = createServerFn({ method: "POST" })
     db.update(t.crmAccounts)
       .set({
         ...apiFields,
-        // Clear notified marker so the next cycle can bell again.
         renewalWindowNotifiedForEndDate: null,
         updatedAt: now,
       })
       .where(eq(t.crmAccounts.id, data.accountId))
       .run();
 
-    // Keep denormalized cycle totals (received=0, pending=deal) — do not overwrite from full ledger.
-    db.update(t.crmAccounts)
-      .set({
-        paymentReceived: roundMoney(0),
-        pendingAmount: roundMoney(data.dealSize),
-        paymentCycleBaseline: apiFields.paymentCycleBaseline,
-        updatedAt: now,
-      })
-      .where(eq(t.crmAccounts.id, data.accountId))
-      .run();
+    // Freeze prior ledger as baseline, then record initial renewal collection if any.
+    if (initialReceived > 0) {
+      const paidDate =
+        (patch.startDate as string | undefined)?.slice(0, 10) || now.slice(0, 10);
+      insertPaymentTransaction(db, {
+        accountId: data.accountId,
+        amount: initialReceived,
+        paidDate,
+        note: "Initial renewal payment",
+        createdBy: user.id,
+      });
+    }
+
+    // Cycle totals from ledger − baseline (handles 0 initial received too).
+    syncAccountPaymentTotals(db, data.accountId);
 
     const row = db.select().from(t.crmAccounts).where(eq(t.crmAccounts.id, data.accountId)).get();
     if (!row) throw new ApiError(500, "Renew failed");
