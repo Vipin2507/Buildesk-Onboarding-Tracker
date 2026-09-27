@@ -816,7 +816,15 @@ export async function resolveWahaMediaDataUrl(
   if (!fetched.ok || !fetched.base64) {
     return { dataUrl: null, error: fetched.error || `HTTP ${fetched.status}` };
   }
-  const mimetype = fetched.mimetype || msg.mimetype || "application/octet-stream";
+  const fetchedMime = fetched.mimetype || undefined;
+  const mimetype =
+    (fetchedMime && fetchedMime !== "application/octet-stream" ? fetchedMime : undefined) ||
+    msg.mimetype ||
+    fetchedMime ||
+    (msg.mediaType === "video" ? "video/mp4" : undefined) ||
+    (msg.mediaType === "image" ? "image/jpeg" : undefined) ||
+    (msg.mediaType === "audio" || msg.mediaType === "voice" ? "audio/ogg" : undefined) ||
+    "application/octet-stream";
   return {
     dataUrl: `data:${mimetype};base64,${fetched.base64}`,
     mimetype,

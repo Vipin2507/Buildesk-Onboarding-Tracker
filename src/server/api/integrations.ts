@@ -419,8 +419,8 @@ export const proxyWahaMediaFile = createServerFn({ method: "POST" })
       };
     }
     const buf = Buffer.from(await res.arrayBuffer());
-    // Cap ~2.5MB base64 payload to keep ServerFn responses manageable.
-    if (buf.byteLength > 2_500_000) {
+    // Cap ~20MB so short WhatsApp videos can inline; larger files fail gracefully.
+    if (buf.byteLength > 20_000_000) {
       return {
         ok: false,
         status: 413,

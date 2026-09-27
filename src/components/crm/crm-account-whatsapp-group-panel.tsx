@@ -1,18 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Check,
   CheckCheck,
+  ChevronLeft,
+  ChevronRight,
+  Download,
   FileIcon,
   Image as ImageIcon,
   Loader2,
   Paperclip,
   Pencil,
+  Play,
   Reply,
   Search,
   Send,
   Video,
   Mic,
   X,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -42,6 +49,263 @@ import { useCrmAccountStore } from "@/stores/useCrmAccountStore";
 import { useCrmAutomationStore } from "@/stores/useCrmAutomationStore";
 
 const POLL_MS = 5000;
+
+type MediaViewerItem = {
+  id: string;
+  src: string;
+  type: NonNullable<WahaChatMessage["mediaType"]>;
+  filename?: string;
+  caption?: string;
+  senderLabel?: string;
+  timestamp: number;
+};
+
+function extensionForMime(mimetype?: string, mediaType?: WahaChatMessage["mediaType"]) {
+  const mt = (mimetype || "").toLowerCase();
+  if (mt.includes("png")) return "png";
+  if (mt.includes("webp")) return "webp";
+  if (mt.includes("gif")) return "gif";
+  if (mt.includes("jpeg") || mt.includes("jpg")) return "jpg";
+  if (mt.includes("mp4")) return "mp4";
+  if (mt.includes("webm")) return "webm";
+  if (mt.includes("ogg")) return "ogg";
+  if (mt.includes("mpeg") || mt.includes("mp3")) return "mp3";
+  if (mt.includes("pdf")) return "pdf";
+  if (mediaType === "image") return "jpg";
+  if (mediaType === "video") return "mp4";
+  if (mediaType === "audio" || mediaType === "voice") return "ogg";
+  if (mediaType === "document") return "bin";
+  return "bin";
+}
+
+function defaultMediaFilename(msg: WahaChatMessage, type: WahaChatMessage["mediaType"]) {
+  if (msg.filename?.trim()) return msg.filename.trim();
+  const ext = extensionForMime(msg.mimetype, type);
+  const stamp = msg.timestamp || Math.floor(Date.now() / 1000);
+  if (type === "image" || type === "sticker") return `IMG-${stamp}.${ext}`;
+  if (type === "video") return `VID-${stamp}.${ext}`;
+  if (type === "audio" || type === "voice") return `AUD-${stamp}.${ext}`;
+  return `DOC-${stamp}.${ext}`;
+}
+
+async function downloadMediaFile(src: string, filename: string) {
+  try {
+    const res = await fetch(src);
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = filename;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(objectUrl);
+  } catch {
+    // Fallback for data URLs / CORS edge cases
+    const a = document.createElement("a");
+    a.href = src;
+    a.download = filename;
+    a.target = "_blank";
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+}
+
+function collectMediaViewerItems(
+  messages: WahaChatMessage[],
+  localPreviews: Map<string, string>,
+): MediaViewerItem[] {
+  const items: MediaViewerItem[] = [];
+  for (const msg of messages) {
+    const src = mediaSrc(msg, localPreviews);
+    if (!src) continue;
+    const type = resolveEffectiveMediaType(msg, src, true);
+    if (!type || type === "unknown") continue;
+    items.push({
+      id: msg.id,
+      src,
+      type,
+      filename: defaultMediaFilename(msg, type),
+      caption: msg.body?.trim() || undefined,
+      senderLabel: msg.fromMe
+        ? "You"
+        : msg.participantName || msg.from.replace(/@.*/, "") || undefined,
+      timestamp: msg.timestamp,
+    });
+  }
+  return items;
+}
+
+function WhatsappMediaViewer({
+  items,
+  index,
+  onIndexChange,
+  onClose,
+}: {
+  items: MediaViewerItem[];
+  index: number;
+  onIndexChange: (index: number) => void;
+  onClose: () => void;
+}) {
+  const item = items[index];
+  const [zoomed, setZoomed] = useState(false);
+  const [busyDownload, setBusyDownload] = useState(false);
+
+  useEffect(() => {
+    setZoomed(false);
+  }, [index]);
+
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft" && index > 0) onIndexChange(index - 1);
+      if (e.key === "ArrowRight" && index < items.length - 1) onIndexChange(index + 1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [index, items.length, onClose, onIndexChange]);
+
+  if (!item || typeof document === "undefined") return null;
+
+  const canPrev = index > 0;
+  const canNext = index < items.length - 1;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex flex-col bg-black/95 text-white"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Media viewer"
+    >
+      <div className="flex shrink-0 items-center gap-2 bg-black/60 px-3 py-2.5 backdrop-blur-sm">
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-medium">{item.senderLabel || "Media"}</div>
+          <div className="truncate text-[11px] text-white/60">
+            {formatMsgTime(item.timestamp)}
+            {items.length > 1 ? ` · ${index + 1} / ${items.length}` : ""}
+          </div>
+        </div>
+        {item.type === "image" || item.type === "sticker" ? (
+          <button
+            type="button"
+            className="rounded-full p-2 hover:bg-white/10"
+            title={zoomed ? "Zoom out" : "Zoom in"}
+            onClick={() => setZoomed((z) => !z)}
+          >
+            {zoomed ? <ZoomOut className="h-5 w-5" /> : <ZoomIn className="h-5 w-5" />}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="rounded-full p-2 hover:bg-white/10 disabled:opacity-40"
+          title="Download"
+          disabled={busyDownload}
+          onClick={() => {
+            setBusyDownload(true);
+            void downloadMediaFile(item.src, item.filename || "media")
+              .then(() => toast.success("Download started"))
+              .catch(() => toast.error("Download failed"))
+              .finally(() => setBusyDownload(false));
+          }}
+        >
+          {busyDownload ? <Loader2 className="h-5 w-5 animate-spin" /> : <Download className="h-5 w-5" />}
+        </button>
+        <button
+          type="button"
+          className="rounded-full p-2 hover:bg-white/10"
+          title="Close"
+          onClick={onClose}
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      <div
+        className="relative flex min-h-0 flex-1 items-center justify-center overflow-auto p-3"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
+        {canPrev ? (
+          <button
+            type="button"
+            className="absolute left-2 z-10 rounded-full bg-black/50 p-2 hover:bg-black/70"
+            title="Previous"
+            onClick={() => onIndexChange(index - 1)}
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </button>
+        ) : null}
+        {canNext ? (
+          <button
+            type="button"
+            className="absolute right-2 z-10 rounded-full bg-black/50 p-2 hover:bg-black/70"
+            title="Next"
+            onClick={() => onIndexChange(index + 1)}
+          >
+            <ChevronRight className="h-6 w-6" />
+          </button>
+        ) : null}
+
+        {item.type === "image" || item.type === "sticker" ? (
+          <img
+            src={item.src}
+            alt=""
+            className={cn(
+              "max-h-full max-w-full rounded-sm object-contain transition-transform",
+              zoomed ? "cursor-zoom-out scale-[1.65]" : "cursor-zoom-in",
+            )}
+            onClick={() => setZoomed((z) => !z)}
+          />
+        ) : null}
+        {item.type === "video" ? (
+          <video
+            src={item.src}
+            controls
+            autoPlay
+            playsInline
+            className="max-h-full max-w-full rounded-sm"
+          />
+        ) : null}
+        {item.type === "audio" || item.type === "voice" ? (
+          <div className="w-full max-w-md rounded-xl bg-white/10 px-4 py-6">
+            <audio src={item.src} controls autoPlay className="w-full" />
+          </div>
+        ) : null}
+        {item.type === "document" ? (
+          <div className="flex max-w-sm flex-col items-center gap-3 rounded-xl bg-white/10 px-6 py-8 text-center">
+            <FileIcon className="h-10 w-10 text-white/80" />
+            <div className="break-all text-sm">{item.filename || "Document"}</div>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => void downloadMediaFile(item.src, item.filename || "document")}
+            >
+              <Download className="mr-1.5 h-4 w-4" />
+              Download
+            </Button>
+          </div>
+        ) : null}
+      </div>
+
+      {item.caption ? (
+        <div className="shrink-0 border-t border-white/10 bg-black/60 px-4 py-2.5 text-center text-sm text-white/90 backdrop-blur-sm">
+          {item.caption}
+        </div>
+      ) : null}
+    </div>,
+    document.body,
+  );
+}
 
 function storedToUiMessage(row: {
   wahaMessageId: string;
@@ -105,6 +369,29 @@ function absoluteWahaMediaUrl(url: string | undefined | null, apiUrl: string): s
 function isBrowserDisplayableMediaUrl(url: string | null | undefined): boolean {
   if (!url) return false;
   return url.startsWith("data:") || url.startsWith("blob:");
+}
+
+/** Prefer blob: for video/audio — large data: URLs often fail or flicker in <video>. */
+function dataUrlToObjectUrl(dataUrl: string): string | null {
+  try {
+    const match = /^data:([^;,]+);base64,([\s\S]+)$/.exec(dataUrl);
+    if (!match) return null;
+    const mime = match[1];
+    const binary = atob(match[2]);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return URL.createObjectURL(new Blob([bytes], { type: mime }));
+  } catch {
+    return null;
+  }
+}
+
+function prefersBlobPlayback(
+  mediaType: WahaChatMessage["mediaType"] | undefined,
+  dataUrl: string,
+): boolean {
+  if (mediaType === "video" || mediaType === "audio" || mediaType === "voice") return true;
+  return dataUrl.length > 400_000;
 }
 
 function mediaSrc(
@@ -541,11 +828,54 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
   const attachKindRef = useRef<WahaMediaKind>("file");
   /** Session-only previews so sent media still shows after WAHA sync without downloadMedia. */
   const localMediaPreviewRef = useRef<Map<string, string>>(new Map());
+  const mediaBlobUrlsRef = useRef<Map<string, string>>(new Map());
   const mediaHydrateInFlight = useRef<Set<string>>(new Set());
   /** Fail counts — retry a few times before giving up (WAHA timeouts are flaky). */
   const mediaHydrateFailCount = useRef<Map<string, number>>(new Map());
   const MEDIA_HYDRATE_MAX_ATTEMPTS = 3;
   const [mediaHydrateEpoch, setMediaHydrateEpoch] = useState(0);
+  /** Message IDs whose media failed permanently (stops Loading ↔ error flicker). */
+  const [mediaBrokenIds, setMediaBrokenIds] = useState<Set<string>>(() => new Set());
+  /** Open media lightbox for this message id (WhatsApp-style fullscreen viewer). */
+  const [mediaViewerId, setMediaViewerId] = useState<string | null>(null);
+  /** Bumps when local blob previews change so the gallery can see new srcs. */
+  const [mediaPreviewTick, setMediaPreviewTick] = useState(0);
+
+  const setLocalMediaPreview = useCallback((id: string, url: string | null) => {
+    const prevBlob = mediaBlobUrlsRef.current.get(id);
+    if (prevBlob) {
+      URL.revokeObjectURL(prevBlob);
+      mediaBlobUrlsRef.current.delete(id);
+    }
+    if (!url) {
+      localMediaPreviewRef.current.delete(id);
+      setMediaPreviewTick((n) => n + 1);
+      return;
+    }
+    if (url.startsWith("blob:")) mediaBlobUrlsRef.current.set(id, url);
+    localMediaPreviewRef.current.set(id, url);
+    setMediaPreviewTick((n) => n + 1);
+  }, []);
+
+  const markMediaBroken = useCallback((id: string) => {
+    mediaHydrateFailCount.current.set(id, MEDIA_HYDRATE_MAX_ATTEMPTS);
+    setMediaBrokenIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
+
+  const clearMediaBroken = useCallback((id: string) => {
+    mediaHydrateFailCount.current.delete(id);
+    setMediaBrokenIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }, []);
 
   const groupId = account?.whatsappGroupId?.trim() || "";
   const groupName = account?.whatsappGroupName?.trim() || groupId;
@@ -578,6 +908,32 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
       (g) => g.subject.toLowerCase().includes(q) || g.id.toLowerCase().includes(q),
     );
   }, [availablePickerGroups, groupSearch]);
+
+  const mediaGallery = useMemo(
+    () => collectMediaViewerItems(messages, localMediaPreviewRef.current),
+    // mediaPreviewTick forces refresh when blob/data previews land in the ref.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [messages, mediaPreviewTick],
+  );
+
+  const openMediaViewer = useCallback(
+    (messageId: string) => {
+      const items = collectMediaViewerItems(messages, localMediaPreviewRef.current);
+      const idx = items.findIndex((item) => item.id === messageId);
+      if (idx < 0) {
+        toast.error("Media is still loading");
+        return;
+      }
+      setMediaViewerId(messageId);
+    },
+    [messages],
+  );
+
+  const mediaViewerIndex = useMemo(() => {
+    if (!mediaViewerId) return null;
+    const idx = mediaGallery.findIndex((item) => item.id === mediaViewerId);
+    return idx >= 0 ? idx : null;
+  }, [mediaGallery, mediaViewerId]);
 
   const loadMessages = useCallback(
     async (opts?: { silent?: boolean; recentOnly?: boolean }) => {
@@ -729,6 +1085,11 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
     lastSeenIds.current = new Set();
     mediaHydrateInFlight.current = new Set();
     mediaHydrateFailCount.current = new Map();
+    for (const url of mediaBlobUrlsRef.current.values()) URL.revokeObjectURL(url);
+    mediaBlobUrlsRef.current = new Map();
+    localMediaPreviewRef.current = new Map();
+    setMediaBrokenIds(new Set());
+    setMediaViewerId(null);
     setMessages([]);
     setPollError(null);
     setHasMoreHistory(true);
@@ -742,8 +1103,16 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
   useEffect(() => {
     mediaHydrateFailCount.current = new Map();
     mediaHydrateInFlight.current = new Set();
+    setMediaBrokenIds(new Set());
     setMediaHydrateEpoch((n) => n + 1);
   }, [waha.apiKey, waha.apiUrl]);
+
+  useEffect(() => {
+    return () => {
+      for (const url of mediaBlobUrlsRef.current.values()) URL.revokeObjectURL(url);
+      mediaBlobUrlsRef.current = new Map();
+    };
+  }, []);
 
   const pendingPreviewUrlRef = useRef<string | null>(null);
   useEffect(() => {
@@ -790,6 +1159,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
     if (document.visibilityState === "hidden") return;
 
     const missing = messages.filter((m) => {
+      if (mediaBrokenIds.has(m.id)) return false;
       if (mediaHydrateInFlight.current.has(m.id)) return false;
       const fails = mediaHydrateFailCount.current.get(m.id) ?? 0;
       if (fails >= MEDIA_HYDRATE_MAX_ATTEMPTS) return false;
@@ -838,27 +1208,34 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
           if (cancelled) continue;
 
           if (!resolved.dataUrl) {
-            mediaHydrateFailCount.current.set(
-              msg.id,
-              (mediaHydrateFailCount.current.get(msg.id) ?? 0) + 1,
-            );
+            const nextFails = (mediaHydrateFailCount.current.get(msg.id) ?? 0) + 1;
+            mediaHydrateFailCount.current.set(msg.id, nextFails);
+            if (nextFails >= MEDIA_HYDRATE_MAX_ATTEMPTS) markMediaBroken(msg.id);
             continue;
           }
 
-          mediaHydrateFailCount.current.delete(msg.id);
-          localMediaPreviewRef.current.set(msg.id, resolved.dataUrl);
+          clearMediaBroken(msg.id);
+          const mime = resolved.mimetype || candidate.mimetype;
+          const resolvedType = betterMediaType(
+            mediaTypeFromMime(mime),
+            candidate.mediaType,
+          );
+          let displayUrl = resolved.dataUrl;
+          if (prefersBlobPlayback(resolvedType, resolved.dataUrl)) {
+            displayUrl = dataUrlToObjectUrl(resolved.dataUrl) || resolved.dataUrl;
+          }
+          setLocalMediaPreview(msg.id, displayUrl);
 
           const durableUrl = persistableMediaUrl(resolved.dataUrl);
-          const mime = resolved.mimetype || candidate.mimetype;
+          const remoteKeep =
+            absoluteWahaMediaUrl(candidate.mediaUrl, waha.apiUrl) || candidate.mediaUrl;
+          // Avoid stuffing multi-MB data URLs into React/DB state — blob preview + remote URL is enough.
           const enriched: WahaChatMessage = {
             ...candidate,
-            mediaUrl: durableUrl || resolved.dataUrl,
+            mediaUrl: durableUrl || (displayUrl.startsWith("blob:") ? remoteKeep : resolved.dataUrl),
             mimetype: mime,
             hasMedia: true,
-            mediaType: betterMediaType(
-              mediaTypeFromMime(mime),
-              candidate.mediaType,
-            ),
+            mediaType: resolvedType,
           };
 
           setMessages((prev) => mergeMessages(prev, [enriched]));
@@ -871,10 +1248,9 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
             },
           }).catch(() => null);
         } catch {
-          mediaHydrateFailCount.current.set(
-            msg.id,
-            (mediaHydrateFailCount.current.get(msg.id) ?? 0) + 1,
-          );
+          const nextFails = (mediaHydrateFailCount.current.get(msg.id) ?? 0) + 1;
+          mediaHydrateFailCount.current.set(msg.id, nextFails);
+          if (nextFails >= MEDIA_HYDRATE_MAX_ATTEMPTS) markMediaBroken(msg.id);
         } finally {
           mediaHydrateInFlight.current.delete(msg.id);
         }
@@ -884,7 +1260,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
     return () => {
       cancelled = true;
     };
-  }, [messages, groupId, editing, waha, accountId, mediaHydrateEpoch]);
+  }, [messages, groupId, editing, waha, accountId, mediaHydrateEpoch, mediaBrokenIds, markMediaBroken, clearMediaBroken, setLocalMediaPreview]);
 
   useEffect(() => {
     const el = threadRef.current;
@@ -1344,26 +1720,50 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                   ) : null}
                   {showMedia && effectiveType === "image" ? (
                     src ? (
-                      <img
-                        src={src}
-                        alt=""
-                        className="mb-1 max-h-48 max-w-full rounded-md object-cover"
-                        onError={() => {
-                          localMediaPreviewRef.current.delete(msg.id);
-                          mediaHydrateFailCount.current.delete(msg.id);
-                          setMessages((prev) =>
-                            prev.map((m) =>
-                              m.id === msg.id
-                                ? {
-                                    ...m,
-                                    mediaUrl: m.mediaUrl?.startsWith("data:") ? undefined : m.mediaUrl,
-                                    mediaData: undefined,
-                                  }
-                                : m,
-                            ),
-                          );
-                        }}
-                      />
+                      <button
+                        type="button"
+                        className="group/media relative mb-1 block max-w-full overflow-hidden rounded-md text-left"
+                        onClick={() => openMediaViewer(msg.id)}
+                        title="Open photo"
+                      >
+                        <img
+                          src={src}
+                          alt=""
+                          className="max-h-48 max-w-full cursor-pointer object-cover transition group-hover/media:brightness-95"
+                          onError={() => {
+                            setLocalMediaPreview(msg.id, null);
+                            markMediaBroken(msg.id);
+                            setMessages((prev) =>
+                              prev.map((m) =>
+                                m.id === msg.id
+                                  ? {
+                                      ...m,
+                                      mediaUrl:
+                                        m.mediaUrl?.startsWith("data:") || m.mediaUrl?.startsWith("blob:")
+                                          ? undefined
+                                          : m.mediaUrl,
+                                      mediaData: undefined,
+                                    }
+                                  : m,
+                              ),
+                            );
+                          }}
+                        />
+                      </button>
+                    ) : mediaBrokenIds.has(msg.id) ? (
+                      <div className="mb-1 flex min-h-[56px] min-w-[140px] flex-col items-center justify-center gap-1 rounded-md bg-black/10 px-3 py-3 text-[11px] text-muted-foreground">
+                        <span>Couldn’t load photo</span>
+                        <button
+                          type="button"
+                          className="underline"
+                          onClick={() => {
+                            clearMediaBroken(msg.id);
+                            setMediaHydrateEpoch((n) => n + 1);
+                          }}
+                        >
+                          Retry
+                        </button>
+                      </div>
                     ) : (
                       <div className="mb-1 flex min-h-[72px] min-w-[140px] items-center justify-center gap-1.5 rounded-md bg-black/10 px-3 py-4 text-[11px] text-muted-foreground">
                         <ImageIcon className="h-4 w-4" />
@@ -1373,36 +1773,80 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                   ) : null}
                   {showMedia && effectiveType === "video" ? (
                     src ? (
-                      <video
-                        src={src}
-                        controls
-                        className="mb-1 max-h-48 max-w-full rounded-md"
-                        onError={() => {
-                          localMediaPreviewRef.current.delete(msg.id);
-                          mediaHydrateFailCount.current.delete(msg.id);
-                          setMessages((prev) =>
-                            prev.map((m) =>
-                              m.id === msg.id
-                                ? {
-                                    ...m,
-                                    mediaUrl: m.mediaUrl?.startsWith("data:") ? undefined : m.mediaUrl,
-                                    mediaData: undefined,
-                                  }
-                                : m,
-                            ),
-                          );
-                        }}
-                      />
+                      <button
+                        type="button"
+                        className="group/media relative mb-1 block max-w-full overflow-hidden rounded-md text-left"
+                        onClick={() => openMediaViewer(msg.id)}
+                        title="Open video"
+                      >
+                        <video
+                          src={src}
+                          muted
+                          playsInline
+                          preload="metadata"
+                          className="max-h-48 max-w-full cursor-pointer object-cover"
+                          onError={() => {
+                            setLocalMediaPreview(msg.id, null);
+                            markMediaBroken(msg.id);
+                            setMessages((prev) =>
+                              prev.map((m) =>
+                                m.id === msg.id
+                                  ? {
+                                      ...m,
+                                      mediaUrl:
+                                        m.mediaUrl?.startsWith("data:") || m.mediaUrl?.startsWith("blob:")
+                                          ? undefined
+                                          : m.mediaUrl,
+                                      mediaData: undefined,
+                                    }
+                                  : m,
+                              ),
+                            );
+                          }}
+                        />
+                        <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/25">
+                          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white shadow">
+                            <Play className="h-5 w-5 fill-current" />
+                          </span>
+                        </span>
+                      </button>
+                    ) : mediaBrokenIds.has(msg.id) ? (
+                      <div className="mb-1 flex min-h-[56px] min-w-[140px] flex-col items-center justify-center gap-1 rounded-md bg-black/10 px-3 py-3 text-[11px] text-muted-foreground">
+                        <Video className="h-4 w-4" />
+                        <span>Couldn’t load video</span>
+                        <button
+                          type="button"
+                          className="underline"
+                          onClick={() => {
+                            clearMediaBroken(msg.id);
+                            setMediaHydrateEpoch((n) => n + 1);
+                          }}
+                        >
+                          Retry
+                        </button>
+                      </div>
                     ) : (
                       <div className="mb-1 flex min-h-[72px] min-w-[140px] items-center justify-center gap-1.5 rounded-md bg-black/10 px-3 py-4 text-[11px] text-muted-foreground">
-                        <Video className="h-4 w-4" />
+                        <Loader2 className="h-4 w-4 animate-spin" />
                         Loading video…
                       </div>
                     )
                   ) : null}
                   {showMedia && (effectiveType === "audio" || effectiveType === "voice") ? (
                     src ? (
-                      <audio src={src} controls className="mb-1 max-w-full" />
+                      <div className="mb-1 flex max-w-full items-center gap-1.5">
+                        <audio src={src} controls className="max-w-full min-w-0 flex-1" />
+                        <button
+                          type="button"
+                          className="shrink-0 rounded p-1.5 text-muted-foreground hover:bg-black/5 hover:text-foreground"
+                          title="Download audio"
+                          onClick={() =>
+                            void downloadMediaFile(src, defaultMediaFilename(msg, effectiveType))
+                          }
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     ) : (
                       <div className="mb-1 flex items-center gap-1.5 rounded-md bg-black/10 px-2 py-1.5 text-[11px] text-muted-foreground">
                         <Mic className="h-3.5 w-3.5" />
@@ -1418,14 +1862,38 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                   ) : null}
                   {showMedia && (effectiveType === "document" || effectiveType === "sticker") ? (
                     src ? (
-                      <a
-                        href={src}
-                        download={msg.filename}
-                        className="mb-1 flex items-center gap-1.5 rounded bg-black/5 px-2 py-1.5 text-[11px] underline"
-                      >
-                        <FileIcon className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate">{mediaPlaceholderLabel(msg)}</span>
-                      </a>
+                      effectiveType === "sticker" ? (
+                        <button
+                          type="button"
+                          className="mb-1 block"
+                          onClick={() => openMediaViewer(msg.id)}
+                          title="Open sticker"
+                        >
+                          <img src={src} alt="" className="max-h-28 max-w-[7rem] cursor-pointer object-contain" />
+                        </button>
+                      ) : (
+                        <div className="mb-1 flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => openMediaViewer(msg.id)}
+                            className="flex min-w-0 flex-1 items-center gap-1.5 rounded bg-black/5 px-2 py-1.5 text-left text-[11px] hover:bg-black/10"
+                            title="Open document"
+                          >
+                            <FileIcon className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">{mediaPlaceholderLabel(msg)}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="shrink-0 rounded p-1.5 text-muted-foreground hover:bg-black/5 hover:text-foreground"
+                            title="Download"
+                            onClick={() =>
+                              void downloadMediaFile(src, defaultMediaFilename(msg, "document"))
+                            }
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      )
                     ) : (
                       <div className="mb-1 flex items-center gap-1.5 rounded bg-black/5 px-2 py-1.5 text-[11px] text-muted-foreground">
                         <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
@@ -1576,6 +2044,18 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
           {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
         </Button>
       </div>
+
+      {mediaViewerIndex != null && mediaGallery[mediaViewerIndex] ? (
+        <WhatsappMediaViewer
+          items={mediaGallery}
+          index={mediaViewerIndex}
+          onIndexChange={(next) => {
+            const item = mediaGallery[next];
+            if (item) setMediaViewerId(item.id);
+          }}
+          onClose={() => setMediaViewerId(null)}
+        />
+      ) : null}
     </div>
   );
 }

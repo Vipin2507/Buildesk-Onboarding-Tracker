@@ -624,7 +624,7 @@ export async function fetchWahaMediaFile(
       };
     }
     const buf = await res.arrayBuffer();
-    if (buf.byteLength > 2_500_000) {
+    if (buf.byteLength > 20_000_000) {
       return { ok: false, status: 413, base64: null, mimetype: null, error: "Media too large" };
     }
     const bytes = new Uint8Array(buf);
