@@ -24,26 +24,35 @@ function canPersistAppConfig() {
  * authoritative SQLite snapshot. Otherwise seed defaults / local rehydrate can
  * race ahead and overwrite durable isActive / isEnabled toggles on deploy.
  */
-let automationConfigPersistReady = false;
+let erpAutomationConfigPersistReady = false;
+let crmAutomationConfigPersistReady = false;
 
 /** True once bootstrap has finished hydrating (or seeding) automation app_config. */
 export function isAutomationConfigPersistReady() {
-  return automationConfigPersistReady;
+  return erpAutomationConfigPersistReady || crmAutomationConfigPersistReady;
 }
 
 /**
  * Drop any queued automation writes, then allow subsequent toggles to persist.
  * Call after hydrateCrmAutomationFromServer / hydrateAutomationFromServer (or empty seed).
  */
-export function markAutomationConfigPersistReady() {
-  cancelServerSyncDebounced("automation-config");
-  cancelServerSyncDebounced("crm-automation-config");
-  automationConfigPersistReady = true;
+export function markAutomationConfigPersistReady(opts?: { erp?: boolean; crm?: boolean }) {
+  const markErp = opts?.erp !== false;
+  const markCrm = opts?.crm !== false;
+  if (markErp) {
+    cancelServerSyncDebounced("automation-config");
+    erpAutomationConfigPersistReady = true;
+  }
+  if (markCrm) {
+    cancelServerSyncDebounced("crm-automation-config");
+    crmAutomationConfigPersistReady = true;
+  }
 }
 
 /** Used when the session ends so the next login re-gates against server state. */
 export function resetAutomationConfigPersistReady() {
-  automationConfigPersistReady = false;
+  erpAutomationConfigPersistReady = false;
+  crmAutomationConfigPersistReady = false;
   cancelServerSyncDebounced("automation-config");
   cancelServerSyncDebounced("crm-automation-config");
 }
@@ -102,14 +111,14 @@ function crmAutomationSnapshot() {
 let wired = false;
 
 function persistAutomationConfig() {
-  if (!canPersistAppConfig() || !automationConfigPersistReady) return;
+  if (!canPersistAppConfig() || !erpAutomationConfigPersistReady) return;
   serverSyncDebounced("automation-config", 400, () =>
     setAppConfig({ data: { key: "automation", value: automationSnapshot() } }),
   );
 }
 
 function persistCrmAutomationConfig() {
-  if (!canPersistAppConfig() || !automationConfigPersistReady) return;
+  if (!canPersistAppConfig() || !crmAutomationConfigPersistReady) return;
   serverSyncDebounced("crm-automation-config", 400, () =>
     setAppConfig({ data: { key: "crm-automation", value: crmAutomationSnapshot() } }),
   );
@@ -135,12 +144,18 @@ export function flushCrmMasterConfigPersistence() {
 }
 
 /** Force pending automation config to SQLite now (settings/rules — logs sync separately). */
-export function flushAutomationConfigPersistence() {
-  if (!canPersistAppConfig() || !automationConfigPersistReady) return;
-  persistAutomationConfig();
-  persistCrmAutomationConfig();
-  flushServerSyncDebounced("automation-config");
-  flushServerSyncDebounced("crm-automation-config");
+export function flushAutomationConfigPersistence(opts?: { erp?: boolean; crm?: boolean }) {
+  if (!canPersistAppConfig()) return;
+  const flushErp = opts?.erp !== false;
+  const flushCrm = opts?.crm !== false;
+  if (flushErp && erpAutomationConfigPersistReady) {
+    persistAutomationConfig();
+    flushServerSyncDebounced("automation-config");
+  }
+  if (flushCrm && crmAutomationConfigPersistReady) {
+    persistCrmAutomationConfig();
+    flushServerSyncDebounced("crm-automation-config");
+  }
 }
 
 /** One-time migration: push local logs to SQLite when server row lacks them. */

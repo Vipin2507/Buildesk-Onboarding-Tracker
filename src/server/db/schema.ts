@@ -198,6 +198,7 @@ export const crmWhatsappGroupMessages = sqliteTable(
     filename: text("filename"),
     ack: integer("ack"),
     replyTo: text("reply_to"),
+    replyPreview: text("reply_preview"),
     ...timestamps,
   },
   (t) => [

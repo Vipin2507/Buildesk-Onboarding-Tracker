@@ -55,6 +55,7 @@ function storedToUiMessage(row: {
   filename?: string;
   ack?: number;
   replyTo?: string;
+  replyPreview?: string;
 }): WahaChatMessage {
   return {
     id: row.wahaMessageId,
@@ -70,6 +71,7 @@ function storedToUiMessage(row: {
     filename: row.filename,
     ack: row.ack,
     replyTo: row.replyTo,
+    replyPreview: row.replyPreview,
   };
 }
 
@@ -83,6 +85,23 @@ function persistableMediaUrl(url: string | undefined | null): string | null {
   }
   if (url.startsWith("http://") || url.startsWith("https://")) return url;
   return null;
+}
+
+/** Make relative WAHA media paths absolute against the configured API base. */
+function absoluteWahaMediaUrl(url: string | undefined | null, apiUrl: string): string | undefined {
+  if (!url) return undefined;
+  if (
+    url.startsWith("data:") ||
+    url.startsWith("blob:") ||
+    url.startsWith("http://") ||
+    url.startsWith("https://")
+  ) {
+    return url;
+  }
+  if (url.startsWith("/") && apiUrl) {
+    return `${apiUrl.replace(/\/+$/, "")}${url}`;
+  }
+  return url;
 }
 
 function uiToStoredPayload(msg: WahaChatMessage) {
@@ -105,6 +124,7 @@ function uiToStoredPayload(msg: WahaChatMessage) {
     filename: msg.filename ?? null,
     ack: msg.ack ?? null,
     replyTo: msg.replyTo ?? null,
+    replyPreview: msg.replyPreview ?? null,
   };
 }
 
@@ -187,6 +207,8 @@ function mergeMessages(existing: WahaChatMessage[], incoming: WahaChatMessage[])
       mimetype: msg.mimetype || prev.mimetype,
       filename: msg.filename || prev.filename,
       participantName: msg.participantName || prev.participantName,
+      replyTo: msg.replyTo || prev.replyTo,
+      replyPreview: msg.replyPreview || prev.replyPreview,
     });
   }
   return [...byId.values()].sort(
@@ -259,6 +281,7 @@ function collapseDuplicateOutgoingMedia(
       filename: merged.filename || other.filename,
       ack: Math.max(merged.ack ?? 0, other.ack ?? 0) || merged.ack,
       replyTo: merged.replyTo || other.replyTo,
+      replyPreview: merged.replyPreview || other.replyPreview,
     };
   }
 
@@ -318,15 +341,78 @@ function AckIcon({ ack }: { ack?: number }) {
 function mediaSrc(
   msg: WahaChatMessage,
   localPreviews?: Map<string, string>,
+  apiUrl?: string,
 ): string | null {
   // Prefer session blob previews (sharper) over persisted thumbnails.
   const local = localPreviews?.get(msg.id);
   if (local) return local;
-  if (msg.mediaUrl) return msg.mediaUrl;
+  if (msg.mediaUrl) {
+    return absoluteWahaMediaUrl(msg.mediaUrl, apiUrl || "") || msg.mediaUrl;
+  }
   if (msg.mediaData && msg.mimetype) {
     return `data:${msg.mimetype};base64,${msg.mediaData}`;
   }
   return null;
+}
+
+/** Match reply targets across WAHA id formats (`true_…@g.us_ABC` vs bare `ABC`). */
+function messageIdTail(id: string) {
+  const trimmed = id.trim();
+  if (!trimmed) return "";
+  const parts = trimmed.split("_");
+  return parts[parts.length - 1] || trimmed;
+}
+
+function findQuotedMessage(
+  messages: WahaChatMessage[],
+  replyTo: string | undefined,
+): WahaChatMessage | undefined {
+  if (!replyTo) return undefined;
+  const direct = messages.find((m) => m.id === replyTo);
+  if (direct) return direct;
+  const tail = messageIdTail(replyTo);
+  return messages.find(
+    (m) =>
+      m.id.endsWith(replyTo) ||
+      replyTo.endsWith(m.id) ||
+      (tail && messageIdTail(m.id) === tail),
+  );
+}
+
+function quotePreviewLabel(msg: WahaChatMessage, quoted?: WahaChatMessage): string {
+  const fromQuoted =
+    quoted?.body?.trim() ||
+    (quoted?.hasMedia ? mediaPlaceholderLabel(quoted) : "") ||
+    quoted?.replyPreview?.trim();
+  if (fromQuoted) return fromQuoted.slice(0, 120);
+  if (msg.replyPreview?.trim()) return msg.replyPreview.trim().slice(0, 120);
+  return "Replied message";
+}
+
+/** Render message text with clickable http(s) links. */
+function LinkifiedText({ text }: { text: string }) {
+  // Capturing group keeps URLs in the split result.
+  const parts = text.split(/(https?:\/\/[^\s<]+[^\s<.,;:!?"')\]])/gi);
+  return (
+    <div className="whitespace-pre-wrap break-words">
+      {parts.map((part, i) =>
+        /^https?:\/\//i.test(part) ? (
+          <a
+            key={`${i}-${part.slice(0, 24)}`}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="break-all text-sky-700 underline underline-offset-2 hover:text-sky-800"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {part}
+          </a>
+        ) : (
+          <span key={`${i}-${part.slice(0, 12)}`}>{part}</span>
+        ),
+      )}
+    </div>
+  );
 }
 
 function resolveEffectiveMediaType(
@@ -433,7 +519,9 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
   /** Session-only previews so sent media still shows after WAHA sync without downloadMedia. */
   const localMediaPreviewRef = useRef<Map<string, string>>(new Map());
   const mediaHydrateInFlight = useRef<Set<string>>(new Set());
-  const mediaHydrateFailed = useRef<Set<string>>(new Set());
+  /** Fail counts — retry a few times before giving up (WAHA timeouts are flaky). */
+  const mediaHydrateFailCount = useRef<Map<string, number>>(new Map());
+  const MEDIA_HYDRATE_MAX_ATTEMPTS = 3;
 
   const groupId = account?.whatsappGroupId?.trim() || "";
   const groupName = account?.whatsappGroupName?.trim() || groupId;
@@ -511,8 +599,12 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
         setPollError(null);
 
         if (result.messages.length > 0) {
+          const normalized = result.messages.map((m) => ({
+            ...m,
+            mediaUrl: absoluteWahaMediaUrl(m.mediaUrl, waha.apiUrl) || m.mediaUrl,
+          }));
           setMessages((prev) => {
-            let next = stripEmptyMessageShells(mergeMessages(prev, result.messages));
+            let next = stripEmptyMessageShells(mergeMessages(prev, normalized));
             for (const m of next) {
               if (m.id.startsWith("local-media-")) {
                 next = collapseDuplicateOutgoingMedia(
@@ -529,7 +621,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
               data: {
                 accountId,
                 groupId,
-                messages: result.messages.map((incoming) => {
+                messages: normalized.map((incoming) => {
                   const local = byId.get(incoming.id);
                   return uiToStoredPayload(
                     local
@@ -543,6 +635,8 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                           mimetype: local.mimetype || incoming.mimetype,
                           filename: local.filename || incoming.filename,
                           hasMedia: local.hasMedia || incoming.hasMedia,
+                          replyTo: incoming.replyTo || local.replyTo,
+                          replyPreview: incoming.replyPreview || local.replyPreview,
                         }
                       : incoming,
                   );
@@ -610,7 +704,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
   useEffect(() => {
     lastSeenIds.current = new Set();
     mediaHydrateInFlight.current = new Set();
-    mediaHydrateFailed.current = new Set();
+    mediaHydrateFailCount.current = new Map();
     setMessages([]);
     setPollError(null);
     setHasMoreHistory(true);
@@ -667,13 +761,14 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
     const missing = messages.filter((m) => {
       if (!m.hasMedia || m.id.startsWith("local-media-")) return false;
       if (mediaHydrateInFlight.current.has(m.id)) return false;
-      if (mediaHydrateFailed.current.has(m.id)) return false;
-      return !mediaSrc(m, localMediaPreviewRef.current);
+      const fails = mediaHydrateFailCount.current.get(m.id) ?? 0;
+      if (fails >= MEDIA_HYDRATE_MAX_ATTEMPTS) return false;
+      return !mediaSrc(m, localMediaPreviewRef.current, waha.apiUrl);
     });
     if (missing.length === 0) return;
 
     let cancelled = false;
-    const batch = missing.slice(-3); // keep account UI responsive — small batches only
+    const batch = missing.slice(-5);
 
     void (async () => {
       for (const msg of batch) {
@@ -685,36 +780,52 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
           });
           if (cancelled) continue;
           if (!result.ok || !result.message) {
-            mediaHydrateFailed.current.add(msg.id);
+            mediaHydrateFailCount.current.set(
+              msg.id,
+              (mediaHydrateFailCount.current.get(msg.id) ?? 0) + 1,
+            );
             continue;
           }
 
           const fetched = result.message;
-          let durableUrl = persistableMediaUrl(fetched.mediaUrl);
-          if (
-            !durableUrl &&
-            fetched.mediaData &&
-            fetched.mimetype &&
-            fetched.mediaData.length <= 120_000
-          ) {
-            durableUrl = `data:${fetched.mimetype};base64,${fetched.mediaData}`;
+          const absUrl = absoluteWahaMediaUrl(fetched.mediaUrl, waha.apiUrl);
+          let durableUrl = persistableMediaUrl(absUrl);
+
+          // Prefer in-memory data-URL for display even when too large to persist.
+          if (fetched.mediaData && fetched.mimetype) {
+            const dataUrl = `data:${fetched.mimetype};base64,${fetched.mediaData}`;
+            localMediaPreviewRef.current.set(msg.id, dataUrl);
+            if (!durableUrl && dataUrl.length <= 350_000) {
+              durableUrl = dataUrl;
+            }
           }
 
+          const displayUrl =
+            durableUrl || absUrl || localMediaPreviewRef.current.get(msg.id) || undefined;
           const hasBytes = Boolean(
-            durableUrl || fetched.mediaUrl || (fetched.mediaData && fetched.mimetype),
+            displayUrl || (fetched.mediaData && fetched.mimetype),
           );
           if (!hasBytes) {
-            mediaHydrateFailed.current.add(msg.id);
+            mediaHydrateFailCount.current.set(
+              msg.id,
+              (mediaHydrateFailCount.current.get(msg.id) ?? 0) + 1,
+            );
             continue;
           }
+
+          // Success — clear fail streak.
+          mediaHydrateFailCount.current.delete(msg.id);
 
           setMessages((prev) =>
             mergeMessages(prev, [
               {
                 ...fetched,
-                mediaUrl: durableUrl || fetched.mediaUrl,
+                mediaUrl: durableUrl || absUrl || fetched.mediaUrl,
+                mediaData: fetched.mediaData,
                 mediaType: betterMediaType(fetched.mediaType, msg.mediaType),
                 hasMedia: true,
+                replyTo: fetched.replyTo || msg.replyTo,
+                replyPreview: fetched.replyPreview || msg.replyPreview,
               },
             ]),
           );
@@ -727,15 +838,20 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                 uiToStoredPayload({
                   ...msg,
                   ...fetched,
-                  mediaUrl: durableUrl || fetched.mediaUrl,
+                  mediaUrl: durableUrl || absUrl || fetched.mediaUrl,
                   hasMedia: true,
                   mediaType: betterMediaType(fetched.mediaType, msg.mediaType),
+                  replyTo: fetched.replyTo || msg.replyTo,
+                  replyPreview: fetched.replyPreview || msg.replyPreview,
                 }),
               ],
             },
           }).catch(() => null);
         } catch {
-          mediaHydrateFailed.current.add(msg.id);
+          mediaHydrateFailCount.current.set(
+            msg.id,
+            (mediaHydrateFailCount.current.get(msg.id) ?? 0) + 1,
+          );
         } finally {
           mediaHydrateInFlight.current.delete(msg.id);
         }
@@ -901,6 +1017,10 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
         filename: file.name,
         ack: parsed?.ack ?? 1,
         replyTo: replyTo?.id,
+        replyPreview:
+          replyTo?.body?.slice(0, 240) ||
+          replyTo?.replyPreview ||
+          (replyTo?.hasMedia ? mediaPlaceholderLabel(replyTo) : undefined),
       };
 
       setMessages((prev) => mergeMessages(prev, [optimistic]));
@@ -1164,8 +1284,8 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
         {messages.map((msg, idx) => {
           const prev = messages[idx - 1];
           const showDay = !prev || dayKey(prev.timestamp) !== dayKey(msg.timestamp);
-          const quoted = msg.replyTo ? messages.find((m) => m.id === msg.replyTo) : undefined;
-          const src = mediaSrc(msg, localMediaPreviewRef.current);
+          const quoted = findQuotedMessage(messages, msg.replyTo);
+          const src = mediaSrc(msg, localMediaPreviewRef.current, waha.apiUrl);
           const showMedia = Boolean(msg.hasMedia || src);
           const effectiveType = resolveEffectiveMediaType(msg, src, showMedia);
           return (
@@ -1189,9 +1309,14 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                       {msg.participantName || msg.from.replace(/@.*/, "")}
                     </div>
                   ) : null}
-                  {quoted || msg.replyTo ? (
+                  {quoted || msg.replyTo || msg.replyPreview ? (
                     <div className="mb-1 rounded border-l-2 border-teal-600 bg-black/5 px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                      {quoted?.body?.slice(0, 120) || "Replied message"}
+                      {quoted && !quoted.fromMe && (quoted.participantName || quoted.from) ? (
+                        <div className="truncate font-semibold text-teal-700/80">
+                          {quoted.participantName || quoted.from.replace(/@.*/, "")}
+                        </div>
+                      ) : null}
+                      <div className="line-clamp-2">{quotePreviewLabel(msg, quoted)}</div>
                     </div>
                   ) : null}
                   {showMedia && effectiveType === "image" ? (
@@ -1241,7 +1366,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                       </div>
                     )
                   ) : null}
-                  {msg.body ? <div className="whitespace-pre-wrap break-words">{msg.body}</div> : null}
+                  {msg.body ? <LinkifiedText text={msg.body} /> : null}
                   <div className="mt-0.5 flex items-center justify-end gap-1">
                     <button
                       type="button"
@@ -1266,7 +1391,10 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
         <div className="flex items-center gap-2 border-t bg-white/90 px-3 py-1.5 text-[11px]">
           <Reply className="h-3.5 w-3.5 shrink-0 text-teal-700" />
           <div className="min-w-0 flex-1 truncate text-muted-foreground">
-            Replying to: {replyPreview.body?.slice(0, 80) || "media"}
+            Replying to:{" "}
+            {replyPreview.body?.slice(0, 80) ||
+              replyPreview.replyPreview?.slice(0, 80) ||
+              (replyPreview.hasMedia ? mediaPlaceholderLabel(replyPreview) : "message")}
           </div>
           <button type="button" onClick={() => setReplyTo(null)}>
             <X className="h-3.5 w-3.5" />

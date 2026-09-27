@@ -39,6 +39,8 @@ export type WahaChatMessage = {
   filename?: string;
   ack?: number;
   replyTo?: string;
+  /** Snippet of the quoted message (survives when the parent isn't in the loaded window). */
+  replyPreview?: string;
 };
 
 export async function sendWahaText(
@@ -322,6 +324,119 @@ function detectMediaType(
   return undefined;
 }
 
+/** Pull caption/body text out of a Baileys/WEBJS quoted-message payload. */
+function extractQuotedText(quoted: Record<string, unknown> | null): string {
+  if (!quoted) return "";
+  if (typeof quoted.conversation === "string" && quoted.conversation.trim()) {
+    return quoted.conversation.trim();
+  }
+  if (typeof quoted.body === "string" && quoted.body.trim() && !quoted.body.startsWith("/9j")) {
+    return quoted.body.trim();
+  }
+  if (typeof quoted.caption === "string" && quoted.caption.trim()) {
+    return quoted.caption.trim();
+  }
+  const ext = asRecord(quoted.extendedTextMessage);
+  if (ext && typeof ext.text === "string" && ext.text.trim()) return ext.text.trim();
+
+  const image = asRecord(quoted.imageMessage);
+  if (image) {
+    if (typeof image.caption === "string" && image.caption.trim()) return image.caption.trim();
+    return "Photo";
+  }
+  const video = asRecord(quoted.videoMessage);
+  if (video) {
+    if (typeof video.caption === "string" && video.caption.trim()) return video.caption.trim();
+    return "Video";
+  }
+  const doc = asRecord(quoted.documentMessage);
+  if (doc) {
+    if (typeof doc.caption === "string" && doc.caption.trim()) return doc.caption.trim();
+    if (typeof doc.fileName === "string" && doc.fileName.trim()) return doc.fileName.trim();
+    return "Document";
+  }
+  const audio = asRecord(quoted.audioMessage);
+  if (audio) return "Audio";
+  const sticker = asRecord(quoted.stickerMessage);
+  if (sticker) return "Sticker";
+  return "";
+}
+
+function extractReplyMeta(row: Record<string, unknown>): {
+  replyTo?: string;
+  replyPreview?: string;
+} {
+  let replyTo: string | undefined;
+  let replyPreview: string | undefined;
+
+  const replyRaw = row.replyTo ?? row.reply_to;
+  if (typeof replyRaw === "string" && replyRaw.trim()) replyTo = replyRaw.trim();
+  else {
+    const coerced = coerceWahaId(replyRaw);
+    if (coerced) replyTo = coerced;
+  }
+
+  if (typeof row.replyPreview === "string" && row.replyPreview.trim()) {
+    replyPreview = row.replyPreview.trim();
+  } else if (typeof row.reply_preview === "string" && row.reply_preview.trim()) {
+    replyPreview = row.reply_preview.trim();
+  }
+
+  // WEBJS: quotedMsg / _data.quotedMsg
+  const data = asRecord(row._data);
+  const quotedMsg =
+    asRecord(row.quotedMsg) ||
+    asRecord(row.quoted_msg) ||
+    (data ? asRecord(data.quotedMsg) || asRecord(data.quoted_msg) : null);
+  if (quotedMsg) {
+    const qid =
+      coerceWahaId(quotedMsg.id) ||
+      coerceWahaId(quotedMsg.messageId) ||
+      (typeof quotedMsg.id === "object" ? coerceWahaId(quotedMsg.id) : "");
+    if (qid && !replyTo) replyTo = qid;
+    if (!replyPreview) {
+      const text = extractQuotedText(quotedMsg);
+      if (text) replyPreview = text;
+    }
+  }
+
+  // Baileys / NOWEB: message.*.contextInfo
+  const message = asRecord(row.message) || (data ? asRecord(data.message) : null);
+  if (message) {
+    for (const value of Object.values(message)) {
+      const part = asRecord(value);
+      const ctx = part ? asRecord(part.contextInfo) : null;
+      if (!ctx) continue;
+      const stanzaId =
+        (typeof ctx.stanzaId === "string" && ctx.stanzaId.trim()) ||
+        coerceWahaId(ctx.stanzaId) ||
+        (typeof ctx.participant === "string" ? "" : "");
+      if (stanzaId && !replyTo) replyTo = stanzaId;
+      const quoted = asRecord(ctx.quotedMessage);
+      if (quoted && !replyPreview) {
+        const text = extractQuotedText(quoted);
+        if (text) replyPreview = text;
+      }
+    }
+  }
+
+  return {
+    replyTo: replyTo || undefined,
+    replyPreview: replyPreview ? replyPreview.slice(0, 240) : undefined,
+  };
+}
+
+function captionFromMessage(message: Record<string, unknown> | null): string {
+  if (!message) return "";
+  for (const key of ["imageMessage", "videoMessage", "documentMessage"]) {
+    const part = asRecord(message[key]);
+    if (part && typeof part.caption === "string" && part.caption.trim()) {
+      return part.caption.trim();
+    }
+  }
+  return "";
+}
+
 function parseOneMessage(row: Record<string, unknown>): WahaChatMessage | null {
   const key = asRecord(row.key);
   const id =
@@ -332,20 +447,27 @@ function parseOneMessage(row: Record<string, unknown>): WahaChatMessage | null {
   if (!id) return null;
 
   const media = asRecord(row.media);
+  const data = asRecord(row._data);
+  const message = asRecord(row.message) || (data ? asRecord(data.message) : null);
+
   const mimetype =
     (typeof row.mimetype === "string" && row.mimetype) ||
     (media && typeof media.mimetype === "string" && media.mimetype) ||
     undefined;
-  const mediaUrl =
+  let mediaUrl =
     (typeof row.mediaUrl === "string" && row.mediaUrl) ||
     (media && typeof media.url === "string" && media.url) ||
     undefined;
+  // Some WAHA builds return media.path / media.filename only.
+  if (!mediaUrl && media && typeof media.path === "string" && media.path) {
+    mediaUrl = media.path;
+  }
   const mediaData =
     (typeof row.body === "string" && row.hasMedia && row.body.startsWith("/9j") ? row.body : undefined) ||
-    (media && typeof media.data === "string" ? media.data : undefined);
+    (media && typeof media.data === "string" ? media.data : undefined) ||
+    (typeof row.mediaData === "string" ? row.mediaData : undefined);
   const hasMedia = Boolean(row.hasMedia) || Boolean(mediaUrl) || Boolean(mediaData) || Boolean(mimetype);
 
-  const message = asRecord(row.message);
   const conversation =
     (message && typeof message.conversation === "string" && message.conversation) ||
     (message &&
@@ -359,7 +481,7 @@ function parseOneMessage(row: Record<string, unknown>): WahaChatMessage | null {
       ? row.body
       : typeof row.caption === "string"
         ? row.caption
-        : conversation;
+        : captionFromMessage(message) || conversation;
 
   const from =
     coerceWahaId(row.from) ||
@@ -370,17 +492,10 @@ function parseOneMessage(row: Record<string, unknown>): WahaChatMessage | null {
     (typeof row.notifyName === "string" && row.notifyName) ||
     (typeof row.senderName === "string" && row.senderName) ||
     (typeof row.pushName === "string" && row.pushName) ||
-    (typeof row._data === "object" &&
-      asRecord(row._data) &&
-      typeof asRecord(row._data)!.pushName === "string" &&
-      (asRecord(row._data)!.pushName as string)) ||
+    (data && typeof data.pushName === "string" && data.pushName) ||
     undefined;
 
-  const replyRaw = row.replyTo ?? row.reply_to;
-  const replyTo =
-    typeof replyRaw === "string"
-      ? replyRaw
-      : coerceWahaId(replyRaw) || undefined;
+  const { replyTo, replyPreview } = extractReplyMeta(row);
 
   let timestamp = 0;
   const rawTs = row.timestamp ?? row.messageTimestamp;
@@ -398,6 +513,14 @@ function parseOneMessage(row: Record<string, unknown>): WahaChatMessage | null {
         ? key.fromMe
         : false;
 
+  const filename =
+    (typeof row.filename === "string" && row.filename) ||
+    (media && typeof media.filename === "string" ? media.filename : undefined) ||
+    (() => {
+      const doc = message ? asRecord(message.documentMessage) : null;
+      return doc && typeof doc.fileName === "string" ? doc.fileName : undefined;
+    })();
+
   return {
     id,
     timestamp,
@@ -410,12 +533,10 @@ function parseOneMessage(row: Record<string, unknown>): WahaChatMessage | null {
     mimetype,
     mediaUrl,
     mediaData,
-    filename:
-      (typeof row.filename === "string" && row.filename) ||
-      (media && typeof media.filename === "string" ? media.filename : undefined) ||
-      undefined,
+    filename,
     ack: typeof row.ack === "number" ? row.ack : undefined,
     replyTo,
+    replyPreview,
   };
 }
 

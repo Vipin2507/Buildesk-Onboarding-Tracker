@@ -46,6 +46,7 @@ import {
   listBookingBlocks,
 } from "@/lib/api";
 import {
+  flushAutomationConfigPersistence,
   markAutomationConfigPersistReady,
   resetAutomationConfigPersistReady,
   wireConfigPersistence,
@@ -425,12 +426,14 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
             data: { key: "crm-master", value: crmMasterSnapshot() },
           }).catch(() => {});
         }
+        let automationConfigAuthoritative = false;
         if (automation === null) {
           // Fetch failed — do not overwrite durable server toggles with local defaults.
           console.warn("[bootstrap] ERP automation config unavailable; keeping local store only");
         } else if (automation && typeof automation === "object" && Object.keys(automation).length > 0) {
           hydrateAutomationFromServer(automation as Record<string, unknown>);
           useAutomationStore.getState().ensureDefaults();
+          automationConfigAuthoritative = true;
         } else if (user.role === "Admin") {
           useAutomationStore.getState().ensureDefaults();
           const localAutomation = useAutomationStore.getState();
@@ -446,8 +449,10 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
               },
             },
           }).catch(() => {});
+          automationConfigAuthoritative = true;
         }
 
+        let crmAutomationConfigAuthoritative = false;
         if (crmAutomation === null) {
           console.warn("[bootstrap] CRM automation config unavailable; keeping local store only");
         } else if (
@@ -457,6 +462,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
         ) {
           hydrateCrmAutomationFromServer(crmAutomation as Record<string, unknown>);
           useCrmAutomationStore.getState().ensureDefaults();
+          crmAutomationConfigAuthoritative = true;
         } else if (user.role === "Admin") {
           // Empty server only — seed from local after ensureDefaults so missing seed
           // rules exist, but never overwrite a non-empty SQLite row (handled above).
@@ -474,10 +480,27 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
               },
             },
           }).catch(() => {});
+          crmAutomationConfigAuthoritative = true;
         }
 
         // Allow toggle/settings writes only after authoritative hydrate (or empty seed).
-        if (!cancelled) markAutomationConfigPersistReady();
+        // Never mark a side ready on fetch failure — that lets stale local defaults clobber SQLite.
+        if (!cancelled) {
+          if (automationConfigAuthoritative || crmAutomationConfigAuthoritative) {
+            markAutomationConfigPersistReady({
+              erp: automationConfigAuthoritative,
+              crm: crmAutomationConfigAuthoritative,
+            });
+            flushAutomationConfigPersistence({
+              erp: automationConfigAuthoritative,
+              crm: crmAutomationConfigAuthoritative,
+            });
+          } else {
+            console.warn(
+              "[bootstrap] automation config not authoritative; toggle persistence stays blocked",
+            );
+          }
+        }
 
         if (user.role === "Admin") {
           const emptyLogs: AutomationLogWire[] = [];

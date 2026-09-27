@@ -123,7 +123,7 @@ const CRM_AUTOMATION_SEED_SYNC_RULE_IDS = new Set([
   "crm-rule-query-response-whatsapp",
 ]);
 
-/** True when a saved rule still has pre-digest copy/templates and should pick up seed defaults. */
+/** True when a saved rule still has pre-digest / legacy copy and should pick up seed defaults once. */
 export function crmAutomationRuleNeedsSeedSync(
   existing: AutomationRule,
   seed: AutomationRule,
@@ -132,39 +132,35 @@ export function crmAutomationRuleNeedsSeedSync(
   if (existing.id !== seed.id) return false;
 
   if (seed.id === "crm-rule-payment-executive-email") {
+    // Already on digest template — never overwrite operator edits on deploy.
     if (existing.templateBody?.includes("{{digestBody}}")) return false;
     if (existing.description?.includes("overdue payments digest")) return false;
+    // Legacy copy only (one-time migration).
     if (existing.description?.includes("sales manager and support managers")) return true;
     if (existing.templateBody?.includes("Payment collection update")) return true;
-    return existing.templateSubject !== seed.templateSubject || existing.templateBody !== seed.templateBody;
+    return false;
   }
 
   if (seed.id === "crm-rule-payment-executive-whatsapp") {
-    if (existing.templateBody?.trim() === "{{digestBodyWhatsapp}}") return false;
+    if (existing.templateBody?.includes("{{digestBodyWhatsapp}}")) return false;
+    // Legacy digest / account-count copy only.
     if (existing.templateBody?.trim() === "{{digestBody}}") return true;
     if (existing.templateBody?.includes("payment reminder ({{accountCount}}")) return true;
-    return existing.templateBody !== seed.templateBody || existing.description !== seed.description;
+    return false;
   }
 
   if (seed.trigger === "query-response") {
-    if (existing.description === seed.description && existing.templateBody === seed.templateBody) {
-      return false;
-    }
-    if (!existing.description?.includes("replied on a query") && seed.description?.includes("replied on a query")) {
-      return true;
-    }
-    // Keep WhatsApp/email bodies unique per send ({{sentAt}}) so follow-up mentions aren't dropped.
+    // Already migrated — keep operator customizations across deploys.
+    if (existing.templateBody?.includes("{{sentAt}}")) return false;
+    if (existing.description?.includes("replied on a query")) return false;
+    // One-time bump so follow-up mentions aren't dropped.
     if (seed.templateBody?.includes("{{sentAt}}") && !existing.templateBody?.includes("{{sentAt}}")) {
       return true;
     }
+    return false;
   }
 
-  return (
-    existing.name !== seed.name ||
-    existing.description !== seed.description ||
-    existing.templateSubject !== seed.templateSubject ||
-    existing.templateBody !== seed.templateBody
-  );
+  return false;
 }
 
 function applyCrmAutomationSeedSync(existing: AutomationRule, seed: AutomationRule): AutomationRule {
@@ -186,13 +182,15 @@ function applyCrmAutomationSeedSync(existing: AutomationRule, seed: AutomationRu
   };
 }
 
-/** Merge seed rules by id so new automations appear on older saved configs; patch legacy payment/query templates. */
+/** Merge seed rules by id so new automations appear on older saved configs.
+ * Preserves operator isActive / templates; only patches known-legacy payment/query copy. */
 export function mergeCrmAutomationRules(existing: AutomationRule[]): AutomationRule[] {
   const byId = new Map(existing.map((r) => [r.id, r]));
   for (const seed of DEFAULT_CRM_AUTOMATION_RULES) {
     const current = byId.get(seed.id);
     if (!current) {
-      byId.set(seed.id, seed);
+      // New seed rule — add once. Operator can disable afterward; we won't reset it.
+      byId.set(seed.id, { ...seed });
       continue;
     }
     byId.set(seed.id, applyCrmAutomationSeedSync(current, seed));

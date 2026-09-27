@@ -9,6 +9,7 @@ import {
   FileSpreadsheet,
   KeyRound,
   Layers,
+  MessageCircle,
   Plus,
   Search,
   Upload,
@@ -23,6 +24,7 @@ import { CrmAccountExportModal } from "@/components/crm/crm-account-export-modal
 import { CrmAccountGoLiveActions } from "@/components/crm/crm-account-go-live-actions";
 import { CrmAccountRenewDialog } from "@/components/crm/crm-account-renew-dialog";
 import { CrmAccountStageSelect } from "@/components/crm/crm-account-stage-select";
+import { CrmAccountWhatsappSyncModal } from "@/components/crm/crm-account-whatsapp-sync-modal";
 import { CrmAccountModulesCell } from "@/components/crm/crm-account-modules-cell";
 import {
   CrmAccountFormFields,
@@ -395,6 +397,7 @@ function CrmAccountsPage() {
   const [dateBulkOpen, setDateBulkOpen] = useState(false);
   const [apiKeyBulkOpen, setApiKeyBulkOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [whatsappSyncOpen, setWhatsappSyncOpen] = useState(false);
   const [editing, setEditing] = useState<CrmAccount | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState<CrmAccountRow | null>(null);
@@ -807,6 +810,15 @@ function CrmAccountsPage() {
             >
               <Download className="h-3.5 w-3.5" />
               Export
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 gap-1 px-3 text-xs"
+              onClick={() => setWhatsappSyncOpen(true)}
+            >
+              <MessageCircle className="h-3.5 w-3.5" />
+              Sync accounts
             </Button>
             <Button
               size="sm"
@@ -1390,6 +1402,12 @@ function CrmAccountsPage() {
           )}
       </div>
       </div>
+
+      <CrmAccountWhatsappSyncModal
+        open={whatsappSyncOpen}
+        onOpenChange={setWhatsappSyncOpen}
+        accounts={rows}
+      />
 
       <CrmAccountRenewDialog
         account={renewAccount}

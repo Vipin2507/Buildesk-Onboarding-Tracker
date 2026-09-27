@@ -310,6 +310,7 @@ const EXTRA_COLUMNS = [
   { table: "payment_transactions", name: "image_mime_type", ddl: "TEXT" },
   { table: "payment_transactions", name: "image_size_bytes", ddl: "INTEGER" },
   { table: "payment_transactions", name: "image_storage_key", ddl: "TEXT" },
+  { table: "crm_whatsapp_group_messages", name: "reply_preview", ddl: "TEXT" },
 ];
 
 for (const col of EXTRA_COLUMNS) {
@@ -1317,6 +1318,7 @@ if (!tableExists("crm_whatsapp_group_messages")) {
       filename TEXT,
       ack INTEGER,
       reply_to TEXT,
+      reply_preview TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );

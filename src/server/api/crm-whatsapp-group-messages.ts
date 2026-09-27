@@ -24,6 +24,7 @@ export type StoredWhatsappGroupMessage = {
   filename?: string;
   ack?: number;
   replyTo?: string;
+  replyPreview?: string;
 };
 
 function messageRowId(accountId: string, wahaMessageId: string) {
@@ -48,6 +49,7 @@ function mapRow(row: typeof t.crmWhatsappGroupMessages.$inferSelect): StoredWhat
     filename: row.filename ?? undefined,
     ack: row.ack ?? undefined,
     replyTo: row.replyTo ?? undefined,
+    replyPreview: row.replyPreview ?? undefined,
   };
 }
 
@@ -86,6 +88,7 @@ const storedMessageSchema = z.object({
   filename: z.string().optional().nullable(),
   ack: z.number().int().optional().nullable(),
   replyTo: z.string().optional().nullable(),
+  replyPreview: z.string().optional().nullable(),
 });
 
 export const listCrmWhatsappGroupMessages = createServerFn({ method: "GET" })
@@ -171,6 +174,7 @@ export const upsertCrmWhatsappGroupMessages = createServerFn({ method: "POST" })
             filename,
             ack: m.ack ?? existing?.ack ?? null,
             replyTo: m.replyTo ?? existing?.replyTo ?? null,
+            replyPreview: m.replyPreview || existing?.replyPreview || null,
             updatedAt: now,
           };
 
