@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, MessageCircle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
+import { DesignTicketSearchableSelect } from "@/components/design-ticket/design-ticket-fields";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -51,54 +52,74 @@ export function CrmAccountWhatsappSyncModal({
   onOpenChange: (open: boolean) => void;
   accounts: CrmAccount[];
 }) {
-  const waha = useCrmAutomationStore((s) => s.waha);
+  const apiUrl = useCrmAutomationStore((s) => s.waha.apiUrl);
+  const apiKey = useCrmAutomationStore((s) => s.waha.apiKey);
+  const sessionName = useCrmAutomationStore((s) => s.waha.sessionName);
+  const isEnabled = useCrmAutomationStore((s) => s.waha.isEnabled);
   const updateAccount = useCrmAccountStore((s) => s.updateAccount);
 
-  const [search, setSearch] = useState("");
+  const [accountSearch, setAccountSearch] = useState("");
   const [groups, setGroups] = useState<WahaGroupSummary[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [groupsError, setGroupsError] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<RowDraft[]>([]);
+  /** Snapshot of accounts at open time — used for dirty checks so live store updates don't reset picks. */
+  const [baselineAccounts, setBaselineAccounts] = useState<CrmAccount[]>([]);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
-    setSearch("");
-    setDrafts(draftFromAccounts(accounts));
-    setGroupsError(null);
+  const accountsRef = useRef(accounts);
+  accountsRef.current = accounts;
+  const sessionOpenRef = useRef(false);
 
-    if (!waha.apiUrl || !waha.apiKey || !waha.sessionName) {
+  const loadGroups = useCallback(async (opts?: { quiet?: boolean }) => {
+    if (!apiUrl || !apiKey || !sessionName) {
       setGroups([]);
       setGroupsError("WAHA is not configured — set API URL, key, and session in Automation.");
       return;
     }
-
-    let cancelled = false;
     setLoadingGroups(true);
-    void (async () => {
-      const result = await listWahaGroups(waha);
-      if (cancelled) return;
-      if (!result.ok) {
-        setGroups([]);
-        setGroupsError(result.error ?? "Could not load WhatsApp groups");
-        toast.error(result.error ?? "Could not load WhatsApp groups");
-      } else {
-        setGroups(result.groups);
-        setGroupsError(null);
-      }
-      setLoadingGroups(false);
-    })();
+    if (!opts?.quiet) setGroupsError(null);
+    const result = await listWahaGroups({
+      apiUrl,
+      apiKey,
+      sessionName,
+      isEnabled: isEnabled ?? true,
+    });
+    if (!result.ok) {
+      setGroups([]);
+      setGroupsError(result.error ?? "Could not load WhatsApp groups");
+      if (!opts?.quiet) toast.error(result.error ?? "Could not load WhatsApp groups");
+    } else {
+      setGroups(result.groups);
+      setGroupsError(null);
+      if (!opts?.quiet) toast.success(`Loaded ${result.groups.length} WhatsApp groups`);
+    }
+    setLoadingGroups(false);
+  }, [apiUrl, apiKey, sessionName, isEnabled]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [open, accounts, waha]);
+  // Initialize drafts + load groups once per open. Do NOT depend on `accounts` /
+  // store object identity — that was resetting selections on every refresh.
+  useEffect(() => {
+    if (!open) {
+      sessionOpenRef.current = false;
+      return;
+    }
+    if (sessionOpenRef.current) return;
+    sessionOpenRef.current = true;
+
+    const snapshot = accountsRef.current.map((a) => ({ ...a }));
+    setBaselineAccounts(snapshot);
+    setDrafts(draftFromAccounts(snapshot));
+    setAccountSearch("");
+    setGroupsError(null);
+    void loadGroups({ quiet: true });
+  }, [open, loadGroups]);
 
   const accountById = useMemo(() => {
     const map = new Map<string, CrmAccount>();
-    for (const a of accounts) map.set(a.id, a);
+    for (const a of baselineAccounts) map.set(a.id, a);
     return map;
-  }, [accounts]);
+  }, [baselineAccounts]);
 
   /** groupId → account currently bound to it (from draft selections). */
   const takenByDraft = useMemo(() => {
@@ -112,7 +133,7 @@ export function CrmAccountWhatsappSyncModal({
   }, [drafts]);
 
   const filteredDrafts = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = accountSearch.trim().toLowerCase();
     if (!q) return drafts;
     return drafts.filter((d) => {
       const a = accountById.get(d.accountId);
@@ -124,7 +145,7 @@ export function CrmAccountWhatsappSyncModal({
         (a.whatsappGroupId ?? "").toLowerCase().includes(q)
       );
     });
-  }, [drafts, search, accountById]);
+  }, [drafts, accountSearch, accountById]);
 
   const dirtyCount = useMemo(() => {
     let n = 0;
@@ -145,32 +166,12 @@ export function CrmAccountWhatsappSyncModal({
     setDrafts((prev) =>
       prev.map((d) => {
         if (d.accountId === accountId) return { ...d, groupId: nextId };
-        // One group → one account: clear from any other row that had it.
         if (nextId && normalizeGroupId(d.groupId) === nextId) {
           return { ...d, groupId: "" };
         }
         return d;
       }),
     );
-  }
-
-  async function reloadGroups() {
-    if (!waha.apiUrl || !waha.apiKey || !waha.sessionName) {
-      setGroupsError("WAHA is not configured — set API URL, key, and session in Automation.");
-      return;
-    }
-    setLoadingGroups(true);
-    setGroupsError(null);
-    const result = await listWahaGroups(waha);
-    if (!result.ok) {
-      setGroups([]);
-      setGroupsError(result.error ?? "Could not load WhatsApp groups");
-      toast.error(result.error ?? "Could not load WhatsApp groups");
-    } else {
-      setGroups(result.groups);
-      toast.success(`Loaded ${result.groups.length} WhatsApp groups`);
-    }
-    setLoadingGroups(false);
   }
 
   function applySync() {
@@ -215,7 +216,7 @@ export function CrmAccountWhatsappSyncModal({
 
   function optionsForRow(accountId: string, currentGroupId: string) {
     const current = normalizeGroupId(currentGroupId);
-    const opts: { value: string; label: string; disabled?: boolean }[] = [
+    const opts: { value: string; label: string }[] = [
       { value: UNLINK, label: "— Not linked —" },
     ];
 
@@ -223,20 +224,15 @@ export function CrmAccountWhatsappSyncModal({
       const gid = normalizeGroupId(g.id);
       if (!gid) continue;
       const takenBy = takenByDraft.get(gid);
-      const takenElsewhere = Boolean(takenBy && takenBy !== accountId);
-      const takenAccount = takenBy ? accountById.get(takenBy) : undefined;
-      const label = takenElsewhere
-        ? `${g.subject || gid} · taken by ${takenAccount?.name ?? "another account"}`
-        : g.subject || gid;
+      // Hide groups already picked on another row (keep this row's current pick).
+      if (takenBy && takenBy !== accountId) continue;
+      const subject = g.subject?.trim() || gid;
       opts.push({
         value: gid,
-        label,
-        // Keep current selection selectable; block stealing from other draft rows.
-        disabled: takenElsewhere && gid !== current,
+        label: subject === gid ? subject : `${subject}`,
       });
     }
 
-    // Orphan binding (group no longer in WAHA list) — still show so it can be kept/cleared.
     if (current && !opts.some((o) => o.value === current)) {
       const a = accountById.get(accountId);
       opts.push({
@@ -264,8 +260,8 @@ export function CrmAccountWhatsappSyncModal({
 
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b bg-muted/30 px-4 py-2">
           <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={accountSearch}
+            onChange={(e) => setAccountSearch(e.target.value)}
             placeholder="Search accounts…"
             className="h-8 max-w-xs text-xs"
           />
@@ -275,7 +271,7 @@ export function CrmAccountWhatsappSyncModal({
             variant="outline"
             className="h-8 gap-1 text-xs"
             disabled={loadingGroups}
-            onClick={() => void reloadGroups()}
+            onClick={() => void loadGroups()}
           >
             {loadingGroups ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -325,10 +321,7 @@ export function CrmAccountWhatsappSyncModal({
                   return (
                     <tr
                       key={d.accountId}
-                      className={cn(
-                        "border-b border-border/60",
-                        dirty && "bg-amber-500/5",
-                      )}
+                      className={cn("border-b border-border/60", dirty && "bg-amber-500/5")}
                     >
                       <td className="px-4 py-2 align-middle">
                         <div className="font-medium text-foreground">{account.name}</div>
@@ -338,18 +331,16 @@ export function CrmAccountWhatsappSyncModal({
                         </div>
                       </td>
                       <td className="px-4 py-2 align-middle">
-                        <select
-                          className="h-8 w-full max-w-md rounded-md border border-input bg-background px-2 text-xs outline-none focus:ring-2 focus:ring-ring/40"
-                          value={selectValue}
-                          onChange={(e) => setRowGroup(d.accountId, e.target.value)}
-                          disabled={loadingGroups && groups.length === 0}
-                        >
-                          {opts.map((o) => (
-                            <option key={o.value} value={o.value} disabled={o.disabled}>
-                              {o.label}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="max-w-md">
+                          <DesignTicketSearchableSelect
+                            value={selectValue}
+                            options={opts}
+                            onChange={(v) => setRowGroup(d.accountId, v)}
+                            placeholder="Search WhatsApp groups…"
+                            emptyLabel="No groups found"
+                            disabled={loadingGroups && groups.length === 0}
+                          />
+                        </div>
                       </td>
                     </tr>
                   );
