@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { CrmAccountPaymentBulkUpdateModal } from "@/components/crm/crm-account-payment-bulk-update-modal";
+import { CrmAccountRenewDialog } from "@/components/crm/crm-account-renew-dialog";
 import { CrmExecutivePaymentReminderDialog } from "@/components/crm/crm-executive-payment-reminder-dialog";
 import { CrmPaymentsExpandedRow } from "@/components/crm/crm-payments-expanded-row";
 import { DataTable } from "@/components/data-table";
@@ -32,6 +33,10 @@ import {
   useRemindCrmPaymentsBulk,
 } from "@/hooks/use-crm-payments";
 import type { PaymentStatus } from "@/lib/crm-payment-allocation";
+import {
+  crmRenewalWindowLabel,
+  isCrmAccountInRenewalWindow,
+} from "@/lib/crm-account-renewal";
 import {
   crmPaymentsSearchSchema,
   crmPaymentsSearchToApiFilters,
@@ -143,6 +148,11 @@ function CrmPaymentsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [bulkPaymentOpen, setBulkPaymentOpen] = useState(false);
   const [executiveDigestOpen, setExecutiveDigestOpen] = useState(false);
+  const [renewAccountId, setRenewAccountId] = useState<string | null>(null);
+  const renewAccount = useMemo(
+    () => (renewAccountId ? accounts.find((a) => a.id === renewAccountId) ?? null : null),
+    [accounts, renewAccountId],
+  );
 
   useEffect(() => {
     setSearchDraft(search.search ?? "");
@@ -596,12 +606,33 @@ function CrmPaymentsPage() {
             density="compact"
             expandedRowIds={expandedRowIds}
             onRowClick={(r) => toggleExpanded(r.id)}
+            getRowClassName={(r) =>
+              isCrmAccountInRenewalWindow({ endDate: r.renewalDate })
+                ? "border-amber-500/50 bg-amber-500/[0.07] dark:bg-amber-500/10"
+                : undefined
+            }
             selection={{
               selectedIds,
               onToggle: toggleSelection,
               onToggleAll: toggleSelectionAll,
             }}
             renderExpandedRow={(r) => <CrmPaymentsExpandedRow row={r} search={search} />}
+            actions={(r) =>
+              isCrmAccountInRenewalWindow({ endDate: r.renewalDate }) ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-800 hover:bg-amber-500/20 dark:text-amber-300"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setRenewAccountId(r.id);
+                  }}
+                >
+                  Renew
+                </Button>
+              ) : null
+            }
             columns={[
               {
                 key: "expand",
@@ -617,14 +648,21 @@ function CrmPaymentsPage() {
                 key: "accountName",
                 header: "Account",
                 render: (r) => (
-                  <Link
-                    to="/crm/accounts/$accountId"
-                    params={{ accountId: r.id }}
-                    className="font-medium hover:underline"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {r.accountName}
-                  </Link>
+                  <div>
+                    <Link
+                      to="/crm/accounts/$accountId"
+                      params={{ accountId: r.id }}
+                      className="font-medium hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {r.accountName}
+                    </Link>
+                    {crmRenewalWindowLabel({ endDate: r.renewalDate }) ? (
+                      <div className="mt-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+                        {crmRenewalWindowLabel({ endDate: r.renewalDate })}
+                      </div>
+                    ) : null}
+                  </div>
                 ),
               },
               {
@@ -782,6 +820,17 @@ function CrmPaymentsPage() {
         open={executiveDigestOpen}
         onOpenChange={setExecutiveDigestOpen}
         accountIdsScope={selectedIds.size > 0 ? [...selectedIds] : undefined}
+      />
+      <CrmAccountRenewDialog
+        account={renewAccount}
+        open={Boolean(renewAccount)}
+        onOpenChange={(open) => {
+          if (!open) setRenewAccountId(null);
+        }}
+        onRenewed={() => {
+          void listQuery.refetch();
+          void summaryQuery.refetch();
+        }}
       />
     </PageWrap>
   );

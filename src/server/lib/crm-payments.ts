@@ -1,6 +1,6 @@
 import { desc, eq, sql } from "drizzle-orm";
 
-import { parseInstallmentsJson, originalInstallments, roundMoney, serializeInstallments } from "@/lib/crm-account-commercial";
+import { parseInstallmentsJson, originalInstallments, renewalInstallments, roundMoney, serializeInstallments } from "@/lib/crm-account-commercial";
 import {
   allocateAccountPayments,
   classifyPaymentTransactionRenewal,
@@ -55,18 +55,20 @@ export function getAccountPaymentReceived(db: ReturnType<typeof getDb>, accountI
   return sumPaymentTransactions(rows);
 }
 
-/** Denormalize payment_received + pending_amount from the ledger. */
+/** Denormalize payment_received + pending_amount from the ledger (respects renewal cycle baseline). */
 export function syncAccountPaymentTotals(db: ReturnType<typeof getDb>, accountId: string) {
   const account = db.select().from(t.crmAccounts).where(eq(t.crmAccounts.id, accountId)).get();
   if (!account) return;
 
-  const received = getAccountPaymentReceived(db, accountId);
+  const lifetime = getAccountPaymentReceived(db, accountId);
+  const baseline = roundMoney(Number(account.paymentCycleBaseline) || 0);
+  const cycleReceived = roundMoney(Math.max(0, lifetime - baseline));
   const dealSize = roundMoney(Number(account.dealSize) || 0);
-  const pending = roundMoney(Math.max(0, dealSize - received));
+  const pending = roundMoney(Math.max(0, dealSize - cycleReceived));
 
   db.update(t.crmAccounts)
     .set({
-      paymentReceived: received,
+      paymentReceived: cycleReceived,
       pendingAmount: pending,
       updatedAt: nowIso(),
     })
@@ -289,18 +291,58 @@ export function buildAccountPaymentSnapshot(
 } {
   const installments = parseInstallmentsJson(account.installmentsJson);
   const totalDealValue = roundMoney(Number(account.dealSize) || 0);
-  const paymentReceived = roundMoney(totalReceived);
-  const pendingAmount = roundMoney(Math.max(0, totalDealValue - paymentReceived));
+  const baseline = roundMoney(Number(account.paymentCycleBaseline) || 0);
+  const lifetimeReceived = roundMoney(totalReceived);
+  const cycleReceived = roundMoney(Math.max(0, lifetimeReceived - baseline));
+  const pendingAmount = roundMoney(Math.max(0, totalDealValue - cycleReceived));
+
+  const renewals = renewalInstallments(installments);
+  const originals = originalInstallments(installments);
+  const useRenewalCycle = baseline > 0.01 && renewals.length > 0;
+
   const allocation = allocateAccountPayments({
-    installments,
-    totalReceived: paymentReceived,
+    installments: useRenewalCycle ? renewals : installments,
+    totalReceived: cycleReceived,
     totalDealValue,
     todayYmd,
   });
+
+  if (useRenewalCycle && originals.length > 0) {
+    const paidOriginals = originals
+      .slice()
+      .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+      .map((row, i) => {
+        const amount = roundMoney(Number(row.amount) || 0);
+        return {
+          index: i + 1,
+          id: row.id,
+          kind: row.kind,
+          amount,
+          dueDate: row.dueDate,
+          paidAmount: amount,
+          remainingAmount: 0,
+          status: "paid" as const,
+        };
+      });
+    const renewAllocated = allocation.installments.map((row, i) => ({
+      ...row,
+      index: paidOriginals.length + i + 1,
+    }));
+    return {
+      ...allocation,
+      installments: [...paidOriginals, ...renewAllocated],
+      totalDealValue,
+      paymentReceived: cycleReceived,
+      pendingAmount,
+      // Lifetime excess beyond current deal is not "renewal overflow" in a fresh cycle.
+      renewalAmount: roundMoney(Math.max(0, cycleReceived - totalDealValue)),
+    };
+  }
+
   return {
     ...allocation,
     totalDealValue,
-    paymentReceived,
+    paymentReceived: cycleReceived,
     pendingAmount,
   };
 }

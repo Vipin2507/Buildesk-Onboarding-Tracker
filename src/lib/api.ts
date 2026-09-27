@@ -163,6 +163,7 @@ export {
   upsertCrmAccountsBatch,
   deleteCrmAccount,
   bulkUpdateCrmAccountPayments,
+  renewCrmAccount,
 } from "@/server/api/crm-accounts";
 
 export {

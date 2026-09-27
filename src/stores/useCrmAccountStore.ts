@@ -64,6 +64,8 @@ function toApiPayload(account: CrmAccount) {
     totalCost: account.totalCost,
     paymentReceived: account.paymentReceived,
     pendingAmount: account.pendingAmount,
+    paymentCycleBaseline: account.paymentCycleBaseline ?? null,
+    renewalWindowNotifiedForEndDate: account.renewalWindowNotifiedForEndDate ?? null,
     installmentCount: account.installmentCount,
     installmentsJson:
       account.installments && account.installments.length > 0

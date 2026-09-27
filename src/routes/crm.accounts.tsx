@@ -21,6 +21,7 @@ import { CrmAccountClientTransferModal } from "@/components/crm/crm-account-clie
 import { CrmAccountDateBulkUploadModal } from "@/components/crm/crm-account-date-bulk-upload-modal";
 import { CrmAccountExportModal } from "@/components/crm/crm-account-export-modal";
 import { CrmAccountGoLiveActions } from "@/components/crm/crm-account-go-live-actions";
+import { CrmAccountRenewDialog } from "@/components/crm/crm-account-renew-dialog";
 import { CrmAccountStageSelect } from "@/components/crm/crm-account-stage-select";
 import { CrmAccountModulesCell } from "@/components/crm/crm-account-modules-cell";
 import {
@@ -54,7 +55,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { isCrmGoLiveStage } from "@/lib/crm-implementation-stages";
+import {
+  crmRenewalWindowLabel,
+  isCrmAccountInRenewalWindow,
+} from "@/lib/crm-account-renewal";
 import { isAdminRoleKey } from "@/lib/permissions";
+import {
+  crmRenewalWindowLabel,
+  isCrmAccountInRenewalWindow,
+} from "@/lib/crm-account-renewal";
 import {
   listActiveCrmImplementationStages,
   resolveCrmStageLabel,
@@ -393,6 +402,7 @@ function CrmAccountsPage() {
   const [editing, setEditing] = useState<CrmAccount | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState<CrmAccountRow | null>(null);
+  const [renewAccount, setRenewAccount] = useState<CrmAccount | null>(null);
   const [selectedModules, setSelectedModules] = useState<CrmProductModuleKey[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
 
@@ -1164,6 +1174,11 @@ function CrmAccountsPage() {
               initialSortKey="startDate"
               initialSortDir="desc"
               getRowId={(r) => r.id}
+              getRowClassName={(r) =>
+                isCrmAccountInRenewalWindow(r)
+                  ? "border-amber-500/50 bg-amber-500/[0.07] dark:bg-amber-500/10"
+                  : undefined
+              }
               selection={{
                 selectedIds,
                 onToggle: toggleSelection,
@@ -1210,6 +1225,11 @@ function CrmAccountsPage() {
                         <div className="font-mono text-xs text-muted-foreground">
                           {r.userId?.trim() || "—"}
                         </div>
+                        {crmRenewalWindowLabel(r) ? (
+                          <div className="mt-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+                            {crmRenewalWindowLabel(r)}
+                          </div>
+                        ) : null}
                       </div>
                     ),
                   },
@@ -1326,38 +1346,62 @@ function CrmAccountsPage() {
                   },
                 ]}
                 actions={(r) => (
-                  <CrmAccountGoLiveActions
-                    variant="icon"
-                    companyId={r.id}
-                    accountName={r.name}
-                    accountStatus={r.status}
-                    who={currentUser?.name}
-                    onOpenGoLiveTab={() =>
-                      void navigate({
-                        to: "/crm/accounts/$accountId",
-                        params: { accountId: r.id },
-                        search: { tab: "golive" },
-                      })
-                    }
-                    onEdit={() => openEdit(r)}
-                    onCreateQuery={() =>
-                      void navigate({
-                        to: "/crm/accounts/$accountId",
-                        params: { accountId: r.id },
-                        search: { tab: "queries" },
-                      })
-                    }
-                    onDelete={() => {
-                      setDeleting(r);
-                      setDeleteOpen(true);
-                    }}
-                  />
+                  <div className="flex flex-wrap items-center justify-end gap-1">
+                    {isCrmAccountInRenewalWindow(r) ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-800 hover:bg-amber-500/20 dark:text-amber-300"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRenewAccount(r);
+                        }}
+                      >
+                        Renew
+                      </Button>
+                    ) : null}
+                    <CrmAccountGoLiveActions
+                      variant="icon"
+                      companyId={r.id}
+                      accountName={r.name}
+                      accountStatus={r.status}
+                      who={currentUser?.name}
+                      onOpenGoLiveTab={() =>
+                        void navigate({
+                          to: "/crm/accounts/$accountId",
+                          params: { accountId: r.id },
+                          search: { tab: "golive" },
+                        })
+                      }
+                      onEdit={() => openEdit(r)}
+                      onCreateQuery={() =>
+                        void navigate({
+                          to: "/crm/accounts/$accountId",
+                          params: { accountId: r.id },
+                          search: { tab: "queries" },
+                        })
+                      }
+                      onDelete={() => {
+                        setDeleting(r);
+                        setDeleteOpen(true);
+                      }}
+                    />
+                  </div>
                 )}
               />
             </motion.div>
           )}
       </div>
       </div>
+
+      <CrmAccountRenewDialog
+        account={renewAccount}
+        open={Boolean(renewAccount)}
+        onOpenChange={(open) => {
+          if (!open) setRenewAccount(null);
+        }}
+      />
 
       <EntityFormModal
         open={modalOpen}

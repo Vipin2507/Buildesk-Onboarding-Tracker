@@ -35,6 +35,13 @@ export type CrmAccount = Timestamps & {
   totalCost?: number;
   paymentReceived?: number;
   pendingAmount?: number;
+  /**
+   * Lifetime ledger total frozen at renew time. Pending/received for the current deal
+   * are computed as max(0, lifetimeReceived − paymentCycleBaseline).
+   */
+  paymentCycleBaseline?: number;
+  /** `endDate` value for which the 30-day renewal bell notification was already sent. */
+  renewalWindowNotifiedForEndDate?: string;
   /** GST rate applied to deal value (deal size is inclusive of GST). */
   gstPercent?: number;
   installmentCount?: number;

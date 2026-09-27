@@ -11,9 +11,12 @@ import { isAdminRoleKey } from "@/lib/permissions";
 import { parseInstallmentsJson } from "@/lib/crm-account-commercial";
 import {
   ensureInitialPaymentOnAccountCreate,
+  getAccountPaymentReceived,
   replaceAccountPaymentLedgerForImport,
   syncAccountPaymentTotals,
 } from "@/server/lib/crm-payments";
+import { buildCrmAccountRenewPatch, renewPatchToApiFields } from "@/lib/crm-account-renewal";
+import { roundMoney } from "@/lib/crm-account-commercial";
 import type { CrmAccount } from "@/types/crm-account";
 import type { CompanyType } from "@/types/company";
 
@@ -51,6 +54,8 @@ function mapRow(row: typeof t.crmAccounts.$inferSelect): CrmAccount {
     totalCost: row.totalCost ?? undefined,
     paymentReceived: row.paymentReceived ?? undefined,
     pendingAmount: row.pendingAmount ?? undefined,
+    paymentCycleBaseline: row.paymentCycleBaseline ?? undefined,
+    renewalWindowNotifiedForEndDate: row.renewalWindowNotifiedForEndDate ?? undefined,
     installmentCount: row.installmentCount ?? undefined,
     installments: parseInstallmentsJson(row.installmentsJson),
     healthScore: row.healthScore ?? undefined,
@@ -95,6 +100,8 @@ const accountInput = z.object({
   totalCost: z.number().optional().nullable(),
   paymentReceived: z.number().optional().nullable(),
   pendingAmount: z.number().optional().nullable(),
+  paymentCycleBaseline: z.number().optional().nullable(),
+  renewalWindowNotifiedForEndDate: z.string().optional().nullable(),
   installmentCount: z.number().int().optional().nullable(),
   installmentsJson: z.string().optional().nullable(),
   healthScore: z.number().int().optional().nullable(),
@@ -144,6 +151,8 @@ function toRowValues(
     totalCost: data.totalCost ?? null,
     paymentReceived: data.paymentReceived ?? null,
     pendingAmount: data.pendingAmount ?? null,
+    paymentCycleBaseline: data.paymentCycleBaseline ?? null,
+    renewalWindowNotifiedForEndDate: data.renewalWindowNotifiedForEndDate ?? null,
     installmentCount: data.installmentCount ?? null,
     installmentsJson: data.installmentsJson ?? null,
     healthScore: data.healthScore ?? null,
@@ -373,4 +382,78 @@ export const bulkUpdateCrmAccountPayments = createServerFn({ method: "POST" })
     }
 
     return { updated: saved.length, accounts: saved };
+  });
+
+/** Start a new renewal commercial cycle — keeps ledger history, fresh pending, appends renewal installments. */
+export const renewCrmAccount = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        accountId: z.string().min(1),
+        dealSize: z.number().positive(),
+        usersPurchased: z.number().int().nonnegative(),
+        gstPercent: z.number().min(0).max(100),
+        endDate: z.string().min(8),
+        renewalInstallments: z
+          .array(
+            z.object({
+              amount: z.number(),
+              dueDate: z.string().min(8),
+              id: z.string().optional(),
+            }),
+          )
+          .max(60),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    const db = getDb();
+    const existing = db.select().from(t.crmAccounts).where(eq(t.crmAccounts.id, data.accountId)).get();
+    if (!existing) throw new ApiError(404, "Account not found");
+    assertCanMutateAccount(user, existing, existing.salesManagerName);
+    if (!existing.endDate?.trim()) {
+      throw new ApiError(400, "Account has no end date to renew from");
+    }
+
+    const account = mapRow(existing);
+    const lifetime = getAccountPaymentReceived(db, data.accountId);
+    const patch = buildCrmAccountRenewPatch(account, {
+      dealSize: data.dealSize,
+      usersPurchased: data.usersPurchased,
+      gstPercent: data.gstPercent,
+      endDate: data.endDate,
+      renewalInstallments: data.renewalInstallments.map((r) => ({
+        ...r,
+        kind: "renewal" as const,
+      })),
+      lifetimePaymentReceived: lifetime,
+    });
+
+    const now = nowIso();
+    const apiFields = renewPatchToApiFields(patch);
+    db.update(t.crmAccounts)
+      .set({
+        ...apiFields,
+        // Clear notified marker so the next cycle can bell again.
+        renewalWindowNotifiedForEndDate: null,
+        updatedAt: now,
+      })
+      .where(eq(t.crmAccounts.id, data.accountId))
+      .run();
+
+    // Keep denormalized cycle totals (received=0, pending=deal) — do not overwrite from full ledger.
+    db.update(t.crmAccounts)
+      .set({
+        paymentReceived: roundMoney(0),
+        pendingAmount: roundMoney(data.dealSize),
+        paymentCycleBaseline: apiFields.paymentCycleBaseline,
+        updatedAt: now,
+      })
+      .where(eq(t.crmAccounts.id, data.accountId))
+      .run();
+
+    const row = db.select().from(t.crmAccounts).where(eq(t.crmAccounts.id, data.accountId)).get();
+    if (!row) throw new ApiError(500, "Renew failed");
+    return mapRow(row);
   });

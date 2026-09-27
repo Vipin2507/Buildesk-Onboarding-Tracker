@@ -1,3 +1,4 @@
+import { processCrmAccountRenewalReminders } from "@/server/crm-account-renewal-reminders";
 import { processTaskInAppReminders } from "@/server/crm-task-in-app-reminder";
 import { processTaskReminderAutomations } from "@/server/crm-task-reminder-automation";
 import { processTaskWebPushReminders } from "@/server/crm-task-web-push";
@@ -19,7 +20,10 @@ export function startCrmReminderScheduler() {
       await processTaskReminderAutomations(db, DEFAULT_BOOKING_TIMEZONE);
       const inAppSent = processTaskInAppReminders(db, DEFAULT_BOOKING_TIMEZONE);
       const pushSent = await processTaskWebPushReminders(db, DEFAULT_BOOKING_TIMEZONE);
-      console.log(`[crm-reminder-scheduler] tick inApp=${inAppSent} push=${pushSent}`);
+      const renewalSent = processCrmAccountRenewalReminders(db);
+      console.log(
+        `[crm-reminder-scheduler] tick inApp=${inAppSent} push=${pushSent} renewal=${renewalSent}`,
+      );
     } catch (err) {
       console.warn("[crm-reminder-scheduler]", err);
     }

@@ -299,6 +299,8 @@ const EXTRA_COLUMNS = [
   { table: "crm_accounts", name: "gst_percent", ddl: "REAL" },
   { table: "crm_accounts", name: "whatsapp_group_id", ddl: "TEXT" },
   { table: "crm_accounts", name: "whatsapp_group_name", ddl: "TEXT" },
+  { table: "crm_accounts", name: "payment_cycle_baseline", ddl: "REAL" },
+  { table: "crm_accounts", name: "renewal_window_notified_for_end_date", ddl: "TEXT" },
   { table: "erp_meetings", name: "google_event_id", ddl: "TEXT" },
   { table: "erp_meetings", name: "meet_url", ddl: "TEXT" },
   { table: "erp_meetings", name: "google_sync_status", ddl: "TEXT NOT NULL DEFAULT 'none'" },

@@ -49,6 +49,7 @@ export function DataTable<T>({
   expandedRowIds,
   renderExpandedRow,
   flush = false,
+  getRowClassName,
 }: {
   data: T[];
   columns: {
@@ -79,6 +80,7 @@ export function DataTable<T>({
   renderExpandedRow?: (row: T) => ReactNode;
   /** Edge-to-edge table — no side border/radius (for dense list pages). */
   flush?: boolean;
+  getRowClassName?: (row: T) => string | undefined;
 }) {
   const [internalSearch, setInternalSearch] = useState("");
   const search = searchQuery ?? internalSearch;
@@ -203,6 +205,7 @@ export function DataTable<T>({
                   onRowClick && "active:bg-muted/50",
                   selected && "border-primary/40 bg-primary/5",
                   expanded && "border-primary/30 ring-1 ring-primary/15",
+                  getRowClassName?.(row),
                 )}
               >
                 <div
@@ -355,6 +358,7 @@ export function DataTable<T>({
                         onRowClick && "cursor-pointer hover:bg-muted/40",
                         selected && "bg-primary/5",
                         expanded && "bg-primary/[0.04]",
+                        getRowClassName?.(row),
                       )}
                       onClick={() => onRowClick?.(row)}
                     >

@@ -157,6 +157,9 @@ export const crmAccounts = sqliteTable(
     totalCost: real("total_cost"),
     paymentReceived: real("payment_received"),
     pendingAmount: real("pending_amount"),
+    /** Lifetime payments frozen when a renewal cycle starts (see crm-account-renewal). */
+    paymentCycleBaseline: real("payment_cycle_baseline"),
+    renewalWindowNotifiedForEndDate: text("renewal_window_notified_for_end_date"),
     installmentCount: integer("installment_count"),
     installmentsJson: text("installments_json"),
     healthScore: integer("health_score"),
