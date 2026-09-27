@@ -61,10 +61,6 @@ import {
 } from "@/lib/crm-account-renewal";
 import { isAdminRoleKey } from "@/lib/permissions";
 import {
-  crmRenewalWindowLabel,
-  isCrmAccountInRenewalWindow,
-} from "@/lib/crm-account-renewal";
-import {
   listActiveCrmImplementationStages,
   resolveCrmStageLabel,
 } from "@/stores/useCrmMasterStore";
