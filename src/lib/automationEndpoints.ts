@@ -561,3 +561,82 @@ export async function fetchWahaSendMedia(
   });
   return readResponse(res);
 }
+
+/**
+ * Download WAHA media bytes with API key (via server proxy on HTTPS / direct or /waha in dev).
+ * Browser <img> cannot attach X-Api-Key, so this is required for inbound media previews.
+ */
+export async function fetchWahaMediaFile(
+  config: WahaConfig,
+  mediaUrl: string,
+): Promise<{
+  ok: boolean;
+  status: number;
+  base64: string | null;
+  mimetype: string | null;
+  error?: string;
+}> {
+  let url = mediaUrl.trim();
+  if (!url) {
+    return { ok: false, status: 0, base64: null, mimetype: null, error: "Empty media URL" };
+  }
+  if (url.startsWith("/")) {
+    url = `${trimSlash(config.apiUrl)}${url}`;
+  }
+
+  if (isDevClient()) {
+    // Rewrite absolute WAHA API host → vite /waha proxy so the browser can load with API key.
+    try {
+      const api = new URL(trimSlash(config.apiUrl));
+      const target = new URL(url);
+      if (target.host === api.host) {
+        url = `/waha${target.pathname}${target.search}`;
+      }
+    } catch {
+      /* keep url */
+    }
+    const res = await fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "*/*",
+        "X-Api-Key": config.apiKey,
+      },
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      return {
+        ok: false,
+        status: res.status,
+        base64: null,
+        mimetype: null,
+        error: text.slice(0, 200) || `HTTP ${res.status}`,
+      };
+    }
+    const buf = await res.arrayBuffer();
+    if (buf.byteLength > 2_500_000) {
+      return { ok: false, status: 413, base64: null, mimetype: null, error: "Media too large" };
+    }
+    const bytes = new Uint8Array(buf);
+    let binary = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+    }
+    return {
+      ok: true,
+      status: res.status,
+      base64: btoa(binary),
+      mimetype: res.headers.get("content-type")?.split(";")[0]?.trim() || "application/octet-stream",
+    };
+  }
+
+  // HTTPS production (and non-dev): always go through server so X-Api-Key stays off the client img path.
+  const { proxyWahaMediaFile } = await import("@/server/api/integrations");
+  return proxyWahaMediaFile({
+    data: {
+      apiUrl: config.apiUrl,
+      apiKey: config.apiKey,
+      mediaUrl: url,
+    },
+  });
+}

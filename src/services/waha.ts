@@ -450,7 +450,7 @@ function parseOneMessage(row: Record<string, unknown>): WahaChatMessage | null {
   const data = asRecord(row._data);
   const message = asRecord(row.message) || (data ? asRecord(data.message) : null);
 
-  const mimetype =
+  let mimetype =
     (typeof row.mimetype === "string" && row.mimetype) ||
     (media && typeof media.mimetype === "string" && media.mimetype) ||
     undefined;
@@ -462,10 +462,26 @@ function parseOneMessage(row: Record<string, unknown>): WahaChatMessage | null {
   if (!mediaUrl && media && typeof media.path === "string" && media.path) {
     mediaUrl = media.path;
   }
-  const mediaData =
+
+  let mediaData: string | undefined;
+  const rawMediaData =
     (typeof row.body === "string" && row.hasMedia && row.body.startsWith("/9j") ? row.body : undefined) ||
     (media && typeof media.data === "string" ? media.data : undefined) ||
     (typeof row.mediaData === "string" ? row.mediaData : undefined);
+  if (rawMediaData) {
+    if (rawMediaData.startsWith("data:") && rawMediaData.includes(";base64,")) {
+      // Already a data-URL — prefer as mediaUrl for display.
+      if (!mediaUrl || !mediaUrl.startsWith("data:")) mediaUrl = rawMediaData;
+      const comma = rawMediaData.indexOf(",");
+      mediaData = rawMediaData.slice(comma + 1);
+      if (!mimetype) {
+        const mimeMatch = /^data:([^;,]+)/.exec(rawMediaData);
+        if (mimeMatch?.[1]) mimetype = mimeMatch[1];
+      }
+    } else {
+      mediaData = rawMediaData;
+    }
+  }
   const hasMedia = Boolean(row.hasMedia) || Boolean(mediaUrl) || Boolean(mediaData) || Boolean(mimetype);
 
   const conversation =
@@ -669,6 +685,47 @@ export async function getWahaChatMessage(
       error: err instanceof Error ? err.message : "Failed to load message",
     };
   }
+}
+
+/**
+ * Resolve inbound WAHA media into a browser-displayable data-URL.
+ * WAHA file URLs require X-Api-Key — never use them as bare <img src>.
+ */
+export async function resolveWahaMediaDataUrl(
+  config: WahaConfig,
+  msg: WahaChatMessage,
+): Promise<{ dataUrl: string | null; mimetype?: string; error?: string }> {
+  if (msg.mediaUrl?.startsWith("data:")) {
+    return { dataUrl: msg.mediaUrl, mimetype: msg.mimetype };
+  }
+  if (msg.mediaData && msg.mimetype) {
+    return {
+      dataUrl: `data:${msg.mimetype};base64,${msg.mediaData}`,
+      mimetype: msg.mimetype,
+    };
+  }
+
+  const remote =
+    msg.mediaUrl &&
+    (msg.mediaUrl.startsWith("http://") ||
+      msg.mediaUrl.startsWith("https://") ||
+      msg.mediaUrl.startsWith("/"))
+      ? msg.mediaUrl
+      : undefined;
+  if (!remote) {
+    return { dataUrl: null, error: "No media URL or bytes" };
+  }
+
+  const { fetchWahaMediaFile } = await import("@/lib/automationEndpoints");
+  const fetched = await fetchWahaMediaFile(config, remote);
+  if (!fetched.ok || !fetched.base64) {
+    return { dataUrl: null, error: fetched.error || `HTTP ${fetched.status}` };
+  }
+  const mimetype = fetched.mimetype || msg.mimetype || "application/octet-stream";
+  return {
+    dataUrl: `data:${mimetype};base64,${fetched.base64}`,
+    mimetype,
+  };
 }
 
 export async function sendWahaMedia(

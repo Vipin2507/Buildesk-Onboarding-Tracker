@@ -30,6 +30,7 @@ import {
   listWahaGroups,
   markWahaChatSeen,
   parseWahaMessagesPayload,
+  resolveWahaMediaDataUrl,
   sendWahaMedia,
   sendWahaText,
   type WahaChatMessage,
@@ -79,15 +80,14 @@ function persistableMediaUrl(url: string | undefined | null): string | null {
   if (!url) return null;
   // blob: dies when the tab unmounts — never write it to SQLite.
   if (url.startsWith("blob:")) return null;
-  // Keep compact data-URLs and remote URLs.
+  // Only data-URLs are browser-safe without WAHA API key. Do not persist http(s) WAHA file links.
   if (url.startsWith("data:")) {
     return url.length <= 350_000 ? url : null;
   }
-  if (url.startsWith("http://") || url.startsWith("https://")) return url;
   return null;
 }
 
-/** Make relative WAHA media paths absolute against the configured API base. */
+/** Make relative WAHA media paths absolute against the configured API base (for server fetch only). */
 function absoluteWahaMediaUrl(url: string | undefined | null, apiUrl: string): string | undefined {
   if (!url) return undefined;
   if (
@@ -102,6 +102,34 @@ function absoluteWahaMediaUrl(url: string | undefined | null, apiUrl: string): s
     return `${apiUrl.replace(/\/+$/, "")}${url}`;
   }
   return url;
+}
+
+/** <img>/<video> can only load data:/blob: — WAHA http URLs need X-Api-Key. */
+function isBrowserDisplayableMediaUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  return url.startsWith("data:") || url.startsWith("blob:");
+}
+
+function mediaSrc(
+  msg: WahaChatMessage,
+  localPreviews?: Map<string, string>,
+): string | null {
+  const local = localPreviews?.get(msg.id);
+  if (local && isBrowserDisplayableMediaUrl(local)) return local;
+  if (isBrowserDisplayableMediaUrl(msg.mediaUrl)) return msg.mediaUrl!;
+  if (msg.mediaData && msg.mimetype) {
+    return `data:${msg.mimetype};base64,${msg.mediaData}`;
+  }
+  return null;
+}
+
+/** True when we still need to download/convert WAHA media for display. */
+function needsMediaHydrate(
+  msg: WahaChatMessage,
+  localPreviews?: Map<string, string>,
+): boolean {
+  if (!msg.hasMedia || msg.id.startsWith("local-media-")) return false;
+  return !mediaSrc(msg, localPreviews);
 }
 
 function uiToStoredPayload(msg: WahaChatMessage) {
@@ -230,6 +258,17 @@ function betterMediaType(
   return score(a) >= score(b) ? a ?? b : b;
 }
 
+function mediaTypeFromMime(mimetype?: string | null): WahaChatMessage["mediaType"] | undefined {
+  if (!mimetype) return undefined;
+  const mt = mimetype.toLowerCase();
+  if (mt.startsWith("image/")) return "image";
+  if (mt.startsWith("video/")) return "video";
+  if (mt.startsWith("audio/ogg") || mt.includes("opus")) return "voice";
+  if (mt.startsWith("audio/")) return "audio";
+  if (mt.includes("webp")) return "sticker";
+  return "document";
+}
+
 function messageHasLocalPreview(
   msg: WahaChatMessage,
   localPreviews: Map<string, string>,
@@ -336,23 +375,6 @@ function AckIcon({ ack }: { ack?: number }) {
   if (ack >= 3) return <CheckCheck className="h-3 w-3 text-sky-500" />;
   if (ack >= 2) return <CheckCheck className="h-3 w-3 text-muted-foreground" />;
   return <Check className="h-3 w-3 text-muted-foreground" />;
-}
-
-function mediaSrc(
-  msg: WahaChatMessage,
-  localPreviews?: Map<string, string>,
-  apiUrl?: string,
-): string | null {
-  // Prefer session blob previews (sharper) over persisted thumbnails.
-  const local = localPreviews?.get(msg.id);
-  if (local) return local;
-  if (msg.mediaUrl) {
-    return absoluteWahaMediaUrl(msg.mediaUrl, apiUrl || "") || msg.mediaUrl;
-  }
-  if (msg.mediaData && msg.mimetype) {
-    return `data:${msg.mimetype};base64,${msg.mediaData}`;
-  }
-  return null;
 }
 
 /** Match reply targets across WAHA id formats (`true_…@g.us_ABC` vs bare `ABC`). */
@@ -759,11 +781,10 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
     if (document.visibilityState === "hidden") return;
 
     const missing = messages.filter((m) => {
-      if (!m.hasMedia || m.id.startsWith("local-media-")) return false;
       if (mediaHydrateInFlight.current.has(m.id)) return false;
       const fails = mediaHydrateFailCount.current.get(m.id) ?? 0;
       if (fails >= MEDIA_HYDRATE_MAX_ATTEMPTS) return false;
-      return !mediaSrc(m, localMediaPreviewRef.current, waha.apiUrl);
+      return needsMediaHydrate(m, localMediaPreviewRef.current);
     });
     if (missing.length === 0) return;
 
@@ -779,72 +800,65 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
             downloadMedia: true,
           });
           if (cancelled) continue;
-          if (!result.ok || !result.message) {
-            mediaHydrateFailCount.current.set(
-              msg.id,
-              (mediaHydrateFailCount.current.get(msg.id) ?? 0) + 1,
-            );
-            continue;
-          }
 
-          const fetched = result.message;
-          const absUrl = absoluteWahaMediaUrl(fetched.mediaUrl, waha.apiUrl);
-          let durableUrl = persistableMediaUrl(absUrl);
-
-          // Prefer in-memory data-URL for display even when too large to persist.
-          if (fetched.mediaData && fetched.mimetype) {
-            const dataUrl = `data:${fetched.mimetype};base64,${fetched.mediaData}`;
-            localMediaPreviewRef.current.set(msg.id, dataUrl);
-            if (!durableUrl && dataUrl.length <= 350_000) {
-              durableUrl = dataUrl;
-            }
-          }
-
-          const displayUrl =
-            durableUrl || absUrl || localMediaPreviewRef.current.get(msg.id) || undefined;
-          const hasBytes = Boolean(
-            displayUrl || (fetched.mediaData && fetched.mimetype),
-          );
-          if (!hasBytes) {
-            mediaHydrateFailCount.current.set(
-              msg.id,
-              (mediaHydrateFailCount.current.get(msg.id) ?? 0) + 1,
-            );
-            continue;
-          }
-
-          // Success — clear fail streak.
-          mediaHydrateFailCount.current.delete(msg.id);
-
-          setMessages((prev) =>
-            mergeMessages(prev, [
-              {
+          const fetched = result.ok && result.message ? result.message : null;
+          const candidate: WahaChatMessage = fetched
+            ? {
+                ...msg,
                 ...fetched,
-                mediaUrl: durableUrl || absUrl || fetched.mediaUrl,
-                mediaData: fetched.mediaData,
+                mediaUrl:
+                  absoluteWahaMediaUrl(fetched.mediaUrl, waha.apiUrl) ||
+                  fetched.mediaUrl ||
+                  absoluteWahaMediaUrl(msg.mediaUrl, waha.apiUrl) ||
+                  msg.mediaUrl,
+                mediaData: fetched.mediaData || msg.mediaData,
+                mimetype: fetched.mimetype || msg.mimetype,
                 mediaType: betterMediaType(fetched.mediaType, msg.mediaType),
                 hasMedia: true,
                 replyTo: fetched.replyTo || msg.replyTo,
                 replyPreview: fetched.replyPreview || msg.replyPreview,
-              },
-            ]),
-          );
+              }
+            : {
+                ...msg,
+                mediaUrl: absoluteWahaMediaUrl(msg.mediaUrl, waha.apiUrl) || msg.mediaUrl,
+                hasMedia: true,
+              };
+
+          // Convert WAHA API-keyed URLs / base64 into a browser-safe data-URL.
+          const resolved = await resolveWahaMediaDataUrl(waha, candidate);
+          if (cancelled) continue;
+
+          if (!resolved.dataUrl) {
+            mediaHydrateFailCount.current.set(
+              msg.id,
+              (mediaHydrateFailCount.current.get(msg.id) ?? 0) + 1,
+            );
+            continue;
+          }
+
+          mediaHydrateFailCount.current.delete(msg.id);
+          localMediaPreviewRef.current.set(msg.id, resolved.dataUrl);
+
+          const durableUrl = persistableMediaUrl(resolved.dataUrl);
+          const mime = resolved.mimetype || candidate.mimetype;
+          const enriched: WahaChatMessage = {
+            ...candidate,
+            mediaUrl: durableUrl || resolved.dataUrl,
+            mimetype: mime,
+            hasMedia: true,
+            mediaType: betterMediaType(
+              mediaTypeFromMime(mime),
+              candidate.mediaType,
+            ),
+          };
+
+          setMessages((prev) => mergeMessages(prev, [enriched]));
 
           void upsertCrmWhatsappGroupMessages({
             data: {
               accountId,
               groupId,
-              messages: [
-                uiToStoredPayload({
-                  ...msg,
-                  ...fetched,
-                  mediaUrl: durableUrl || absUrl || fetched.mediaUrl,
-                  hasMedia: true,
-                  mediaType: betterMediaType(fetched.mediaType, msg.mediaType),
-                  replyTo: fetched.replyTo || msg.replyTo,
-                  replyPreview: fetched.replyPreview || msg.replyPreview,
-                }),
-              ],
+              messages: [uiToStoredPayload(enriched)],
             },
           }).catch(() => null);
         } catch {
@@ -1285,7 +1299,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
           const prev = messages[idx - 1];
           const showDay = !prev || dayKey(prev.timestamp) !== dayKey(msg.timestamp);
           const quoted = findQuotedMessage(messages, msg.replyTo);
-          const src = mediaSrc(msg, localMediaPreviewRef.current, waha.apiUrl);
+          const src = mediaSrc(msg, localMediaPreviewRef.current);
           const showMedia = Boolean(msg.hasMedia || src);
           const effectiveType = resolveEffectiveMediaType(msg, src, showMedia);
           return (
@@ -1321,21 +1335,59 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                   ) : null}
                   {showMedia && effectiveType === "image" ? (
                     src ? (
-                      <img src={src} alt="" className="mb-1 max-h-48 max-w-full rounded-md object-cover" />
+                      <img
+                        src={src}
+                        alt=""
+                        className="mb-1 max-h-48 max-w-full rounded-md object-cover"
+                        onError={() => {
+                          localMediaPreviewRef.current.delete(msg.id);
+                          mediaHydrateFailCount.current.delete(msg.id);
+                          setMessages((prev) =>
+                            prev.map((m) =>
+                              m.id === msg.id
+                                ? {
+                                    ...m,
+                                    mediaUrl: m.mediaUrl?.startsWith("data:") ? undefined : m.mediaUrl,
+                                    mediaData: undefined,
+                                  }
+                                : m,
+                            ),
+                          );
+                        }}
+                      />
                     ) : (
                       <div className="mb-1 flex min-h-[72px] min-w-[140px] items-center justify-center gap-1.5 rounded-md bg-black/10 px-3 py-4 text-[11px] text-muted-foreground">
                         <ImageIcon className="h-4 w-4" />
-                        Photo
+                        Loading photo…
                       </div>
                     )
                   ) : null}
                   {showMedia && effectiveType === "video" ? (
                     src ? (
-                      <video src={src} controls className="mb-1 max-h-48 max-w-full rounded-md" />
+                      <video
+                        src={src}
+                        controls
+                        className="mb-1 max-h-48 max-w-full rounded-md"
+                        onError={() => {
+                          localMediaPreviewRef.current.delete(msg.id);
+                          mediaHydrateFailCount.current.delete(msg.id);
+                          setMessages((prev) =>
+                            prev.map((m) =>
+                              m.id === msg.id
+                                ? {
+                                    ...m,
+                                    mediaUrl: m.mediaUrl?.startsWith("data:") ? undefined : m.mediaUrl,
+                                    mediaData: undefined,
+                                  }
+                                : m,
+                            ),
+                          );
+                        }}
+                      />
                     ) : (
                       <div className="mb-1 flex min-h-[72px] min-w-[140px] items-center justify-center gap-1.5 rounded-md bg-black/10 px-3 py-4 text-[11px] text-muted-foreground">
                         <Video className="h-4 w-4" />
-                        Video
+                        Loading video…
                       </div>
                     )
                   ) : null}
