@@ -380,16 +380,16 @@ export const proxyWahaMediaFile = createServerFn({ method: "POST" })
     try {
       allowedHost = new URL(trimSlash(data.apiUrl)).host;
     } catch {
-      return { ok: false as const, status: 400, error: "Invalid WAHA API URL", base64: null, mimetype: null };
+      return { ok: false, status: 400, error: "Invalid WAHA API URL", base64: null, mimetype: null };
     }
     let target: URL;
     try {
       target = new URL(url);
     } catch {
-      return { ok: false as const, status: 400, error: "Invalid media URL", base64: null, mimetype: null };
+      return { ok: false, status: 400, error: "Invalid media URL", base64: null, mimetype: null };
     }
     if (target.host !== allowedHost) {
-      return { ok: false as const, status: 400, error: "Media URL host mismatch", base64: null, mimetype: null };
+      return { ok: false, status: 400, error: "Media URL host mismatch", base64: null, mimetype: null };
     }
 
     const res = await fetch(url, {
@@ -402,7 +402,7 @@ export const proxyWahaMediaFile = createServerFn({ method: "POST" })
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       return {
-        ok: false as const,
+        ok: false,
         status: res.status,
         error: text.slice(0, 200) || `HTTP ${res.status}`,
         base64: null,
@@ -413,7 +413,7 @@ export const proxyWahaMediaFile = createServerFn({ method: "POST" })
     // Cap ~2.5MB base64 payload to keep ServerFn responses manageable.
     if (buf.byteLength > 2_500_000) {
       return {
-        ok: false as const,
+        ok: false,
         status: 413,
         error: "Media too large to inline",
         base64: null,
@@ -423,9 +423,8 @@ export const proxyWahaMediaFile = createServerFn({ method: "POST" })
     const mimetype =
       res.headers.get("content-type")?.split(";")[0]?.trim() || "application/octet-stream";
     return {
-      ok: true as const,
+      ok: true,
       status: res.status,
-      error: null,
       base64: buf.toString("base64"),
       mimetype,
     };

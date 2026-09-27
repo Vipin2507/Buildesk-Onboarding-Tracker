@@ -632,11 +632,18 @@ export async function fetchWahaMediaFile(
 
   // HTTPS production (and non-dev): always go through server so X-Api-Key stays off the client img path.
   const { proxyWahaMediaFile } = await import("@/server/api/integrations");
-  return proxyWahaMediaFile({
+  const result = await proxyWahaMediaFile({
     data: {
       apiUrl: config.apiUrl,
       apiKey: config.apiKey,
       mediaUrl: url,
     },
   });
+  return {
+    ok: Boolean(result.ok),
+    status: result.status,
+    base64: result.base64 ?? null,
+    mimetype: result.mimetype ?? null,
+    error: result.error || undefined,
+  };
 }
