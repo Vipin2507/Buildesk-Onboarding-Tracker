@@ -372,8 +372,17 @@ export const proxyWahaMediaFile = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     requireUser();
     let url = data.mediaUrl.trim();
-    if (url.startsWith("/")) {
-      url = `${trimSlash(data.apiUrl)}${url}`;
+    // Prefer configured WAHA origin so localhost vs LAN IP mismatches still fetch.
+    try {
+      const api = new URL(trimSlash(data.apiUrl));
+      if (url.startsWith("/")) {
+        url = `${api.origin}${url}`;
+      } else {
+        const media = new URL(url);
+        url = `${api.origin}${media.pathname}${media.search}`;
+      }
+    } catch {
+      return { ok: false, status: 400, error: "Invalid WAHA API URL or media URL", base64: null, mimetype: null };
     }
     // Only allow fetching from the configured WAHA host (SSRF guard).
     let allowedHost: string;

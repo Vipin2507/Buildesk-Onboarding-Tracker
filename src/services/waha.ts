@@ -320,8 +320,73 @@ function detectMediaType(
   if (mt.startsWith("audio/ogg") || mt.includes("opus")) return "voice";
   if (mt.startsWith("audio/")) return "audio";
   if (mt.includes("webp")) return "sticker";
-  if (hasMedia || mt) return "document";
-  return undefined;
+  // Don't default stubs to "document" — that paints a fake Document chip before hydrate.
+  if (mt) return "document";
+  return "unknown";
+}
+
+/** Prefer nested Baileys kinds / concrete types over generic stubs. */
+function betterMediaTypePick(
+  a?: WahaChatMessage["mediaType"],
+  b?: WahaChatMessage["mediaType"],
+): WahaChatMessage["mediaType"] | undefined {
+  const score = (t?: WahaChatMessage["mediaType"]) => {
+    if (!t || t === "unknown") return 0;
+    if (t === "document") return 1;
+    if (t === "sticker") return 2;
+    return 3;
+  };
+  return score(a) >= score(b) ? a ?? b : b;
+}
+
+function detectMediaTypeFromRow(
+  row: Record<string, unknown>,
+  message: Record<string, unknown> | null,
+  mimetype: string | undefined,
+  hasMedia: boolean,
+): WahaChatMessage["mediaType"] | undefined {
+  const rawType =
+    (typeof row.type === "string" && row.type) ||
+    (typeof row.messageType === "string" && row.messageType) ||
+    (asRecord(row.media) && typeof asRecord(row.media)!.type === "string"
+      ? String(asRecord(row.media)!.type)
+      : "");
+  const t = rawType.toLowerCase();
+  if (t === "image" || t === "photo") return "image";
+  if (t === "video") return "video";
+  if (t === "audio" || t === "ptt" || t === "voice") return t === "ptt" || t === "voice" ? "voice" : "audio";
+  if (t === "document" || t === "doc") return "document";
+  if (t === "sticker") return "sticker";
+
+  if (message) {
+    if (asRecord(message.imageMessage)) return "image";
+    if (asRecord(message.videoMessage)) return "video";
+    if (asRecord(message.audioMessage)) {
+      const audio = asRecord(message.audioMessage)!;
+      return audio.ptt === true ? "voice" : "audio";
+    }
+    if (asRecord(message.stickerMessage)) return "sticker";
+    if (asRecord(message.documentMessage)) return "document";
+  }
+
+  return detectMediaType(mimetype, hasMedia);
+}
+
+/** Prefer configured WAHA origin so media.host mismatches (localhost vs LAN IP) still fetch. */
+export function rewriteWahaMediaUrlToApiOrigin(mediaUrl: string, apiUrl: string): string {
+  const trimmed = mediaUrl.trim();
+  if (!trimmed) return trimmed;
+  if (trimmed.startsWith("data:") || trimmed.startsWith("blob:")) return trimmed;
+  try {
+    const api = new URL(apiUrl.replace(/\/+$/, ""));
+    if (trimmed.startsWith("/")) {
+      return `${api.origin}${trimmed}`;
+    }
+    const media = new URL(trimmed);
+    return `${api.origin}${media.pathname}${media.search}`;
+  } catch {
+    return trimmed;
+  }
 }
 
 /** Pull caption/body text out of a Baileys/WEBJS quoted-message payload. */
@@ -482,7 +547,34 @@ function parseOneMessage(row: Record<string, unknown>): WahaChatMessage | null {
       mediaData = rawMediaData;
     }
   }
-  const hasMedia = Boolean(row.hasMedia) || Boolean(mediaUrl) || Boolean(mediaData) || Boolean(mimetype);
+
+  // MIME / media presence from nested Baileys payloads when list stubs omit them.
+  let nestedMediaKind: WahaChatMessage["mediaType"] | undefined;
+  if (message) {
+    if (asRecord(message.imageMessage)) nestedMediaKind = "image";
+    else if (asRecord(message.videoMessage)) nestedMediaKind = "video";
+    else if (asRecord(message.audioMessage)) {
+      nestedMediaKind = asRecord(message.audioMessage)!.ptt === true ? "voice" : "audio";
+    } else if (asRecord(message.stickerMessage)) nestedMediaKind = "sticker";
+    else if (asRecord(message.documentMessage)) nestedMediaKind = "document";
+
+    if (!mimetype) {
+      for (const key of ["imageMessage", "videoMessage", "documentMessage", "audioMessage", "stickerMessage"]) {
+        const part = asRecord(message[key]);
+        if (part && typeof part.mimetype === "string" && part.mimetype) {
+          mimetype = part.mimetype;
+          break;
+        }
+      }
+    }
+  }
+
+  const hasMedia =
+    Boolean(row.hasMedia) ||
+    Boolean(mediaUrl) ||
+    Boolean(mediaData) ||
+    Boolean(mimetype) ||
+    Boolean(nestedMediaKind);
 
   const conversation =
     (message && typeof message.conversation === "string" && message.conversation) ||
@@ -545,7 +637,10 @@ function parseOneMessage(row: Record<string, unknown>): WahaChatMessage | null {
     participantName: participantName || undefined,
     body,
     hasMedia,
-    mediaType: detectMediaType(mimetype, hasMedia),
+    mediaType: betterMediaTypePick(
+      nestedMediaKind,
+      detectMediaTypeFromRow(row, message, mimetype, hasMedia),
+    ),
     mimetype,
     mediaUrl,
     mediaData,
@@ -710,7 +805,7 @@ export async function resolveWahaMediaDataUrl(
     (msg.mediaUrl.startsWith("http://") ||
       msg.mediaUrl.startsWith("https://") ||
       msg.mediaUrl.startsWith("/"))
-      ? msg.mediaUrl
+      ? rewriteWahaMediaUrlToApiOrigin(msg.mediaUrl, config.apiUrl)
       : undefined;
   if (!remote) {
     return { dataUrl: null, error: "No media URL or bytes" };

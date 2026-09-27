@@ -31,6 +31,7 @@ import {
   markWahaChatSeen,
   parseWahaMessagesPayload,
   resolveWahaMediaDataUrl,
+  rewriteWahaMediaUrlToApiOrigin,
   sendWahaMedia,
   sendWahaText,
   type WahaChatMessage,
@@ -87,19 +88,15 @@ function persistableMediaUrl(url: string | undefined | null): string | null {
   return null;
 }
 
-/** Make relative WAHA media paths absolute against the configured API base (for server fetch only). */
+/** Make relative / host-mismatched WAHA media paths absolute against the configured API base. */
 function absoluteWahaMediaUrl(url: string | undefined | null, apiUrl: string): string | undefined {
   if (!url) return undefined;
+  if (url.startsWith("data:") || url.startsWith("blob:")) return url;
   if (
-    url.startsWith("data:") ||
-    url.startsWith("blob:") ||
-    url.startsWith("http://") ||
-    url.startsWith("https://")
+    (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("/")) &&
+    apiUrl
   ) {
-    return url;
-  }
-  if (url.startsWith("/") && apiUrl) {
-    return `${apiUrl.replace(/\/+$/, "")}${url}`;
+    return rewriteWahaMediaUrlToApiOrigin(url, apiUrl);
   }
   return url;
 }
@@ -450,8 +447,12 @@ function resolveEffectiveMediaType(
   if (mime.startsWith("audio/") || src?.startsWith("data:audio/")) {
     return msg.mediaType === "voice" ? "voice" : "audio";
   }
+  // Bare "document" stubs without bytes/filename are usually photos awaiting hydrate.
+  if (!src && (msg.mediaType === "document" || msg.mediaType === "unknown") && !msg.filename) {
+    return "unknown";
+  }
   if (msg.mediaType && msg.mediaType !== "unknown") return msg.mediaType;
-  if (showMedia) return "document";
+  if (showMedia) return src ? "document" : "unknown";
   return undefined;
 }
 
@@ -544,6 +545,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
   /** Fail counts — retry a few times before giving up (WAHA timeouts are flaky). */
   const mediaHydrateFailCount = useRef<Map<string, number>>(new Map());
   const MEDIA_HYDRATE_MAX_ATTEMPTS = 3;
+  const [mediaHydrateEpoch, setMediaHydrateEpoch] = useState(0);
 
   const groupId = account?.whatsappGroupId?.trim() || "";
   const groupName = account?.whatsappGroupName?.trim() || groupId;
@@ -736,6 +738,13 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
     });
   }, [groupId]);
 
+  // New API key / URL should retry media that previously failed (e.g. 401 before key was set).
+  useEffect(() => {
+    mediaHydrateFailCount.current = new Map();
+    mediaHydrateInFlight.current = new Set();
+    setMediaHydrateEpoch((n) => n + 1);
+  }, [waha.apiKey, waha.apiUrl]);
+
   const pendingPreviewUrlRef = useRef<string | null>(null);
   useEffect(() => {
     pendingPreviewUrlRef.current = pendingMedia?.previewUrl ?? null;
@@ -875,7 +884,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
     return () => {
       cancelled = true;
     };
-  }, [messages, groupId, editing, waha, accountId]);
+  }, [messages, groupId, editing, waha, accountId, mediaHydrateEpoch]);
 
   useEffect(() => {
     const el = threadRef.current;
@@ -1397,9 +1406,15 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                     ) : (
                       <div className="mb-1 flex items-center gap-1.5 rounded-md bg-black/10 px-2 py-1.5 text-[11px] text-muted-foreground">
                         <Mic className="h-3.5 w-3.5" />
-                        Audio
+                        Loading audio…
                       </div>
                     )
+                  ) : null}
+                  {showMedia && effectiveType === "unknown" ? (
+                    <div className="mb-1 flex min-h-[56px] min-w-[120px] items-center justify-center gap-1.5 rounded-md bg-black/10 px-3 py-3 text-[11px] text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Loading media…
+                    </div>
                   ) : null}
                   {showMedia && (effectiveType === "document" || effectiveType === "sticker") ? (
                     src ? (
@@ -1412,9 +1427,9 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                         <span className="truncate">{mediaPlaceholderLabel(msg)}</span>
                       </a>
                     ) : (
-                      <div className="mb-1 flex items-center gap-1.5 rounded bg-black/5 px-2 py-1.5 text-[11px]">
-                        <FileIcon className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate">{mediaPlaceholderLabel(msg)}</span>
+                      <div className="mb-1 flex items-center gap-1.5 rounded bg-black/5 px-2 py-1.5 text-[11px] text-muted-foreground">
+                        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                        <span className="truncate">Loading {mediaPlaceholderLabel(msg).toLowerCase()}…</span>
                       </div>
                     )
                   ) : null}

@@ -580,8 +580,19 @@ export async function fetchWahaMediaFile(
   if (!url) {
     return { ok: false, status: 0, base64: null, mimetype: null, error: "Empty media URL" };
   }
-  if (url.startsWith("/")) {
-    url = `${trimSlash(config.apiUrl)}${url}`;
+  // Rewrite to configured WAHA origin (localhost vs LAN IP, relative paths).
+  try {
+    const api = new URL(trimSlash(config.apiUrl));
+    if (url.startsWith("/")) {
+      url = `${api.origin}${url}`;
+    } else if (url.startsWith("http://") || url.startsWith("https://")) {
+      const media = new URL(url);
+      url = `${api.origin}${media.pathname}${media.search}`;
+    }
+  } catch {
+    if (url.startsWith("/")) {
+      url = `${trimSlash(config.apiUrl)}${url}`;
+    }
   }
 
   if (isDevClient()) {
