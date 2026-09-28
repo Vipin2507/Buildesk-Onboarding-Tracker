@@ -79,7 +79,17 @@ import {
   type CrmAccountRow,
 } from "@/stores/crm-dashboard-selectors";
 import { filterCrmAccountsForTableSearch } from "@/lib/crm-account-sheet-export";
-import { sortCrmAccountsByStartDateDesc } from "@/lib/crm-account-sort";
+import {
+  composeCrmAccountSortBy,
+  CRM_ACCOUNT_SORT_DIRS,
+  CRM_ACCOUNT_SORT_FIELDS,
+  DEFAULT_CRM_ACCOUNT_SORT,
+  parseCrmAccountSortBy,
+  sortCrmAccounts,
+  type CrmAccountSortBy,
+  type CrmAccountSortDir,
+  type CrmAccountSortField,
+} from "@/lib/crm-account-sort";
 import { findPortalSlugConflictMessage } from "@/lib/portal-slug-conflict";
 import { isValidPortalSlug, normalizePortalSlug } from "@/lib/design-ticket-portal";
 import { getCrmMasterProductModuleCatalog } from "@/stores/useCrmMasterStore";
@@ -109,6 +119,7 @@ const ACCOUNT_LIST_FILTER_DEFAULTS: {
   moduleFilter: string;
   dateFrom: string;
   dateTo: string;
+  sortBy: CrmAccountSortBy;
   tableSearch: string;
 } = {
   kpiFilter: "all",
@@ -126,6 +137,7 @@ const ACCOUNT_LIST_FILTER_DEFAULTS: {
   moduleFilter: "",
   dateFrom: "",
   dateTo: "",
+  sortBy: DEFAULT_CRM_ACCOUNT_SORT,
   tableSearch: "",
 };
 
@@ -318,6 +330,7 @@ function CrmAccountsPage() {
     moduleFilter,
     dateFrom,
     dateTo,
+    sortBy,
     tableSearch,
   } = listFilters;
 
@@ -382,6 +395,24 @@ function CrmAccountsPage() {
   const setDateTo = useCallback(
     (value: string) => setListFilters({ dateTo: value }),
     [setListFilters],
+  );
+  const { field: sortField, dir: sortDir } = useMemo(
+    () => parseCrmAccountSortBy(sortBy),
+    [sortBy],
+  );
+  const setSortField = useCallback(
+    (field: string) =>
+      setListFilters({
+        sortBy: composeCrmAccountSortBy(field as CrmAccountSortField, sortDir),
+      }),
+    [setListFilters, sortDir],
+  );
+  const setSortDir = useCallback(
+    (dir: string) =>
+      setListFilters({
+        sortBy: composeCrmAccountSortBy(sortField, dir as CrmAccountSortDir),
+      }),
+    [setListFilters, sortField],
   );
   const setTableSearch = useCallback(
     (value: string) => setListFilters({ tableSearch: value }),
@@ -609,10 +640,19 @@ function CrmAccountsPage() {
   }
 
   const filtered = useMemo(() => {
-    return sortCrmAccountsByStartDateDesc(
+    return sortCrmAccounts(
       scopedRows.filter((r) => matchesAccountKpi(r, kpiFilter)),
+      sortBy,
     );
-  }, [scopedRows, kpiFilter]);
+  }, [scopedRows, kpiFilter, sortBy]);
+
+  const tableSort = useMemo(() => {
+    const [field, dir] = sortBy.split(":");
+    return {
+      key: field === "users" ? "usersPurchased" : field || "startDate",
+      dir: (dir === "asc" ? "asc" : "desc") as "asc" | "desc",
+    };
+  }, [sortBy]);
 
   const exportRows = useMemo(
     () => filterCrmAccountsForTableSearch(filtered, tableSearch),
@@ -642,6 +682,7 @@ function CrmAccountsPage() {
     moduleFilterKeys.length > 0,
     Boolean(dateFrom),
     Boolean(dateTo),
+    sortBy !== DEFAULT_CRM_ACCOUNT_SORT,
     kpiFilter !== "all",
   ].filter(Boolean).length;
 
@@ -1113,6 +1154,28 @@ function CrmAccountsPage() {
           onChange={setDateTo}
           placeholder="To"
         />
+        <DesignTicketFilterField label="Sort by" compact>
+          <DesignTicketSelect
+            compact
+            value={sortField}
+            onChange={setSortField}
+            options={CRM_ACCOUNT_SORT_FIELDS.map((opt) => ({
+              value: opt.value,
+              label: opt.label,
+            }))}
+          />
+        </DesignTicketFilterField>
+        <DesignTicketFilterField label="Order" compact>
+          <DesignTicketSelect
+            compact
+            value={sortDir}
+            onChange={setSortDir}
+            options={CRM_ACCOUNT_SORT_DIRS.map((opt) => ({
+              value: opt.value,
+              label: opt.label,
+            }))}
+          />
+        </DesignTicketFilterField>
           </DesignTicketFilterBar>
         </div>
 
@@ -1177,10 +1240,11 @@ function CrmAccountsPage() {
             className="bg-card [&_tbody_tr]:bg-card [&_thead]:bg-card"
           >
             <DataTable
+              key={sortBy}
               flush
               data={filtered}
-              initialSortKey="startDate"
-              initialSortDir="desc"
+              initialSortKey={tableSort.key}
+              initialSortDir={tableSort.dir}
               getRowId={(r) => r.id}
               getRowClassName={(r) =>
                 isCrmAccountInRenewalWindow(r)

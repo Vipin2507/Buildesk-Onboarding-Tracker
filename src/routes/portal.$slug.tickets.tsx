@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useChildMatches, useNavigate } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { Plus } from "lucide-react";
@@ -33,6 +33,7 @@ export const Route = createFileRoute("/portal/$slug/tickets")({
   component: PortalMyTickets,
 });
 
+/** Child `/tickets/$ticketId` renders via Outlet; index is the active ticket list. */
 function PortalMyTickets() {
   const { slug } = Route.useParams();
   const navigate = useNavigate({ from: "/portal/$slug/tickets" });
@@ -43,21 +44,26 @@ function PortalMyTickets() {
   const hydrated = useDesignTicketStore((s) =>
     s.tickets.some((t) => t.companyId === access?.companyId),
   );
+  const childMatches = useChildMatches();
+
+  const allActive = useMemo(() => {
+    if (!access) return [];
+    return tickets
+      .filter((t) => t.companyId === access.companyId && isDesignTicketActive(t.status))
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }, [access, tickets]);
+
+  const rows = useMemo(
+    () => allActive.filter((t) => matchesPortalTicketFilter(t.status, kpiFilter)),
+    [allActive, kpiFilter],
+  );
 
   const setKpiFilter = (filter: PortalTicketFilter) => {
     void navigate({ search: { filter }, replace: true });
   };
 
   if (!access) return null;
-
-  const allActive = tickets
-    .filter((t) => t.companyId === access.companyId && isDesignTicketActive(t.status))
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-
-  const rows = useMemo(
-    () => allActive.filter((t) => matchesPortalTicketFilter(t.status, kpiFilter)),
-    [allActive, kpiFilter],
-  );
+  if (childMatches.length > 0) return <Outlet />;
 
   const pendingCount = stats.open + stats.inProgress;
 

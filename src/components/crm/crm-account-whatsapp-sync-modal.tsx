@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { isCrmAccountEnded } from "@/lib/crm-account-status";
 import { cn } from "@/lib/utils";
 import { listWahaGroups, type WahaGroupSummary } from "@/services/waha";
 import { useCrmAccountStore } from "@/stores/useCrmAccountStore";
@@ -19,6 +20,8 @@ import { useCrmAutomationStore } from "@/stores/useCrmAutomationStore";
 import type { CrmAccount } from "@/types/crm-account";
 
 const UNLINK = "__unlink__";
+
+type LinkFilter = "all" | "linked" | "not_linked";
 
 function normalizeGroupId(raw: string) {
   const id = raw.trim();
@@ -28,6 +31,10 @@ function normalizeGroupId(raw: string) {
   return id;
 }
 
+function isActiveAccount(account: CrmAccount) {
+  return !isCrmAccountEnded(account.status);
+}
+
 type RowDraft = {
   accountId: string;
   groupId: string;
@@ -35,6 +42,7 @@ type RowDraft = {
 
 function draftFromAccounts(accounts: CrmAccount[]): RowDraft[] {
   return accounts
+    .filter(isActiveAccount)
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((a) => ({
@@ -59,6 +67,7 @@ export function CrmAccountWhatsappSyncModal({
   const updateAccount = useCrmAccountStore((s) => s.updateAccount);
 
   const [accountSearch, setAccountSearch] = useState("");
+  const [linkFilter, setLinkFilter] = useState<LinkFilter>("all");
   const [groups, setGroups] = useState<WahaGroupSummary[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [groupsError, setGroupsError] = useState<string | null>(null);
@@ -107,10 +116,11 @@ export function CrmAccountWhatsappSyncModal({
     if (sessionOpenRef.current) return;
     sessionOpenRef.current = true;
 
-    const snapshot = accountsRef.current.map((a) => ({ ...a }));
+    const snapshot = accountsRef.current.filter(isActiveAccount).map((a) => ({ ...a }));
     setBaselineAccounts(snapshot);
     setDrafts(draftFromAccounts(snapshot));
     setAccountSearch("");
+    setLinkFilter("all");
     setGroupsError(null);
     void loadGroups({ quiet: true });
   }, [open, loadGroups]);
@@ -132,20 +142,35 @@ export function CrmAccountWhatsappSyncModal({
     return map;
   }, [drafts]);
 
+  const linkCounts = useMemo(() => {
+    let linked = 0;
+    let notLinked = 0;
+    for (const d of drafts) {
+      if (normalizeGroupId(d.groupId)) linked += 1;
+      else notLinked += 1;
+    }
+    return { linked, notLinked, all: drafts.length };
+  }, [drafts]);
+
   const filteredDrafts = useMemo(() => {
     const q = accountSearch.trim().toLowerCase();
-    if (!q) return drafts;
     return drafts.filter((d) => {
+      const linked = Boolean(normalizeGroupId(d.groupId));
+      if (linkFilter === "linked" && !linked) return false;
+      if (linkFilter === "not_linked" && linked) return false;
+
+      if (!q) return true;
       const a = accountById.get(d.accountId);
       if (!a) return false;
       return (
         a.name.toLowerCase().includes(q) ||
         (a.pocName ?? "").toLowerCase().includes(q) ||
+        (a.userId ?? "").toLowerCase().includes(q) ||
         (a.whatsappGroupName ?? "").toLowerCase().includes(q) ||
         (a.whatsappGroupId ?? "").toLowerCase().includes(q)
       );
     });
-  }, [drafts, accountSearch, accountById]);
+  }, [drafts, accountSearch, accountById, linkFilter]);
 
   const dirtyCount = useMemo(() => {
     let n = 0;
@@ -158,8 +183,6 @@ export function CrmAccountWhatsappSyncModal({
     }
     return n;
   }, [drafts, accountById]);
-
-  const linkedCount = drafts.filter((d) => Boolean(normalizeGroupId(d.groupId))).length;
 
   function setRowGroup(accountId: string, groupId: string) {
     const nextId = groupId === UNLINK ? "" : normalizeGroupId(groupId);
@@ -244,6 +267,12 @@ export function CrmAccountWhatsappSyncModal({
     return opts;
   }
 
+  const linkFilterOptions: { id: LinkFilter; label: string; count: number }[] = [
+    { id: "all", label: "All", count: linkCounts.all },
+    { id: "linked", label: "Linked", count: linkCounts.linked },
+    { id: "not_linked", label: "Not linked", count: linkCounts.notLinked },
+  ];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[85vh] max-w-3xl flex-col gap-0 overflow-hidden p-0">
@@ -253,8 +282,8 @@ export function CrmAccountWhatsappSyncModal({
             Sync accounts · WhatsApp groups
           </DialogTitle>
           <p className="text-[11px] text-muted-foreground">
-            Map each CRM account to a WhatsApp group. After sync, open the account’s WhatsApp tab to
-            load messages.
+            Map each active CRM account to a WhatsApp group. After sync, open the account’s WhatsApp
+            tab to load messages.
           </p>
         </DialogHeader>
 
@@ -265,6 +294,24 @@ export function CrmAccountWhatsappSyncModal({
             placeholder="Search accounts…"
             className="h-8 max-w-xs text-xs"
           />
+          <div className="flex flex-wrap items-center gap-1">
+            {linkFilterOptions.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setLinkFilter(opt.id)}
+                className={cn(
+                  "inline-flex h-7 items-center gap-1 rounded-md px-2 text-[11px] font-medium transition-colors",
+                  linkFilter === opt.id
+                    ? "bg-foreground text-background"
+                    : "border bg-background text-muted-foreground hover:bg-muted",
+                )}
+              >
+                {opt.label}
+                <span className="tabular-nums opacity-80">{opt.count}</span>
+              </button>
+            ))}
+          </div>
           <Button
             type="button"
             size="sm"
@@ -281,7 +328,7 @@ export function CrmAccountWhatsappSyncModal({
             Refresh groups
           </Button>
           <span className="ml-auto text-[11px] text-muted-foreground">
-            {linkedCount}/{drafts.length} linked
+            {linkCounts.linked}/{linkCounts.all} linked
             {dirtyCount > 0 ? ` · ${dirtyCount} pending` : ""}
           </span>
         </div>
@@ -299,7 +346,11 @@ export function CrmAccountWhatsappSyncModal({
               Loading WhatsApp groups…
             </div>
           ) : filteredDrafts.length === 0 ? (
-            <div className="py-12 text-center text-xs text-muted-foreground">No accounts match.</div>
+            <div className="py-12 text-center text-xs text-muted-foreground">
+              {drafts.length === 0
+                ? "No active accounts to sync."
+                : "No accounts match this filter."}
+            </div>
           ) : (
             <table className="w-full text-left text-xs">
               <thead className="sticky top-0 z-10 border-b bg-background">
