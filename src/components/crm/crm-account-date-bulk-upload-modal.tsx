@@ -77,7 +77,9 @@ export function CrmAccountDateBulkUploadModal({
       if (preview.summary.update === 0 && preview.summary.error > 0) {
         toast.error("Sheet has errors — fix rows and try again");
       } else if (preview.summary.notFound > 0) {
-        toast.message(`${preview.summary.notFound} Client Id${preview.summary.notFound === 1 ? "" : "s"} not found in CRM`);
+        toast.message(
+          `${preview.summary.notFound} Client Id${preview.summary.notFound === 1 ? "" : "s"} not found in CRM`,
+        );
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed to read file";
@@ -104,12 +106,13 @@ export function CrmAccountDateBulkUploadModal({
         const existing = current.find((a) => a.id === row.existingId);
         if (!existing) continue;
         updateAccount(existing.id, {
+          ...(row.applyUsers != null ? { usersPurchased: row.applyUsers } : {}),
           ...(row.applyStartDate ? { startDate: row.applyStartDate } : {}),
           ...(row.applyEndDate ? { endDate: row.applyEndDate } : {}),
         });
       }
       toast.success(
-        `Updated dates for ${ready.length} account${ready.length === 1 ? "" : "s"}`,
+        `Updated ${ready.length} account${ready.length === 1 ? "" : "s"}`,
       );
       handleOpenChange(false);
     } catch (e) {
@@ -121,16 +124,15 @@ export function CrmAccountDateBulkUploadModal({
 
   return (
     <AlertDialog open={open} onOpenChange={handleOpenChange}>
-      <AlertDialogContent className="flex max-h-[90vh] max-w-4xl flex-col gap-0 overflow-hidden p-0">
+      <AlertDialogContent className="flex max-h-[90vh] max-w-5xl flex-col gap-0 overflow-hidden p-0">
         <AlertDialogHeader className="shrink-0 border-b px-5 py-4 text-left">
           <AlertDialogTitle className="flex items-center gap-2">
             <CalendarRange className="h-4 w-4" />
-            Update start & end dates
+            Update users & dates
           </AlertDialogTitle>
           <AlertDialogDescription>
-            Upload a sheet with Client Id, Company Name, Start Date, and End Date. Rows are matched
-            to existing CRM accounts by Client Id (same as User ID on the account). Only dates are
-            updated — no other fields change.
+            Upload a sheet with Client Id, Users, Start Date, and End Date. Rows match existing CRM
+            accounts by Client Id (User ID). Only users and dates are updated.
           </AlertDialogDescription>
         </AlertDialogHeader>
 
@@ -198,7 +200,7 @@ export function CrmAccountDateBulkUploadModal({
               <Upload className="mb-2 h-8 w-8 text-muted-foreground" />
               <p className="text-sm font-medium">Drop Excel file here</p>
               <p className="mt-1 max-w-md text-[11px] text-muted-foreground">
-                Headers: S.No, Client Id, Company Name, Start Date, End Date
+                Headers: S.No, Client Id, Users, Start Date, End Date
               </p>
             </div>
           ) : null}
@@ -223,14 +225,14 @@ export function CrmAccountDateBulkUploadModal({
 
               <div className="overflow-hidden rounded-xl border">
                 <div className="max-h-[42vh] overflow-auto">
-                  <table className="w-full min-w-[760px] text-left text-xs">
+                  <table className="w-full min-w-[860px] text-left text-xs">
                     <thead className="sticky top-0 bg-muted/80 text-[10px] uppercase tracking-wide text-muted-foreground">
                       <tr>
                         <th className="px-2 py-2 font-medium">Row</th>
                         <th className="px-2 py-2 font-medium">Client Id</th>
                         <th className="px-2 py-2 font-medium">Account</th>
-                        <th className="px-2 py-2 font-medium">Current dates</th>
-                        <th className="px-2 py-2 font-medium">New dates</th>
+                        <th className="px-2 py-2 font-medium">Users</th>
+                        <th className="px-2 py-2 font-medium">Dates</th>
                         <th className="px-2 py-2 font-medium">Action</th>
                       </tr>
                     </thead>
@@ -241,46 +243,55 @@ export function CrmAccountDateBulkUploadModal({
                             {row.rowNumber}
                           </td>
                           <td className="px-2 py-2 font-medium">{row.clientId || "—"}</td>
-                          <td className="px-2 py-2">
-                            <div>{row.existingName ?? row.companyName ?? "—"}</div>
-                            {row.companyName &&
-                            row.existingName &&
-                            row.companyName !== row.existingName ? (
-                              <div className="text-[10px] text-muted-foreground">
-                                Sheet: {row.companyName}
-                              </div>
-                            ) : null}
-                          </td>
-                          <td className="px-2 py-2 text-muted-foreground">
-                            {row.previousStartDate || row.previousEndDate ? (
+                          <td className="px-2 py-2">{row.existingName ?? "—"}</td>
+                          <td className="px-2 py-2 tabular-nums">
+                            {row.applyUsers != null || row.previousUsers != null ? (
                               <>
-                                {row.previousStartDate ? formatDate(row.previousStartDate) : "—"}
+                                <span className="text-muted-foreground">
+                                  {row.previousUsers ?? "—"}
+                                </span>
                                 {" → "}
-                                {row.previousEndDate ? formatDate(row.previousEndDate) : "—"}
+                                <span className="font-medium">
+                                  {row.applyUsers ?? row.usersPurchased ?? "—"}
+                                </span>
                               </>
+                            ) : row.usersPurchased != null ? (
+                              row.usersPurchased
                             ) : (
                               "—"
                             )}
                           </td>
                           <td className="px-2 py-2">
-                            {row.applyStartDate || row.applyEndDate ? (
-                              <>
-                                {row.applyStartDate ? formatDate(row.applyStartDate) : "—"}
+                            <div className="text-muted-foreground">
+                              {(row.previousStartDate || row.previousEndDate) ? (
+                                <>
+                                  {row.previousStartDate ? formatDate(row.previousStartDate) : "—"}
+                                  {" → "}
+                                  {row.previousEndDate ? formatDate(row.previousEndDate) : "—"}
+                                </>
+                              ) : (
+                                "—"
+                              )}
+                            </div>
+                            {(row.applyStartDate ||
+                              row.applyEndDate ||
+                              row.startDate ||
+                              row.endDate) && (
+                              <div className="font-medium">
+                                {row.applyStartDate || row.startDate
+                                  ? formatDate(row.applyStartDate ?? row.startDate!)
+                                  : "—"}
                                 {" → "}
-                                {row.applyEndDate ? formatDate(row.applyEndDate) : "—"}
-                              </>
-                            ) : row.startDate || row.endDate ? (
-                              <>
-                                {row.startDate ? formatDate(row.startDate) : "—"}
-                                {" → "}
-                                {row.endDate ? formatDate(row.endDate) : "—"}
-                              </>
-                            ) : (
-                              "—"
+                                {row.applyEndDate || row.endDate
+                                  ? formatDate(row.applyEndDate ?? row.endDate!)
+                                  : "—"}
+                              </div>
                             )}
                           </td>
                           <td className={cn("px-2 py-2", actionTone(row.action))}>
-                            <div className="font-medium capitalize">{row.action.replace("_", " ")}</div>
+                            <div className="font-medium capitalize">
+                              {row.action.replace("_", " ")}
+                            </div>
                             <div className="text-[10px] opacity-90">{row.message}</div>
                           </td>
                         </tr>

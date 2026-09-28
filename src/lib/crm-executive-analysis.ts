@@ -15,12 +15,24 @@ export type ExecutiveDetailRow = {
   breakdown: { label: string; accounts: number }[];
 };
 
+/** Year → month → executive hierarchy for the Year tab. */
+export type ExecutiveYearMonthRow = {
+  name: string;
+  accounts: number;
+  months: {
+    name: string;
+    monthKey: string;
+    accounts: number;
+    executives: ExecutiveAccountRow[];
+  }[];
+};
+
 export type CrmExecutiveAnalysis = {
   bySalesManager: ExecutiveAccountRow[];
   bySupport1: ExecutiveAccountRow[];
   bySupport2: ExecutiveAccountRow[];
   byLocation: ExecutiveDetailRow[];
-  byYear: ExecutiveDetailRow[];
+  byYear: ExecutiveYearMonthRow[];
   totals: {
     activeAccounts: number;
   };
@@ -34,6 +46,21 @@ export const EXECUTIVE_ROLE_LABEL: Record<ExecutiveRole, string> = {
   support2: "Support 2",
 };
 
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
 function label(value: string | undefined) {
   const name = value?.trim();
   return name || "Unassigned";
@@ -41,18 +68,37 @@ function label(value: string | undefined) {
 
 function locationOf(account: CrmAccount) {
   return (
-    account.city?.trim() ||
     account.region?.trim() ||
     account.state?.trim() ||
+    account.city?.trim() ||
     account.country?.trim() ||
     "Unknown"
   );
 }
 
-function yearOf(account: CrmAccount) {
-  const raw = account.startDate?.trim() || account.createdAt?.slice(0, 10) || "";
-  const m = raw.match(/^(\d{4})/);
-  return m?.[1] ?? "Unknown";
+function accountDateRaw(account: CrmAccount) {
+  return account.startDate?.trim() || account.createdAt?.slice(0, 10) || "";
+}
+
+/** Returns `{ year, monthKey, monthName }` — monthKey is `01`–`12` or `Unknown`. */
+function yearMonthOf(account: CrmAccount): {
+  year: string;
+  monthKey: string;
+  monthName: string;
+} {
+  const raw = accountDateRaw(account);
+  const m = raw.match(/^(\d{4})-(\d{2})/);
+  if (m) {
+    const monthIdx = Number(m[2]) - 1;
+    if (monthIdx >= 0 && monthIdx < 12) {
+      return { year: m[1], monthKey: m[2], monthName: MONTH_NAMES[monthIdx] };
+    }
+  }
+  const yearOnly = raw.match(/^(\d{4})/);
+  if (yearOnly) {
+    return { year: yearOnly[1], monthKey: "Unknown", monthName: "Unknown" };
+  }
+  return { year: "Unknown", monthKey: "Unknown", monthName: "Unknown" };
 }
 
 function roleName(account: CrmAccount, role: ExecutiveRole) {
@@ -75,7 +121,7 @@ function countBy(
     .sort((a, b) => b.accounts - a.accounts || a.name.localeCompare(b.name));
 }
 
-/** Group by executive first; nested breakdown is location or year. */
+/** Group by executive first; nested breakdown is location. */
 function executivesWithBreakdown(
   accounts: CrmAccount[],
   role: ExecutiveRole,
@@ -108,6 +154,12 @@ function sortYearLabel(a: string, b: string) {
   return b.localeCompare(a);
 }
 
+function sortMonthKey(a: string, b: string) {
+  if (a === "Unknown") return 1;
+  if (b === "Unknown") return -1;
+  return a.localeCompare(b);
+}
+
 function sortLocationLabel(a: string, b: string) {
   return a.localeCompare(b);
 }
@@ -117,8 +169,58 @@ function keepOwnRows<T extends { name: string }>(rows: T[], viewerName: string |
   return rows.filter((r) => crmSalesManagerNamesMatch(r.name, viewerName));
 }
 
+function accountMatchesViewer(account: CrmAccount, role: ExecutiveRole, viewerName: string) {
+  return crmSalesManagerNamesMatch(roleName(account, role), viewerName);
+}
+
+/** Year → month → executive. */
+function yearsWithMonthsAndExecutives(
+  accounts: CrmAccount[],
+  role: ExecutiveRole,
+): ExecutiveYearMonthRow[] {
+  type MonthBucket = {
+    monthName: string;
+    accounts: number;
+    executives: Map<string, number>;
+  };
+  const years = new Map<string, { accounts: number; months: Map<string, MonthBucket> }>();
+
+  for (const a of accounts) {
+    const { year, monthKey, monthName } = yearMonthOf(a);
+    const person = roleName(a, role);
+    const yearEntry = years.get(year) ?? { accounts: 0, months: new Map() };
+    yearEntry.accounts += 1;
+    const monthEntry = yearEntry.months.get(monthKey) ?? {
+      monthName,
+      accounts: 0,
+      executives: new Map(),
+    };
+    monthEntry.accounts += 1;
+    monthEntry.executives.set(person, (monthEntry.executives.get(person) ?? 0) + 1);
+    yearEntry.months.set(monthKey, monthEntry);
+    years.set(year, yearEntry);
+  }
+
+  return [...years.entries()]
+    .map(([name, v]) => ({
+      name,
+      accounts: v.accounts,
+      months: [...v.months.entries()]
+        .map(([monthKey, m]) => ({
+          name: m.monthName,
+          monthKey,
+          accounts: m.accounts,
+          executives: [...m.executives.entries()]
+            .map(([execName, accounts]) => ({ name: execName, accounts }))
+            .sort((a, b) => b.accounts - a.accounts || a.name.localeCompare(b.name)),
+        }))
+        .sort((a, b) => sortMonthKey(a.monthKey, b.monthKey)),
+    }))
+    .sort((a, b) => sortYearLabel(a.name, b.name) || b.accounts - a.accounts);
+}
+
 /**
- * Active accounts by manager / location / year.
+ * Active accounts by manager / region / year.
  * Admins see everyone; non-admins only see rows matching their own name.
  */
 export function buildCrmExecutiveAnalysis(
@@ -141,14 +243,18 @@ export function buildCrmExecutiveAnalysis(
   let bySupport1 = countBy(active, (a) => a.supportManager1);
   let bySupport2 = countBy(active, (a) => a.supportManager2);
   let byLocation = executivesWithBreakdown(active, locationRole, locationOf, sortLocationLabel);
-  let byYear = executivesWithBreakdown(active, yearRole, yearOf, sortYearLabel);
+
+  const yearAccounts =
+    !isAdmin && viewerName
+      ? active.filter((a) => accountMatchesViewer(a, yearRole, viewerName))
+      : active;
+  const byYear = yearsWithMonthsAndExecutives(yearAccounts, yearRole);
 
   if (!isAdmin) {
     bySalesManager = keepOwnRows(bySalesManager, viewerName);
     bySupport1 = keepOwnRows(bySupport1, viewerName);
     bySupport2 = keepOwnRows(bySupport2, viewerName);
     byLocation = keepOwnRows(byLocation, viewerName);
-    byYear = keepOwnRows(byYear, viewerName);
   }
 
   return {

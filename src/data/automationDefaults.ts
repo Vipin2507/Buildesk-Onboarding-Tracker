@@ -7,7 +7,7 @@ import type {
 import { nowIso } from "@/types";
 
 export const DEFAULT_N8N_WEBHOOK_BASE = "http://72.60.200.185:5678/webhook";
-export const N8N_EMAIL_SEGMENT = "buildesk-email";
+export const N8N_EMAIL_SEGMENT = "buildesk-support";
 export const N8N_HEALTH_SEGMENT = "buildesk-health";
 
 export const DEFAULT_WHATSAPP_WEBHOOK = "http://72.60.200.185:5678/webhook/buildesk-whatsapp";

@@ -8,6 +8,7 @@ import {
   type ExecutiveAccountRow,
   type ExecutiveDetailRow,
   type ExecutiveRole,
+  type ExecutiveYearMonthRow,
 } from "@/lib/crm-executive-analysis";
 import { isAdminRoleKey } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
@@ -116,6 +117,162 @@ function ExpandableExecutiveTable({
   );
 }
 
+/** Year → month → executive expandable table. */
+function ExpandableYearMonthTable({
+  rows,
+  executiveLabel,
+}: {
+  rows: ExecutiveYearMonthRow[];
+  executiveLabel: string;
+}) {
+  const [openYear, setOpenYear] = useState<string | null>(null);
+  const [openMonth, setOpenMonth] = useState<string | null>(null);
+
+  if (rows.length === 0) {
+    return (
+      <div className="bg-white px-4 py-10 text-center text-xs text-muted-foreground">
+        No active accounts
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full bg-white">
+      <div className="sticky top-0 z-[1] grid grid-cols-[2.5rem_1fr_auto] gap-3 border-b border-border bg-white px-4 py-3 text-xs font-medium text-muted-foreground">
+        <span className="tabular-nums">S.No.</span>
+        <span className="pl-7">Year</span>
+        <span className="text-right">Active accounts</span>
+      </div>
+
+      <ul>
+        {rows.map((yearRow, yearIndex) => {
+          const yearExpanded = openYear === yearRow.name;
+          return (
+            <li key={yearRow.name} className="border-b border-border bg-white last:border-b-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenYear(yearExpanded ? null : yearRow.name);
+                  if (yearExpanded) setOpenMonth(null);
+                }}
+                className="grid w-full grid-cols-[2.5rem_1fr_auto] items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30"
+                aria-expanded={yearExpanded}
+              >
+                <span className="tabular-nums text-xs text-muted-foreground">{yearIndex + 1}</span>
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                      yearExpanded && "rotate-180",
+                    )}
+                  />
+                  <span className="truncate text-sm font-medium text-foreground">{yearRow.name}</span>
+                </span>
+                <span className="text-base font-semibold tabular-nums text-foreground">
+                  {yearRow.accounts}
+                </span>
+              </button>
+
+              <motion.div
+                initial={false}
+                animate={{
+                  height: yearExpanded ? "auto" : 0,
+                  opacity: yearExpanded ? 1 : 0,
+                }}
+                transition={{ duration: 0.28, ease: EASE }}
+                className="overflow-hidden"
+              >
+                <div className="border-t border-border bg-muted/20 px-2 pb-1 pt-1 sm:px-4">
+                  <div className="grid grid-cols-[2.5rem_1fr_auto] gap-3 px-2 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <span className="normal-case tracking-normal">S.No.</span>
+                    <span className="pl-7">Month</span>
+                    <span className="text-right normal-case tracking-normal">Accounts</span>
+                  </div>
+                  <ul>
+                    {yearRow.months.map((monthRow, monthIndex) => {
+                      const monthKey = `${yearRow.name}:${monthRow.monthKey}`;
+                      const monthExpanded = openMonth === monthKey;
+                      return (
+                        <li
+                          key={monthKey}
+                          className="border-t border-border/80 bg-white first:border-t-0"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setOpenMonth(monthExpanded ? null : monthKey)}
+                            className="grid w-full grid-cols-[2.5rem_1fr_auto] items-center gap-3 px-2 py-2.5 text-left transition-colors hover:bg-muted/30"
+                            aria-expanded={monthExpanded}
+                          >
+                            <span className="tabular-nums text-xs text-muted-foreground">
+                              {monthIndex + 1}
+                            </span>
+                            <span className="flex min-w-0 items-center gap-2.5">
+                              <ChevronDown
+                                className={cn(
+                                  "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                                  monthExpanded && "rotate-180",
+                                )}
+                              />
+                              <span className="truncate text-sm font-medium text-foreground">
+                                {monthRow.name}
+                              </span>
+                            </span>
+                            <span className="text-sm font-semibold tabular-nums text-foreground">
+                              {monthRow.accounts}
+                            </span>
+                          </button>
+
+                          <motion.div
+                            initial={false}
+                            animate={{
+                              height: monthExpanded ? "auto" : 0,
+                              opacity: monthExpanded ? 1 : 0,
+                            }}
+                            transition={{ duration: 0.24, ease: EASE }}
+                            className="overflow-hidden"
+                          >
+                            <div className="border-t border-border/60 bg-muted/10 px-2 pb-1 pt-1 sm:pl-6">
+                              <div className="grid grid-cols-[2.5rem_1fr_auto] gap-3 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                                <span className="normal-case tracking-normal">S.No.</span>
+                                <span>{executiveLabel}</span>
+                                <span className="text-right normal-case tracking-normal">
+                                  Accounts
+                                </span>
+                              </div>
+                              <ul className="max-h-48 overflow-y-auto">
+                                {monthRow.executives.map((exec, execIndex) => (
+                                  <li
+                                    key={exec.name}
+                                    className="grid grid-cols-[2.5rem_1fr_auto] items-center gap-3 border-t border-border/70 py-2 text-sm"
+                                  >
+                                    <span className="tabular-nums text-xs text-muted-foreground">
+                                      {execIndex + 1}
+                                    </span>
+                                    <span className="min-w-0 truncate text-muted-foreground">
+                                      {exec.name}
+                                    </span>
+                                    <span className="shrink-0 text-right tabular-nums font-medium text-foreground">
+                                      {exec.accounts}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </motion.div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              </motion.div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccount[] }) {
   const currentUser = useAuthStore((s) => s.user);
   const isAdmin = isAdminRoleKey(currentUser?.role);
@@ -147,7 +304,7 @@ export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccou
     { id: "sales", label: "Sales manager", icon: UserRound },
     { id: "support1", label: "Support 1", icon: Headphones },
     { id: "support2", label: "Support 2", icon: Headphones },
-    { id: "location", label: "Location", icon: MapPin },
+    { id: "location", label: "Region", icon: MapPin },
     { id: "year", label: "Year", icon: CalendarRange },
   ];
 
@@ -177,7 +334,7 @@ export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccou
           <h3 className="text-sm font-semibold tracking-tight">Executive analysis</h3>
           <p className="text-xs text-muted-foreground">
             {isAdmin
-              ? `Active accounts by manager, location, and year · ${analysis.totals.activeAccounts} active accounts`
+              ? `Active accounts by manager, region, and year · ${analysis.totals.activeAccounts} active accounts`
               : `Your active accounts only · ${analysis.totals.activeAccounts} assigned active accounts`}
           </p>
         </div>
@@ -225,7 +382,8 @@ export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccou
             </button>
           ))}
           <span className="text-xs text-muted-foreground">
-            · click a row to expand {tab === "location" ? "locations" : "years"}
+            · click a row to expand{" "}
+            {tab === "location" ? "regions" : "months, then executives"}
           </span>
         </div>
       ) : null}
@@ -235,15 +393,14 @@ export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccou
           <ExpandableExecutiveTable
             rows={analysis.byLocation}
             personLabel={tableTitle}
-            breakdownLabel="Location"
+            breakdownLabel="Region"
           />
         ) : null}
 
         {tab === "year" ? (
-          <ExpandableExecutiveTable
+          <ExpandableYearMonthTable
             rows={analysis.byYear}
-            personLabel={tableTitle}
-            breakdownLabel="Year"
+            executiveLabel={EXECUTIVE_ROLE_LABEL[yearRole]}
           />
         ) : null}
 

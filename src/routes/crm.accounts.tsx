@@ -854,7 +854,7 @@ function CrmAccountsPage() {
               onClick={() => setDateBulkOpen(true)}
             >
               <CalendarRange className="h-3.5 w-3.5" />
-              Update dates
+              Update users & dates
             </Button>
             <Button
               size="sm"

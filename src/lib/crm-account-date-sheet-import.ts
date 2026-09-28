@@ -7,7 +7,7 @@ import type { CrmAccount } from "@/types/crm-account";
 export const CRM_ACCOUNT_DATE_IMPORT_HEADERS = [
   "S.No",
   "Client Id",
-  "Company Name",
+  "Users",
   "Start Date",
   "End Date",
 ] as const;
@@ -17,7 +17,7 @@ type DateImportHeader = (typeof CRM_ACCOUNT_DATE_IMPORT_HEADERS)[number];
 const HEADER_ALIASES: Record<DateImportHeader, string[]> = {
   "S.No": ["sno", "srno", "serialno", "serialnumber", "#"],
   "Client Id": ["clientid", "userid", "clinetid", "accountid", "client"],
-  "Company Name": ["companyname", "accountname", "company", "account", "name"],
+  Users: ["users", "userspurchased", "userpurchased", "licences", "licenses", "seats"],
   "Start Date": ["startdate", "start", "fromdate"],
   "End Date": ["enddate", "end", "todate", "expiry"],
 };
@@ -26,7 +26,8 @@ export type CrmAccountDateImportRawRow = {
   rowNumber: number;
   serialNo: string;
   clientId: string;
-  companyName: string;
+  usersRaw: string;
+  usersPurchased: number | null;
   startDateRaw: string;
   endDateRaw: string;
   startDate: string | null;
@@ -38,14 +39,16 @@ export type CrmAccountDateImportPlanRow = {
   rowNumber: number;
   key: string;
   clientId: string;
-  companyName: string;
+  usersPurchased: number | null;
   startDate: string | null;
   endDate: string | null;
   action: "update" | "skip" | "error" | "not_found";
   existingId?: string;
   existingName?: string;
+  previousUsers?: number;
   previousStartDate?: string;
   previousEndDate?: string;
+  applyUsers?: number;
   applyStartDate?: string;
   applyEndDate?: string;
   message: string;
@@ -69,6 +72,15 @@ function cellStr(value: unknown): string {
   if (value == null) return "";
   if (value instanceof Date) return value.toISOString();
   return String(value).trim();
+}
+
+function parseNumber(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const cleaned = String(value).replace(/[,\s₹$]/g, "").trim();
+  if (!cleaned) return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
 }
 
 function mapHeaders(keys: string[]) {
@@ -106,10 +118,10 @@ export function downloadCrmAccountDateImportTemplate() {
   const sample = [
     {
       "S.No": 1,
-      "Client Id": "skyline-dev",
-      "Company Name": "Skyline Developers",
-      "Start Date": "2026-01-15",
-      "End Date": "2027-01-14",
+      "Client Id": "126493",
+      Users: 12,
+      "Start Date": "9/26/2026",
+      "End Date": "9/25/2027",
     },
   ];
   const ws = XLSX.utils.json_to_sheet(sample, {
@@ -146,7 +158,9 @@ export async function parseCrmAccountDateImportFile(file: File): Promise<CrmAcco
   return json.map((row, i) => {
     const serialNo = cellStr(row[mapped["S.No"] ?? ""]);
     const clientId = cellStr(row[mapped["Client Id"]!]);
-    const companyName = cellStr(row[mapped["Company Name"] ?? ""]);
+    const usersCell = row[mapped.Users ?? ""];
+    const usersRaw = cellStr(usersCell);
+    const usersPurchased = parseNumber(usersCell);
     const startRaw = row[mapped["Start Date"] ?? ""];
     const endRaw = row[mapped["End Date"] ?? ""];
 
@@ -155,9 +169,10 @@ export async function parseCrmAccountDateImportFile(file: File): Promise<CrmAcco
     const parseErrors: string[] = [];
 
     if (!clientId.trim()) parseErrors.push("Client Id is required");
-    if (!cellStr(startRaw) && !cellStr(endRaw)) {
-      parseErrors.push("At least one of Start Date or End Date is required");
+    if (!usersRaw && !cellStr(startRaw) && !cellStr(endRaw)) {
+      parseErrors.push("At least one of Users, Start Date, or End Date is required");
     }
+    if (usersRaw && usersPurchased == null) parseErrors.push(`Invalid Users: ${usersRaw}`);
     if (cellStr(startRaw) && !startDate) parseErrors.push(`Invalid Start Date: ${cellStr(startRaw)}`);
     if (cellStr(endRaw) && !endDate) parseErrors.push(`Invalid End Date: ${cellStr(endRaw)}`);
 
@@ -165,7 +180,8 @@ export async function parseCrmAccountDateImportFile(file: File): Promise<CrmAcco
       rowNumber: i + 2,
       serialNo,
       clientId,
-      companyName,
+      usersRaw,
+      usersPurchased,
       startDateRaw: cellStr(startRaw),
       endDateRaw: cellStr(endRaw),
       startDate,
@@ -194,7 +210,7 @@ export function buildCrmAccountDateImportPlan(
         rowNumber: raw.rowNumber,
         key,
         clientId: raw.clientId,
-        companyName: raw.companyName,
+        usersPurchased: raw.usersPurchased,
         startDate: raw.startDate,
         endDate: raw.endDate,
         action: "error",
@@ -203,13 +219,13 @@ export function buildCrmAccountDateImportPlan(
       continue;
     }
 
-    if (!raw.clientId.trim() && !raw.companyName.trim()) {
+    if (!raw.clientId.trim()) {
       skip += 1;
       rows.push({
         rowNumber: raw.rowNumber,
         key,
         clientId: "",
-        companyName: "",
+        usersPurchased: null,
         startDate: null,
         endDate: null,
         action: "skip",
@@ -225,7 +241,7 @@ export function buildCrmAccountDateImportPlan(
         rowNumber: raw.rowNumber,
         key,
         clientId: raw.clientId,
-        companyName: raw.companyName,
+        usersPurchased: raw.usersPurchased,
         startDate: raw.startDate,
         endDate: raw.endDate,
         action: "not_found",
@@ -234,48 +250,55 @@ export function buildCrmAccountDateImportPlan(
       continue;
     }
 
+    const nextUsers =
+      raw.usersPurchased != null ? Math.max(0, Math.round(raw.usersPurchased)) : null;
+    const willChangeUsers =
+      nextUsers != null && nextUsers !== (existing.usersPurchased ?? undefined);
     const willChangeStart = Boolean(raw.startDate && raw.startDate !== (existing.startDate ?? ""));
     const willChangeEnd = Boolean(raw.endDate && raw.endDate !== (existing.endDate ?? ""));
 
-    if (!willChangeStart && !willChangeEnd) {
+    if (!willChangeUsers && !willChangeStart && !willChangeEnd) {
       skip += 1;
       rows.push({
         rowNumber: raw.rowNumber,
         key,
         clientId: raw.clientId,
-        companyName: raw.companyName || existing.name,
+        usersPurchased: nextUsers,
         startDate: raw.startDate,
         endDate: raw.endDate,
         action: "skip",
         existingId: existing.id,
         existingName: existing.name,
+        previousUsers: existing.usersPurchased,
         previousStartDate: existing.startDate,
         previousEndDate: existing.endDate,
-        message: "Dates already match — skipped",
+        message: "Users and dates already match — skipped",
       });
       continue;
     }
 
     update += 1;
     const notes: string[] = [`Update ${existing.name}`];
+    if (willChangeUsers && nextUsers != null) {
+      notes.push(`Users ${existing.usersPurchased ?? "—"} → ${nextUsers}`);
+    }
     if (willChangeStart && raw.startDate) notes.push(`Start → ${raw.startDate}`);
     if (willChangeEnd && raw.endDate) notes.push(`End → ${raw.endDate}`);
-    if (raw.companyName && normalizeManagerName(raw.companyName) !== normalizeManagerName(existing.name)) {
-      notes.push(`Sheet company “${raw.companyName}” differs from account “${existing.name}”`);
-    }
 
     rows.push({
       rowNumber: raw.rowNumber,
       key,
       clientId: raw.clientId,
-      companyName: raw.companyName || existing.name,
+      usersPurchased: nextUsers,
       startDate: raw.startDate,
       endDate: raw.endDate,
       action: "update",
       existingId: existing.id,
       existingName: existing.name,
+      previousUsers: existing.usersPurchased,
       previousStartDate: existing.startDate,
       previousEndDate: existing.endDate,
+      applyUsers: willChangeUsers ? (nextUsers ?? undefined) : undefined,
       applyStartDate: willChangeStart ? (raw.startDate ?? undefined) : undefined,
       applyEndDate: willChangeEnd ? (raw.endDate ?? undefined) : undefined,
       message: notes.join(" · "),
