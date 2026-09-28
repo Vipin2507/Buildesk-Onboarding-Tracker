@@ -138,7 +138,7 @@ export function compareCrmAccountsByStartDateDesc(
   b: Pick<CrmAccount, "startDate" | "name">,
 ) {
   return (
-    compareCrmAccounts(a, b, "startDate", "desc") ||
+    cmpDate(dateKey(a.startDate), dateKey(b.startDate), "desc") ||
     cmpText(a.name, b.name, "asc")
   );
 }
