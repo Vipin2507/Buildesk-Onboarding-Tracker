@@ -271,7 +271,10 @@ function CrmDashboardPage() {
           queryTotal={kpis.openQueries}
         />
 
-        <CrmDashboardExecutiveAnalysis accounts={rows} />
+        <CrmDashboardExecutiveAnalysis
+          accounts={rows}
+          onOpenDrillDown={openDrillDown}
+        />
 
         <div className="grid gap-2.5 lg:grid-cols-2">
           <motion.div

@@ -19,6 +19,10 @@ import {
   type ChecklistPhaseBucket,
 } from "@/lib/checklist";
 import { filterCrmAccountsForUser } from "@/lib/crm-account-access";
+import {
+  crmExecutiveDrillTitle,
+  matchCrmExecutiveDrillFilter,
+} from "@/lib/crm-executive-analysis";
 import { formatTaskPreviewTitle } from "@/lib/task-display";
 import { isCrmAccountEnded } from "@/lib/crm-account-status";
 import { isCrmGoLiveStage } from "@/lib/crm-implementation-stages";
@@ -97,7 +101,15 @@ export type CrmDashboardDrillDownFilter =
   | { type: "modules"; key: string }
   | { type: "bookings"; scope: "pending" | "upcoming" }
   | { type: "support" }
-  | { type: "progress"; bucket: "low" | "mid" | "high" };
+  | { type: "progress"; bucket: "low" | "mid" | "high" }
+  | {
+      type: "executive";
+      role: "sales" | "support1" | "support2";
+      name?: string;
+      region?: string;
+      year?: string;
+      monthKey?: string;
+    };
 
 export type CrmDashboardTaskItem = {
   id: string;
@@ -600,6 +612,12 @@ export function useCrmDashboardOverview() {
               if (filter.bucket === "mid") return r.progress >= 40 && r.progress < 75;
               return r.progress >= 75;
             }),
+          };
+        case "executive":
+          return {
+            kind: "accounts" as const,
+            title: crmExecutiveDrillTitle(filter),
+            accounts: rows.filter((r) => matchCrmExecutiveDrillFilter(r, filter)),
           };
       }
     }

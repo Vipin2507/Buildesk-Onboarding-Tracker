@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { Copy, ExternalLink, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
@@ -38,6 +38,7 @@ import {
 import type { DesignTicket } from "@/types/design-ticket";
 
 export function CrmAccountPortalPanel({ accountId }: { accountId: string }) {
+  const navigate = useNavigate();
   const account = useCrmAccountStore((s) => s.getById(accountId));
   const portal = useCompanyPortalStore((s) => s.getByCompanyId(accountId));
   const generateAccess = useCompanyPortalStore((s) => s.generateAccessForCompany);
@@ -285,6 +286,12 @@ export function CrmAccountPortalPanel({ accountId }: { accountId: string }) {
               hideSearch
               pageSize={8}
               density="compact"
+              onRowClick={(row) =>
+                void navigate({
+                  to: "/crm/tickets/$ticketId",
+                  params: { ticketId: row.id },
+                })
+              }
               columns={[
                 {
                   key: "ticketNumber",

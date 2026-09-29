@@ -81,7 +81,7 @@ function accountDateRaw(account: CrmAccount) {
 }
 
 /** Returns `{ year, monthKey, monthName }` — monthKey is `01`–`12` or `Unknown`. */
-function yearMonthOf(account: CrmAccount): {
+export function yearMonthOfAccount(account: CrmAccount): {
   year: string;
   monthKey: string;
   monthName: string;
@@ -101,10 +101,75 @@ function yearMonthOf(account: CrmAccount): {
   return { year: "Unknown", monthKey: "Unknown", monthName: "Unknown" };
 }
 
-function roleName(account: CrmAccount, role: ExecutiveRole) {
+function yearMonthOf(account: CrmAccount) {
+  return yearMonthOfAccount(account);
+}
+
+export function executiveRoleName(account: CrmAccount, role: ExecutiveRole) {
   if (role === "support1") return label(account.supportManager1);
   if (role === "support2") return label(account.supportManager2);
   return label(account.salesManagerName);
+}
+
+function roleName(account: CrmAccount, role: ExecutiveRole) {
+  return executiveRoleName(account, role);
+}
+
+export function executiveRegionOf(account: CrmAccount) {
+  return locationOf(account);
+}
+
+/** Drill-down filter from executive analysis rows. */
+export type CrmExecutiveDrillFilter = {
+  type: "executive";
+  role: ExecutiveRole;
+  /** Executive display name ("Unassigned" when blank). */
+  name?: string;
+  region?: string;
+  year?: string;
+  /** Month key `01`–`12` or `Unknown`. */
+  monthKey?: string;
+};
+
+export function matchCrmExecutiveDrillFilter(
+  account: CrmAccount,
+  filter: Omit<CrmExecutiveDrillFilter, "type">,
+) {
+  if (isCrmAccountEnded(account.status)) return false;
+  if (filter.name) {
+    const person = executiveRoleName(account, filter.role);
+    if (filter.name === "Unassigned") {
+      if (person !== "Unassigned") return false;
+    } else if (!crmSalesManagerNamesMatch(person, filter.name) && person !== filter.name) {
+      return false;
+    }
+  }
+  if (filter.region && executiveRegionOf(account) !== filter.region) return false;
+  if (filter.year || filter.monthKey) {
+    const ym = yearMonthOfAccount(account);
+    if (filter.year && ym.year !== filter.year) return false;
+    if (filter.monthKey && ym.monthKey !== filter.monthKey) return false;
+  }
+  return true;
+}
+
+export function crmExecutiveDrillTitle(filter: Omit<CrmExecutiveDrillFilter, "type">) {
+  const parts: string[] = [EXECUTIVE_ROLE_LABEL[filter.role]];
+  if (filter.name) parts.push(filter.name);
+  if (filter.region) parts.push(filter.region);
+  if (filter.year) {
+    if (filter.monthKey) {
+      const idx = Number(filter.monthKey) - 1;
+      const month =
+        filter.monthKey === "Unknown"
+          ? "Unknown"
+          : MONTH_NAMES[idx] ?? filter.monthKey;
+      parts.push(`${month} ${filter.year}`);
+    } else {
+      parts.push(filter.year);
+    }
+  }
+  return parts.join(" · ");
 }
 
 function countBy(

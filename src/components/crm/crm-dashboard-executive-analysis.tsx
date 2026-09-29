@@ -13,6 +13,7 @@ import {
 import { isAdminRoleKey } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores";
+import type { CrmDashboardDrillDownFilter } from "@/stores/crm-dashboard-selectors";
 import type { CrmAccount } from "@/types/crm-account";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -21,14 +22,20 @@ type TabId = "sales" | "support1" | "support2" | "location" | "year";
 
 const ROLE_OPTIONS: ExecutiveRole[] = ["sales", "support1", "support2"];
 
+type OpenDrillDown = (filter: CrmDashboardDrillDownFilter) => void;
+
 function ExpandableExecutiveTable({
   rows,
   personLabel,
   breakdownLabel,
+  role,
+  onOpenDrillDown,
 }: {
   rows: ExecutiveDetailRow[];
   personLabel: string;
   breakdownLabel: string;
+  role: ExecutiveRole;
+  onOpenDrillDown: OpenDrillDown;
 }) {
   const [open, setOpen] = useState<string | null>(null);
 
@@ -53,26 +60,43 @@ function ExpandableExecutiveTable({
           const expanded = open === r.name;
           return (
             <li key={r.name} className="border-b border-border bg-white last:border-b-0">
-              <button
-                type="button"
-                onClick={() => setOpen(expanded ? null : r.name)}
-                className="grid w-full grid-cols-[2.5rem_1fr_auto] items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30"
-                aria-expanded={expanded}
-              >
+              <div className="grid w-full grid-cols-[2.5rem_1fr_auto] items-center gap-3 px-4 py-3 hover:bg-muted/30">
                 <span className="tabular-nums text-xs text-muted-foreground">{index + 1}</span>
-                <span className="flex min-w-0 items-center gap-2.5">
-                  <ChevronDown
-                    className={cn(
-                      "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-                      expanded && "rotate-180",
-                    )}
-                  />
-                  <span className="truncate text-sm font-medium text-foreground">{r.name}</span>
-                </span>
-                <span className="text-base font-semibold tabular-nums text-foreground">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setOpen(expanded ? null : r.name)}
+                    className="shrink-0 rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    aria-expanded={expanded}
+                    aria-label={expanded ? "Collapse regions" : "Expand regions"}
+                  >
+                    <ChevronDown
+                      className={cn(
+                        "h-4 w-4 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                        expanded && "rotate-180",
+                      )}
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onOpenDrillDown({ type: "executive", role, name: r.name })
+                    }
+                    className="min-w-0 truncate text-left text-sm font-medium text-foreground hover:underline"
+                  >
+                    {r.name}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onOpenDrillDown({ type: "executive", role, name: r.name })
+                  }
+                  className="text-right text-base font-semibold tabular-nums text-foreground hover:underline"
+                >
                   {r.accounts}
-                </span>
-              </button>
+                </button>
+              </div>
 
               <motion.div
                 initial={false}
@@ -91,19 +115,29 @@ function ExpandableExecutiveTable({
                   </div>
                   <ul className="max-h-56 overflow-y-auto">
                     {r.breakdown.map((b, locIndex) => (
-                      <li
-                        key={b.label}
-                        className="grid grid-cols-[2.5rem_1fr_auto] items-center gap-3 border-t border-border/80 py-2.5 text-sm"
-                      >
-                        <span className="tabular-nums text-xs text-muted-foreground">
-                          {locIndex + 1}
-                        </span>
-                        <span className="min-w-0 truncate text-muted-foreground">
-                          {b.label === "—" ? "Unspecified" : b.label}
-                        </span>
-                        <span className="shrink-0 text-right tabular-nums font-medium text-foreground">
-                          {b.accounts}
-                        </span>
+                      <li key={b.label}>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onOpenDrillDown({
+                              type: "executive",
+                              role,
+                              name: r.name,
+                              region: b.label,
+                            })
+                          }
+                          className="grid w-full grid-cols-[2.5rem_1fr_auto] items-center gap-3 border-t border-border/80 py-2.5 text-left text-sm transition-colors hover:bg-muted/40"
+                        >
+                          <span className="tabular-nums text-xs text-muted-foreground">
+                            {locIndex + 1}
+                          </span>
+                          <span className="min-w-0 truncate text-muted-foreground">
+                            {b.label === "—" ? "Unspecified" : b.label}
+                          </span>
+                          <span className="shrink-0 text-right tabular-nums font-medium text-foreground">
+                            {b.accounts}
+                          </span>
+                        </button>
                       </li>
                     ))}
                   </ul>
@@ -121,9 +155,13 @@ function ExpandableExecutiveTable({
 function ExpandableYearMonthTable({
   rows,
   executiveLabel,
+  role,
+  onOpenDrillDown,
 }: {
   rows: ExecutiveYearMonthRow[];
   executiveLabel: string;
+  role: ExecutiveRole;
+  onOpenDrillDown: OpenDrillDown;
 }) {
   const [openYear, setOpenYear] = useState<string | null>(null);
   const [openMonth, setOpenMonth] = useState<string | null>(null);
@@ -149,29 +187,54 @@ function ExpandableYearMonthTable({
           const yearExpanded = openYear === yearRow.name;
           return (
             <li key={yearRow.name} className="border-b border-border bg-white last:border-b-0">
-              <button
-                type="button"
-                onClick={() => {
-                  setOpenYear(yearExpanded ? null : yearRow.name);
-                  if (yearExpanded) setOpenMonth(null);
-                }}
-                className="grid w-full grid-cols-[2.5rem_1fr_auto] items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30"
-                aria-expanded={yearExpanded}
-              >
+              <div className="grid w-full grid-cols-[2.5rem_1fr_auto] items-center gap-3 px-4 py-3 hover:bg-muted/30">
                 <span className="tabular-nums text-xs text-muted-foreground">{yearIndex + 1}</span>
-                <span className="flex min-w-0 items-center gap-2.5">
-                  <ChevronDown
-                    className={cn(
-                      "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-                      yearExpanded && "rotate-180",
-                    )}
-                  />
-                  <span className="truncate text-sm font-medium text-foreground">{yearRow.name}</span>
-                </span>
-                <span className="text-base font-semibold tabular-nums text-foreground">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenYear(yearExpanded ? null : yearRow.name);
+                      if (yearExpanded) setOpenMonth(null);
+                    }}
+                    className="shrink-0 rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    aria-expanded={yearExpanded}
+                    aria-label={yearExpanded ? "Collapse months" : "Expand months"}
+                  >
+                    <ChevronDown
+                      className={cn(
+                        "h-4 w-4 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                        yearExpanded && "rotate-180",
+                      )}
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onOpenDrillDown({
+                        type: "executive",
+                        role,
+                        year: yearRow.name,
+                      })
+                    }
+                    className="min-w-0 truncate text-left text-sm font-medium text-foreground hover:underline"
+                  >
+                    {yearRow.name}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onOpenDrillDown({
+                      type: "executive",
+                      role,
+                      year: yearRow.name,
+                    })
+                  }
+                  className="text-right text-base font-semibold tabular-nums text-foreground hover:underline"
+                >
                   {yearRow.accounts}
-                </span>
-              </button>
+                </button>
+              </div>
 
               <motion.div
                 initial={false}
@@ -197,30 +260,59 @@ function ExpandableYearMonthTable({
                           key={monthKey}
                           className="border-t border-border/80 bg-white first:border-t-0"
                         >
-                          <button
-                            type="button"
-                            onClick={() => setOpenMonth(monthExpanded ? null : monthKey)}
-                            className="grid w-full grid-cols-[2.5rem_1fr_auto] items-center gap-3 px-2 py-2.5 text-left transition-colors hover:bg-muted/30"
-                            aria-expanded={monthExpanded}
-                          >
+                          <div className="grid w-full grid-cols-[2.5rem_1fr_auto] items-center gap-3 px-2 py-2.5 hover:bg-muted/30">
                             <span className="tabular-nums text-xs text-muted-foreground">
                               {monthIndex + 1}
                             </span>
-                            <span className="flex min-w-0 items-center gap-2.5">
-                              <ChevronDown
-                                className={cn(
-                                  "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-                                  monthExpanded && "rotate-180",
-                                )}
-                              />
-                              <span className="truncate text-sm font-medium text-foreground">
+                            <div className="flex min-w-0 items-center gap-2.5">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setOpenMonth(monthExpanded ? null : monthKey)
+                                }
+                                className="shrink-0 rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                aria-expanded={monthExpanded}
+                                aria-label={
+                                  monthExpanded ? "Collapse executives" : "Expand executives"
+                                }
+                              >
+                                <ChevronDown
+                                  className={cn(
+                                    "h-3.5 w-3.5 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                                    monthExpanded && "rotate-180",
+                                  )}
+                                />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  onOpenDrillDown({
+                                    type: "executive",
+                                    role,
+                                    year: yearRow.name,
+                                    monthKey: monthRow.monthKey,
+                                  })
+                                }
+                                className="min-w-0 truncate text-left text-sm font-medium text-foreground hover:underline"
+                              >
                                 {monthRow.name}
-                              </span>
-                            </span>
-                            <span className="text-sm font-semibold tabular-nums text-foreground">
+                              </button>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onOpenDrillDown({
+                                  type: "executive",
+                                  role,
+                                  year: yearRow.name,
+                                  monthKey: monthRow.monthKey,
+                                })
+                              }
+                              className="text-right text-sm font-semibold tabular-nums text-foreground hover:underline"
+                            >
                               {monthRow.accounts}
-                            </span>
-                          </button>
+                            </button>
+                          </div>
 
                           <motion.div
                             initial={false}
@@ -241,19 +333,30 @@ function ExpandableYearMonthTable({
                               </div>
                               <ul className="max-h-48 overflow-y-auto">
                                 {monthRow.executives.map((exec, execIndex) => (
-                                  <li
-                                    key={exec.name}
-                                    className="grid grid-cols-[2.5rem_1fr_auto] items-center gap-3 border-t border-border/70 py-2 text-sm"
-                                  >
-                                    <span className="tabular-nums text-xs text-muted-foreground">
-                                      {execIndex + 1}
-                                    </span>
-                                    <span className="min-w-0 truncate text-muted-foreground">
-                                      {exec.name}
-                                    </span>
-                                    <span className="shrink-0 text-right tabular-nums font-medium text-foreground">
-                                      {exec.accounts}
-                                    </span>
+                                  <li key={exec.name}>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        onOpenDrillDown({
+                                          type: "executive",
+                                          role,
+                                          name: exec.name,
+                                          year: yearRow.name,
+                                          monthKey: monthRow.monthKey,
+                                        })
+                                      }
+                                      className="grid w-full grid-cols-[2.5rem_1fr_auto] items-center gap-3 border-t border-border/70 py-2 text-left text-sm transition-colors hover:bg-muted/40"
+                                    >
+                                      <span className="tabular-nums text-xs text-muted-foreground">
+                                        {execIndex + 1}
+                                      </span>
+                                      <span className="min-w-0 truncate text-muted-foreground">
+                                        {exec.name}
+                                      </span>
+                                      <span className="shrink-0 text-right tabular-nums font-medium text-foreground">
+                                        {exec.accounts}
+                                      </span>
+                                    </button>
                                   </li>
                                 ))}
                               </ul>
@@ -273,7 +376,13 @@ function ExpandableYearMonthTable({
   );
 }
 
-export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccount[] }) {
+export function CrmDashboardExecutiveAnalysis({
+  accounts,
+  onOpenDrillDown,
+}: {
+  accounts: CrmAccount[];
+  onOpenDrillDown: OpenDrillDown;
+}) {
   const currentUser = useAuthStore((s) => s.user);
   const isAdmin = isAdminRoleKey(currentUser?.role);
   const [tab, setTab] = useState<TabId>("sales");
@@ -290,6 +399,9 @@ export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccou
       }),
     [accounts, locationRole, yearRole, currentUser?.name, isAdmin],
   );
+
+  const managerRole: ExecutiveRole =
+    tab === "support1" ? "support1" : tab === "support2" ? "support2" : "sales";
 
   const managerRows: ExecutiveAccountRow[] =
     tab === "sales"
@@ -382,11 +494,15 @@ export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccou
             </button>
           ))}
           <span className="text-xs text-muted-foreground">
-            · click a row to expand{" "}
-            {tab === "location" ? "regions" : "months, then executives"}
+            · click a count to open accounts · chevron to expand{" "}
+            {tab === "location" ? "regions" : "months / executives"}
           </span>
         </div>
-      ) : null}
+      ) : (
+        <p className="mb-3 text-xs text-muted-foreground">
+          Click a row to open matching accounts
+        </p>
+      )}
 
       <div className="max-h-[28rem] overflow-y-auto rounded-xl border border-border bg-white">
         {tab === "location" ? (
@@ -394,6 +510,8 @@ export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccou
             rows={analysis.byLocation}
             personLabel={tableTitle}
             breakdownLabel="Region"
+            role={locationRole}
+            onOpenDrillDown={onOpenDrillDown}
           />
         ) : null}
 
@@ -401,6 +519,8 @@ export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccou
           <ExpandableYearMonthTable
             rows={analysis.byYear}
             executiveLabel={EXECUTIVE_ROLE_LABEL[yearRole]}
+            role={yearRole}
+            onOpenDrillDown={onOpenDrillDown}
           />
         ) : null}
 
@@ -424,7 +544,26 @@ export function CrmDashboardExecutiveAnalysis({ accounts }: { accounts: CrmAccou
                 managerRows.map((r, index) => (
                   <tr
                     key={r.name}
-                    className="border-b border-border last:border-b-0 hover:bg-muted/30"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() =>
+                      onOpenDrillDown({
+                        type: "executive",
+                        role: managerRole,
+                        name: r.name,
+                      })
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onOpenDrillDown({
+                          type: "executive",
+                          role: managerRole,
+                          name: r.name,
+                        });
+                      }
+                    }}
+                    className="cursor-pointer border-b border-border last:border-b-0 hover:bg-muted/30"
                   >
                     <td className="px-4 py-3 tabular-nums text-xs text-muted-foreground">
                       {index + 1}
