@@ -58,6 +58,9 @@ import {
 } from "@/components/ui/dialog";
 import { isCrmGoLiveStage } from "@/lib/crm-implementation-stages";
 import {
+  crmAccountStatusLabel,
+} from "@/lib/crm-account-status";
+import {
   crmRenewalWindowLabel,
   isCrmAccountInRenewalWindow,
 } from "@/lib/crm-account-renewal";
@@ -113,7 +116,6 @@ const ACCOUNT_LIST_FILTER_DEFAULTS: {
   managerFilter: string;
   supportManager1Filter: string;
   supportManager2Filter: string;
-  healthFilter: string;
   stageFilter: string;
   providerFilter: string;
   moduleFilter: string;
@@ -131,7 +133,6 @@ const ACCOUNT_LIST_FILTER_DEFAULTS: {
   managerFilter: "all",
   supportManager1Filter: "all",
   supportManager2Filter: "all",
-  healthFilter: "all",
   stageFilter: "all",
   providerFilter: "all",
   moduleFilter: "",
@@ -187,10 +188,13 @@ function isAccountFilterPillActive(
   return statusFilter === id && kpiFilter === "all";
 }
 
-function healthTone(bucket: CrmAccountRow["healthBucket"]) {
-  if (bucket === "Healthy") return "success" as const;
-  if (bucket === "Moderate") return "warning" as const;
-  return "danger" as const;
+function accountStatusTone(status: CrmAccount["status"]) {
+  if (status === "live") return "success" as const;
+  if (status === "onboarding") return "warning" as const;
+  if (status === "active") return "info" as const;
+  if (status === "suspended") return "warning" as const;
+  if (status === "inactive" || status === "closed") return "danger" as const;
+  return "muted" as const;
 }
 
 function matchesAccountKpi(row: CrmAccountRow, filter: AccountKpiFilter) {
@@ -211,7 +215,6 @@ type AccountListFilters = {
   managerFilter: string;
   supportManager1Filter: string;
   supportManager2Filter: string;
-  healthFilter: string;
   stageFilter: string;
   providerFilter: string;
   moduleFilter: string;
@@ -259,7 +262,6 @@ function matchesAccountListFilters(row: CrmAccountRow, f: AccountListFilters) {
   ) {
     return false;
   }
-  if (f.healthFilter !== "all" && row.healthBucket !== f.healthFilter) return false;
   if (f.stageFilter !== "all" && row.stage !== f.stageFilter) return false;
   if (f.providerFilter === "none" && row.providers.length > 0) return false;
   if (
@@ -324,7 +326,6 @@ function CrmAccountsPage() {
     managerFilter,
     supportManager1Filter,
     supportManager2Filter,
-    healthFilter,
     stageFilter,
     providerFilter,
     moduleFilter,
@@ -370,10 +371,6 @@ function CrmAccountsPage() {
   );
   const setSupportManager2Filter = useCallback(
     (value: string) => setListFilters({ supportManager2Filter: value }),
-    [setListFilters],
-  );
-  const setHealthFilter = useCallback(
-    (value: string) => setListFilters({ healthFilter: value }),
     [setListFilters],
   );
   const setStageFilter = useCallback(
@@ -559,7 +556,6 @@ function CrmAccountsPage() {
       managerFilter,
       supportManager1Filter,
       supportManager2Filter,
-      healthFilter,
       stageFilter,
       providerFilter,
       moduleFilter,
@@ -574,7 +570,6 @@ function CrmAccountsPage() {
       managerFilter,
       supportManager1Filter,
       supportManager2Filter,
-      healthFilter,
       stageFilter,
       providerFilter,
       moduleFilter,
@@ -676,7 +671,6 @@ function CrmAccountsPage() {
     managerFilter !== "all",
     supportManager1Filter !== "all",
     supportManager2Filter !== "all",
-    healthFilter !== "all",
     stageFilter !== "all",
     providerFilter !== "all",
     moduleFilterKeys.length > 0,
@@ -1007,19 +1001,6 @@ function CrmAccountsPage() {
             placeholder="All modules"
             searchPlaceholder="Search modules…"
             options={moduleOptions}
-          />
-        </DesignTicketFilterField>
-        <DesignTicketFilterField label="Health" compact>
-          <DesignTicketSelect
-            compact
-            value={healthFilter}
-            onChange={setHealthFilter}
-            options={[
-              { value: "all", label: "All health" },
-              { value: "Healthy", label: "Healthy" },
-              { value: "Moderate", label: "Moderate" },
-              { value: "Critical", label: "Critical" },
-            ]}
           />
         </DesignTicketFilterField>
         <DesignTicketFilterField label="Progress" compact>
@@ -1406,13 +1387,12 @@ function CrmAccountsPage() {
                       ),
                   },
                   {
-                    key: "healthBucket",
-                    header: "Health",
+                    key: "status",
+                    header: "Status",
                     sortable: true,
                     render: (r) => (
-                      <Pill tone={healthTone(r.healthBucket)}>
-                        {r.healthBucket}
-                        {r.overdue ? " · overdue" : ""}
+                      <Pill tone={accountStatusTone(r.status)}>
+                        {crmAccountStatusLabel(r.status)}
                       </Pill>
                     ),
                   },
