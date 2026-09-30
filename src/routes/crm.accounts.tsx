@@ -58,6 +58,7 @@ import {
 } from "@/components/ui/dialog";
 import { isCrmGoLiveStage } from "@/lib/crm-implementation-stages";
 import {
+  CRM_ACCOUNT_STATUSES,
   crmAccountStatusLabel,
 } from "@/lib/crm-account-status";
 import {
@@ -1001,6 +1002,23 @@ function CrmAccountsPage() {
             placeholder="All modules"
             searchPlaceholder="Search modules…"
             options={moduleOptions}
+          />
+        </DesignTicketFilterField>
+        <DesignTicketFilterField label="Status" compact>
+          <DesignTicketSelect
+            compact
+            value={statusFilter}
+            onChange={(value) => {
+              setKpiFilter("all");
+              setStatusFilter(value);
+            }}
+            options={[
+              { value: "all", label: "All statuses" },
+              ...CRM_ACCOUNT_STATUSES.map((status) => ({
+                value: status,
+                label: crmAccountStatusLabel(status),
+              })),
+            ]}
           />
         </DesignTicketFilterField>
         <DesignTicketFilterField label="Progress" compact>
