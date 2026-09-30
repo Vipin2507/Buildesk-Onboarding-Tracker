@@ -267,7 +267,7 @@ export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who 
             size="sm"
             variant="outline"
             className="h-8 gap-1 border-warning/50 text-xs text-warning-foreground hover:bg-warning/10"
-            disabled={isSuspended || isInactive || isLive}
+            disabled={isEnded}
             onClick={() => setConfirmSuspended(true)}
           >
             <PauseCircle className="h-3.5 w-3.5" />
@@ -604,7 +604,7 @@ export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who 
         open={confirmSuspended}
         onOpenChange={setConfirmSuspended}
         title="Mark account suspended?"
-        description={`${accountName} will be marked Suspended. Use when the client is temporarily paused but may resume onboarding later.`}
+        description={`${accountName} will be marked Suspended. Use when the client is temporarily paused (including after go-live) but may resume later.`}
         confirmLabel="Mark Suspended"
         remarksPlaceholder="Why is this account being suspended?"
         onConfirm={markSuspended}

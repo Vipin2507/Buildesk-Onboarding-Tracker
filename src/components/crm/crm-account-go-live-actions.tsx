@@ -172,7 +172,7 @@ export function CrmAccountGoLiveActions({
             Account status
           </DropdownMenuLabel>
           <DropdownMenuItem
-            disabled={isSuspended || isInactive || isLive}
+            disabled={isEnded}
             onClick={() => setConfirmSuspended(true)}
           >
             <PauseCircle className="mr-2 h-4 w-4 text-warning-foreground" />
@@ -242,7 +242,7 @@ export function CrmAccountGoLiveActions({
         open={confirmSuspended}
         onOpenChange={setConfirmSuspended}
         title="Mark account suspended?"
-        description={`${accountName} will be marked Suspended. Use when the client is temporarily paused but may resume onboarding later.`}
+        description={`${accountName} will be marked Suspended. Use when the client is temporarily paused (including after go-live) but may resume later.`}
         confirmLabel="Mark Suspended"
         remarksPlaceholder="Why is this account being suspended?"
         onConfirm={markSuspended}

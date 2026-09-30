@@ -187,6 +187,65 @@ export function parseWahaGroupChatsPayload(text: string): WahaGroupSummary[] {
   return parseWahaGroupsPayload(text).filter((g) => g.id.includes("@g.us"));
 }
 
+const WAHA_GROUPS_PAGE_SIZE = 200;
+/** Safety cap — supports up to ~10k groups (50 × 200). */
+const WAHA_GROUPS_MAX_PAGES = 50;
+
+function mergeUniqueGroups(into: WahaGroupSummary[], page: WahaGroupSummary[]) {
+  const seen = new Set(into.map((g) => g.id));
+  for (const g of page) {
+    if (seen.has(g.id)) continue;
+    seen.add(g.id);
+    into.push(g);
+  }
+}
+
+async function fetchAllWahaGroupPages(
+  config: WahaConfig,
+  fetchPage: (opts: {
+    limit: number;
+    offset: number;
+  }) => Promise<{ ok: boolean; status: number; text: string }>,
+  parsePage: (text: string) => WahaGroupSummary[],
+): Promise<{
+  ok: boolean;
+  status: number;
+  groups: WahaGroupSummary[];
+  error?: string;
+  raw?: string;
+}> {
+  const groups: WahaGroupSummary[] = [];
+  let lastStatus = 0;
+  let lastText = "";
+
+  for (let page = 0; page < WAHA_GROUPS_MAX_PAGES; page += 1) {
+    const offset = page * WAHA_GROUPS_PAGE_SIZE;
+    const result = await fetchPage({ limit: WAHA_GROUPS_PAGE_SIZE, offset });
+    lastStatus = result.status;
+    lastText = result.text;
+    if (!result.ok) {
+      if (page === 0) {
+        return {
+          ok: false,
+          status: result.status,
+          groups: [],
+          error: `HTTP ${result.status}: ${result.text.slice(0, 240)}`,
+          raw: result.text.slice(0, 400),
+        };
+      }
+      // Keep what we already loaded if a later page fails.
+      break;
+    }
+
+    const chunk = parsePage(result.text);
+    mergeUniqueGroups(groups, chunk);
+    if (chunk.length < WAHA_GROUPS_PAGE_SIZE) break;
+  }
+
+  groups.sort((a, b) => a.subject.localeCompare(b.subject));
+  return { ok: true, status: lastStatus, groups, raw: lastText.slice(0, 400) };
+}
+
 export async function listWahaGroups(config: WahaConfig): Promise<{
   ok: boolean;
   status: number;
@@ -196,56 +255,61 @@ export async function listWahaGroups(config: WahaConfig): Promise<{
   source?: "groups" | "groups-refresh" | "chats-overview";
 }> {
   try {
-    const first = await fetchWahaGroups(config, { limit: 200, offset: 0 });
+    const first = await fetchAllWahaGroupPages(
+      config,
+      (opts) => fetchWahaGroups(config, opts),
+      parseWahaGroupsPayload,
+    );
     if (!first.ok) {
       return {
         ok: false,
         status: first.status,
         groups: [],
-        error: `HTTP ${first.status}: ${first.text.slice(0, 240)}`,
-        raw: first.text.slice(0, 400),
+        error: first.error,
+        raw: first.raw,
       };
     }
 
-    let groups = parseWahaGroupsPayload(first.text);
-    if (groups.length > 0) {
-      return { ok: true, status: first.status, groups, source: "groups" };
+    if (first.groups.length > 0) {
+      return { ok: true, status: first.status, groups: first.groups, source: "groups" };
     }
 
     // Empty list is common right after joining a group — force WAHA to re-sync once.
     await fetchWahaGroupsRefresh(config).catch(() => null);
-    const refreshed = await fetchWahaGroups(config, { limit: 200, offset: 0 });
-    if (refreshed.ok) {
-      groups = parseWahaGroupsPayload(refreshed.text);
-      if (groups.length > 0) {
-        return {
-          ok: true,
-          status: refreshed.status,
-          groups,
-          source: "groups-refresh",
-        };
-      }
+    const refreshed = await fetchAllWahaGroupPages(
+      config,
+      (opts) => fetchWahaGroups(config, opts),
+      parseWahaGroupsPayload,
+    );
+    if (refreshed.ok && refreshed.groups.length > 0) {
+      return {
+        ok: true,
+        status: refreshed.status,
+        groups: refreshed.groups,
+        source: "groups-refresh",
+      };
     }
 
     // Fallback: chats overview often lists groups even when /groups is empty (NOWEB store lag).
-    const chats = await fetchWahaChatsOverview(config, { limit: 200, offset: 0 });
-    if (chats.ok) {
-      groups = parseWahaGroupChatsPayload(chats.text);
-      if (groups.length > 0) {
-        return {
-          ok: true,
-          status: chats.status,
-          groups,
-          source: "chats-overview",
-        };
-      }
+    const chats = await fetchAllWahaGroupPages(
+      config,
+      (opts) => fetchWahaChatsOverview(config, opts),
+      parseWahaGroupChatsPayload,
+    );
+    if (chats.ok && chats.groups.length > 0) {
+      return {
+        ok: true,
+        status: chats.status,
+        groups: chats.groups,
+        source: "chats-overview",
+      };
     }
 
     return {
       ok: true,
       status: first.status,
       groups: [],
-      raw: (refreshed.ok ? refreshed.text : first.text).slice(0, 400),
+      raw: refreshed.raw ?? first.raw,
       source: "groups",
     };
   } catch (err) {
