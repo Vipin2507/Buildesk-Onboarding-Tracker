@@ -594,9 +594,12 @@ export function dispatchCrmBookingAutomationTrigger(
 
     const vars: Record<string, string> = {
       customerName: recipientName,
+      recipientName,
       accountName,
       companyName: accountName,
       salesManagerName: account?.salesManagerName ?? hostName,
+      supportManager1: account?.supportManager1?.trim() || "—",
+      supportManager2: account?.supportManager2?.trim() || "—",
       status: statusLabel,
       previousStatus: opts?.previousStatus
         ? BOOKING_STATUS_LABEL[opts.previousStatus] ?? opts.previousStatus

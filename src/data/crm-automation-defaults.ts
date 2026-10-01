@@ -121,6 +121,9 @@ const CRM_AUTOMATION_SEED_SYNC_RULE_IDS = new Set([
   "crm-rule-payment-executive-whatsapp",
   "crm-rule-query-response-email",
   "crm-rule-query-response-whatsapp",
+  "crm-rule-account-renewal-whatsapp",
+  "crm-rule-booking-created-whatsapp",
+  "crm-rule-booking-created-email",
 ]);
 
 /** True when a saved rule still has pre-digest / legacy copy and should pick up seed defaults once. */
@@ -146,6 +149,34 @@ export function crmAutomationRuleNeedsSeedSync(
     // Legacy digest / account-count copy only.
     if (existing.templateBody?.trim() === "{{digestBody}}") return true;
     if (existing.templateBody?.includes("payment reminder ({{accountCount}}")) return true;
+    return false;
+  }
+
+  if (seed.id === "crm-rule-account-renewal-whatsapp") {
+    // Already includes team lines — keep operator customizations.
+    if (
+      existing.templateBody?.includes("{{supportManager1}}") &&
+      existing.templateBody?.includes("{{salesManagerName}}")
+    ) {
+      return false;
+    }
+    // Legacy renewal copy missing team names — one-time bump.
+    if (existing.templateBody?.includes("Renewal window")) return true;
+    return false;
+  }
+
+  if (
+    seed.id === "crm-rule-booking-created-whatsapp" ||
+    seed.id === "crm-rule-booking-created-email"
+  ) {
+    if (existing.templateBody?.includes("{{supportManager1}}")) return false;
+    // Legacy meeting-request copy missing support names — one-time bump.
+    if (
+      existing.templateBody?.includes("booked a") ||
+      existing.templateBody?.includes("requested a")
+    ) {
+      return true;
+    }
     return false;
   }
 
@@ -288,7 +319,7 @@ export const DEFAULT_CRM_AUTOMATION_RULES: AutomationRule[] = [
     isActive: true,
     templateSubject: "New meeting request — {{eventTypeTitle}} · {{accountName}}",
     templateBody:
-      "Hi {{hostName}},\n\n{{guestName}} requested a {{eventTypeTitle}} for {{accountName}}.\n\nWhen: {{startsAt}} – {{endsAt}}\nGuest: {{guestName}} ({{guestEmail}})\nStatus: {{status}}\n\nApprove, reject, or postpone in CRM Meetings: {{bookingUrl}}",
+      "Hi {{hostName}},\n\n{{guestName}} requested a {{eventTypeTitle}} for {{accountName}}.\n\nWhen: {{startsAt}} – {{endsAt}}\nGuest: {{guestName}} ({{guestEmail}})\nStatus: {{status}}\nSupport 1: {{supportManager1}}\nSupport 2: {{supportManager2}}\n\nApprove, reject, or postpone in CRM Meetings: {{bookingUrl}}",
   }),
   rule({
     id: "crm-rule-booking-created-whatsapp",
@@ -299,7 +330,7 @@ export const DEFAULT_CRM_AUTOMATION_RULES: AutomationRule[] = [
     channel: "whatsapp",
     isActive: true,
     templateBody:
-      "Hi {{recipientName}}, {{guestName}} booked a {{eventTypeTitle}} for {{accountName}}.\n\nWhen: {{startsAt}} – {{endsAt}}\nGuest: {{guestName}} ({{guestEmail}})\nStatus: {{status}}\n\nApprove / reject / postpone: {{bookingUrl}}",
+      "Hi {{recipientName}}, {{guestName}} booked a {{eventTypeTitle}} for {{accountName}}.\n\nWhen: {{startsAt}} – {{endsAt}}\nGuest: {{guestName}} ({{guestEmail}})\nStatus: {{status}}\n*Support 1:* {{supportManager1}}\n*Support 2:* {{supportManager2}}\n\nApprove / reject / postpone: {{bookingUrl}}",
   }),
   rule({
     id: "crm-rule-booking-status-email",
@@ -377,7 +408,7 @@ export const DEFAULT_CRM_AUTOMATION_RULES: AutomationRule[] = [
     channel: "whatsapp",
     isActive: true,
     templateBody:
-      "Hi {{recipientName}},\n\n🔄 *Renewal window* — {{accountName}}\n\nService ends {{endDate}}.\nNext period starts {{nextStartDate}}.\n{{renewalWindowLabel}}\n\nOpen Renew in CRM: {{renewUrl}}",
+      "Hi {{recipientName}},\n\n🔄 *Renewal window* — {{accountName}}\n\nService ends {{endDate}}.\nNext period starts {{nextStartDate}}.\n{{renewalWindowLabel}}\n\n*Sales agent:* {{salesManagerName}}\n*Support 1:* {{supportManager1}}\n*Support 2:* {{supportManager2}}\n\nOpen Renew in CRM: {{renewUrl}}",
   }),
   rule({
     id: "crm-rule-query-response-whatsapp",

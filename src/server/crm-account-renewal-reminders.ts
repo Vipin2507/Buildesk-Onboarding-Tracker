@@ -39,8 +39,8 @@ export async function processCrmAccountRenewalReminders(
       insertNotificationsForUserIds(db, recipientIds, {
         title: `Renewal window · ${account.name}`,
         body: nextStart
-          ? `Service ends ${formatDate(endDate)}. Next period starts ${formatDate(nextStart)}. Open Renew on Accounts or Payments.`
-          : `Service ends ${formatDate(endDate)}. Open Renew on Accounts or Payments.`,
+          ? `Service ends ${formatDate(endDate)}. Next period starts ${formatDate(nextStart)}. Sales: ${account.salesManagerName?.trim() || "—"}. Support 1: ${account.supportManager1?.trim() || "—"}. Support 2: ${account.supportManager2?.trim() || "—"}. Open Renew on Accounts or Payments.`
+          : `Service ends ${formatDate(endDate)}. Sales: ${account.salesManagerName?.trim() || "—"}. Support 1: ${account.supportManager1?.trim() || "—"}. Support 2: ${account.supportManager2?.trim() || "—"}. Open Renew on Accounts or Payments.`,
         kind: "warning",
         href: `/crm/accounts/${account.id}`,
         companyId: account.id,

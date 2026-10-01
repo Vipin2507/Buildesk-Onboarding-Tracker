@@ -191,12 +191,21 @@ async function dispatchServerBookingEmail(
   const recipientEmail =
     opts.trigger === "booking-created" ? opts.hostEmail : opts.appointment.guestEmail;
 
+  const account = db
+    .select()
+    .from(t.crmAccounts)
+    .where(eq(t.crmAccounts.id, opts.appointment.companyId))
+    .get();
+
   const vars: Record<string, string> = {
     customerName: recipientName,
+    recipientName,
     accountName: opts.accountName,
     companyName: opts.accountName,
-    salesManagerName: opts.hostName,
-    supportManagerName: opts.hostName,
+    salesManagerName: account?.salesManagerName?.trim() || opts.hostName,
+    supportManager1: account?.supportManager1?.trim() || "—",
+    supportManager2: account?.supportManager2?.trim() || "—",
+    supportManagerName: account?.supportManager1?.trim() || opts.hostName,
     status: opts.trigger === "booking-created" ? "Pending" : statusLabel,
     previousStatus: previousStatusLabel,
     guestName: opts.appointment.guestName,
