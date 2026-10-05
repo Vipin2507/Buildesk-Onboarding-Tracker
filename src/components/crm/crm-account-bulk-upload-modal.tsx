@@ -185,7 +185,7 @@ export function CrmAccountBulkUploadModal({
     return { ...plan.summary, notFound, skip };
   }, [plan, updatesOnly]);
 
-  function applyImport() {
+  async function applyImport() {
     if (!plan) return;
 
     const actionable = updatesOnly
