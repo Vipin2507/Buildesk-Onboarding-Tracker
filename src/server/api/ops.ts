@@ -566,7 +566,7 @@ export const getAppConfig = createServerFn({ method: "GET" })
         })
         .parse(data),
   )
-  .handler(async ({ data }): Promise<Record<string, unknown>> => {
+  .handler(async ({ data }) => {
     // Shared runtime config: master catalogs + automation/WAHA must be readable by all
     // signed-in roles. Writes stay Admin-only via setAppConfig.
     // Without this, executives keep a stale WAHA session from localStorage forever.
@@ -580,12 +580,18 @@ export const getAppConfig = createServerFn({ method: "GET" })
       requireUser(["Admin"]);
     }
     const row = getDb().select().from(t.appConfig).where(eq(t.appConfig.key, data.key)).get();
-    if (!row) return {};
-    const parsed = JSON.parse(row.valueJson) as Record<string, unknown>;
-    // Logs are fetched separately; omit them from the shared config payload.
-    if (data.key === "automation" || data.key === "crm-automation") {
-      const { logs: _logs, ...rest } = parsed;
-      return { ...rest };
+    // Keep JSON.parse return type as `any` — TanStack strict output rejects Record<string, unknown>.
+    const parsed = row ? JSON.parse(row.valueJson) : {};
+    if (
+      (data.key === "automation" || data.key === "crm-automation") &&
+      parsed &&
+      typeof parsed === "object" &&
+      !Array.isArray(parsed) &&
+      "logs" in parsed
+    ) {
+      const clone = { ...parsed };
+      delete clone.logs;
+      return clone;
     }
     return parsed;
   });
