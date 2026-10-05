@@ -566,7 +566,7 @@ export const getAppConfig = createServerFn({ method: "GET" })
         })
         .parse(data),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data }): Promise<Record<string, unknown>> => {
     // Shared runtime config: master catalogs + automation/WAHA must be readable by all
     // signed-in roles. Writes stay Admin-only via setAppConfig.
     // Without this, executives keep a stale WAHA session from localStorage forever.
@@ -583,13 +583,9 @@ export const getAppConfig = createServerFn({ method: "GET" })
     if (!row) return {};
     const parsed = JSON.parse(row.valueJson) as Record<string, unknown>;
     // Logs are fetched separately; omit them from the shared config payload.
-    if (
-      (data.key === "automation" || data.key === "crm-automation") &&
-      parsed &&
-      typeof parsed === "object"
-    ) {
+    if (data.key === "automation" || data.key === "crm-automation") {
       const { logs: _logs, ...rest } = parsed;
-      return rest;
+      return { ...rest };
     }
     return parsed;
   });
