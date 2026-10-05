@@ -4,6 +4,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { pullCrmAutomationConfigFromServer } from "@/lib/crm-automation-refresh";
 import { listWahaGroups, sendWahaText, type WahaGroupSummary } from "@/services/waha";
 import { useCrmAutomationStore } from "@/stores/useCrmAutomationStore";
 
@@ -26,15 +27,16 @@ export function WahaConnectedGroups() {
   });
 
   async function loadGroups() {
-    if (!waha.apiUrl.trim() || !waha.apiKey.trim() || !waha.sessionName.trim()) {
-      toast.error("Save WAHA URL, API key, and session name first");
-      return;
-    }
     setLoading(true);
     setError(null);
     setHint(null);
     try {
-      const result = await listWahaGroups(waha);
+      const liveWaha = await pullCrmAutomationConfigFromServer();
+      if (!liveWaha.apiUrl.trim() || !liveWaha.apiKey.trim() || !liveWaha.sessionName.trim()) {
+        toast.error("Save WAHA URL, API key, and session name first");
+        return;
+      }
+      const result = await listWahaGroups(liveWaha);
       if (!result.ok) {
         setGroups([]);
         setError(result.error ?? "Failed to load groups");

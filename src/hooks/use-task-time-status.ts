@@ -14,19 +14,24 @@ export function useTaskTimeStatusSync(enabled = true, scope: TaskProductScope = 
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
-    const store = scope === "erp" ? useErpTaskStore : useCrmTaskStore;
-    const syncFn = scope === "erp" ? syncErpFollowUpTaskStatuses : syncFollowUpTaskStatuses;
 
     async function run() {
       try {
-        const updated = await syncFn({ data: {} });
+        const updated =
+          scope === "erp"
+            ? await syncErpFollowUpTaskStatuses({ data: {} })
+            : await syncFollowUpTaskStatuses({ data: {} });
         if (cancelled || updated.length === 0) return;
-        store.setState((state) => {
-          const byId = new Map(updated.map((task) => [task.id, task]));
-          return {
+        const byId = new Map(updated.map((task) => [task.id, task]));
+        if (scope === "erp") {
+          useErpTaskStore.setState((state) => ({
             tasks: state.tasks.map((task) => byId.get(task.id) ?? task),
-          };
-        });
+          }));
+        } else {
+          useCrmTaskStore.setState((state) => ({
+            tasks: state.tasks.map((task) => byId.get(task.id) ?? task),
+          }));
+        }
       } catch {
         // Non-blocking — next interval or page refresh will retry.
       }

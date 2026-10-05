@@ -14,9 +14,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { isCrmAccountEnded } from "@/lib/crm-account-status";
 import { cn } from "@/lib/utils";
+import { pullCrmAutomationConfigFromServer } from "@/lib/crm-automation-refresh";
 import { listWahaGroups, type WahaGroupSummary } from "@/services/waha";
 import { useCrmAccountStore } from "@/stores/useCrmAccountStore";
-import { useCrmAutomationStore } from "@/stores/useCrmAutomationStore";
 import type { CrmAccount } from "@/types/crm-account";
 
 const UNLINK = "__unlink__";
@@ -60,10 +60,6 @@ export function CrmAccountWhatsappSyncModal({
   onOpenChange: (open: boolean) => void;
   accounts: CrmAccount[];
 }) {
-  const apiUrl = useCrmAutomationStore((s) => s.waha.apiUrl);
-  const apiKey = useCrmAutomationStore((s) => s.waha.apiKey);
-  const sessionName = useCrmAutomationStore((s) => s.waha.sessionName);
-  const isEnabled = useCrmAutomationStore((s) => s.waha.isEnabled);
   const updateAccount = useCrmAccountStore((s) => s.updateAccount);
 
   const [accountSearch, setAccountSearch] = useState("");
@@ -81,18 +77,20 @@ export function CrmAccountWhatsappSyncModal({
   const sessionOpenRef = useRef(false);
 
   const loadGroups = useCallback(async (opts?: { quiet?: boolean }) => {
-    if (!apiUrl || !apiKey || !sessionName) {
-      setGroups([]);
-      setGroupsError("WAHA is not configured — set API URL, key, and session in Automation.");
-      return;
-    }
     setLoadingGroups(true);
     if (!opts?.quiet) setGroupsError(null);
+    const live = await pullCrmAutomationConfigFromServer();
+    if (!live.apiUrl || !live.apiKey || !live.sessionName) {
+      setGroups([]);
+      setGroupsError("WAHA is not configured — set API URL, key, and session in Automation.");
+      setLoadingGroups(false);
+      return;
+    }
     const result = await listWahaGroups({
-      apiUrl,
-      apiKey,
-      sessionName,
-      isEnabled: isEnabled ?? true,
+      apiUrl: live.apiUrl,
+      apiKey: live.apiKey,
+      sessionName: live.sessionName,
+      isEnabled: live.isEnabled ?? true,
     });
     if (!result.ok) {
       setGroups([]);
@@ -104,7 +102,7 @@ export function CrmAccountWhatsappSyncModal({
       if (!opts?.quiet) toast.success(`Loaded ${result.groups.length} WhatsApp groups`);
     }
     setLoadingGroups(false);
-  }, [apiUrl, apiKey, sessionName, isEnabled]);
+  }, []);
 
   // Initialize drafts + load groups once per open. Do NOT depend on `accounts` /
   // store object identity — that was resetting selections on every refresh.

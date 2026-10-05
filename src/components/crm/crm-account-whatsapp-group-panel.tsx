@@ -45,6 +45,7 @@ import {
   type WahaGroupSummary,
   type WahaMediaKind,
 } from "@/services/waha";
+import { pullCrmAutomationConfigFromServer } from "@/lib/crm-automation-refresh";
 import { useCrmAccountStore } from "@/stores/useCrmAccountStore";
 import { useCrmAutomationStore } from "@/stores/useCrmAutomationStore";
 
@@ -1299,7 +1300,8 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
     setLoadingPicker(true);
     setGroupSearch("");
     try {
-      const result = await listWahaGroups(waha);
+      const liveWaha = await pullCrmAutomationConfigFromServer();
+      const result = await listWahaGroups(liveWaha);
       if (!result.ok) {
         toast.error(result.error ?? "Could not load groups");
         setPickerGroups([]);

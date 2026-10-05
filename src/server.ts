@@ -57,6 +57,20 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
+/** Stop browsers from pinning an old HTML shell that points at stale JS after deploy. */
+function applyHtmlNoCacheHeaders(response: Response): Response {
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("text/html")) return response;
+  const headers = new Headers(response.headers);
+  headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
+  headers.set("Pragma", "no-cache");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
@@ -80,7 +94,8 @@ export default {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       const normalized = await normalizeCatastrophicSsrResponse(response);
-      return applyPortalIframeHeaders(normalized, url.pathname);
+      const withPortal = applyPortalIframeHeaders(normalized, url.pathname);
+      return applyHtmlNoCacheHeaders(withPortal);
     } catch (error) {
       console.error(error);
       return new Response(renderErrorPage(), {

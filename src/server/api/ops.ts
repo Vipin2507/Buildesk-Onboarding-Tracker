@@ -567,14 +567,31 @@ export const getAppConfig = createServerFn({ method: "GET" })
         .parse(data),
   )
   .handler(async ({ data }) => {
-    // CRM master (providers, modules, picklists) is read by all roles for account onboarding UI.
-    if (data.key === "crm-master") {
+    // Shared runtime config: master catalogs + automation/WAHA must be readable by all
+    // signed-in roles. Writes stay Admin-only via setAppConfig.
+    // Without this, executives keep a stale WAHA session from localStorage forever.
+    if (
+      data.key === "crm-master" ||
+      data.key === "automation" ||
+      data.key === "crm-automation"
+    ) {
       requireUser();
     } else {
       requireUser(["Admin"]);
     }
     const row = getDb().select().from(t.appConfig).where(eq(t.appConfig.key, data.key)).get();
-    return row ? JSON.parse(row.valueJson) : {};
+    if (!row) return {};
+    const parsed = JSON.parse(row.valueJson) as Record<string, unknown>;
+    // Logs are fetched separately; omit them from the shared config payload.
+    if (
+      (data.key === "automation" || data.key === "crm-automation") &&
+      parsed &&
+      typeof parsed === "object"
+    ) {
+      const { logs: _logs, ...rest } = parsed;
+      return rest;
+    }
+    return parsed;
   });
 
 const automationConfigKeySchema = z.enum(["automation", "crm-automation"]);
