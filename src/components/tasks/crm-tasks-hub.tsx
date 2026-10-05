@@ -54,7 +54,7 @@ import {
 } from "@/lib/task-defaults";
 import { resolveTaskAssigneeIds } from "@/lib/task-scheduling";
 import { useTaskTimeStatusSync, useTasksWithTimeStatus } from "@/hooks/use-task-time-status";
-import { useAuthStore, useCrmAccountStore, useCrmTaskStore, useUserStore } from "@/stores";
+import { useAuthStore, useBookingStore, useCrmAccountStore, useCrmTaskStore, useUserStore } from "@/stores";
 import {
   FOLLOW_UP_TASK_TYPE_LABEL,
   type FollowUpTask,
@@ -180,6 +180,7 @@ type Props = {
 
 export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: Props) {
   const tasks = useCrmTaskStore((s) => s.tasks);
+  const bookingAppointments = useBookingStore((s) => s.appointments);
   useTaskTimeStatusSync(true, "crm");
   const timeAwareTasks = useTasksWithTimeStatus(tasks);
   const addTask = useCrmTaskStore((s) => s.addTask);
@@ -316,6 +317,9 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
     companyId: createAccountId,
     markCompleteOnCreate,
     reminderMode: isReminderCreate || isReminderEdit,
+    productScope: "crm",
+    internalMeeting: isInternalCreate || Boolean(editing && isInternalCrmTask(editing)),
+    schedulePeers: { tasks, bookings: bookingAppointments },
   });
 
   function canManageTask(task?: FollowUpTask) {
@@ -419,22 +423,26 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
       remark: remark.trim() || undefined,
     };
 
-    if (editing) {
-      updateTask(editing.id, payload);
-      toast.success("Task updated");
-    } else if (markCompleteOnCreate) {
-      addTask({
-        ...payload,
-        status: "completed",
-        priority: "medium",
-        progressPercent: 100,
-      });
-      toast.success("Task created and marked complete");
-    } else {
-      addTask({ ...payload, status: "open", priority: "medium", progressPercent: 0 });
-      toast.success("Task created");
+    try {
+      if (editing) {
+        updateTask(editing.id, payload);
+        toast.success("Task updated");
+      } else if (markCompleteOnCreate) {
+        await addTask({
+          ...payload,
+          status: "completed",
+          priority: "medium",
+          progressPercent: 100,
+        });
+        toast.success("Task created and marked complete");
+      } else {
+        await addTask({ ...payload, status: "open", priority: "medium", progressPercent: 0 });
+        toast.success("Task created");
+      }
+      setModalOpen(false);
+    } catch {
+      // addTask surfaces save errors
     }
-    setModalOpen(false);
   }
 
   const calendarView: TaskCalendarView = isCalendarTab(tab) ? tab : "list";

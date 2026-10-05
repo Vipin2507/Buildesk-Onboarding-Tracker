@@ -1,5 +1,6 @@
 import { browserWallClockIso, localWallClockIso } from "@/lib/booking-slots";
-import type { FollowUpTaskStatus, FollowUpTaskType } from "@/types";
+import { isCrmReminderTaskType } from "@/lib/crm-reminder-task";
+import type { FollowUpTask, FollowUpTaskStatus, FollowUpTaskType, TaskProductScope } from "@/types";
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -161,6 +162,83 @@ export function formatScheduleConflictMessage(conflict: ScheduleConflict): strin
   const end = conflict.endsAt.slice(11, 16);
   const label = conflict.kind === "booking" ? "meeting" : "task";
   return `Time slot unavailable: This user already has a ${label} scheduled from ${formatTimeRange12h(start, end)} (${conflict.title}).`;
+}
+
+const OCCUPIED_TASK_STATUSES = new Set<FollowUpTaskStatus>([
+  "open",
+  "in_progress",
+  "blocked",
+  "overdue",
+]);
+
+const OCCUPIED_BOOKING_STATUSES = new Set(["pending", "confirmed", "postponed"]);
+
+/** Client-side conflict check (store tasks + bookings) before server validation. */
+export function findLocalScheduleConflicts(input: {
+  userIds: string[];
+  startsAt: string;
+  endsAt: string;
+  tasks: FollowUpTask[];
+  bookings?: {
+    id: string;
+    hostUserId: string;
+    startsAt: string;
+    endsAt: string;
+    status: string;
+    guestName?: string;
+  }[];
+  excludeTaskId?: string;
+  excludeBookingId?: string;
+  productScope?: TaskProductScope;
+}): ScheduleConflict[] {
+  const scope = input.productScope ?? "crm";
+  const conflicts: ScheduleConflict[] = [];
+  const rangeStart = `${input.startsAt.slice(0, 10)}T00:00:00`;
+  const rangeEnd = `${input.startsAt.slice(0, 10)}T23:59:59`;
+
+  for (const userId of input.userIds) {
+    for (const task of input.tasks) {
+      if ((task.productScope ?? "crm") !== scope) continue;
+      if (input.excludeTaskId && task.id === input.excludeTaskId) continue;
+      if (!OCCUPIED_TASK_STATUSES.has(task.status)) continue;
+      if (isCrmReminderTaskType(task.taskType)) continue;
+      const bounds = resolveTaskScheduleIsoBounds(task);
+      if (!bounds) continue;
+      if (bounds.endsAt < rangeStart || bounds.startsAt > rangeEnd) continue;
+      if (!resolveTaskAssigneeIds(task).includes(userId)) continue;
+      if (
+        scheduleRangesOverlap(input.startsAt, input.endsAt, bounds.startsAt, bounds.endsAt)
+      ) {
+        conflicts.push({
+          kind: "task",
+          title: task.title,
+          startsAt: bounds.startsAt,
+          endsAt: bounds.endsAt,
+          userId,
+        });
+      }
+    }
+
+    for (const booking of input.bookings ?? []) {
+      if (input.excludeBookingId && booking.id === input.excludeBookingId) continue;
+      if (booking.hostUserId !== userId) continue;
+      if (!OCCUPIED_BOOKING_STATUSES.has(booking.status)) continue;
+      if (booking.endsAt < rangeStart || booking.startsAt > rangeEnd) continue;
+      if (
+        scheduleRangesOverlap(input.startsAt, input.endsAt, booking.startsAt, booking.endsAt)
+      ) {
+        conflicts.push({
+          kind: "booking",
+          title: booking.guestName ? `${booking.guestName} – Meeting` : "Meeting",
+          startsAt: booking.startsAt,
+          endsAt: booking.endsAt,
+          userId,
+        });
+      }
+    }
+  }
+
+  return conflicts;
 }
 
 export function isScheduledTaskType(taskType?: FollowUpTaskType): boolean {

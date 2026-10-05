@@ -43,3 +43,11 @@ export const deleteDbBackup = createServerFn({ method: "POST" })
     requireUser(["Admin"]);
     return deleteDbBackupFile(data.filename);
   });
+
+export const restoreDbBackup = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ filename: z.string().min(1) }).parse(data))
+  .handler(async ({ data }) => {
+    requireUser(["Admin"]);
+    const { restoreDbFromBackupFilename } = await import("@/server/lib/db-backup-storage");
+    return restoreDbFromBackupFilename(data.filename);
+  });

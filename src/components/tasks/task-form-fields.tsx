@@ -14,6 +14,8 @@ import {
   buildTaskScheduleWindow,
   calcDurationFromTimes,
   calcEndTimeFromDuration,
+  findLocalScheduleConflicts,
+  formatScheduleConflictMessage,
   isPastDateYmd,
   isTimeBeforeMin,
   minEndTimeForSchedule,
@@ -58,6 +60,18 @@ type Props = {
   internalMeeting?: boolean;
   /** Soft nudge — no calendar blocking. */
   reminderMode?: boolean;
+  /** In-memory tasks/bookings for conflict checks before server round-trip. */
+  schedulePeers?: {
+    tasks: FollowUpTask[];
+    bookings?: {
+      id: string;
+      hostUserId: string;
+      startsAt: string;
+      endsAt: string;
+      status: string;
+      guestName?: string;
+    }[];
+  };
 };
 
 const fieldClass = cn(ticketFieldClass, "h-8 text-xs");
@@ -224,6 +238,25 @@ export function useTaskFormState(props: Props) {
     const isReminder =
       props.reminderMode || isCrmReminderTaskType(taskType) || props.editing?.taskType === "reminder";
     if (isReminder) return true;
+
+    const scope = props.productScope ?? "crm";
+    if (props.schedulePeers) {
+      const local = findLocalScheduleConflicts({
+        userIds: assigneeUserIds,
+        startsAt: window.startsAt,
+        endsAt: window.endsAt,
+        tasks: props.schedulePeers.tasks,
+        bookings: props.schedulePeers.bookings,
+        excludeTaskId: props.editing?.id,
+        excludeBookingId: props.editing?.bookingAppointmentId,
+        productScope: scope,
+      });
+      if (local.length > 0) {
+        toast.error(formatScheduleConflictMessage(local[0]!));
+        return false;
+      }
+    }
+
     try {
       const checkConflicts =
         props.productScope === "erp" ? checkErpTaskScheduleConflicts : checkTaskScheduleConflicts;

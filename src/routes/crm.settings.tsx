@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import {
   Bell,
@@ -13,8 +13,10 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  RotateCcw,
   Shield,
   Trash2,
+  Upload,
   UserRound,
   Users,
 } from "lucide-react";
@@ -37,6 +39,7 @@ import {
   createUser as apiCreateUser,
   deleteDbBackup,
   listDbBackups,
+  restoreDbBackup,
   setUserPassword as apiSetUserPassword,
   setAppConfig,
   updateUser as apiUpdateUser,
@@ -1192,7 +1195,12 @@ function DatabaseBackupsSection() {
   const [rows, setRows] = useState<DbBackupRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DbBackupRow | null>(null);
+  const [restoreTarget, setRestoreTarget] = useState<DbBackupRow | null>(null);
+  const [confirmUpload, setConfirmUpload] = useState(false);
+  const [pendingUploadFile, setPendingUploadFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function refresh() {
     setLoading(true);
@@ -1246,7 +1254,66 @@ function DatabaseBackupsSection() {
     a.remove();
   }
 
+  function afterSuccessfulReplace(message: string) {
+    toast.success(message);
+    window.setTimeout(() => {
+      window.location.reload();
+    }, 800);
+  }
+
+  async function handleRestoreFromList() {
+    if (!restoreTarget) return;
+    setRestoring(true);
+    try {
+      await restoreDbBackup({ data: { filename: restoreTarget.filename } });
+      setRestoreTarget(null);
+      afterSuccessfulReplace("Database restored — reloading…");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Restore failed");
+      setRestoring(false);
+    }
+  }
+
+  function onPickUploadFile(file: File | null) {
+    if (!file) return;
+    const lower = file.name.toLowerCase();
+    if (!lower.endsWith(".db") && !lower.endsWith(".sqlite") && !lower.endsWith(".sqlite3")) {
+      toast.error("Choose a .db / .sqlite file");
+      return;
+    }
+    setPendingUploadFile(file);
+    setConfirmUpload(true);
+  }
+
+  async function handleUploadReplace() {
+    if (!pendingUploadFile) return;
+    setRestoring(true);
+    setConfirmUpload(false);
+    try {
+      const form = new FormData();
+      form.append("file", pendingUploadFile);
+      const res = await fetch("/api/db-backups/restore-upload", {
+        method: "POST",
+        body: form,
+        credentials: "include",
+      });
+      const payload = (await res.json().catch(() => null)) as
+        | { ok?: boolean; message?: string; error?: string }
+        | null;
+      if (!res.ok) {
+        throw new Error(payload?.error ?? `Upload failed (HTTP ${res.status})`);
+      }
+      setPendingUploadFile(null);
+      afterSuccessfulReplace(payload?.message ?? "Database replaced — reloading…");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload failed");
+      setRestoring(false);
+      setPendingUploadFile(null);
+    }
+  }
+
   const latest = rows[0];
+  const busy = creating || loading || restoring;
 
   return (
     <div className="card-soft space-y-3 p-3">
@@ -1257,10 +1324,12 @@ function DatabaseBackupsSection() {
 
       <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
         <p>
-          The server creates an automatic backup about once per day. After an incident, download a
-          dated file from this list, stop the app, replace the live{" "}
-          <code className="rounded bg-muted px-1 font-mono text-[10px]">buildesk.db</code>, then
-          restart.
+          The server creates an automatic backup about once per day. You can download a dated file,
+          restore one from this list, or upload a{" "}
+          <code className="rounded bg-muted px-1 font-mono text-[10px]">.db</code> file to replace
+          the live{" "}
+          <code className="rounded bg-muted px-1 font-mono text-[10px]">buildesk.db</code>. A safety
+          backup of the current database is created before every replace.
         </p>
         {latest ? (
           <p className="mt-1.5 text-foreground/80">
@@ -1275,12 +1344,24 @@ function DatabaseBackupsSection() {
         )}
       </div>
 
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".db,.sqlite,.sqlite3,application/x-sqlite3,application/octet-stream"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0] ?? null;
+          e.target.value = "";
+          onPickUploadFile(file);
+        }}
+      />
+
       <div className="flex flex-wrap items-center gap-2">
         <Button
           type="button"
           size="sm"
           className="h-8 gap-1.5"
-          disabled={creating || loading}
+          disabled={busy}
           onClick={() => void handleCreate()}
         >
           <Database className="h-3.5 w-3.5" />
@@ -1291,7 +1372,18 @@ function DatabaseBackupsSection() {
           size="sm"
           variant="outline"
           className="h-8 gap-1.5"
-          disabled={loading || creating}
+          disabled={busy}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <Upload className="h-3.5 w-3.5" />
+          {restoring ? "Replacing…" : "Upload & replace"}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-8 gap-1.5"
+          disabled={busy}
           onClick={() => void refresh()}
         >
           <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
@@ -1335,12 +1427,24 @@ function DatabaseBackupsSection() {
                 <div className="hidden text-[11px] tabular-nums text-muted-foreground sm:block">
                   {formatBackupSize(row.sizeBytes)}
                 </div>
-                <div className="flex items-center justify-end gap-1">
+                <div className="flex flex-wrap items-center justify-end gap-1">
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
                     className="h-7 gap-1 px-2 text-[11px]"
+                    disabled={busy}
+                    onClick={() => setRestoreTarget(row)}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Restore
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1 px-2 text-[11px]"
+                    disabled={busy}
                     onClick={() => handleDownload(row)}
                   >
                     <Download className="h-3.5 w-3.5" />
@@ -1352,6 +1456,7 @@ function DatabaseBackupsSection() {
                     variant="ghost"
                     className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
                     aria-label={`Delete ${row.filename}`}
+                    disabled={busy}
                     onClick={() => setDeleteTarget(row)}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -1375,6 +1480,39 @@ function DatabaseBackupsSection() {
             : undefined
         }
         onConfirm={() => void handleDelete()}
+      />
+
+      <ConfirmDeleteDialog
+        open={Boolean(restoreTarget)}
+        onOpenChange={(open) => {
+          if (!open && !restoring) setRestoreTarget(null);
+        }}
+        title="Replace live database?"
+        description={
+          restoreTarget
+            ? `This restores ${restoreTarget.filename} over the live buildesk.db. A safety backup of the current database is created first. The page will reload.`
+            : undefined
+        }
+        confirmLabel={restoring ? "Restoring…" : "Restore & reload"}
+        onConfirm={() => void handleRestoreFromList()}
+      />
+
+      <ConfirmDeleteDialog
+        open={confirmUpload}
+        onOpenChange={(open) => {
+          if (!open && !restoring) {
+            setConfirmUpload(false);
+            setPendingUploadFile(null);
+          }
+        }}
+        title="Upload and replace live database?"
+        description={
+          pendingUploadFile
+            ? `Replace buildesk.db with “${pendingUploadFile.name}” (${formatBackupSize(pendingUploadFile.size)}). A safety backup of the current database is created first. The page will reload.`
+            : undefined
+        }
+        confirmLabel={restoring ? "Replacing…" : "Upload & replace"}
+        onConfirm={() => void handleUploadReplace()}
       />
     </div>
   );

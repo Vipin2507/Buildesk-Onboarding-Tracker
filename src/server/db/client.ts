@@ -28,6 +28,19 @@ export function getSqlite() {
   return _sqlite;
 }
 
+/** Close the live connection so the DB file can be replaced safely. */
+export function closeSqliteConnection() {
+  if (_sqlite) {
+    try {
+      _sqlite.close();
+    } catch {
+      /* already closed */
+    }
+  }
+  _sqlite = null;
+  _db = null;
+}
+
 export function getDb() {
   if (_db) return _db;
   _db = drizzle(getSqlite(), { schema });

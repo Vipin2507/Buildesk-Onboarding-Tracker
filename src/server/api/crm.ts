@@ -391,6 +391,7 @@ export const listFollowUpTasks = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const user = requireUser();
     const db = getDb();
+    ensureInternalCrmCompanyRow();
     syncFollowUpTaskStatusesByTime(db, user.timezone || DEFAULT_BOOKING_TIMEZONE);
     void processTaskReminderAutomations(db, user.timezone || DEFAULT_BOOKING_TIMEZONE);
     void processTaskInAppReminders(db, user.timezone || DEFAULT_BOOKING_TIMEZONE);

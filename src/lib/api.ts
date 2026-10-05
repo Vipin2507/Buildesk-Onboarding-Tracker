@@ -315,4 +315,5 @@ export {
   listDbBackups,
   createDbBackup,
   deleteDbBackup,
+  restoreDbBackup,
 } from "@/server/api/db-backups";

@@ -31,7 +31,7 @@ import {
 } from "@/hooks/use-task-time-status";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { resolveAssigneeLabel } from "@/lib/managers";
-import { useAuthStore, useCrmAccountStore, useCrmTaskStore, useUserStore } from "@/stores";
+import { useAuthStore, useBookingStore, useCrmAccountStore, useCrmTaskStore, useUserStore } from "@/stores";
 import {
   FOLLOW_UP_TASK_TYPE_LABEL,
   type FollowUpTask,
@@ -58,6 +58,7 @@ type Props = {
 export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: Props) {
   const account = useCrmAccountStore((s) => s.getById(accountId));
   const tasks = useCrmTaskStore((s) => s.tasks);
+  const bookingAppointments = useBookingStore((s) => s.appointments);
   // Compact dashboard mount should not block account open with an immediate server sync.
   useTaskTimeStatusSync(!compact, "crm");
   const timeAwareTasks = useTasksWithTimeStatus(tasks);
@@ -118,6 +119,7 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
     companyId: accountId,
     markCompleteOnCreate,
     productScope: "crm",
+    schedulePeers: { tasks, bookings: bookingAppointments },
   });
 
   const openCount = accountTasks.filter((t) => OPEN_STATUSES.includes(t.status)).length;
@@ -190,22 +192,26 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
       remark: remark.trim() || undefined,
     };
 
-    if (editing) {
-      updateTask(editing.id, payload);
-      toast.success("Task updated");
-    } else if (markCompleteOnCreate) {
-      addTask({
-        ...payload,
-        status: "completed",
-        priority: "medium",
-        progressPercent: 100,
-      });
-      toast.success("Task created and marked complete");
-    } else {
-      addTask({ ...payload, status: "open", priority: "medium", progressPercent: 0 });
-      toast.success("Task created");
+    try {
+      if (editing) {
+        updateTask(editing.id, payload);
+        toast.success("Task updated");
+      } else if (markCompleteOnCreate) {
+        await addTask({
+          ...payload,
+          status: "completed",
+          priority: "medium",
+          progressPercent: 100,
+        });
+        toast.success("Task created and marked complete");
+      } else {
+        await addTask({ ...payload, status: "open", priority: "medium", progressPercent: 0 });
+        toast.success("Task created");
+      }
+      setOpen(false);
+    } catch {
+      // addTask surfaces save errors
     }
-    setOpen(false);
   }
 
   function handleComplete() {

@@ -9,6 +9,8 @@ import {
   updateFollowUpTask as apiUpdate,
   listCrmEvents as apiListCrmEvents,
 } from "@/lib/api";
+import { toast } from "sonner";
+
 import { appendTaskRemark, serializeTaskRemarks } from "@/lib/task-remarks";
 import { serverSyncWithRollback } from "@/lib/sync";
 
@@ -17,7 +19,7 @@ type CrmTaskState = {
   setTasks: (tasks: FollowUpTask[]) => void;
   addTask: (
     data: Omit<FollowUpTask, "id" | "createdAt" | "updatedAt" | "completedAt" | "completedByUserId" | "productScope">,
-  ) => FollowUpTask;
+  ) => Promise<FollowUpTask>;
   updateTask: (
     id: string,
     data: Partial<FollowUpTask> & { remark?: string },
@@ -60,7 +62,7 @@ export const useCrmTaskStore = createStore<CrmTaskState>((set, get) => ({
 
   setTasks: (tasks) => set({ tasks }),
 
-  addTask: (data) => {
+  addTask: async (data) => {
     const now = nowIso();
     const assigneeUserIds =
       data.assigneeUserIds?.length
@@ -79,22 +81,23 @@ export const useCrmTaskStore = createStore<CrmTaskState>((set, get) => ({
       updatedAt: now,
     };
     set((s) => ({ tasks: [task, ...s.tasks] }));
-    serverSyncWithRollback(
-      "createFollowUpTask",
-      () =>
-        apiCreate({
-          data: { id: task.id, ...taskPayload(task) },
-        }).then((saved) => {
-          if (saved) {
-            set((s) => ({
-              tasks: s.tasks.map((t) => (t.id === task.id ? saved : t)),
-            }));
-          }
-          return saved;
-        }),
-      () => set((s) => ({ tasks: s.tasks.filter((t) => t.id !== task.id) })),
-    );
-    return task;
+    try {
+      const saved = await apiCreate({
+        data: { id: task.id, ...taskPayload(task) },
+      });
+      if (saved) {
+        set((s) => ({
+          tasks: s.tasks.map((t) => (t.id === task.id ? saved : t)),
+        }));
+        return saved;
+      }
+      return task;
+    } catch (e) {
+      set((s) => ({ tasks: s.tasks.filter((t) => t.id !== task.id) }));
+      const message = e instanceof Error ? e.message : "Failed to save task";
+      toast.error(message, { description: "Task was not saved." });
+      throw e;
+    }
   },
 
   updateTask: (id, data) => {
