@@ -169,6 +169,7 @@ export {
 export {
   listCrmWhatsappGroupMessages,
   upsertCrmWhatsappGroupMessages,
+  listCrmWhatsappLastEngaged,
 } from "@/server/api/crm-whatsapp-group-messages";
 
 export {

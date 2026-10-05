@@ -55,6 +55,11 @@ import {
   buildCrmActivityFeed,
   type CrmActivityItem,
 } from "@/lib/crm-activity-feed";
+import {
+  buildCrmAccountLastEngagedMap,
+  type CrmLastEngaged,
+} from "@/lib/crm-account-last-engaged";
+import { useCrmWhatsappEngagementStore } from "@/stores/useCrmWhatsappEngagementStore";
 
 function toDashboardActivityItem(item: CrmActivityItem): CrmDashboardActivityItem {
   return {
@@ -167,6 +172,9 @@ export type CrmAccountRow = CrmAccount & {
   /** All enabled product module keys (core + integrations). */
   enabledModuleKeys: string[];
   overdue: boolean;
+  /** Latest engagement across queries, tasks, meetings, updates, WhatsApp. */
+  lastEngaged: CrmLastEngaged | null;
+  lastEngagedAt: string;
 };
 
 function healthBucketOf(score: number): CrmHealthBucket {
@@ -212,6 +220,7 @@ export function useCrmDashboardOverview() {
   const designTickets = useDesignTicketStore((s) => s.tickets);
   const bookingAppointments = useBookingStore((s) => s.appointments);
   const accountQueries = useCrmAccountQueryStore((s) => s.allQueries);
+  const whatsappLastByAccountId = useCrmWhatsappEngagementStore((s) => s.lastByAccountId);
 
   return useMemo(() => {
     // Admins see all; others only accounts where they are sales or support manager.
@@ -221,6 +230,26 @@ export function useCrmDashboardOverview() {
     const accountIds = new Set(accounts.map((a) => a.id));
     const accountNameById = new Map(accounts.map((a) => [a.id, a.name]));
     const today = todayYmd();
+
+    const lastEngagedByAccount = buildCrmAccountLastEngagedMap({
+      accountIds,
+      accountUpdatedAt: accounts,
+      queries: accountQueries,
+      tasks: followUpTasks.filter((task) => task.productScope !== "erp"),
+      bookings: bookingAppointments,
+      visits: clientVisits,
+      crmEvents,
+      onboarding: records.map((record) => ({
+        companyId: record.companyId,
+        updatedAt: record.updatedAt,
+        stageUpdatedAt: record.tracker.stageUpdatedAt,
+        commLog: record.commLog,
+      })),
+      whatsapp: Object.entries(whatsappLastByAccountId).map(([accountId, timestamp]) => ({
+        accountId,
+        timestamp,
+      })),
+    });
 
     const scopedOpenTasks = followUpTasks.filter(
       (task) => task.companyId && accountIds.has(task.companyId) && isOpenCrmTask(task),
@@ -282,6 +311,8 @@ export function useCrmDashboardOverview() {
           .map((m) => ({ key: m.key, label: m.label })),
         enabledModuleKeys: record.productModules.filter((m) => m.enabled).map((m) => m.key),
         overdue,
+        lastEngaged: lastEngagedByAccount.get(account.id) ?? null,
+        lastEngagedAt: lastEngagedByAccount.get(account.id)?.at ?? "",
       };
     });
 
@@ -679,7 +710,9 @@ export function useCrmDashboardOverview() {
     followUpTasks,
     clientVisits,
     accountQueries,
+    tickets,
     users,
+    whatsappLastByAccountId,
   ]);
 }
 

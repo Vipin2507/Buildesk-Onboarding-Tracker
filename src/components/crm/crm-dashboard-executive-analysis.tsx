@@ -41,15 +41,15 @@ function ExpandableExecutiveTable({
 
   if (rows.length === 0) {
     return (
-      <div className="bg-white px-4 py-10 text-center text-xs text-muted-foreground">
+      <div className="bg-card px-4 py-10 text-center text-xs text-muted-foreground">
         No active accounts
       </div>
     );
   }
 
   return (
-    <div className="w-full bg-white">
-      <div className="sticky top-0 z-[1] grid grid-cols-[2.5rem_1fr_auto] gap-3 border-b border-border bg-white px-4 py-3 text-xs font-medium text-muted-foreground">
+    <div className="w-full bg-card">
+      <div className="sticky top-0 z-[1] grid grid-cols-[2.5rem_1fr_auto] gap-3 border-b border-border bg-card px-4 py-3 text-xs font-medium text-muted-foreground">
         <span className="tabular-nums">S.No.</span>
         <span className="pl-7">{personLabel}</span>
         <span className="text-right">Active accounts</span>
@@ -59,7 +59,7 @@ function ExpandableExecutiveTable({
         {rows.map((r, index) => {
           const expanded = open === r.name;
           return (
-            <li key={r.name} className="border-b border-border bg-white last:border-b-0">
+            <li key={r.name} className="border-b border-border bg-card last:border-b-0">
               <div className="grid w-full grid-cols-[2.5rem_1fr_auto] items-center gap-3 px-4 py-3 hover:bg-muted/30">
                 <span className="tabular-nums text-xs text-muted-foreground">{index + 1}</span>
                 <div className="flex min-w-0 items-center gap-2.5">
@@ -107,7 +107,7 @@ function ExpandableExecutiveTable({
                 transition={{ duration: 0.28, ease: EASE }}
                 className="overflow-hidden"
               >
-                <div className="border-t border-border bg-white px-4 pb-1 pt-1">
+                <div className="border-t border-border bg-card px-4 pb-1 pt-1">
                   <div className="grid grid-cols-[2.5rem_1fr_auto] gap-3 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     <span className="normal-case tracking-normal">S.No.</span>
                     <span>{breakdownLabel}</span>
@@ -168,15 +168,15 @@ function ExpandableYearMonthTable({
 
   if (rows.length === 0) {
     return (
-      <div className="bg-white px-4 py-10 text-center text-xs text-muted-foreground">
+      <div className="bg-card px-4 py-10 text-center text-xs text-muted-foreground">
         No active accounts
       </div>
     );
   }
 
   return (
-    <div className="w-full bg-white">
-      <div className="sticky top-0 z-[1] grid grid-cols-[2.5rem_1fr_auto] gap-3 border-b border-border bg-white px-4 py-3 text-xs font-medium text-muted-foreground">
+    <div className="w-full bg-card">
+      <div className="sticky top-0 z-[1] grid grid-cols-[2.5rem_1fr_auto] gap-3 border-b border-border bg-card px-4 py-3 text-xs font-medium text-muted-foreground">
         <span className="tabular-nums">S.No.</span>
         <span className="pl-7">Year</span>
         <span className="text-right">Active accounts</span>
@@ -186,7 +186,7 @@ function ExpandableYearMonthTable({
         {rows.map((yearRow, yearIndex) => {
           const yearExpanded = openYear === yearRow.name;
           return (
-            <li key={yearRow.name} className="border-b border-border bg-white last:border-b-0">
+            <li key={yearRow.name} className="border-b border-border bg-card last:border-b-0">
               <div className="grid w-full grid-cols-[2.5rem_1fr_auto] items-center gap-3 px-4 py-3 hover:bg-muted/30">
                 <span className="tabular-nums text-xs text-muted-foreground">{yearIndex + 1}</span>
                 <div className="flex min-w-0 items-center gap-2.5">
@@ -258,7 +258,7 @@ function ExpandableYearMonthTable({
                       return (
                         <li
                           key={monthKey}
-                          className="border-t border-border/80 bg-white first:border-t-0"
+                          className="border-t border-border/80 bg-card first:border-t-0"
                         >
                           <div className="grid w-full grid-cols-[2.5rem_1fr_auto] items-center gap-3 px-2 py-2.5 hover:bg-muted/30">
                             <span className="tabular-nums text-xs text-muted-foreground">
@@ -504,7 +504,7 @@ export function CrmDashboardExecutiveAnalysis({
         </p>
       )}
 
-      <div className="max-h-[28rem] overflow-y-auto rounded-xl border border-border bg-white">
+      <div className="max-h-[28rem] overflow-y-auto rounded-xl border border-border bg-card">
         {tab === "location" ? (
           <ExpandableExecutiveTable
             rows={analysis.byLocation}
@@ -525,8 +525,8 @@ export function CrmDashboardExecutiveAnalysis({
         ) : null}
 
         {tab === "sales" || tab === "support1" || tab === "support2" ? (
-          <table className="w-full bg-white text-left text-sm">
-            <thead className="sticky top-0 z-[1] bg-white text-xs text-muted-foreground">
+          <table className="w-full bg-card text-left text-sm">
+            <thead className="sticky top-0 z-[1] bg-card text-xs text-muted-foreground">
               <tr className="border-b border-border">
                 <th className="w-14 px-4 py-3 font-medium">S.No.</th>
                 <th className="px-4 py-3 font-medium">{tableTitle}</th>

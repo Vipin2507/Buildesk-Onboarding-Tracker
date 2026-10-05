@@ -71,6 +71,14 @@ import {
   resolveCrmStageLabel,
 } from "@/stores/useCrmMasterStore";
 import { cn, formatDateDmy } from "@/lib/utils";
+import {
+  formatCrmLastEngaged,
+  formatCrmLastEngagedKind,
+} from "@/lib/crm-account-last-engaged";
+import {
+  formatCrmLastEngaged,
+  formatCrmLastEngagedKind,
+} from "@/lib/crm-account-last-engaged";
 import { useSessionFilterState } from "@/hooks/use-session-filter";
 import {
   useAuthStore,
@@ -1377,6 +1385,23 @@ function CrmAccountsPage() {
                       <div className="text-xs tabular-nums text-muted-foreground">
                         <div className="whitespace-nowrap">{formatDateDmy(r.startDate)}</div>
                         <div className="whitespace-nowrap">{formatDateDmy(r.endDate)}</div>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "lastEngagedAt",
+                    header: "Last engaged",
+                    sortable: true,
+                    render: (r) => (
+                      <div className="min-w-[5.5rem] text-xs">
+                        <div className="font-medium tabular-nums text-foreground">
+                          {formatCrmLastEngaged(r.lastEngaged)}
+                        </div>
+                        {r.lastEngaged ? (
+                          <div className="text-[10px] text-muted-foreground">
+                            {formatCrmLastEngagedKind(r.lastEngaged)}
+                          </div>
+                        ) : null}
                       </div>
                     ),
                   },

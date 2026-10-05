@@ -31,6 +31,7 @@ export { useClientVisitStore } from "./useClientVisitStore";
 export { useErpMeetingStore } from "./useErpMeetingStore";
 export { useCrmOnboardingStore } from "./useCrmOnboardingStore";
 export { useCrmAccountStore } from "./useCrmAccountStore";
+export { useCrmWhatsappEngagementStore } from "./useCrmWhatsappEngagementStore";
 export { useCrmMasterStore, getCrmPicklistValues, getCrmMasterMigrationFields, getCrmMasterTrainingFields, getCrmMasterBookingCallTypes, getCrmMasterBookingHostHours } from "./useCrmMasterStore";
 export { useCrmSettingsStore, hydrateCrmSettingsFromServer } from "./useCrmSettingsStore";
 export type { CrmNotificationSettings } from "./useCrmSettingsStore";

@@ -1,9 +1,11 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { canViewCrmAccount } from "@/lib/crm-account-access";
+import { isAdminRoleKey, roleHasPermission } from "@/lib/permissions";
 import { ApiError, nowIso, requireUser } from "@/server/auth/session";
+import { loadServerRoles } from "@/server/auth/permissions";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 
@@ -212,4 +214,48 @@ export const upsertCrmWhatsappGroupMessages = createServerFn({ method: "POST" })
     }
 
     return { upserted };
+  });
+
+/** Latest WhatsApp message unix timestamp per CRM account (for Last engaged). */
+export const listCrmWhatsappLastEngaged = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => z.object({}).optional().parse(data ?? {}))
+  .handler(async () => {
+    const user = requireUser();
+    const db = getDb();
+    try {
+      const rows = db
+        .select({
+          accountId: t.crmWhatsappGroupMessages.accountId,
+          timestamp: sql<number>`max(${t.crmWhatsappGroupMessages.timestamp})`.mapWith(Number),
+        })
+        .from(t.crmWhatsappGroupMessages)
+        .groupBy(t.crmWhatsappGroupMessages.accountId)
+        .all();
+
+      if (isAdminRoleKey(user.role)) return rows;
+      const roles = loadServerRoles();
+      if (roleHasPermission(roles, user.role, "manageCompanies")) return rows;
+
+      const accounts = db.select().from(t.crmAccounts).all();
+      const allowed = new Set(
+        accounts
+          .filter((account) =>
+            canViewCrmAccount(
+              {
+                salesManagerName: account.salesManagerName ?? undefined,
+                supportManager1: account.supportManager1 ?? undefined,
+                supportManager2: account.supportManager2 ?? undefined,
+                accountManagerName: account.accountManagerName ?? undefined,
+              },
+              user,
+            ),
+          )
+          .map((account) => account.id),
+      );
+      return rows.filter((row) => allowed.has(row.accountId));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes("no such table")) return [];
+      throw err;
+    }
   });

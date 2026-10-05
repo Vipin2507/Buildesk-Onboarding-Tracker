@@ -658,8 +658,8 @@ function dayKey(ts: number) {
 function AckIcon({ ack }: { ack?: number }) {
   if (ack == null || ack < 0) return null;
   if (ack >= 3) return <CheckCheck className="h-3 w-3 text-sky-500" />;
-  if (ack >= 2) return <CheckCheck className="h-3 w-3 text-muted-foreground" />;
-  return <Check className="h-3 w-3 text-muted-foreground" />;
+  if (ack >= 2) return <CheckCheck className="h-3 w-3 text-sky-600" />;
+  return <Check className="h-3 w-3 text-neutral-500" />;
 }
 
 /** Match reply targets across WAHA id formats (`true_…@g.us_ABC` vs bare `ABC`). */
@@ -1650,18 +1650,18 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
         <div className="bg-destructive/10 px-3 py-1.5 text-[10px] text-destructive">{pollError}</div>
       ) : null}
 
-      {/* Thread */}
+      {/* Thread — intentionally light WhatsApp styling; force dark text so dark theme doesn't bleach copy */}
       <div
         ref={threadRef}
         onScroll={onThreadScroll}
-        className="flex-1 space-y-1 overflow-y-auto px-3 py-3"
+        className="flex-1 space-y-1 overflow-y-auto px-3 py-3 text-neutral-900"
         style={{
           backgroundImage:
             "url(\"data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h60v60H0z' fill='%23efeae2'/%3E%3Cpath d='M30 5l2 6 6 1-4.5 4.2 1.2 6.3L30 19.5 25.3 22.5l1.2-6.3L22 12l6-1z' fill='%23d4cdc4' fill-opacity='.35'/%3E%3C/svg%3E\")",
         }}
       >
         {messages.length === 0 && !loadingMsgs ? (
-          <p className="py-8 text-center text-xs text-muted-foreground">
+          <p className="py-8 text-center text-xs text-neutral-600">
             {pollError
               ? "Could not load chat history — check the error above."
               : "No messages yet. If this group has history, tap Refresh or Load older."}
@@ -1693,7 +1693,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
             <div key={msg.id}>
               {showDay ? (
                 <div className="my-2 flex justify-center">
-                  <span className="rounded-md bg-white/80 px-2 py-0.5 text-[10px] text-muted-foreground shadow-sm">
+                  <span className="rounded-md bg-white/90 px-2 py-0.5 text-[10px] text-neutral-600 shadow-sm">
                     {formatDayLabel(msg.timestamp)}
                   </span>
                 </div>
@@ -1701,7 +1701,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
               <div className={cn("flex", msg.fromMe ? "justify-end" : "justify-start")}>
                 <div
                   className={cn(
-                    "group relative max-w-[78%] rounded-lg px-2.5 py-1.5 text-xs shadow-sm",
+                    "group relative max-w-[78%] rounded-lg px-2.5 py-1.5 text-xs text-neutral-900 shadow-sm",
                     msg.fromMe ? "rounded-tr-none bg-[#dcf8c6]" : "rounded-tl-none bg-white",
                   )}
                 >
@@ -1711,7 +1711,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                     </div>
                   ) : null}
                   {quoted || msg.replyTo || msg.replyPreview ? (
-                    <div className="mb-1 rounded border-l-2 border-teal-600 bg-black/5 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                    <div className="mb-1 rounded border-l-2 border-teal-600 bg-black/5 px-1.5 py-0.5 text-[10px] text-neutral-600">
                       {quoted && !quoted.fromMe && (quoted.participantName || quoted.from) ? (
                         <div className="truncate font-semibold text-teal-700/80">
                           {quoted.participantName || quoted.from.replace(/@.*/, "")}
@@ -1753,7 +1753,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                         />
                       </button>
                     ) : mediaBrokenIds.has(msg.id) ? (
-                      <div className="mb-1 flex min-h-[56px] min-w-[140px] flex-col items-center justify-center gap-1 rounded-md bg-black/10 px-3 py-3 text-[11px] text-muted-foreground">
+                      <div className="mb-1 flex min-h-[56px] min-w-[140px] flex-col items-center justify-center gap-1 rounded-md bg-black/10 px-3 py-3 text-[11px] text-neutral-600">
                         <span>Couldn’t load photo</span>
                         <button
                           type="button"
@@ -1767,7 +1767,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                         </button>
                       </div>
                     ) : (
-                      <div className="mb-1 flex min-h-[72px] min-w-[140px] items-center justify-center gap-1.5 rounded-md bg-black/10 px-3 py-4 text-[11px] text-muted-foreground">
+                      <div className="mb-1 flex min-h-[72px] min-w-[140px] items-center justify-center gap-1.5 rounded-md bg-black/10 px-3 py-4 text-[11px] text-neutral-600">
                         <ImageIcon className="h-4 w-4" />
                         Loading photo…
                       </div>
@@ -1813,7 +1813,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                         </span>
                       </button>
                     ) : mediaBrokenIds.has(msg.id) ? (
-                      <div className="mb-1 flex min-h-[56px] min-w-[140px] flex-col items-center justify-center gap-1 rounded-md bg-black/10 px-3 py-3 text-[11px] text-muted-foreground">
+                      <div className="mb-1 flex min-h-[56px] min-w-[140px] flex-col items-center justify-center gap-1 rounded-md bg-black/10 px-3 py-3 text-[11px] text-neutral-600">
                         <Video className="h-4 w-4" />
                         <span>Couldn’t load video</span>
                         <button
@@ -1828,7 +1828,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                         </button>
                       </div>
                     ) : (
-                      <div className="mb-1 flex min-h-[72px] min-w-[140px] items-center justify-center gap-1.5 rounded-md bg-black/10 px-3 py-4 text-[11px] text-muted-foreground">
+                      <div className="mb-1 flex min-h-[72px] min-w-[140px] items-center justify-center gap-1.5 rounded-md bg-black/10 px-3 py-4 text-[11px] text-neutral-600">
                         <Loader2 className="h-4 w-4 animate-spin" />
                         Loading video…
                       </div>
@@ -1840,7 +1840,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                         <audio src={src} controls className="max-w-full min-w-0 flex-1" />
                         <button
                           type="button"
-                          className="shrink-0 rounded p-1.5 text-muted-foreground hover:bg-black/5 hover:text-foreground"
+                          className="shrink-0 rounded p-1.5 text-neutral-500 hover:bg-black/5 hover:text-neutral-900"
                           title="Download audio"
                           onClick={() =>
                             void downloadMediaFile(src, defaultMediaFilename(msg, effectiveType))
@@ -1850,14 +1850,14 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                         </button>
                       </div>
                     ) : (
-                      <div className="mb-1 flex items-center gap-1.5 rounded-md bg-black/10 px-2 py-1.5 text-[11px] text-muted-foreground">
+                      <div className="mb-1 flex items-center gap-1.5 rounded-md bg-black/10 px-2 py-1.5 text-[11px] text-neutral-600">
                         <Mic className="h-3.5 w-3.5" />
                         Loading audio…
                       </div>
                     )
                   ) : null}
                   {showMedia && effectiveType === "unknown" ? (
-                    <div className="mb-1 flex min-h-[56px] min-w-[120px] items-center justify-center gap-1.5 rounded-md bg-black/10 px-3 py-3 text-[11px] text-muted-foreground">
+                    <div className="mb-1 flex min-h-[56px] min-w-[120px] items-center justify-center gap-1.5 rounded-md bg-black/10 px-3 py-3 text-[11px] text-neutral-600">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       Loading media…
                     </div>
@@ -1886,7 +1886,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                           </button>
                           <button
                             type="button"
-                            className="shrink-0 rounded p-1.5 text-muted-foreground hover:bg-black/5 hover:text-foreground"
+                            className="shrink-0 rounded p-1.5 text-neutral-500 hover:bg-black/5 hover:text-neutral-900"
                             title="Download"
                             onClick={() =>
                               void downloadMediaFile(src, defaultMediaFilename(msg, "document"))
@@ -1897,7 +1897,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                         </div>
                       )
                     ) : (
-                      <div className="mb-1 flex items-center gap-1.5 rounded bg-black/5 px-2 py-1.5 text-[11px] text-muted-foreground">
+                      <div className="mb-1 flex items-center gap-1.5 rounded bg-black/5 px-2 py-1.5 text-[11px] text-neutral-600">
                         <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
                         <span className="truncate">Loading {mediaPlaceholderLabel(msg).toLowerCase()}…</span>
                       </div>
@@ -1911,9 +1911,9 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                       title="Reply"
                       onClick={() => setReplyTo(msg)}
                     >
-                      <Reply className="h-3 w-3 text-muted-foreground" />
+                      <Reply className="h-3 w-3 text-neutral-500" />
                     </button>
-                    <span className="text-[9px] text-muted-foreground">{formatMsgTime(msg.timestamp)}</span>
+                    <span className="text-[9px] text-neutral-500">{formatMsgTime(msg.timestamp)}</span>
                     {msg.fromMe ? <AckIcon ack={msg.ack} /> : null}
                   </div>
                 </div>
@@ -1925,9 +1925,9 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
 
       {/* Reply banner */}
       {replyPreview ? (
-        <div className="flex items-center gap-2 border-t bg-white/90 px-3 py-1.5 text-[11px]">
+        <div className="flex items-center gap-2 border-t bg-white/90 px-3 py-1.5 text-[11px] text-neutral-900">
           <Reply className="h-3.5 w-3.5 shrink-0 text-teal-700" />
-          <div className="min-w-0 flex-1 truncate text-muted-foreground">
+          <div className="min-w-0 flex-1 truncate text-neutral-600">
             Replying to:{" "}
             {replyPreview.body?.slice(0, 80) ||
               replyPreview.replyPreview?.slice(0, 80) ||
@@ -1941,8 +1941,8 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
 
       {/* Pending media preview */}
       {pendingMedia ? (
-        <div className="flex items-start gap-2 border-t bg-white px-3 py-2">
-          <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md bg-muted">
+        <div className="flex items-start gap-2 border-t bg-white px-3 py-2 text-neutral-900">
+          <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md bg-neutral-100">
             {pendingMedia.kind === "image" ? (
               <img src={pendingMedia.previewUrl} alt="" className="h-full w-full object-cover" />
             ) : pendingMedia.kind === "video" ? (
@@ -1950,16 +1950,16 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
             ) : (
               <div className="flex h-full w-full flex-col items-center justify-center gap-0.5 px-1 text-center">
                 {pendingMedia.kind === "voice" ? (
-                  <Mic className="h-5 w-5 text-muted-foreground" />
+                  <Mic className="h-5 w-5 text-neutral-500" />
                 ) : (
-                  <FileIcon className="h-5 w-5 text-muted-foreground" />
+                  <FileIcon className="h-5 w-5 text-neutral-500" />
                 )}
               </div>
             )}
           </div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-xs font-medium">{pendingMedia.file.name}</div>
-            <div className="text-[10px] text-muted-foreground">
+            <div className="text-[10px] text-neutral-500">
               {(pendingMedia.file.size / 1024).toFixed(0)} KB · Add a caption below, then send
             </div>
           </div>
@@ -1970,44 +1970,44 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
       ) : null}
 
       {/* Composer */}
-      <div className="flex items-end gap-1.5 border-t bg-[#f0f2f5] px-2 py-2">
+      <div className="flex items-end gap-1.5 border-t bg-[#f0f2f5] px-2 py-2 text-neutral-900">
         <div className="relative">
           <Button
             size="sm"
             variant="ghost"
             type="button"
-            className="h-9 w-9 shrink-0 rounded-full p-0"
+            className="h-9 w-9 shrink-0 rounded-full p-0 text-neutral-700 hover:bg-black/5 hover:text-neutral-900"
             disabled={sending}
             onClick={() => setAttachOpen((v) => !v)}
           >
             <Paperclip className="h-4 w-4" />
           </Button>
           {attachOpen ? (
-            <div className="absolute bottom-10 left-0 z-10 min-w-[140px] rounded-md border bg-white p-1 shadow-md">
+            <div className="absolute bottom-10 left-0 z-10 min-w-[140px] rounded-md border border-neutral-200 bg-white p-1 text-neutral-900 shadow-md">
               <button
                 type="button"
-                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-muted"
+                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-neutral-100"
                 onClick={() => pickAttach("image")}
               >
                 <ImageIcon className="h-3.5 w-3.5" /> Photo
               </button>
               <button
                 type="button"
-                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-muted"
+                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-neutral-100"
                 onClick={() => pickAttach("video")}
               >
                 <Video className="h-3.5 w-3.5" /> Video
               </button>
               <button
                 type="button"
-                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-muted"
+                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-neutral-100"
                 onClick={() => pickAttach("voice")}
               >
                 <Mic className="h-3.5 w-3.5" /> Audio
               </button>
               <button
                 type="button"
-                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-muted"
+                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-neutral-100"
                 onClick={() => pickAttach("file")}
               >
                 <FileIcon className="h-3.5 w-3.5" /> Document
@@ -2032,7 +2032,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
           }}
           rows={1}
           placeholder={pendingMedia ? "Add a caption…" : "Type a message"}
-          className="max-h-28 min-h-[36px] flex-1 resize-none rounded-2xl border-0 bg-white px-3 py-2 text-xs shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-teal-600"
+          className="max-h-28 min-h-[36px] flex-1 resize-none rounded-2xl border-0 bg-white px-3 py-2 text-xs text-neutral-900 shadow-sm outline-none placeholder:text-neutral-500 focus-visible:ring-1 focus-visible:ring-teal-600"
           disabled={sending}
         />
         <Button

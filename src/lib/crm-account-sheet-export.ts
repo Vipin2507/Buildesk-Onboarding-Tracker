@@ -1,6 +1,10 @@
 import * as XLSX from "xlsx";
 
 import { crmAccountStatusLabel } from "@/lib/crm-account-status";
+import {
+  formatCrmLastEngaged,
+  formatCrmLastEngagedKind,
+} from "@/lib/crm-account-last-engaged";
 import type { CrmAccountRow } from "@/stores/crm-dashboard-selectors";
 
 export type CrmAccountExportColumnId =
@@ -46,7 +50,9 @@ export type CrmAccountExportColumnId =
   | "portalApiKey"
   | "openTickets"
   | "openTasks"
-  | "openQueries";
+  | "openQueries"
+  | "lastEngaged"
+  | "lastEngagedKind";
 
 export type CrmAccountExportColumnDef = {
   id: CrmAccountExportColumnId;
@@ -99,6 +105,8 @@ export const CRM_ACCOUNT_EXPORT_COLUMNS: CrmAccountExportColumnDef[] = [
   { id: "openTickets", label: "Open tickets", group: "Activity" },
   { id: "openTasks", label: "Open tasks", group: "Activity" },
   { id: "openQueries", label: "Open queries", group: "Activity" },
+  { id: "lastEngaged", label: "Last engaged", group: "Activity", defaultSelected: true },
+  { id: "lastEngagedKind", label: "Last engaged via", group: "Activity" },
 ];
 
 export const CRM_ACCOUNT_EXPORT_DEFAULT_COLUMN_IDS = CRM_ACCOUNT_EXPORT_COLUMNS.filter(
@@ -229,6 +237,10 @@ function columnValue(
       return row.openTasks;
     case "openQueries":
       return row.openQueries;
+    case "lastEngaged":
+      return formatCrmLastEngaged(row.lastEngaged);
+    case "lastEngagedKind":
+      return formatCrmLastEngagedKind(row.lastEngaged);
     default:
       return "";
   }
