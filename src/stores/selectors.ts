@@ -35,16 +35,14 @@ function calcOnboardingProjectProgress(
 }
 
 /**
- * Project card / list progress: higher of onboarding checklist and Progress Tracker,
- * so Mark all on the tracker is reflected on project cards.
+ * Project card / list / detail progress from onboarding checklist only.
+ * Progress Tracker UI was removed; using Math.max with tracker inflated % while checklist stayed 0/X.
  */
 function calcCombinedProjectProgress(
   projectId: string,
   checklistItems: ReturnType<typeof useOnboardingStore.getState>["checklistItems"],
 ) {
-  const checklist = calcOnboardingProjectProgress(projectId, checklistItems);
-  const manual = useProjectProgressStore.getState().calcPercent(projectId);
-  return Math.max(checklist, manual);
+  return calcOnboardingProjectProgress(projectId, checklistItems);
 }
 
 function calcCompanyOnboardingProjectsAverage(companyId: string): number | null {

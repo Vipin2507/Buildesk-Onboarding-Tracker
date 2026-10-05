@@ -158,7 +158,7 @@ export function syncProgressFromChecklistItem(
 /**
  * Align both sides when opening a project:
  * 1) Checklist completions bump Progress
- * 2) Progress state wins and rewrites mapped Checklist rows
+ * 2) Progress may promote mapped Checklist rows (never clears existing phases)
  */
 export function reconcileProgressAndChecklist(projectId: string) {
   if (isProgressChecklistSyncing()) return;

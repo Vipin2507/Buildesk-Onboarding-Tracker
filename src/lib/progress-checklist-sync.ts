@@ -143,18 +143,8 @@ export function computeChecklistPatchFromProgress(
         updatedAt: now,
       };
     } else {
-      // Partial or open milestones → checklist not complete
-      next = {
-        ...item,
-        notApplicable: false,
-        collected: false,
-        uploaded: false,
-        live: false,
-        collectedAt: undefined,
-        uploadedAt: undefined,
-        liveAt: undefined,
-        updatedAt: now,
-      };
+      // Incomplete milestones must not wipe checklist phases already saved in DB.
+      continue;
     }
     if (!sameChecklistState(item, next)) {
       patched.push(next);
