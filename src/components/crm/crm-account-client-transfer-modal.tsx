@@ -124,12 +124,17 @@ export function CrmAccountClientTransferModal({
       ...account,
       [field]: toName.trim(),
     }));
-    upsertAccountsBatch(payloads);
-    toast.success(
-      `Transferred ${payloads.length} client${payloads.length === 1 ? "" : "s"} to ${toName.trim()}`,
-    );
-    onTransferred?.();
-    handleOpenChange(false);
+    void upsertAccountsBatch(payloads)
+      .then(() => {
+        toast.success(
+          `Transferred ${payloads.length} client${payloads.length === 1 ? "" : "s"} to ${toName.trim()}`,
+        );
+        onTransferred?.();
+        handleOpenChange(false);
+      })
+      .catch(() => {
+        // upsertAccountsBatch surfaces save errors
+      });
   }
 
   return (

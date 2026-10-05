@@ -707,95 +707,99 @@ function CrmAccountsPage() {
     void form.handleSubmit(
       async (values) => {
         const data = normalizeCrmAccountForm(values);
-        if (editing) {
-          upsertAccount({
-            ...editing,
-            ...data,
-            status: editing.status,
-          });
-          ensure(editing.id, data.companyType);
+        try {
+          if (editing) {
+            await upsertAccount({
+              ...editing,
+              ...data,
+              status: editing.status,
+            });
+            ensure(editing.id, data.companyType);
 
-          const apiKey = values.portalApiKey?.trim();
-          if (apiKey) {
-            const result = await useCompanyPortalStore.getState().setPortalApiKey(
-              {
-                id: editing.id,
-                name: data.name,
-                contact: data.contact,
-                email: data.email,
-              },
-              apiKey,
-            );
-            if (!result.ok) {
-              toast.error(result.error);
+            const apiKey = values.portalApiKey?.trim();
+            if (apiKey) {
+              const result = await useCompanyPortalStore.getState().setPortalApiKey(
+                {
+                  id: editing.id,
+                  name: data.name,
+                  contact: data.contact,
+                  email: data.email,
+                },
+                apiKey,
+              );
+              if (!result.ok) {
+                toast.error(result.error);
+                return;
+              }
+            }
+
+            toast.success(`${data.name} updated`);
+          } else {
+            const portalSlug = normalizePortalSlug(values.portalApiKey ?? "");
+            if (!portalSlug) {
+              toast.error("Portal API key is required");
               return;
             }
-          }
-
-          toast.success(`${data.name} updated`);
-        } else {
-          const portalSlug = normalizePortalSlug(values.portalApiKey ?? "");
-          if (!portalSlug) {
-            toast.error("Portal API key is required");
-            return;
-          }
-          if (!isValidPortalSlug(portalSlug)) {
-            toast.error("Portal API key must be 3–48 characters (letters, numbers, hyphens)");
-            return;
-          }
-          const portalConflict = findPortalSlugConflictMessage(
-            useCompanyPortalStore.getState().access,
-            portalSlug,
-            "",
-            (id) => {
-              const account = useCrmAccountStore.getState().getById(id);
-              return account ? { name: account.name, userId: account.userId } : undefined;
-            },
-          );
-          if (portalConflict) {
-            toast.error(portalConflict);
-            return;
-          }
-
-          const created = upsertAccount({
-            ...data,
-            status: "onboarding",
-          });
-          useCompanyPortalStore.getState().generateAccessForCompany(
-            {
-              id: created.id,
-              name: created.name,
-              contact: created.contact,
-              email: created.email,
-            },
-            { slug: portalSlug },
-          );
-          const record = ensure(created.id, created.companyType);
-          const catalogKeys = new Set(getCrmMasterProductModuleCatalog().map((m) => m.key));
-          for (const mod of record.productModules) {
-            if (!catalogKeys.has(mod.key)) continue;
-            const shouldEnable = selectedModules.includes(mod.key as CrmProductModuleKey);
-            if (mod.enabled !== shouldEnable) {
-              setProductModuleEnabled(created.id, mod.key, shouldEnable);
+            if (!isValidPortalSlug(portalSlug)) {
+              toast.error("Portal API key must be 3–48 characters (letters, numbers, hyphens)");
+              return;
             }
+            const portalConflict = findPortalSlugConflictMessage(
+              useCompanyPortalStore.getState().access,
+              portalSlug,
+              "",
+              (id) => {
+                const account = useCrmAccountStore.getState().getById(id);
+                return account ? { name: account.name, userId: account.userId } : undefined;
+              },
+            );
+            if (portalConflict) {
+              toast.error(portalConflict);
+              return;
+            }
+
+            const created = await upsertAccount({
+              ...data,
+              status: "onboarding",
+            });
+            useCompanyPortalStore.getState().generateAccessForCompany(
+              {
+                id: created.id,
+                name: created.name,
+                contact: created.contact,
+                email: created.email,
+              },
+              { slug: portalSlug },
+            );
+            const record = ensure(created.id, created.companyType);
+            const catalogKeys = new Set(getCrmMasterProductModuleCatalog().map((m) => m.key));
+            for (const mod of record.productModules) {
+              if (!catalogKeys.has(mod.key)) continue;
+              const shouldEnable = selectedModules.includes(mod.key as CrmProductModuleKey);
+              if (mod.enabled !== shouldEnable) {
+                setProductModuleEnabled(created.id, mod.key, shouldEnable);
+              }
+            }
+            toast.success(`${created.name} created`, {
+              action: {
+                label: "Open",
+                onClick: () =>
+                  void navigate({
+                    to: "/crm/accounts/$accountId",
+                    params: { accountId: created.id },
+                  }),
+              },
+            });
+            void navigate({
+              to: "/crm/accounts/$accountId",
+              params: { accountId: created.id },
+            });
           }
-          toast.success(`${created.name} created`, {
-            action: {
-              label: "Open",
-              onClick: () =>
-                void navigate({
-                  to: "/crm/accounts/$accountId",
-                  params: { accountId: created.id },
-                }),
-            },
-          });
-          void navigate({
-            to: "/crm/accounts/$accountId",
-            params: { accountId: created.id },
-          });
+          setModalOpen(false);
+          setEditing(null);
+        } catch {
+          // upsertAccount surfaces save errors
         }
-        setModalOpen(false);
-        setEditing(null);
       },
       (errors) => {
         const first = Object.values(errors)[0];
@@ -813,8 +817,9 @@ function CrmAccountsPage() {
         action: {
           label: "Undo",
           onClick: () => {
-            upsertAccount({ ...removed });
-            ensure(removed.id, removed.companyType);
+            void upsertAccount({ ...removed }).then(() => {
+              ensure(removed.id, removed.companyType);
+            });
           },
         },
       });

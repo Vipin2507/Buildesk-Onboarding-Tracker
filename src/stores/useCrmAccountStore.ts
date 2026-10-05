@@ -10,6 +10,7 @@ import {
   upsertCrmAccountsBatch as apiUpsertCrmAccountsBatch,
 } from "@/lib/api";
 import { serverSync } from "@/lib/sync";
+import { toast } from "sonner";
 import { createStore, touch } from "./persist";
 
 type CrmAccountInput = Omit<CrmAccount, "id" | "createdAt" | "updatedAt"> & { id?: string };
@@ -18,8 +19,8 @@ type CrmAccountState = {
   accounts: CrmAccount[];
   hydrateAccounts: (accounts: CrmAccount[]) => void;
   getById: (id: string) => CrmAccount | undefined;
-  upsertAccount: (data: CrmAccountInput) => CrmAccount;
-  upsertAccountsBatch: (rows: CrmAccountInput[]) => CrmAccount[];
+  upsertAccount: (data: CrmAccountInput) => Promise<CrmAccount>;
+  upsertAccountsBatch: (rows: CrmAccountInput[]) => Promise<CrmAccount[]>;
   updateAccount: (id: string, patch: Partial<CrmAccount>) => void;
   markLive: (id: string, who?: string) => void;
   setAccountStatus: (
@@ -94,15 +95,28 @@ export const useCrmAccountStore = createStore<CrmAccountState>((set, get) => ({
 
   getById: (id) => get().accounts.find((a) => a.id === id),
 
-  upsertAccount: (data) => {
+  upsertAccount: async (data) => {
     const now = nowIso();
-    if (data.id && get().getById(data.id)) {
-      const updated = touch({ ...get().getById(data.id)!, ...data, updatedAt: now });
+    const previous = data.id ? get().getById(data.id) : undefined;
+    if (data.id && previous) {
+      const updated = touch({ ...previous, ...data, updatedAt: now });
       set((s) => ({
         accounts: s.accounts.map((a) => (a.id === data.id ? updated : a)),
       }));
-      serverSync("crm account", () => apiUpsertCrmAccount({ data: toApiPayload(updated) }));
-      return updated;
+      try {
+        const saved = await apiUpsertCrmAccount({ data: toApiPayload(updated) });
+        set((s) => ({
+          accounts: s.accounts.map((a) => (a.id === saved.id ? saved : a)),
+        }));
+        return saved;
+      } catch (e) {
+        set((s) => ({
+          accounts: s.accounts.map((a) => (a.id === previous.id ? previous : a)),
+        }));
+        const message = e instanceof Error ? e.message : "Failed to save account";
+        toast.error(message, { description: "Account changes were not saved." });
+        throw e;
+      }
     }
     const created: CrmAccount = {
       ...data,
@@ -112,13 +126,24 @@ export const useCrmAccountStore = createStore<CrmAccountState>((set, get) => ({
       updatedAt: now,
     };
     set((s) => ({ accounts: [created, ...s.accounts] }));
-    serverSync("crm account", () => apiUpsertCrmAccount({ data: toApiPayload(created) }));
-    return created;
+    try {
+      const saved = await apiUpsertCrmAccount({ data: toApiPayload(created) });
+      set((s) => ({
+        accounts: s.accounts.map((a) => (a.id === created.id ? saved : a)),
+      }));
+      return saved;
+    } catch (e) {
+      set((s) => ({ accounts: s.accounts.filter((a) => a.id !== created.id) }));
+      const message = e instanceof Error ? e.message : "Failed to save account";
+      toast.error(message, { description: "Account was not saved." });
+      throw e;
+    }
   },
 
-  upsertAccountsBatch: (rows) => {
+  upsertAccountsBatch: async (rows) => {
     const now = nowIso();
-    const byId = new Map(get().accounts.map((a) => [a.id, a]));
+    const previousAccounts = get().accounts;
+    const byId = new Map(previousAccounts.map((a) => [a.id, a]));
     const saved: CrmAccount[] = [];
 
     for (const data of rows) {
@@ -140,10 +165,23 @@ export const useCrmAccountStore = createStore<CrmAccountState>((set, get) => ({
     }
 
     set({ accounts: [...byId.values()] });
-    serverSync("crm accounts batch", () =>
-      apiUpsertCrmAccountsBatch({ data: { accounts: saved.map(toApiPayload) } }),
-    );
-    return saved;
+    try {
+      const remote = await apiUpsertCrmAccountsBatch({
+        data: { accounts: saved.map(toApiPayload) },
+      });
+      if (remote.length > 0) {
+        const next = new Map(get().accounts.map((a) => [a.id, a]));
+        for (const account of remote) next.set(account.id, account);
+        set({ accounts: [...next.values()] });
+        return remote;
+      }
+      return saved;
+    } catch (e) {
+      set({ accounts: previousAccounts });
+      const message = e instanceof Error ? e.message : "Failed to save accounts";
+      toast.error(message, { description: "Account import was not saved." });
+      throw e;
+    }
   },
 
   updateAccount: (id, patch) => {

@@ -7,7 +7,8 @@ import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { canViewCrmAccount, crmSalesManagerNamesMatch } from "@/lib/crm-account-access";
 import { sortCrmAccountsByStartDateDesc } from "@/lib/crm-account-sort";
-import { isAdminRoleKey } from "@/lib/permissions";
+import { isAdminRoleKey, roleHasPermission } from "@/lib/permissions";
+import { loadServerRoles } from "@/server/auth/permissions";
 import { parseInstallmentsJson } from "@/lib/crm-account-commercial";
 import {
   ensureInitialPaymentOnAccountCreate,
@@ -166,6 +167,12 @@ function toRowValues(
   };
 }
 
+function canManageAllCrmAccounts(user: { role: string }) {
+  if (isAdminRoleKey(user.role)) return true;
+  const roles = loadServerRoles();
+  return roleHasPermission(roles, user.role, "manageCompanies");
+}
+
 export const listCrmAccounts = createServerFn({ method: "GET" }).handler(async () => {
   const user = requireUser();
   const db = getDb();
@@ -173,7 +180,8 @@ export const listCrmAccounts = createServerFn({ method: "GET" }).handler(async (
     db.select().from(t.crmAccounts).all().map(mapRow),
   );
 
-  if (isAdminRoleKey(user.role)) return rows;
+  // Admins / company managers see the full book; executives only see assigned accounts.
+  if (canManageAllCrmAccounts(user)) return rows;
   return rows.filter((a) => canViewCrmAccount(a, user));
 });
 
@@ -188,7 +196,7 @@ function assertCanMutateAccount(
     | undefined,
   nextSalesManagerName: string | null | undefined,
 ) {
-  if (isAdminRoleKey(user.role)) return;
+  if (canManageAllCrmAccounts(user)) return;
   if (existing) {
     if (
       !canViewCrmAccount(
@@ -204,7 +212,7 @@ function assertCanMutateAccount(
     }
     return;
   }
-  // New accounts must be created with the current user as sales manager.
+  // Executives may create accounts only when they are the sales manager.
   if (!crmSalesManagerNamesMatch(nextSalesManagerName ?? undefined, user.name)) {
     throw new ApiError(403, "Sales manager must be you for accounts you manage");
   }

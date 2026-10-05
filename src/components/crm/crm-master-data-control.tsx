@@ -60,18 +60,22 @@ export function CrmMasterDataControl() {
   }
 
   function onSubmit() {
-    void form.handleSubmit((values) => {
+    void form.handleSubmit(async (values) => {
       if (!editing) return;
       const data = normalizeCrmAccountForm(values);
-      upsertAccount({
-        ...editing,
-        ...data,
-        status: editing.status,
-      });
-      ensure(editing.id, data.companyType);
-      toast.success(`${data.name} updated`);
-      setModalOpen(false);
-      setEditing(null);
+      try {
+        await upsertAccount({
+          ...editing,
+          ...data,
+          status: editing.status,
+        });
+        ensure(editing.id, data.companyType);
+        toast.success(`${data.name} updated`);
+        setModalOpen(false);
+        setEditing(null);
+      } catch {
+        // upsertAccount surfaces save errors
+      }
     })();
   }
 

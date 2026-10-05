@@ -219,7 +219,7 @@ export function CrmAccountBulkUploadModal({
         );
       });
 
-      const saved = upsertAccountsBatch(payloads);
+      const saved = await upsertAccountsBatch(payloads);
       for (const account of saved) {
         ensure(account.id, account.companyType);
       }
