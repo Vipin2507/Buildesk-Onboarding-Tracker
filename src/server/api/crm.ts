@@ -21,6 +21,7 @@ import {
   findScheduleConflicts,
   mapTaskRow,
   normalizeTaskSchedule,
+  parseAssigneeIdsJson,
   resolvePrimaryAssignee,
   serializeAssigneeIds,
   syncFollowUpTaskStatusesByTime,
@@ -49,10 +50,39 @@ function assertCrmTaskRow(row: typeof t.followUpTasks.$inferSelect) {
   }
 }
 
-function assertCanManageInternalFollowUpTask(user: ReturnType<typeof requireUser>) {
+function assigneeIdsFromTaskRow(row: typeof t.followUpTasks.$inferSelect): string[] {
+  const fromJson = parseAssigneeIdsJson(row.assigneeUserIdsJson);
+  if (fromJson.length) return fromJson;
+  return row.assigneeUserId ? [row.assigneeUserId] : [];
+}
+
+function isInternalFollowUpTask(row: { isInternal?: boolean | null; companyId: string }) {
+  return Boolean(row.isInternal) || row.companyId === INTERNAL_CRM_TASK_COMPANY_ID;
+}
+
+function userCanManageAnyCrmAccountTasks(user: ReturnType<typeof requireUser>) {
+  const accounts = getDb().select().from(t.crmAccounts).all();
+  return accounts.some((crmAccount) =>
+    canViewCrmAccount(
+      {
+        salesManagerName: crmAccount.salesManagerName ?? undefined,
+        supportManager1: crmAccount.supportManager1 ?? undefined,
+        supportManager2: crmAccount.supportManager2 ?? undefined,
+      },
+      user,
+    ),
+  );
+}
+
+function assertCanManageInternalFollowUpTask(
+  user: ReturnType<typeof requireUser>,
+  assigneeUserIds: string[],
+) {
   if (user.role === "Admin") return;
   const roles = loadServerRoles();
   if (roleHasPermission(roles, user.role, "manageTasks")) return;
+  if (assigneeUserIds.includes(user.id)) return;
+  if (userCanManageAnyCrmAccountTasks(user)) return;
   throw new ApiError(403, "You do not have permission for this action");
 }
 
@@ -60,9 +90,10 @@ function assertCanManageFollowUpTask(
   user: ReturnType<typeof requireUser>,
   companyId: string,
   isInternal?: boolean,
+  assigneeUserIds: string[] = [],
 ) {
   if (isInternal) {
-    assertCanManageInternalFollowUpTask(user);
+    assertCanManageInternalFollowUpTask(user, assigneeUserIds);
     return;
   }
   if (user.role === "Admin") return;
@@ -545,9 +576,15 @@ export const createFollowUpTask = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => taskInput.parse(data))
   .handler(async ({ data }) => {
     const user = requireUser();
-    const isInternal = Boolean(data.isInternal);
+    const isInternal =
+      Boolean(data.isInternal) || data.companyId === INTERNAL_CRM_TASK_COMPANY_ID;
     const companyId = isInternal ? INTERNAL_CRM_TASK_COMPANY_ID : data.companyId;
-    assertCanManageFollowUpTask(user, companyId, isInternal);
+    assertCanManageFollowUpTask(
+      user,
+      companyId,
+      isInternal,
+      resolveAssigneeIdsFromTaskInput(data),
+    );
     const db = getDb();
     if (isInternal) ensureInternalCrmCompanyRow();
     const id = data.id ?? newId();
@@ -673,7 +710,12 @@ export const updateFollowUpTask = createServerFn({ method: "POST" })
     const existing = db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, data.id)).get();
     if (!existing) throw new ApiError(404, "Task not found");
     assertCrmTaskRow(existing);
-    assertCanManageFollowUpTask(user, existing.companyId, existing.isInternal ?? false);
+    assertCanManageFollowUpTask(
+      user,
+      existing.companyId,
+      isInternalFollowUpTask(existing),
+      assigneeIdsFromTaskRow(existing),
+    );
     const { remark, ...patch } = data.patch;
     const now = nowIso();
     const nextStatus = patch.status ?? existing.status;
@@ -843,7 +885,12 @@ export const completeFollowUpTask = createServerFn({ method: "POST" })
     const existing = db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, data.id)).get();
     if (!existing) throw new ApiError(404, "Task not found");
     assertCrmTaskRow(existing);
-    assertCanManageFollowUpTask(user, existing.companyId, existing.isInternal ?? false);
+    assertCanManageFollowUpTask(
+      user,
+      existing.companyId,
+      isInternalFollowUpTask(existing),
+      assigneeIdsFromTaskRow(existing),
+    );
     const now = nowIso();
     const remarkUpdate = data.remark?.trim()
       ? appendTaskRemark(existing.remarksJson, existing.latestRemark, data.remark, {
@@ -918,7 +965,12 @@ export const cancelFollowUpTask = createServerFn({ method: "POST" })
     const existing = db.select().from(t.followUpTasks).where(eq(t.followUpTasks.id, data.id)).get();
     if (!existing) throw new ApiError(404, "Task not found");
     assertCrmTaskRow(existing);
-    assertCanManageFollowUpTask(user, existing.companyId, existing.isInternal ?? false);
+    assertCanManageFollowUpTask(
+      user,
+      existing.companyId,
+      isInternalFollowUpTask(existing),
+      assigneeIdsFromTaskRow(existing),
+    );
     const now = nowIso();
     const remarkUpdate = data.reason?.trim()
       ? appendTaskRemark(existing.remarksJson, existing.latestRemark, data.reason, {

@@ -336,7 +336,7 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
     isAdmin ||
     can("manageTasks") ||
     visibleAccounts.some((a) => canManageCrmAccountTasks(a, currentUser));
-  const canCreateInternal = isAdmin || can("manageTasks");
+  const canCreateInternal = canCreate;
 
   function openCreate() {
     setEditing(null);
