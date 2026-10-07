@@ -223,34 +223,43 @@ function ClockDial({
   onHour: (h: number) => void;
   onMinute: (m: number) => void;
 }) {
-  const size = 168;
+  // One coordinate space for face + hand + labels (keeps the ring concentric).
+  const size = 180;
   const cx = size / 2;
   const cy = size / 2;
-  const r = 62;
-  const selected = mode === "hour" ? hour12 : minute;
+  const r = 66;
+  const labelSize = 32;
   const dialOptions = mode === "hour" ? HOUR_OPTIONS : MINUTE_OPTIONS;
 
   const angleFor = (value: number) => {
     if (mode === "hour") {
+      // 12 at top, then 1…11 clockwise
       const h = value % 12;
-      return (h / 12) * 360 - 90;
+      return (h / 12) * Math.PI * 2 - Math.PI / 2;
     }
-    return (value / 60) * 360 - 90;
+    return (value / 60) * Math.PI * 2 - Math.PI / 2;
   };
 
-  const selectedAngle = angleFor(mode === "hour" ? hour12 % 12 || 12 : minute);
-  const rad = (selectedAngle * Math.PI) / 180;
-  const hx = cx + Math.cos(rad) * r;
-  const hy = cy + Math.sin(rad) * r;
+  const selectedValue = mode === "hour" ? hour12 % 12 || 12 : minute;
+  const selectedAngle = angleFor(selectedValue);
+  const hx = cx + Math.cos(selectedAngle) * r;
+  const hy = cy + Math.sin(selectedAngle) * r;
 
   return (
-    <div className="relative flex h-[180px] w-[180px] items-center justify-center rounded-full bg-muted/50 dark:bg-muted/30">
-      <svg width={size} height={size} className="absolute inset-0 m-auto text-primary" aria-hidden>
+    <div
+      className="relative shrink-0 rounded-full bg-muted/50 dark:bg-muted/30"
+      style={{ width: size, height: size }}
+    >
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        className="pointer-events-none absolute inset-0 text-primary"
+        aria-hidden
+      >
         <motion.line
           x1={cx}
           y1={cy}
-          x2={hx}
-          y2={hy}
           stroke="currentColor"
           strokeWidth={2.5}
           strokeLinecap="round"
@@ -260,18 +269,18 @@ function ClockDial({
         />
         <circle cx={cx} cy={cy} r={4} fill="currentColor" />
         <motion.circle
-          r={16}
+          r={labelSize / 2}
           fill="currentColor"
           initial={false}
           animate={{ cx: hx, cy: hy }}
           transition={{ type: "spring", stiffness: 280, damping: 28 }}
         />
       </svg>
-        {dialOptions.map((opt) => {
+
+      {dialOptions.map((opt) => {
         const angle = angleFor(opt);
-        const a = (angle * Math.PI) / 180;
-        const x = cx + Math.cos(a) * r;
-        const y = cy + Math.sin(a) * r;
+        const x = cx + Math.cos(angle) * r;
+        const y = cy + Math.sin(angle) * r;
         const isSelected = mode === "hour" ? opt === hour12 : opt === minute;
         const disabled =
           mode === "hour"
@@ -284,11 +293,20 @@ function ClockDial({
             disabled={disabled}
             onClick={() => (mode === "hour" ? onHour(opt) : onMinute(opt))}
             className={cn(
-              "absolute flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-xs font-medium tabular-nums transition-colors",
-              isSelected ? "z-10 text-primary-foreground" : "text-foreground hover:bg-muted",
+              "absolute m-0 appearance-none border-0 p-0",
+              "flex items-center justify-center rounded-full bg-transparent text-xs font-medium leading-none tabular-nums",
+              "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+              isSelected
+                ? "z-10 text-primary-foreground"
+                : "z-[1] text-foreground hover:bg-foreground/5",
               disabled && "pointer-events-none opacity-30",
             )}
-            style={{ left: x, top: y }}
+            style={{
+              width: labelSize,
+              height: labelSize,
+              left: x - labelSize / 2,
+              top: y - labelSize / 2,
+            }}
           >
             {mode === "hour" ? opt : pad2(opt)}
           </button>
@@ -514,15 +532,19 @@ export function TimePickerField({
                 })}
               </div>
 
-              <div className="flex gap-1 rounded-lg bg-muted/40 p-0.5">
+              <div className="relative grid grid-cols-2 rounded-lg bg-muted/40 p-0.5">
+                <motion.div
+                  className="absolute inset-y-0.5 w-[calc(50%-2px)] rounded-md bg-card shadow-sm"
+                  initial={false}
+                  animate={{ x: pickerMode === "drum" ? 2 : "calc(100% + 2px)" }}
+                  transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                />
                 <button
                   type="button"
                   onClick={() => setPickerMode("drum")}
                   className={cn(
-                    "h-7 flex-1 rounded-md text-[10px] font-medium transition-colors",
-                    pickerMode === "drum"
-                      ? "bg-card text-foreground shadow-sm"
-                      : "text-muted-foreground",
+                    "relative z-[1] h-7 rounded-md text-[10px] font-medium transition-colors duration-200",
+                    pickerMode === "drum" ? "text-foreground" : "text-muted-foreground",
                   )}
                 >
                   Scroll
@@ -531,10 +553,8 @@ export function TimePickerField({
                   type="button"
                   onClick={() => setPickerMode("dial")}
                   className={cn(
-                    "h-7 flex-1 rounded-md text-[10px] font-medium transition-colors",
-                    pickerMode === "dial"
-                      ? "bg-card text-foreground shadow-sm"
-                      : "text-muted-foreground",
+                    "relative z-[1] h-7 rounded-md text-[10px] font-medium transition-colors duration-200",
+                    pickerMode === "dial" ? "text-foreground" : "text-muted-foreground",
                   )}
                 >
                   Dial
@@ -542,42 +562,66 @@ export function TimePickerField({
               </div>
             </div>
 
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={`${pickerMode}-${activeField}`}
-                initial={{ opacity: 0, scale: 0.96, y: 4 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.98, y: -4 }}
-                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-                className="flex justify-center"
-              >
+            {/* Fixed stage so dial ↔ scroll crossfades without layout jump */}
+            <div className="relative h-[180px] w-[180px] shrink-0 overflow-hidden">
+              <AnimatePresence initial={false} mode="sync">
                 {pickerMode === "drum" ? (
-                  <TimeDrum
-                    options={activeField === "hour" ? HOUR_OPTIONS : MINUTE_OPTIONS}
-                    value={activeField === "hour" ? hour12 : minute}
-                    disabledValues={activeField === "hour" ? disabledHours : disabledMinutes}
-                    format={activeField === "hour" ? (n) => String(n) : pad2}
-                    onChange={(next) => {
-                      if (activeField === "hour") commit(next, minute, period);
-                      else commit(hour12, next, period);
-                    }}
-                  />
+                  <motion.div
+                    key="drum"
+                    className="absolute inset-0 flex items-center justify-center"
+                    initial={{ opacity: 0, scale: 0.88, filter: "blur(6px)" }}
+                    animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                    exit={{ opacity: 0, scale: 1.06, filter: "blur(6px)" }}
+                    transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                  >
+                    <AnimatePresence initial={false} mode="popLayout">
+                      <motion.div
+                        key={activeField}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                      >
+                        <TimeDrum
+                          options={activeField === "hour" ? HOUR_OPTIONS : MINUTE_OPTIONS}
+                          value={activeField === "hour" ? hour12 : minute}
+                          disabledValues={
+                            activeField === "hour" ? disabledHours : disabledMinutes
+                          }
+                          format={activeField === "hour" ? (n) => String(n) : pad2}
+                          onChange={(next) => {
+                            if (activeField === "hour") commit(next, minute, period);
+                            else commit(hour12, next, period);
+                          }}
+                        />
+                      </motion.div>
+                    </AnimatePresence>
+                  </motion.div>
                 ) : (
-                  <ClockDial
-                    mode={activeField}
-                    hour12={hour12}
-                    minute={minute}
-                    period={period}
-                    min={min}
-                    onHour={(h) => {
-                      commit(h, minute, period);
-                      setActiveField("minute");
-                    }}
-                    onMinute={(m) => commit(hour12, m, period)}
-                  />
+                  <motion.div
+                    key="dial"
+                    className="absolute inset-0 flex items-center justify-center"
+                    initial={{ opacity: 0, scale: 0.88, filter: "blur(6px)" }}
+                    animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                    exit={{ opacity: 0, scale: 1.06, filter: "blur(6px)" }}
+                    transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                  >
+                    <ClockDial
+                      mode={activeField}
+                      hour12={hour12}
+                      minute={minute}
+                      period={period}
+                      min={min}
+                      onHour={(h) => {
+                        commit(h, minute, period);
+                        setActiveField("minute");
+                      }}
+                      onMinute={(m) => commit(hour12, m, period)}
+                    />
+                  </motion.div>
                 )}
-              </motion.div>
-            </AnimatePresence>
+              </AnimatePresence>
+            </div>
           </div>
 
           <div className="flex items-center justify-end gap-2 border-t border-border/70 px-3 py-2.5">
