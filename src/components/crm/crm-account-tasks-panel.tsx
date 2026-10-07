@@ -175,6 +175,8 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
     }
     if (!(await form.validateSchedule())) return;
 
+    const isGmeetTask =
+      form.taskType === "on_call_gmeet_teams" || editing?.taskType === "on_call_gmeet_teams";
     const payload = {
       companyId: accountId,
       title: form.title.trim(),
@@ -190,6 +192,9 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
       priority: editing?.priority ?? ("medium" as const),
       progressPercent: editing?.progressPercent ?? 0,
       remark: remark.trim() || undefined,
+      ...(isGmeetTask
+        ? { meetTitle: form.meetTitle.trim() || form.title.trim() }
+        : {}),
     };
 
     try {
@@ -203,10 +208,15 @@ export function CrmAccountTasksPanel({ accountId, compact = false, onViewAll }: 
           priority: "medium",
           progressPercent: 100,
         });
-        toast.success("Task created and marked complete");
+        toast.success(
+          isGmeetTask ? "Meeting task created with Google Meet" : "Task created and marked complete",
+        );
       } else {
         await addTask({ ...payload, status: "open", priority: "medium", progressPercent: 0 });
-        toast.success("Task created");
+        toast.success(isGmeetTask ? "Meeting task created with Google Meet" : "Task created");
+      }
+      if (isGmeetTask) {
+        void useBookingStore.getState().refreshStaff({}).catch(() => undefined);
       }
       setOpen(false);
     } catch {

@@ -272,7 +272,8 @@ export function syncTaskFromBookingAppointment(
       .get() ?? null;
   const accountName = account?.name?.trim() || "Account";
   const typeLabel = FOLLOW_UP_TASK_TYPE_LABEL.on_call_gmeet_teams;
-  const taskTitle = `${accountName} – ${typeLabel}`;
+  const taskTitle =
+    appointment.meetTitle?.trim() || `${accountName} – ${typeLabel}`;
   const assigneeIds = [appointment.hostUserId];
   const schedule = {
     dueDate: appointment.startsAt.slice(0, 10),

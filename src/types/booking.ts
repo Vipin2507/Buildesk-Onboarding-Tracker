@@ -63,6 +63,8 @@ export type BookingAppointment = {
   guestPhone?: string;
   notes?: string;
   hostNote?: string;
+  /** Google Calendar / Meet event title (editable on create / approve). */
+  meetTitle?: string;
   createdVia: BookingCreatedVia;
   googleEventId?: string;
   meetUrl?: string;

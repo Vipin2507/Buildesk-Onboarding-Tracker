@@ -53,6 +53,17 @@ function accountGuestDefaults(account: CrmAccount | undefined) {
   return { guestName, guestEmail, guestPhone };
 }
 
+export function defaultCrmMeetTitle(input: {
+  eventTitle?: string;
+  accountName?: string;
+  guestName?: string;
+}) {
+  const eventTitle = input.eventTitle?.trim() || "Call";
+  const accountName = input.accountName?.trim() || "CRM";
+  const guestName = input.guestName?.trim() || "Guest";
+  return `${eventTitle} · ${accountName} · ${guestName}`;
+}
+
 export function CreateCrmBookingDialog({
   open,
   onOpenChange,
@@ -87,6 +98,8 @@ export function CreateCrmBookingDialog({
   const [guestName, setGuestName] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
+  const [meetTitle, setMeetTitle] = useState("");
+  const [meetTitleTouched, setMeetTitleTouched] = useState(false);
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [bootstrapping, setBootstrapping] = useState(false);
@@ -123,6 +136,8 @@ export function CreateCrmBookingDialog({
     setSelectedSlot(null);
     setSlots([]);
     setNotes("");
+    setMeetTitle("");
+    setMeetTitleTouched(false);
     const account = sortedAccounts.find((a) => a.id === firstAccount);
     const guest = accountGuestDefaults(account);
     setGuestName(guest.guestName);
@@ -203,6 +218,21 @@ export function CreateCrmBookingDialog({
     };
   }, [open, eventTypeId, date, effectiveHostUserId, listSlotsForEvent]);
 
+  const selectedType = companyEventTypes.find((e) => e.id === eventTypeId) as
+    | BookingEventType
+    | undefined;
+
+  useEffect(() => {
+    if (!open || meetTitleTouched) return;
+    setMeetTitle(
+      defaultCrmMeetTitle({
+        eventTitle: selectedType?.title,
+        accountName: selectedAccount?.name,
+        guestName,
+      }),
+    );
+  }, [open, meetTitleTouched, selectedType?.title, selectedAccount?.name, guestName]);
+
   async function submit() {
     if (!companyId) {
       toast.error("Choose an account");
@@ -244,6 +274,7 @@ export function CreateCrmBookingDialog({
         guestEmail: guestEmail.trim(),
         guestPhone: guestPhone.trim() || undefined,
         notes: notes.trim() || undefined,
+        meetTitle: meetTitle.trim() || undefined,
       });
       toast.success("Meeting created");
       onOpenChange(false);
@@ -254,10 +285,6 @@ export function CreateCrmBookingDialog({
       setSaving(false);
     }
   }
-
-  const selectedType = companyEventTypes.find((e) => e.id === eventTypeId) as
-    | BookingEventType
-    | undefined;
 
   return (
     <EntityFormModal
@@ -387,6 +414,21 @@ export function CreateCrmBookingDialog({
             onChange={(e) => setGuestPhone(e.target.value)}
             placeholder="Optional"
           />
+        </DesignTicketFormField>
+
+        <DesignTicketFormField label="Google Meet title" required>
+          <input
+            className={ticketFieldClass}
+            value={meetTitle}
+            onChange={(e) => {
+              setMeetTitleTouched(true);
+              setMeetTitle(e.target.value);
+            }}
+            placeholder="Title shown on Google Calendar / Meet"
+          />
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            Shown on Google Calendar and the linked follow-up task.
+          </p>
         </DesignTicketFormField>
 
         <DesignTicketFormField label="Notes">

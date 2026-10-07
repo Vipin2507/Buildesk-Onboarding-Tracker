@@ -43,6 +43,8 @@ export type TaskFormValues = {
   endTime: string;
   durationMinutes: number;
   assigneeUserIds: string[];
+  /** Google Meet / Calendar title (On Call Via GMeet / Teams). */
+  meetTitle: string;
 };
 
 type Props = {
@@ -82,27 +84,48 @@ function allowPastSchedule(props: Pick<Props, "editing" | "markCompleteOnCreate"
   return Boolean(!props.editing && props.markCompleteOnCreate);
 }
 
+/** Default create schedule: today + current time (5-min snap) + duration. */
+function defaultCreateSchedule(durationMinutes = 60) {
+  const dueDate = todayYmd();
+  const startTime = minSelectableTimeForDate(dueDate) ?? "09:00";
+  const endTime = calcEndTimeFromDuration(startTime, durationMinutes);
+  return { dueDate, startTime, endTime };
+}
+
 export function useTaskFormState(props: Props) {
+  const [createSeed] = useState(() => defaultCreateSchedule(60));
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [dueDate, setDueDate] = useState("");
+  const [dueDate, setDueDate] = useState(createSeed.dueDate);
   const [taskType, setTaskType] = useState<FollowUpTaskType | "">("");
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
+  const [startTime, setStartTime] = useState(createSeed.startTime);
+  const [endTime, setEndTime] = useState(createSeed.endTime);
   const [durationMinutes, setDurationMinutes] = useState(60);
   const [assigneeUserIds, setAssigneeUserIds] = useState<string[]>([]);
   const [companyId, setCompanyId] = useState(props.companyId ?? "");
+  const [meetTitle, setMeetTitle] = useState("");
+  const [meetTitleTouched, setMeetTitleTouched] = useState(false);
 
   useEffect(() => {
     if (props.initial) {
-      setTitle(props.initial.title ?? "");
+      const duration = props.initial.durationMinutes ?? 60;
+      const schedule = defaultCreateSchedule(duration);
+      const nextTitle = props.initial.title ?? "";
+      setTitle(nextTitle);
       setDescription(props.initial.description ?? "");
-      setDueDate(props.initial.dueDate ?? "");
+      setDueDate(props.initial.dueDate ?? schedule.dueDate);
       setTaskType(props.initial.taskType ?? "");
-      setStartTime(props.initial.startTime ?? "");
-      setEndTime(props.initial.endTime ?? "");
-      setDurationMinutes(props.initial.durationMinutes ?? 60);
+      setStartTime(props.initial.startTime ?? schedule.startTime);
+      setEndTime(
+        props.initial.endTime ??
+          (props.initial.startTime
+            ? calcEndTimeFromDuration(props.initial.startTime, duration)
+            : schedule.endTime),
+      );
+      setDurationMinutes(duration);
       setAssigneeUserIds(props.initial.assigneeUserIds ?? []);
+      setMeetTitle(props.initial.meetTitle ?? nextTitle);
+      setMeetTitleTouched(Boolean(props.initial.meetTitle));
     }
   }, [props.initial]);
 
@@ -122,8 +145,14 @@ export function useTaskFormState(props: Props) {
             ? [props.editing.assigneeUserId]
             : [],
       );
+      setMeetTitle(props.editing.title);
+      setMeetTitleTouched(true);
     }
   }, [props.editing]);
+
+  useEffect(() => {
+    if (!meetTitleTouched) setMeetTitle(title);
+  }, [title, meetTitleTouched]);
 
   useEffect(() => {
     if (!props.editing && props.defaultAssigneeIds?.length && assigneeUserIds.length === 0) {
@@ -291,6 +320,7 @@ export function useTaskFormState(props: Props) {
     endTime,
     durationMinutes,
     assigneeUserIds,
+    meetTitle,
   };
 
   return {
@@ -312,17 +342,25 @@ export function useTaskFormState(props: Props) {
     setAssigneeUserIds,
     companyId,
     setCompanyId,
+    meetTitle,
+    setMeetTitle: (next: string) => {
+      setMeetTitleTouched(true);
+      setMeetTitle(next);
+    },
     values,
     validateSchedule,
     reset: () => {
+      const schedule = defaultCreateSchedule(60);
       setTitle("");
       setDescription("");
-      setDueDate("");
+      setDueDate(schedule.dueDate);
       setTaskType("");
-      setStartTime("");
-      setEndTime("");
+      setStartTime(schedule.startTime);
+      setEndTime(schedule.endTime);
       setDurationMinutes(60);
       setAssigneeUserIds(props.defaultAssigneeIds ?? []);
+      setMeetTitle("");
+      setMeetTitleTouched(false);
     },
   };
 }
@@ -351,6 +389,8 @@ export function TaskFormFields(props: Props & ReturnType<typeof useTaskFormState
     setAssigneeUserIds,
     companyId,
     setCompanyId,
+    meetTitle,
+    setMeetTitle,
     editing,
     markCompleteOnCreate,
     onMarkCompleteOnCreateChange,
@@ -432,6 +472,23 @@ export function TaskFormFields(props: Props & ReturnType<typeof useTaskFormState
           ))}
         </select>
       </label>
+
+      {taskType === "on_call_gmeet_teams" ? (
+        <label className="block text-xs font-medium">
+          Google Meet title
+          <input
+            className={cn(fieldClass, "mt-1 w-full")}
+            value={meetTitle}
+            onChange={(e) => setMeetTitle(e.target.value)}
+            placeholder="Title shown on Google Calendar / Meet"
+          />
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            {editing?.bookingAppointmentId
+              ? "Updates the linked Google Calendar / Meet title."
+              : "Creating this task also creates a Google Meet with this title."}
+          </p>
+        </label>
+      ) : null}
 
       <label className="block text-xs font-medium">
         Due date
@@ -536,7 +593,9 @@ export function TaskFormFields(props: Props & ReturnType<typeof useTaskFormState
               const checked = e.target.checked;
               onMarkCompleteOnCreateChange?.(checked);
               if (!checked && dueDate && isPastDateYmd(dueDate)) {
-                setDueDate("");
+                const schedule = defaultCreateSchedule(durationMinutes);
+                setDueDate(schedule.dueDate);
+                onStartTimeChange(schedule.startTime);
               }
             }}
           />

@@ -1077,6 +1077,8 @@ export const bookingAppointments = sqliteTable(
     guestPhone: text("guest_phone"),
     notes: text("notes"),
     hostNote: text("host_note"),
+    /** Google Calendar / Meet event title. Falls back to call type · account · guest when empty. */
+    meetTitle: text("meet_title"),
     createdVia: text("created_via").notNull().default("portal"),
     googleEventId: text("google_event_id"),
     meetUrl: text("meet_url"),

@@ -18,11 +18,14 @@ type CrmTaskState = {
   tasks: FollowUpTask[];
   setTasks: (tasks: FollowUpTask[]) => void;
   addTask: (
-    data: Omit<FollowUpTask, "id" | "createdAt" | "updatedAt" | "completedAt" | "completedByUserId" | "productScope">,
+    data: Omit<
+      FollowUpTask,
+      "id" | "createdAt" | "updatedAt" | "completedAt" | "completedByUserId" | "productScope"
+    > & { meetTitle?: string },
   ) => Promise<FollowUpTask>;
   updateTask: (
     id: string,
-    data: Partial<FollowUpTask> & { remark?: string },
+    data: Partial<FollowUpTask> & { remark?: string; meetTitle?: string },
   ) => void;
   completeTask: (id: string, remark?: string) => void;
   cancelTask: (id: string, reason?: string) => void;
@@ -31,7 +34,7 @@ type CrmTaskState = {
   getByCompany: (companyId: string) => FollowUpTask[];
 };
 
-function taskPayload(task: Partial<FollowUpTask>) {
+function taskPayload(task: Partial<FollowUpTask> & { meetTitle?: string }) {
   return {
     companyId: task.companyId!,
     onboardingProjectId: task.onboardingProjectId,
@@ -54,6 +57,7 @@ function taskPayload(task: Partial<FollowUpTask>) {
     source: task.source,
     bookingAppointmentId: task.bookingAppointmentId,
     isInternal: task.isInternal,
+    meetTitle: task.meetTitle,
   };
 }
 

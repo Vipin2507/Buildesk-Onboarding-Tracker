@@ -16,6 +16,10 @@ import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { logActivity } from "@/server/api/mappers";
+import {
+  createGmeetBookingForTask,
+  updateLinkedBookingMeetTitle,
+} from "@/server/api/bookings";
 import { ensureInternalCrmCompanyRow } from "@/server/lib/ensure-internal-crm-company";
 import {
   findScheduleConflicts,
@@ -504,6 +508,8 @@ const taskInput = z.object({
   assigneeUserIds: z.array(z.string()).optional().nullable(),
   source: z.enum(["manual", "booking"]).optional(),
   bookingAppointmentId: z.string().optional().nullable(),
+  /** Google Meet / Calendar title when creating an On Call GMeet task. Defaults to task title. */
+  meetTitle: z.string().optional().nullable(),
   skipConflictCheck: z.boolean().optional(),
 });
 
@@ -659,6 +665,46 @@ export const createFollowUpTask = createServerFn({ method: "POST" })
         updatedAt: now,
       })
       .run();
+
+    // On Call Via GMeet / Teams from the task form → create confirmed booking + Meet.
+    let bookingAppointmentId = data.bookingAppointmentId ?? null;
+    if (
+      !isInternal &&
+      !bookingAppointmentId &&
+      data.taskType === "on_call_gmeet_teams" &&
+      primaryAssignee &&
+      schedule.startsAt &&
+      schedule.endsAt
+    ) {
+      try {
+        const appointment = await createGmeetBookingForTask({
+          companyId,
+          hostUserId: primaryAssignee,
+          startsAt: schedule.startsAt,
+          endsAt: schedule.endsAt,
+          meetTitle: data.meetTitle?.trim() || data.title.trim(),
+          notes: data.description,
+          actingUser: user,
+        });
+        bookingAppointmentId = appointment.id;
+        db.update(t.followUpTasks)
+          .set({
+            bookingAppointmentId,
+            source: "booking",
+            updatedAt: nowIso(),
+          })
+          .where(eq(t.followUpTasks.id, id))
+          .run();
+      } catch (err) {
+        db.delete(t.followUpTasks).where(eq(t.followUpTasks.id, id)).run();
+        if (err instanceof ApiError) throw err;
+        throw new ApiError(
+          500,
+          err instanceof Error ? err.message : "Failed to create Google Meet for this task",
+        );
+      }
+    }
+
     if (!isInternal) {
       writeCrmEvent({
         companyId,
@@ -676,6 +722,7 @@ export const createFollowUpTask = createServerFn({ method: "POST" })
           endTime: schedule.endTime,
           assigneeUserId: primaryAssignee,
           assigneeUserIds: data.assigneeUserIds,
+          bookingAppointmentId,
         },
         dueDate: schedule.dueDate ?? undefined,
       });
@@ -812,10 +859,14 @@ export const updateFollowUpTask = createServerFn({ method: "POST" })
         })
       : null;
 
+    const nextTitle = patch.title ?? existing.title;
+    const nextDescription =
+      patch.description !== undefined ? patch.description : existing.description;
+
     db.update(t.followUpTasks)
       .set({
-        title: patch.title ?? existing.title,
-        description: patch.description !== undefined ? patch.description : existing.description,
+        title: nextTitle,
+        description: nextDescription,
         status: nextStatus,
         priority: patch.priority ?? existing.priority,
         progressPercent: patch.progressPercent ?? existing.progressPercent,
@@ -837,6 +888,20 @@ export const updateFollowUpTask = createServerFn({ method: "POST" })
       })
       .where(eq(t.followUpTasks.id, data.id))
       .run();
+
+    if (
+      existing.bookingAppointmentId &&
+      (existing.taskType === "on_call_gmeet_teams" || taskType === "on_call_gmeet_teams")
+    ) {
+      await updateLinkedBookingMeetTitle({
+        bookingAppointmentId: existing.bookingAppointmentId,
+        meetTitle: patch.meetTitle?.trim() || nextTitle,
+        startsAt: schedule.startsAt,
+        endsAt: schedule.endsAt,
+        notes: nextDescription,
+        actingUser: user,
+      });
+    }
 
     const eventType = remark
       ? "task_remark"

@@ -31,7 +31,10 @@ import { EmptyState } from "@/components/empty-state";
 import { WeeklyHoursEditor } from "@/components/crm/weekly-hours-editor";
 import { BookingBlocksPanel } from "@/components/crm/booking-blocks-panel";
 import { BookingGoogleCalendarPanel } from "@/components/crm/booking-google-calendar-panel";
-import { CreateCrmBookingDialog } from "@/components/crm/create-crm-booking-dialog";
+import {
+  CreateCrmBookingDialog,
+  defaultCrmMeetTitle,
+} from "@/components/crm/create-crm-booking-dialog";
 import { PageWrap } from "@/components/page-header";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
@@ -295,6 +298,7 @@ function CrmBookingsPage() {
   const canCreateMeeting = canCreateCrmMeeting(user);
 
   const [noteById, setNoteById] = useState<Record<string, string>>({});
+  const [meetTitleById, setMeetTitleById] = useState<Record<string, string>>({});
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [rescheduleSlots, setRescheduleSlots] = useState<{ startsAt: string; endsAt: string }[]>(
@@ -454,6 +458,16 @@ function CrmBookingsPage() {
   const hostName = (id: string) => users.find((u) => u.id === id)?.name ?? "—";
   const eventTitle = (id: string) => eventTypes.find((e) => e.id === id)?.title ?? "Call";
 
+  function resolveMeetTitle(appt: BookingAppointment) {
+    if (meetTitleById[appt.id] !== undefined) return meetTitleById[appt.id]!;
+    if (appt.meetTitle?.trim()) return appt.meetTitle.trim();
+    return defaultCrmMeetTitle({
+      eventTitle: eventTitle(appt.eventTypeId),
+      accountName: accountName(appt.companyId),
+      guestName: appt.guestName,
+    });
+  }
+
   const hostOptions = useMemo(() => {
     const ids = [...new Set(appointments.map((a) => a.hostUserId))];
     return ids
@@ -591,7 +605,7 @@ function CrmBookingsPage() {
             className="h-7 gap-1 px-2 text-[10px]"
             onClick={(e) => {
               e.stopPropagation();
-              void acceptAppointment(appt.id, noteById[appt.id])
+              void acceptAppointment(appt.id, noteById[appt.id], resolveMeetTitle(appt))
                 .then((updated) => {
                   showBookingApproveToast(
                     updated,
@@ -973,13 +987,21 @@ function CrmBookingsPage() {
                             onNoteChange={(v) =>
                               setNoteById((prev) => ({ ...prev, [appt.id]: v }))
                             }
+                            meetTitle={resolveMeetTitle(appt)}
+                            onMeetTitleChange={(v) =>
+                              setMeetTitleById((prev) => ({ ...prev, [appt.id]: v }))
+                            }
                             accountName={accountName(appt.companyId)}
                             executiveName={hostName(appt.hostUserId)}
                             callType={eventTitle(appt.eventTypeId)}
                             googleConnected={googleConnected}
                             userId={user?.id}
                             onAccept={() =>
-                              void acceptAppointment(appt.id, noteById[appt.id])
+                              void acceptAppointment(
+                                appt.id,
+                                noteById[appt.id],
+                                resolveMeetTitle(appt),
+                              )
                                 .then((updated) => {
                                   showBookingApproveToast(
                                     updated,
@@ -1249,6 +1271,8 @@ function BookingDetailPanel({
   now,
   note,
   onNoteChange,
+  meetTitle,
+  onMeetTitleChange,
   accountName,
   executiveName,
   callType,
@@ -1269,6 +1293,8 @@ function BookingDetailPanel({
   now: string;
   note: string;
   onNoteChange: (v: string) => void;
+  meetTitle: string;
+  onMeetTitleChange: (v: string) => void;
   accountName: string;
   executiveName: string;
   callType: string;
@@ -1456,12 +1482,32 @@ function BookingDetailPanel({
       ) : null}
 
       {appt.status === "pending" ? (
-        <Input
-          placeholder="Optional note to guest"
-          className="mt-3 h-9 text-sm"
-          value={note}
-          onChange={(e) => onNoteChange(e.target.value)}
-        />
+        <div className="mt-3 space-y-2">
+          <div>
+            <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              Google Meet title
+            </div>
+            <Input
+              placeholder="Title shown on Google Calendar / Meet"
+              className="h-9 text-sm"
+              value={meetTitle}
+              onChange={(e) => onMeetTitleChange(e.target.value)}
+            />
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Also used for the linked follow-up task title.
+            </p>
+          </div>
+          <Input
+            placeholder="Optional note to guest"
+            className="h-9 text-sm"
+            value={note}
+            onChange={(e) => onNoteChange(e.target.value)}
+          />
+        </div>
+      ) : appt.meetTitle ? (
+        <div className="mt-3 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">Meet title:</span> {appt.meetTitle}
+        </div>
       ) : null}
 
       {canReschedule ? (

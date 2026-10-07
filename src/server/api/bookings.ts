@@ -106,6 +106,7 @@ function mapAppointment(row: typeof t.bookingAppointments.$inferSelect): Booking
     guestPhone: row.guestPhone ?? undefined,
     notes: row.notes ?? undefined,
     hostNote: row.hostNote ?? undefined,
+    meetTitle: row.meetTitle?.trim() || undefined,
     createdVia: row.createdVia as BookingCreatedVia,
     googleEventId: row.googleEventId ?? undefined,
     meetUrl: row.meetUrl ?? undefined,
@@ -511,7 +512,8 @@ async function syncGoogleCalendarForAppointment(
     .from(t.crmAccounts)
     .where(eq(t.crmAccounts.id, appointment.companyId))
     .get();
-  const summary = `${eventRow?.title ?? "Call"} · ${account?.name ?? "CRM"} · ${appointment.guestName}`;
+  const defaultSummary = `${eventRow?.title ?? "Call"} · ${account?.name ?? "CRM"} · ${appointment.guestName}`;
+  const summary = appointment.meetTitle?.trim() || defaultSummary;
   const additionalGuestEmails = parseAdditionalGuestEmailsJson(appointment.additionalGuestEmailsJson);
   const guestEmails = allGuestEmails({
     guestEmail: appointment.guestEmail,
@@ -634,6 +636,162 @@ async function syncGoogleCalendarForAppointment(
       .where(eq(t.bookingAppointments.id, appointment.id))
       .run();
   }
+}
+
+function isVideoEventType(slug: string, title: string): boolean {
+  const hay = `${slug} ${title}`.toLowerCase();
+  return hay.includes("gmeet") || hay.includes("meet") || hay.includes("teams") || hay.includes("video");
+}
+
+function resolveVideoEventTypeForCompany(companyId: string): BookingEventType {
+  const db = getDb();
+  const existing = db
+    .select()
+    .from(t.bookingEventTypes)
+    .where(and(eq(t.bookingEventTypes.companyId, companyId), eq(t.bookingEventTypes.isActive, true)))
+    .all()
+    .map(mapEventType);
+  const video = existing.find((e) => isVideoEventType(e.slug, e.title));
+  if (video) return video;
+  if (existing[0]) return existing[0];
+  const created = ensureEventTypesFromCatalog(companyId, [
+    {
+      key: "on-call-gmeet",
+      label: "On Call Via GMeet / Teams",
+      durationMinutes: DEFAULT_BOOKING_DURATION_MINUTES,
+      isActive: true,
+    },
+  ]);
+  return created[0]!;
+}
+
+/**
+ * Create a confirmed CRM booking + Google Meet for an existing follow-up task
+ * (task form → On Call Via GMeet / Teams). Does not create a second task.
+ */
+export async function createGmeetBookingForTask(input: {
+  companyId: string;
+  hostUserId: string;
+  startsAt: string;
+  endsAt: string;
+  meetTitle: string;
+  notes?: string | null;
+  actingUser: ActingUser;
+}): Promise<BookingAppointment> {
+  const db = getDb();
+  const account = db
+    .select()
+    .from(t.crmAccounts)
+    .where(eq(t.crmAccounts.id, input.companyId))
+    .get();
+  if (!account) throw new ApiError(404, "Account not found");
+
+  assertCrmHostUser(input.hostUserId);
+  const event = resolveVideoEventTypeForCompany(input.companyId);
+  const startsAt = input.startsAt.slice(0, 19);
+  const endsAt = input.endsAt.slice(0, 19);
+  if (endsAt <= startsAt) throw new ApiError(400, "End time must be after start time");
+
+  const guestName =
+    account.ownerName?.trim() ||
+    account.pocName?.trim() ||
+    account.contact?.trim() ||
+    account.name.trim();
+  const guestEmail = (
+    account.ownerEmail?.trim() ||
+    account.pocEmail?.trim() ||
+    account.email.trim()
+  ).toLowerCase();
+
+  const now = nowIso();
+  const id = newId();
+  db.insert(t.bookingAppointments)
+    .values({
+      id,
+      eventTypeId: event.id,
+      companyId: input.companyId,
+      hostUserId: input.hostUserId,
+      startsAt,
+      endsAt,
+      status: "confirmed",
+      guestName,
+      guestEmail,
+      additionalGuestEmailsJson: "[]",
+      guestPhone:
+        account.ownerPhone?.trim() ||
+        account.pocMobile?.trim() ||
+        account.phone?.trim() ||
+        null,
+      notes: input.notes?.trim() || null,
+      hostNote: null,
+      meetTitle: input.meetTitle.trim() || null,
+      createdVia: "crm",
+      googleEventId: null,
+      meetUrl: null,
+      googleSyncStatus: "none",
+      googleSyncError: null,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .run();
+
+  let fresh = db
+    .select()
+    .from(t.bookingAppointments)
+    .where(eq(t.bookingAppointments.id, id))
+    .get()!;
+
+  await syncGoogleCalendarForAppointment(fresh, "upsert", input.actingUser);
+  fresh = db
+    .select()
+    .from(t.bookingAppointments)
+    .where(eq(t.bookingAppointments.id, id))
+    .get()!;
+
+  return mapAppointment(fresh);
+}
+
+/** Update Meet title on a booking linked to a task and refresh Google Calendar. */
+export async function updateLinkedBookingMeetTitle(input: {
+  bookingAppointmentId: string;
+  meetTitle: string;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  notes?: string | null;
+  actingUser: ActingUser;
+}): Promise<BookingAppointment | null> {
+  const db = getDb();
+  const row = db
+    .select()
+    .from(t.bookingAppointments)
+    .where(eq(t.bookingAppointments.id, input.bookingAppointmentId))
+    .get();
+  if (!row) return null;
+  if (row.status === "cancelled" || row.status === "declined" || row.status === "completed") {
+    return mapAppointment(row);
+  }
+
+  const now = nowIso();
+  db.update(t.bookingAppointments)
+    .set({
+      meetTitle: input.meetTitle.trim() || null,
+      ...(input.startsAt ? { startsAt: input.startsAt.slice(0, 19) } : {}),
+      ...(input.endsAt ? { endsAt: input.endsAt.slice(0, 19) } : {}),
+      ...(input.notes !== undefined ? { notes: input.notes?.trim() || null } : {}),
+      updatedAt: now,
+    })
+    .where(eq(t.bookingAppointments.id, row.id))
+    .run();
+
+  const updated = db
+    .select()
+    .from(t.bookingAppointments)
+    .where(eq(t.bookingAppointments.id, row.id))
+    .get()!;
+  await syncGoogleCalendarForAppointment(updated, "upsert", input.actingUser);
+  return mapAppointment(
+    db.select().from(t.bookingAppointments).where(eq(t.bookingAppointments.id, row.id)).get()!,
+  );
 }
 
 /* ---------- Portal (public) ---------- */
@@ -905,6 +1063,7 @@ export const createCrmBooking = createServerFn({ method: "POST" })
         additionalGuestEmails: z.array(z.string().email()).optional(),
         guestPhone: z.string().optional(),
         notes: z.string().optional(),
+        meetTitle: z.string().optional(),
       })
       .parse(data),
   )
@@ -983,6 +1142,7 @@ export const createCrmBooking = createServerFn({ method: "POST" })
         guestPhone: data.guestPhone?.trim() || null,
         notes: data.notes?.trim() || null,
         hostNote: null,
+        meetTitle: data.meetTitle?.trim() || null,
         createdVia: "crm",
         googleEventId: null,
         meetUrl: null,
@@ -1475,6 +1635,7 @@ export const updateBookingAppointmentStatus = createServerFn({ method: "POST" })
         id: z.string().min(1),
         status: z.enum(["pending", "confirmed", "declined", "cancelled", "postponed", "completed"]),
         hostNote: z.string().optional(),
+        meetTitle: z.string().optional(),
       })
       .parse(data),
   )
@@ -1505,11 +1666,17 @@ export const updateBookingAppointmentStatus = createServerFn({ method: "POST" })
       }
     }
 
+    const nextMeetTitle =
+      data.meetTitle !== undefined
+        ? data.meetTitle.trim() || null
+        : row.meetTitle;
+
     db.update(t.bookingAppointments)
       .set({
         status: data.status,
         endsAt: nextEndsAt,
         hostNote: data.hostNote?.trim() ?? row.hostNote,
+        meetTitle: nextMeetTitle,
         updatedAt: now,
       })
       .where(eq(t.bookingAppointments.id, data.id))

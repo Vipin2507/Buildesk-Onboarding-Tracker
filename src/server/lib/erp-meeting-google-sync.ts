@@ -80,7 +80,8 @@ export async function syncGoogleCalendarForErpMeeting(
   const timeZone = resolveHostTimezone(meeting.hostUserId ?? actingUser.id);
   const company = db.select().from(t.companies).where(eq(t.companies.id, meeting.companyId)).get();
   const typeLabel = ERP_MEETING_TYPE_LABELS[meeting.meetingType as keyof typeof ERP_MEETING_TYPE_LABELS] ?? "Meeting";
-  const summary = `${meeting.title} · ${company?.name ?? "Company"} · ${typeLabel}`;
+  // Meet / Calendar title is the editable meeting title (company + type go in description).
+  const summary = meeting.title.trim() || `${company?.name ?? "Company"} · ${typeLabel}`;
   const guestLine = meeting.attendeeEmail
     ? meeting.attendeeName
       ? `Guest: ${meeting.attendeeName} (${meeting.attendeeEmail})`
@@ -89,6 +90,8 @@ export async function syncGoogleCalendarForErpMeeting(
       ? `Guest: ${meeting.attendeeName}`
       : null;
   const description = [
+    `Company: ${company?.name ?? "Company"}`,
+    `Type: ${typeLabel}`,
     guestLine,
     meeting.notes ? `Notes: ${meeting.notes}` : null,
     `Buildesk ERP meeting: ${meeting.id}`,
