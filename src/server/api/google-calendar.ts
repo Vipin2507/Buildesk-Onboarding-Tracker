@@ -9,6 +9,7 @@ import {
   getGoogleCalendarStatus,
   isGoogleCalendarConfigured,
   googleCalendarRedirectUri,
+  refreshGoogleCalendarStatus,
   setGoogleCalendarSyncEnabled,
   verifyGoogleOAuthState,
 } from "@/server/google/calendar-oauth";
@@ -16,7 +17,7 @@ import {
 export const getGoogleCalendarConnectionStatus = createServerFn({ method: "GET" }).handler(
   async () => {
     const user = requireUser();
-    return getGoogleCalendarStatus(user.id);
+    return refreshGoogleCalendarStatus(user.id);
   },
 );
 

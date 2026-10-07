@@ -1107,6 +1107,8 @@ export const userGoogleCalendar = sqliteTable("user_google_calendar", {
   calendarId: text("calendar_id").notNull().default("primary"),
   scopes: text("scopes").notNull().default(""),
   syncEnabled: integer("sync_enabled", { mode: "boolean" }).notNull().default(true),
+  /** Set when Google rejects the refresh token (invalid_grant); cleared on successful reconnect. */
+  authError: text("auth_error"),
   connectedAt: text("connected_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });

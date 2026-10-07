@@ -16,7 +16,7 @@ export const DEFAULT_HEALTH_WEBHOOK = `${DEFAULT_N8N_WEBHOOK_BASE}/${N8N_HEALTH_
 
 export const DEFAULT_WAHA_API_URL = "http://72.60.200.185:3000";
 export const DEFAULT_WAHA_API_KEY = "MySecretWAHAKey";
-export const DEFAULT_WAHA_SESSION = "first";
+export const DEFAULT_WAHA_SESSION = "second";
 
 export const DEFAULT_WAHA_CONFIG = {
   apiUrl: DEFAULT_WAHA_API_URL,

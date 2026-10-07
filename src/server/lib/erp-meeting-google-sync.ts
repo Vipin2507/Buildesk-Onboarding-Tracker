@@ -12,7 +12,10 @@ import {
   deleteGoogleMeetEvent,
   updateGoogleMeetEvent,
 } from "@/server/google/calendar-client";
-import { getGoogleCalendarConnection } from "@/server/google/calendar-oauth";
+import {
+  getGoogleCalendarConnection,
+  hasUsableGoogleCalendarConnection,
+} from "@/server/google/calendar-oauth";
 
 type ActingUser = { id: string; role: string; name: string };
 type MeetingRow = typeof t.erpMeetings.$inferSelect;
@@ -27,12 +30,12 @@ export function erpMeetingShouldDeleteFromGoogle(row: Pick<MeetingRow, "status">
 
 function resolveGoogleCalendarUserId(meeting: MeetingRow, actingUser: ActingUser) {
   const hostId = meeting.hostUserId?.trim();
-  if (hostId && getGoogleCalendarConnection(hostId)) return hostId;
-  if (getGoogleCalendarConnection(actingUser.id)) {
+  if (hostId && hasUsableGoogleCalendarConnection(hostId)) return hostId;
+  if (hasUsableGoogleCalendarConnection(actingUser.id)) {
     if (actingUser.id === hostId || !hostId) return actingUser.id;
     if (isAdminRoleKey(actingUser.role)) return actingUser.id;
   }
-  return hostId && getGoogleCalendarConnection(hostId) ? hostId : null;
+  return null;
 }
 
 function googleCalendarSyncErrorMessage(
@@ -41,6 +44,14 @@ function googleCalendarSyncErrorMessage(
   hostName?: string,
 ): string {
   const hostLabel = hostName?.trim() || "The assigned host";
+  const hostId = meeting.hostUserId?.trim();
+  const hostConn = hostId ? getGoogleCalendarConnection(hostId) : undefined;
+  if (hostConn?.authError?.trim()) {
+    if (actingUser.id === meeting.hostUserId) {
+      return "Google Calendar access expired. Reconnect under ERP → Meetings → Calendar, then retry sync.";
+    }
+    return `${hostLabel}'s Google Calendar access expired. Ask them to reconnect under ERP → Meetings → Calendar.`;
+  }
   if (actingUser.id === meeting.hostUserId) {
     return "Connect Google Calendar under ERP → Meetings → Calendar, then retry sync.";
   }

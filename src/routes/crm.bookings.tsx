@@ -363,7 +363,7 @@ function CrmBookingsPage() {
 
   useEffect(() => {
     void getGoogleCalendarConnectionStatus()
-      .then((s) => setGoogleConnected(s.connected))
+      .then((s) => setGoogleConnected(Boolean(s.connected && !s.needsReconnect)))
       .catch(() => setGoogleConnected(false));
   }, [tab, search.google]);
 

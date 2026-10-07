@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Calendar, CheckCircle2, ExternalLink, Link2Off, RefreshCw } from "lucide-react";
+import { AlertTriangle, Calendar, CheckCircle2, ExternalLink, Link2Off, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 import { DesignTicketSection } from "@/components/design-ticket/design-ticket-shared";
@@ -15,10 +15,12 @@ import {
 type Status = {
   configured: boolean;
   connected: boolean;
+  needsReconnect?: boolean;
   googleEmail?: string;
   calendarId?: string;
   syncEnabled: boolean;
   connectedAt?: string;
+  authError?: string;
 };
 
 type Props = {
@@ -121,6 +123,8 @@ export function GoogleCalendarConnectPanel({ variant, flash, flashError }: Props
     }
   }
 
+  const needsReconnect = Boolean(status?.connected && status.needsReconnect);
+
   return (
     <div className="space-y-3">
       <DesignTicketSection compact title={copy.title}>
@@ -173,11 +177,23 @@ export function GoogleCalendarConnectPanel({ variant, flash, flashError }: Props
         <div className="card-soft space-y-3 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-start gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-success/15 text-success">
-                <CheckCircle2 className="h-4 w-4" />
+              <div
+                className={
+                  needsReconnect
+                    ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                    : "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-success/15 text-success"
+                }
+              >
+                {needsReconnect ? (
+                  <AlertTriangle className="h-4 w-4" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4" />
+                )}
               </div>
               <div className="min-w-0">
-                <div className="text-sm font-medium">Connected</div>
+                <div className="text-sm font-medium">
+                  {needsReconnect ? "Reconnect required" : "Connected"}
+                </div>
                 <div className="mt-0.5 text-xs text-muted-foreground">{status.googleEmail}</div>
                 <div className="mt-1 text-[10px] text-muted-foreground">
                   Calendar: {status.calendarId || "primary"}
@@ -189,7 +205,7 @@ export function GoogleCalendarConnectPanel({ variant, flash, flashError }: Props
               <Button
                 type="button"
                 size="sm"
-                variant="outline"
+                variant={needsReconnect ? "default" : "outline"}
                 className="h-8 gap-1 text-xs"
                 disabled={busy}
                 onClick={() => void connect()}
@@ -211,6 +227,16 @@ export function GoogleCalendarConnectPanel({ variant, flash, flashError }: Props
             </div>
           </div>
 
+          {needsReconnect ? (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-200">
+              <p className="font-medium">Google access expired — Meet sync is paused.</p>
+              <p className="mt-1 text-[10px] opacity-90">
+                {status.authError ||
+                  "Click Reconnect to authorize again. If this keeps happening every ~7 days, publish the Google OAuth app (consent screen → Production) instead of leaving it in Testing."}
+              </p>
+            </div>
+          ) : null}
+
           {variant === "crm" ? (
             <label className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs">
               <div>
@@ -222,7 +248,7 @@ export function GoogleCalendarConnectPanel({ variant, flash, flashError }: Props
               <Switch
                 size="sm"
                 checked={status.syncEnabled}
-                disabled={busy}
+                disabled={busy || needsReconnect}
                 onCheckedChange={(v) => void toggleSync(v)}
               />
             </label>

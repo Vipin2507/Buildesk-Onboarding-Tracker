@@ -25,7 +25,10 @@ import {
   fetchGoogleFreeBusyRanges,
   updateGoogleMeetEvent,
 } from "@/server/google/calendar-client";
-import { getGoogleCalendarConnection } from "@/server/google/calendar-oauth";
+import {
+  getGoogleCalendarConnection,
+  hasUsableGoogleCalendarConnection,
+} from "@/server/google/calendar-oauth";
 import {
   cancelLinkedTaskForBooking,
   collectTaskBusyRanges,
@@ -471,8 +474,8 @@ function resolveGoogleCalendarUserId(
   appointment: { hostUserId: string },
   actingUser: ActingUser,
 ): string | null {
-  if (getGoogleCalendarConnection(appointment.hostUserId)) return appointment.hostUserId;
-  if (!getGoogleCalendarConnection(actingUser.id)) return null;
+  if (hasUsableGoogleCalendarConnection(appointment.hostUserId)) return appointment.hostUserId;
+  if (!hasUsableGoogleCalendarConnection(actingUser.id)) return null;
   if (actingUser.id === appointment.hostUserId) return actingUser.id;
   if (isAdminRoleKey(actingUser.role)) return actingUser.id;
   return null;
@@ -484,6 +487,13 @@ function googleCalendarSyncErrorMessage(
   hostName?: string,
 ): string {
   const hostLabel = hostName?.trim() || "The assigned executive";
+  const hostConn = getGoogleCalendarConnection(appointment.hostUserId);
+  if (hostConn?.authError?.trim()) {
+    if (actingUser.id === appointment.hostUserId) {
+      return "Google Calendar access expired. Reconnect under CRM → Meetings → Calendar, then retry sync.";
+    }
+    return `${hostLabel}'s Google Calendar access expired. Ask them to reconnect under CRM → Meetings → Calendar.`;
+  }
   if (actingUser.id === appointment.hostUserId) {
     return "Connect Google Calendar under CRM → Meetings → Calendar, then use Retry calendar sync.";
   }

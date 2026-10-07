@@ -274,6 +274,7 @@ const EXTRA_COLUMNS = [
     ddl: "TEXT NOT NULL DEFAULT '[]'",
   },
   { table: "booking_appointments", name: "meet_title", ddl: "TEXT" },
+  { table: "user_google_calendar", name: "auth_error", ddl: "TEXT" },
   { table: "follow_up_tasks", name: "task_type", ddl: "TEXT" },
   { table: "follow_up_tasks", name: "start_time", ddl: "TEXT" },
   { table: "follow_up_tasks", name: "end_time", ddl: "TEXT" },
@@ -979,6 +980,7 @@ if (!tableExists("user_google_calendar")) {
       calendar_id TEXT NOT NULL DEFAULT 'primary',
       scopes TEXT NOT NULL DEFAULT '',
       sync_enabled INTEGER NOT NULL DEFAULT 1,
+      auth_error TEXT,
       connected_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
