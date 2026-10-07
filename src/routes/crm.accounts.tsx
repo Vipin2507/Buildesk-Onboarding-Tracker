@@ -72,8 +72,14 @@ import {
 } from "@/stores/useCrmMasterStore";
 import { cn, formatDateDmy } from "@/lib/utils";
 import {
+  CRM_LAST_ENGAGED_KIND_OPTIONS,
+  CRM_LAST_ENGAGED_RECENCY_OPTIONS,
   formatCrmLastEngaged,
   formatCrmLastEngagedKind,
+  matchesCrmLastEngagedDateRange,
+  matchesCrmLastEngagedKind,
+  matchesCrmLastEngagedRecency,
+  type CrmLastEngagedRecencyFilter,
 } from "@/lib/crm-account-last-engaged";
 import { useSessionFilterState } from "@/hooks/use-session-filter";
 import {
@@ -126,6 +132,10 @@ const ACCOUNT_LIST_FILTER_DEFAULTS: {
   moduleFilter: string;
   dateFrom: string;
   dateTo: string;
+  engagedRecencyFilter: CrmLastEngagedRecencyFilter;
+  engagedKindFilter: string;
+  engagedFrom: string;
+  engagedTo: string;
   sortBy: CrmAccountSortBy;
   tableSearch: string;
 } = {
@@ -143,6 +153,10 @@ const ACCOUNT_LIST_FILTER_DEFAULTS: {
   moduleFilter: "",
   dateFrom: "",
   dateTo: "",
+  engagedRecencyFilter: "all",
+  engagedKindFilter: "all",
+  engagedFrom: "",
+  engagedTo: "",
   sortBy: DEFAULT_CRM_ACCOUNT_SORT,
   tableSearch: "",
 };
@@ -226,6 +240,10 @@ type AccountListFilters = {
   progressFilter: string;
   dateFrom: string;
   dateTo: string;
+  engagedRecencyFilter: CrmLastEngagedRecencyFilter;
+  engagedKindFilter: string;
+  engagedFrom: string;
+  engagedTo: string;
 };
 
 function matchesAccountListFilters(row: CrmAccountRow, f: AccountListFilters) {
@@ -288,6 +306,9 @@ function matchesAccountListFilters(row: CrmAccountRow, f: AccountListFilters) {
   if (f.progressFilter === "50-99" && !(row.progress >= 50 && row.progress <= 99)) return false;
   if (f.progressFilter === "100" && row.progress !== 100) return false;
   if (!inDateRange(row.startDate, f.dateFrom, f.dateTo)) return false;
+  if (!matchesCrmLastEngagedRecency(row.lastEngaged, f.engagedRecencyFilter)) return false;
+  if (!matchesCrmLastEngagedKind(row.lastEngaged, f.engagedKindFilter)) return false;
+  if (!matchesCrmLastEngagedDateRange(row.lastEngaged, f.engagedFrom, f.engagedTo)) return false;
   return true;
 }
 
@@ -336,6 +357,10 @@ function CrmAccountsPage() {
     moduleFilter,
     dateFrom,
     dateTo,
+    engagedRecencyFilter,
+    engagedKindFilter,
+    engagedFrom,
+    engagedTo,
     sortBy,
     tableSearch,
   } = listFilters;
@@ -396,6 +421,23 @@ function CrmAccountsPage() {
   );
   const setDateTo = useCallback(
     (value: string) => setListFilters({ dateTo: value }),
+    [setListFilters],
+  );
+  const setEngagedRecencyFilter = useCallback(
+    (value: string) =>
+      setListFilters({ engagedRecencyFilter: value as CrmLastEngagedRecencyFilter }),
+    [setListFilters],
+  );
+  const setEngagedKindFilter = useCallback(
+    (value: string) => setListFilters({ engagedKindFilter: value }),
+    [setListFilters],
+  );
+  const setEngagedFrom = useCallback(
+    (value: string) => setListFilters({ engagedFrom: value }),
+    [setListFilters],
+  );
+  const setEngagedTo = useCallback(
+    (value: string) => setListFilters({ engagedTo: value }),
     [setListFilters],
   );
   const { field: sortField, dir: sortDir } = useMemo(
@@ -567,6 +609,10 @@ function CrmAccountsPage() {
       progressFilter,
       dateFrom,
       dateTo,
+      engagedRecencyFilter,
+      engagedKindFilter,
+      engagedFrom,
+      engagedTo,
     }),
     [
       typeFilter,
@@ -581,6 +627,10 @@ function CrmAccountsPage() {
       progressFilter,
       dateFrom,
       dateTo,
+      engagedRecencyFilter,
+      engagedKindFilter,
+      engagedFrom,
+      engagedTo,
     ],
   );
 
@@ -681,6 +731,10 @@ function CrmAccountsPage() {
     moduleFilterKeys.length > 0,
     Boolean(dateFrom),
     Boolean(dateTo),
+    engagedRecencyFilter !== "all",
+    engagedKindFilter !== "all",
+    Boolean(engagedFrom),
+    Boolean(engagedTo),
     sortBy !== DEFAULT_CRM_ACCOUNT_SORT,
     kpiFilter !== "all",
   ].filter(Boolean).length;
@@ -1160,6 +1214,42 @@ function CrmAccountsPage() {
           label="Start to"
           value={dateTo}
           onChange={setDateTo}
+          placeholder="To"
+        />
+        <DesignTicketFilterField label="Last engaged" compact>
+          <DesignTicketSelect
+            compact
+            value={engagedRecencyFilter}
+            onChange={setEngagedRecencyFilter}
+            options={CRM_LAST_ENGAGED_RECENCY_OPTIONS.map((opt) => ({
+              value: opt.value,
+              label: opt.label,
+            }))}
+          />
+        </DesignTicketFilterField>
+        <DesignTicketFilterField label="Engaged via" compact>
+          <DesignTicketSelect
+            compact
+            value={engagedKindFilter}
+            onChange={setEngagedKindFilter}
+            options={CRM_LAST_ENGAGED_KIND_OPTIONS.map((opt) => ({
+              value: opt.value,
+              label: opt.label,
+            }))}
+          />
+        </DesignTicketFilterField>
+        <DesignTicketDateField
+          compact
+          label="Engaged from"
+          value={engagedFrom}
+          onChange={setEngagedFrom}
+          placeholder="From"
+        />
+        <DesignTicketDateField
+          compact
+          label="Engaged to"
+          value={engagedTo}
+          onChange={setEngagedTo}
           placeholder="To"
         />
         <DesignTicketFilterField label="Sort by" compact>

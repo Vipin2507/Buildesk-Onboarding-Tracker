@@ -8,7 +8,8 @@ export type CrmAccountSortField =
   | "users"
   | "city"
   | "dealSize"
-  | "progress";
+  | "progress"
+  | "lastEngagedAt";
 
 export type CrmAccountSortDir = "asc" | "desc";
 
@@ -17,6 +18,7 @@ export type CrmAccountSortBy = `${CrmAccountSortField}:${CrmAccountSortDir}`;
 export const CRM_ACCOUNT_SORT_FIELDS: { value: CrmAccountSortField; label: string }[] = [
   { value: "startDate", label: "Start date" },
   { value: "endDate", label: "End date" },
+  { value: "lastEngagedAt", label: "Last engaged" },
   { value: "name", label: "Account name" },
   { value: "userId", label: "User ID" },
   { value: "users", label: "Users" },
@@ -51,6 +53,7 @@ export function parseCrmAccountSortBy(sortBy: string): {
   const known: CrmAccountSortField[] = [
     "startDate",
     "endDate",
+    "lastEngagedAt",
     "name",
     "userId",
     "users",
@@ -102,7 +105,7 @@ function cmpDate(a: string, b: string, dir: CrmAccountSortDir) {
 type SortableAccount = Pick<
   CrmAccount,
   "name" | "userId" | "usersPurchased" | "startDate" | "endDate" | "city" | "dealSize"
-> & { progress?: number };
+> & { progress?: number; lastEngagedAt?: string };
 
 function compareCrmAccounts(
   a: SortableAccount,
@@ -115,6 +118,8 @@ function compareCrmAccounts(
       return cmpDate(dateKey(a.startDate), dateKey(b.startDate), dir);
     case "endDate":
       return cmpDate(dateKey(a.endDate), dateKey(b.endDate), dir);
+    case "lastEngagedAt":
+      return cmpDate(a.lastEngagedAt?.trim() ?? "", b.lastEngagedAt?.trim() ?? "", dir);
     case "name":
       return cmpText(a.name ?? "", b.name ?? "", dir);
     case "userId":

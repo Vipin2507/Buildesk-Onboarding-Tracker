@@ -129,3 +129,96 @@ export function formatCrmLastEngagedKind(engaged: CrmLastEngaged | null | undefi
   if (!engaged) return "";
   return CRM_LAST_ENGAGED_KIND_LABEL[engaged.kind];
 }
+
+/** Preset recency filters for the accounts Last engaged column. */
+export type CrmLastEngagedRecencyFilter =
+  | "all"
+  | "never"
+  | "7d"
+  | "14d"
+  | "30d"
+  | "90d"
+  | "older_30d"
+  | "older_90d";
+
+export const CRM_LAST_ENGAGED_RECENCY_OPTIONS: {
+  value: CrmLastEngagedRecencyFilter;
+  label: string;
+}[] = [
+  { value: "all", label: "Any engagement" },
+  { value: "never", label: "Never engaged" },
+  { value: "7d", label: "Last 7 days" },
+  { value: "14d", label: "Last 14 days" },
+  { value: "30d", label: "Last 30 days" },
+  { value: "90d", label: "Last 90 days" },
+  { value: "older_30d", label: "Older than 30 days" },
+  { value: "older_90d", label: "Older than 90 days" },
+];
+
+export const CRM_LAST_ENGAGED_KIND_OPTIONS: {
+  value: "all" | CrmLastEngagedKind;
+  label: string;
+}[] = [
+  { value: "all", label: "Any channel" },
+  ...(Object.entries(CRM_LAST_ENGAGED_KIND_LABEL) as [CrmLastEngagedKind, string][]).map(
+    ([value, label]) => ({ value, label }),
+  ),
+];
+
+function daysSinceEngaged(at: string, now: Date): number | null {
+  const ms = new Date(at).getTime();
+  if (Number.isNaN(ms)) return null;
+  return (now.getTime() - ms) / 86_400_000;
+}
+
+export function matchesCrmLastEngagedRecency(
+  engaged: CrmLastEngaged | null | undefined,
+  filter: CrmLastEngagedRecencyFilter,
+  now = new Date(),
+): boolean {
+  if (filter === "all") return true;
+  if (filter === "never") return !engaged?.at;
+  if (!engaged?.at) return false;
+  const days = daysSinceEngaged(engaged.at, now);
+  if (days == null || days < 0) return false;
+  switch (filter) {
+    case "7d":
+      return days <= 7;
+    case "14d":
+      return days <= 14;
+    case "30d":
+      return days <= 30;
+    case "90d":
+      return days <= 90;
+    case "older_30d":
+      return days > 30;
+    case "older_90d":
+      return days > 90;
+    default:
+      return true;
+  }
+}
+
+export function matchesCrmLastEngagedKind(
+  engaged: CrmLastEngaged | null | undefined,
+  kind: string,
+): boolean {
+  if (!kind || kind === "all") return true;
+  if (!engaged) return false;
+  return engaged.kind === kind;
+}
+
+/** YYYY-MM-DD range on last engaged timestamp (empty bounds ignored). */
+export function matchesCrmLastEngagedDateRange(
+  engaged: CrmLastEngaged | null | undefined,
+  from: string,
+  to: string,
+): boolean {
+  if (!from && !to) return true;
+  if (!engaged?.at) return false;
+  const value = engaged.at.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  if (from && value < from.slice(0, 10)) return false;
+  if (to && value > to.slice(0, 10)) return false;
+  return true;
+}
