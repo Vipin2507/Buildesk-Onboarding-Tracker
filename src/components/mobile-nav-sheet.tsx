@@ -62,54 +62,45 @@ export function MobileNavSheet({
           {navItems.map((item, i) => {
             const active = isNavActive(pathname, item);
             const Icon = item.icon;
-            const showAdminDivider = !crm && item.to === "/master";
             return (
-              <div key={item.to}>
-                {showAdminDivider && (
-                  <div className="mx-2 mb-2 mt-4 border-t border-sidebar-border pt-3">
-                    <div className="px-2 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/45">
-                      Administration
-                    </div>
-                  </div>
-                )}
-                <motion.div
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.28, delay: Math.min(i * 0.02, 0.24), ease }}
+              <motion.div
+                key={item.to}
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.28, delay: Math.min(i * 0.02, 0.24), ease }}
+              >
+                <Link
+                  to={item.to}
+                  onClick={() => onOpenChange(false)}
+                  className={cn(
+                    "relative flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                    active
+                      ? "bg-sidebar-accent text-white"
+                      : "text-sidebar-foreground/85 hover:bg-sidebar-accent/70 hover:text-white",
+                  )}
                 >
-                  <Link
-                    to={item.to}
-                    onClick={() => onOpenChange(false)}
-                    className={cn(
-                      "relative flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                      active
-                        ? "bg-sidebar-accent text-white"
-                        : "text-sidebar-foreground/85 hover:bg-sidebar-accent/70 hover:text-white",
-                    )}
-                  >
-                    {active && (
-                      <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-sidebar-primary" />
-                    )}
-                    <Icon className="h-4 w-4 shrink-0" />
-                    <span className="truncate">{item.label}</span>
-                    {!crm && item.to === "/live-chat" && chatBadge > 0 ? (
-                      <span className="ml-auto rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground">
-                        {chatBadge}
-                      </span>
-                    ) : null}
-                    {crm && item.to === "/crm/live-chat" && chatBadge > 0 ? (
-                      <span className="ml-auto rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground">
-                        {chatBadge}
-                      </span>
-                    ) : null}
-                    {crm && item.to === "/crm/tasks" && upcomingTaskBadge > 0 ? (
-                      <span className="ml-auto rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                        {upcomingTaskBadge}
-                      </span>
-                    ) : null}
-                  </Link>
-                </motion.div>
-              </div>
+                  {active && (
+                    <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-sidebar-primary" />
+                  )}
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{item.label}</span>
+                  {!crm && item.to === "/live-chat" && chatBadge > 0 ? (
+                    <span className="ml-auto rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground">
+                      {chatBadge}
+                    </span>
+                  ) : null}
+                  {crm && item.to === "/crm/live-chat" && chatBadge > 0 ? (
+                    <span className="ml-auto rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground">
+                      {chatBadge}
+                    </span>
+                  ) : null}
+                  {crm && item.to === "/crm/tasks" && upcomingTaskBadge > 0 ? (
+                    <span className="ml-auto rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                      {upcomingTaskBadge}
+                    </span>
+                  ) : null}
+                </Link>
+              </motion.div>
             );
           })}
         </nav>

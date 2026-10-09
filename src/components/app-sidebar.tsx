@@ -83,65 +83,51 @@ export function AppSidebar() {
           {navItems.map((item) => {
             const active = isNavActive(pathname, item);
             const Icon = item.icon;
-            const showAdminDivider = item.to === "/master";
             return (
-              <div key={item.to}>
-                {showAdminDivider && (
-                  <div className="mx-2 mb-1.5 mt-3 border-t border-sidebar-border pt-2.5">
-                    <div
-                      className={cn(
-                        "overflow-hidden text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/45 transition-[opacity,height] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-                        collapsed ? "h-0 opacity-0" : "h-4 opacity-100",
-                      )}
-                    >
-                      Administration
-                    </div>
-                  </div>
+              <Link
+                key={item.to}
+                to={item.to}
+                title={collapsed ? item.label : undefined}
+                className={cn(
+                  "group relative flex items-center gap-2.5 rounded-md text-[13px] font-medium",
+                  "transition-[color,padding,width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                  collapsed ? "h-9 w-9 justify-center p-0" : "px-2.5 py-1.5",
+                  active
+                    ? "text-white"
+                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent/70 hover:text-white",
                 )}
-                <Link
-                  to={item.to}
-                  title={collapsed ? item.label : undefined}
-                  className={cn(
-                    "group relative flex items-center gap-2.5 rounded-md text-[13px] font-medium",
-                    "transition-[color,padding,width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-                    collapsed ? "h-9 w-9 justify-center p-0" : "px-2.5 py-1.5",
-                    active
-                      ? "text-white"
-                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent/70 hover:text-white",
-                  )}
-                >
-                  {active && (
-                    <motion.span
-                      layoutId="sidebar-active"
-                      className="absolute inset-0 rounded-md bg-sidebar-accent"
-                      transition={{ type: "spring", stiffness: 400, damping: 36 }}
-                    />
-                  )}
-                  {active && !collapsed && (
-                    <motion.span
-                      layoutId="sidebar-indicator"
-                      className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-sidebar-primary"
-                      transition={{ type: "spring", stiffness: 400, damping: 36 }}
-                    />
-                  )}
-                  <Icon className="relative z-10 h-4 w-4 shrink-0" />
-                  {!collapsed ? (
-                    <span className="relative z-10 truncate">{item.label}</span>
-                  ) : null}
-                  {item.to === "/live-chat" && chatBadge > 0 ? (
-                    <span
-                      className={cn(
-                        "relative z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground",
-                        collapsed
-                          ? "absolute -right-0.5 -top-0.5 h-4 min-w-4 px-0.5"
-                          : "ml-auto px-1",
-                      )}
-                    >
-                      {chatBadge > 9 ? "9+" : chatBadge}
-                    </span>
-                  ) : null}
-                </Link>
-              </div>
+              >
+                {active && (
+                  <motion.span
+                    layoutId="sidebar-active"
+                    className="absolute inset-0 rounded-md bg-sidebar-accent"
+                    transition={{ type: "spring", stiffness: 400, damping: 36 }}
+                  />
+                )}
+                {active && !collapsed && (
+                  <motion.span
+                    layoutId="sidebar-indicator"
+                    className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-sidebar-primary"
+                    transition={{ type: "spring", stiffness: 400, damping: 36 }}
+                  />
+                )}
+                <Icon className="relative z-10 h-4 w-4 shrink-0" />
+                {!collapsed ? (
+                  <span className="relative z-10 truncate">{item.label}</span>
+                ) : null}
+                {item.to === "/live-chat" && chatBadge > 0 ? (
+                  <span
+                    className={cn(
+                      "relative z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground",
+                      collapsed
+                        ? "absolute -right-0.5 -top-0.5 h-4 min-w-4 px-0.5"
+                        : "ml-auto px-1",
+                    )}
+                  >
+                    {chatBadge > 9 ? "9+" : chatBadge}
+                  </span>
+                ) : null}
+              </Link>
             );
           })}
         </nav>

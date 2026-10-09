@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Bell,
@@ -32,6 +32,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { useAuthStore, useSettingsStore, useUserStore } from "@/stores";
 import { createUser as apiCreateUser, setUserPassword as apiSetUserPassword, updateUser as apiUpdateUser } from "@/lib/api";
 import { departmentSelectOptions } from "@/data/user-departments";
+import { APP_SETTINGS_NAV, filterNavItems } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 import type { ThemeMode } from "@/lib/theme";
 import { motion } from "framer-motion";
@@ -114,6 +115,17 @@ function Settings() {
   const visibleSections = SECTIONS.filter((s) =>
     canAccessSettingsSection(s, { isAdmin, can }),
   );
+  const settingsNavItems = filterNavItems(APP_SETTINGS_NAV, { isAdmin, can });
+  const settingsNavGroups = useMemo(() => {
+    const groups = new Map<string, typeof settingsNavItems>();
+    for (const item of settingsNavItems) {
+      const key = item.settingsGroup ?? "More tools";
+      const list = groups.get(key) ?? [];
+      list.push(item);
+      groups.set(key, list);
+    }
+    return [...groups.entries()];
+  }, [settingsNavItems]);
 
   useEffect(() => {
     if (search.section) {
@@ -143,26 +155,67 @@ function Settings() {
         subtitle="Configure the tracker to match your workflow."
       />
       {!section ? (
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-2">
-          {visibleSections.map((s, i) => (
-            <motion.button
-              key={s.id}
-              type="button"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.28, delay: Math.min(i * 0.03, 0.2), ease: TICKET_EASE }}
-              whileHover={{ y: -1 }}
-              onClick={() => openSection(s.id)}
-              className="card-soft flex gap-3 px-3 py-2.5 text-left transition-shadow hover:shadow-sm"
-            >
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <s.icon className="h-4 w-4" />
+        <div className="space-y-6">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-2">
+            {visibleSections.map((s, i) => (
+              <motion.button
+                key={s.id}
+                type="button"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.28, delay: Math.min(i * 0.03, 0.2), ease: TICKET_EASE }}
+                whileHover={{ y: -1 }}
+                onClick={() => openSection(s.id)}
+                className="card-soft flex gap-3 px-3 py-2.5 text-left transition-shadow hover:shadow-sm"
+              >
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <s.icon className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold">{s.title}</div>
+                  <div className="text-[11px] text-muted-foreground">{s.desc}</div>
+                </div>
+              </motion.button>
+            ))}
+          </div>
+
+          {settingsNavGroups.map(([group, items]) => (
+            <div key={group} className="space-y-2">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {group}
+              </h2>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-2">
+                {items.map((item, i) => {
+                  const Icon = item.icon;
+                  return (
+                    <motion.div
+                      key={item.to}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{
+                        duration: 0.28,
+                        delay: Math.min(i * 0.03, 0.2),
+                        ease: TICKET_EASE,
+                      }}
+                      whileHover={{ y: -1 }}
+                    >
+                      <Link
+                        to={item.to}
+                        className="card-soft flex gap-3 px-3 py-2.5 transition-shadow hover:shadow-sm"
+                      >
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold">{item.label}</div>
+                          <div className="text-[11px] text-muted-foreground">Open {item.label}</div>
+                        </div>
+                      </Link>
+                    </motion.div>
+                  );
+                })}
               </div>
-              <div className="min-w-0">
-                <div className="text-sm font-semibold">{s.title}</div>
-                <div className="text-[11px] text-muted-foreground">{s.desc}</div>
-              </div>
-            </motion.button>
+            </div>
           ))}
         </div>
       ) : (
