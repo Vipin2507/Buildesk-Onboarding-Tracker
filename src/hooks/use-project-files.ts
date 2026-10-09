@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   deleteProjectFile,
   listProjectFiles,
+  listProjectFilesByCompany,
   updateProjectFileMeta,
   uploadProjectFile,
 } from "@/lib/api";
@@ -11,6 +12,7 @@ import type { ProjectFileCategory } from "@/types/project-file";
 export const projectFilesKeys = {
   all: ["project-files"] as const,
   list: (projectId: string) => [...projectFilesKeys.all, "list", projectId] as const,
+  byCompany: (companyId: string) => [...projectFilesKeys.all, "company", companyId] as const,
 };
 
 function fileToBase64(file: Blob): Promise<string> {
@@ -38,6 +40,15 @@ export function useProjectFiles(projectId: string, enabled = true) {
   });
 }
 
+export function useCompanyProjectFiles(companyId: string, enabled = true) {
+  return useQuery({
+    queryKey: projectFilesKeys.byCompany(companyId),
+    queryFn: () => listProjectFilesByCompany({ data: { companyId } }),
+    enabled: enabled && !!companyId,
+    staleTime: 15_000,
+  });
+}
+
 export function useUploadProjectFile(projectId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -60,8 +71,11 @@ export function useUploadProjectFile(projectId: string) {
         },
       });
     },
-    onSuccess: () => {
+    onSuccess: (file) => {
       void queryClient.invalidateQueries({ queryKey: projectFilesKeys.list(projectId) });
+      if (file?.companyId) {
+        void queryClient.invalidateQueries({ queryKey: projectFilesKeys.byCompany(file.companyId) });
+      }
     },
   });
 }
@@ -77,6 +91,7 @@ export function useUpdateProjectFileMeta(projectId: string) {
     }) => updateProjectFileMeta({ data: input }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: projectFilesKeys.list(projectId) });
+      void queryClient.invalidateQueries({ queryKey: projectFilesKeys.all });
     },
   });
 }
@@ -87,6 +102,7 @@ export function useDeleteProjectFile(projectId: string) {
     mutationFn: (id: string) => deleteProjectFile({ data: { id } }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: projectFilesKeys.list(projectId) });
+      void queryClient.invalidateQueries({ queryKey: projectFilesKeys.all });
     },
   });
 }

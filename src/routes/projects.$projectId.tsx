@@ -269,7 +269,7 @@ function ProjectDetailPage() {
           <Link
             to="/companies/$companyId"
             params={{ companyId: project.companyId }}
-            search={{ tab: "Project" }}
+            search={{ tab: "Notes & Attachments" }}
           >
             <ArrowLeft className="h-4 w-4" /> Company
           </Link>

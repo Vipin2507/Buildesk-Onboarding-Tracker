@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { StatusPill } from "@/components/status-pill";
-import { MODULE_CATALOG, createCompanyModules } from "@/data/module-catalog";
+import { MODULE_CATALOG, createCompanyModules, getModuleLabel } from "@/data/module-catalog";
 import { cn, formatDate } from "@/lib/utils";
 import { assignableManagerUsers } from "@/lib/managers";
 import {
@@ -702,7 +702,7 @@ function CompanyAdminEditModal({
                       }}
                     />
                     <span>
-                      <span className="font-medium">{m.label}</span>
+                      <span className="font-medium">{getModuleLabel(m.key)}</span>
                       <span className="block text-[11px] text-muted-foreground">{m.description}</span>
                     </span>
                   </label>

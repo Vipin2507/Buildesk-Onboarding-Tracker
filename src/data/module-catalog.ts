@@ -89,8 +89,19 @@ export function buildPostSalesStepsFromDefs(
   }));
 }
 
+/** Optional live resolver from Master Config (client). Avoids circular store imports. */
+let masterModuleLabelResolver: ((key: string) => string | undefined) | undefined;
+
+export function setMasterModuleLabelResolver(fn: (key: string) => string | undefined) {
+  masterModuleLabelResolver = fn;
+}
+
 export function getModuleLabel(key: ModuleKey): string {
-  return MODULE_CATALOG.find((m) => m.key === key)?.label ?? key;
+  return (
+    masterModuleLabelResolver?.(key) ??
+    MODULE_CATALOG.find((m) => m.key === key)?.label ??
+    key
+  );
 }
 
 export function createCompanyModules(optedKeys: ModuleKey[], optedOnDate?: string) {
@@ -99,7 +110,7 @@ export function createCompanyModules(optedKeys: ModuleKey[], optedOnDate?: strin
     const optedIn = optedKeys.includes(m.key);
     return {
       moduleKey: m.key,
-      label: m.label,
+      label: getModuleLabel(m.key),
       optedIn,
       optedOnDate: optedIn ? today : undefined,
       liveAt: undefined as string | undefined,
@@ -154,7 +165,8 @@ export function normalizeCompanyModules(input: unknown): CompanyModule[] {
           m.moduleKey,
           withSubscriptionProjection({
             moduleKey: m.moduleKey,
-            label: m.label ?? getModuleLabel(m.moduleKey),
+            // Prefer live Master label on client; keep DB label on server.
+            label: masterModuleLabelResolver?.(m.moduleKey) ?? m.label ?? getModuleLabel(m.moduleKey),
             optedIn: Boolean(m.optedIn),
             optedOnDate: m.optedOnDate,
             liveAt: m.liveAt,

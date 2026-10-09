@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader, PageWrap } from "@/components/page-header";
 import { CountUp } from "@/components/count-up";
 import { useCompanyStore } from "@/stores";
-import { MODULE_CATALOG } from "@/data/module-catalog";
+import { MODULE_CATALOG, getModuleLabel } from "@/data/module-catalog";
 
 export const Route = createFileRoute("/modules")({
   component: Modules,
@@ -21,7 +21,7 @@ function Modules() {
           return (
             <div key={m.key} className="card-soft p-4 sm:p-5">
               <div className="mb-2 flex items-center justify-between">
-                <div className="font-semibold">{m.label}</div>
+                <div className="font-semibold">{getModuleLabel(m.key)}</div>
                 <span className="text-xs text-muted-foreground">{pct}%</span>
               </div>
               <div className="mb-3 text-2xl font-semibold sm:text-3xl">

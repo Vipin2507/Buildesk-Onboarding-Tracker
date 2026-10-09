@@ -4,11 +4,9 @@ import { motion } from "framer-motion";
 import { z } from "zod";
 import {
   ArrowLeft,
-  ArrowRight,
   Building2,
   CalendarClock,
   Layers,
-  Pencil,
   Plus,
   RefreshCw,
   Trash2,
@@ -34,10 +32,9 @@ import { CompanyDesignTicketsPanel } from "@/components/company-design-tickets-p
 import { CompanyTasksPanel } from "@/components/company-tasks-panel";
 import { CompanyVisitsPanel } from "@/components/company-visits-panel";
 import { CompanyMeetingsPanel } from "@/components/company-meetings-panel";
-import { EntityNotFound, EmptyState } from "@/components/empty-state";
+import { EntityNotFound } from "@/components/empty-state";
 import { DetailPageSkeleton } from "@/components/loading-skeleton";
 import { ConfirmDeleteDialog } from "@/components/entity-form-modal";
-import { ProgressSummaryCards } from "@/components/progress-summary-cards";
 import {
   ProjectFormModal,
   formValuesToProjectPatch,
@@ -60,13 +57,10 @@ import {
 import { getModuleLabel } from "@/data/module-catalog";
 import { resolveAssigneeName } from "@/lib/managers";
 import { formatDate } from "@/lib/utils";
-import type { Project } from "@/types";
 
 const tabSchema = z.enum([
   "Overview",
   "Modules",
-  "Progress",
-  "Project",
   "Tickets",
   "Tasks",
   "Meetings",
@@ -80,8 +74,10 @@ const searchSchema = z.object({
   tab: z
     .union([
       tabSchema,
-      // Legacy company tab id from before Projects → Project rename
-      z.literal("Projects").transform(() => "Project" as const),
+      // Legacy tabs removed from the company detail nav
+      z.literal("Progress").transform(() => "Modules" as const),
+      z.literal("Project").transform(() => "Overview" as const),
+      z.literal("Projects").transform(() => "Overview" as const),
     ])
     .optional(),
 });
@@ -94,8 +90,6 @@ export const Route = createFileRoute("/companies/$companyId")({
 const TABS = [
   { id: "Overview", label: "Details" },
   { id: "Modules", label: "Modules" },
-  { id: "Progress", label: "Progress" },
-  { id: "Project", label: "Project" },
   { id: "Tickets", label: "Tickets" },
   { id: "Tasks", label: "Tasks" },
   { id: "Meetings", label: "Meetings" },
@@ -122,7 +116,6 @@ function CompanyDetailContent() {
   const navigate = useNavigate({ from: "/companies/$companyId" });
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [projectModalOpen, setProjectModalOpen] = useState(false);
-  const [editingProject, setEditingProject] = useState<Project | null>(null);
 
   const setTab = (next: TabId) => {
     void navigate({ search: { tab: next }, replace: true });
@@ -133,7 +126,6 @@ function CompanyDetailContent() {
   const markRenewed = useCompanyStore((s) => s.markRenewed);
   const enableModule = useCompanyStore((s) => s.enableModule);
   const addProject = useProjectStore((s) => s.addProject);
-  const updateProject = useProjectStore((s) => s.updateProject);
   const checklistProjects = useCompanyChecklistProjectsForCompany(companyId);
   const employees = useEmployeeStore((s) => s.employees);
   const users = useUserStore((s) => s.users);
@@ -191,28 +183,12 @@ function CompanyDetailContent() {
   const visitCount = companyVisits.length;
   const meetingCount = companyMeetings.length;
   const optedModules = modulesWithProgress.filter((m) => m.optedIn);
-  const liveModules = optedModules.filter((m) => m.isLive);
   const companyLive =
     optedModules.length > 0 && optedModules.every((m) => m.isLive);
   const avgModuleProgress =
     optedModules.length === 0
       ? 0
       : Math.round(optedModules.reduce((sum, m) => sum + m.progressPercent, 0) / optedModules.length);
-  const projectsLive = checklistProjects.filter(
-    (p) => p.progress >= 100 || p.status === "completed" || Boolean(p.goLiveAt),
-  ).length;
-  const progressCards = [
-    { id: "opted", label: "Modules Opted", value: optedModules.length },
-    { id: "live", label: "Modules Live", value: liveModules.length },
-    { id: "avg", label: "Avg Module %", value: avgModuleProgress, suffix: "%" },
-    { id: "overall", label: "Overall %", value: progress, suffix: "%" },
-    { id: "projects", label: "Projects", value: checklistProjects.length },
-    {
-      id: "projects_live",
-      label: "Projects Live",
-      value: projectsLive,
-    },
-  ];
 
   function handleDelete() {
     if (checklistProjects.length > 0) {
@@ -229,24 +205,11 @@ function CompanyDetailContent() {
   function openAddProject() {
     const postSalesModule = company?.modules?.find((m) => m.moduleKey === "post-sales");
     if (!postSalesModule?.optedIn) enableModule(companyId, "post-sales");
-    setEditingProject(null);
-    setTab("Project");
-    setProjectModalOpen(true);
-  }
-
-  function openEditProject(project: Project) {
-    setEditingProject(project);
     setProjectModalOpen(true);
   }
 
   function onSaveProject(data: ProjectAdminFormValues) {
     const patch = formValuesToProjectPatch({ ...data, companyId });
-    if (editingProject) {
-      updateProject(editingProject.id, patch);
-      toast.success("Project details updated");
-      setEditingProject(null);
-      return;
-    }
     const project = addProject({ ...patch, status: "not_started", currentStep: 0 });
     toast.success("Post Sales project created", {
       description: "Open the project to work through the onboarding checklist.",
@@ -390,143 +353,6 @@ function CompanyDetailContent() {
             ))}
           </div>
         </DesignTicketSection>
-      )}
-
-      {tab === "Progress" && (
-        <DesignTicketSection compact title="Module progress" delay={0.02}>
-          <p className="mb-2 text-xs text-muted-foreground">
-            Completion across opted-in modules. Drill into a module to update steps.
-          </p>
-          <ProgressSummaryCards cards={progressCards} />
-          {optedModules.length === 0 ? (
-            <EmptyState
-              title="No modules opted in"
-              description="Enable a module from the Modules tab to start tracking progress."
-              actionLabel="Open Modules"
-              onAction={() => setTab("Modules")}
-            />
-          ) : (
-            <div className="mt-2 space-y-1.5">
-              {optedModules.map((m) => (
-                <div
-                  key={m.moduleKey}
-                  className="card-soft flex flex-wrap items-center gap-2.5 px-3 py-2 transition-shadow hover:shadow-sm"
-                >
-                  <div className="min-w-[140px]">
-                    <div className="text-sm font-medium">{m.label}</div>
-                    <div className="text-[10px] text-muted-foreground">
-                      {m.isLive
-                        ? "Live"
-                        : m.progressPercent >= 100
-                          ? "Ready for Live"
-                          : m.progressPercent === 0
-                            ? "Not started"
-                            : "In progress"}
-                    </div>
-                  </div>
-                  <div className="min-w-[120px] flex-1">
-                    <ProgressBar value={m.progressPercent} />
-                  </div>
-                  <span className="w-10 text-right text-xs font-semibold tabular-nums">
-                    {m.progressPercent}%
-                  </span>
-                  <Pill tone={m.isLive ? "success" : "muted"}>{m.isLive ? "Live" : "Not Live"}</Pill>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 gap-1 text-xs"
-                    onClick={() =>
-                      navigate({
-                        to: "/companies/$companyId/modules/$moduleKey",
-                        params: { companyId, moduleKey: m.moduleKey },
-                      })
-                    }
-                  >
-                    Open <ArrowRight className="h-3 w-3" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-        </DesignTicketSection>
-      )}
-
-      {tab === "Project" && (
-        <div className="space-y-4">
-          <DesignTicketSection compact title="Projects" delay={0.02}>
-            <p className="mb-2 text-xs text-muted-foreground">
-              Post Sales projects use the onboarding checklist — edit address, towers, floors, and commercial details.
-            </p>
-          </DesignTicketSection>
-
-          <section className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5">
-                <Layers className="h-3.5 w-3.5 text-muted-foreground" />
-                <h4 className="text-xs font-semibold text-muted-foreground">Post Sales</h4>
-                <Pill>{checklistProjects.length}</Pill>
-              </div>
-              <Button size="sm" className="h-7 gap-1 bg-primary text-xs" onClick={openAddProject}>
-                <Plus className="h-3 w-3" /> Add Project
-              </Button>
-            </div>
-            {checklistProjects.length === 0 ? (
-              <EmptyState
-                title="No Post Sales projects yet"
-                description="Create a project for this company to start the onboarding checklist."
-                actionLabel="+ Add Project"
-                onAction={openAddProject}
-              />
-            ) : (
-              <div className="grid gap-2 md:grid-cols-2">
-                {checklistProjects.map((p) => (
-                  <div
-                    key={p.id}
-                    className="card-soft group p-3 transition-all hover:-translate-y-0.5 hover:shadow-sm"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <Link
-                        to="/projects/$projectId"
-                        params={{ projectId: p.id }}
-                        search={{ tab: "onboarding" }}
-                        className="min-w-0 flex-1"
-                      >
-                        <div className="text-sm font-semibold group-hover:text-primary">{p.name}</div>
-                        <div className="mt-0.5 text-[11px] text-muted-foreground">
-                          {p.type} · {p.units} units · {p.city || "No city"}
-                          {p.address ? ` · ${p.address}` : ""}
-                        </div>
-                      </Link>
-                      <div className="flex shrink-0 items-center gap-1">
-                        <StatusPill status={p.status} />
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="h-7 gap-1 px-2 text-xs"
-                          onClick={() => openEditProject(p)}
-                        >
-                          <Pencil className="h-3 w-3" /> Edit
-                        </Button>
-                      </div>
-                    </div>
-                    <Link
-                      to="/projects/$projectId"
-                      params={{ projectId: p.id }}
-                      search={{ tab: "onboarding" }}
-                      className="mt-2 block"
-                    >
-                      <ProgressBar value={p.progress} />
-                      <div className="mt-0.5 text-[10px] text-muted-foreground">
-                        {p.checklistDone}/{p.checklistTotal} checklist items · {p.progress}% complete
-                      </div>
-                    </Link>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
       )}
 
       {tab === "Tickets" && <CompanyDesignTicketsPanel companyId={companyId} />}
@@ -675,12 +501,9 @@ function CompanyDetailContent() {
 
       <ProjectFormModal
         open={projectModalOpen}
-        onOpenChange={(open) => {
-          setProjectModalOpen(open);
-          if (!open) setEditingProject(null);
-        }}
+        onOpenChange={setProjectModalOpen}
         companies={companyFormOptions}
-        editing={editingProject}
+        editing={null}
         defaultCompanyId={companyId}
         onSave={onSaveProject}
       />

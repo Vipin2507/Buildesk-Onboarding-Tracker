@@ -14,6 +14,7 @@ export {
   updateCompany,
   deleteCompany,
   renewCompany,
+  syncCompanyModuleLabels,
   updateCompaniesCommercialBatch,
 } from "@/server/api/companies";
 
@@ -306,6 +307,7 @@ export {
 
 export {
   listProjectFiles,
+  listProjectFilesByCompany,
   uploadProjectFile,
   updateProjectFileMeta,
   deleteProjectFile,

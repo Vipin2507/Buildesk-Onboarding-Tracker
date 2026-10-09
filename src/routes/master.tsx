@@ -1454,9 +1454,11 @@ function ModulesPanel() {
     };
     if (editing) {
       updateModule(editing.id, payload);
-      toast.success("Module updated");
+      void import("@/lib/config-persistence").then((m) => m.flushMasterConfigPersistence());
+      toast.success("Module updated — synced to companies");
     } else {
       addModule(payload);
+      void import("@/lib/config-persistence").then((m) => m.flushMasterConfigPersistence());
       toast.success("Module added");
     }
     setModalOpen(false);

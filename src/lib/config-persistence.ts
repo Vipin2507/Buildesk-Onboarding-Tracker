@@ -143,6 +143,13 @@ export function flushCrmMasterConfigPersistence() {
   void setAppConfig({ data: { key: "crm-master", value: crmMasterSnapshot() } });
 }
 
+/** Force pending ERP master config to SQLite now. */
+export function flushMasterConfigPersistence() {
+  if (!canPersistAppConfig()) return;
+  flushServerSyncDebounced("master-config");
+  void setAppConfig({ data: { key: "master", value: masterSnapshot() } });
+}
+
 /** Force pending automation config to SQLite now (settings/rules — logs sync separately). */
 export function flushAutomationConfigPersistence(opts?: { erp?: boolean; crm?: boolean }) {
   if (!canPersistAppConfig()) return;
@@ -215,6 +222,7 @@ export function wireConfigPersistence() {
   const flush = () => {
     flushAutomationConfigPersistence();
     if (canPersistAppConfig()) {
+      flushMasterConfigPersistence();
       flushServerSyncDebounced("crm-master-config");
     }
   };

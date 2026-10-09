@@ -67,6 +67,22 @@ export const listProjectFiles = createServerFn({ method: "GET" })
       .map(mapRow);
   });
 
+export const listProjectFilesByCompany = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => z.object({ companyId: z.string().min(1) }).parse(data))
+  .handler(async ({ data }) => {
+    requireUser();
+    const db = getDb();
+    const company = db.select().from(t.companies).where(eq(t.companies.id, data.companyId)).get();
+    if (!company) throw new ApiError(404, "Company not found");
+    return db
+      .select()
+      .from(t.projectFiles)
+      .where(eq(t.projectFiles.companyId, data.companyId))
+      .orderBy(desc(t.projectFiles.uploadedAt))
+      .all()
+      .map(mapRow);
+  });
+
 export const uploadProjectFile = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z

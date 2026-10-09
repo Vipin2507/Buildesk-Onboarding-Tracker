@@ -32,7 +32,12 @@ import { ProjectImportModal } from "@/components/project-import-modal";
 import { CompanyCommercialBulkUpdateModal } from "@/components/companies/company-commercial-bulk-update-modal";
 import { inDateRange } from "@/components/list-toolbar";
 import { usePermissions } from "@/hooks/use-permissions";
-import { MODULE_CATALOG, createCompanyModules, normalizeCompanyModules } from "@/data/module-catalog";
+import {
+  MODULE_CATALOG,
+  createCompanyModules,
+  getModuleLabel,
+  normalizeCompanyModules,
+} from "@/data/module-catalog";
 import {
   useCompanyStore,
   useEmployeeStore,
@@ -1180,7 +1185,7 @@ function CompaniesListPage() {
                             .slice(0, 2)
                             .map((m) => (
                               <Pill key={m.moduleKey} tone="accent">
-                                {m.label}
+                                {getModuleLabel(m.moduleKey)}
                               </Pill>
                             ))}
                           {c.modules.filter((m) => m.optedIn).length > 2 ? (
@@ -1648,7 +1653,7 @@ function CompaniesListPage() {
                       }}
                     />
                     <span>
-                      <span className="font-medium">{m.label}</span>
+                      <span className="font-medium">{getModuleLabel(m.key)}</span>
                       <span className="block text-xs text-muted-foreground">{m.description}</span>
                     </span>
                   </label>

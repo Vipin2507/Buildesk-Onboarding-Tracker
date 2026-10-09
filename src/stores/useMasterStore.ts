@@ -25,6 +25,7 @@ import {
   SEED_TRIGGERS,
   SEED_WORKFLOW_STEPS,
 } from "@/data/master-seed";
+import { setMasterModuleLabelResolver } from "@/data/module-catalog";
 import { createPersistedStore, touch } from "./persist";
 import { logActivity } from "./useActivityStore";
 
@@ -317,9 +318,20 @@ export const useMasterStore = createPersistedStore<MasterState>("master-config-v
     logActivity({ who: "You", what: `Added module ${data.label}`, kind: "success" });
   },
   updateModule: (id, data) => {
+    const prev = get().modules.find((x) => x.id === id);
     set((s) => ({
       modules: s.modules.map((m) => (m.id === id ? touch({ ...m, ...data }) : m)),
     }));
+    const next = get().modules.find((x) => x.id === id);
+    const labelChanged =
+      Boolean(next) &&
+      (data.label !== undefined || data.key !== undefined) &&
+      (prev?.label !== next?.label || prev?.key !== next?.key);
+    if (labelChanged) {
+      void import("@/lib/sync-master-module-labels").then((m) =>
+        m.syncMasterModuleLabelsToCompanies(),
+      );
+    }
   },
   deleteModule: (id) => {
     const m = get().modules.find((x) => x.id === id);
@@ -459,6 +471,10 @@ export const useMasterStore = createPersistedStore<MasterState>("master-config-v
     logActivity({ who: "You", what: "Reset all master configuration to defaults", kind: "warning" });
   },
 }));
+
+setMasterModuleLabelResolver(
+  (key) => useMasterStore.getState().modules.find((m) => m.key === key)?.label,
+);
 
 /** Enabled Post Sales step defs for new projects (Master-driven). */
 export function getEnabledWorkflowStepDefs() {

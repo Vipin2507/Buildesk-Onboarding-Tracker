@@ -490,6 +490,45 @@ const commercialPatchInput = z.object({
     .partial(),
 });
 
+/** Cascade Master Config module labels into every company_modules row. */
+export const syncCompanyModuleLabels = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        labels: z
+          .array(
+            z.object({
+              moduleKey: z.string().min(1),
+              label: z.string().min(1),
+            }),
+          )
+          .min(1)
+          .max(50),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const user = requirePermission("manageCompanies");
+    const db = getDb();
+    let updated = 0;
+
+    for (const row of data.labels) {
+      const result = db
+        .update(t.companyModules)
+        .set({ label: row.label })
+        .where(eq(t.companyModules.moduleKey, row.moduleKey))
+        .run();
+      updated += Number((result as { changes?: number }).changes ?? 0);
+    }
+
+    logActivity({
+      who: user.name,
+      what: `Synced Master module labels to ${updated} company module row(s)`,
+      kind: "info",
+    });
+    return { updated, companies: loadCompanies() };
+  });
+
 export const updateCompaniesCommercialBatch = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z.object({ updates: z.array(commercialPatchInput).min(1).max(500) }).parse(data),

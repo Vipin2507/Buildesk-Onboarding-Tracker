@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Pill } from "@/components/status-pill";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDeleteDialog } from "@/components/entity-form-modal";
+import { useCompanyProjectFiles } from "@/hooks/use-project-files";
 import {
   useNotesAttachmentsStore,
   useCurrentUser,
@@ -21,6 +22,11 @@ import {
   usePostSalesStore,
 } from "@/stores";
 import { ATTACHMENT_CATEGORY_LABEL, type AttachmentCategory, type CompanyAttachment } from "@/types";
+import {
+  formatProjectFileSize,
+  PROJECT_FILE_CATEGORY_LABEL,
+  type ProjectFile,
+} from "@/types/project-file";
 import { downloadAttachmentFile, downloadNoteFile } from "@/lib/download-file";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +47,34 @@ const MANUAL_PURPOSES: { purpose: string; category: AttachmentCategory }[] = [
   { purpose: "Other document", category: "other" },
 ];
 
+type UnifiedFile =
+  | {
+      kind: "attachment";
+      id: string;
+      fileName: string;
+      purpose: string;
+      categoryLabel: string;
+      uploadedAt: string;
+      uploadedBy: string;
+      projectId?: string;
+      context?: string;
+      recordCount?: number;
+      attachment: CompanyAttachment;
+    }
+  | {
+      kind: "project-file";
+      id: string;
+      fileName: string;
+      purpose: string;
+      categoryLabel: string;
+      uploadedAt: string;
+      uploadedBy: string;
+      projectId: string;
+      sizeLabel: string;
+      url: string;
+      projectFile: ProjectFile;
+    };
+
 export function CompanyNotesAttachmentsTab({ companyId }: { companyId: string }) {
   const currentUser = useCurrentUser();
   const allNotes = useNotesAttachmentsStore((s) => s.notes);
@@ -52,6 +86,7 @@ export function CompanyNotesAttachmentsTab({ companyId }: { companyId: string })
   const deleteAttachment = useNotesAttachmentsStore((s) => s.deleteAttachment);
   const onboardingProjects = useProjectStore((s) => s.projects);
   const postSalesProjects = usePostSalesStore((s) => s.projects);
+  const { data: projectFiles = [], isLoading: projectFilesLoading } = useCompanyProjectFiles(companyId);
 
   const [noteBody, setNoteBody] = useState("");
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
@@ -74,23 +109,49 @@ export function CompanyNotesAttachmentsTab({ companyId }: { companyId: string })
     [allNotes, companyId],
   );
 
-  const attachments = useMemo(
-    () =>
-      allAttachments
-        .filter((a) => a.companyId === companyId)
-        .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt)),
-    [allAttachments, companyId],
-  );
+  const files = useMemo((): UnifiedFile[] => {
+    const fromAttachments: UnifiedFile[] = allAttachments
+      .filter((a) => a.companyId === companyId)
+      .map((a) => ({
+        kind: "attachment" as const,
+        id: `att-${a.id}`,
+        fileName: a.fileName,
+        purpose: a.purpose,
+        categoryLabel: ATTACHMENT_CATEGORY_LABEL[a.category],
+        uploadedAt: a.uploadedAt,
+        uploadedBy: a.uploadedBy,
+        projectId: a.projectId,
+        context: a.context,
+        recordCount: a.recordCount,
+        attachment: a,
+      }));
+
+    const fromProjects: UnifiedFile[] = projectFiles.map((f) => ({
+      kind: "project-file" as const,
+      id: `pf-${f.id}`,
+      fileName: f.fileName,
+      purpose: f.purpose?.trim() || PROJECT_FILE_CATEGORY_LABEL[f.category],
+      categoryLabel: PROJECT_FILE_CATEGORY_LABEL[f.category],
+      uploadedAt: f.uploadedAt,
+      uploadedBy: f.uploadedBy,
+      projectId: f.projectId,
+      sizeLabel: formatProjectFileSize(f.sizeBytes),
+      url: f.url,
+      projectFile: f,
+    }));
+
+    return [...fromAttachments, ...fromProjects].sort((a, b) =>
+      b.uploadedAt.localeCompare(a.uploadedAt),
+    );
+  }, [allAttachments, companyId, projectFiles]);
 
   const purposes = useMemo(() => {
-    const set = new Set(attachments.map((a) => a.purpose));
+    const set = new Set(files.map((a) => a.purpose));
     return ["All", ...Array.from(set).sort()];
-  }, [attachments]);
+  }, [files]);
 
-  const filteredAttachments =
-    purposeFilter === "All"
-      ? attachments
-      : attachments.filter((a) => a.purpose === purposeFilter);
+  const filteredFiles =
+    purposeFilter === "All" ? files : files.filter((a) => a.purpose === purposeFilter);
 
   function projectLabel(projectId?: string) {
     if (!projectId) return null;
@@ -134,13 +195,19 @@ export function CompanyNotesAttachmentsTab({ companyId }: { companyId: string })
     toast.success("Note updated");
   }
 
-  function handleDownload(a: CompanyAttachment) {
-    downloadAttachmentFile(a);
-    toast.success("Download started", { description: a.fileName });
+  function handleDownload(file: UnifiedFile) {
+    if (file.kind === "project-file") {
+      window.open(file.url, "_blank", "noopener,noreferrer");
+      toast.success("Download started", { description: file.fileName });
+      return;
+    }
+    downloadAttachmentFile(file.attachment);
+    toast.success("Download started", { description: file.fileName });
   }
 
   function handleManualUpload() {
-    const fileName = manualFileName.trim() || `${manualPurpose.toLowerCase().replace(/\s+/g, "_")}.xlsx`;
+    const fileName =
+      manualFileName.trim() || `${manualPurpose.toLowerCase().replace(/\s+/g, "_")}.xlsx`;
     const meta = MANUAL_PURPOSES.find((p) => p.purpose === manualPurpose) ?? MANUAL_PURPOSES[0];
     addAttachment({
       companyId,
@@ -148,7 +215,7 @@ export function CompanyNotesAttachmentsTab({ companyId }: { companyId: string })
       purpose: meta.purpose,
       category: meta.category,
       uploadedBy: currentUser?.name ?? "You",
-      context: "Manual upload from Notes & Attachments",
+      context: "Manual upload from Notes & Files",
       recordCount: 10 + Math.floor(Math.random() * 80),
     });
     setManualFileName("");
@@ -182,7 +249,10 @@ export function CompanyNotesAttachmentsTab({ companyId }: { companyId: string })
         </div>
 
         {notes.length === 0 ? (
-          <EmptyState title="No notes yet" description="Capture kickoff decisions, preferences, and follow-ups here." />
+          <EmptyState
+            title="No notes yet"
+            description="Capture kickoff decisions, preferences, and follow-ups here."
+          />
         ) : (
           <ul className="max-h-[28rem] space-y-3 overflow-y-auto pr-1">
             {notes.map((n) => (
@@ -201,8 +271,12 @@ export function CompanyNotesAttachmentsTab({ companyId }: { companyId: string })
                       className="min-h-[72px] w-full rounded-md border bg-background px-2 py-1.5 text-sm"
                     />
                     <div className="flex justify-end gap-2">
-                      <Button size="sm" variant="outline" onClick={() => setEditingNoteId(null)}>Cancel</Button>
-                      <Button size="sm" onClick={saveEditNote}>Save</Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditingNoteId(null)}>
+                        Cancel
+                      </Button>
+                      <Button size="sm" onClick={saveEditNote}>
+                        Save
+                      </Button>
                     </div>
                   </div>
                 ) : (
@@ -265,14 +339,19 @@ export function CompanyNotesAttachmentsTab({ companyId }: { companyId: string })
       <section className="card-soft flex flex-col p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="font-semibold">Attachments</h3>
+            <h3 className="font-semibold">Files</h3>
             <p className="text-xs text-muted-foreground">
-              Every uploaded document with purpose, date & time
+              Company attachments and all project files for this account
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Pill>{attachments.length}</Pill>
-            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setUploadOpen((v) => !v)}>
+            <Pill>{files.length}</Pill>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => setUploadOpen((v) => !v)}
+            >
               <Upload className="h-3.5 w-3.5" /> Add File
             </Button>
           </div>
@@ -288,7 +367,9 @@ export function CompanyNotesAttachmentsTab({ companyId }: { companyId: string })
                 className="mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm"
               >
                 {MANUAL_PURPOSES.map((p) => (
-                  <option key={p.purpose} value={p.purpose}>{p.purpose}</option>
+                  <option key={p.purpose} value={p.purpose}>
+                    {p.purpose}
+                  </option>
                 ))}
               </select>
             </label>
@@ -302,8 +383,12 @@ export function CompanyNotesAttachmentsTab({ companyId }: { companyId: string })
               />
             </label>
             <div className="flex justify-end gap-2">
-              <Button size="sm" variant="outline" onClick={() => setUploadOpen(false)}>Cancel</Button>
-              <Button size="sm" onClick={handleManualUpload}>Upload</Button>
+              <Button size="sm" variant="outline" onClick={() => setUploadOpen(false)}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleManualUpload}>
+                Upload
+              </Button>
             </div>
           </div>
         )}
@@ -328,14 +413,16 @@ export function CompanyNotesAttachmentsTab({ companyId }: { companyId: string })
           </div>
         )}
 
-        {filteredAttachments.length === 0 ? (
+        {projectFilesLoading && files.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Loading project files…</p>
+        ) : filteredFiles.length === 0 ? (
           <EmptyState
-            title="No attachments yet"
-            description="Files from Post Sales, data migration, and manual uploads appear here."
+            title="No files yet"
+            description="Project uploads and company attachments for this account appear here."
           />
         ) : (
           <ul className="max-h-[28rem] space-y-2 overflow-y-auto pr-1">
-            {filteredAttachments.map((a) => (
+            {filteredFiles.map((a) => (
               <li
                 key={a.id}
                 className="group flex items-start gap-3 rounded-lg border bg-card p-3 transition-colors hover:bg-muted/30"
@@ -347,17 +434,26 @@ export function CompanyNotesAttachmentsTab({ companyId }: { companyId: string })
                   <div className="truncate text-sm font-medium">{a.fileName}</div>
                   <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                     <Pill tone="accent">{a.purpose}</Pill>
-                    <span className="text-[11px] text-muted-foreground">
-                      {ATTACHMENT_CATEGORY_LABEL[a.category]}
-                    </span>
+                    <span className="text-[11px] text-muted-foreground">{a.categoryLabel}</span>
+                    {a.kind === "project-file" ? (
+                      <Pill tone="muted">Project</Pill>
+                    ) : (
+                      <Pill tone="muted">Company</Pill>
+                    )}
                   </div>
                   <div className="mt-1 text-[11px] text-muted-foreground">
                     {formatDateTime(a.uploadedAt)} · by {a.uploadedBy}
-                    {a.recordCount != null && ` · ${a.recordCount} records`}
+                    {a.kind === "attachment" && a.recordCount != null && ` · ${a.recordCount} records`}
+                    {a.kind === "project-file" && ` · ${a.sizeLabel}`}
                   </div>
-                  {a.context && (
+                  {a.projectId ? (
+                    <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                      {projectLabel(a.projectId)}
+                    </div>
+                  ) : null}
+                  {a.kind === "attachment" && a.context ? (
                     <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{a.context}</div>
-                  )}
+                  ) : null}
                 </div>
                 <div className="flex shrink-0 flex-col gap-0.5 opacity-80 transition-opacity group-hover:opacity-100">
                   <Button
@@ -369,15 +465,17 @@ export function CompanyNotesAttachmentsTab({ companyId }: { companyId: string })
                   >
                     <Download className="h-4 w-4" />
                   </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8"
-                    title="Remove"
-                    onClick={() => setDeleteAttachId(a.id)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                  </Button>
+                  {a.kind === "attachment" ? (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8"
+                      title="Remove"
+                      onClick={() => setDeleteAttachId(a.attachment.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
+                  ) : null}
                 </div>
               </li>
             ))}
@@ -400,7 +498,7 @@ export function CompanyNotesAttachmentsTab({ companyId }: { companyId: string })
         open={!!deleteAttachId}
         onOpenChange={(open) => !open && setDeleteAttachId(null)}
         title="Remove attachment?"
-        description="This removes the document from the company register (prototype)."
+        description="This removes the document from the company register."
         onConfirm={() => {
           if (deleteAttachId) deleteAttachment(deleteAttachId);
           setDeleteAttachId(null);

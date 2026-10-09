@@ -409,6 +409,9 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
 
         if (master && typeof master === "object" && Object.keys(master).length) {
           useMasterStore.setState((s) => ({ ...s, ...master }));
+        } else if (user.role === "Admin") {
+          const { flushMasterConfigPersistence } = await import("@/lib/config-persistence");
+          flushMasterConfigPersistence();
         }
         if (settings && typeof settings === "object" && Object.keys(settings).length > 1) {
           const { hydrateSettingsFromServer } = await import("@/stores/useSettingsStore");
@@ -425,6 +428,12 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           await setAppConfig({
             data: { key: "crm-master", value: crmMasterSnapshot() },
           }).catch(() => {});
+        }
+        if (user.role === "Admin") {
+          const { syncMasterModuleLabelsToCompanies } = await import(
+            "@/lib/sync-master-module-labels"
+          );
+          void syncMasterModuleLabelsToCompanies();
         }
         let automationConfigAuthoritative = false;
         if (automation === null) {
