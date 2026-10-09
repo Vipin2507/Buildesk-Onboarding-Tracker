@@ -122,6 +122,49 @@ export const companyModules = sqliteTable(
   ],
 );
 
+/** ERP company payment ledger — separate from CRM payment_transactions. */
+export const companyPaymentTransactions = sqliteTable(
+  "company_payment_transactions",
+  {
+    id: text("id").primaryKey(),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    amount: real("amount").notNull(),
+    paidDate: text("paid_date").notNull(),
+    note: text("note"),
+    method: text("method"),
+    createdBy: text("created_by"),
+    ...timestamps,
+  },
+  (t) => [
+    index("company_payment_tx_company_idx").on(t.companyId),
+    index("company_payment_tx_paid_date_idx").on(t.paidDate),
+  ],
+);
+
+/** ERP company installment schedule — separate from CRM installments. */
+export const companyPaymentInstallments = sqliteTable(
+  "company_payment_installments",
+  {
+    id: text("id").primaryKey(),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    sequence: integer("sequence").notNull().default(1),
+    label: text("label"),
+    amount: real("amount").notNull(),
+    dueDate: text("due_date").notNull(),
+    status: text("status").notNull().default("pending"),
+    notes: text("notes"),
+    ...timestamps,
+  },
+  (t) => [
+    index("company_payment_inst_company_idx").on(t.companyId),
+    index("company_payment_inst_due_idx").on(t.dueDate),
+  ],
+);
+
 /** CRM customer accounts (separate from ERP companies). */
 export const crmAccounts = sqliteTable(
   "crm_accounts",

@@ -18,6 +18,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as RenewalsRouteImport } from './routes/renewals'
 import { Route as ProjectsRouteImport } from './routes/projects'
+import { Route as PaymentsRouteImport } from './routes/payments'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as ModulesRouteImport } from './routes/modules'
 import { Route as MeetingsRouteImport } from './routes/meetings'
@@ -119,6 +120,11 @@ const RenewalsRoute = RenewalsRouteImport.update({
 const ProjectsRoute = ProjectsRouteImport.update({
   id: '/projects',
   path: '/projects',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PaymentsRoute = PaymentsRouteImport.update({
+  id: '/payments',
+  path: '/payments',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OnboardingRoute = OnboardingRouteImport.update({
@@ -433,6 +439,7 @@ export interface FileRoutesByFullPath {
   '/meetings': typeof MeetingsRoute
   '/modules': typeof ModulesRoute
   '/onboarding': typeof OnboardingRoute
+  '/payments': typeof PaymentsRoute
   '/projects': typeof ProjectsRouteWithChildren
   '/renewals': typeof RenewalsRoute
   '/reports': typeof ReportsRoute
@@ -500,6 +507,7 @@ export interface FileRoutesByTo {
   '/meetings': typeof MeetingsRoute
   '/modules': typeof ModulesRoute
   '/onboarding': typeof OnboardingRoute
+  '/payments': typeof PaymentsRoute
   '/projects': typeof ProjectsRouteWithChildren
   '/renewals': typeof RenewalsRoute
   '/reports': typeof ReportsRoute
@@ -567,6 +575,7 @@ export interface FileRoutesById {
   '/meetings': typeof MeetingsRoute
   '/modules': typeof ModulesRoute
   '/onboarding': typeof OnboardingRoute
+  '/payments': typeof PaymentsRoute
   '/projects': typeof ProjectsRouteWithChildren
   '/renewals': typeof RenewalsRoute
   '/reports': typeof ReportsRoute
@@ -637,6 +646,7 @@ export interface FileRouteTypes {
     | '/meetings'
     | '/modules'
     | '/onboarding'
+    | '/payments'
     | '/projects'
     | '/renewals'
     | '/reports'
@@ -704,6 +714,7 @@ export interface FileRouteTypes {
     | '/meetings'
     | '/modules'
     | '/onboarding'
+    | '/payments'
     | '/projects'
     | '/renewals'
     | '/reports'
@@ -770,6 +781,7 @@ export interface FileRouteTypes {
     | '/meetings'
     | '/modules'
     | '/onboarding'
+    | '/payments'
     | '/projects'
     | '/renewals'
     | '/reports'
@@ -839,6 +851,7 @@ export interface RootRouteChildren {
   MeetingsRoute: typeof MeetingsRoute
   ModulesRoute: typeof ModulesRoute
   OnboardingRoute: typeof OnboardingRoute
+  PaymentsRoute: typeof PaymentsRoute
   ProjectsRoute: typeof ProjectsRouteWithChildren
   RenewalsRoute: typeof RenewalsRoute
   ReportsRoute: typeof ReportsRoute
@@ -915,6 +928,13 @@ declare module '@tanstack/react-router' {
       path: '/projects'
       fullPath: '/projects'
       preLoaderRoute: typeof ProjectsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payments': {
+      id: '/payments'
+      path: '/payments'
+      fullPath: '/payments'
+      preLoaderRoute: typeof PaymentsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/onboarding': {
@@ -1545,6 +1565,7 @@ const rootRouteChildren: RootRouteChildren = {
   MeetingsRoute: MeetingsRoute,
   ModulesRoute: ModulesRoute,
   OnboardingRoute: OnboardingRoute,
+  PaymentsRoute: PaymentsRoute,
   ProjectsRoute: ProjectsRouteWithChildren,
   RenewalsRoute: RenewalsRoute,
   ReportsRoute: ReportsRoute,

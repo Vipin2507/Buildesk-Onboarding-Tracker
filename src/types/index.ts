@@ -1,5 +1,6 @@
 export * from "./common";
 export * from "./company";
+export * from "./company-payment";
 export * from "./module";
 export * from "./project";
 export * from "./onboarding";

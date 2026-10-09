@@ -195,6 +195,16 @@ export {
 } from "@/server/api/crm-payments";
 
 export {
+  getCompanyPayments,
+  listErpCompanyPayments,
+  recordCompanyPayment,
+  updateCompanyPayment,
+  deleteCompanyPayment,
+  upsertCompanyPaymentInstallmentApi,
+  deleteCompanyPaymentInstallmentApi,
+} from "@/server/api/company-payments";
+
+export {
   listCrmOnboardingRecords,
   upsertCrmOnboardingRecord,
   deleteCrmOnboardingRecord,

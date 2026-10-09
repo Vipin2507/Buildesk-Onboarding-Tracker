@@ -100,7 +100,6 @@ function defaultCompanyFormValues(users: User[]): CompanyForm {
     supportManager2Id: "",
     annualLicense: true,
     dealSize: undefined,
-    usersPurchased: undefined,
     totalCost: undefined,
     paymentReceived: undefined,
     pendingAmount: undefined,
@@ -233,7 +232,6 @@ const companySchema = z.object({
   supportManager2Id: z.string().optional(),
   annualLicense: z.boolean().optional(),
   dealSize: z.coerce.number().optional(),
-  usersPurchased: z.coerce.number().optional(),
   totalCost: z.coerce.number().optional(),
   paymentReceived: z.coerce.number().optional(),
   pendingAmount: z.coerce.number().optional(),
@@ -699,7 +697,6 @@ function CompaniesListPage() {
       supportManager2Id: c.supportManager2Id ?? "",
       annualLicense: c.annualLicense ?? true,
       dealSize: c.dealSize,
-      usersPurchased: c.usersPurchased,
       totalCost: c.totalCost,
       paymentReceived: c.paymentReceived,
       pendingAmount: c.pendingAmount,
@@ -1512,10 +1509,6 @@ function CompaniesListPage() {
               <div>
                 <label className="text-xs font-medium">GST Amount</label>
                 <input type="number" step="any" {...form.register("gstAmount")} className={inputClass()} />
-              </div>
-              <div>
-                <label className="text-xs font-medium">Users Purchased</label>
-                <input type="number" {...form.register("usersPurchased")} className={inputClass()} />
               </div>
               <div>
                 <label className="text-xs font-medium">Total Cost</label>

@@ -1334,5 +1334,44 @@ if (!tableExists("crm_whatsapp_group_messages")) {
   console.log("+ CREATE TABLE crm_whatsapp_group_messages");
 }
 
+if (!tableExists("company_payment_transactions")) {
+  sqlite.exec(`
+    CREATE TABLE company_payment_transactions (
+      id TEXT PRIMARY KEY NOT NULL,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      amount REAL NOT NULL,
+      paid_date TEXT NOT NULL,
+      note TEXT,
+      method TEXT,
+      created_by TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS company_payment_tx_company_idx ON company_payment_transactions(company_id);
+    CREATE INDEX IF NOT EXISTS company_payment_tx_paid_date_idx ON company_payment_transactions(paid_date);
+  `);
+  console.log("+ CREATE TABLE company_payment_transactions");
+}
+
+if (!tableExists("company_payment_installments")) {
+  sqlite.exec(`
+    CREATE TABLE company_payment_installments (
+      id TEXT PRIMARY KEY NOT NULL,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      sequence INTEGER NOT NULL DEFAULT 1,
+      label TEXT,
+      amount REAL NOT NULL,
+      due_date TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS company_payment_inst_company_idx ON company_payment_installments(company_id);
+    CREATE INDEX IF NOT EXISTS company_payment_inst_due_idx ON company_payment_installments(due_date);
+  `);
+  console.log("+ CREATE TABLE company_payment_installments");
+}
+
 sqlite.close();
 console.log("db:ensure complete");

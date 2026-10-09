@@ -65,7 +65,6 @@ const detailSchema = z.object({
   health: z.enum(["Healthy", "Moderate", "Critical"]),
   status: z.enum(["not_started", "in_progress", "review", "completed", "on_hold"]),
   commercialStatus: z.union([z.enum(COMPANY_COMMERCIAL_STATUSES), z.literal("")]).optional(),
-  usersPurchased: z.string().optional(),
   dealSize: z.string().optional(),
   amountWithGst: z.string().optional(),
   taxableAmount: z.string().optional(),
@@ -195,7 +194,6 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
         paymentStatus: (data.paymentStatus || undefined) as CompanyPaymentStatus | undefined,
         endDate: data.endDate || undefined,
         cancelledOn: data.cancelledOn || undefined,
-        usersPurchased: parseOptionalInt(data.usersPurchased),
         dealSize: parseOptionalNumber(data.dealSize),
         totalCost: parseOptionalNumber(data.dealSize) ?? company.totalCost,
         amountWithGst: parseOptionalNumber(data.amountWithGst),
@@ -408,10 +406,6 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
               </select>
             </label>
             <label className="block text-xs font-medium">
-              Users / Quantity
-              <input type="number" min={0} step={1} {...form.register("usersPurchased")} className={inputClass()} />
-            </label>
-            <label className="block text-xs font-medium">
               Deal Value
               <input type="number" min={0} step={1} {...form.register("dealSize")} className={inputClass()} />
             </label>
@@ -552,9 +546,6 @@ export function CompanyOverviewTab({ company }: { company: Company }) {
             <Field label="Plan Tier">
               <Pill tone="accent">{company.plan}</Pill>
             </Field>
-            <Field label="Users / Quantity">
-              {company.usersPurchased != null ? company.usersPurchased : "—"}
-            </Field>
             <Field label="Deal Value">{formatInr(company.dealSize)}</Field>
             <Field label="Amount with GST">{formatInr(company.amountWithGst)}</Field>
             <Field label="Taxable">{formatInr(company.taxableAmount)}</Field>
@@ -637,7 +628,6 @@ function toFormValues(company: Company): DetailForm {
     health: company.health,
     status: company.status,
     commercialStatus: company.commercialStatus ?? "",
-    usersPurchased: company.usersPurchased != null ? String(company.usersPurchased) : "",
     dealSize: company.dealSize != null ? String(company.dealSize) : "",
     amountWithGst: company.amountWithGst != null ? String(company.amountWithGst) : "",
     taxableAmount: company.taxableAmount != null ? String(company.taxableAmount) : "",

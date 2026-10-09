@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { ModuleCard } from "@/components/module-card";
 import { CompanyOverviewTab } from "@/components/company-overview-tab";
 import { CompanyNotesAttachmentsTab } from "@/components/company-notes-attachments";
+import { CompanyPaymentsTab } from "@/components/company-payments-tab";
 import { CompanyHistoryTab } from "@/components/company-history";
 import { CompanyDesignTicketsPanel } from "@/components/company-design-tickets-panel";
 import { CompanyTasksPanel } from "@/components/company-tasks-panel";
@@ -67,6 +68,7 @@ const tabSchema = z.enum([
   "Visits",
   "Notes & Attachments",
   "History",
+  "Payments",
   "Billing",
 ]);
 
@@ -96,6 +98,7 @@ const TABS = [
   { id: "Visits", label: "Visits" },
   { id: "Notes & Attachments", label: "Notes & Files" },
   { id: "History", label: "History" },
+  { id: "Payments", label: "Payments" },
   { id: "Billing", label: "Billing" },
 ] as const;
 
@@ -366,6 +369,8 @@ function CompanyDetailContent() {
       {tab === "Notes & Attachments" && <CompanyNotesAttachmentsTab companyId={companyId} />}
 
       {tab === "History" && <CompanyHistoryTab companyId={companyId} />}
+
+      {tab === "Payments" && <CompanyPaymentsTab companyId={companyId} />}
 
       {tab === "Billing" && (
         <DesignTicketSection compact title="Billing & subscription" delay={0.02}>

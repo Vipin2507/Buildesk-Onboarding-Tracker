@@ -25,6 +25,7 @@ import {
   MapPin,
   Zap,
   MessagesSquare,
+  Wallet,
 } from "lucide-react";
 import type { RolePermissionKey } from "@/types";
 
@@ -45,6 +46,7 @@ export type NavItem = {
 export const APP_NAV: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { to: "/companies", label: "Companies", icon: Building2 },
+  { to: "/payments", label: "Payments", icon: Wallet },
   { to: "/support", label: "Support Desk", icon: LifeBuoy },
   { to: "/tickets", label: "Ticket Tracking", icon: MessageSquareText },
   { to: "/live-chat", label: "Live Chat", icon: MessagesSquare, permission: "manageTickets" },

@@ -19,7 +19,6 @@ import {
 export const COMPANY_COMMERCIAL_IMPORT_HEADERS = [
   "Status",
   "Name",
-  "Quantity",
   "Total Deal Value",
   "Amount WITH GST",
   "Taxable",
@@ -38,7 +37,6 @@ export type CompanyCommercialImportHeader = (typeof COMPANY_COMMERCIAL_IMPORT_HE
 const HEADER_ALIASES: Record<CompanyCommercialImportHeader, string[]> = {
   Status: ["status", "accountstatus", "subscriptionstatus"],
   Name: ["name", "companyname", "company", "clientname", "client"],
-  Quantity: ["quantity", "users", "userspurchased", "qty", "seats", "licences", "licenses"],
   "Total Deal Value": ["totaldealvalue", "dealvalue", "dealsize", "totalvalue"],
   "Amount WITH GST": ["amountwithgst", "totalwithgst", "amountwithtax", "grandtotal"],
   Taxable: ["taxable", "taxableamount", "taxablevalue"],
@@ -70,7 +68,6 @@ export type CompanyCommercialImportRawRow = {
   rowNumber: number;
   statusRaw: string;
   name: string;
-  quantityRaw: string;
   totalDealValueRaw: string;
   amountWithGstRaw: string;
   taxableRaw: string;
@@ -82,7 +79,6 @@ export type CompanyCommercialImportRawRow = {
   startDateRaw: string;
   endDateRaw: string;
   cancelledOnRaw: string;
-  quantity: number | null;
   totalDealValue: number | null;
   amountWithGst: number | null;
   taxableAmount: number | null;
@@ -104,7 +100,6 @@ export type CompanyCommercialImportPlanRow = {
   commercialStatus: CompanyCommercialStatus | null;
   planName: CompanyCommercialPlanName | null;
   plan: CompanyPlan | null;
-  usersPurchased: number | null;
   dealSize: number | null;
   totalCost: number | null;
   amountWithGst: number | null;
@@ -149,7 +144,6 @@ export type CompanyCommercialPatch = Partial<
     | "status"
     | "plan"
     | "planName"
-    | "usersPurchased"
     | "dealSize"
     | "totalCost"
     | "paymentReceived"
@@ -270,7 +264,6 @@ export function downloadCompanyCommercialImportTemplate() {
     {
       Status: "Live",
       Name: "Skyline Developers",
-      Quantity: 40,
       "Total Deal Value": 850000,
       "Amount WITH GST": 1003000,
       Taxable: 850000,
@@ -320,7 +313,6 @@ export async function parseCompanyCommercialImportFile(
   return json.map((row, i) => {
     const statusRaw = cellStr(row[mapped.Status ?? ""]);
     const name = cellStr(row[mapped.Name!]);
-    const quantityRaw = cellStr(row[mapped.Quantity ?? ""]);
     const totalDealValueRaw = cellStr(row[mapped["Total Deal Value"] ?? ""]);
     const amountWithGstRaw = cellStr(row[mapped["Amount WITH GST"] ?? ""]);
     const taxableRaw = cellStr(row[mapped.Taxable ?? ""]);
@@ -333,7 +325,6 @@ export async function parseCompanyCommercialImportFile(
     const endDateRaw = row[mapped["End date/ Renewal date"] ?? ""];
     const cancelledOnRaw = row[mapped["Cancelled On"] ?? ""];
 
-    const quantity = parseNumber(quantityRaw);
     const totalDealValue = parseNumber(totalDealValueRaw);
     const amountWithGst = parseNumber(amountWithGstRaw);
     const taxableAmount = parseNumber(taxableRaw);
@@ -365,7 +356,6 @@ export async function parseCompanyCommercialImportFile(
         `Invalid Payment status: “${paymentStatusRaw}” — use NA, Fully paid, Partially paid, Pending, or Part payment subscription`,
       );
     }
-    if (quantityRaw && quantity == null) parseErrors.push(`Invalid Quantity: ${quantityRaw}`);
     if (totalDealValueRaw && totalDealValue == null) {
       parseErrors.push(`Invalid Total Deal Value: ${totalDealValueRaw}`);
     }
@@ -394,7 +384,6 @@ export async function parseCompanyCommercialImportFile(
       rowNumber: i + 2,
       statusRaw,
       name,
-      quantityRaw,
       totalDealValueRaw,
       amountWithGstRaw,
       taxableRaw,
@@ -406,7 +395,6 @@ export async function parseCompanyCommercialImportFile(
       startDateRaw: cellStr(startDateRaw),
       endDateRaw: cellStr(endDateRaw),
       cancelledOnRaw: cellStr(cancelledOnRaw),
-      quantity,
       totalDealValue,
       amountWithGst,
       taxableAmount,
@@ -431,7 +419,6 @@ function commercialFieldsFromRaw(raw: CompanyCommercialImportRawRow) {
     commercialStatus: raw.commercialStatus,
     planName,
     plan,
-    usersPurchased: raw.quantity,
     dealSize: raw.totalDealValue,
     totalCost: raw.totalDealValue,
     amountWithGst: raw.amountWithGst,
@@ -580,7 +567,6 @@ export function buildCompanyCommercialImportPlan(
         commercialStatus: null,
         planName: null,
         plan: null,
-        usersPurchased: null,
         dealSize: null,
         totalCost: null,
         amountWithGst: null,
@@ -677,7 +663,6 @@ export function mergeCompanyCommercialImportRow(
   } else if (row.plan) {
     patch.plan = row.plan;
   }
-  if (row.usersPurchased != null) patch.usersPurchased = Math.max(0, Math.round(row.usersPurchased));
   if (row.dealSize != null) {
     patch.dealSize = row.dealSize;
     patch.totalCost = row.dealSize;
