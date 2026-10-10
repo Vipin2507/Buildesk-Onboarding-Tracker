@@ -251,7 +251,7 @@ function legacyPlanFromCommercialPlan(_planName: CompanyCommercialPlanName): Com
 function isEmptyCommercialCell(raw: string): boolean {
   if (!raw.trim()) return true;
   const key = normKey(raw);
-  return !key || key === "na" || key === "nil" || key === "none";
+  return !key || key === "na" || key === "nil" || key === "none" || key === "-";
 }
 
 function parseInstallmentAmount(raw: string): number | null {

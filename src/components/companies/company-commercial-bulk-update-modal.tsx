@@ -28,9 +28,16 @@ const UNSET_PICK = "__unset__";
 export function CompanyCommercialBulkUpdateModal({
   open,
   onOpenChange,
+  title = "Update company commercial data",
+  description = "Upload an Excel sheet to update existing ERP companies matched by company name. When a name is not found, pick the correct company from the dropdown or skip the row. Empty cells leave the current value unchanged.",
+  onSuccess,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  title?: string;
+  description?: string;
+  /** Called after a successful batch apply (e.g. refresh Payments hub). */
+  onSuccess?: (updated: number) => void;
 }) {
   const companies = useCompanyStore((s) => s.companies);
   const updateCompaniesCommercialBatch = useCompanyStore((s) => s.updateCompaniesCommercialBatch);
@@ -134,6 +141,7 @@ export function CompanyCommercialBulkUpdateModal({
             ? ` · ${unresolved} row${unresolved === 1 ? "" : "s"} skipped (no company picked)`
             : ""),
       );
+      onSuccess?.(updated);
       handleOpenChange(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Update failed");
@@ -148,12 +156,8 @@ export function CompanyCommercialBulkUpdateModal({
     <AlertDialog open={open} onOpenChange={handleOpenChange}>
       <AlertDialogContent className="flex max-h-[90vh] max-w-5xl flex-col gap-0 overflow-hidden p-0">
         <AlertDialogHeader className="shrink-0 border-b px-5 py-4 text-left">
-          <AlertDialogTitle>Update company commercial data</AlertDialogTitle>
-          <AlertDialogDescription>
-            Upload an Excel sheet to update existing ERP companies matched by company name. When a
-            name is not found, pick the correct company from the dropdown or skip the row. Empty
-            cells leave the current value unchanged.
-          </AlertDialogDescription>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
 
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">

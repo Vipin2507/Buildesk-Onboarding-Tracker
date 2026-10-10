@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { ArrowRight, RefreshCw, Search } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { ArrowRight, FileSpreadsheet, RefreshCw, Search } from "lucide-react";
 import { z } from "zod";
 
+import { CompanyCommercialBulkUpdateModal } from "@/components/companies/company-commercial-bulk-update-modal";
 import { DataTable } from "@/components/data-table";
 import {
   DesignTicketPageHeader,
@@ -14,7 +16,7 @@ import { ProgressBar } from "@/components/progress-bar";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useErpCompanyPaymentsList } from "@/hooks/use-erp-payments";
+import { erpPaymentsKeys, useErpCompanyPaymentsList } from "@/hooks/use-erp-payments";
 import { COMPANY_PAYMENT_STATUSES, type CompanyPaymentStatus } from "@/types";
 import { cn, formatDate, formatInr } from "@/lib/utils";
 
@@ -44,9 +46,11 @@ function paymentStatusTone(status: CompanyPaymentStatus) {
 function ErpPaymentsPage() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
+  const queryClient = useQueryClient();
   const statusFilter: StatusFilter = search.status ?? "all";
   const { data, isLoading, isError, refetch, isFetching } = useErpCompanyPaymentsList();
   const [query, setQuery] = useState("");
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const filteredRows = useMemo(() => {
     const rows = data?.rows ?? [];
@@ -78,16 +82,22 @@ function ErpPaymentsPage() {
         title="Payments"
         subtitle="ERP collections across onboarded companies — separate from CRM account payments."
         actions={
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8 gap-1"
-            onClick={() => void refetch()}
-            disabled={isFetching}
-          >
-            <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
-            Refresh
-          </Button>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Button size="sm" className="h-8 gap-1" onClick={() => setBulkOpen(true)}>
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              Bulk update
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1"
+              onClick={() => void refetch()}
+              disabled={isFetching}
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
+              Refresh
+            </Button>
+          </div>
         }
       />
 
@@ -248,6 +258,16 @@ function ErpPaymentsPage() {
           ]}
         />
       )}
+
+      <CompanyCommercialBulkUpdateModal
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        title="Bulk update payments"
+        description="Upload your ERP payments Excel sheet (Status, Name, Total Deal Value, Amount WITH GST, Taxable, GST, Plan Name, Payment status, Installment amount, Due date, Start date, End date / Renewal date, Cancelled On). Rows match companies by name. Quantity is ignored. Empty cells leave current values unchanged."
+        onSuccess={() => {
+          void queryClient.invalidateQueries({ queryKey: erpPaymentsKeys.list() });
+        }}
+      />
     </PageWrap>
   );
 }
