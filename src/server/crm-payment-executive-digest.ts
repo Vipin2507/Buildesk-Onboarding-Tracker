@@ -14,6 +14,7 @@ import {
   dispatchExecutivePaymentChannels,
   PAYMENT_AUTOMATION_SEND_PAUSE_MS,
 } from "@/server/crm-payment-reminder-automation";
+import { pickInternalTeamEmailTargets } from "@/server/lib/internal-team-email";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { queryPaymentListItems, type PaymentListItem } from "@/server/lib/crm-payments";
@@ -177,6 +178,7 @@ async function sendDigestToRecipient(
   db: ReturnType<typeof getDb>,
   recipient: typeof t.users.$inferSelect,
   accountLines: ExecutiveDigestAccountLine[],
+  opts?: { extraCc?: string[]; skipEmail?: boolean; skipWhatsapp?: boolean },
 ): Promise<{ ok: boolean; error?: string; email?: boolean; whatsapp?: boolean }> {
   const rules = executivePaymentRulesActive(db);
   if (!rules.any) {
@@ -184,7 +186,7 @@ async function sendDigestToRecipient(
   }
 
   const recipientEmail = resolveUserWorkEmail(recipient);
-  if (rules.email && !recipientEmail?.trim()) {
+  if (rules.email && !opts?.skipEmail && !recipientEmail?.trim()) {
     return { ok: false, error: "Recipient has no email for executive email rule" };
   }
 
@@ -203,15 +205,19 @@ async function sendDigestToRecipient(
     recipientName: recipient.name,
     recipientPhone: recipient.phone ?? undefined,
     vars,
+    extraCc: opts?.extraCc,
+    skipEmail: opts?.skipEmail,
+    skipWhatsapp: opts?.skipWhatsapp,
   });
 
-  const ok =
-    (rules.email && channels.email) || (rules.whatsapp && channels.whatsapp);
+  const wantEmail = rules.email && !opts?.skipEmail;
+  const wantWhatsapp = rules.whatsapp && !opts?.skipWhatsapp;
+  const ok = (wantEmail && channels.email) || (wantWhatsapp && channels.whatsapp);
 
   if (!ok) {
     const parts: string[] = [];
-    if (rules.email && !channels.email) parts.push("email failed or skipped");
-    if (rules.whatsapp && !channels.whatsapp) parts.push("WhatsApp failed or skipped (check phone)");
+    if (wantEmail && !channels.email) parts.push("email failed or skipped");
+    if (wantWhatsapp && !channels.whatsapp) parts.push("WhatsApp failed or skipped (check phone)");
     return {
       ok: false,
       error: parts.join("; ") || "No messages sent",
@@ -231,15 +237,20 @@ export async function sendExecutiveOverdueDigest(
   const allAccountIds = [...new Set(deliveries.flatMap((d) => d.accountIds))];
   const preview = buildExecutiveOverdueDigestPreview(db, allowedAccountIds, allAccountIds);
   const accountById = new Map(preview.accounts.map((a) => [a.accountId, a]));
+  const adminIds = new Set(listActiveAdminUserIds(db, "crm"));
+  const rules = executivePaymentRulesActive(db);
 
   const results: { recipientUserId: string; ok: boolean; error?: string }[] = [];
   let sent = 0;
   let failed = 0;
 
-  for (let i = 0; i < deliveries.length; i++) {
-    const delivery = deliveries[i]!;
-    if (i > 0) await sleep(digestRecipientPauseMs);
+  const authorizedDeliveries: {
+    delivery: ExecutiveDigestDelivery;
+    recipient: typeof t.users.$inferSelect;
+    lines: ExecutiveDigestAccountLine[];
+  }[] = [];
 
+  for (const delivery of deliveries) {
     const recipient = db.select().from(t.users).where(eq(t.users.id, delivery.recipientUserId)).get();
     if (!recipient) {
       failed += 1;
@@ -267,11 +278,67 @@ export async function sendExecutiveOverdueDigest(
     const lines = delivery.accountIds
       .map((id) => accountById.get(id))
       .filter((line): line is ExecutiveDigestAccountLine => Boolean(line));
+    authorizedDeliveries.push({ delivery, recipient, lines });
+  }
 
-    const result = await sendDigestToRecipient(db, recipient, lines);
+  // Email: one message to an admin; every other selected teammate on CC.
+  if (rules.email && authorizedDeliveries.length > 0) {
+    const people = authorizedDeliveries
+      .map(({ recipient }) => {
+        const email = resolveUserWorkEmail(recipient);
+        if (!email) return null;
+        return {
+          id: recipient.id,
+          name: recipient.name,
+          email,
+          phone: recipient.phone ?? undefined,
+          isAdmin: adminIds.has(recipient.id),
+        };
+      })
+      .filter((p): p is NonNullable<typeof p> => Boolean(p));
+    const targets = pickInternalTeamEmailTargets(people);
+    if (targets) {
+      const unionAccountIds = [
+        ...new Set(authorizedDeliveries.flatMap((d) => d.delivery.accountIds)),
+      ];
+      const unionLines = unionAccountIds
+        .map((id) => accountById.get(id))
+        .filter((line): line is ExecutiveDigestAccountLine => Boolean(line));
+      const toUser =
+        authorizedDeliveries.find((d) => d.recipient.id === targets.to.id)?.recipient ??
+        authorizedDeliveries[0]!.recipient;
+      const emailResult = await sendDigestToRecipient(db, toUser, unionLines, {
+        extraCc: targets.ccEmails,
+        skipWhatsapp: true,
+      });
+      if (emailResult.ok) sent += 1;
+      else failed += 1;
+      results.push({
+        recipientUserId: toUser.id,
+        ok: emailResult.ok,
+        error: emailResult.error
+          ? `email: ${emailResult.error}`
+          : emailResult.ok
+            ? undefined
+            : "email failed",
+      });
+    }
+  }
+
+  // WhatsApp still goes per selected recipient.
+  for (let i = 0; i < authorizedDeliveries.length; i++) {
+    const { delivery, recipient, lines } = authorizedDeliveries[i]!;
+    if (!rules.whatsapp) continue;
+    if (i > 0 || (rules.email && sent + failed > 0)) await sleep(digestRecipientPauseMs);
+
+    const result = await sendDigestToRecipient(db, recipient, lines, { skipEmail: true });
     if (result.ok) sent += 1;
-    else failed += 1;
-    results.push({ recipientUserId: delivery.recipientUserId, ok: result.ok, error: result.error });
+    else if (result.error && !/skipped/i.test(result.error)) failed += 1;
+    results.push({
+      recipientUserId: delivery.recipientUserId,
+      ok: result.ok,
+      error: result.error ? `whatsapp: ${result.error}` : undefined,
+    });
   }
 
   return { sent, failed, results };

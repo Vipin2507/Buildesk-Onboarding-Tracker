@@ -2,16 +2,27 @@ import { DEFAULT_CRM_WAHA_CONFIG } from "@/data/crm-automation-defaults";
 import { normalizeIndiaPhone } from "@/lib/automationEndpoints";
 import type { AutomationRule, AutomationSettings, AutomationTrigger, WahaConfig } from "@/types/automation";
 
-export function mergeServerEmailCc(globalCc?: string, ruleCc?: string): string {
-  const parts = [globalCc, ruleCc].flatMap((value) =>
-    value
-      ? value
-          .split(/[,;]/)
-          .map((s) => s.trim())
-          .filter(Boolean)
-      : [],
-  );
-  return [...new Set(parts)].join(", ");
+/** Merge global / rule / dynamic CC lists; dedupe case-insensitively. */
+export function mergeServerEmailCc(
+  ...parts: Array<string | string[] | undefined | null>
+): string {
+  const emails = parts.flatMap((value) => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.map((s) => s.trim()).filter(Boolean);
+    return value
+      .split(/[,;]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  });
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const email of emails) {
+    const key = email.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(email);
+  }
+  return out.join(", ");
 }
 
 export type ServerCrmN8nEmailInput = {
@@ -30,6 +41,8 @@ export type ServerCrmN8nEmailInput = {
   companyName?: string;
   status?: string;
   test?: boolean;
+  /** Extra CC addresses (e.g. other internal-team members). */
+  extraCc?: string[];
   /** Entity-specific fields merged into the n8n body (payment, booking, task, etc.). */
   fields?: Record<string, unknown>;
 };
@@ -49,7 +62,7 @@ export function buildServerCrmN8nEmailBody(input: ServerCrmN8nEmailInput): Recor
     recipientName: input.recipientName,
     messageBody: input.messageBody,
     emailSubject: input.emailSubject,
-    emailCc: mergeServerEmailCc(input.settings.emailCc, input.rule.emailCc),
+    emailCc: mergeServerEmailCc(input.settings.emailCc, input.rule.emailCc, input.extraCc),
     delayHours: 0,
     entityType: input.entityType,
     productScope: "crm",

@@ -9,7 +9,12 @@ import {
   loadCrmAutomationConfig,
 } from "@/server/crm-booking-automation";
 import { buildServerCrmN8nEmailBody } from "@/server/crm-n8n-email-payload";
-import { resolveCrmQueryMentionedUserIds, resolveCrmQueryResponseRecipientUserIds } from "@/server/api/notifications";
+import {
+  listActiveAdminUserIds,
+  resolveCrmQueryMentionedUserIds,
+  resolveCrmQueryResponseRecipientUserIds,
+} from "@/server/api/notifications";
+import { pickInternalTeamEmailTargets } from "@/server/lib/internal-team-email";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import {
@@ -111,6 +116,8 @@ async function dispatchQueryResponseForRule(
     supportManager1?: string | null;
     supportManager2?: string | null;
     recipient: { id: string; name: string; phone?: string | null };
+    /** Other eligible teammates — put on CC for a single team email. */
+    extraCc?: string[];
   },
 ): Promise<boolean> {
   const vars = buildQueryResponseVars({
@@ -147,6 +154,7 @@ async function dispatchQueryResponseForRule(
       queryId: input.queryId,
       ruleId: rule.id,
       recipientUserId: input.recipient.id,
+      emailCc: input.extraCc,
     },
     attemptedAt,
     retryCount: 0,
@@ -180,6 +188,7 @@ async function dispatchQueryResponseForRule(
       entityName: input.queryTitle,
       companyName: input.accountName,
       status: input.queryStatus,
+      extraCc: input.extraCc,
       fields: {
         accountName: input.accountName,
         queryUrl: input.queryUrl,
@@ -317,6 +326,7 @@ export async function dispatchCrmQueryResponseAutomation(
   );
 
   const users = db.select().from(t.users).all();
+  const adminIds = new Set(listActiveAdminUserIds(db, "crm"));
   function recipientsForChannel(channel: AutomationRule["channel"]) {
     const ids =
       channel === "whatsapp" && mentionedIds.size > 0 ? [...mentionedIds] : teamRecipientIds;
@@ -345,6 +355,22 @@ export async function dispatchCrmQueryResponseAutomation(
         hour12: true,
       });
 
+  const shared = {
+    accountId: input.accountId,
+    accountName: account.name,
+    queryId: input.queryId,
+    queryTitle: input.queryTitle,
+    queryStatus: input.queryStatus,
+    authorName: input.authorName,
+    messageSnippet,
+    queryUrl,
+    sentAt,
+    messageId: input.messageId,
+    salesManagerName: account.salesManagerName,
+    supportManager1: account.supportManager1,
+    supportManager2: account.supportManager2,
+  };
+
   for (const rule of rules) {
     const recipients = recipientsForChannel(rule.channel);
     if (!recipients.length) {
@@ -353,21 +379,45 @@ export async function dispatchCrmQueryResponseAutomation(
       );
       continue;
     }
+
+    if (rule.channel === "email") {
+      // One email to an admin; every other eligible teammate goes on CC.
+      const people = recipients
+        .map((r) => {
+          const row = users.find((u) => u.id === r.id);
+          const email = resolveUserWorkEmail(row ?? undefined);
+          if (!email) return null;
+          return {
+            id: r.id,
+            name: r.name,
+            email,
+            phone: r.phone ?? undefined,
+            isAdmin: adminIds.has(r.id),
+          };
+        })
+        .filter((p): p is NonNullable<typeof p> => Boolean(p));
+      const targets = pickInternalTeamEmailTargets(people);
+      if (!targets) {
+        console.warn(
+          `[crm-query-response] no emailable recipients for query=${input.queryId}`,
+        );
+        continue;
+      }
+      await dispatchQueryResponseForRule(db, config, rule, {
+        ...shared,
+        recipient: {
+          id: targets.to.id,
+          name: targets.to.name,
+          phone: targets.to.phone,
+        },
+        extraCc: targets.ccEmails,
+      });
+      continue;
+    }
+
     for (const recipient of recipients) {
       await dispatchQueryResponseForRule(db, config, rule, {
-        accountId: input.accountId,
-        accountName: account.name,
-        queryId: input.queryId,
-        queryTitle: input.queryTitle,
-        queryStatus: input.queryStatus,
-        authorName: input.authorName,
-        messageSnippet,
-        queryUrl,
-        sentAt,
-        messageId: input.messageId,
-        salesManagerName: account.salesManagerName,
-        supportManager1: account.supportManager1,
-        supportManager2: account.supportManager2,
+        ...shared,
         recipient,
       });
     }

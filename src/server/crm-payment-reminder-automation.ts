@@ -12,8 +12,10 @@ import {
   renderAutomationSubject,
   renderAutomationTemplate,
 } from "@/services/automationTemplate";
+import { listActiveAdminUserIds } from "@/server/api/notifications";
 import { appendServerCrmAutomationLog, loadCrmAutomationConfig } from "@/server/crm-booking-automation";
 import { buildServerCrmN8nEmailBody } from "@/server/crm-n8n-email-payload";
+import { pickInternalTeamEmailTargets } from "@/server/lib/internal-team-email";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { buildAccountPaymentSnapshot, getAccountPaymentReceived } from "@/server/lib/crm-payments";
@@ -63,7 +65,30 @@ function resolveExecutiveRecipients(
     { label: "Sales manager", name: account.salesManagerName },
   ];
   const seen = new Set<string>();
-  const recipients: { name: string; email: string; phone?: string; role: string }[] = [];
+  const recipients: {
+    id: string;
+    name: string;
+    email: string;
+    phone?: string;
+    role: string;
+    isAdmin: boolean;
+  }[] = [];
+
+  for (const adminId of listActiveAdminUserIds(db, "crm")) {
+    const user = db.select().from(t.users).where(eq(t.users.id, adminId)).get();
+    if (!user || user.active === false) continue;
+    const email = resolveUserWorkEmail(user);
+    if (!email || seen.has(email.toLowerCase())) continue;
+    seen.add(email.toLowerCase());
+    recipients.push({
+      id: user.id,
+      name: user.name,
+      email,
+      phone: user.phone ?? undefined,
+      role: "Admin",
+      isAdmin: true,
+    });
+  }
 
   for (const role of roles) {
     const displayName = role.name?.trim();
@@ -71,13 +96,15 @@ function resolveExecutiveRecipients(
     for (const user of listActiveCrmUsers(db)) {
       if (!crmSalesManagerNamesMatch(displayName, user.name)) continue;
       const email = resolveUserWorkEmail(user);
-      if (!email || seen.has(email)) continue;
-      seen.add(email);
+      if (!email || seen.has(email.toLowerCase())) continue;
+      seen.add(email.toLowerCase());
       recipients.push({
+        id: user.id,
         name: user.name,
         email,
         phone: user.phone ?? undefined,
         role: role.label,
+        isAdmin: false,
       });
     }
   }
@@ -153,6 +180,7 @@ async function dispatchPaymentEmailRule(
     recipientName: string;
     recipientPhone?: string;
     vars: Record<string, string>;
+    extraCc?: string[];
   },
 ): Promise<boolean> {
   const config = loadCrmAutomationConfig(db);
@@ -188,6 +216,7 @@ async function dispatchPaymentEmailRule(
       entityName: opts.account.name,
       companyName: opts.account.name,
       status: opts.vars.status,
+      extraCc: opts.extraCc,
       fields: {
         accountName: opts.account.name,
         accountId: opts.account.id,
@@ -335,6 +364,11 @@ export async function dispatchExecutivePaymentChannels(
     vars: Record<string, string>;
     entityType?: string;
     entityId?: string;
+    extraCc?: string[];
+    /** Skip email when a shared To+CC mail was already sent for the team. */
+    skipEmail?: boolean;
+    /** Skip WhatsApp (e.g. when only consolidating email). */
+    skipWhatsapp?: boolean;
   },
 ): Promise<ExecutivePaymentChannelResult> {
   const config = loadCrmAutomationConfig(db);
@@ -348,7 +382,7 @@ export async function dispatchExecutivePaymentChannels(
   let email = false;
   let whatsapp = false;
 
-  if (emailRulesActive && opts.recipientEmail.trim()) {
+  if (!opts.skipEmail && emailRulesActive && opts.recipientEmail.trim()) {
     email = await dispatchPaymentEmailRule(db, {
       trigger: "payment-executive-remind",
       account: opts.account,
@@ -356,10 +390,11 @@ export async function dispatchExecutivePaymentChannels(
       recipientName: opts.recipientName,
       recipientPhone: opts.recipientPhone,
       vars: opts.vars,
+      extraCc: opts.extraCc,
     });
   }
 
-  if (whatsappRulesActive) {
+  if (!opts.skipWhatsapp && whatsappRulesActive) {
     if (email) await pauseBetweenPaymentSends();
     whatsapp = await dispatchPaymentWhatsappRule(db, {
       trigger: "payment-executive-remind",
@@ -420,9 +455,28 @@ export async function dispatchServerPaymentExecutiveReminder(
   const snap = buildAccountPaymentSnapshot(account, received);
 
   let anySent = false;
+
+  // Email: one message to an admin, other eligible teammates on CC.
+  const emailTargets = pickInternalTeamEmailTargets(executives);
+  if (emailTargets) {
+    const vars = buildPaymentTemplateVars(account, snap, emailTargets.to.name);
+    const result = await dispatchExecutivePaymentChannels(db, {
+      account,
+      recipientEmail: emailTargets.to.email,
+      recipientName: emailTargets.to.name,
+      recipientPhone: emailTargets.to.phone,
+      vars,
+      extraCc: emailTargets.ccEmails,
+      skipWhatsapp: true,
+    });
+    if (result.email) anySent = true;
+  }
+
+  // WhatsApp still goes per person (no CC equivalent).
   for (let i = 0; i < executives.length; i++) {
     const executive = executives[i]!;
-    if (i > 0) await pauseBetweenPaymentSends();
+    if (!executive.phone?.trim()) continue;
+    if (anySent || i > 0) await pauseBetweenPaymentSends();
     const vars = buildPaymentTemplateVars(account, snap, executive.name);
     const result = await dispatchExecutivePaymentChannels(db, {
       account,
@@ -430,8 +484,9 @@ export async function dispatchServerPaymentExecutiveReminder(
       recipientName: executive.name,
       recipientPhone: executive.phone,
       vars,
+      skipEmail: true,
     });
-    if (result.email || result.whatsapp) anySent = true;
+    if (result.whatsapp) anySent = true;
   }
 
   if (!anySent) {
