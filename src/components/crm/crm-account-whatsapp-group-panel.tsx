@@ -865,16 +865,36 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
   const draftTextareaRef = useRef<HTMLTextAreaElement>(null);
   const attachKindRef = useRef<WahaMediaKind>("file");
 
-  const resizeDraftTextarea = useCallback(() => {
+  /** Measure content height without CSS transition interference, then optionally animate. */
+  const resizeDraftTextarea = useCallback((animate = false) => {
     const el = draftTextareaRef.current;
     if (!el) return;
-    el.style.height = "0px";
-    const next = Math.min(COMPOSER_MAX_H, Math.max(COMPOSER_MIN_H, el.scrollHeight));
-    el.style.height = `${next}px`;
+    const prev = el.offsetHeight || COMPOSER_MIN_H;
+    el.style.transition = "none";
+    el.style.height = "auto";
+    const next = Math.min(
+      COMPOSER_MAX_H,
+      Math.max(COMPOSER_MIN_H, el.scrollHeight),
+    );
+    if (animate && prev !== next) {
+      el.style.height = `${prev}px`;
+      // Force layout so the browser registers the start height before transitioning.
+      void el.offsetHeight;
+      el.style.transition = "height 160ms ease";
+      el.style.height = `${next}px`;
+    } else {
+      el.style.height = `${next}px`;
+    }
   }, []);
 
+  const prevDraftLenRef = useRef(0);
   useEffect(() => {
-    resizeDraftTextarea();
+    const prevLen = prevDraftLenRef.current;
+    prevDraftLenRef.current = draft.length;
+    // Animate when collapsing (after send) or jumping (template paste); keep typing snappy.
+    const animate =
+      draft.length < prevLen || Math.abs(draft.length - prevLen) > 40;
+    resizeDraftTextarea(animate);
   }, [draft, resizeDraftTextarea]);
   /** Session-only previews so sent media still shows after WAHA sync without downloadMedia. */
   const localMediaPreviewRef = useRef<Map<string, string>>(new Map());
@@ -2107,10 +2127,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                       setDraft(filled);
                       setTemplateOpen(false);
                       toast.success(`Template “${t.name}” applied`);
-                      requestAnimationFrame(() => {
-                        resizeDraftTextarea();
-                        draftTextareaRef.current?.focus();
-                      });
+                      requestAnimationFrame(() => draftTextareaRef.current?.focus());
                     }}
                   >
                     <span className="text-xs font-medium">{t.name}</span>
@@ -2135,7 +2152,8 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
           value={draft}
           onChange={(e) => {
             setDraft(e.target.value);
-            requestAnimationFrame(resizeDraftTextarea);
+            // Immediate grow/shrink while typing (no CSS transition fight).
+            requestAnimationFrame(() => resizeDraftTextarea(false));
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
@@ -2145,9 +2163,8 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
           }}
           rows={1}
           placeholder={pendingMedia ? "Add a caption…" : "Type a message"}
-          className="max-h-[144px] min-h-9 flex-1 resize-none overflow-y-auto rounded-[18px] border-0 bg-white px-3.5 py-[8.5px] text-[13px] leading-[1.35] text-neutral-900 shadow-sm outline-none transition-[height] duration-100 ease-out placeholder:text-neutral-500 focus-visible:ring-1 focus-visible:ring-teal-600"
+          className="max-h-[144px] min-h-9 flex-1 resize-none overflow-y-auto rounded-[18px] border-0 bg-white px-3.5 py-[8.5px] text-[13px] leading-[1.35] text-neutral-900 shadow-sm outline-none placeholder:text-neutral-500 focus-visible:ring-1 focus-visible:ring-teal-600"
           disabled={sending}
-          style={{ height: COMPOSER_MIN_H }}
         />
         <div className="flex h-9 shrink-0 items-center">
           <Button
