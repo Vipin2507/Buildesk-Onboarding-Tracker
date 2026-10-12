@@ -262,6 +262,11 @@ export const crmWhatsappBroadcasts = sqliteTable(
     templateId: text("template_id"),
     templateName: text("template_name"),
     body: text("body").notNull(),
+    /** Optional attachment: image | video | voice | file */
+    mediaKind: text("media_kind"),
+    mediaFilename: text("media_filename"),
+    mediaMimetype: text("media_mimetype"),
+    mediaStorageKey: text("media_storage_key"),
     createdByUserId: text("created_by_user_id"),
     createdByName: text("created_by_name"),
     startedAt: text("started_at"),

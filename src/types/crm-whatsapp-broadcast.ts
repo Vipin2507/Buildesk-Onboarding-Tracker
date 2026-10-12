@@ -21,6 +21,10 @@ export type CrmWhatsappBroadcast = {
   templateName: string | null;
   /** Raw body with optional {{variables}} — rendered per account at send time. */
   body: string;
+  mediaKind: "image" | "video" | "voice" | "file" | null;
+  mediaFilename: string | null;
+  mediaMimetype: string | null;
+  hasMedia: boolean;
   createdByUserId: string | null;
   createdByName: string | null;
   startedAt: string | null;

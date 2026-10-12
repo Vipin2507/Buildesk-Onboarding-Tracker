@@ -9,6 +9,7 @@ import { PAYMENT_AUTOMATION_SEND_PAUSE_MS } from "@/server/crm-payment-reminder-
 import type { Db } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { nowIso } from "@/server/auth/session";
+import { readBroadcastMedia } from "@/server/lib/crm-whatsapp-broadcast-media";
 import type { AutomationLog } from "@/types/automation";
 import type { WahaConfig } from "@/types/automation";
 import type { CrmWhatsappTemplateDef } from "@/types/crm-master";
@@ -55,6 +56,41 @@ async function sendServerWahaText(waha: WahaConfig, chatId: string, text: string
   });
   const body = await res.text();
   return { ok: res.ok, status: res.status, text: body };
+}
+
+function wahaMediaPath(kind: "image" | "video" | "voice" | "file") {
+  if (kind === "image") return "/api/sendImage";
+  if (kind === "video") return "/api/sendVideo";
+  if (kind === "voice") return "/api/sendVoice";
+  return "/api/sendFile";
+}
+
+async function sendServerWahaMedia(
+  waha: WahaConfig,
+  kind: "image" | "video" | "voice" | "file",
+  chatId: string,
+  file: { mimetype: string; filename: string; data: string },
+  caption?: string,
+) {
+  const body: Record<string, unknown> = {
+    session: waha.sessionName,
+    chatId,
+    file,
+  };
+  if (caption?.trim()) body.caption = caption;
+  if (kind === "voice" || kind === "video") body.convert = true;
+
+  const res = await fetch(`${trimSlash(waha.apiUrl)}${wahaMediaPath(kind)}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "X-Api-Key": waha.apiKey,
+    },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  return { ok: res.ok, status: res.status, text };
 }
 
 function loadWhatsappTemplates(db: Db): CrmWhatsappTemplateDef[] {
@@ -238,7 +274,39 @@ export async function processWhatsappBroadcasts(
       };
 
       try {
-        const res = await sendServerWahaText(config.waha, groupId, rendered);
+        const mediaKind = (broadcast.mediaKind ?? "").trim() as
+          | "image"
+          | "video"
+          | "voice"
+          | "file"
+          | "";
+        const hasMedia =
+          Boolean(broadcast.mediaStorageKey) &&
+          (mediaKind === "image" ||
+            mediaKind === "video" ||
+            mediaKind === "voice" ||
+            mediaKind === "file");
+
+        let res: { ok: boolean; status: number; text: string };
+        if (hasMedia) {
+          const { buffer } = readBroadcastMedia(broadcast.mediaStorageKey!);
+          res = await sendServerWahaMedia(
+            config.waha,
+            mediaKind,
+            groupId,
+            {
+              mimetype: broadcast.mediaMimetype || "application/octet-stream",
+              filename: broadcast.mediaFilename || "file",
+              data: buffer.toString("base64"),
+            },
+            rendered || undefined,
+          );
+        } else if (rendered.trim()) {
+          res = await sendServerWahaText(config.waha, groupId, rendered);
+        } else {
+          throw new Error("Empty message and no media");
+        }
+
         if (!res.ok) {
           const err = `HTTP ${res.status}: ${summarizeResponse(res.text, 240)}`;
           db.update(t.crmWhatsappBroadcastDeliveries)

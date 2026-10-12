@@ -1343,6 +1343,10 @@ if (!tableExists("crm_whatsapp_broadcasts")) {
       template_id TEXT,
       template_name TEXT,
       body TEXT NOT NULL,
+      media_kind TEXT,
+      media_filename TEXT,
+      media_mimetype TEXT,
+      media_storage_key TEXT,
       created_by_user_id TEXT,
       created_by_name TEXT,
       started_at TEXT,
@@ -1354,6 +1358,21 @@ if (!tableExists("crm_whatsapp_broadcasts")) {
     CREATE INDEX IF NOT EXISTS crm_wa_broadcasts_scheduled_idx ON crm_whatsapp_broadcasts(scheduled_at);
   `);
   console.log("+ CREATE TABLE crm_whatsapp_broadcasts");
+}
+
+if (tableExists("crm_whatsapp_broadcasts")) {
+  const waBroadcastCols = existingColumns("crm_whatsapp_broadcasts");
+  for (const [name, ddl] of [
+    ["media_kind", "TEXT"],
+    ["media_filename", "TEXT"],
+    ["media_mimetype", "TEXT"],
+    ["media_storage_key", "TEXT"],
+  ]) {
+    if (!waBroadcastCols.has(name)) {
+      sqlite.exec(`ALTER TABLE crm_whatsapp_broadcasts ADD COLUMN ${name} ${ddl}`);
+      console.log(`+ ALTER TABLE crm_whatsapp_broadcasts ADD ${name}`);
+    }
+  }
 }
 
 if (!tableExists("crm_whatsapp_broadcast_deliveries")) {

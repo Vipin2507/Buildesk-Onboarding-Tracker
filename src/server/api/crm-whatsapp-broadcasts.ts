@@ -13,6 +13,11 @@ import {
 } from "@/server/crm-whatsapp-broadcast";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
+import {
+  decodeBroadcastMediaBase64,
+  inferBroadcastMediaKind,
+  saveBroadcastMedia,
+} from "@/server/lib/crm-whatsapp-broadcast-media";
 import type {
   CrmWhatsappBroadcast,
   CrmWhatsappBroadcastDelivery,
@@ -32,6 +37,13 @@ function mapBroadcast(
   row: typeof t.crmWhatsappBroadcasts.$inferSelect,
   counts: { accountCount: number; sentCount: number; failedCount: number; skippedCount: number },
 ): CrmWhatsappBroadcast {
+  const mediaKind =
+    row.mediaKind === "image" ||
+    row.mediaKind === "video" ||
+    row.mediaKind === "voice" ||
+    row.mediaKind === "file"
+      ? row.mediaKind
+      : null;
   return {
     id: row.id,
     scheduledAt: row.scheduledAt,
@@ -39,6 +51,10 @@ function mapBroadcast(
     templateId: row.templateId,
     templateName: row.templateName,
     body: row.body,
+    mediaKind,
+    mediaFilename: row.mediaFilename,
+    mediaMimetype: row.mediaMimetype,
+    hasMedia: Boolean(row.mediaStorageKey && mediaKind),
     createdByUserId: row.createdByUserId,
     createdByName: row.createdByName,
     startedAt: row.startedAt,
@@ -174,6 +190,15 @@ export const createCrmWhatsappBroadcast = createServerFn({ method: "POST" })
         body: z.string().max(8000).optional().nullable(),
         scheduledAt: z.string().optional().nullable(),
         sendNow: z.boolean().optional(),
+        media: z
+          .object({
+            filename: z.string().min(1).max(200),
+            mimetype: z.string().min(1).max(120),
+            /** Base64 (optionally data-URL prefixed). */
+            dataBase64: z.string().min(1),
+          })
+          .optional()
+          .nullable(),
       })
       .parse(data),
   )
@@ -181,12 +206,19 @@ export const createCrmWhatsappBroadcast = createServerFn({ method: "POST" })
     const user = requireUser();
     const db = getDb();
 
+    const hasMedia = Boolean(data.media?.dataBase64);
     let resolved;
     try {
-      resolved = resolveBroadcastBody(db, {
-        templateId: data.templateId,
-        body: data.body,
-      });
+      if ((data.body ?? "").trim() || data.templateId) {
+        resolved = resolveBroadcastBody(db, {
+          templateId: data.templateId,
+          body: data.body,
+        });
+      } else if (hasMedia) {
+        resolved = { body: "", templateId: null, templateName: null };
+      } else {
+        throw new Error("Message body or media is required");
+      }
     } catch (err) {
       throw new ApiError(400, err instanceof Error ? err.message : "Invalid message");
     }
@@ -233,6 +265,23 @@ export const createCrmWhatsappBroadcast = createServerFn({ method: "POST" })
     }
 
     const broadcastId = newId();
+    let mediaKind: string | null = null;
+    let mediaFilename: string | null = null;
+    let mediaMimetype: string | null = null;
+    let mediaStorageKey: string | null = null;
+    if (data.media?.dataBase64) {
+      const buffer = decodeBroadcastMediaBase64(data.media.dataBase64);
+      mediaFilename = data.media.filename.trim() || "file";
+      mediaMimetype = data.media.mimetype.trim() || "application/octet-stream";
+      mediaKind = inferBroadcastMediaKind(mediaMimetype);
+      mediaStorageKey = saveBroadcastMedia({
+        broadcastId,
+        fileName: mediaFilename,
+        mimeType: mediaMimetype,
+        buffer,
+      }).storageKey;
+    }
+
     db.insert(t.crmWhatsappBroadcasts)
       .values({
         id: broadcastId,
@@ -241,6 +290,10 @@ export const createCrmWhatsappBroadcast = createServerFn({ method: "POST" })
         templateId: resolved.templateId,
         templateName: resolved.templateName,
         body: resolved.body,
+        mediaKind,
+        mediaFilename,
+        mediaMimetype,
+        mediaStorageKey,
         createdByUserId: user.id,
         createdByName: user.name,
         startedAt: null,
