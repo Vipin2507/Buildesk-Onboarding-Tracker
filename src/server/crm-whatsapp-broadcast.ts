@@ -205,13 +205,19 @@ export async function processWhatsappBroadcasts(
         phone: account.phone,
         email: account.email,
         city: account.city,
-        status: account.status,
-        ownerName: account.ownerName,
-        ownerPhone: account.ownerPhone,
-        ownerEmail: account.ownerEmail,
-        pocName: account.pocName,
-        accountManagerName: account.accountManagerName,
-        salesManagerName: account.salesManagerName,
+        status: account.status as
+          | "active"
+          | "onboarding"
+          | "live"
+          | "suspended"
+          | "inactive"
+          | "closed",
+        ownerName: account.ownerName ?? undefined,
+        ownerPhone: account.ownerPhone ?? undefined,
+        ownerEmail: account.ownerEmail ?? undefined,
+        pocName: account.pocName ?? undefined,
+        accountManagerName: account.accountManagerName ?? undefined,
+        salesManagerName: account.salesManagerName ?? undefined,
       });
 
       const attemptedAt = nowIso();
