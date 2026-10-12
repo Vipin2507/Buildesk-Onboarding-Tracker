@@ -921,7 +921,7 @@ function CrmAccountsPage() {
               Sync accounts
             </Button>
             <Button size="sm" variant="ghost" className="h-8 gap-1 px-3 text-xs" asChild>
-              <Link to="/crm/automation" search={{ tab: "broadcasts" }}>
+              <Link to="/crm/broadcasts">
                 <Megaphone className="h-3.5 w-3.5" />
                 Broadcast
               </Link>

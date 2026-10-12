@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bolt, FileText, List, Megaphone, Settings2, LayoutDashboard } from "lucide-react";
+import { Bolt, FileText, List, Settings2, LayoutDashboard } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -13,7 +13,6 @@ import { AutomationLogsPanel } from "@/components/crm/automation/automation-logs
 import { AutomationRulesPanel } from "@/components/crm/automation/automation-rules-panel";
 import { AutomationWebhookSettings } from "@/components/crm/automation/automation-webhook-settings";
 import { AutomationTestPanel } from "@/components/crm/automation/automation-test-panel";
-import { CrmWhatsappBroadcastPanel } from "@/components/crm/crm-whatsapp-broadcast-panel";
 import { PageWrap } from "@/components/page-header";
 import {
   DesignTicketPageHeader,
@@ -29,7 +28,6 @@ const EASE = TICKET_EASE;
 const TABS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "rules", label: "Rules", icon: FileText },
-  { id: "broadcasts", label: "Broadcasts", icon: Megaphone },
   { id: "logs", label: "Logs", icon: List },
   { id: "settings", label: "Webhooks", icon: Settings2 },
 ] as const;
@@ -160,7 +158,6 @@ function AutomationPage() {
         ) : null}
 
         {tab === "rules" ? <AutomationRulesPanel /> : null}
-        {tab === "broadcasts" ? <CrmWhatsappBroadcastPanel /> : null}
         {tab === "logs" ? <AutomationLogsPanel /> : null}
         {tab === "settings" ? <AutomationWebhookSettings /> : null}
         </motion.div>

@@ -2,6 +2,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+import { canViewCrmAccount } from "@/lib/crm-account-access";
 import { isAdminRoleKey } from "@/lib/permissions";
 import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
 import { loadCrmAutomationConfig } from "@/server/crm-booking-automation";
@@ -18,12 +19,6 @@ import type {
   CrmWhatsappBroadcastDeliveryStatus,
   CrmWhatsappBroadcastStatus,
 } from "@/types/crm-whatsapp-broadcast";
-
-function assertAdmin() {
-  const user = requireUser();
-  if (!isAdminRoleKey(user.role)) throw new ApiError(403, "Admin access required");
-  return user;
-}
 
 function normalizeGroupId(raw: string | null | undefined) {
   const id = (raw ?? "").trim();
@@ -95,30 +90,53 @@ function mapDelivery(
   };
 }
 
+function assertCanAccessBroadcast(
+  row: typeof t.crmWhatsappBroadcasts.$inferSelect,
+  user: { id: string; role?: string },
+) {
+  if (isAdminRoleKey(user.role)) return;
+  if (row.createdByUserId === user.id) return;
+  throw new ApiError(403, "Forbidden");
+}
+
 export const listCrmWhatsappBroadcasts = createServerFn({ method: "GET" })
   .inputValidator((data: unknown) =>
     z
       .object({
         limit: z.number().int().positive().max(100).optional(),
+        /** When true (admin only), include everyone’s pending schedules. */
+        allScheduled: z.boolean().optional(),
       })
       .optional()
       .parse(data ?? {}),
   )
   .handler(async ({ data }) => {
-    assertAdmin();
+    const user = requireUser();
     const db = getDb();
     const limit = data?.limit ?? 40;
+    const isAdmin = isAdminRoleKey(user.role);
     try {
-      const rows = db
+      let rows = db
         .select()
         .from(t.crmWhatsappBroadcasts)
         .orderBy(desc(t.crmWhatsappBroadcasts.createdAt))
-        .limit(limit)
+        .limit(isAdmin ? limit : Math.min(limit, 60))
         .all();
-      return rows.map((row) => mapBroadcast(row, deliveryCounts(db, row.id)));
+
+      if (!isAdmin) {
+        // Non-admins: own broadcasts only (sends + their schedules).
+        rows = rows.filter((r) => r.createdByUserId === user.id);
+      } else if (data?.allScheduled === false) {
+        // unused flag — admins always get full list by default
+      }
+
+      return {
+        isAdmin,
+        broadcasts: rows.map((row) => mapBroadcast(row, deliveryCounts(db, row.id))),
+      };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      if (message.includes("no such table")) return [];
+      if (message.includes("no such table")) return { isAdmin, broadcasts: [] };
       throw err;
     }
   });
@@ -126,7 +144,7 @@ export const listCrmWhatsappBroadcasts = createServerFn({ method: "GET" })
 export const getCrmWhatsappBroadcast = createServerFn({ method: "GET" })
   .inputValidator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
   .handler(async ({ data }) => {
-    assertAdmin();
+    const user = requireUser();
     const db = getDb();
     const row = db
       .select()
@@ -134,6 +152,7 @@ export const getCrmWhatsappBroadcast = createServerFn({ method: "GET" })
       .where(eq(t.crmWhatsappBroadcasts.id, data.id))
       .get();
     if (!row) throw new ApiError(404, "Broadcast not found");
+    assertCanAccessBroadcast(row, user);
     const deliveries = db
       .select()
       .from(t.crmWhatsappBroadcastDeliveries)
@@ -153,14 +172,13 @@ export const createCrmWhatsappBroadcast = createServerFn({ method: "POST" })
         accountIds: z.array(z.string().min(1)).min(1).max(200),
         templateId: z.string().min(1).optional().nullable(),
         body: z.string().max(8000).optional().nullable(),
-        /** ISO datetime; omit / past / "now" → send immediately. */
         scheduledAt: z.string().optional().nullable(),
         sendNow: z.boolean().optional(),
       })
       .parse(data),
   )
   .handler(async ({ data }) => {
-    const user = assertAdmin();
+    const user = requireUser();
     const db = getDb();
 
     let resolved;
@@ -174,16 +192,26 @@ export const createCrmWhatsappBroadcast = createServerFn({ method: "POST" })
     }
 
     const uniqueIds = [...new Set(data.accountIds.map((id) => id.trim()).filter(Boolean))];
-    const accounts = listAccountIdsWithGroups(db, uniqueIds);
+    const accounts = listAccountIdsWithGroups(db, uniqueIds).filter((a) =>
+      canViewCrmAccount(
+        {
+          salesManagerName: a.salesManagerName ?? undefined,
+          supportManager1: a.supportManager1 ?? undefined,
+          supportManager2: a.supportManager2 ?? undefined,
+          accountManagerName: a.accountManagerName ?? undefined,
+        },
+        user,
+      ),
+    );
     if (accounts.length === 0) {
-      throw new ApiError(400, "No valid accounts selected");
+      throw new ApiError(400, "No accessible accounts selected");
     }
 
     const withGroups = accounts.filter((a) => normalizeGroupId(a.whatsappGroupId));
     if (withGroups.length === 0) {
       throw new ApiError(
         400,
-        "None of the selected accounts have a WhatsApp group linked. Sync groups first.",
+        "None of the selected accounts have a WhatsApp group linked.",
       );
     }
 
@@ -200,7 +228,7 @@ export const createCrmWhatsappBroadcast = createServerFn({ method: "POST" })
     if (shouldRunNow) {
       const config = loadCrmAutomationConfig(db);
       if (!config.waha.isEnabled || !config.waha.apiUrl?.trim() || !config.waha.apiKey?.trim()) {
-        throw new ApiError(400, "Enable WAHA in Automation → Webhooks before sending");
+        throw new ApiError(400, "WhatsApp (WAHA) is not enabled. Ask an admin to configure it.");
       }
     }
 
@@ -260,7 +288,7 @@ export const createCrmWhatsappBroadcast = createServerFn({ method: "POST" })
 export const cancelCrmWhatsappBroadcast = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
   .handler(async ({ data }) => {
-    assertAdmin();
+    const user = requireUser();
     const db = getDb();
     const row = db
       .select()
@@ -268,6 +296,7 @@ export const cancelCrmWhatsappBroadcast = createServerFn({ method: "POST" })
       .where(eq(t.crmWhatsappBroadcasts.id, data.id))
       .get();
     if (!row) throw new ApiError(404, "Broadcast not found");
+    assertCanAccessBroadcast(row, user);
     if (row.status !== "pending") {
       throw new ApiError(400, "Only pending scheduled broadcasts can be cancelled");
     }
@@ -291,7 +320,7 @@ export const cancelCrmWhatsappBroadcast = createServerFn({ method: "POST" })
 export const runCrmWhatsappBroadcastNow = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
   .handler(async ({ data }) => {
-    assertAdmin();
+    const user = requireUser();
     const db = getDb();
     const row = db
       .select()
@@ -299,8 +328,13 @@ export const runCrmWhatsappBroadcastNow = createServerFn({ method: "POST" })
       .where(eq(t.crmWhatsappBroadcasts.id, data.id))
       .get();
     if (!row) throw new ApiError(404, "Broadcast not found");
+    assertCanAccessBroadcast(row, user);
     if (row.status === "cancelled" || row.status === "completed") {
       throw new ApiError(400, "Broadcast is already finished");
+    }
+    const config = loadCrmAutomationConfig(db);
+    if (!config.waha.isEnabled || !config.waha.apiUrl?.trim() || !config.waha.apiKey?.trim()) {
+      throw new ApiError(400, "WhatsApp (WAHA) is not enabled. Ask an admin to configure it.");
     }
     const now = nowIso();
     if (row.status === "pending") {
