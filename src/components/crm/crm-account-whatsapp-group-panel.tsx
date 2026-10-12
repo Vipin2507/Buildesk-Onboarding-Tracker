@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import type { ReactNode } from "react";
 import {
   Check,
   CheckCheck,
@@ -7,6 +8,7 @@ import {
   ChevronRight,
   Download,
   FileIcon,
+  FileText,
   Image as ImageIcon,
   Loader2,
   Paperclip,
@@ -29,6 +31,7 @@ import {
   listCrmWhatsappGroupMessages,
   upsertCrmWhatsappGroupMessages,
 } from "@/lib/api";
+import { applyCrmWhatsappTemplate } from "@/lib/crm-whatsapp-templates";
 import { cn } from "@/lib/utils";
 import {
   fileToWahaMedia,
@@ -48,6 +51,10 @@ import {
 import { pullCrmAutomationConfigFromServer } from "@/lib/crm-automation-refresh";
 import { useCrmAccountStore } from "@/stores/useCrmAccountStore";
 import { useCrmAutomationStore } from "@/stores/useCrmAutomationStore";
+import {
+  listActiveCrmWhatsappTemplates,
+  useCrmMasterStore,
+} from "@/stores/useCrmMasterStore";
 
 const POLL_MS = 5000;
 
@@ -696,7 +703,25 @@ function quotePreviewLabel(msg: WahaChatMessage, quoted?: WahaChatMessage): stri
   return "Replied message";
 }
 
-/** Render message text with clickable http(s) links. */
+/** Render WhatsApp *bold* / _italic_ markers inside a plain text segment. */
+function formatWhatsappMarkers(text: string, keyBase: number): ReactNode[] {
+  const parts = text.split(/(\*[^*\n]+\*|_[^_\n]+_)/g);
+  return parts.map((part, i) => {
+    if (part.length > 2 && part.startsWith("*") && part.endsWith("*")) {
+      return (
+        <strong key={`b-${keyBase}-${i}`} className="font-semibold">
+          {part.slice(1, -1)}
+        </strong>
+      );
+    }
+    if (part.length > 2 && part.startsWith("_") && part.endsWith("_")) {
+      return <em key={`i-${keyBase}-${i}`}>{part.slice(1, -1)}</em>;
+    }
+    return <span key={`t-${keyBase}-${i}`}>{part}</span>;
+  });
+}
+
+/** Render message text with WhatsApp formatting + clickable http(s) links. */
 function LinkifiedText({ text }: { text: string }) {
   // Capturing group keeps URLs in the split result.
   const parts = text.split(/(https?:\/\/[^\s<]+[^\s<.,;:!?"')\]])/gi);
@@ -715,7 +740,7 @@ function LinkifiedText({ text }: { text: string }) {
             {part}
           </a>
         ) : (
-          <span key={`${i}-${part.slice(0, 12)}`}>{part}</span>
+          <span key={`${i}-seg`}>{formatWhatsappMarkers(part, i)}</span>
         ),
       )}
     </div>
@@ -816,11 +841,18 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
   const [replyTo, setReplyTo] = useState<WahaChatMessage | null>(null);
   const [sending, setSending] = useState(false);
   const [attachOpen, setAttachOpen] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
   const [pendingMedia, setPendingMedia] = useState<{
     file: File;
     kind: WahaMediaKind;
     previewUrl: string;
   } | null>(null);
+
+  const whatsappTemplates = useCrmMasterStore((s) => s.whatsappTemplates);
+  const activeTemplates = useMemo(
+    () => listActiveCrmWhatsappTemplates(),
+    [whatsappTemplates],
+  );
 
   const threadRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
@@ -1978,12 +2010,26 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
             type="button"
             className="h-9 w-9 shrink-0 rounded-full p-0 text-neutral-700 hover:bg-black/5 hover:text-neutral-900"
             disabled={sending}
-            onClick={() => setAttachOpen((v) => !v)}
+            onClick={() => {
+              setTemplateOpen(false);
+              setAttachOpen((v) => !v);
+            }}
           >
             <Paperclip className="h-4 w-4" />
           </Button>
           {attachOpen ? (
-            <div className="absolute bottom-10 left-0 z-10 min-w-[140px] rounded-md border border-neutral-200 bg-white p-1 text-neutral-900 shadow-md">
+            <div className="absolute bottom-10 left-0 z-10 min-w-[160px] rounded-md border border-neutral-200 bg-white p-1 text-neutral-900 shadow-md">
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-neutral-100"
+                onClick={() => {
+                  setAttachOpen(false);
+                  setTemplateOpen(true);
+                }}
+              >
+                <FileText className="h-3.5 w-3.5" /> Use template
+              </button>
+              <div className="my-1 border-t border-neutral-100" />
               <button
                 type="button"
                 className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-neutral-100"
@@ -2012,6 +2058,48 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
               >
                 <FileIcon className="h-3.5 w-3.5" /> Document
               </button>
+            </div>
+          ) : null}
+          {templateOpen ? (
+            <div className="absolute bottom-10 left-0 z-10 w-[min(320px,calc(100vw-2rem))] max-h-72 overflow-y-auto rounded-md border border-neutral-200 bg-white p-1 text-neutral-900 shadow-md">
+              <div className="flex items-center justify-between gap-2 px-2 py-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
+                  Templates
+                </span>
+                <button
+                  type="button"
+                  className="rounded p-0.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800"
+                  aria-label="Close templates"
+                  onClick={() => setTemplateOpen(false)}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              {activeTemplates.length === 0 ? (
+                <p className="px-2 py-3 text-center text-[10px] text-neutral-500">
+                  No active templates. Add them in CRM Master → WhatsApp.
+                </p>
+              ) : (
+                activeTemplates.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className="flex w-full flex-col items-start gap-0.5 rounded px-2 py-1.5 text-left hover:bg-neutral-100"
+                    onClick={() => {
+                      const filled = applyCrmWhatsappTemplate(t.body, account);
+                      setDraft(filled);
+                      setTemplateOpen(false);
+                      toast.success(`Template “${t.name}” applied`);
+                    }}
+                  >
+                    <span className="text-xs font-medium">{t.name}</span>
+                    <span className="text-[10px] text-neutral-500">{t.category}</span>
+                    <span className="line-clamp-2 whitespace-pre-wrap text-[10px] text-neutral-600">
+                      {applyCrmWhatsappTemplate(t.body, account)}
+                    </span>
+                  </button>
+                ))
+              )}
             </div>
           ) : null}
         </div>

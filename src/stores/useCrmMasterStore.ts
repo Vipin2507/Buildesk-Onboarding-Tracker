@@ -8,6 +8,7 @@ import type {
   CrmMasterPlatformSettings,
   CrmMigrationFieldDef,
   CrmTrainingFieldDef,
+  CrmWhatsappTemplateDef,
 } from "@/types/crm-master";
 import type { AcademyTutorial } from "@/types/buildesk-academy";
 import { newId, nowIso } from "@/types/common";
@@ -39,6 +40,10 @@ import {
   seedCrmBookingHostHours,
 } from "@/data/crm-booking-defaults";
 import { mergeAcademySeedTranscripts, normalizeAcademyTutorials, seedAcademyTutorials } from "@/lib/academy-catalog";
+import {
+  normalizeCrmWhatsappTemplates,
+  seedCrmWhatsappTemplates,
+} from "@/lib/crm-whatsapp-templates";
 import { createPersistedStore, touch } from "./persist";
 
 type CrmMasterState = {
@@ -63,6 +68,8 @@ type CrmMasterState = {
   implementationStages: CrmImplementationStageDef[];
   /** Buildesk Academy tutorials shown in the client portal (editable in Master). */
   academyTutorials: AcademyTutorial[];
+  /** WhatsApp chat templates for account group composer (editable in Master). */
+  whatsappTemplates: CrmWhatsappTemplateDef[];
 
   updatePlatform: (data: Partial<CrmMasterPlatformSettings>) => void;
 
@@ -86,6 +93,7 @@ type CrmMasterState = {
   setBookingHostHours: (hours: CrmBookingHostHoursDef[]) => void;
   setImplementationStages: (stages: CrmImplementationStageDef[]) => void;
   setAcademyTutorials: (tutorials: AcademyTutorial[]) => void;
+  setWhatsappTemplates: (templates: CrmWhatsappTemplateDef[]) => void;
 
   resetAll: () => void;
 };
@@ -105,6 +113,7 @@ function seedState() {
     bookingHostHours: seedCrmBookingHostHours(),
     implementationStages: seedCrmImplementationStages(),
     academyTutorials: seedAcademyTutorials(),
+    whatsappTemplates: seedCrmWhatsappTemplates(),
   };
 }
 
@@ -294,6 +303,10 @@ export const useCrmMasterStore = createPersistedStore<CrmMasterState>(
       set({ academyTutorials: normalizeAcademyTutorials(tutorials) });
     },
 
+    setWhatsappTemplates: (templates) => {
+      set({ whatsappTemplates: normalizeCrmWhatsappTemplates(templates) });
+    },
+
     resetAll: () => {
       set(seedState());
     },
@@ -365,6 +378,21 @@ export function getCrmMasterAcademyTutorials(): AcademyTutorial[] {
   return tutorials;
 }
 
+/** WhatsApp templates for Master + account chat picker (seeds when missing/empty). */
+export function getCrmMasterWhatsappTemplates(): CrmWhatsappTemplateDef[] {
+  const current = useCrmMasterStore.getState().whatsappTemplates;
+  if (!Array.isArray(current) || current.length === 0) {
+    const seed = seedCrmWhatsappTemplates();
+    useCrmMasterStore.setState({ whatsappTemplates: seed });
+    return seed;
+  }
+  return normalizeCrmWhatsappTemplates(current);
+}
+
+export function listActiveCrmWhatsappTemplates(): CrmWhatsappTemplateDef[] {
+  return getCrmMasterWhatsappTemplates().filter((t) => t.active);
+}
+
 /** Core modules are always available; integrations respect Master → Integrations toggles. */
 export function getCrmMasterProductModuleCatalog(): { key: string; label: string }[] {
   ensureCrmMasterModulesCatalog();
@@ -394,6 +422,7 @@ export function crmMasterSnapshot() {
     bookingHostHours: s.bookingHostHours,
     implementationStages: s.implementationStages,
     academyTutorials: s.academyTutorials,
+    whatsappTemplates: s.whatsappTemplates,
   };
 }
 
@@ -450,7 +479,19 @@ export function hydrateCrmMasterFromServer(raw: Record<string, unknown>) {
           ),
         }
       : {}),
+    ...(Array.isArray(raw.whatsappTemplates)
+      ? {
+          whatsappTemplates: normalizeCrmWhatsappTemplates(
+            raw.whatsappTemplates as CrmWhatsappTemplateDef[],
+          ),
+        }
+      : {}),
   }));
+  // Older crm-master snapshots omit WhatsApp templates — seed once so Master + chat stay in sync.
+  if (!Array.isArray(useCrmMasterStore.getState().whatsappTemplates) ||
+      useCrmMasterStore.getState().whatsappTemplates.length === 0) {
+    useCrmMasterStore.setState({ whatsappTemplates: seedCrmWhatsappTemplates() });
+  }
   ensureCrmMasterModulesCatalog();
 }
 

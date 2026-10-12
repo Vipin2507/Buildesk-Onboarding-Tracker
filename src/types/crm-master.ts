@@ -113,3 +113,19 @@ export type CrmBookingHostHoursDef = {
   endTime: string;
   enabled: boolean;
 };
+
+/**
+ * WhatsApp chat template (Master → WhatsApp templates).
+ * Body uses WhatsApp markers (*bold*, _italic_) and `{{variable}}` placeholders.
+ */
+export type CrmWhatsappTemplateDef = {
+  id: string;
+  name: string;
+  /** Short category label shown in Master + picker (e.g. Check-in, Follow-up). */
+  category: string;
+  /** Template body with optional *bold* / _italic_ and {{variables}}. */
+  body: string;
+  /** When false, hidden from the account chat “Use template” picker. */
+  active: boolean;
+  order: number;
+};

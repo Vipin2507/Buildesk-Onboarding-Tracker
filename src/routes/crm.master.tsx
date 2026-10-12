@@ -10,6 +10,7 @@ import {
   GraduationCap,
   Link2,
   ListChecks,
+  MessageCircle,
   Milestone,
   Pencil,
   Plus,
@@ -23,6 +24,7 @@ import { toast } from "sonner";
 
 import { CrmMasterDataControl } from "@/components/crm/crm-master-data-control";
 import { CrmMasterAcademyPanel } from "@/components/crm/crm-master-academy-panel";
+import { CrmMasterWhatsappTemplatesPanel } from "@/components/crm/crm-master-whatsapp-templates-panel";
 import {
   DesignTicketPageHeader,
   TICKET_EASE,
@@ -44,6 +46,7 @@ import {
   getCrmMasterMigrationFields,
   getCrmMasterProductModuleCatalog,
   getCrmMasterTrainingFields,
+  getCrmMasterWhatsappTemplates,
 } from "@/stores/useCrmMasterStore";
 import { getCrmMasterImplementationStages } from "@/stores/useCrmMasterStore";
 import { useAuthStore, useCrmMasterStore, useCrmOnboardingStore } from "@/stores";
@@ -73,6 +76,7 @@ const SECTIONS = [
   { id: "migration", label: "Migration", icon: Upload },
   { id: "training", label: "Training", icon: GraduationCap },
   { id: "academy", label: "Academy", icon: BookOpen },
+  { id: "whatsapp-templates", label: "WhatsApp", icon: MessageCircle },
   { id: "bookings", label: "Meetings", icon: Calendar },
   { id: "data-control", label: "Data Control", icon: Table2 },
   { id: "danger", label: "Reset & Safety", icon: ShieldAlert },
@@ -175,6 +179,7 @@ function CrmMasterPage() {
             {section === "migration" ? <MigrationPanel /> : null}
             {section === "training" ? <TrainingPanel /> : null}
             {section === "academy" ? <CrmMasterAcademyPanel /> : null}
+            {section === "whatsapp-templates" ? <CrmMasterWhatsappTemplatesPanel /> : null}
             {section === "bookings" ? <BookingsPanel /> : null}
             {section === "data-control" ? <CrmMasterDataControl /> : null}
             {section === "danger" ? <DangerPanel /> : null}
@@ -197,6 +202,7 @@ function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) 
   const bookingCallTypes = useCrmMasterStore((s) => s.bookingCallTypes);
   const implementationStages = useCrmMasterStore((s) => s.implementationStages);
   const academyTutorials = useCrmMasterStore((s) => s.academyTutorials);
+  const whatsappTemplates = useCrmMasterStore((s) => s.whatsappTemplates);
 
   const cards = [
     {
@@ -249,6 +255,12 @@ function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) 
       value: (academyTutorials?.length ?? getCrmMasterAcademyTutorials().length),
       total: "tutorials",
       to: "academy" as const,
+    },
+    {
+      label: "WhatsApp",
+      value: (whatsappTemplates?.length ?? getCrmMasterWhatsappTemplates().length),
+      total: "chat templates",
+      to: "whatsapp-templates" as const,
     },
     {
       label: "Meetings",
@@ -1540,7 +1552,7 @@ function DangerPanel() {
         <h3 className="text-sm font-semibold text-destructive">Reset CRM Master Config</h3>
         <p className="mt-1 text-[10px] text-muted-foreground">
           Restores seeded account fields, project fields, picklists, modules, providers, migration,
-          training, Academy tutorials, and meeting catalogs. Does not delete CRM accounts or onboarding checklists.
+          training, Academy tutorials, WhatsApp templates, and meeting catalogs. Does not delete CRM accounts or onboarding checklists.
         </p>
         <Button
           size="sm"
@@ -1556,7 +1568,7 @@ function DangerPanel() {
         open={open}
         onOpenChange={setOpen}
         title="Reset CRM Master Config?"
-        description="All field catalogs, picklists, modules, providers, migration, training, Academy tutorials, and meeting fields will revert to seed defaults."
+        description="All field catalogs, picklists, modules, providers, migration, training, Academy tutorials, WhatsApp templates, and meeting fields will revert to seed defaults."
         confirmLabel="Reset"
         onConfirm={() => {
           resetAll();
