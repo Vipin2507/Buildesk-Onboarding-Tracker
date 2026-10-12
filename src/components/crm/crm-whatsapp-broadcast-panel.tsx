@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { DatePickerField } from "@/components/date-picker-field";
+import { TimePickerField } from "@/components/time-picker-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +20,7 @@ import { filterCrmAccountsForUser } from "@/lib/crm-account-access";
 import { isCrmAccountEnded } from "@/lib/crm-account-status";
 import { applyCrmWhatsappTemplate } from "@/lib/crm-whatsapp-templates";
 import { cn } from "@/lib/utils";
+import { format, isValid, parse } from "date-fns";
 import {
   cancelCrmWhatsappBroadcast,
   createCrmWhatsappBroadcast,
@@ -38,24 +41,51 @@ function hasGroup(account: { whatsappGroupId?: string | null }) {
   return Boolean(account.whatsappGroupId?.trim());
 }
 
-function toLocalInputValue(d = new Date()) {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
 }
 
-function localInputToIso(value: string) {
-  const ms = Date.parse(value);
-  if (!Number.isFinite(ms)) return null;
-  return new Date(ms).toISOString();
+function todayYmd() {
+  return format(new Date(), "yyyy-MM-dd");
+}
+
+function defaultScheduleParts() {
+  const d = new Date(Date.now() + 60 * 60_000);
+  // Snap to nearest 5 minutes like TimePickerField.
+  const snapped = Math.ceil(d.getMinutes() / 5) * 5;
+  if (snapped >= 60) {
+    d.setHours(d.getHours() + 1, 0, 0, 0);
+  } else {
+    d.setMinutes(snapped, 0, 0);
+  }
+  return {
+    date: format(d, "yyyy-MM-dd"),
+    time: `${pad2(d.getHours())}:${pad2(d.getMinutes())}`,
+  };
+}
+
+function schedulePartsToIso(dateYmd: string, timeHm: string): string | null {
+  const date = parse(dateYmd.slice(0, 10), "yyyy-MM-dd", new Date());
+  if (!isValid(date)) return null;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(timeHm.trim());
+  if (!m) return null;
+  const hour = Number(m[1]);
+  const minute = Number(m[2]);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute) || hour > 23 || minute > 59) return null;
+  date.setHours(hour, minute, 0, 0);
+  return date.toISOString();
+}
+
+function formatScheduleSummary(dateYmd: string, timeHm: string) {
+  const iso = schedulePartsToIso(dateYmd, timeHm);
+  if (!iso) return null;
+  return format(new Date(iso), "EEE, d MMM · h:mm a");
 }
 
 function formatWhen(iso: string | null | undefined) {
   if (!iso) return "—";
   try {
-    return new Date(iso).toLocaleString(undefined, {
-      dateStyle: "medium",
-      timeStyle: "short",
-    });
+    return format(new Date(iso), "d MMM yyyy · h:mm a");
   } catch {
     return iso;
   }
@@ -99,9 +129,8 @@ export function CrmWhatsappBroadcastPanel() {
   const [templateId, setTemplateId] = useState("");
   const [body, setBody] = useState("");
   const [scheduleMode, setScheduleMode] = useState<"now" | "later">("now");
-  const [scheduleLocal, setScheduleLocal] = useState(() =>
-    toLocalInputValue(new Date(Date.now() + 60 * 60_000)),
-  );
+  const [scheduleDate, setScheduleDate] = useState(() => defaultScheduleParts().date);
+  const [scheduleTime, setScheduleTime] = useState(() => defaultScheduleParts().time);
   const [submitting, setSubmitting] = useState(false);
   const [broadcasts, setBroadcasts] = useState<CrmWhatsappBroadcast[]>([]);
   const [listIsAdmin, setListIsAdmin] = useState(false);
@@ -213,9 +242,9 @@ export function CrmWhatsappBroadcastPanel() {
     let scheduledAt: string | null = null;
     const sendNow = scheduleMode === "now";
     if (!sendNow) {
-      scheduledAt = localInputToIso(scheduleLocal);
+      scheduledAt = schedulePartsToIso(scheduleDate, scheduleTime);
       if (!scheduledAt) {
-        toast.error("Pick a valid schedule time");
+        toast.error("Pick a valid date and time");
         return;
       }
       if (Date.parse(scheduledAt) <= Date.now()) {
@@ -446,46 +475,79 @@ export function CrmWhatsappBroadcastPanel() {
           </div>
 
           {/* When + send */}
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-            <div className="min-w-0 flex-1 space-y-1.5">
-              <div className="flex rounded-lg border bg-muted/30 p-0.5">
-                <button
-                  type="button"
-                  className={cn(
-                    "flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors",
-                    scheduleMode === "now"
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                  onClick={() => setScheduleMode("now")}
-                >
-                  <Send className="h-3 w-3" /> Send now
-                </button>
-                <button
-                  type="button"
-                  className={cn(
-                    "flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors",
-                    scheduleMode === "later"
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                  onClick={() => setScheduleMode("later")}
-                >
-                  <CalendarClock className="h-3 w-3" /> Schedule
-                </button>
-              </div>
-              {scheduleMode === "later" ? (
-                <Input
-                  type="datetime-local"
-                  value={scheduleLocal}
-                  onChange={(e) => setScheduleLocal(e.target.value)}
-                  className="h-8 text-xs"
-                />
-              ) : null}
+          <div className="space-y-2.5">
+            <div className="flex rounded-lg border bg-muted/30 p-0.5">
+              <button
+                type="button"
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors",
+                  scheduleMode === "now"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => setScheduleMode("now")}
+              >
+                <Send className="h-3 w-3" /> Send now
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors",
+                  scheduleMode === "later"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => {
+                  setScheduleMode("later");
+                  const next = defaultScheduleParts();
+                  setScheduleDate(next.date);
+                  setScheduleTime(next.time);
+                }}
+              >
+                <CalendarClock className="h-3 w-3" /> Schedule
+              </button>
             </div>
+
+            {scheduleMode === "later" ? (
+              <div className="space-y-2 rounded-lg border bg-muted/10 p-2.5">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <div className="mb-1 text-[10px] font-medium text-muted-foreground">Date</div>
+                    <DatePickerField
+                      value={scheduleDate}
+                      onChange={setScheduleDate}
+                      min={todayYmd()}
+                      yearsBack={0}
+                      yearsForward={1}
+                      compact
+                      placeholder="Pick date"
+                    />
+                  </div>
+                  <div>
+                    <div className="mb-1 text-[10px] font-medium text-muted-foreground">Time</div>
+                    <TimePickerField
+                      value={scheduleTime}
+                      onChange={setScheduleTime}
+                      min={scheduleDate === todayYmd() ? format(new Date(), "HH:mm") : undefined}
+                      compact
+                      placeholder="Pick time"
+                    />
+                  </div>
+                </div>
+                {formatScheduleSummary(scheduleDate, scheduleTime) ? (
+                  <p className="text-[11px] text-muted-foreground">
+                    Sends{" "}
+                    <span className="font-medium text-foreground">
+                      {formatScheduleSummary(scheduleDate, scheduleTime)}
+                    </span>
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
             <Button
               type="button"
-              className="h-9 shrink-0 gap-1.5 px-4 text-xs sm:min-w-[140px]"
+              className="h-9 w-full gap-1.5 text-xs"
               disabled={submitting || selectedIds.size === 0 || !messageBody}
               onClick={() => void onSubmit()}
             >
@@ -496,7 +558,7 @@ export function CrmWhatsappBroadcastPanel() {
               ) : (
                 <CalendarClock className="h-3.5 w-3.5" />
               )}
-              {scheduleMode === "now" ? "Send" : "Schedule"}
+              {scheduleMode === "now" ? "Send now" : "Schedule broadcast"}
             </Button>
           </div>
 
