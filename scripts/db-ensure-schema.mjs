@@ -1334,6 +1334,51 @@ if (!tableExists("crm_whatsapp_group_messages")) {
   console.log("+ CREATE TABLE crm_whatsapp_group_messages");
 }
 
+if (!tableExists("crm_whatsapp_broadcasts")) {
+  sqlite.exec(`
+    CREATE TABLE crm_whatsapp_broadcasts (
+      id TEXT PRIMARY KEY NOT NULL,
+      scheduled_at TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      template_id TEXT,
+      template_name TEXT,
+      body TEXT NOT NULL,
+      created_by_user_id TEXT,
+      created_by_name TEXT,
+      started_at TEXT,
+      finished_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS crm_wa_broadcasts_status_idx ON crm_whatsapp_broadcasts(status);
+    CREATE INDEX IF NOT EXISTS crm_wa_broadcasts_scheduled_idx ON crm_whatsapp_broadcasts(scheduled_at);
+  `);
+  console.log("+ CREATE TABLE crm_whatsapp_broadcasts");
+}
+
+if (!tableExists("crm_whatsapp_broadcast_deliveries")) {
+  sqlite.exec(`
+    CREATE TABLE crm_whatsapp_broadcast_deliveries (
+      id TEXT PRIMARY KEY NOT NULL,
+      broadcast_id TEXT NOT NULL REFERENCES crm_whatsapp_broadcasts(id) ON DELETE CASCADE,
+      account_id TEXT NOT NULL REFERENCES crm_accounts(id) ON DELETE CASCADE,
+      account_name TEXT NOT NULL DEFAULT '',
+      group_id TEXT,
+      rendered_body TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      error_message TEXT,
+      sent_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS crm_wa_broadcast_deliv_broadcast_idx ON crm_whatsapp_broadcast_deliveries(broadcast_id);
+    CREATE INDEX IF NOT EXISTS crm_wa_broadcast_deliv_account_idx ON crm_whatsapp_broadcast_deliveries(account_id);
+    CREATE INDEX IF NOT EXISTS crm_wa_broadcast_deliv_status_idx ON crm_whatsapp_broadcast_deliveries(status);
+    CREATE UNIQUE INDEX IF NOT EXISTS crm_wa_broadcast_deliv_uidx ON crm_whatsapp_broadcast_deliveries(broadcast_id, account_id);
+  `);
+  console.log("+ CREATE TABLE crm_whatsapp_broadcast_deliveries");
+}
+
 if (!tableExists("company_payment_transactions")) {
   sqlite.exec(`
     CREATE TABLE company_payment_transactions (

@@ -2,6 +2,7 @@ import { processCrmAccountRenewalReminders } from "@/server/crm-account-renewal-
 import { processTaskInAppReminders } from "@/server/crm-task-in-app-reminder";
 import { processTaskReminderAutomations } from "@/server/crm-task-reminder-automation";
 import { processTaskWebPushReminders } from "@/server/crm-task-web-push";
+import { processWhatsappBroadcasts } from "@/server/crm-whatsapp-broadcast";
 import { getDb } from "@/server/db/client";
 import { DEFAULT_BOOKING_TIMEZONE } from "@/types/booking";
 
@@ -21,8 +22,9 @@ export function startCrmReminderScheduler() {
       const inAppSent = processTaskInAppReminders(db, DEFAULT_BOOKING_TIMEZONE);
       const pushSent = await processTaskWebPushReminders(db, DEFAULT_BOOKING_TIMEZONE);
       const renewalSent = await processCrmAccountRenewalReminders(db);
+      const broadcastSent = await processWhatsappBroadcasts(db);
       console.log(
-        `[crm-reminder-scheduler] tick inApp=${inAppSent} push=${pushSent} renewal=${renewalSent}`,
+        `[crm-reminder-scheduler] tick inApp=${inAppSent} push=${pushSent} renewal=${renewalSent} waBroadcast=${broadcastSent}`,
       );
     } catch (err) {
       console.warn("[crm-reminder-scheduler]", err);

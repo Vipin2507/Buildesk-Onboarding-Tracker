@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
 import {
@@ -9,6 +9,7 @@ import {
   FileSpreadsheet,
   KeyRound,
   Layers,
+  Megaphone,
   MessageCircle,
   Plus,
   Search,
@@ -918,6 +919,12 @@ function CrmAccountsPage() {
             >
               <MessageCircle className="h-3.5 w-3.5" />
               Sync accounts
+            </Button>
+            <Button size="sm" variant="ghost" className="h-8 gap-1 px-3 text-xs" asChild>
+              <Link to="/crm/automation" search={{ tab: "broadcasts" }}>
+                <Megaphone className="h-3.5 w-3.5" />
+                Broadcast
+              </Link>
             </Button>
             <Button
               size="sm"

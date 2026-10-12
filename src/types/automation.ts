@@ -46,7 +46,8 @@ export type AutomationTrigger =
   | "account-renewal-remind"
   | "query-response"
   | "live-chat-started"
-  | "portal-ticket-created";
+  | "portal-ticket-created"
+  | "whatsapp-broadcast";
 
 export interface AutomationRule {
   id: string;
@@ -173,6 +174,7 @@ export const AUTOMATION_TRIGGERS: { value: AutomationTrigger; label: string }[] 
   { value: "query-response", label: "Reply on account query" },
   { value: "live-chat-started", label: "Customer starts live chat" },
   { value: "portal-ticket-created", label: "Portal ticket created (executive)" },
+  { value: "whatsapp-broadcast", label: "WhatsApp group broadcast" },
 ];
 
 export const AUTOMATION_TEMPLATE_VARS = [

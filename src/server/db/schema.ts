@@ -252,6 +252,54 @@ export const crmWhatsappGroupMessages = sqliteTable(
   ],
 );
 
+/** Scheduled / bulk WhatsApp messages to CRM account groups. */
+export const crmWhatsappBroadcasts = sqliteTable(
+  "crm_whatsapp_broadcasts",
+  {
+    id: text("id").primaryKey(),
+    scheduledAt: text("scheduled_at").notNull(),
+    status: text("status").notNull().default("pending"),
+    templateId: text("template_id"),
+    templateName: text("template_name"),
+    body: text("body").notNull(),
+    createdByUserId: text("created_by_user_id"),
+    createdByName: text("created_by_name"),
+    startedAt: text("started_at"),
+    finishedAt: text("finished_at"),
+    ...timestamps,
+  },
+  (t) => [
+    index("crm_wa_broadcasts_status_idx").on(t.status),
+    index("crm_wa_broadcasts_scheduled_idx").on(t.scheduledAt),
+  ],
+);
+
+export const crmWhatsappBroadcastDeliveries = sqliteTable(
+  "crm_whatsapp_broadcast_deliveries",
+  {
+    id: text("id").primaryKey(),
+    broadcastId: text("broadcast_id")
+      .notNull()
+      .references(() => crmWhatsappBroadcasts.id, { onDelete: "cascade" }),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => crmAccounts.id, { onDelete: "cascade" }),
+    accountName: text("account_name").notNull().default(""),
+    groupId: text("group_id"),
+    renderedBody: text("rendered_body"),
+    status: text("status").notNull().default("pending"),
+    errorMessage: text("error_message"),
+    sentAt: text("sent_at"),
+    ...timestamps,
+  },
+  (t) => [
+    index("crm_wa_broadcast_deliv_broadcast_idx").on(t.broadcastId),
+    index("crm_wa_broadcast_deliv_account_idx").on(t.accountId),
+    index("crm_wa_broadcast_deliv_status_idx").on(t.status),
+    uniqueIndex("crm_wa_broadcast_deliv_uidx").on(t.broadcastId, t.accountId),
+  ],
+);
+
 /** CRM account payment ledger — source of truth for collections. */
 export const paymentTransactions = sqliteTable(
   "payment_transactions",

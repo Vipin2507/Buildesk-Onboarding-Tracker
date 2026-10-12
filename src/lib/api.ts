@@ -174,6 +174,14 @@ export {
 } from "@/server/api/crm-whatsapp-group-messages";
 
 export {
+  listCrmWhatsappBroadcasts,
+  getCrmWhatsappBroadcast,
+  createCrmWhatsappBroadcast,
+  cancelCrmWhatsappBroadcast,
+  runCrmWhatsappBroadcastNow,
+} from "@/server/api/crm-whatsapp-broadcasts";
+
+export {
   listCrmPayments,
   getCrmPaymentsSummary,
   getCrmPaymentInstallments,
