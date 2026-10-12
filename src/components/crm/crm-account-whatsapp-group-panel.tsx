@@ -819,6 +819,10 @@ function normalizeGroupId(raw: string) {
   return id;
 }
 
+/** Composer height — matches WhatsApp-style single-line + grow-to-cap. */
+const COMPOSER_MIN_H = 36;
+const COMPOSER_MAX_H = 144;
+
 export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string }) {
   const account = useCrmAccountStore((s) => s.accounts.find((a) => a.id === accountId));
   const accounts = useCrmAccountStore((s) => s.accounts);
@@ -858,7 +862,20 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
   const stickToBottom = useRef(true);
   const lastSeenIds = useRef<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const draftTextareaRef = useRef<HTMLTextAreaElement>(null);
   const attachKindRef = useRef<WahaMediaKind>("file");
+
+  const resizeDraftTextarea = useCallback(() => {
+    const el = draftTextareaRef.current;
+    if (!el) return;
+    el.style.height = "0px";
+    const next = Math.min(COMPOSER_MAX_H, Math.max(COMPOSER_MIN_H, el.scrollHeight));
+    el.style.height = `${next}px`;
+  }, []);
+
+  useEffect(() => {
+    resizeDraftTextarea();
+  }, [draft, resizeDraftTextarea]);
   /** Session-only previews so sent media still shows after WAHA sync without downloadMedia. */
   const localMediaPreviewRef = useRef<Map<string, string>>(new Map());
   const mediaBlobUrlsRef = useRef<Map<string, string>>(new Map());
@@ -2001,9 +2018,9 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
         </div>
       ) : null}
 
-      {/* Composer */}
-      <div className="flex items-end gap-1.5 border-t bg-[#f0f2f5] px-2 py-2 text-neutral-900">
-        <div className="relative">
+      {/* Composer — expands like WhatsApp; actions stay bottom-aligned */}
+      <div className="flex items-end gap-1.5 border-t bg-[#f0f2f5] px-2 py-1.5 text-neutral-900">
+        <div className="relative flex h-9 shrink-0 items-center">
           <Button
             size="sm"
             variant="ghost"
@@ -2090,6 +2107,10 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                       setDraft(filled);
                       setTemplateOpen(false);
                       toast.success(`Template “${t.name}” applied`);
+                      requestAnimationFrame(() => {
+                        resizeDraftTextarea();
+                        draftTextareaRef.current?.focus();
+                      });
                     }}
                   >
                     <span className="text-xs font-medium">{t.name}</span>
@@ -2110,8 +2131,12 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
           onChange={(e) => onFilePicked(e.target.files)}
         />
         <textarea
+          ref={draftTextareaRef}
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            requestAnimationFrame(resizeDraftTextarea);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -2120,19 +2145,22 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
           }}
           rows={1}
           placeholder={pendingMedia ? "Add a caption…" : "Type a message"}
-          className="max-h-28 min-h-[36px] flex-1 resize-none rounded-2xl border-0 bg-white px-3 py-2 text-xs text-neutral-900 shadow-sm outline-none placeholder:text-neutral-500 focus-visible:ring-1 focus-visible:ring-teal-600"
+          className="max-h-[144px] min-h-9 flex-1 resize-none overflow-y-auto rounded-[18px] border-0 bg-white px-3.5 py-[8.5px] text-[13px] leading-[1.35] text-neutral-900 shadow-sm outline-none transition-[height] duration-100 ease-out placeholder:text-neutral-500 focus-visible:ring-1 focus-visible:ring-teal-600"
           disabled={sending}
+          style={{ height: COMPOSER_MIN_H }}
         />
-        <Button
-          size="sm"
-          type="button"
-          className="h-9 w-9 shrink-0 rounded-full p-0"
-          style={{ background: "#075e54" }}
-          disabled={sending || (!pendingMedia && !draft.trim())}
-          onClick={() => void sendComposer()}
-        >
-          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-        </Button>
+        <div className="flex h-9 shrink-0 items-center">
+          <Button
+            size="sm"
+            type="button"
+            className="h-9 w-9 shrink-0 rounded-full p-0"
+            style={{ background: "#075e54" }}
+            disabled={sending || (!pendingMedia && !draft.trim())}
+            onClick={() => void sendComposer()}
+          >
+            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          </Button>
+        </div>
       </div>
 
       {mediaViewerIndex != null && mediaGallery[mediaViewerIndex] ? (
