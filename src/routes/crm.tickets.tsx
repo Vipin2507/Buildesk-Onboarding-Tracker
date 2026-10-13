@@ -1,4 +1,5 @@
 import { createFileRoute, Link, Outlet, useChildMatches, useNavigate } from "@tanstack/react-router";
+import { differenceInCalendarDays, parseISO, isValid } from "date-fns";
 import { motion } from "framer-motion";
 import { Link2, Plus, Search } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -26,7 +27,7 @@ import { cn, formatDate } from "@/lib/utils";
 import { isDesignTicketActive } from "@/stores/design-ticket-selectors";
 import { useAuthStore, useCrmAccountStore, useCurrentUser } from "@/stores";
 import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
-import type { DesignTicketPriority, DesignTicketStatus } from "@/types/design-ticket";
+import type { DesignTicket, DesignTicketPriority, DesignTicketStatus } from "@/types/design-ticket";
 import {
   DESIGN_TICKET_PRIORITY_LABEL,
   DESIGN_TICKET_STATUS_LABEL,
@@ -37,8 +38,40 @@ const TICKET_LIST_FILTER_DEFAULTS = {
   statusFilter: "all",
   priorityFilter: "all",
   accountFilter: "all",
+  support1Filter: "all",
+  support2Filter: "all",
+  salesFilter: "all",
   query: "",
 };
+
+/** Row shape enriched for sorting/filtering (account managers + age). */
+type TicketListRow = DesignTicket & {
+  accountName: string;
+  supportManager1: string;
+  supportManager2: string;
+  salesManagerName: string;
+  raisedByName: string;
+  daysOpen: number;
+};
+
+function daysSinceRaised(createdAt: string, now = new Date()): number {
+  const raw = createdAt.trim();
+  const d = raw.includes("T") || raw.includes(" ") ? parseISO(raw) : new Date(raw);
+  if (!isValid(d)) return 0;
+  return Math.max(0, differenceInCalendarDays(now, d));
+}
+
+function formatDaysOpen(days: number) {
+  if (days === 0) return "Today";
+  if (days === 1) return "1 day";
+  return `${days} days`;
+}
+
+function uniqueSortedNames(values: string[]) {
+  return [...new Set(values.map((v) => v.trim()).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b),
+  );
+}
 
 const KPI_CHIPS = [
   { id: "all", label: "All" },
@@ -111,7 +144,16 @@ function CrmTicketTrackingPage() {
     "crm.tickets.list",
     TICKET_LIST_FILTER_DEFAULTS,
   );
-  const { kpiFilter, statusFilter, priorityFilter, accountFilter, query } = listFilters;
+  const {
+    kpiFilter,
+    statusFilter,
+    priorityFilter,
+    accountFilter,
+    support1Filter,
+    support2Filter,
+    salesFilter,
+    query,
+  } = listFilters;
 
   const setKpiFilter = useCallback(
     (value: KpiFilterId) => setListFilters({ kpiFilter: value }),
@@ -129,15 +171,56 @@ function CrmTicketTrackingPage() {
     (value: string) => setListFilters({ accountFilter: value }),
     [setListFilters],
   );
+  const setSupport1Filter = useCallback(
+    (value: string) => setListFilters({ support1Filter: value }),
+    [setListFilters],
+  );
+  const setSupport2Filter = useCallback(
+    (value: string) => setListFilters({ support2Filter: value }),
+    [setListFilters],
+  );
+  const setSalesFilter = useCallback(
+    (value: string) => setListFilters({ salesFilter: value }),
+    [setListFilters],
+  );
   const setQuery = useCallback(
     (value: string) => setListFilters({ query: value }),
     [setListFilters],
   );
 
-  const accountName = useMemo(() => {
-    const map = new Map(accounts.map((a) => [a.id, a.name]));
-    return (id: string) => map.get(id) ?? "Account";
+  const accountById = useMemo(() => {
+    const map = new Map(accounts.map((a) => [a.id, a]));
+    return map;
   }, [accounts]);
+
+  const ticketRows = useMemo((): TicketListRow[] => {
+    const now = new Date();
+    return crmTickets.map((t) => {
+      const account = accountById.get(t.companyId);
+      return {
+        ...t,
+        accountName: account?.name ?? "Account",
+        supportManager1: account?.supportManager1?.trim() || "",
+        supportManager2: account?.supportManager2?.trim() || "",
+        salesManagerName: account?.salesManagerName?.trim() || "",
+        raisedByName: t.createdBy.name,
+        daysOpen: daysSinceRaised(t.createdAt, now),
+      };
+    });
+  }, [crmTickets, accountById]);
+
+  const support1Options = useMemo(
+    () => uniqueSortedNames(ticketRows.map((r) => r.supportManager1)),
+    [ticketRows],
+  );
+  const support2Options = useMemo(
+    () => uniqueSortedNames(ticketRows.map((r) => r.supportManager2)),
+    [ticketRows],
+  );
+  const salesOptions = useMemo(
+    () => uniqueSortedNames(ticketRows.map((r) => r.salesManagerName)),
+    [ticketRows],
+  );
 
   const kpiCounts = useMemo(
     () => ({
@@ -151,26 +234,46 @@ function CrmTicketTrackingPage() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return crmTickets.filter((t) => {
+    return ticketRows.filter((t) => {
       if (!matchesKpi(t, kpiFilter)) return false;
       if (statusFilter !== "all" && t.status !== statusFilter) return false;
       if (priorityFilter !== "all" && t.priority !== priorityFilter) return false;
       if (accountFilter !== "all" && t.companyId !== accountFilter) return false;
+      if (support1Filter !== "all" && t.supportManager1 !== support1Filter) return false;
+      if (support2Filter !== "all" && t.supportManager2 !== support2Filter) return false;
+      if (salesFilter !== "all" && t.salesManagerName !== salesFilter) return false;
       if (!q) return true;
       return (
         t.subject.toLowerCase().includes(q) ||
         t.ticketNumber.toLowerCase().includes(q) ||
         t.id.toLowerCase().includes(q) ||
-        accountName(t.companyId).toLowerCase().includes(q)
+        t.accountName.toLowerCase().includes(q) ||
+        t.supportManager1.toLowerCase().includes(q) ||
+        t.supportManager2.toLowerCase().includes(q) ||
+        t.salesManagerName.toLowerCase().includes(q) ||
+        t.raisedByName.toLowerCase().includes(q)
       );
     });
-  }, [crmTickets, kpiFilter, statusFilter, priorityFilter, accountFilter, query, accountName]);
+  }, [
+    ticketRows,
+    kpiFilter,
+    statusFilter,
+    priorityFilter,
+    accountFilter,
+    support1Filter,
+    support2Filter,
+    salesFilter,
+    query,
+  ]);
 
   const activeFilterCount = [
     kpiFilter !== "all",
     statusFilter !== "all",
     priorityFilter !== "all",
     accountFilter !== "all",
+    support1Filter !== "all",
+    support2Filter !== "all",
+    salesFilter !== "all",
     Boolean(query),
   ].filter(Boolean).length;
 
@@ -261,7 +364,7 @@ function CrmTicketTrackingPage() {
           <DesignTicketFilterBar
             variant="inline"
             compact
-            className="xl:grid-cols-3"
+            className="xl:grid-cols-3 2xl:grid-cols-4"
             activeFilterCount={activeFilterCount}
             onClear={clearFilters}
             onApply={applyFilters}
@@ -273,7 +376,7 @@ function CrmTicketTrackingPage() {
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Subject, id, account…"
+                  placeholder="Subject, account, support, sales…"
                   aria-label="Search tickets"
                   className="h-8 w-full rounded-md border border-input bg-background pl-8 pr-3 text-xs outline-none focus:ring-2 focus:ring-ring/40"
                 />
@@ -316,6 +419,39 @@ function CrmTicketTrackingPage() {
                 options={[
                   { value: "all", label: "All accounts" },
                   ...accounts.map((a) => ({ value: a.id, label: a.name })),
+                ]}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketFilterField label="Support 1" compact>
+              <DesignTicketSelect
+                compact
+                value={support1Filter}
+                onChange={setSupport1Filter}
+                options={[
+                  { value: "all", label: "All support 1" },
+                  ...support1Options.map((name) => ({ value: name, label: name })),
+                ]}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketFilterField label="Support 2" compact>
+              <DesignTicketSelect
+                compact
+                value={support2Filter}
+                onChange={setSupport2Filter}
+                options={[
+                  { value: "all", label: "All support 2" },
+                  ...support2Options.map((name) => ({ value: name, label: name })),
+                ]}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketFilterField label="Sales" compact>
+              <DesignTicketSelect
+                compact
+                value={salesFilter}
+                onChange={setSalesFilter}
+                options={[
+                  { value: "all", label: "All sales" },
+                  ...salesOptions.map((name) => ({ value: name, label: name })),
                 ]}
               />
             </DesignTicketFilterField>
@@ -371,7 +507,7 @@ function CrmTicketTrackingPage() {
                     ),
                   },
                   {
-                    key: "account",
+                    key: "accountName",
                     header: "Account",
                     sortable: true,
                     render: (t) => (
@@ -381,7 +517,7 @@ function CrmTicketTrackingPage() {
                         className="text-xs text-primary hover:underline"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        {accountName(t.companyId)}
+                        {t.accountName}
                       </Link>
                     ),
                   },
@@ -431,11 +567,42 @@ function CrmTicketTrackingPage() {
                     ),
                   },
                   {
-                    key: "createdBy",
-                    header: "Raised by",
+                    key: "supportManager1",
+                    header: "Support 1",
+                    sortable: true,
                     render: (t) => (
                       <span className="text-xs text-muted-foreground">
-                        {t.createdBy.name}
+                        {t.supportManager1 || "—"}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: "supportManager2",
+                    header: "Support 2",
+                    sortable: true,
+                    render: (t) => (
+                      <span className="text-xs text-muted-foreground">
+                        {t.supportManager2 || "—"}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: "salesManagerName",
+                    header: "Sales",
+                    sortable: true,
+                    render: (t) => (
+                      <span className="text-xs text-muted-foreground">
+                        {t.salesManagerName || "—"}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: "raisedByName",
+                    header: "Raised by",
+                    sortable: true,
+                    render: (t) => (
+                      <span className="text-xs text-muted-foreground">
+                        {t.raisedByName}
                         {t.createdBy.type === "client" ? " · Client" : ""}
                       </span>
                     ),
@@ -446,6 +613,26 @@ function CrmTicketTrackingPage() {
                     sortable: true,
                     render: (t) => (
                       <span className="text-xs text-muted-foreground">{formatDate(t.createdAt)}</span>
+                    ),
+                  },
+                  {
+                    key: "daysOpen",
+                    header: "Days open",
+                    sortable: true,
+                    render: (t) => (
+                      <span
+                        className={cn(
+                          "text-xs tabular-nums font-medium",
+                          t.daysOpen >= 7
+                            ? "text-destructive"
+                            : t.daysOpen >= 3
+                              ? "text-amber-600 dark:text-amber-400"
+                              : "text-muted-foreground",
+                        )}
+                        title={`Raised ${formatDate(t.createdAt)}`}
+                      >
+                        {formatDaysOpen(t.daysOpen)}
+                      </span>
                     ),
                   },
                 ]}
