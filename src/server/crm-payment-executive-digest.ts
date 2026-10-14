@@ -65,7 +65,7 @@ function loadOverduePaymentRows(
 ): PaymentListItem[] {
   const { rows } = queryPaymentListItems(
     db,
-    { status: "overdue", pageSize: 10_000, sortBy: "overdueAmount", sortDir: "desc" },
+    { status: "overdue", unpaged: true, sortBy: "overdueAmount", sortDir: "desc" },
     allowedAccountIds,
   );
   let overdue = rows.filter((r) => r.paymentStatus === "overdue" && r.overdueAmount > 0.009);

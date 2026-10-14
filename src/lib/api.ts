@@ -183,6 +183,7 @@ export {
 
 export {
   listCrmPayments,
+  exportCrmPayments,
   getCrmPaymentsSummary,
   getCrmPaymentInstallments,
   addCrmPaymentInstallment,

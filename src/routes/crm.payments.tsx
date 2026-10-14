@@ -260,14 +260,16 @@ function CrmPaymentsPage() {
 
   async function handleExport() {
     try {
-      const filters = crmPaymentsSearchToApiFilters({ ...search, page: 1, pageSize: 100000 });
-      const { listCrmPayments } = await import("@/lib/api");
-      const data = await listCrmPayments({ data: filters });
+      const filters = crmPaymentsSearchToApiFilters({ ...search, page: 1 });
+      const { exportCrmPayments } = await import("@/lib/api");
+      const data = await exportCrmPayments({ data: filters });
       const header = [
         "Account",
         "Support 1",
         "Support 2",
         "Sales manager",
+        "Deal date",
+        "Users",
         "Deal value",
         "Received",
         "Pending",
@@ -283,6 +285,8 @@ function CrmPaymentsPage() {
           r.supportManager1 ?? "",
           r.supportManager2 ?? "",
           r.salesManager ?? "",
+          r.dealDate ?? "",
+          r.usersPurchased ?? "",
           r.totalDealValue,
           r.paymentReceived,
           r.pendingAmount,
@@ -679,6 +683,28 @@ function CrmPaymentsPage() {
                 key: "salesManager",
                 header: "Sales manager",
                 render: (r) => managerCell(r.salesManager),
+              },
+              {
+                key: "dealDate",
+                header: "Deal date",
+                render: (r) =>
+                  r.dealDate ? (
+                    <span className="text-xs tabular-nums text-muted-foreground">
+                      {formatDate(r.dealDate)}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  ),
+              },
+              {
+                key: "usersPurchased",
+                header: "Users",
+                render: (r) =>
+                  r.usersPurchased != null ? (
+                    <span className="tabular-nums text-xs">{r.usersPurchased}</span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  ),
               },
               {
                 key: "totalDealValue",

@@ -130,6 +130,18 @@ export const listCrmPayments = createServerFn({ method: "GET" })
     return { rows, total, page: filters.page ?? 1, pageSize: filters.pageSize ?? 15 };
   });
 
+/** Full filtered list for CSV export (no pageSize cap). */
+export const exportCrmPayments = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => listFiltersSchema.optional().parse(data ?? {}))
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    const db = getDb();
+    const filters = { ...toListFilters(data ?? {}), unpaged: true as const };
+    const allowed = allowedAccountIdsForUser(user);
+    const { rows, total } = queryPaymentListItems(db, filters, allowed);
+    return { rows, total };
+  });
+
 export const getCrmPaymentsSummary = createServerFn({ method: "GET" })
   .inputValidator((data: unknown) => listFiltersSchema.optional().parse(data ?? {}))
   .handler(async ({ data }) => {

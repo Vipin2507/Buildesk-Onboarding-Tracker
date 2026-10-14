@@ -454,6 +454,8 @@ export type PaymentsListFilters = {
   search?: string;
   page?: number;
   pageSize?: number;
+  /** Skip pagination — used for CSV export and summary rollups. */
+  unpaged?: boolean;
   sortBy?: "nextDueDate" | "overdueAmount" | "collectionPercent" | "renewalDate";
   sortDir?: "asc" | "desc";
 };
@@ -566,6 +568,10 @@ export type PaymentListItem = {
   supportManager1?: string;
   supportManager2?: string;
   salesManager?: string;
+  /** Account start / deal date (YYYY-MM-DD). */
+  dealDate?: string;
+  /** Users purchased on the account. */
+  usersPurchased?: number;
   totalDealValue: number;
   paymentReceived: number;
   pendingAmount: number;
@@ -600,6 +606,11 @@ function mapAccountsToPaymentListItems(
       supportManager1: account.supportManager1 ?? undefined,
       supportManager2: account.supportManager2 ?? undefined,
       salesManager: account.salesManagerName ?? undefined,
+      dealDate: account.startDate?.slice(0, 10) || undefined,
+      usersPurchased:
+        typeof account.usersPurchased === "number" && Number.isFinite(account.usersPurchased)
+          ? Math.max(0, Math.round(account.usersPurchased))
+          : undefined,
       totalDealValue: snap.totalDealValue,
       paymentReceived: snap.paymentReceived,
       pendingAmount: snap.pendingAmount,
@@ -675,6 +686,9 @@ export function queryPaymentListItems(
   });
 
   const total = items.length;
+  if (filters.unpaged) {
+    return { rows: items, total };
+  }
   const page = Math.max(1, filters.page ?? 1);
   const pageSize = Math.min(100, Math.max(1, filters.pageSize ?? 15));
   const start = (page - 1) * pageSize;
@@ -699,7 +713,7 @@ export function summarizePaymentList(
   const today = new Date().toISOString().slice(0, 10);
   const { rows: tableRows } = queryPaymentListItems(
     db,
-    { ...filters, page: 1, pageSize: 100000 },
+    { ...filters, unpaged: true },
     allowedAccountIds,
   );
 
