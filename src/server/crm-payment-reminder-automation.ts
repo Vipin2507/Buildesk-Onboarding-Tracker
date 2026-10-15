@@ -6,6 +6,10 @@ import {
 } from "@/data/crm-automation-defaults";
 import { crmSalesManagerNamesMatch } from "@/lib/crm-account-access";
 import { phoneToWahaChatId } from "@/lib/automationEndpoints";
+import type {
+  PaymentClientReminderPreview,
+  PaymentClientReminderSendInput,
+} from "@/lib/crm-payment-client-reminder";
 import { buildExecutiveDigestTemplateVars } from "@/lib/crm-payment-executive-digest";
 import { resolveUserWorkEmail } from "@/lib/user-email";
 import {
@@ -14,7 +18,10 @@ import {
 } from "@/services/automationTemplate";
 import { listActiveAdminUserIds } from "@/server/api/notifications";
 import { appendServerCrmAutomationLog, loadCrmAutomationConfig } from "@/server/crm-booking-automation";
-import { buildServerCrmN8nEmailBody } from "@/server/crm-n8n-email-payload";
+import {
+  buildServerCrmN8nEmailBody,
+  mergeServerEmailCc,
+} from "@/server/crm-n8n-email-payload";
 import { pickInternalTeamEmailTargets } from "@/server/lib/internal-team-email";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
@@ -181,6 +188,9 @@ async function dispatchPaymentEmailRule(
     recipientPhone?: string;
     vars: Record<string, string>;
     extraCc?: string[];
+    /** When set, use instead of rendering the rule template (dialog edits). */
+    overrideSubject?: string;
+    overrideBody?: string;
   },
 ): Promise<boolean> {
   const config = loadCrmAutomationConfig(db);
@@ -199,8 +209,12 @@ async function dispatchPaymentEmailRule(
   let sent = false;
 
   for (const rule of rules) {
-    const message = renderAutomationTemplate(rule.templateBody, opts.vars);
-    const subject = renderAutomationSubject(rule.templateSubject, opts.vars);
+    const message =
+      opts.overrideBody?.trim() ||
+      renderAutomationTemplate(rule.templateBody, opts.vars);
+    const subject =
+      opts.overrideSubject?.trim() ||
+      renderAutomationSubject(rule.templateSubject, opts.vars);
     const body = buildServerCrmN8nEmailBody({
       rule,
       settings: config.settings,
@@ -407,22 +421,78 @@ export async function dispatchExecutivePaymentChannels(
   return { email, whatsapp };
 }
 
+export type { PaymentClientReminderPreview };
+export type PaymentClientReminderOverrides = Omit<PaymentClientReminderSendInput, "accountId">;
+
+/** Preview client payment reminder email (editable in Payments UI before send). */
+export function previewServerPaymentClientReminder(
+  db: ReturnType<typeof getDb>,
+  accountId: string,
+): { ok: true; preview: PaymentClientReminderPreview } | { ok: false; error: string } {
+  const account = db.select().from(t.crmAccounts).where(eq(t.crmAccounts.id, accountId)).get();
+  if (!account) return { ok: false, error: "CRM account not found" };
+
+  const config = loadCrmAutomationConfig(db);
+  if (!config.settings.automationsEnabled) {
+    return { ok: false, error: "CRM automations are disabled" };
+  }
+
+  const rule = config.rules.find(
+    (r) => r.isActive && r.trigger === "payment-overdue" && r.channel === "email",
+  );
+  if (!rule) {
+    return { ok: false, error: "No active Payment reminder (client) email rule" };
+  }
+
+  const emailEndpoint = config.endpoints.find((e) => e.channel === "email" && e.isEnabled);
+  if (!emailEndpoint) {
+    return { ok: false, error: "Email endpoint is disabled" };
+  }
+
+  const recipientEmail = (account.pocEmail || account.email)?.trim() || "";
+  const recipientName =
+    account.pocName?.trim() || account.contact?.trim() || account.name;
+  const received = getAccountPaymentReceived(db, accountId);
+  const snap = buildAccountPaymentSnapshot(account, received);
+  const vars = buildPaymentTemplateVars(account, snap, recipientName);
+
+  return {
+    ok: true,
+    preview: {
+      accountId: account.id,
+      accountName: account.name,
+      recipientName,
+      recipientEmail,
+      subject: renderAutomationSubject(rule.templateSubject, vars),
+      body: renderAutomationTemplate(rule.templateBody, vars),
+      defaultCc: mergeServerEmailCc(config.settings.emailCc, rule.emailCc),
+      ruleName: rule.name,
+    },
+  };
+}
+
 export async function dispatchServerPaymentClientReminder(
   db: ReturnType<typeof getDb>,
   accountId: string,
+  overrides?: PaymentClientReminderOverrides,
 ): Promise<{ ok: boolean; error?: string }> {
   const account = db.select().from(t.crmAccounts).where(eq(t.crmAccounts.id, accountId)).get();
   if (!account) return { ok: false, error: "CRM account not found" };
 
   const received = getAccountPaymentReceived(db, accountId);
   const snap = buildAccountPaymentSnapshot(account, received);
-  const recipientEmail = (account.pocEmail || account.email)?.trim();
+  const recipientEmail =
+    overrides?.recipientEmail?.trim() ||
+    (account.pocEmail || account.email)?.trim();
   if (!recipientEmail) {
     return { ok: false, error: "Account has no client email" };
   }
 
   const recipientName =
-    account.pocName?.trim() || account.contact?.trim() || account.name;
+    overrides?.recipientName?.trim() ||
+    account.pocName?.trim() ||
+    account.contact?.trim() ||
+    account.name;
   const vars = buildPaymentTemplateVars(account, snap, recipientName);
   const sent = await dispatchPaymentEmailRule(db, {
     trigger: "payment-overdue",
@@ -431,6 +501,9 @@ export async function dispatchServerPaymentClientReminder(
     recipientName,
     recipientPhone: account.pocMobile || account.phone || undefined,
     vars,
+    extraCc: overrides?.extraCc,
+    overrideSubject: overrides?.subject,
+    overrideBody: overrides?.body,
   });
 
   if (!sent) {

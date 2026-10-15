@@ -17,9 +17,11 @@ import {
   remindCrmPaymentAccount,
   remindCrmPaymentExecutive,
   remindCrmPaymentsBulk,
+  previewCrmPaymentClientReminder,
   previewCrmExecutivePaymentDigest,
   sendCrmExecutivePaymentDigest,
 } from "@/lib/api";
+import type { PaymentClientReminderSendInput } from "@/lib/crm-payment-client-reminder";
 import type { ExecutiveDigestDelivery } from "@/lib/crm-payment-executive-digest";
 import type { CrmPaymentsSearch } from "@/lib/crm-payments-search";
 import { crmPaymentsSearchToApiFilters } from "@/lib/crm-payments-search";
@@ -287,9 +289,29 @@ export function useDeleteCrmPaymentInstallment(search: CrmPaymentsSearch) {
   });
 }
 
+export function usePreviewCrmPaymentClientReminder() {
+  return useMutation({
+    mutationFn: (accountId: string) =>
+      previewCrmPaymentClientReminder({ data: { accountId } }),
+  });
+}
+
 export function useRemindCrmPayment() {
   return useMutation({
-    mutationFn: (accountId: string) => remindCrmPaymentAccount({ data: { accountId } }),
+    mutationFn: (input: string | PaymentClientReminderSendInput) => {
+      const data =
+        typeof input === "string"
+          ? { accountId: input }
+          : {
+              accountId: input.accountId,
+              recipientName: input.recipientName,
+              recipientEmail: input.recipientEmail,
+              subject: input.subject,
+              body: input.body,
+              extraCc: input.extraCc,
+            };
+      return remindCrmPaymentAccount({ data });
+    },
   });
 }
 

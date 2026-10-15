@@ -15,6 +15,7 @@ import {
 import {
   dispatchServerPaymentClientReminder,
   dispatchServerPaymentExecutiveReminder,
+  previewServerPaymentClientReminder,
 } from "@/server/crm-payment-reminder-automation";
 import {
   buildAccountPaymentSnapshot,
@@ -404,9 +405,32 @@ export const deleteCrmPaymentTransaction = createServerFn({ method: "POST" })
     return { ok: true as const, snapshot };
   });
 
-async function sendPaymentReminderForAccount(accountId: string, userId: string) {
+const paymentClientReminderOverridesSchema = z.object({
+  recipientName: z.string().optional(),
+  recipientEmail: z.string().email().optional().or(z.literal("")),
+  subject: z.string().optional(),
+  body: z.string().optional(),
+  extraCc: z.array(z.string()).optional(),
+});
+
+async function sendPaymentReminderForAccount(
+  accountId: string,
+  userId: string,
+  overrides?: z.infer<typeof paymentClientReminderOverridesSchema>,
+) {
   const db = getDb();
-  const result = await dispatchServerPaymentClientReminder(db, accountId);
+  const cleaned = overrides
+    ? {
+        recipientName: overrides.recipientName?.trim() || undefined,
+        recipientEmail: overrides.recipientEmail?.trim() || undefined,
+        subject: overrides.subject?.trim() || undefined,
+        body: overrides.body?.trim() || undefined,
+        extraCc: (overrides.extraCc ?? [])
+          .map((e) => e.trim())
+          .filter(Boolean),
+      }
+    : undefined;
+  const result = await dispatchServerPaymentClientReminder(db, accountId, cleaned);
   if (!result.ok) {
     throw new ApiError(502, result.error ?? "Failed to send payment reminder");
   }
@@ -427,12 +451,46 @@ async function sendPaymentExecutiveReminderForAccount(accountId: string, userId:
   };
 }
 
-export const remindCrmPaymentAccount = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ accountId: z.string() }).parse(data))
+export const previewCrmPaymentClientReminder = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ accountId: z.string().min(1) }).parse(data))
   .handler(async ({ data }) => {
     const user = requireUser();
     assertCanViewAccountId(user, data.accountId);
-    return sendPaymentReminderForAccount(data.accountId, user.id);
+    const db = getDb();
+    const result = previewServerPaymentClientReminder(db, data.accountId);
+    if (!result.ok) {
+      throw new ApiError(400, result.error);
+    }
+    return result.preview;
+  });
+
+export const remindCrmPaymentAccount = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        accountId: z.string().min(1),
+        recipientName: z.string().optional(),
+        recipientEmail: z.string().optional(),
+        subject: z.string().optional(),
+        body: z.string().optional(),
+        extraCc: z.array(z.string()).optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const user = requireUser();
+    assertCanViewAccountId(user, data.accountId);
+    const email = data.recipientEmail?.trim();
+    if (email && !z.string().email().safeParse(email).success) {
+      throw new ApiError(400, "Invalid recipient email");
+    }
+    return sendPaymentReminderForAccount(data.accountId, user.id, {
+      recipientName: data.recipientName,
+      recipientEmail: email,
+      subject: data.subject,
+      body: data.body,
+      extraCc: data.extraCc,
+    });
   });
 
 export const remindCrmPaymentExecutive = createServerFn({ method: "POST" })

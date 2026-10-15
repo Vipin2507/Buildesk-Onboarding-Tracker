@@ -2,6 +2,7 @@ import { Bell, Mail, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { CrmClientPaymentReminderDialog } from "@/components/crm/crm-client-payment-reminder-dialog";
 import { CrmPaymentRemarksPanel } from "@/components/crm/crm-payment-remarks-panel";
 import {
   CrmPaymentInstallmentDialog,
@@ -21,7 +22,6 @@ import {
   useDeleteCrmPayment,
   useDeleteCrmPaymentInstallment,
   useRecordCrmPayment,
-  useRemindCrmPayment,
   useRemindCrmPaymentExecutive,
   useUpdateCrmPayment,
   useUpdateCrmPaymentInstallment,
@@ -78,6 +78,7 @@ export function CrmPaymentsExpandedRow({ row, search }: Props) {
     id: string;
     amount: number;
   } | null>(null);
+  const [clientRemindOpen, setClientRemindOpen] = useState(false);
   const installmentsQuery = useCrmPaymentInstallments(row.id, true);
   const transactionsQuery = useCrmPaymentTransactions(row.id, true);
   const recordPayment = useRecordCrmPayment(search);
@@ -86,7 +87,6 @@ export function CrmPaymentsExpandedRow({ row, search }: Props) {
   const addInstallment = useAddCrmPaymentInstallment(search);
   const updateInstallment = useUpdateCrmPaymentInstallment(search);
   const removeInstallment = useDeleteCrmPaymentInstallment(search);
-  const remindClient = useRemindCrmPayment();
   const remindExecutive = useRemindCrmPaymentExecutive();
 
   function openCreate() {
@@ -120,16 +120,6 @@ export function CrmPaymentsExpandedRow({ row, search }: Props) {
       image: txn.image,
     });
     setDialogOpen(true);
-  }
-
-  async function handleRemindClient() {
-    try {
-      await remindClient.mutateAsync(row.id);
-      toast.success("Client payment reminder sent");
-      void refreshAutomationLogsInStore("crm-automation");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to send client reminder");
-    }
   }
 
   async function handleRemindExecutive() {
@@ -183,8 +173,7 @@ export function CrmPaymentsExpandedRow({ row, search }: Props) {
               size="sm"
               variant="outline"
               className="h-7 gap-1 px-2 text-[11px]"
-              disabled={remindClient.isPending}
-              onClick={() => void handleRemindClient()}
+              onClick={() => setClientRemindOpen(true)}
             >
               <Bell className="h-3 w-3" />
               Remind client
@@ -376,6 +365,13 @@ export function CrmPaymentsExpandedRow({ row, search }: Props) {
       </div>
 
       <CrmPaymentRemarksPanel accountId={row.id} />
+
+      <CrmClientPaymentReminderDialog
+        open={clientRemindOpen}
+        onOpenChange={setClientRemindOpen}
+        accountId={row.id}
+        accountName={row.accountName}
+      />
 
       <CrmRecordPaymentDialog
         open={dialogOpen}

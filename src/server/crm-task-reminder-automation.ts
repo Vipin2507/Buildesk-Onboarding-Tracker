@@ -12,6 +12,7 @@ import {
   appendServerCrmAutomationLog,
   loadCrmAutomationConfig,
 } from "@/server/crm-booking-automation";
+import { buildServerCrmN8nEmailBody } from "@/server/crm-n8n-email-payload";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { mapTaskRow, parseAssigneeIdsJson } from "@/server/lib/task-schedule";
@@ -44,18 +45,6 @@ function summarizeResponse(text: string, max = 200) {
 
 function formatTaskWhen(iso: string) {
   return `${iso.slice(0, 10)} ${iso.slice(11, 16)}`;
-}
-
-function mergeEmailCc(globalCc?: string, ruleCc?: string): string {
-  const parts = [globalCc, ruleCc].flatMap((value) =>
-    value
-      ? value
-          .split(/[,;]/)
-          .map((s) => s.trim())
-          .filter(Boolean)
-      : [],
-  );
-  return [...new Set(parts)].join(", ");
 }
 
 function taskAssigneeIds(row: typeof t.followUpTasks.$inferSelect): string[] {
@@ -207,30 +196,35 @@ async function dispatchTaskReminderForRule(
 
     const n8nBase = config.settings.n8nWebhookBase;
     const url = buildN8nUrl(n8nBase, N8N_EMAIL_SEGMENT);
-    const body = {
-      channel: "email" as const,
-      templateId: rule.id,
-      templateName: rule.name,
+    // Use the same canonical email body as other CRM rules (includes delayHours: 0).
+    // A custom payload was omitting delayHours and broke n8n Wait ("Invalid wait amount").
+    const body = buildServerCrmN8nEmailBody({
+      rule,
+      settings: config.settings,
+      waha: config.waha,
       trigger: "task-before-start",
       recipientEmail,
       recipientName: assignee.name,
+      recipientPhone: recipientPhone ?? undefined,
       messageBody: message,
       emailSubject: subject,
-      emailCc: mergeEmailCc(config.settings.emailCc, rule.emailCc),
       entityType: "crm-task",
-      productScope: "crm",
       entityId: task.id,
       entityName: task.title,
       companyName: accountName,
-      customerName: assignee.name,
-      customerEmail: recipientEmail,
-      taskId: task.id,
-      taskTitle: task.title,
-      taskUrl,
-      startsAt: vars.startsAt,
-      endsAt: vars.endsAt,
-      offsetMinutes,
-    };
+      status: vars.status,
+      fields: {
+        taskId: task.id,
+        taskTitle: task.title,
+        taskUrl,
+        ticketUrl: taskUrl,
+        startsAt: vars.startsAt,
+        endsAt: vars.endsAt,
+        // Keep reminder offset as a string so n8n Wait does not treat it as delayHours.
+        offsetMinutes: String(offsetMinutes),
+        assigneeName: assignee.name,
+      },
+    });
 
     try {
       const res = await fetch(url, {
