@@ -438,15 +438,44 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
     let updated = 0;
     set((s) => ({
       records: s.records.map((r) => {
-        const next = mergeCrmProductModules(r.productModules, catalog as { key: CrmProductModuleKey; label: string }[]);
+        let next = mergeCrmProductModules(
+          r.productModules,
+          catalog as { key: CrmProductModuleKey; label: string }[],
+        ).map((m) =>
+          needsModuleWorkflowUpgrade(m)
+            ? { ...m, workflow: mergeModuleWorkflow(m.workflow, m.key) }
+            : m,
+        );
+        // Also refresh labels/steps when workflow template labels changed without key drift
+        next = next.map((m) => {
+          if (!m.enabled || m.key === "sales-crm") return m;
+          const merged = mergeModuleWorkflow(m.workflow, m.key);
+          if (!merged) return m;
+          const labelsChanged = merged.some(
+            (step, i) => step.label !== m.workflow?.[i]?.label || step.key !== m.workflow?.[i]?.key,
+          );
+          if (!labelsChanged && merged.length === (m.workflow?.length ?? 0)) return m;
+          return { ...m, workflow: merged };
+        });
         const same =
           next.length === r.productModules.length &&
-          next.every(
-            (m, i) =>
-              m.key === r.productModules[i]?.key &&
-              m.label === r.productModules[i]?.label &&
-              m.enabled === r.productModules[i]?.enabled,
-          );
+          next.every((m, i) => {
+            const prev = r.productModules[i];
+            if (!prev) return false;
+            if (
+              m.key !== prev.key ||
+              m.label !== prev.label ||
+              m.enabled !== prev.enabled
+            ) {
+              return false;
+            }
+            const a = m.workflow ?? [];
+            const b = prev.workflow ?? [];
+            if (a.length !== b.length) return false;
+            return a.every(
+              (step, si) => step.key === b[si]?.key && step.label === b[si]?.label,
+            );
+          });
         if (same) return r;
         updated += 1;
         return touch({ ...r, productModules: next });

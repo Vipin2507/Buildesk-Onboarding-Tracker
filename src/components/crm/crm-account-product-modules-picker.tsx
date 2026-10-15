@@ -2,8 +2,7 @@ import { useMemo } from "react";
 import { Check, Package } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { CRM_CORE_MODULES } from "@/data/crm-onboarding-defaults";
-import { getCrmMasterProductModuleCatalog } from "@/stores/useCrmMasterStore";
+import { getCrmMasterModulesList } from "@/stores/useCrmMasterStore";
 import type { CrmProductModuleKey } from "@/types/crm-onboarding";
 
 type Props = {
@@ -19,11 +18,12 @@ function toggleKey(list: CrmProductModuleKey[], key: CrmProductModuleKey, on: bo
 
 /** Checkbox picker for core modules when creating an account. */
 export function CrmAccountProductModulesPicker({ selected, onChange, compact }: Props) {
-  const catalog = useMemo(() => getCrmMasterProductModuleCatalog(), []);
-  const catalogKeys = useMemo(() => new Set(catalog.map((m) => m.key)), [catalog]);
   const items = useMemo(
-    () => CRM_CORE_MODULES.filter((m) => catalogKeys.has(m.key)),
-    [catalogKeys],
+    () =>
+      getCrmMasterModulesList()
+        .filter((m) => m.enabled && m.kind === "core" && m.key !== "sales-crm")
+        .sort((a, b) => a.order - b.order),
+    [],
   );
 
   const selectedCoreCount = selected.filter((key) => items.some((m) => m.key === key)).length;

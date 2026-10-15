@@ -4,6 +4,8 @@ import type {
   CrmImplementationStageDef,
   CrmMasterFieldDef,
   CrmMasterModuleDef,
+  CrmMasterModuleKind,
+  CrmMasterModuleWorkflowStepDef,
   CrmMasterPicklist,
   CrmMasterPlatformSettings,
   CrmMigrationFieldDef,
@@ -25,14 +27,16 @@ import {
   seedCrmImplementationStages,
 } from "@/lib/crm-implementation-stages";
 import {
-  CRM_CORE_MODULES,
   CRM_INTEGRATION_MODULES,
   CRM_PRODUCT_MODULES,
+  registerCrmMasterModuleLookup,
   seedCrmMigrationFields,
   seedCrmModuleProviders,
   seedCrmTrainingFields,
+  seedWorkflowStepsForModuleKey,
   type CrmTrainingTrack,
 } from "@/data/crm-onboarding-defaults";
+import type { CrmProductModuleKey } from "@/types/crm-onboarding";
 import {
   normalizeCrmBookingCallTypes,
   normalizeCrmBookingHostHours,
@@ -85,7 +89,14 @@ type CrmMasterState = {
   updatePicklist: (id: string, data: Partial<CrmMasterPicklist>) => void;
   deletePicklist: (id: string) => void;
 
+  addModule: (
+    data: Omit<CrmMasterModuleDef, "id" | "createdAt" | "updatedAt" | "builtIn" | "order"> & {
+      order?: number;
+    },
+  ) => void;
   updateModule: (id: string, data: Partial<CrmMasterModuleDef>) => void;
+  deleteModule: (id: string) => void;
+  reorderModule: (id: string, direction: "up" | "down") => void;
   setModuleProviders: (moduleKey: string, providers: string[]) => void;
   setMigrationFields: (fields: CrmMigrationFieldDef[]) => void;
   setTrainingFields: (track: CrmTrainingTrack, fields: CrmTrainingFieldDef[]) => void;
@@ -142,15 +153,74 @@ function normalizeModuleProviders(
   return out;
 }
 
+const BUILT_IN_MODULE_KEYS = new Set(CRM_PRODUCT_MODULES.map((m) => m.key));
+const BUILT_IN_INTEGRATION_KEYS = new Set(CRM_INTEGRATION_MODULES.map((m) => m.key));
+
+function defaultKindForKey(key: string): CrmMasterModuleKind {
+  const seed = CRM_SEED_MODULES.find((m) => m.key === key);
+  if (seed) return seed.kind;
+  if (BUILT_IN_INTEGRATION_KEYS.has(key as CrmProductModuleKey)) return "integration";
+  if (key.endsWith("-integration")) return "integration";
+  return "core";
+}
+
+function normalizeWorkflowSteps(
+  steps: CrmMasterModuleWorkflowStepDef[] | undefined,
+  fallbackKey?: string,
+): CrmMasterModuleWorkflowStepDef[] {
+  if (Array.isArray(steps) && steps.length > 0) {
+    return steps
+      .map((s) => ({
+        key: String(s.key ?? "")
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "_")
+          .replace(/^_|_$/g, ""),
+        label: String(s.label ?? "").trim(),
+        kind: s.kind ?? "date",
+      }))
+      .filter((s) => s.key && s.label);
+  }
+  if (fallbackKey) return seedWorkflowStepsForModuleKey(fallbackKey as CrmProductModuleKey);
+  return [
+    { key: "requirement", label: "Requirement gathering", kind: "date" },
+    { key: "configuration", label: "Configuration", kind: "date" },
+    { key: "uat", label: "UAT / Testing", kind: "date" },
+    { key: "go_live", label: "Go-Live", kind: "date" },
+    { key: "remarks", label: "Remarks", kind: "remarks" },
+  ];
+}
+
+function slugifyModuleKey(raw: string) {
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+/** Merge built-in catalog with Master-custom modules; preserve labels, kind, workflow, enabled. */
 function normalizeMasterModules(
   existing: CrmMasterModuleDef[] | undefined,
 ): CrmMasterModuleDef[] {
   const byKey = new Map((existing ?? []).map((m) => [m.key, m]));
   const now = nowIso();
-  return CRM_PRODUCT_MODULES.map((def, i) => {
+  const builtIns: CrmMasterModuleDef[] = CRM_PRODUCT_MODULES.map((def, i) => {
     const prev = byKey.get(def.key);
+    const kind = prev?.kind ?? defaultKindForKey(def.key);
     if (prev) {
-      return { ...prev, label: def.label, order: i + 1 };
+      return {
+        ...prev,
+        key: def.key,
+        label: String(prev.label ?? def.label).trim() || def.label,
+        description:
+          String(prev.description ?? "").trim() || `${def.label} product module`,
+        enabled: prev.enabled !== false,
+        order: typeof prev.order === "number" ? prev.order : i + 1,
+        kind,
+        builtIn: true,
+        workflowSteps: normalizeWorkflowSteps(prev.workflowSteps, def.key),
+      };
     }
     return {
       id: newId(),
@@ -159,10 +229,36 @@ function normalizeMasterModules(
       description: `${def.label} product module`,
       enabled: true,
       order: i + 1,
+      kind: defaultKindForKey(def.key),
+      builtIn: true,
+      workflowSteps: normalizeWorkflowSteps(undefined, def.key),
       createdAt: now,
       updatedAt: now,
     };
   });
+
+  const custom: CrmMasterModuleDef[] = (existing ?? [])
+    .filter((m) => m.key && !BUILT_IN_MODULE_KEYS.has(m.key as CrmProductModuleKey))
+    .map((prev, i): CrmMasterModuleDef => {
+      const kind: CrmMasterModuleKind =
+        prev.kind === "integration" ? "integration" : "core";
+      return {
+        id: prev.id || newId(),
+        key: slugifyModuleKey(prev.key),
+        label: String(prev.label ?? "").trim() || prev.key,
+        description: String(prev.description ?? "").trim() || "Custom module",
+        enabled: prev.enabled !== false,
+        order: typeof prev.order === "number" ? prev.order : builtIns.length + i + 1,
+        kind,
+        builtIn: false,
+        workflowSteps: normalizeWorkflowSteps(prev.workflowSteps),
+        createdAt: prev.createdAt ?? now,
+        updatedAt: prev.updatedAt ?? now,
+      };
+    })
+    .filter((m) => m.key && m.label);
+
+  return [...builtIns, ...custom].sort((a, b) => a.order - b.order || a.label.localeCompare(b.label));
 }
 
 function normalizeCrmMigrationFields(
@@ -251,12 +347,77 @@ export const useCrmMasterStore = createPersistedStore<CrmMasterState>(
       set((s) => ({ picklists: s.picklists.filter((p) => p.id !== id) }));
     },
 
+    addModule: (data) => {
+      const now = nowIso();
+      const key = slugifyModuleKey(data.key);
+      if (!key || !data.label.trim()) return;
+      set((s) => {
+        const modules = normalizeMasterModules(s.modules);
+        if (modules.some((m) => m.key === key)) return s;
+        const maxOrder = modules.reduce((n, m) => Math.max(n, m.order), 0);
+        const next: CrmMasterModuleDef = {
+          id: newId(),
+          key,
+          label: data.label.trim(),
+          description: (data.description ?? "").trim() || `${data.label.trim()} product module`,
+          enabled: data.enabled !== false,
+          order: data.order ?? maxOrder + 1,
+          kind: data.kind === "integration" ? "integration" : "core",
+          builtIn: false,
+          workflowSteps: normalizeWorkflowSteps(data.workflowSteps),
+          createdAt: now,
+          updatedAt: now,
+        };
+        return { modules: [...modules, next] };
+      });
+    },
+
     updateModule: (id, data) => {
       set((s) => ({
-        modules: normalizeMasterModules(s.modules).map((m) =>
-          m.id === id ? touch({ ...m, ...data }) : m,
-        ),
+        modules: normalizeMasterModules(s.modules).map((m) => {
+          if (m.id !== id) return m;
+          const patch: Partial<CrmMasterModuleDef> = { ...data };
+          // Built-in keys are stable; custom keys may be renamed carefully.
+          if (m.builtIn) {
+            delete patch.key;
+            delete patch.builtIn;
+          } else if (typeof patch.key === "string") {
+            patch.key = slugifyModuleKey(patch.key);
+          }
+          if (patch.workflowSteps) {
+            patch.workflowSteps = normalizeWorkflowSteps(patch.workflowSteps);
+          }
+          if (patch.kind && patch.kind !== "core" && patch.kind !== "integration") {
+            delete patch.kind;
+          }
+          return touch({ ...m, ...patch });
+        }),
       }));
+    },
+
+    deleteModule: (id) => {
+      set((s) => {
+        const modules = normalizeMasterModules(s.modules);
+        const target = modules.find((m) => m.id === id);
+        if (!target || target.builtIn) return s;
+        return { modules: modules.filter((m) => m.id !== id) };
+      });
+    },
+
+    reorderModule: (id, direction) => {
+      set((s) => {
+        const modules = normalizeMasterModules(s.modules).slice().sort((a, b) => a.order - b.order);
+        const index = modules.findIndex((m) => m.id === id);
+        if (index < 0) return s;
+        const swapWith = direction === "up" ? index - 1 : index + 1;
+        if (swapWith < 0 || swapWith >= modules.length) return s;
+        const a = modules[index]!;
+        const b = modules[swapWith]!;
+        const orderA = a.order;
+        modules[index] = touch({ ...a, order: b.order });
+        modules[swapWith] = touch({ ...b, order: orderA });
+        return { modules };
+      });
     },
 
     setModuleProviders: (moduleKey, providers) => {
@@ -327,11 +488,21 @@ export function ensureCrmMasterModulesCatalog() {
   const state = useCrmMasterStore.getState();
   const modules = normalizeMasterModules(state.modules);
   const moduleProviders = normalizeModuleProviders(state.moduleProviders);
-  if (
+  const needsModules =
     modules.length !== state.modules.length ||
-    modules.some((m, i) => m.key !== state.modules[i]?.key) ||
-    Object.keys(moduleProviders).length !== Object.keys(state.moduleProviders ?? {}).length
-  ) {
+    modules.some((m, i) => {
+      const prev = state.modules[i];
+      return (
+        !prev ||
+        m.key !== prev.key ||
+        m.kind !== prev.kind ||
+        m.builtIn !== prev.builtIn ||
+        !Array.isArray(prev.workflowSteps)
+      );
+    });
+  const needsProviders =
+    Object.keys(moduleProviders).length !== Object.keys(state.moduleProviders ?? {}).length;
+  if (needsModules || needsProviders) {
     useCrmMasterStore.setState({ modules, moduleProviders });
   }
 }
@@ -393,17 +564,18 @@ export function listActiveCrmWhatsappTemplates(): CrmWhatsappTemplateDef[] {
   return getCrmMasterWhatsappTemplates().filter((t) => t.active);
 }
 
-/** Core modules are always available; integrations respect Master → Integrations toggles. */
+/** Enabled modules from Master catalog (labels + order from Master → Modules). */
 export function getCrmMasterProductModuleCatalog(): { key: string; label: string }[] {
   ensureCrmMasterModulesCatalog();
-  const byKey = new Map(
-    normalizeMasterModules(useCrmMasterStore.getState().modules).map((m) => [m.key, m]),
-  );
-  const core = CRM_CORE_MODULES.map((m) => ({ key: m.key, label: m.label }));
-  const integrations = CRM_INTEGRATION_MODULES.filter(
-    (m) => byKey.get(m.key)?.enabled !== false,
-  ).map((m) => ({ key: m.key, label: m.label }));
-  return [...core, ...integrations];
+  return normalizeMasterModules(useCrmMasterStore.getState().modules)
+    .filter((m) => m.enabled)
+    .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label))
+    .map((m) => ({ key: m.key, label: m.label }));
+}
+
+export function getCrmMasterModulesList(): CrmMasterModuleDef[] {
+  ensureCrmMasterModulesCatalog();
+  return normalizeMasterModules(useCrmMasterStore.getState().modules);
 }
 
 export function crmMasterSnapshot() {
@@ -509,3 +681,9 @@ export function resolveCrmStageLabel(stage: string | undefined): string {
   const match = getCrmMasterImplementationStages().find((s) => s.key === normalized);
   return match?.label ?? normalized.replace(/_/g, " ");
 }
+
+registerCrmMasterModuleLookup((key) => {
+  const mod = normalizeMasterModules(useCrmMasterStore.getState().modules).find((m) => m.key === key);
+  if (!mod) return undefined;
+  return { kind: mod.kind, workflowSteps: mod.workflowSteps };
+});

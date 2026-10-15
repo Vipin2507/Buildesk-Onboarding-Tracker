@@ -5,7 +5,11 @@ import type {
   CrmMasterPlatformSettings,
 } from "@/types/crm-master";
 import { newId, nowIso } from "@/types/common";
-import { CRM_PRODUCT_MODULES } from "@/data/crm-onboarding-defaults";
+import {
+  CRM_INTEGRATION_MODULES,
+  CRM_PRODUCT_MODULES,
+  seedWorkflowStepsForModuleKey,
+} from "@/data/crm-onboarding-defaults";
 
 function stampField(
   partial: Omit<CrmMasterFieldDef, "id" | "createdAt" | "updatedAt"> & { id?: string },
@@ -107,6 +111,8 @@ export const CRM_SEED_PICKLISTS: CrmMasterPicklist[] = [
   },
 ];
 
+const CRM_INTEGRATION_KEY_SET = new Set(CRM_INTEGRATION_MODULES.map((m) => m.key));
+
 export const CRM_SEED_MODULES: CrmMasterModuleDef[] = CRM_PRODUCT_MODULES.map((m, i) => ({
   id: newId(),
   key: m.key,
@@ -114,6 +120,9 @@ export const CRM_SEED_MODULES: CrmMasterModuleDef[] = CRM_PRODUCT_MODULES.map((m
   description: `${m.label} product module`,
   enabled: true,
   order: i + 1,
+  kind: CRM_INTEGRATION_KEY_SET.has(m.key) ? "integration" : "core",
+  builtIn: true,
+  workflowSteps: seedWorkflowStepsForModuleKey(m.key),
   createdAt: nowIso(),
   updatedAt: nowIso(),
 }));

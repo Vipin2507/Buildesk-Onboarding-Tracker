@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  ArrowDown,
+  ArrowUp,
   BookOpen,
   Building2,
   Boxes,
@@ -12,6 +14,7 @@ import {
   ListChecks,
   MessageCircle,
   Milestone,
+  Package,
   Pencil,
   Plus,
   ShieldAlert,
@@ -36,7 +39,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { flushCrmMasterConfigPersistence } from "@/lib/config-persistence";
-import { CRM_MODULE_PROVIDERS, CRM_INTEGRATION_MODULES, isCrmIntegrationModule } from "@/data/crm-onboarding-defaults";
+import { CRM_MODULE_PROVIDERS } from "@/data/crm-onboarding-defaults";
 import { normalizeCrmBookingHostHours } from "@/data/crm-booking-defaults";
 import {
   ensureCrmMasterModulesCatalog,
@@ -44,7 +47,7 @@ import {
   getCrmMasterBookingCallTypes,
   getCrmMasterBookingHostHours,
   getCrmMasterMigrationFields,
-  getCrmMasterProductModuleCatalog,
+  getCrmMasterModulesList,
   getCrmMasterTrainingFields,
   getCrmMasterWhatsappTemplates,
 } from "@/stores/useCrmMasterStore";
@@ -54,6 +57,9 @@ import type {
   CrmBookingCallTypeDef,
   CrmBookingHostHoursDef,
   CrmMasterFieldDef,
+  CrmMasterModuleDef,
+  CrmMasterModuleKind,
+  CrmMasterModuleWorkflowStepDef,
   CrmMasterPicklist,
   CrmImplementationStageDef,
   CrmMigrationFieldDef,
@@ -72,6 +78,7 @@ const SECTIONS = [
   { id: "project-fields", label: "Project Fields", icon: Boxes },
   { id: "picklists", label: "Picklists", icon: ListChecks },
   { id: "account-stages", label: "Account stages", icon: Milestone },
+  { id: "modules", label: "Modules", icon: Package },
   { id: "integrations", label: "Integrations", icon: Link2 },
   { id: "migration", label: "Migration", icon: Upload },
   { id: "training", label: "Training", icon: GraduationCap },
@@ -175,6 +182,7 @@ function CrmMasterPage() {
             {section === "project-fields" ? <FieldsPanel entity="project" /> : null}
             {section === "picklists" ? <PicklistsPanel /> : null}
             {section === "account-stages" ? <AccountStagesPanel /> : null}
+            {section === "modules" ? <ModulesPanel /> : null}
             {section === "integrations" ? <IntegrationsPanel /> : null}
             {section === "migration" ? <MigrationPanel /> : null}
             {section === "training" ? <TrainingPanel /> : null}
@@ -191,6 +199,10 @@ function CrmMasterPage() {
 }
 
 function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) {
+  useEffect(() => {
+    ensureCrmMasterModulesCatalog();
+  }, []);
+
   const platform = useCrmMasterStore((s) => s.platform);
   const accountFields = useCrmMasterStore((s) => s.accountFields);
   const projectFields = useCrmMasterStore((s) => s.projectFields);
@@ -231,9 +243,15 @@ function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) 
       to: "account-stages" as const,
     },
     {
+      label: "Modules",
+      value: modules.filter((m) => m.enabled).length,
+      total: modules.length || getCrmMasterModulesList().length,
+      to: "modules" as const,
+    },
+    {
       label: "Integrations",
-      value: modules.filter((m) => isCrmIntegrationModule(m.key) && m.enabled).length,
-      total: CRM_INTEGRATION_MODULES.length,
+      value: modules.filter((m) => m.kind === "integration" && m.enabled).length,
+      total: modules.filter((m) => m.kind === "integration").length || "integrations",
       to: "integrations" as const,
     },
     {
@@ -808,6 +826,467 @@ function AccountStagesPanel() {
   );
 }
 
+function slugifyWorkflowKey(label: string) {
+  return label
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
+}
+
+function ModulesPanel() {
+  const modules = useCrmMasterStore((s) => s.modules);
+  const addModule = useCrmMasterStore((s) => s.addModule);
+  const updateModule = useCrmMasterStore((s) => s.updateModule);
+  const deleteModule = useCrmMasterStore((s) => s.deleteModule);
+  const reorderModule = useCrmMasterStore((s) => s.reorderModule);
+  const applyToAllAccounts = useCrmOnboardingStore((s) => s.applyProductModulesCatalogToAllAccounts);
+  const accountCount = useCrmOnboardingStore((s) => s.records.length);
+
+  const [filter, setFilter] = useState<"all" | CrmMasterModuleKind>("all");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<CrmMasterModuleDef | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    key: "",
+    label: "",
+    description: "",
+    kind: "core" as CrmMasterModuleKind,
+    enabled: true,
+    workflowSteps: [] as CrmMasterModuleWorkflowStepDef[],
+  });
+  const [stepDraft, setStepDraft] = useState("");
+
+  useEffect(() => {
+    ensureCrmMasterModulesCatalog();
+  }, []);
+
+  const sorted = useMemo(
+    () =>
+      (modules?.length ? modules : getCrmMasterModulesList())
+        .slice()
+        .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label)),
+    [modules],
+  );
+
+  const visible = useMemo(
+    () => (filter === "all" ? sorted : sorted.filter((m) => m.kind === filter)),
+    [sorted, filter],
+  );
+
+  const enabledCount = sorted.filter((m) => m.enabled).length;
+
+  function openCreate() {
+    setEditing(null);
+    setForm({
+      key: "",
+      label: "",
+      description: "",
+      kind: "core",
+      enabled: true,
+      workflowSteps: [
+        { key: "requirement", label: "Requirement gathering", kind: "date" },
+        { key: "configuration", label: "Configuration", kind: "date" },
+        { key: "uat", label: "UAT / Testing", kind: "date" },
+        { key: "go_live", label: "Go-Live", kind: "date" },
+        { key: "remarks", label: "Remarks", kind: "remarks" },
+      ],
+    });
+    setStepDraft("");
+    setModalOpen(true);
+  }
+
+  function openEdit(m: CrmMasterModuleDef) {
+    setEditing(m);
+    setForm({
+      key: m.key,
+      label: m.label,
+      description: m.description,
+      kind: m.kind ?? "core",
+      enabled: m.enabled,
+      workflowSteps: (m.workflowSteps ?? []).map((s) => ({ ...s })),
+    });
+    setStepDraft("");
+    setModalOpen(true);
+  }
+
+  function addWorkflowStep() {
+    const label = stepDraft.trim();
+    if (!label) {
+      toast.error("Enter a step label");
+      return;
+    }
+    const key = slugifyWorkflowKey(label);
+    if (!key) {
+      toast.error("Invalid step label");
+      return;
+    }
+    if (form.workflowSteps.some((s) => s.key === key)) {
+      toast.error("Step already exists");
+      return;
+    }
+    setForm((f) => ({
+      ...f,
+      workflowSteps: [...f.workflowSteps, { key, label, kind: "date" }],
+    }));
+    setStepDraft("");
+  }
+
+  function save() {
+    if (!form.label.trim()) {
+      toast.error("Label required");
+      return;
+    }
+    const key = (form.key || form.label).trim();
+    if (!editing && !key) {
+      toast.error("Key required");
+      return;
+    }
+    if (editing) {
+      updateModule(editing.id, {
+        label: form.label.trim(),
+        description: form.description.trim() || `${form.label.trim()} product module`,
+        kind: form.kind,
+        enabled: form.enabled,
+        workflowSteps: form.workflowSteps,
+        ...(!editing.builtIn ? { key } : {}),
+      });
+      flushCrmMasterConfigPersistence();
+      toast.success("Module updated");
+    } else {
+      addModule({
+        key,
+        label: form.label.trim(),
+        description: form.description.trim() || `${form.label.trim()} product module`,
+        kind: form.kind,
+        enabled: form.enabled,
+        workflowSteps: form.workflowSteps,
+      });
+      flushCrmMasterConfigPersistence();
+      toast.success("Module added");
+    }
+    setModalOpen(false);
+  }
+
+  function syncForMe() {
+    flushCrmMasterConfigPersistence();
+    toast.success("Module catalog saved", {
+      description:
+        "Synced to server for all admins. Account records update when each account is opened, or use Update for all.",
+    });
+  }
+
+  function syncForAll() {
+    flushCrmMasterConfigPersistence();
+    const updated = applyToAllAccounts();
+    toast.success("Module catalog applied to all accounts", {
+      description:
+        updated > 0
+          ? `Updated ${updated} of ${accountCount} CRM account onboarding record(s).`
+          : `All ${accountCount} account(s) already matched the master catalog.`,
+    });
+  }
+
+  return (
+    <div className="space-y-2.5">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold">Modules</h3>
+          <p className="text-[10px] text-muted-foreground">
+            Manage CRM product modules and onboarding checklist steps. Changes sync to accounts from
+            here.
+          </p>
+        </div>
+        <Button size="sm" className="h-7 gap-1 text-xs" onClick={openCreate}>
+          <Plus className="h-3.5 w-3.5" />
+          Add module
+        </Button>
+      </div>
+
+      <div className="card-soft flex flex-col gap-2 border border-primary/20 bg-primary/5 p-2.5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-[10px] text-muted-foreground">
+          <span className="font-medium text-foreground">{enabledCount}</span> of{" "}
+          {sorted.length} module(s) enabled ·{" "}
+          <span className="font-medium text-foreground">{accountCount}</span> CRM account(s)
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={syncForMe}>
+            Update for me
+          </Button>
+          <Button type="button" size="sm" className="h-7 text-xs" onClick={syncForAll}>
+            Update for all
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-1">
+        {(
+          [
+            ["all", "All"],
+            ["core", "Core"],
+            ["integration", "Integrations"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setFilter(id)}
+            className={cn(
+              "rounded-md px-2.5 py-1 text-[10px] font-medium transition-colors",
+              filter === id
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="space-y-1.5">
+        {visible.map((m) => {
+          const orderIndex = sorted.findIndex((x) => x.id === m.id);
+          return (
+          <div key={m.id} className="card-soft flex items-start justify-between gap-2 p-2.5">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <div className="text-xs font-medium">{m.label}</div>
+                <Pill tone={m.kind === "integration" ? "info" : "muted"}>
+                  {m.kind === "integration" ? "Integration" : "Core"}
+                </Pill>
+                {m.builtIn ? <Pill tone="muted">Built-in</Pill> : <Pill tone="success">Custom</Pill>}
+                <Pill tone={m.enabled ? "success" : "muted"}>
+                  {m.enabled ? "In catalog" : "Hidden"}
+                </Pill>
+              </div>
+              <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">{m.key}</div>
+              <p className="mt-1 text-[10px] text-muted-foreground">{m.description}</p>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                {(m.workflowSteps?.length ?? 0) > 0
+                  ? `${m.workflowSteps.length} checklist step(s)`
+                  : m.key === "sales-crm"
+                    ? "Uses Masters / Migration / Training tabs"
+                    : "No checklist steps"}
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              <div className="flex items-center gap-0.5">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  disabled={orderIndex <= 0}
+                  onClick={() => reorderModule(m.id, "up")}
+                  aria-label="Move up"
+                >
+                  <ArrowUp className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  disabled={orderIndex < 0 || orderIndex >= sorted.length - 1}
+                  onClick={() => reorderModule(m.id, "down")}
+                  aria-label="Move down"
+                >
+                  <ArrowDown className="h-3.5 w-3.5" />
+                </Button>
+                <Switch
+                  size="sm"
+                  checked={m.enabled}
+                  onCheckedChange={(v) => updateModule(m.id, { enabled: v === true })}
+                />
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(m)}>
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                {!m.builtIn ? (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7"
+                    onClick={() => setDeleteId(m.id)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          </div>
+          );
+        })}
+      </div>
+
+      <EntityFormModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        title={editing ? "Edit module" : "Add module"}
+        submitLabel={editing ? "Save" : "Create"}
+        onSubmit={save}
+      >
+        <div className="grid max-h-[70vh] gap-3 overflow-y-auto sm:grid-cols-2">
+          <div>
+            <label className="text-xs font-medium">Label</label>
+            <input
+              className="mt-1 h-8 w-full rounded-md border bg-background px-2.5 text-xs"
+              value={form.label}
+              onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium">Key</label>
+            <input
+              className="mt-1 h-8 w-full rounded-md border bg-background px-2.5 font-mono text-xs"
+              value={form.key}
+              disabled={Boolean(editing?.builtIn)}
+              onChange={(e) => setForm((f) => ({ ...f, key: e.target.value }))}
+              placeholder="custom-module"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="text-xs font-medium">Description</label>
+            <textarea
+              className="mt-1 min-h-[56px] w-full rounded-md border bg-background px-2.5 py-1.5 text-xs"
+              value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium">Type</label>
+            <select
+              className="mt-1 h-8 w-full rounded-md border bg-background px-2.5 text-xs"
+              value={form.kind}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, kind: e.target.value as CrmMasterModuleKind }))
+              }
+            >
+              <option value="core">Core module</option>
+              <option value="integration">Integration</option>
+            </select>
+          </div>
+          <div className="flex items-end pb-1">
+            <label className="flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={form.enabled}
+                onChange={(e) => setForm((f) => ({ ...f, enabled: e.target.checked }))}
+              />
+              Enabled in catalog
+            </label>
+          </div>
+
+          {form.key === "sales-crm" ? (
+            <p className="sm:col-span-2 text-[10px] text-muted-foreground">
+              Sales CRM uses dedicated Masters, Migration, Training, and Reports tabs — no module
+              checklist here.
+            </p>
+          ) : (
+            <div className="sm:col-span-2 space-y-2">
+              <div>
+                <label className="text-xs font-medium">Checklist steps (Details)</label>
+                <p className="text-[10px] text-muted-foreground">
+                  These steps appear on the account module page and sync with Update for all.
+                </p>
+              </div>
+              <div className="space-y-1">
+                {form.workflowSteps.map((step, index) => (
+                  <div key={`${step.key}-${index}`} className="flex items-center gap-1.5">
+                    <input
+                      value={step.label}
+                      onChange={(e) => {
+                        const label = e.target.value;
+                        setForm((f) => ({
+                          ...f,
+                          workflowSteps: f.workflowSteps.map((s, i) =>
+                            i === index
+                              ? {
+                                  ...s,
+                                  label,
+                                  key: editing?.builtIn ? s.key : slugifyWorkflowKey(label) || s.key,
+                                }
+                              : s,
+                          ),
+                        }));
+                      }}
+                      className="h-8 min-w-0 flex-1 rounded-md border bg-background px-2 text-xs"
+                    />
+                    <select
+                      value={step.kind ?? "date"}
+                      onChange={(e) => {
+                        const kind = e.target.value as CrmMasterModuleWorkflowStepDef["kind"];
+                        setForm((f) => ({
+                          ...f,
+                          workflowSteps: f.workflowSteps.map((s, i) =>
+                            i === index ? { ...s, kind } : s,
+                          ),
+                        }));
+                      }}
+                      className="h-8 w-[7.5rem] rounded-md border bg-background px-1.5 text-[10px]"
+                    >
+                      <option value="date">Date</option>
+                      <option value="yes_no">Yes / No</option>
+                      <option value="file">File</option>
+                      <option value="remarks">Remarks</option>
+                    </select>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 shrink-0 text-destructive"
+                      onClick={() =>
+                        setForm((f) => ({
+                          ...f,
+                          workflowSteps: f.workflowSteps.filter((_, i) => i !== index),
+                        }))
+                      }
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <input
+                  value={stepDraft}
+                  onChange={(e) => setStepDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addWorkflowStep();
+                    }
+                  }}
+                  placeholder="Add checklist step…"
+                  className="h-8 min-w-[10rem] flex-1 rounded-md border bg-background px-2 text-xs"
+                />
+                <Button type="button" size="sm" className="h-8 gap-1 text-xs" onClick={addWorkflowStep}>
+                  <Plus className="h-3.5 w-3.5" />
+                  Add step
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </EntityFormModal>
+
+      <ConfirmDeleteDialog
+        open={!!deleteId}
+        onOpenChange={(o) => !o && setDeleteId(null)}
+        title="Delete module?"
+        description="Accounts that already opted into this module keep their records; it will no longer appear for new opt-ins after you sync."
+        onConfirm={() => {
+          if (deleteId) {
+            deleteModule(deleteId);
+            flushCrmMasterConfigPersistence();
+            toast.success("Module deleted");
+          }
+          setDeleteId(null);
+        }}
+      />
+    </div>
+  );
+}
+
 function IntegrationsPanel() {
   const modules = useCrmMasterStore((s) => s.modules);
   const updateModule = useCrmMasterStore((s) => s.updateModule);
@@ -824,7 +1303,7 @@ function IntegrationsPanel() {
   const integrationModules = useMemo(
     () =>
       modules
-        .filter((m) => isCrmIntegrationModule(m.key))
+        .filter((m) => m.kind === "integration")
         .slice()
         .sort((a, b) => a.order - b.order),
     [modules],

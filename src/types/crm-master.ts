@@ -37,6 +37,16 @@ export type CrmMasterPicklist = Timestamps & {
   values: string[];
 };
 
+/** Onboarding checklist step defined on a Master module (synced to account workflows). */
+export type CrmMasterModuleWorkflowStepDef = {
+  key: string;
+  label: string;
+  /** Defaults to date/checklist completion. */
+  kind?: "date" | "yes_no" | "file" | "remarks";
+};
+
+export type CrmMasterModuleKind = "core" | "integration";
+
 export type CrmMasterModuleDef = Timestamps & {
   id: string;
   key: string;
@@ -44,6 +54,12 @@ export type CrmMasterModuleDef = Timestamps & {
   description: string;
   enabled: boolean;
   order: number;
+  /** Core modules appear under Modules; integrations under Integrations. */
+  kind: CrmMasterModuleKind;
+  /** Seeded from code catalog — key cannot be changed; delete blocked. */
+  builtIn: boolean;
+  /** Checklist steps for account module onboarding (Master → Details). */
+  workflowSteps: CrmMasterModuleWorkflowStepDef[];
 };
 
 /** Account-scoped project master (ERP project scale fields, CRM-scoped). */

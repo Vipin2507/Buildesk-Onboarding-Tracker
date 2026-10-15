@@ -17,8 +17,8 @@ export type CrmLegacyProductModuleKey =
   | "reports"
   | "marketing";
 
-/** Purchased CRM product features (not Buildesk ModuleKey). */
-export type CrmProductModuleKey =
+/** Built-in CRM product features (not Buildesk ModuleKey). */
+export type CrmBuiltInProductModuleKey =
   | "sales-crm"
   | "cp-application"
   | "reception-application"
@@ -36,7 +36,14 @@ export type CrmProductModuleKey =
   | "ai-call-analysis"
   | "waha"
   | "auto-dialer"
+  | "wavly"
   | CrmLegacyProductModuleKey;
+
+/**
+ * Purchased CRM product features — built-in keys plus any Master-defined custom module key.
+ * `string & {}` keeps autocomplete for known keys while allowing Master catalog extensions.
+ */
+export type CrmProductModuleKey = CrmBuiltInProductModuleKey | (string & {});
 
 export type CrmChecklistStatus = "pending" | "completed";
 export type CrmMigrationStatus = "pending" | "in_progress" | "completed";

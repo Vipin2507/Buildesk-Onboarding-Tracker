@@ -147,12 +147,52 @@ export const CORE_MODULE_WORKFLOWS: Partial<
     { key: "user_training", label: "User Training", kind: "date" },
     { key: "remarks", label: "Remarks", kind: "remarks" },
   ],
+  wavly: [
+    { key: "connected_meta", label: "Wavly Connected with Meta Business", kind: "date" },
+    { key: "connected_buildesk", label: "Wavly Connected with Buildesk", kind: "date" },
+    { key: "incoming_lead_tested", label: "Incoming Lead Tested", kind: "date" },
+    { key: "workflow_trigger_explained", label: "Workflow and Trigger explained", kind: "date" },
+    { key: "sample_template_created", label: "Sample Template Created", kind: "date" },
+    { key: "sign_off", label: "Sign off", kind: "date" },
+    { key: "remarks", label: "Remarks", kind: "remarks" },
+  ],
 };
+
+/** Optional Master catalog lookup (registered by useCrmMasterStore to avoid import cycles). */
+export type CrmMasterModuleLookup = (key: string) =>
+  | {
+      kind?: "core" | "integration";
+      workflowSteps?: { key: string; label: string; kind?: CrmModuleWorkflowStepKind }[];
+    }
+  | undefined;
+
+let crmMasterModuleLookup: CrmMasterModuleLookup | undefined;
+
+export function registerCrmMasterModuleLookup(fn: CrmMasterModuleLookup) {
+  crmMasterModuleLookup = fn;
+}
+
+/** Code-default workflow for a module key (ignores Master overrides). */
+export function getCodeModuleWorkflowTemplate(
+  key: CrmProductModuleKey,
+): CrmModuleWorkflowStepDef[] | undefined {
+  if (key === "sales-crm") return undefined;
+  if (CRM_INTEGRATION_KEY_SET.has(key as CrmProductModuleKey)) return INTEGRATION_MODULE_WORKFLOW;
+  return CORE_MODULE_WORKFLOWS[key] ?? GENERIC_MODULE_WORKFLOW;
+}
 
 export function getModuleWorkflowTemplate(
   key: CrmProductModuleKey,
 ): CrmModuleWorkflowStepDef[] | undefined {
   if (key === "sales-crm") return undefined;
+  const fromMaster = crmMasterModuleLookup?.(key);
+  if (fromMaster?.workflowSteps && fromMaster.workflowSteps.length > 0) {
+    return fromMaster.workflowSteps.map((s) => ({
+      key: s.key,
+      label: s.label,
+      kind: s.kind ?? "date",
+    }));
+  }
   if (isCrmIntegrationModule(key)) return INTEGRATION_MODULE_WORKFLOW;
   return CORE_MODULE_WORKFLOWS[key] ?? GENERIC_MODULE_WORKFLOW;
 }
@@ -452,6 +492,7 @@ export const CRM_CORE_MODULES: { key: CrmProductModuleKey; label: string }[] = [
   { key: "ai-call-analysis", label: "AI Call Analysis" },
   { key: "waha", label: "WAHA" },
   { key: "auto-dialer", label: "Auto Dialer" },
+  { key: "wavly", label: "Wavly" },
 ];
 
 /** Third-party / channel integrations. */
@@ -476,11 +517,28 @@ export const CRM_PRODUCT_MODULES: { key: CrmProductModuleKey; label: string }[] 
 const CRM_INTEGRATION_KEY_SET = new Set(CRM_INTEGRATION_MODULES.map((m) => m.key));
 
 export function isCrmIntegrationModule(key: CrmProductModuleKey | string): boolean {
+  const fromMaster = crmMasterModuleLookup?.(String(key));
+  if (fromMaster?.kind === "integration" || fromMaster?.kind === "core") {
+    return fromMaster.kind === "integration";
+  }
   return CRM_INTEGRATION_KEY_SET.has(key as CrmProductModuleKey);
 }
 
 export function isCrmCoreModule(key: CrmProductModuleKey | string): boolean {
   return !isCrmIntegrationModule(key);
+}
+
+/** Seed workflow step defs for Master module catalog (built-in keys). */
+export function seedWorkflowStepsForModuleKey(
+  key: CrmProductModuleKey,
+): { key: string; label: string; kind?: CrmModuleWorkflowStepKind }[] {
+  const template = getCodeModuleWorkflowTemplate(key);
+  if (!template?.length) return [];
+  return template.map((s) => ({
+    key: s.key,
+    label: s.label,
+    kind: s.kind ?? "date",
+  }));
 }
 
 export const CRM_MASTER_CHECKLIST_LABELS: { key: string; label: string }[] = [
