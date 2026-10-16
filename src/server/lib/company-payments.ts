@@ -441,6 +441,78 @@ function dealSizeFromCompanyRecord(company: Company): number {
   );
 }
 
+function todayDateIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function addDaysIso(isoDate: string, days: number) {
+  const d = new Date(`${isoDate}T12:00:00`);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function endOfMonthIso(isoDate: string) {
+  const d = new Date(`${isoDate}T12:00:00`);
+  const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  return end.toISOString().slice(0, 10);
+}
+
+type InstallmentDueInfo = {
+  nextDueDate?: string;
+  nextDueAmount?: number;
+  overdueAmount: number;
+  overdueInstallmentCount: number;
+  dueBucket: ErpCompanyPaymentListItem["dueBucket"];
+};
+
+function computeInstallmentDueInfo(
+  installments: { amount: number; dueDate: string; status: string }[],
+  companyInstallmentDueDate?: string,
+): InstallmentDueInfo {
+  const today = todayDateIso();
+  const weekEnd = addDaysIso(today, 7);
+  const monthEnd = endOfMonthIso(today);
+
+  const open = installments.filter(
+    (i) => i.status !== "paid" && i.status !== "waived" && i.dueDate,
+  );
+
+  let overdueAmount = 0;
+  let overdueInstallmentCount = 0;
+  for (const i of open) {
+    const due = i.dueDate.slice(0, 10);
+    if (i.status === "overdue" || due < today) {
+      overdueAmount += Number(i.amount) || 0;
+      overdueInstallmentCount += 1;
+    }
+  }
+
+  const upcoming = open
+    .filter((i) => i.dueDate.slice(0, 10) >= today)
+    .sort((a, b) => a.dueDate.slice(0, 10).localeCompare(b.dueDate.slice(0, 10)));
+
+  const next = upcoming[0];
+  const nextDueDate = next?.dueDate.slice(0, 10) ?? companyInstallmentDueDate?.slice(0, 10);
+  const nextDueAmount = next ? Number(next.amount) || 0 : undefined;
+
+  let dueBucket: InstallmentDueInfo["dueBucket"] = "none";
+  if (overdueInstallmentCount > 0 || overdueAmount > 0) {
+    dueBucket = "overdue";
+  } else if (nextDueDate) {
+    if (nextDueDate <= weekEnd) dueBucket = "due_this_week";
+    else if (nextDueDate <= monthEnd) dueBucket = "due_this_month";
+    else dueBucket = "upcoming";
+  }
+
+  return {
+    nextDueDate,
+    nextDueAmount,
+    overdueAmount,
+    overdueInstallmentCount,
+    dueBucket,
+  };
+}
+
 /** ERP hub: all companies with commercial rollups (not CRM payments). */
 export function listErpCompanyPaymentSummaries(): {
   rows: ErpCompanyPaymentListItem[];
@@ -449,9 +521,28 @@ export function listErpCompanyPaymentSummaries(): {
   const companies = loadCompanies();
   const db = getDb();
   const txCountByCompany = new Map<string, number>();
+  const installmentsByCompany = new Map<
+    string,
+    { amount: number; dueDate: string; status: string }[]
+  >();
+
   try {
     for (const row of db.select().from(t.companyPaymentTransactions).all()) {
       txCountByCompany.set(row.companyId, (txCountByCompany.get(row.companyId) ?? 0) + 1);
+    }
+  } catch {
+    /* table may not exist until db:ensure */
+  }
+
+  try {
+    for (const row of db.select().from(t.companyPaymentInstallments).all()) {
+      const list = installmentsByCompany.get(row.companyId) ?? [];
+      list.push({
+        amount: Number(row.amount) || 0,
+        dueDate: row.dueDate,
+        status: row.status || "pending",
+      });
+      installmentsByCompany.set(row.companyId, list);
     }
   } catch {
     /* table may not exist until db:ensure */
@@ -465,6 +556,10 @@ export function listErpCompanyPaymentSummaries(): {
     const paymentStatus = c.paymentStatus ?? derivePaymentStatus(paymentReceived, dealSize);
     const collectionPercent =
       dealSize > 0 ? Math.min(100, Math.round((paymentReceived / dealSize) * 100)) : 0;
+    const due = computeInstallmentDueInfo(
+      installmentsByCompany.get(c.id) ?? [],
+      c.installmentDueDate,
+    );
 
     return {
       companyId: c.id,
@@ -475,26 +570,64 @@ export function listErpCompanyPaymentSummaries(): {
       paymentReceived,
       pendingAmount,
       paymentStatus,
-      installmentDueDate: c.installmentDueDate,
+      installmentDueDate: due.nextDueDate ?? c.installmentDueDate,
+      nextDueDate: due.nextDueDate,
+      nextDueAmount: due.nextDueAmount,
+      overdueAmount: due.overdueAmount,
+      overdueInstallmentCount: due.overdueInstallmentCount,
+      dueBucket: due.dueBucket,
       transactionCount: txCountByCompany.get(c.id) ?? 0,
       collectionPercent,
     };
   });
 
   rows.sort((a, b) => {
+    if (b.overdueAmount !== a.overdueAmount) return b.overdueAmount - a.overdueAmount;
     if (b.pendingAmount !== a.pendingAmount) return b.pendingAmount - a.pendingAmount;
     return a.companyName.localeCompare(b.companyName);
   });
 
+  const totalDealSize = rows.reduce((s, r) => s + r.dealSize, 0);
+  const totalReceived = rows.reduce((s, r) => s + r.paymentReceived, 0);
+  const overdueRows = rows.filter((r) => r.dueBucket === "overdue");
+  const weekRows = rows.filter((r) => r.dueBucket === "due_this_week");
+  const monthRows = rows.filter((r) => r.dueBucket === "due_this_month");
+  const fullyPaidCount = rows.filter((r) => r.paymentStatus === "Fully paid").length;
+  const pendingCount = rows.filter((r) => r.paymentStatus === "Pending").length;
+  const partiallyPaidCount = rows.filter(
+    (r) =>
+      r.paymentStatus === "Partially paid" || r.paymentStatus === "Part payment subscription",
+  ).length;
+  const naCount = rows.filter((r) => r.paymentStatus === "NA").length;
+
   const summary: ErpCompanyPaymentsSummary = {
     companyCount: rows.length,
-    totalDealSize: rows.reduce((s, r) => s + r.dealSize, 0),
-    totalReceived: rows.reduce((s, r) => s + r.paymentReceived, 0),
+    totalDealSize,
+    totalReceived,
     totalPending: rows.reduce((s, r) => s + r.pendingAmount, 0),
-    fullyPaidCount: rows.filter((r) => r.paymentStatus === "Fully paid").length,
-    pendingCount: rows.filter(
-      (r) => r.paymentStatus === "Pending" || r.paymentStatus === "Partially paid",
-    ).length,
+    totalOverdueAmount: overdueRows.reduce((s, r) => s + r.overdueAmount, 0),
+    overdueCompanyCount: overdueRows.length,
+    dueThisWeekAmount: weekRows.reduce((s, r) => s + (r.nextDueAmount ?? 0), 0),
+    dueThisWeekCount: weekRows.length,
+    dueThisMonthAmount: monthRows.reduce((s, r) => s + (r.nextDueAmount ?? 0), 0),
+    dueThisMonthCount: monthRows.length,
+    collectionRatePercent:
+      totalDealSize > 0 ? Math.min(100, Math.round((totalReceived / totalDealSize) * 100)) : 0,
+    fullyPaidCount,
+    pendingCount,
+    partiallyPaidCount,
+    naCount,
+    statusCounts: {
+      all: rows.length,
+      overdue: overdueRows.length,
+      due_this_week: weekRows.length,
+      due_this_month: monthRows.length,
+      upcoming: rows.filter((r) => r.dueBucket === "upcoming").length,
+      fully_paid: fullyPaidCount,
+      pending: pendingCount,
+      partially_paid: partiallyPaidCount,
+      na: naCount,
+    },
   };
 
   return { rows, summary };

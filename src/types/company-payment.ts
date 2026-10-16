@@ -60,6 +60,14 @@ export type CompanyPaymentsSnapshot = {
   installments: CompanyPaymentInstallment[];
 };
 
+/** Due-window bucket for ERP hub filters (installment-derived). */
+export type ErpPaymentDueBucket =
+  | "overdue"
+  | "due_this_week"
+  | "due_this_month"
+  | "upcoming"
+  | "none";
+
 /** Row for ERP /payments hub (separate from CRM payments list). */
 export type ErpCompanyPaymentListItem = {
   companyId: string;
@@ -70,7 +78,14 @@ export type ErpCompanyPaymentListItem = {
   paymentReceived: number;
   pendingAmount: number;
   paymentStatus: CompanyPaymentStatus;
+  /** @deprecated Prefer nextDueDate from installments. */
   installmentDueDate?: string;
+  /** Earliest unpaid installment due date (YYYY-MM-DD). */
+  nextDueDate?: string;
+  nextDueAmount?: number;
+  overdueAmount: number;
+  overdueInstallmentCount: number;
+  dueBucket: ErpPaymentDueBucket;
   transactionCount: number;
   collectionPercent: number;
 };
@@ -80,6 +95,16 @@ export type ErpCompanyPaymentsSummary = {
   totalDealSize: number;
   totalReceived: number;
   totalPending: number;
+  totalOverdueAmount: number;
+  overdueCompanyCount: number;
+  dueThisWeekAmount: number;
+  dueThisWeekCount: number;
+  dueThisMonthAmount: number;
+  dueThisMonthCount: number;
+  collectionRatePercent: number;
   fullyPaidCount: number;
   pendingCount: number;
+  partiallyPaidCount: number;
+  naCount: number;
+  statusCounts: Record<string, number>;
 };
