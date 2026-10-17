@@ -229,15 +229,7 @@ function CrmPortalTicketDetail() {
           variants={ticketSectionVariants}
           className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_240px]"
         >
-          <div className="card-soft flex min-h-0 min-w-0 flex-col p-3">
-            <div className="mb-2 flex items-center justify-between gap-2 border-b border-border/70 pb-2">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Conversation
-              </h2>
-              <span className="text-[11px] tabular-nums text-muted-foreground">
-                {ticket.messages.filter((m) => m.kind !== "system").length} messages
-              </span>
-            </div>
+          <div className="flex min-h-0 min-w-0 flex-col">
             <DesignTicketThread
               ticket={ticket}
               mode="internal"

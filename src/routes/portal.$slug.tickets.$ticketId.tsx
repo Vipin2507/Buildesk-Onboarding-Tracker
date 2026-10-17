@@ -104,7 +104,7 @@ function PortalTicketDetail() {
           <PortalTicketMetaAside ticket={ticket} />
         </motion.div>
 
-        <motion.div variants={ticketSectionVariants} className="card-soft p-3 sm:p-4">
+        <motion.div variants={ticketSectionVariants} className="min-w-0">
           <DesignTicketThread
             ticket={ticket}
             mode="client"

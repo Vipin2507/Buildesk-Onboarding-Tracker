@@ -208,7 +208,7 @@ function InternalTicketDetail() {
         </motion.div>
 
         <motion.div variants={ticketSectionVariants} className="grid gap-3 lg:grid-cols-[1fr_280px]">
-          <div className="card-soft min-h-0 p-3">
+          <div className="min-h-0 min-w-0">
             <DesignTicketThread
               ticket={ticket}
               mode="internal"
