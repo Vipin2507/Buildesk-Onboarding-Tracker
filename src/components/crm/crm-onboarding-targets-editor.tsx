@@ -18,7 +18,7 @@ type Props = {
   className?: string;
 };
 
-/** Editable 45-day onboarding SLA buckets — Master + Automation share this. */
+/** Editable 45-day onboarding SLA buckets — Settings, Master, and Automation share this. */
 export function CrmOnboardingTargetsEditor({ showMasterLink, className }: Props) {
   const stored = useCrmMasterStore((s) => s.onboardingTargets);
   const setOnboardingTargets = useCrmMasterStore((s) => s.setOnboardingTargets);

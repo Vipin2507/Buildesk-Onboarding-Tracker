@@ -1,10 +1,10 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
+import { Link } from "@tanstack/react-router";
 import { CalendarDays, ClipboardList, IndianRupee, Mail, MessageCircle, MessageSquare, Pencil, Play, Plus, Power, RefreshCw, Target, Trash2, Ticket, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 import { AutomationRuleDialog } from "@/components/crm/automation/automation-rule-dialog";
-import { CrmOnboardingTargetsEditor } from "@/components/crm/crm-onboarding-targets-editor";
 import { ConfirmDeleteDialog } from "@/components/entity-form-modal";
 import { DataTable } from "@/components/data-table";
 import { Pill } from "@/components/status-pill";
@@ -245,7 +245,7 @@ export function AutomationRulesPanel() {
 
   function renderRulesSection(
     title: string,
-    description: string,
+    description: ReactNode,
     icon: ReactNode,
     sectionRules: AutomationRule[],
   ) {
@@ -350,29 +350,25 @@ export function AutomationRulesPanel() {
             <IndianRupee className="h-3.5 w-3.5" />,
             paymentRules,
           )}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                <Target className="h-3.5 w-3.5" />
-              </div>
-              <div>
-                <h3 className="text-xs font-semibold">Onboarding SLA</h3>
-                <p className="text-[10px] text-muted-foreground">
-                  Day-bucket % targets (default 45 days) from CRM Master. When overall progress is below
-                  target, WhatsApp Support 1, Support 2, and Admins.
-                </p>
-              </div>
-            </div>
-            <div className="card-soft p-3">
-              <CrmOnboardingTargetsEditor showMasterLink />
-            </div>
-            {renderRulesSection(
-              "Onboarding SLA rules",
-              "Toggle and edit WhatsApp copy for behind-target alerts. Thresholds above sync from Master.",
-              <Target className="h-3.5 w-3.5" />,
-              onboardingSlaRules,
-            )}
-          </div>
+          {renderRulesSection(
+            "Onboarding SLA",
+            (
+              <>
+                WhatsApp Support 1, Support 2, and Admins when overall onboarding % is below target.
+                Edit day buckets in{" "}
+                <Link
+                  to="/crm/settings"
+                  search={{ section: "onboarding-sla", invite: false }}
+                  className="text-primary hover:underline"
+                >
+                  Settings → Onboarding SLA
+                </Link>
+                .
+              </>
+            ),
+            <Target className="h-3.5 w-3.5" />,
+            onboardingSlaRules,
+          )}
           {renderRulesSection(
             "Account renewals",
             "WhatsApp CRM admins when an account enters the 30-day renewal window (in-app bell still notifies the account team).",

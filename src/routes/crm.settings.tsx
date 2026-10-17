@@ -15,6 +15,7 @@ import {
   RefreshCw,
   RotateCcw,
   Shield,
+  Target,
   Trash2,
   Upload,
   UserRound,
@@ -22,6 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { CrmOnboardingTargetsEditor } from "@/components/crm/crm-onboarding-targets-editor";
 import { ConfirmDeleteDialog, EntityFormModal } from "@/components/entity-form-modal";
 import { WebPushDevicePanel } from "@/components/crm/web-push-device-panel";
 import {
@@ -63,6 +65,7 @@ type SectionId =
   | "appearance"
   | "organization"
   | "notifications"
+  | "onboarding-sla"
   | "users"
   | "roles"
   | "backups"
@@ -72,6 +75,7 @@ const SECTION_IDS: SectionId[] = [
   "appearance",
   "organization",
   "notifications",
+  "onboarding-sla",
   "users",
   "roles",
   "backups",
@@ -132,6 +136,13 @@ const SECTIONS: {
     title: "Email & Alerts",
     desc: "In-app CRM alerts, web push for tasks, and SMTP settings.",
     icon: Bell,
+    adminOnly: true,
+  },
+  {
+    id: "onboarding-sla",
+    title: "Onboarding SLA",
+    desc: "45-day onboarding % targets and WhatsApp alert thresholds.",
+    icon: Target,
     adminOnly: true,
   },
   {
@@ -240,6 +251,7 @@ function CrmSettingsPage() {
           {section === "appearance" ? <AppearanceSection /> : null}
           {section === "organization" && isAdmin ? <OrganizationSection /> : null}
           {section === "notifications" && isAdmin ? <NotificationsSection /> : null}
+          {section === "onboarding-sla" && isAdmin ? <OnboardingSlaSection /> : null}
           {section === "users" && isAdmin ? (
             <UsersSection initialInviteOpen={Boolean(search.invite)} />
           ) : null}
@@ -257,6 +269,20 @@ function SectionTitle({ title, subtitle }: { title: string; subtitle?: string })
     <div className="mb-2.5">
       <h3 className="text-sm font-semibold">{title}</h3>
       {subtitle ? <p className="text-[11px] text-muted-foreground">{subtitle}</p> : null}
+    </div>
+  );
+}
+
+function OnboardingSlaSection() {
+  return (
+    <div className="space-y-3">
+      <SectionTitle
+        title="Onboarding SLA"
+        subtitle="Day-bucket progress targets. When overall onboarding % is below target, WhatsApp notifies Support 1, Support 2, and Admins (Automation → Onboarding SLA rules)."
+      />
+      <div className="card-soft p-3">
+        <CrmOnboardingTargetsEditor />
+      </div>
     </div>
   );
 }
