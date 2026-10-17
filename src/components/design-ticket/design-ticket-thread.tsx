@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ExternalLink, Paperclip, Send, X } from "lucide-react";
 import { toast } from "sonner";
@@ -13,6 +13,10 @@ import {
 import type { DesignTicket, DesignTicketAttachment, DesignTicketMessage } from "@/types/design-ticket";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+
+/** Reply composer — grows with content, caps before taking over the thread. */
+const REPLY_MIN_H = 48;
+const REPLY_MAX_H = 200;
 
 type ReplyProps = {
   placeholder?: string;
@@ -173,6 +177,7 @@ export function DesignTicketThread({
   const [files, setFiles] = useState<DesignTicketAttachment[]>([]);
   const [picking, setPicking] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const initialMessageCount = useRef<number | null>(null);
   const sorted = [...ticket.messages].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
@@ -180,9 +185,23 @@ export function DesignTicketThread({
     initialMessageCount.current = sorted.length;
   }
 
+  const resizeReplyTextarea = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "0px";
+    const contentH = el.scrollHeight;
+    const next = Math.max(REPLY_MIN_H, Math.min(contentH, REPLY_MAX_H));
+    el.style.height = `${next}px`;
+    el.style.overflowY = contentH > REPLY_MAX_H ? "auto" : "hidden";
+  }, []);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [ticket.messages.length, ticket.status]);
+
+  useEffect(() => {
+    resizeReplyTextarea();
+  }, [text, resizeReplyTextarea]);
 
   function handleSend() {
     if (!reply || !text.trim()) return;
@@ -274,8 +293,8 @@ export function DesignTicketThread({
               ))}
             </div>
           ) : null}
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-            <label className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center self-start rounded-lg border bg-card transition-colors hover:bg-muted sm:self-auto">
+          <div className="flex items-end gap-2">
+            <label className="flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center rounded-lg border bg-card transition-colors hover:bg-muted">
               <Paperclip className={cn("h-4 w-4 text-muted-foreground", picking && "animate-pulse")} />
               <input
                 type="file"
@@ -286,18 +305,23 @@ export function DesignTicketThread({
               />
             </label>
             <textarea
+              ref={textareaRef}
               value={text}
               onChange={(e) => setText(e.target.value)}
-              rows={2}
+              rows={1}
               placeholder={reply.placeholder ?? `Reply as ${contactName ?? "team"}…`}
-              className={cn(ticketTextareaClass, "min-h-[44px] flex-1")}
+              className={cn(
+                ticketTextareaClass,
+                "min-h-12 flex-1 leading-5 overflow-hidden",
+              )}
+              style={{ height: REPLY_MIN_H }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSend();
               }}
             />
             <Button
               type="button"
-              className="w-full shrink-0 gap-1.5 sm:w-auto"
+              className="h-12 shrink-0 gap-1.5 px-4"
               onClick={handleSend}
               disabled={!text.trim() || picking}
             >
