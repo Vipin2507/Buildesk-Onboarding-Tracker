@@ -424,6 +424,10 @@ export function AutomationRuleDialog({
         addRule(payload);
         toast.success("Rule created");
       }
+      // Ensure SQLite crm-automation snapshot has the new template before the
+      // server reminder scheduler ticks (debounced subscribe alone can lag).
+      const { flushAutomationConfigPersistence } = await import("@/lib/config-persistence");
+      flushAutomationConfigPersistence({ crm: true, erp: false });
       onOpenChange(false);
       onSaved?.();
     } finally {

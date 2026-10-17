@@ -253,17 +253,30 @@ export const useCrmAutomationStore = createPersistedStore<AutomationState>(
         updatedAt: now,
       };
       set((s) => ({ rules: [rule, ...s.rules] }));
+      flushAutomationToggles();
       return rule;
     },
 
     updateRule: (id, data) => {
-      set((s) => ({
-        rules: s.rules.map((r) => (r.id === id ? touch({ ...r, ...data }) : r)),
-      }));
+      set((s) => {
+        const exists = s.rules.some((r) => r.id === id);
+        if (exists) {
+          return {
+            rules: s.rules.map((r) => (r.id === id ? touch({ ...r, ...data }) : r)),
+          };
+        }
+        // Panel may show a seed-merged rule that isn't in the store yet — upsert so
+        // template edits persist to SQLite and the reminder scheduler picks them up.
+        const seed = DEFAULT_CRM_AUTOMATION_RULES.find((r) => r.id === id);
+        if (!seed) return s;
+        return { rules: [...s.rules, touch({ ...seed, ...data })] };
+      });
+      flushAutomationToggles();
     },
 
     deleteRule: (id) => {
       set((s) => ({ rules: s.rules.filter((r) => r.id !== id) }));
+      flushAutomationToggles();
     },
 
     toggleRule: (id, isActive) => {
