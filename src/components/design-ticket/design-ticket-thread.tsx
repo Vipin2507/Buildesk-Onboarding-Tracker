@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { ExternalLink, FileText, Paperclip, Send, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -17,12 +17,12 @@ import {
 } from "@/stores/useCrmMasterStore";
 import { useCompanyStore } from "@/stores/useCompanyStore";
 import type { DesignTicket, DesignTicketAttachment, DesignTicketMessage } from "@/types/design-ticket";
-import { formatDate } from "@/lib/utils";
+import { formatChatDateLabel, formatTime, localDateKey } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 /** Reply composer — grows with content, caps before taking over the thread. */
 const REPLY_MIN_H = 40;
-const REPLY_MAX_H = 180;
+const REPLY_MAX_H = 160;
 
 type ReplyProps = {
   placeholder?: string;
@@ -55,21 +55,12 @@ function AttachmentChip({
         target="_blank"
         rel="noreferrer"
         className={cn(
-          "block overflow-hidden rounded-lg",
-          isTeam ? "bg-primary-foreground/15" : "bg-background/80",
+          "mb-1 block max-w-full overflow-hidden rounded-md",
+          isTeam ? "bg-primary-foreground/10" : "bg-muted",
         )}
         title={`Open ${file.name}`}
       >
-        <img src={file.url} alt={file.name} className="max-h-36 max-w-full object-contain" />
-        <div
-          className={cn(
-            "flex items-center gap-1 px-2 py-1 text-[10px]",
-            isTeam ? "text-primary-foreground/90" : "text-muted-foreground",
-          )}
-        >
-          <ExternalLink className="h-3 w-3 shrink-0" />
-          <span className="truncate">{file.name}</span>
-        </div>
+        <img src={file.url} alt={file.name} className="max-h-40 max-w-full object-cover" />
       </a>
     );
   }
@@ -82,8 +73,8 @@ function AttachmentChip({
         rel="noreferrer"
         download={file.name}
         className={cn(
-          "inline-flex max-w-full items-center gap-1 truncate rounded-md px-2 py-0.5 text-xs underline-offset-2 hover:underline",
-          isTeam ? "bg-primary-foreground/15" : "bg-background/70",
+          "mb-1 inline-flex max-w-full items-center gap-1 truncate rounded-md px-2 py-1 text-[11px] underline-offset-2 hover:underline",
+          isTeam ? "bg-primary-foreground/15" : "bg-muted",
         )}
       >
         <Paperclip className="h-3 w-3 shrink-0" />
@@ -96,8 +87,8 @@ function AttachmentChip({
   return (
     <span
       className={cn(
-        "inline-flex max-w-full items-center gap-1 truncate rounded-md px-2 py-0.5 text-xs",
-        isTeam ? "bg-primary-foreground/15" : "bg-background/70",
+        "mb-1 inline-flex max-w-full items-center gap-1 truncate rounded-md px-2 py-1 text-[11px]",
+        isTeam ? "bg-primary-foreground/15" : "bg-muted",
       )}
       title="File was attached as name only — content was not stored"
     >
@@ -105,6 +96,16 @@ function AttachmentChip({
       <span className="truncate">{file.name}</span>
       <span className="shrink-0 opacity-60">(unavailable)</span>
     </span>
+  );
+}
+
+function DateChip({ label }: { label: string }) {
+  return (
+    <div className="my-2 flex justify-center">
+      <span className="rounded-full border border-border/80 bg-card px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground shadow-sm">
+        {label}
+      </span>
+    </div>
   );
 }
 
@@ -119,56 +120,60 @@ function MessageBubble({
 }) {
   return (
     <motion.div
-      initial={animateIn ? { opacity: 0, y: 6 } : false}
+      initial={animateIn ? { opacity: 0, y: 4 } : false}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.22, ease: TICKET_EASE }}
-      layout="position"
+      transition={{ duration: 0.18, ease: TICKET_EASE }}
       className={cn("flex", isTeam ? "justify-end" : "justify-start")}
     >
       <div
         className={cn(
-          "w-fit max-w-[min(92%,26rem)] rounded-2xl px-3 py-2 text-sm sm:max-w-[min(78%,28rem)]",
+          "w-fit max-w-[min(85%,22rem)] rounded-2xl px-3 py-2 text-sm shadow-sm sm:max-w-[78%]",
           isTeam
             ? "rounded-br-md bg-primary text-primary-foreground"
-            : "rounded-bl-md bg-background text-foreground shadow-sm ring-1 ring-border/60",
+            : "rounded-bl-md border bg-card text-foreground",
         )}
       >
         <div
           className={cn(
-            "mb-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0 text-[11px]",
-            isTeam ? "text-primary-foreground/75" : "text-muted-foreground",
+            "mb-0.5 text-[11px] font-medium",
+            isTeam ? "text-primary-foreground/80" : "text-muted-foreground",
           )}
         >
-          <span className="font-medium">{msg.authorName}</span>
-          <span className="tabular-nums opacity-80">{formatDate(msg.createdAt)}</span>
+          {msg.authorName}
         </div>
-        <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.message}</p>
         {msg.attachments?.length ? (
-          <div className="mt-2 flex flex-wrap gap-1.5">
+          <div className="flex flex-col gap-1">
             {msg.attachments.map((file, i) => (
               <AttachmentChip key={`${file.name}-${i}`} file={file} isTeam={isTeam} />
             ))}
           </div>
         ) : null}
+        {msg.message ? (
+          <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.message}</p>
+        ) : null}
+        <div className="mt-1 flex items-center justify-end">
+          <span
+            className={cn(
+              "text-[10px] tabular-nums",
+              isTeam ? "text-primary-foreground/65" : "text-muted-foreground",
+            )}
+          >
+            {formatTime(msg.createdAt)}
+          </span>
+        </div>
       </div>
     </motion.div>
   );
 }
 
-function SystemEntry({ msg, animateIn }: { msg: DesignTicketMessage; animateIn: boolean }) {
+function SystemEntry({ msg }: { msg: DesignTicketMessage }) {
   return (
-    <motion.div
-      initial={animateIn ? { opacity: 0, scale: 0.98 } : false}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.2, ease: TICKET_EASE }}
-      layout="position"
-      className="flex justify-center py-0.5"
-    >
-      <span className="max-w-[90%] text-center text-[11px] text-muted-foreground">
+    <div className="flex justify-center py-1">
+      <span className="max-w-[90%] rounded-full bg-muted px-3 py-1 text-center text-[11px] text-muted-foreground">
         {msg.message}
-        <span className="ml-1.5 tabular-nums opacity-70">{formatDate(msg.createdAt)}</span>
+        <span className="ml-1.5 tabular-nums opacity-70">{formatTime(msg.createdAt)}</span>
       </span>
-    </motion.div>
+    </div>
   );
 }
 
@@ -186,7 +191,10 @@ export function DesignTicketThread({
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const initialMessageCount = useRef<number | null>(null);
-  const sorted = [...ticket.messages].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const sorted = useMemo(
+    () => [...ticket.messages].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    [ticket.messages],
+  );
   const ticketReplyTemplates = useCrmMasterStore((s) => s.ticketReplyTemplates);
   const companyName = useCompanyStore(
     (s) => s.companies.find((c) => c.id === ticket.companyId)?.name,
@@ -267,85 +275,92 @@ export function DesignTicketThread({
   const messageCount = sorted.filter((m) => m.kind !== "system").length;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="card-soft flex min-h-0 flex-1 flex-col overflow-hidden">
       <AnimatePresence>
         {showResolvedBanner && ticket.status === "resolved" ? (
           <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: -4 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ duration: 0.35, ease: TICKET_EASE }}
-            className="mb-3 rounded-lg bg-success/10 px-3 py-2 text-center text-xs font-medium text-success"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25, ease: TICKET_EASE }}
+            className="border-b border-success/20 bg-success/10 px-3 py-2 text-center text-xs font-medium text-success"
           >
             This ticket is now Resolved — thank you for working with the Buildesk team.
           </motion.div>
         ) : null}
       </AnimatePresence>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-muted/35">
-        <div className="flex items-center justify-between gap-2 px-3 py-2">
-          <h2 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Conversation
-          </h2>
-          <span className="text-[11px] tabular-nums text-muted-foreground">
-            {messageCount} {messageCount === 1 ? "message" : "messages"}
-          </span>
-        </div>
+      <div className="flex items-center justify-between gap-2 border-b border-border/70 px-3 py-2">
+        <h2 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Conversation
+        </h2>
+        <span className="text-[11px] tabular-nums text-muted-foreground">
+          {messageCount} {messageCount === 1 ? "message" : "messages"}
+        </span>
+      </div>
 
-        <div className="min-h-[200px] max-h-[min(48dvh,480px)] flex-1 space-y-2.5 overflow-y-auto px-3 pb-3 sm:min-h-[260px]">
-          {sorted.length === 0 ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">
-              No messages yet.{" "}
-              {mode === "client"
-                ? "Our team will reply here soon."
-                : "Waiting for client or team replies."}
-            </p>
-          ) : (
-            sorted.map((msg, index) => {
-              const animateIn = index >= (initialMessageCount.current ?? sorted.length);
-              return msg.kind === "system" ? (
-                <SystemEntry key={msg.id} msg={msg} animateIn={animateIn} />
-              ) : (
-                <MessageBubble
-                  key={msg.id}
-                  msg={msg}
-                  isTeam={msg.authorType === "team"}
-                  animateIn={animateIn}
-                />
-              );
-            })
-          )}
-          <div ref={bottomRef} />
-        </div>
-
-        {reply && !reply.disabled ? (
-          <div className="shrink-0 space-y-2 border-t border-border/50 bg-background/70 px-2.5 py-2 backdrop-blur-sm">
-            {files.length > 0 ? (
-              <div className="flex flex-wrap gap-1.5 px-0.5">
-                {files.map((f, i) => (
-                  <span
-                    key={`${f.name}-${i}`}
-                    className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-muted px-2.5 py-1 text-[11px]"
-                  >
-                    <Paperclip className="h-3 w-3 shrink-0 text-muted-foreground" />
-                    <span className="truncate">{f.name}</span>
-                    <button
-                      type="button"
-                      className="shrink-0 rounded-full p-0.5 hover:bg-background"
-                      onClick={() => setFiles((prev) => prev.filter((_, idx) => idx !== i))}
-                      aria-label={`Remove ${f.name}`}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
+      <div className="min-h-[220px] max-h-[min(48dvh,480px)] flex-1 space-y-1.5 overflow-y-auto bg-muted/15 px-3 py-3 sm:min-h-[280px]">
+        {sorted.length === 0 ? (
+          <p className="py-10 text-center text-sm text-muted-foreground">
+            No messages yet.{" "}
+            {mode === "client"
+              ? "Our team will reply here soon."
+              : "Waiting for client or team replies."}
+          </p>
+        ) : (
+          sorted.map((msg, index) => {
+            const prev = sorted[index - 1];
+            const showDay =
+              !prev || localDateKey(prev.createdAt) !== localDateKey(msg.createdAt);
+            const animateIn = index >= (initialMessageCount.current ?? sorted.length);
+            return (
+              <div key={msg.id}>
+                {showDay ? <DateChip label={formatChatDateLabel(msg.createdAt)} /> : null}
+                {msg.kind === "system" ? (
+                  <SystemEntry msg={msg} />
+                ) : (
+                  <MessageBubble
+                    msg={msg}
+                    isTeam={msg.authorType === "team"}
+                    animateIn={animateIn}
+                  />
+                )}
               </div>
-            ) : null}
+            );
+          })
+        )}
+        <div ref={bottomRef} />
+      </div>
 
-            <div className="flex items-end gap-1 rounded-xl border border-border/70 bg-card p-1 shadow-sm focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/15">
+      {reply && !reply.disabled ? (
+        <div className="shrink-0 border-t border-border/70 bg-card px-2.5 py-2">
+          {files.length > 0 ? (
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {files.map((f, i) => (
+                <span
+                  key={`${f.name}-${i}`}
+                  className="inline-flex max-w-full items-center gap-1 truncate rounded-md border bg-muted/40 px-2 py-1 text-[11px]"
+                >
+                  <Paperclip className="h-3 w-3 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{f.name}</span>
+                  <button
+                    type="button"
+                    className="shrink-0 rounded p-0.5 hover:bg-muted"
+                    onClick={() => setFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                    aria-label={`Remove ${f.name}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="flex items-end gap-1.5 rounded-xl border border-border bg-background p-1 focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/15">
+            <div className="relative mb-0.5 flex shrink-0 items-center">
               <label
                 className={cn(
-                  "mb-0.5 flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                  "flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
                   picking && "opacity-60",
                 )}
                 title="Attach files"
@@ -361,7 +376,7 @@ export function DesignTicketThread({
               </label>
 
               {mode === "internal" ? (
-                <div className="relative mb-0.5 shrink-0">
+                <>
                   <Button
                     type="button"
                     size="sm"
@@ -375,7 +390,7 @@ export function DesignTicketThread({
                     Template
                   </Button>
                   {templateOpen ? (
-                    <div className="absolute bottom-11 left-0 z-20 w-[min(340px,calc(100vw-2rem))] max-h-72 overflow-y-auto rounded-xl border bg-card p-1 shadow-lg">
+                    <div className="absolute bottom-11 left-0 z-20 w-[min(320px,calc(100vw-2rem))] max-h-72 overflow-y-auto rounded-xl border bg-card p-1 shadow-lg">
                       <div className="flex items-center justify-between gap-2 px-2 py-1.5">
                         <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                           Templates
@@ -411,42 +426,40 @@ export function DesignTicketThread({
                       )}
                     </div>
                   ) : null}
-                </div>
+                </>
               ) : null}
-
-              <textarea
-                ref={textareaRef}
-                value={text}
-                onChange={(e) => {
-                  setText(e.target.value);
-                  setTemplateOpen(false);
-                }}
-                rows={1}
-                placeholder={reply.placeholder ?? `Reply as ${contactName ?? "team"}…`}
-                className="min-h-10 min-w-0 flex-1 resize-none bg-transparent px-1.5 py-2.5 text-sm leading-5 outline-none placeholder:text-muted-foreground"
-                style={{ height: REPLY_MIN_H }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSend();
-                }}
-              />
-
-              <Button
-                type="button"
-                size="sm"
-                className="mb-0.5 h-9 shrink-0 gap-1.5 px-3"
-                onClick={handleSend}
-                disabled={!text.trim() || picking}
-              >
-                <Send className="h-3.5 w-3.5" />
-                Send
-              </Button>
             </div>
-            <p className="px-1 text-[10px] text-muted-foreground">
-              ⌘/Ctrl + Enter to send
-            </p>
+
+            <textarea
+              ref={textareaRef}
+              value={text}
+              onChange={(e) => {
+                setText(e.target.value);
+                setTemplateOpen(false);
+              }}
+              rows={1}
+              placeholder={reply.placeholder ?? `Reply as ${contactName ?? "team"}…`}
+              className="min-h-10 min-w-0 flex-1 resize-none bg-transparent px-1.5 py-2.5 text-sm leading-5 outline-none placeholder:text-muted-foreground"
+              style={{ height: REPLY_MIN_H }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSend();
+              }}
+            />
+
+            <Button
+              type="button"
+              size="sm"
+              className="mb-0.5 h-9 shrink-0 gap-1.5 px-3"
+              onClick={handleSend}
+              disabled={!text.trim() || picking}
+              title="Send (⌘/Ctrl + Enter)"
+            >
+              <Send className="h-3.5 w-3.5" />
+              Send
+            </Button>
           </div>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }
