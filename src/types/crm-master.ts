@@ -167,3 +167,17 @@ export type CrmWhatsappTemplateDef = {
   active: boolean;
   order: number;
 };
+
+/**
+ * Design / support ticket reply template (Master → Ticket replies).
+ * Plain text with optional `{{variable}}` placeholders filled from the ticket.
+ */
+export type CrmTicketReplyTemplateDef = {
+  id: string;
+  name: string;
+  category: string;
+  body: string;
+  /** When false, hidden from the ticket conversation “Use template” picker. */
+  active: boolean;
+  order: number;
+};

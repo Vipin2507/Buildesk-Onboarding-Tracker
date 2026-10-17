@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ExternalLink, Paperclip, Send, X } from "lucide-react";
+import { ExternalLink, FileText, Paperclip, Send, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { TICKET_EASE, ticketTextareaClass } from "@/components/design-ticket/design-ticket-shared";
@@ -10,6 +10,12 @@ import {
   isImageAttachment,
   snapshotFiles,
 } from "@/lib/design-ticket-attachments";
+import { applyCrmTicketReplyTemplate } from "@/lib/crm-ticket-reply-templates";
+import {
+  listActiveCrmTicketReplyTemplates,
+  useCrmMasterStore,
+} from "@/stores/useCrmMasterStore";
+import { useCompanyStore } from "@/stores/useCompanyStore";
 import type { DesignTicket, DesignTicketAttachment, DesignTicketMessage } from "@/types/design-ticket";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -176,10 +182,30 @@ export function DesignTicketThread({
   const [text, setText] = useState("");
   const [files, setFiles] = useState<DesignTicketAttachment[]>([]);
   const [picking, setPicking] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const initialMessageCount = useRef<number | null>(null);
   const sorted = [...ticket.messages].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const ticketReplyTemplates = useCrmMasterStore((s) => s.ticketReplyTemplates);
+  const companyName = useCompanyStore(
+    (s) => s.companies.find((c) => c.id === ticket.companyId)?.name,
+  );
+  const activeTemplates = useMemo(
+    () => listActiveCrmTicketReplyTemplates(),
+    [ticketReplyTemplates],
+  );
+  const templateCtx = useMemo(
+    () => ({
+      ticket,
+      companyName,
+      clientName:
+        ticket.createdBy.type === "client"
+          ? ticket.createdBy.name
+          : contactName,
+    }),
+    [ticket, companyName, contactName],
+  );
 
   if (initialMessageCount.current === null) {
     initialMessageCount.current = sorted.length;
@@ -208,6 +234,20 @@ export function DesignTicketThread({
     reply.onSend(text.trim(), files);
     setText("");
     setFiles([]);
+    setTemplateOpen(false);
+  }
+
+  function applyTemplate(templateId: string) {
+    const tpl = activeTemplates.find((t) => t.id === templateId);
+    if (!tpl) return;
+    const filled = applyCrmTicketReplyTemplate(tpl.body, templateCtx);
+    setText(filled);
+    setTemplateOpen(false);
+    toast.success(`Template “${tpl.name}” applied`);
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      resizeReplyTextarea();
+    });
   }
 
   async function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
@@ -304,10 +344,65 @@ export function DesignTicketThread({
                 onChange={(e) => void onPickFiles(e)}
               />
             </label>
+            {mode === "internal" ? (
+              <div className="relative shrink-0">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-12 shrink-0 gap-1.5 px-3 text-xs"
+                  onClick={() => setTemplateOpen((v) => !v)}
+                  aria-label="Use template"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  Use template
+                </Button>
+                {templateOpen ? (
+                  <div className="absolute bottom-14 left-0 z-20 w-[min(340px,calc(100vw-2rem))] max-h-72 overflow-y-auto rounded-lg border bg-card p-1 shadow-md">
+                    <div className="flex items-center justify-between gap-2 px-2 py-1.5">
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Templates
+                      </span>
+                      <button
+                        type="button"
+                        className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        aria-label="Close templates"
+                        onClick={() => setTemplateOpen(false)}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    {activeTemplates.length === 0 ? (
+                      <p className="px-2 py-3 text-center text-[10px] text-muted-foreground">
+                        No active templates. Add them in CRM Master → Ticket replies.
+                      </p>
+                    ) : (
+                      activeTemplates.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          className="flex w-full flex-col items-start gap-0.5 rounded-md px-2 py-1.5 text-left hover:bg-muted"
+                          onClick={() => applyTemplate(t.id)}
+                        >
+                          <span className="text-xs font-medium">{t.name}</span>
+                          <span className="text-[10px] text-muted-foreground">{t.category}</span>
+                          <span className="line-clamp-2 whitespace-pre-wrap text-[10px] text-muted-foreground">
+                            {applyCrmTicketReplyTemplate(t.body, templateCtx)}
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             <textarea
               ref={textareaRef}
               value={text}
-              onChange={(e) => setText(e.target.value)}
+              onChange={(e) => {
+                setText(e.target.value);
+                setTemplateOpen(false);
+              }}
               rows={1}
               placeholder={reply.placeholder ?? `Reply as ${contactName ?? "team"}…`}
               className={cn(

@@ -13,6 +13,7 @@ import {
   Link2,
   ListChecks,
   MessageCircle,
+  MessageSquareText,
   Milestone,
   Package,
   Pencil,
@@ -28,6 +29,7 @@ import { toast } from "sonner";
 
 import { CrmMasterDataControl } from "@/components/crm/crm-master-data-control";
 import { CrmMasterAcademyPanel } from "@/components/crm/crm-master-academy-panel";
+import { CrmMasterTicketReplyTemplatesPanel } from "@/components/crm/crm-master-ticket-reply-templates-panel";
 import { CrmMasterWhatsappTemplatesPanel } from "@/components/crm/crm-master-whatsapp-templates-panel";
 import { CrmOnboardingTargetsEditor } from "@/components/crm/crm-onboarding-targets-editor";
 import {
@@ -51,6 +53,7 @@ import {
   getCrmMasterMigrationFields,
   getCrmMasterModulesList,
   getCrmMasterTrainingFields,
+  getCrmMasterTicketReplyTemplates,
   getCrmMasterWhatsappTemplates,
 } from "@/stores/useCrmMasterStore";
 import { getCrmMasterImplementationStages } from "@/stores/useCrmMasterStore";
@@ -87,6 +90,7 @@ const SECTIONS = [
   { id: "training", label: "Training", icon: GraduationCap },
   { id: "academy", label: "Academy", icon: BookOpen },
   { id: "whatsapp-templates", label: "WhatsApp", icon: MessageCircle },
+  { id: "ticket-replies", label: "Ticket replies", icon: MessageSquareText },
   { id: "bookings", label: "Meetings", icon: Calendar },
   { id: "data-control", label: "Data Control", icon: Table2 },
   { id: "danger", label: "Reset & Safety", icon: ShieldAlert },
@@ -196,6 +200,7 @@ function CrmMasterPage() {
             {section === "training" ? <TrainingPanel /> : null}
             {section === "academy" ? <CrmMasterAcademyPanel /> : null}
             {section === "whatsapp-templates" ? <CrmMasterWhatsappTemplatesPanel /> : null}
+            {section === "ticket-replies" ? <CrmMasterTicketReplyTemplatesPanel /> : null}
             {section === "bookings" ? <BookingsPanel /> : null}
             {section === "data-control" ? <CrmMasterDataControl /> : null}
             {section === "danger" ? <DangerPanel /> : null}
@@ -223,6 +228,7 @@ function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) 
   const implementationStages = useCrmMasterStore((s) => s.implementationStages);
   const academyTutorials = useCrmMasterStore((s) => s.academyTutorials);
   const whatsappTemplates = useCrmMasterStore((s) => s.whatsappTemplates);
+  const ticketReplyTemplates = useCrmMasterStore((s) => s.ticketReplyTemplates);
   const onboardingTargets = useCrmMasterStore((s) => s.onboardingTargets);
 
   const cards = [
@@ -294,6 +300,12 @@ function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) 
       value: (whatsappTemplates?.length ?? getCrmMasterWhatsappTemplates().length),
       total: "chat templates",
       to: "whatsapp-templates" as const,
+    },
+    {
+      label: "Ticket replies",
+      value: (ticketReplyTemplates?.length ?? getCrmMasterTicketReplyTemplates().length),
+      total: "reply templates",
+      to: "ticket-replies" as const,
     },
     {
       label: "Meetings",
@@ -2046,7 +2058,7 @@ function DangerPanel() {
         <h3 className="text-sm font-semibold text-destructive">Reset CRM Master Config</h3>
         <p className="mt-1 text-[10px] text-muted-foreground">
           Restores seeded account fields, project fields, picklists, modules, providers, migration,
-          training, Academy tutorials, WhatsApp templates, and meeting catalogs. Does not delete CRM accounts or onboarding checklists.
+          training, Academy tutorials, WhatsApp templates, ticket reply templates, and meeting catalogs. Does not delete CRM accounts or onboarding checklists.
         </p>
         <Button
           size="sm"
@@ -2062,7 +2074,7 @@ function DangerPanel() {
         open={open}
         onOpenChange={setOpen}
         title="Reset CRM Master Config?"
-        description="All field catalogs, picklists, modules, providers, migration, training, Academy tutorials, WhatsApp templates, and meeting fields will revert to seed defaults."
+        description="All field catalogs, picklists, modules, providers, migration, training, Academy tutorials, WhatsApp templates, ticket reply templates, and meeting fields will revert to seed defaults."
         confirmLabel="Reset"
         onConfirm={() => {
           resetAll();

@@ -10,6 +10,7 @@ import type {
   CrmMasterPlatformSettings,
   CrmMigrationFieldDef,
   CrmOnboardingTargetSettings,
+  CrmTicketReplyTemplateDef,
   CrmTrainingFieldDef,
   CrmWhatsappTemplateDef,
 } from "@/types/crm-master";
@@ -53,6 +54,10 @@ import {
   normalizeCrmWhatsappTemplates,
   seedCrmWhatsappTemplates,
 } from "@/lib/crm-whatsapp-templates";
+import {
+  normalizeCrmTicketReplyTemplates,
+  seedCrmTicketReplyTemplates,
+} from "@/lib/crm-ticket-reply-templates";
 import { createPersistedStore, touch } from "./persist";
 
 type CrmMasterState = {
@@ -79,6 +84,8 @@ type CrmMasterState = {
   academyTutorials: AcademyTutorial[];
   /** WhatsApp chat templates for account group composer (editable in Master). */
   whatsappTemplates: CrmWhatsappTemplateDef[];
+  /** Design / support ticket reply templates for conversation composer (editable in Master). */
+  ticketReplyTemplates: CrmTicketReplyTemplateDef[];
   /** 45-day onboarding SLA buckets (synced to Automation → Onboarding SLA). */
   onboardingTargets: CrmOnboardingTargetSettings;
 
@@ -112,6 +119,7 @@ type CrmMasterState = {
   setImplementationStages: (stages: CrmImplementationStageDef[]) => void;
   setAcademyTutorials: (tutorials: AcademyTutorial[]) => void;
   setWhatsappTemplates: (templates: CrmWhatsappTemplateDef[]) => void;
+  setTicketReplyTemplates: (templates: CrmTicketReplyTemplateDef[]) => void;
   setOnboardingTargets: (settings: CrmOnboardingTargetSettings) => void;
 
   resetAll: () => void;
@@ -133,6 +141,7 @@ function seedState() {
     implementationStages: seedCrmImplementationStages(),
     academyTutorials: seedAcademyTutorials(),
     whatsappTemplates: seedCrmWhatsappTemplates(),
+    ticketReplyTemplates: seedCrmTicketReplyTemplates(),
     onboardingTargets: seedCrmOnboardingTargetSettings(),
   };
 }
@@ -477,6 +486,15 @@ export const useCrmMasterStore = createPersistedStore<CrmMasterState>(
       set({ whatsappTemplates: normalizeCrmWhatsappTemplates(templates) });
     },
 
+    setTicketReplyTemplates: (templates) => {
+      set({ ticketReplyTemplates: normalizeCrmTicketReplyTemplates(templates) });
+      if (typeof window !== "undefined") {
+        void import("@/lib/config-persistence").then((m) =>
+          m.scheduleCrmMasterConfigPersistence(),
+        );
+      }
+    },
+
     setOnboardingTargets: (settings) => {
       set({ onboardingTargets: normalizeCrmOnboardingTargetSettings(settings) });
       if (typeof window !== "undefined") {
@@ -582,6 +600,21 @@ export function listActiveCrmWhatsappTemplates(): CrmWhatsappTemplateDef[] {
   return getCrmMasterWhatsappTemplates().filter((t) => t.active);
 }
 
+/** Ticket reply templates for Master + design ticket conversation picker. */
+export function getCrmMasterTicketReplyTemplates(): CrmTicketReplyTemplateDef[] {
+  const current = useCrmMasterStore.getState().ticketReplyTemplates;
+  if (!Array.isArray(current) || current.length === 0) {
+    const seed = seedCrmTicketReplyTemplates();
+    useCrmMasterStore.setState({ ticketReplyTemplates: seed });
+    return seed;
+  }
+  return normalizeCrmTicketReplyTemplates(current);
+}
+
+export function listActiveCrmTicketReplyTemplates(): CrmTicketReplyTemplateDef[] {
+  return getCrmMasterTicketReplyTemplates().filter((t) => t.active);
+}
+
 /** Onboarding SLA targets (Master + Automation rules page). Seeds when missing. */
 export function getCrmMasterOnboardingTargets(): CrmOnboardingTargetSettings {
   const current = useCrmMasterStore.getState().onboardingTargets;
@@ -624,6 +657,7 @@ export function crmMasterSnapshot() {
     implementationStages: s.implementationStages,
     academyTutorials: s.academyTutorials,
     whatsappTemplates: s.whatsappTemplates,
+    ticketReplyTemplates: s.ticketReplyTemplates,
     onboardingTargets: s.onboardingTargets,
   };
 }
@@ -688,6 +722,13 @@ export function hydrateCrmMasterFromServer(raw: Record<string, unknown>) {
           ),
         }
       : {}),
+    ...(Array.isArray(raw.ticketReplyTemplates)
+      ? {
+          ticketReplyTemplates: normalizeCrmTicketReplyTemplates(
+            raw.ticketReplyTemplates as CrmTicketReplyTemplateDef[],
+          ),
+        }
+      : {}),
     ...(raw.onboardingTargets && typeof raw.onboardingTargets === "object"
       ? {
           onboardingTargets: normalizeCrmOnboardingTargetSettings(raw.onboardingTargets),
@@ -698,6 +739,12 @@ export function hydrateCrmMasterFromServer(raw: Record<string, unknown>) {
   if (!Array.isArray(useCrmMasterStore.getState().whatsappTemplates) ||
       useCrmMasterStore.getState().whatsappTemplates.length === 0) {
     useCrmMasterStore.setState({ whatsappTemplates: seedCrmWhatsappTemplates() });
+  }
+  if (
+    !Array.isArray(useCrmMasterStore.getState().ticketReplyTemplates) ||
+    useCrmMasterStore.getState().ticketReplyTemplates.length === 0
+  ) {
+    useCrmMasterStore.setState({ ticketReplyTemplates: seedCrmTicketReplyTemplates() });
   }
   if (
     !useCrmMasterStore.getState().onboardingTargets ||
