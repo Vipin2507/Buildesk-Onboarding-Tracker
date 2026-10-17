@@ -1,9 +1,10 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { CalendarDays, ClipboardList, IndianRupee, Mail, MessageCircle, MessageSquare, Pencil, Play, Plus, Power, RefreshCw, Trash2, Ticket, Zap } from "lucide-react";
+import { CalendarDays, ClipboardList, IndianRupee, Mail, MessageCircle, MessageSquare, Pencil, Play, Plus, Power, RefreshCw, Target, Trash2, Ticket, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 import { AutomationRuleDialog } from "@/components/crm/automation/automation-rule-dialog";
+import { CrmOnboardingTargetsEditor } from "@/components/crm/crm-onboarding-targets-editor";
 import { ConfirmDeleteDialog } from "@/components/entity-form-modal";
 import { DataTable } from "@/components/data-table";
 import { Pill } from "@/components/status-pill";
@@ -12,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import {
   CRM_BOOKING_AUTOMATION_TRIGGERS,
   CRM_LIVE_CHAT_AUTOMATION_TRIGGERS,
+  CRM_ONBOARDING_SLA_AUTOMATION_TRIGGERS,
   CRM_PAYMENT_AUTOMATION_TRIGGERS,
   CRM_QUERY_AUTOMATION_TRIGGERS,
   CRM_RENEWAL_AUTOMATION_TRIGGERS,
@@ -39,6 +41,7 @@ const PAYMENT_TRIGGER_SET = new Set<string>(CRM_PAYMENT_AUTOMATION_TRIGGERS);
 const RENEWAL_TRIGGER_SET = new Set<string>(CRM_RENEWAL_AUTOMATION_TRIGGERS);
 const QUERY_TRIGGER_SET = new Set<string>(CRM_QUERY_AUTOMATION_TRIGGERS);
 const LIVE_CHAT_TRIGGER_SET = new Set<string>(CRM_LIVE_CHAT_AUTOMATION_TRIGGERS);
+const ONBOARDING_SLA_TRIGGER_SET = new Set<string>(CRM_ONBOARDING_SLA_AUTOMATION_TRIGGERS);
 
 type RuleColumn = {
   key: string;
@@ -136,7 +139,16 @@ export function AutomationRulesPanel() {
   const [testingRuleId, setTestingRuleId] = useState<string | null>(null);
   const [editing, setEditing] = useState<AutomationRule | null>(null);
 
-  const { ticketRules, bookingRules, taskRules, paymentRules, renewalRules, queryRules, liveChatRules } = useMemo(() => {
+  const {
+    ticketRules,
+    bookingRules,
+    taskRules,
+    paymentRules,
+    renewalRules,
+    queryRules,
+    liveChatRules,
+    onboardingSlaRules,
+  } = useMemo(() => {
     const ticketRules: AutomationRule[] = [];
     const bookingRules: AutomationRule[] = [];
     const taskRules: AutomationRule[] = [];
@@ -144,8 +156,10 @@ export function AutomationRulesPanel() {
     const renewalRules: AutomationRule[] = [];
     const queryRules: AutomationRule[] = [];
     const liveChatRules: AutomationRule[] = [];
+    const onboardingSlaRules: AutomationRule[] = [];
     for (const rule of rules) {
       if (PAYMENT_TRIGGER_SET.has(rule.trigger)) paymentRules.push(rule);
+      else if (ONBOARDING_SLA_TRIGGER_SET.has(rule.trigger)) onboardingSlaRules.push(rule);
       else if (RENEWAL_TRIGGER_SET.has(rule.trigger)) renewalRules.push(rule);
       else if (QUERY_TRIGGER_SET.has(rule.trigger)) queryRules.push(rule);
       else if (LIVE_CHAT_TRIGGER_SET.has(rule.trigger)) liveChatRules.push(rule);
@@ -153,7 +167,16 @@ export function AutomationRulesPanel() {
       else if (TASK_TRIGGER_SET.has(rule.trigger)) taskRules.push(rule);
       else ticketRules.push(rule);
     }
-    return { ticketRules, bookingRules, taskRules, paymentRules, renewalRules, queryRules, liveChatRules };
+    return {
+      ticketRules,
+      bookingRules,
+      taskRules,
+      paymentRules,
+      renewalRules,
+      queryRules,
+      liveChatRules,
+      onboardingSlaRules,
+    };
   }, [rules]);
 
   function openCreate() {
@@ -327,6 +350,29 @@ export function AutomationRulesPanel() {
             <IndianRupee className="h-3.5 w-3.5" />,
             paymentRules,
           )}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                <Target className="h-3.5 w-3.5" />
+              </div>
+              <div>
+                <h3 className="text-xs font-semibold">Onboarding SLA</h3>
+                <p className="text-[10px] text-muted-foreground">
+                  Day-bucket % targets (default 45 days) from CRM Master. When overall progress is below
+                  target, WhatsApp Support 1, Support 2, and Admins.
+                </p>
+              </div>
+            </div>
+            <div className="card-soft p-3">
+              <CrmOnboardingTargetsEditor showMasterLink />
+            </div>
+            {renderRulesSection(
+              "Onboarding SLA rules",
+              "Toggle and edit WhatsApp copy for behind-target alerts. Thresholds above sync from Master.",
+              <Target className="h-3.5 w-3.5" />,
+              onboardingSlaRules,
+            )}
+          </div>
           {renderRulesSection(
             "Account renewals",
             "WhatsApp CRM admins when an account enters the 30-day renewal window (in-app bell still notifies the account team).",

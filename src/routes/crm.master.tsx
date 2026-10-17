@@ -19,6 +19,7 @@ import {
   Plus,
   ShieldAlert,
   Table2,
+  Target,
   Trash2,
   RotateCcw,
   Upload,
@@ -28,6 +29,7 @@ import { toast } from "sonner";
 import { CrmMasterDataControl } from "@/components/crm/crm-master-data-control";
 import { CrmMasterAcademyPanel } from "@/components/crm/crm-master-academy-panel";
 import { CrmMasterWhatsappTemplatesPanel } from "@/components/crm/crm-master-whatsapp-templates-panel";
+import { CrmOnboardingTargetsEditor } from "@/components/crm/crm-onboarding-targets-editor";
 import {
   DesignTicketPageHeader,
   TICKET_EASE,
@@ -78,6 +80,7 @@ const SECTIONS = [
   { id: "project-fields", label: "Project Fields", icon: Boxes },
   { id: "picklists", label: "Picklists", icon: ListChecks },
   { id: "account-stages", label: "Account stages", icon: Milestone },
+  { id: "onboarding-targets", label: "Onboarding targets", icon: Target },
   { id: "modules", label: "Modules", icon: Package },
   { id: "integrations", label: "Integrations", icon: Link2 },
   { id: "migration", label: "Migration", icon: Upload },
@@ -182,6 +185,11 @@ function CrmMasterPage() {
             {section === "project-fields" ? <FieldsPanel entity="project" /> : null}
             {section === "picklists" ? <PicklistsPanel /> : null}
             {section === "account-stages" ? <AccountStagesPanel /> : null}
+            {section === "onboarding-targets" ? (
+              <div className="card-soft p-3">
+                <CrmOnboardingTargetsEditor />
+              </div>
+            ) : null}
             {section === "modules" ? <ModulesPanel /> : null}
             {section === "integrations" ? <IntegrationsPanel /> : null}
             {section === "migration" ? <MigrationPanel /> : null}
@@ -215,6 +223,7 @@ function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) 
   const implementationStages = useCrmMasterStore((s) => s.implementationStages);
   const academyTutorials = useCrmMasterStore((s) => s.academyTutorials);
   const whatsappTemplates = useCrmMasterStore((s) => s.whatsappTemplates);
+  const onboardingTargets = useCrmMasterStore((s) => s.onboardingTargets);
 
   const cards = [
     {
@@ -241,6 +250,12 @@ function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) 
       value: (implementationStages?.length ?? getCrmMasterImplementationStages().length),
       total: "pipeline steps",
       to: "account-stages" as const,
+    },
+    {
+      label: "Onboarding targets",
+      value: onboardingTargets?.buckets?.filter((b) => b.active).length ?? 4,
+      total: `${onboardingTargets?.targetDays ?? 45}-day plan`,
+      to: "onboarding-targets" as const,
     },
     {
       label: "Modules",

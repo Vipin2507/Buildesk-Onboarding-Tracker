@@ -114,6 +114,8 @@ export const CRM_LIVE_CHAT_AUTOMATION_TRIGGERS = ["live-chat-started"] as const;
 
 export const CRM_PORTAL_TICKET_AUTOMATION_TRIGGERS = ["portal-ticket-created"] as const;
 
+export const CRM_ONBOARDING_SLA_AUTOMATION_TRIGGERS = ["onboarding-sla-remind"] as const;
+
 export const DEFAULT_TASK_REMINDER_OFFSET_MINUTES = 15;
 
 const CRM_AUTOMATION_SEED_SYNC_RULE_IDS = new Set([
@@ -455,6 +457,17 @@ export const DEFAULT_CRM_AUTOMATION_RULES: AutomationRule[] = [
     templateBody:
       "Hi {{recipientName}}, {{authorName}} created portal ticket {{ticketNumber}} for {{accountName}}.\n\n{{title}}\nPriority: {{priority}}\n\nOpen in CRM: {{ticketUrl}}",
   }),
+  rule({
+    id: "crm-rule-onboarding-sla-whatsapp",
+    name: "Onboarding SLA — Support & Admin WhatsApp",
+    description:
+      "WhatsApp Support 1, Support 2, and CRM Admins when overall onboarding % is below the Master day-bucket target (default 45-day plan). Thresholds are edited in CRM Master → Onboarding targets (also shown on this page).",
+    trigger: "onboarding-sla-remind",
+    channel: "whatsapp",
+    isActive: true,
+    templateBody:
+      "Hi {{recipientName}},\n\n⚠️ *Onboarding behind target* — {{accountName}}\n\nDay {{daysSinceStart}} of {{targetDays}} ({{targetLabel}})\nProgress: {{currentProgress}}% · Target: {{targetProgress}}%\n\n*Support 1:* {{supportManager1}}\n*Support 2:* {{supportManager2}}\n*Sales:* {{salesManagerName}}\n\n{{targetRemarks}}\n\nOpen in CRM: {{onboardingUrl}}",
+  }),
 ];
 
 export const CRM_AUTOMATION_TEMPLATE_VARS = [
@@ -511,6 +524,13 @@ export const CRM_AUTOMATION_TEMPLATE_VARS = [
   "{{renewUrl}}",
   "{{renewalWindowLabel}}",
   "{{daysUntilEnd}}",
+  "{{daysSinceStart}}",
+  "{{targetDays}}",
+  "{{targetLabel}}",
+  "{{currentProgress}}",
+  "{{targetProgress}}",
+  "{{targetRemarks}}",
+  "{{onboardingUrl}}",
 ] as const;
 
 export const CRM_AUTOMATION_SAMPLE_VARS: Record<string, string> = {
@@ -565,6 +585,14 @@ export const CRM_AUTOMATION_SAMPLE_VARS: Record<string, string> = {
   visitorName: "Amit Verma",
   chatUrl: "https://track.example.com/crm/live-chat",
   sessionId: "CS-1001",
+  daysSinceStart: "12",
+  targetDays: "45",
+  targetLabel: "Day 6–20 · 50%",
+  currentProgress: "35",
+  targetProgress: "50",
+  targetRemarks:
+    "If The Overall % is Less than this, Push Whats app message notification to Support 1 & 2 & Admin",
+  onboardingUrl: "https://track.example.com/crm/accounts/acme",
   endDate: "9 Sept 2026",
   nextStartDate: "10 Sept 2026",
   renewUrl: "https://track.example.com/crm/accounts/horizon",

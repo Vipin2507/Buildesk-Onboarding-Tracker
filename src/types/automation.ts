@@ -47,7 +47,8 @@ export type AutomationTrigger =
   | "query-response"
   | "live-chat-started"
   | "portal-ticket-created"
-  | "whatsapp-broadcast";
+  | "whatsapp-broadcast"
+  | "onboarding-sla-remind";
 
 export interface AutomationRule {
   id: string;
@@ -175,6 +176,10 @@ export const AUTOMATION_TRIGGERS: { value: AutomationTrigger; label: string }[] 
   { value: "live-chat-started", label: "Customer starts live chat" },
   { value: "portal-ticket-created", label: "Portal ticket created (executive)" },
   { value: "whatsapp-broadcast", label: "WhatsApp group broadcast" },
+  {
+    value: "onboarding-sla-remind",
+    label: "Onboarding SLA (behind target)",
+  },
 ];
 
 export const AUTOMATION_TEMPLATE_VARS = [

@@ -95,6 +95,28 @@ export type CrmMigrationFieldDef = {
   category: string;
 };
 
+/**
+ * Onboarding SLA day-bucket (Master → Onboarding targets).
+ * When account days-since-start falls in [dayFrom, dayTo] and overall % is below
+ * minProgressPercent, automation can WhatsApp Support 1/2 + Admins.
+ */
+export type CrmOnboardingTargetBucket = {
+  id: string;
+  dayFrom: number;
+  dayTo: number;
+  minProgressPercent: number;
+  remarks: string;
+  active: boolean;
+  order: number;
+};
+
+/** Master settings for the 45-day (configurable) onboarding target window. */
+export type CrmOnboardingTargetSettings = {
+  /** Calendar days from account startDate that define the onboarding target window. */
+  targetDays: number;
+  buckets: CrmOnboardingTargetBucket[];
+};
+
 /** Account implementation pipeline stage (Master → Account stages). */
 export type CrmImplementationStageDef = {
   key: CrmImplementationStage;

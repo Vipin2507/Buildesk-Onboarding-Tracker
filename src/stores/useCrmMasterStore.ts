@@ -9,9 +9,14 @@ import type {
   CrmMasterPicklist,
   CrmMasterPlatformSettings,
   CrmMigrationFieldDef,
+  CrmOnboardingTargetSettings,
   CrmTrainingFieldDef,
   CrmWhatsappTemplateDef,
 } from "@/types/crm-master";
+import {
+  normalizeCrmOnboardingTargetSettings,
+  seedCrmOnboardingTargetSettings,
+} from "@/data/crm-onboarding-targets-seed";
 import type { AcademyTutorial } from "@/types/buildesk-academy";
 import { newId, nowIso } from "@/types/common";
 import {
@@ -74,6 +79,8 @@ type CrmMasterState = {
   academyTutorials: AcademyTutorial[];
   /** WhatsApp chat templates for account group composer (editable in Master). */
   whatsappTemplates: CrmWhatsappTemplateDef[];
+  /** 45-day onboarding SLA buckets (synced to Automation → Onboarding SLA). */
+  onboardingTargets: CrmOnboardingTargetSettings;
 
   updatePlatform: (data: Partial<CrmMasterPlatformSettings>) => void;
 
@@ -105,6 +112,7 @@ type CrmMasterState = {
   setImplementationStages: (stages: CrmImplementationStageDef[]) => void;
   setAcademyTutorials: (tutorials: AcademyTutorial[]) => void;
   setWhatsappTemplates: (templates: CrmWhatsappTemplateDef[]) => void;
+  setOnboardingTargets: (settings: CrmOnboardingTargetSettings) => void;
 
   resetAll: () => void;
 };
@@ -125,6 +133,7 @@ function seedState() {
     implementationStages: seedCrmImplementationStages(),
     academyTutorials: seedAcademyTutorials(),
     whatsappTemplates: seedCrmWhatsappTemplates(),
+    onboardingTargets: seedCrmOnboardingTargetSettings(),
   };
 }
 
@@ -468,6 +477,15 @@ export const useCrmMasterStore = createPersistedStore<CrmMasterState>(
       set({ whatsappTemplates: normalizeCrmWhatsappTemplates(templates) });
     },
 
+    setOnboardingTargets: (settings) => {
+      set({ onboardingTargets: normalizeCrmOnboardingTargetSettings(settings) });
+      if (typeof window !== "undefined") {
+        void import("@/lib/config-persistence").then((m) =>
+          m.scheduleCrmMasterConfigPersistence(),
+        );
+      }
+    },
+
     resetAll: () => {
       set(seedState());
     },
@@ -564,6 +582,17 @@ export function listActiveCrmWhatsappTemplates(): CrmWhatsappTemplateDef[] {
   return getCrmMasterWhatsappTemplates().filter((t) => t.active);
 }
 
+/** Onboarding SLA targets (Master + Automation rules page). Seeds when missing. */
+export function getCrmMasterOnboardingTargets(): CrmOnboardingTargetSettings {
+  const current = useCrmMasterStore.getState().onboardingTargets;
+  if (!current || !Array.isArray(current.buckets) || current.buckets.length === 0) {
+    const seed = seedCrmOnboardingTargetSettings();
+    useCrmMasterStore.setState({ onboardingTargets: seed });
+    return seed;
+  }
+  return normalizeCrmOnboardingTargetSettings(current);
+}
+
 /** Enabled modules from Master catalog (labels + order from Master → Modules). */
 export function getCrmMasterProductModuleCatalog(): { key: string; label: string }[] {
   ensureCrmMasterModulesCatalog();
@@ -595,6 +624,7 @@ export function crmMasterSnapshot() {
     implementationStages: s.implementationStages,
     academyTutorials: s.academyTutorials,
     whatsappTemplates: s.whatsappTemplates,
+    onboardingTargets: s.onboardingTargets,
   };
 }
 
@@ -658,11 +688,23 @@ export function hydrateCrmMasterFromServer(raw: Record<string, unknown>) {
           ),
         }
       : {}),
+    ...(raw.onboardingTargets && typeof raw.onboardingTargets === "object"
+      ? {
+          onboardingTargets: normalizeCrmOnboardingTargetSettings(raw.onboardingTargets),
+        }
+      : {}),
   }));
   // Older crm-master snapshots omit WhatsApp templates — seed once so Master + chat stay in sync.
   if (!Array.isArray(useCrmMasterStore.getState().whatsappTemplates) ||
       useCrmMasterStore.getState().whatsappTemplates.length === 0) {
     useCrmMasterStore.setState({ whatsappTemplates: seedCrmWhatsappTemplates() });
+  }
+  if (
+    !useCrmMasterStore.getState().onboardingTargets ||
+    !Array.isArray(useCrmMasterStore.getState().onboardingTargets.buckets) ||
+    useCrmMasterStore.getState().onboardingTargets.buckets.length === 0
+  ) {
+    useCrmMasterStore.setState({ onboardingTargets: seedCrmOnboardingTargetSettings() });
   }
   ensureCrmMasterModulesCatalog();
 }

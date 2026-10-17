@@ -35,6 +35,7 @@ const TRIGGER_SHORT: Record<AutomationRule["trigger"], string> = {
   "live-chat-started": "Live chat",
   "portal-ticket-created": "Portal ticket",
   "whatsapp-broadcast": "WA broadcast",
+  "onboarding-sla-remind": "Onboarding SLA",
 };
 
 export function AutomationTestPanel({ className }: { className?: string }) {
