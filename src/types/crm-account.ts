@@ -47,8 +47,15 @@ export type CrmAccount = Timestamps & {
   installmentCount?: number;
   installments?: CrmAccountInstallment[];
   healthScore?: number;
-  status: "active" | "onboarding" | "live" | "suspended" | "inactive" | "closed";
-  /** Reason noted when marking suspended or inactive */
+  status:
+    | "active"
+    | "onboarding"
+    | "live"
+    | "suspended"
+    | "suspend_and_close"
+    | "inactive"
+    | "closed";
+  /** Reason noted when marking suspend / suspend-and-close / inactive */
   statusRemarks?: string;
   /** WAHA WhatsApp group JID (`…@g.us`) bound for the account chat tab */
   whatsappGroupId?: string;

@@ -9,6 +9,7 @@ import {
   Pencil,
   PowerOff,
   Rocket,
+  ShieldOff,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -65,6 +66,7 @@ export function CrmAccountGoLiveActions({
 
   const isLive = accountStatus === "live";
   const isSuspended = accountStatus === "suspended";
+  const isSuspendAndClose = accountStatus === "suspend_and_close";
   const isInactive = accountStatus === "inactive";
   const isEnded = isCrmAccountEnded(accountStatus);
   const ready = crmGoLiveReady(getRecord(companyId)!);
@@ -72,6 +74,7 @@ export function CrmAccountGoLiveActions({
   const [confirmApprove, setConfirmApprove] = useState(false);
   const [confirmForce, setConfirmForce] = useState(false);
   const [confirmSuspended, setConfirmSuspended] = useState(false);
+  const [confirmSuspendAndClose, setConfirmSuspendAndClose] = useState(false);
   const [confirmInactive, setConfirmInactive] = useState(false);
 
   function approveGoLive() {
@@ -96,8 +99,14 @@ export function CrmAccountGoLiveActions({
 
   function markSuspended(remarks: string) {
     setAccountStatus(companyId, "suspended", { who, statusRemarks: remarks });
-    toast.success(`${accountName} marked Suspended`);
+    toast.success(`${accountName} marked Suspend`);
     setConfirmSuspended(false);
+  }
+
+  function markSuspendAndClose(remarks: string) {
+    setAccountStatus(companyId, "suspend_and_close", { who, statusRemarks: remarks });
+    toast.success(`${accountName} marked Suspend and Close`);
+    setConfirmSuspendAndClose(false);
   }
 
   function markInactive(remarks: string) {
@@ -176,10 +185,17 @@ export function CrmAccountGoLiveActions({
             onClick={() => setConfirmSuspended(true)}
           >
             <PauseCircle className="mr-2 h-4 w-4 text-warning-foreground" />
-            {isSuspended ? "Already Suspended" : "Mark Suspended"}
+            {isSuspended ? "Already Suspend" : "Mark Suspend"}
           </DropdownMenuItem>
           <DropdownMenuItem
-            disabled={isInactive}
+            disabled={isSuspendAndClose || isInactive}
+            onClick={() => setConfirmSuspendAndClose(true)}
+          >
+            <ShieldOff className="mr-2 h-4 w-4 text-destructive" />
+            {isSuspendAndClose ? "Already Suspend and Close" : "Mark Suspend and Close"}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={isInactive || isSuspendAndClose}
             onClick={() => setConfirmInactive(true)}
           >
             <PowerOff className="mr-2 h-4 w-4 text-destructive" />
@@ -241,11 +257,21 @@ export function CrmAccountGoLiveActions({
       <CrmAccountStatusRemarksModal
         open={confirmSuspended}
         onOpenChange={setConfirmSuspended}
-        title="Mark account suspended?"
-        description={`${accountName} will be marked Suspended. Use when the client is temporarily paused (including after go-live) but may resume later.`}
-        confirmLabel="Mark Suspended"
+        title="Mark account Suspend?"
+        description={`${accountName} will be marked Suspend (on hold). This does not classify the account as lost.`}
+        confirmLabel="Mark Suspend"
         remarksPlaceholder="Why is this account being suspended?"
         onConfirm={markSuspended}
+      />
+
+      <CrmAccountStatusRemarksModal
+        open={confirmSuspendAndClose}
+        onOpenChange={setConfirmSuspendAndClose}
+        title="Mark Suspend and Close?"
+        description={`${accountName} will be suspended and closed. First-time accounts record remaining value as Sales Lost; renewal accounts as Customer Lost.`}
+        confirmLabel="Mark Suspend and Close"
+        remarksPlaceholder="Why is this account being suspended and closed?"
+        onConfirm={markSuspendAndClose}
       />
 
       <CrmAccountStatusRemarksModal

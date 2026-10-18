@@ -4,7 +4,9 @@ import { originalInstallments, parseInstallmentsJson, roundMoney, serializeInsta
 import {
   buildCycleAwarePaymentAllocation,
   classifyPaymentTransactionRenewal,
+  classifyCrmPaymentsLostOutcome,
   isInactiveCrmAccountForPayments,
+  isSuspendedCrmAccountForPayments,
   isRenewalPaymentAccount,
   matchesPaymentDueFilter,
   PAYMENT_BACKFILL_NOTE,
@@ -536,8 +538,24 @@ function applyPaymentsStatusFilter(
   status: PaymentListFilterStatus,
   today: string,
 ): PaymentListItem[] {
+  if (status === "suspended") {
+    return items.filter((row) => isSuspendedCrmAccountForPayments(row.accountStatus));
+  }
+  if (status === "suspend_and_close") {
+    return items.filter((row) => row.accountStatus === "suspend_and_close");
+  }
   if (status === "lost") {
     return items.filter((row) => isInactiveCrmAccountForPayments(row.accountStatus));
+  }
+  if (status === "sales_lost") {
+    return items.filter(
+      (row) => classifyCrmPaymentsLostOutcome(row)?.kind === "sales_lost",
+    );
+  }
+  if (status === "customer_lost") {
+    return items.filter(
+      (row) => classifyCrmPaymentsLostOutcome(row)?.kind === "customer_lost",
+    );
   }
 
   const active = items.filter((row) => !isInactiveCrmAccountForPayments(row.accountStatus));
@@ -588,6 +606,11 @@ export type PaymentListItem = {
   paymentStatus: PaymentStatus;
   /** Collections beyond deal value. */
   renewalAmount: number;
+  /** Lifetime received before current deal cycle (renewal marker). */
+  paymentCycleBaseline?: number;
+  /** Sales Lost / Customer Lost when Suspend and Close (or inactive). */
+  lostKind?: "sales_lost" | "customer_lost";
+  lostValue?: number;
 };
 
 function mapAccountsToPaymentListItems(
@@ -599,7 +622,11 @@ function mapAccountsToPaymentListItems(
     const received = receivedByAccount.get(account.id) ?? 0;
     const snap = buildAccountPaymentSnapshot(account, received, today);
     const endDate = account.endDate?.slice(0, 10) || undefined;
-    return {
+    const paymentCycleBaseline =
+      typeof account.paymentCycleBaseline === "number" && Number.isFinite(account.paymentCycleBaseline)
+        ? account.paymentCycleBaseline
+        : undefined;
+    const base = {
       id: account.id,
       accountName: account.name,
       accountStatus: account.status as CrmAccount["status"],
@@ -621,6 +648,13 @@ function mapAccountsToPaymentListItems(
       collectionPercent: snap.collectionPercent,
       paymentStatus: snap.paymentStatus,
       renewalAmount: snap.renewalAmount,
+      paymentCycleBaseline,
+    };
+    const lost = classifyCrmPaymentsLostOutcome(base);
+    return {
+      ...base,
+      lostKind: lost?.kind,
+      lostValue: lost?.value,
     };
   });
 }
@@ -752,6 +786,25 @@ export function summarizePaymentList(
   const collectionRatePercent =
     totalContractValue > 0 ? roundMoney((totalReceived / totalContractValue) * 100) : 0;
 
+  const suspendedRows = countScope.filter((row) =>
+    isSuspendedCrmAccountForPayments(row.accountStatus),
+  );
+  const suspendAndCloseRows = countScope.filter(
+    (row) => row.accountStatus === "suspend_and_close",
+  );
+  const salesLostRows = countScope.filter(
+    (row) => classifyCrmPaymentsLostOutcome(row)?.kind === "sales_lost",
+  );
+  const customerLostRows = countScope.filter(
+    (row) => classifyCrmPaymentsLostOutcome(row)?.kind === "customer_lost",
+  );
+  const salesLostAmount = roundMoney(
+    salesLostRows.reduce((s, r) => s + (r.lostValue ?? 0), 0),
+  );
+  const customerLostAmount = roundMoney(
+    customerLostRows.reduce((s, r) => s + (r.lostValue ?? 0), 0),
+  );
+
   return {
     totalContractValue,
     totalReceived,
@@ -765,6 +818,12 @@ export function summarizePaymentList(
     dueIn45DaysAmount,
     dueIn45DaysCount,
     collectionRatePercent,
+    suspendedCount: suspendedRows.length,
+    suspendAndCloseCount: suspendAndCloseRows.length,
+    salesLostCount: salesLostRows.length,
+    salesLostAmount,
+    customerLostCount: customerLostRows.length,
+    customerLostAmount,
     statusCounts: {
       all: countByStatusTab(countScope, "all", today),
       overdue: countByStatusTab(countScope, "overdue", today),
@@ -777,6 +836,10 @@ export function summarizePaymentList(
       not_started: countByStatusTab(countScope, "not_started", today),
       lost: countByStatusTab(countScope, "lost", today),
       renewal: countByStatusTab(countScope, "renewal", today),
+      suspended: countByStatusTab(countScope, "suspended", today),
+      suspend_and_close: countByStatusTab(countScope, "suspend_and_close", today),
+      sales_lost: countByStatusTab(countScope, "sales_lost", today),
+      customer_lost: countByStatusTab(countScope, "customer_lost", today),
     },
   };
 }

@@ -209,7 +209,7 @@ export const useCrmAccountStore = createStore<CrmAccountState>((set, get) => ({
     if (!existing || existing.status === status) return;
 
     const patch: Partial<CrmAccount> = { status };
-    if (status === "suspended" || status === "inactive") {
+    if (status === "suspended" || status === "suspend_and_close" || status === "inactive") {
       patch.statusRemarks = opts?.statusRemarks?.trim() || undefined;
     } else {
       patch.statusRemarks = undefined;

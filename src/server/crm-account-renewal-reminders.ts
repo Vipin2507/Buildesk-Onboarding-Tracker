@@ -25,7 +25,14 @@ export async function processCrmAccountRenewalReminders(
   for (const account of accounts) {
     const endDate = account.endDate?.slice(0, 10);
     if (!endDate) continue;
-    if (account.status === "closed" || account.status === "inactive") continue;
+    if (
+      account.status === "closed" ||
+      account.status === "inactive" ||
+      account.status === "suspended" ||
+      account.status === "suspend_and_close"
+    ) {
+      continue;
+    }
     if (!isCrmAccountInRenewalWindow({ endDate }, today)) continue;
     if (account.renewalWindowNotifiedForEndDate?.slice(0, 10) === endDate) continue;
 

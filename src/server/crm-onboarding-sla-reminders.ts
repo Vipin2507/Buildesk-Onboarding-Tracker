@@ -217,7 +217,13 @@ export async function processCrmOnboardingSlaReminders(db: Db): Promise<number> 
 
   for (const account of accounts) {
     const status = (account.status || "").toLowerCase();
-    if (status === "live" || status === "closed" || status === "inactive" || status === "suspended") {
+    if (
+      status === "live" ||
+      status === "closed" ||
+      status === "inactive" ||
+      status === "suspended" ||
+      status === "suspend_and_close"
+    ) {
       continue;
     }
 

@@ -327,7 +327,12 @@ export function useCrmDashboardOverview() {
     ).length;
     const active = rows.filter((r) => r.status === "active").length;
     const closed = rows.filter(
-      (r) => r.status === "closed" || r.status === "suspended" || r.status === "inactive" || (r.status as string) === "churned",
+      (r) =>
+        r.status === "closed" ||
+        r.status === "suspended" ||
+        r.status === "suspend_and_close" ||
+        r.status === "inactive" ||
+        (r.status as string) === "churned",
     ).length;
     const avgCompletion =
       rows.length === 0 ? 0 : Math.round(rows.reduce((s, r) => s + r.progress, 0) / rows.length);

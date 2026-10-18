@@ -213,7 +213,9 @@ function accountStatusTone(status: CrmAccount["status"]) {
   if (status === "onboarding") return "warning" as const;
   if (status === "active") return "info" as const;
   if (status === "suspended") return "warning" as const;
-  if (status === "inactive" || status === "closed") return "danger" as const;
+  if (status === "suspend_and_close" || status === "inactive" || status === "closed") {
+    return "danger" as const;
+  }
   return "muted" as const;
 }
 

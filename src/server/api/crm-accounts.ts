@@ -107,7 +107,17 @@ const accountInput = z.object({
   installmentCount: z.number().int().optional().nullable(),
   installmentsJson: z.string().optional().nullable(),
   healthScore: z.number().int().optional().nullable(),
-  status: z.enum(["active", "onboarding", "live", "suspended", "inactive", "closed"]).optional(),
+  status: z
+    .enum([
+      "active",
+      "onboarding",
+      "live",
+      "suspended",
+      "suspend_and_close",
+      "inactive",
+      "closed",
+    ])
+    .optional(),
   statusRemarks: z.string().optional().nullable(),
   whatsappGroupId: z.string().optional().nullable(),
   whatsappGroupName: z.string().optional().nullable(),

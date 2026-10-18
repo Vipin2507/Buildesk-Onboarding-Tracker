@@ -519,8 +519,57 @@ export function getCrmMasterModuleProviders(): Record<string, string[]> {
   return normalizeModuleProviders(useCrmMasterStore.getState().moduleProviders);
 }
 
+/** Ensures Account Statuses picklist includes Suspend and Close. */
+export function ensureCrmAccountStatusesPicklist() {
+  const state = useCrmMasterStore.getState();
+  const required = [
+    "onboarding",
+    "live",
+    "active",
+    "suspended",
+    "suspend_and_close",
+    "inactive",
+    "closed",
+  ];
+  const picklists = state.picklists.map((p) => {
+    if (p.key !== "account-statuses") return p;
+    const values = [...p.values];
+    let changed = false;
+    for (const v of required) {
+      if (!values.includes(v)) {
+        values.push(v);
+        changed = true;
+      }
+    }
+    if (!changed) return p;
+    return { ...p, values, updatedAt: nowIso() };
+  });
+  const accountFields = state.accountFields.map((f) => {
+    if (f.key !== "status" || !Array.isArray(f.options)) return f;
+    const options = [...f.options];
+    let changed = false;
+    for (const v of required) {
+      if (!options.includes(v)) {
+        options.push(v);
+        changed = true;
+      }
+    }
+    if (!changed) return f;
+    return { ...f, options, updatedAt: nowIso() };
+  });
+  const picklistChanged = picklists.some((p, i) => p !== state.picklists[i]);
+  const fieldsChanged = accountFields.some((f, i) => f !== state.accountFields[i]);
+  if (picklistChanged || fieldsChanged) {
+    useCrmMasterStore.setState({
+      ...(picklistChanged ? { picklists } : {}),
+      ...(fieldsChanged ? { accountFields } : {}),
+    });
+  }
+}
+
 /** Ensures newly catalogued CRM product modules appear in Master → Modules. */
 export function ensureCrmMasterModulesCatalog() {
+  ensureCrmAccountStatusesPicklist();
   const state = useCrmMasterStore.getState();
   const modules = normalizeMasterModules(state.modules);
   const moduleProviders = normalizeModuleProviders(state.moduleProviders);

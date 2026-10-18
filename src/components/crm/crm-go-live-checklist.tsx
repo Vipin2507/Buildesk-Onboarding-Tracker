@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Ban, CheckCircle2, PauseCircle, PowerOff, Rocket } from "lucide-react";
+import { Ban, CheckCircle2, PauseCircle, PowerOff, Rocket, ShieldOff } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -69,6 +69,7 @@ export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who 
   const items = useMemo(() => getApplicableGoLiveChecklist(record), [record]);
   const isLive = accountStatus === "live";
   const isSuspended = accountStatus === "suspended";
+  const isSuspendAndClose = accountStatus === "suspend_and_close";
   const isInactive = accountStatus === "inactive";
   const isEnded = isCrmAccountEnded(accountStatus);
   const ready = crmGoLiveReady(record);
@@ -81,6 +82,7 @@ export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who 
   const [confirmApprove, setConfirmApprove] = useState(false);
   const [confirmForce, setConfirmForce] = useState(false);
   const [confirmSuspended, setConfirmSuspended] = useState(false);
+  const [confirmSuspendAndClose, setConfirmSuspendAndClose] = useState(false);
   const [confirmInactive, setConfirmInactive] = useState(false);
   const [completeDialog, setCompleteDialog] = useState<{
     key: string;
@@ -184,8 +186,14 @@ export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who 
 
   function markSuspended(remarks: string) {
     setAccountStatus(companyId, "suspended", { who, statusRemarks: remarks });
-    toast.success(`${accountName} marked Suspended`);
+    toast.success(`${accountName} marked Suspend`);
     setConfirmSuspended(false);
+  }
+
+  function markSuspendAndClose(remarks: string) {
+    setAccountStatus(companyId, "suspend_and_close", { who, statusRemarks: remarks });
+    toast.success(`${accountName} marked Suspend and Close`);
+    setConfirmSuspendAndClose(false);
   }
 
   function markInactive(remarks: string) {
@@ -195,16 +203,26 @@ export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who 
   }
 
   const statusTone =
-    isLive ? "success" : isSuspended ? "warning" : isInactive || accountStatus === "closed" ? "danger" : ready ? "warning" : "muted";
+    isLive
+      ? "success"
+      : isSuspended
+        ? "warning"
+        : isSuspendAndClose || isInactive || accountStatus === "closed"
+          ? "danger"
+          : ready
+            ? "warning"
+            : "muted";
   const statusLabel = isLive
     ? "Live"
     : isSuspended
-      ? "Suspended"
-      : isInactive
-        ? "Inactive"
-        : ready
-          ? "Ready"
-          : crmAccountStatusLabel(accountStatus);
+      ? "Suspend"
+      : isSuspendAndClose
+        ? "Suspend and Close"
+        : isInactive
+          ? "Inactive"
+          : ready
+            ? "Ready"
+            : crmAccountStatusLabel(accountStatus);
 
   return (
     <div className="space-y-2.5">
@@ -223,12 +241,14 @@ export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who 
             {isLive
               ? "This account is already live."
               : isSuspended
-                ? "This account is suspended — portal access and onboarding are paused."
-                : isInactive
-                  ? "This account is inactive — it is no longer in active onboarding."
-                  : ready
-                    ? "All checklist items are done — approve go-live, or force-complete the account."
-                    : "Finish verification items, or use Go Live & Complete to finish the account directly."}
+                ? "This account is on Suspend (hold) — not classified as lost."
+                : isSuspendAndClose
+                  ? "This account is Suspend and Close — value is Sales Lost or Customer Lost in Payments."
+                  : isInactive
+                    ? "This account is inactive — it is no longer in active onboarding."
+                    : ready
+                      ? "All checklist items are done — approve go-live, or force-complete the account."
+                      : "Finish verification items, or use Go Live & Complete to finish the account directly."}
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -271,13 +291,23 @@ export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who 
             onClick={() => setConfirmSuspended(true)}
           >
             <PauseCircle className="h-3.5 w-3.5" />
-            {isSuspended ? "Suspended" : "Mark Suspended"}
+            {isSuspended ? "Suspend" : "Mark Suspend"}
           </Button>
           <Button
             size="sm"
             variant="outline"
             className="h-8 gap-1 border-destructive/40 text-xs text-destructive hover:bg-destructive/10"
-            disabled={isInactive}
+            disabled={isSuspendAndClose || isInactive}
+            onClick={() => setConfirmSuspendAndClose(true)}
+          >
+            <ShieldOff className="h-3.5 w-3.5" />
+            {isSuspendAndClose ? "Already Suspend and Close" : "Suspend and Close"}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 gap-1 border-destructive/40 text-xs text-destructive hover:bg-destructive/10"
+            disabled={isInactive || isSuspendAndClose}
             onClick={() => setConfirmInactive(true)}
           >
             <PowerOff className="h-3.5 w-3.5" />
@@ -603,11 +633,21 @@ export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who 
       <CrmAccountStatusRemarksModal
         open={confirmSuspended}
         onOpenChange={setConfirmSuspended}
-        title="Mark account suspended?"
-        description={`${accountName} will be marked Suspended. Use when the client is temporarily paused (including after go-live) but may resume later.`}
-        confirmLabel="Mark Suspended"
+        title="Mark account Suspend?"
+        description={`${accountName} will be marked Suspend (on hold). This does not classify the account as lost.`}
+        confirmLabel="Mark Suspend"
         remarksPlaceholder="Why is this account being suspended?"
         onConfirm={markSuspended}
+      />
+
+      <CrmAccountStatusRemarksModal
+        open={confirmSuspendAndClose}
+        onOpenChange={setConfirmSuspendAndClose}
+        title="Mark Suspend and Close?"
+        description={`${accountName} will be suspended and closed. First-time accounts record remaining value as Sales Lost; renewal accounts as Customer Lost.`}
+        confirmLabel="Mark Suspend and Close"
+        remarksPlaceholder="Why is this account being suspended and closed?"
+        onConfirm={markSuspendAndClose}
       />
 
       <CrmAccountStatusRemarksModal

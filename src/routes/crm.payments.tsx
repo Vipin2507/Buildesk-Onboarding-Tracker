@@ -37,6 +37,7 @@ import {
   crmRenewalWindowLabel,
   isCrmAccountInRenewalWindow,
 } from "@/lib/crm-account-renewal";
+import { crmAccountStatusLabel } from "@/lib/crm-account-status";
 import {
   crmPaymentsSearchSchema,
   crmPaymentsSearchToApiFilters,
@@ -61,7 +62,11 @@ const STATUS_TABS: { id: CrmPaymentStatusTabId; label: string }[] = [
   { id: "upcoming", label: "Later" },
   { id: "fully_paid", label: "Fully paid" },
   { id: "renewal", label: "Renewal payments" },
-  { id: "lost", label: "Lost" },
+  { id: "suspended", label: "Suspend" },
+  { id: "suspend_and_close", label: "Suspend and Close" },
+  { id: "sales_lost", label: "Sales Lost" },
+  { id: "customer_lost", label: "Customer Lost" },
+  { id: "lost", label: "All lost" },
 ];
 
 const STATUS_TAB_TONE: Record<CrmPaymentStatusTabId, string> = {
@@ -74,6 +79,10 @@ const STATUS_TAB_TONE: Record<CrmPaymentStatusTabId, string> = {
   upcoming: "text-muted-foreground",
   fully_paid: "text-emerald-600 dark:text-emerald-400",
   renewal: "text-violet-600 dark:text-violet-400",
+  suspended: "text-amber-700 dark:text-amber-400",
+  suspend_and_close: "text-destructive",
+  sales_lost: "text-rose-700 dark:text-rose-400",
+  customer_lost: "text-fuchsia-700 dark:text-fuchsia-400",
   lost: "text-muted-foreground",
 };
 
@@ -367,55 +376,99 @@ function CrmPaymentsPage() {
         </div>
 
         {summary ? (
-          <div className="mt-2 overflow-x-auto rounded-lg border border-border bg-card">
-            <div className="flex min-w-[880px] divide-x divide-border">
-              {[
-                { label: "Contract value", value: formatInr(summary.totalContractValue) },
-                { label: "Received", value: formatInr(summary.totalReceived) },
-                { label: "Pending", value: formatInr(summary.totalPending) },
-                {
-                  label: "Overdue",
-                  value: formatInr(summary.totalOverdueAmount),
-                  sub: `${summary.overdueAccountCount} accounts`,
-                  tone: "text-destructive",
-                },
-                {
-                  label: "Due this week",
-                  value: formatInr(summary.dueThisWeekAmount),
-                  sub: `${summary.dueThisWeekCount} accounts`,
-                  tone: "text-amber-600 dark:text-amber-400",
-                },
-                {
-                  label: "Due this month",
-                  value: formatInr(summary.dueThisMonthAmount),
-                  sub: `${summary.dueThisMonthCount} accounts`,
-                  tone: "text-orange-600 dark:text-orange-400",
-                },
-                {
-                  label: "Due in 45 days",
-                  value: formatInr(summary.dueIn45DaysAmount),
-                  sub: `${summary.dueIn45DaysCount} accounts`,
-                  tone: "text-primary",
-                },
-                {
-                  label: "Collection rate",
-                  value: `${summary.collectionRatePercent}%`,
-                },
-              ].map((item) => (
-                <div key={item.label} className="min-w-0 flex-1 px-3 py-2">
-                  <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                    {item.label}
+          <div className="mt-2 space-y-2">
+            <div className="overflow-x-auto rounded-lg border border-border bg-card">
+              <div className="flex min-w-[880px] divide-x divide-border">
+                {[
+                  { label: "Contract value", value: formatInr(summary.totalContractValue) },
+                  { label: "Received", value: formatInr(summary.totalReceived) },
+                  { label: "Pending", value: formatInr(summary.totalPending) },
+                  {
+                    label: "Overdue",
+                    value: formatInr(summary.totalOverdueAmount),
+                    sub: `${summary.overdueAccountCount} accounts`,
+                    tone: "text-destructive",
+                  },
+                  {
+                    label: "Due this week",
+                    value: formatInr(summary.dueThisWeekAmount),
+                    sub: `${summary.dueThisWeekCount} accounts`,
+                    tone: "text-amber-600 dark:text-amber-400",
+                  },
+                  {
+                    label: "Due this month",
+                    value: formatInr(summary.dueThisMonthAmount),
+                    sub: `${summary.dueThisMonthCount} accounts`,
+                    tone: "text-orange-600 dark:text-orange-400",
+                  },
+                  {
+                    label: "Due in 45 days",
+                    value: formatInr(summary.dueIn45DaysAmount),
+                    sub: `${summary.dueIn45DaysCount} accounts`,
+                    tone: "text-primary",
+                  },
+                  {
+                    label: "Collection rate",
+                    value: `${summary.collectionRatePercent}%`,
+                  },
+                ].map((item) => (
+                  <div key={item.label} className="min-w-0 flex-1 px-3 py-2">
+                    <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                      {item.label}
+                    </div>
+                    <div className={cn("mt-0.5 text-sm font-semibold tabular-nums", item.tone)}>
+                      {item.value}
+                    </div>
+                    {item.sub ? (
+                      <div className={cn("text-[10px] tabular-nums", item.tone ?? "text-muted-foreground")}>
+                        {item.sub}
+                      </div>
+                    ) : null}
                   </div>
-                  <div className={cn("mt-0.5 text-sm font-semibold tabular-nums", item.tone)}>
-                    {item.value}
-                  </div>
-                  {item.sub ? (
-                    <div className={cn("text-[10px] tabular-nums", item.tone ?? "text-muted-foreground")}>
+                ))}
+              </div>
+            </div>
+            <div className="overflow-x-auto rounded-lg border border-border bg-card">
+              <div className="flex min-w-[640px] divide-x divide-border">
+                {[
+                  {
+                    label: "Suspend",
+                    value: String(summary.suspendedCount ?? 0),
+                    sub: "On hold — not lost",
+                    tone: "text-amber-700 dark:text-amber-400",
+                  },
+                  {
+                    label: "Suspend and Close",
+                    value: String(summary.suspendAndCloseCount ?? 0),
+                    sub: "Closed after suspend",
+                    tone: "text-destructive",
+                  },
+                  {
+                    label: "Sales Lost",
+                    value: formatInr(summary.salesLostAmount ?? 0),
+                    sub: `${summary.salesLostCount ?? 0} first-time`,
+                    tone: "text-rose-700 dark:text-rose-400",
+                  },
+                  {
+                    label: "Customer Lost",
+                    value: formatInr(summary.customerLostAmount ?? 0),
+                    sub: `${summary.customerLostCount ?? 0} renewal`,
+                    tone: "text-fuchsia-700 dark:text-fuchsia-400",
+                  },
+                ].map((item) => (
+                  <div key={item.label} className="min-w-0 flex-1 px-3 py-2">
+                    <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                      Account status · {item.label}
+                    </div>
+                    <div className={cn("mt-0.5 text-sm font-semibold tabular-nums", item.tone)}>
+                      {item.value}
+                    </div>
+                    <div className={cn("text-[10px] tabular-nums", item.tone)}>
                       {item.sub}
                     </div>
-                  ) : null}
-                </div>
-              ))}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         ) : null}
@@ -661,6 +714,27 @@ function CrmPaymentsPage() {
                     >
                       {r.accountName}
                     </Link>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                      <span className="text-[10px] text-muted-foreground">
+                        {crmAccountStatusLabel(r.accountStatus)}
+                      </span>
+                      {r.lostKind ? (
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "h-5 px-1.5 text-[9px] font-medium",
+                            r.lostKind === "sales_lost"
+                              ? "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-400"
+                              : "border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400",
+                          )}
+                        >
+                          {r.lostKind === "sales_lost" ? "Sales Lost" : "Customer Lost"}
+                          {typeof r.lostValue === "number"
+                            ? ` · ${formatInr(r.lostValue)}`
+                            : ""}
+                        </Badge>
+                      ) : null}
+                    </div>
                     {crmRenewalWindowLabel({ endDate: r.renewalDate }) ? (
                       <div className="mt-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
                         {crmRenewalWindowLabel({ endDate: r.renewalDate })}

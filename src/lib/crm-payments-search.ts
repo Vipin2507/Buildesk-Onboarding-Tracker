@@ -12,6 +12,10 @@ export const CRM_PAYMENT_STATUS_TAB_IDS = [
   "upcoming",
   "fully_paid",
   "renewal",
+  "suspended",
+  "suspend_and_close",
+  "sales_lost",
+  "customer_lost",
   "lost",
 ] as const;
 

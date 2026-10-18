@@ -80,22 +80,64 @@ export function endOfMonthYmd(ymd: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** List filter tabs — includes lost + due-window filters beyond row PaymentStatus. */
+/** List filter tabs — includes lost + account-status filters beyond row PaymentStatus. */
 export type PaymentListFilterStatus =
   | PaymentStatus
   | "all"
   | "due_this_month"
   | "due_in_45_days"
   | "due_in_90_days"
-  | "lost";
+  | "lost"
+  | "suspended"
+  | "suspend_and_close"
+  | "sales_lost"
+  | "customer_lost";
 
+export type CrmPaymentsLostKind = "sales_lost" | "customer_lost";
+
+/** Legacy inactive + Suspend and Close — out of active collection. */
 export function isInactiveCrmAccountForPayments(accountStatus: string): boolean {
-  return accountStatus === "inactive";
+  return accountStatus === "inactive" || accountStatus === "suspend_and_close";
+}
+
+export function isSuspendedCrmAccountForPayments(accountStatus: string): boolean {
+  return accountStatus === "suspended";
+}
+
+/**
+ * Suspend and Close / Inactive outcome for Payments:
+ * - first-time → Sales Lost (remaining deal value)
+ * - renewal → Customer Lost (remaining, or original deal when remaining is 0)
+ */
+export function classifyCrmPaymentsLostOutcome(row: {
+  accountStatus: string;
+  paymentStatus?: PaymentStatus;
+  renewalAmount?: number;
+  paymentReceived?: number;
+  totalDealValue?: number;
+  pendingAmount?: number;
+  paymentCycleBaseline?: number;
+}): { kind: CrmPaymentsLostKind; value: number } | null {
+  if (!isInactiveCrmAccountForPayments(row.accountStatus)) return null;
+
+  const pending = roundMoney(Math.max(0, row.pendingAmount ?? 0));
+  const deal = roundMoney(Math.max(0, row.totalDealValue ?? 0));
+  const isRenewal =
+    isRenewalPaymentAccount(row) ||
+    (typeof row.paymentCycleBaseline === "number" && row.paymentCycleBaseline > 0.01);
+
+  if (isRenewal) {
+    return {
+      kind: "customer_lost",
+      value: pending > 0.01 ? pending : deal,
+    };
+  }
+  return { kind: "sales_lost", value: pending };
 }
 
 /** Accounts with collections beyond deal value (renewal payments). */
 export function isRenewalPaymentAccount(row: {
-  paymentStatus: PaymentStatus;
+  paymentStatus?: PaymentStatus;
   renewalAmount?: number;
   paymentReceived?: number;
   totalDealValue?: number;
@@ -152,7 +194,15 @@ export function matchesPaymentDueFilter(
   todayYmd?: string,
 ): boolean {
   if (filter === "all") return true;
-  if (filter === "lost") return false;
+  if (
+    filter === "lost" ||
+    filter === "suspended" ||
+    filter === "suspend_and_close" ||
+    filter === "sales_lost" ||
+    filter === "customer_lost"
+  ) {
+    return false;
+  }
 
   const today = (todayYmd ?? new Date().toISOString()).slice(0, 10);
   const due = row.nextDueInstallment?.dueDate.slice(0, 10);

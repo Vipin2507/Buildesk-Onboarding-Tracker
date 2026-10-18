@@ -65,7 +65,14 @@ export function CrmAccountStatusRemarksNote({
   remarks?: string;
   className?: string;
 }) {
-  if ((status !== "suspended" && status !== "inactive") || !remarks?.trim()) return null;
+  if (
+    (status !== "suspended" &&
+      status !== "suspend_and_close" &&
+      status !== "inactive") ||
+    !remarks?.trim()
+  ) {
+    return null;
+  }
   return (
     <p className={cn("text-[10px] leading-snug text-muted-foreground", className)}>
       {remarks.trim()}
