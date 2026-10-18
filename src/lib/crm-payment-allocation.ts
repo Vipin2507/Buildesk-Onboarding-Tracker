@@ -103,7 +103,7 @@ export function isSuspendedCrmAccountForPayments(accountStatus: string): boolean
 }
 
 /**
- * Suspend and Close / Inactive outcome for Payments:
+ * Suspend and Close outcome for Payments:
  * - first-time → Sales Lost (remaining deal value)
  * - renewal → Customer Lost (remaining, or original deal when remaining is 0)
  */
@@ -116,7 +116,7 @@ export function classifyCrmPaymentsLostOutcome(row: {
   pendingAmount?: number;
   paymentCycleBaseline?: number;
 }): { kind: CrmPaymentsLostKind; value: number } | null {
-  if (!isInactiveCrmAccountForPayments(row.accountStatus)) return null;
+  if (row.accountStatus !== "suspend_and_close") return null;
 
   const pending = roundMoney(Math.max(0, row.pendingAmount ?? 0));
   const deal = roundMoney(Math.max(0, row.totalDealValue ?? 0));

@@ -541,7 +541,10 @@ function applyPaymentsStatusFilter(
   if (status === "suspended") {
     return items.filter((row) => isSuspendedCrmAccountForPayments(row.accountStatus));
   }
-  if (status === "suspend_and_close" || status === "lost") {
+  if (status === "suspend_and_close") {
+    return items.filter((row) => row.accountStatus === "suspend_and_close");
+  }
+  if (status === "lost") {
     return items.filter((row) => isInactiveCrmAccountForPayments(row.accountStatus));
   }
 
@@ -776,8 +779,8 @@ export function summarizePaymentList(
   const suspendedRows = countScope.filter((row) =>
     isSuspendedCrmAccountForPayments(row.accountStatus),
   );
-  const suspendAndCloseRows = countScope.filter((row) =>
-    isInactiveCrmAccountForPayments(row.accountStatus),
+  const suspendAndCloseRows = countScope.filter(
+    (row) => row.accountStatus === "suspend_and_close",
   );
   const salesLostRows = suspendAndCloseRows.filter(
     (row) => classifyCrmPaymentsLostOutcome(row)?.kind === "sales_lost",

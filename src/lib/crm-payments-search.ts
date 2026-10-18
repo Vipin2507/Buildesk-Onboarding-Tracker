@@ -18,12 +18,13 @@ export const CRM_PAYMENT_STATUS_TAB_IDS = [
 
 export type CrmPaymentStatusTabId = (typeof CRM_PAYMENT_STATUS_TAB_IDS)[number];
 
-/** Legacy Sales/Customer Lost filters map onto Suspend and Close. */
+/** Legacy Sales/Customer Lost filters map onto Suspend and Close (not inactive). */
 function normalizePaymentStatusTab(value: unknown): CrmPaymentStatusTabId | undefined {
   if (typeof value !== "string") return undefined;
-  if (value === "sales_lost" || value === "customer_lost" || value === "lost") {
+  if (value === "sales_lost" || value === "customer_lost") {
     return "suspend_and_close";
   }
+  if (value === "lost") return undefined;
   if (CRM_PAYMENT_STATUS_TAB_IDS.includes(value as CrmPaymentStatusTabId)) {
     return value as CrmPaymentStatusTabId;
   }
