@@ -541,21 +541,8 @@ function applyPaymentsStatusFilter(
   if (status === "suspended") {
     return items.filter((row) => isSuspendedCrmAccountForPayments(row.accountStatus));
   }
-  if (status === "suspend_and_close") {
-    return items.filter((row) => row.accountStatus === "suspend_and_close");
-  }
-  if (status === "lost") {
+  if (status === "suspend_and_close" || status === "lost") {
     return items.filter((row) => isInactiveCrmAccountForPayments(row.accountStatus));
-  }
-  if (status === "sales_lost") {
-    return items.filter(
-      (row) => classifyCrmPaymentsLostOutcome(row)?.kind === "sales_lost",
-    );
-  }
-  if (status === "customer_lost") {
-    return items.filter(
-      (row) => classifyCrmPaymentsLostOutcome(row)?.kind === "customer_lost",
-    );
   }
 
   const active = items.filter((row) => !isInactiveCrmAccountForPayments(row.accountStatus));
@@ -789,13 +776,13 @@ export function summarizePaymentList(
   const suspendedRows = countScope.filter((row) =>
     isSuspendedCrmAccountForPayments(row.accountStatus),
   );
-  const suspendAndCloseRows = countScope.filter(
-    (row) => row.accountStatus === "suspend_and_close",
+  const suspendAndCloseRows = countScope.filter((row) =>
+    isInactiveCrmAccountForPayments(row.accountStatus),
   );
-  const salesLostRows = countScope.filter(
+  const salesLostRows = suspendAndCloseRows.filter(
     (row) => classifyCrmPaymentsLostOutcome(row)?.kind === "sales_lost",
   );
-  const customerLostRows = countScope.filter(
+  const customerLostRows = suspendAndCloseRows.filter(
     (row) => classifyCrmPaymentsLostOutcome(row)?.kind === "customer_lost",
   );
   const salesLostAmount = roundMoney(
@@ -838,8 +825,6 @@ export function summarizePaymentList(
       renewal: countByStatusTab(countScope, "renewal", today),
       suspended: countByStatusTab(countScope, "suspended", today),
       suspend_and_close: countByStatusTab(countScope, "suspend_and_close", today),
-      sales_lost: countByStatusTab(countScope, "sales_lost", today),
-      customer_lost: countByStatusTab(countScope, "customer_lost", today),
     },
   };
 }

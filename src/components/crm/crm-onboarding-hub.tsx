@@ -36,6 +36,7 @@ import { CrmAccountModulesOverview } from "@/components/crm/crm-account-modules-
 import { CrmAccountModulesTab } from "@/components/crm/crm-account-modules-tab";
 import { CrmAccountStageSelect } from "@/components/crm/crm-account-stage-select";
 import { CrmAccountPortalPanel } from "@/components/crm/crm-account-portal-panel";
+import { CrmAccountGoLiveActions } from "@/components/crm/crm-account-go-live-actions";
 import { CrmAccountInstallmentSchedule } from "@/components/crm/crm-account-installment-schedule";
 import { CrmAccountTasksPanel } from "@/components/crm/crm-account-tasks-panel";
 import { CrmGoLiveChecklist } from "@/components/crm/crm-go-live-checklist";
@@ -262,6 +263,13 @@ export function CrmOnboardingHub({
                 </Button>
               </>
             ) : null}
+            <CrmAccountGoLiveActions
+              companyId={accountId}
+              accountName={accountName}
+              accountStatus={account.status}
+              who={currentUser?.name}
+              onOpenGoLiveTab={() => setTab("golive")}
+            />
           </div>
         }
       />

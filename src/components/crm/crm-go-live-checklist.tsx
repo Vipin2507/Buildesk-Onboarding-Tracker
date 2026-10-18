@@ -287,21 +287,21 @@ export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who 
             size="sm"
             variant="outline"
             className="h-8 gap-1 border-warning/50 text-xs text-warning-foreground hover:bg-warning/10"
-            disabled={isEnded}
+            disabled={isSuspended || isSuspendAndClose || isInactive || accountStatus === "closed"}
             onClick={() => setConfirmSuspended(true)}
           >
             <PauseCircle className="h-3.5 w-3.5" />
-            {isSuspended ? "Suspend" : "Mark Suspend"}
+            {isSuspended ? "Already Suspend" : "Suspend"}
           </Button>
           <Button
             size="sm"
             variant="outline"
             className="h-8 gap-1 border-destructive/40 text-xs text-destructive hover:bg-destructive/10"
-            disabled={isSuspendAndClose || isInactive}
+            disabled={isSuspendAndClose || isInactive || accountStatus === "closed"}
             onClick={() => setConfirmSuspendAndClose(true)}
           >
             <ShieldOff className="h-3.5 w-3.5" />
-            {isSuspendAndClose ? "Already Suspend and Close" : "Suspend and Close"}
+            {isSuspendAndClose ? "Already Suspend and Close" : "Suspend and Close (Lost)"}
           </Button>
           <Button
             size="sm"

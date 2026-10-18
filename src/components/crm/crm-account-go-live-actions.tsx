@@ -144,7 +144,37 @@ export function CrmAccountGoLiveActions({
             </Button>
           )}
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenuContent
+          align="end"
+          className="max-h-[min(70vh,28rem)] w-60 overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <DropdownMenuLabel className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            Account status
+          </DropdownMenuLabel>
+          <DropdownMenuItem
+            disabled={isSuspended || isSuspendAndClose || isInactive || accountStatus === "closed"}
+            onClick={() => setConfirmSuspended(true)}
+          >
+            <PauseCircle className="mr-2 h-4 w-4 text-warning-foreground" />
+            {isSuspended ? "Already Suspend" : "Suspend"}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={isSuspendAndClose || isInactive || accountStatus === "closed"}
+            onClick={() => setConfirmSuspendAndClose(true)}
+          >
+            <ShieldOff className="mr-2 h-4 w-4 text-destructive" />
+            {isSuspendAndClose ? "Already Suspend and Close" : "Suspend and Close (Lost)"}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={isInactive || isSuspendAndClose || accountStatus === "closed"}
+            onClick={() => setConfirmInactive(true)}
+          >
+            <PowerOff className="mr-2 h-4 w-4 text-destructive" />
+            {isInactive ? "Already Inactive" : "Mark Inactive"}
+          </DropdownMenuItem>
+
+          <DropdownMenuSeparator />
           <DropdownMenuLabel className="text-[11px] uppercase tracking-wide text-muted-foreground">
             Go-Live
           </DropdownMenuLabel>
@@ -174,32 +204,6 @@ export function CrmAccountGoLiveActions({
           >
             <Rocket className="mr-2 h-4 w-4 text-success" />
             Go Live & Complete
-          </DropdownMenuItem>
-
-          <DropdownMenuSeparator />
-          <DropdownMenuLabel className="text-[11px] uppercase tracking-wide text-muted-foreground">
-            Account status
-          </DropdownMenuLabel>
-          <DropdownMenuItem
-            disabled={isEnded}
-            onClick={() => setConfirmSuspended(true)}
-          >
-            <PauseCircle className="mr-2 h-4 w-4 text-warning-foreground" />
-            {isSuspended ? "Already Suspend" : "Mark Suspend"}
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            disabled={isSuspendAndClose || isInactive}
-            onClick={() => setConfirmSuspendAndClose(true)}
-          >
-            <ShieldOff className="mr-2 h-4 w-4 text-destructive" />
-            {isSuspendAndClose ? "Already Suspend and Close" : "Mark Suspend and Close"}
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            disabled={isInactive || isSuspendAndClose}
-            onClick={() => setConfirmInactive(true)}
-          >
-            <PowerOff className="mr-2 h-4 w-4 text-destructive" />
-            {isInactive ? "Already Inactive" : "Mark Inactive"}
           </DropdownMenuItem>
 
           {onCreateQuery || onEdit || onDelete ? (

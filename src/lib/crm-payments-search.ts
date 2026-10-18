@@ -14,15 +14,24 @@ export const CRM_PAYMENT_STATUS_TAB_IDS = [
   "renewal",
   "suspended",
   "suspend_and_close",
-  "sales_lost",
-  "customer_lost",
-  "lost",
 ] as const;
 
 export type CrmPaymentStatusTabId = (typeof CRM_PAYMENT_STATUS_TAB_IDS)[number];
 
+/** Legacy Sales/Customer Lost filters map onto Suspend and Close. */
+function normalizePaymentStatusTab(value: unknown): CrmPaymentStatusTabId | undefined {
+  if (typeof value !== "string") return undefined;
+  if (value === "sales_lost" || value === "customer_lost" || value === "lost") {
+    return "suspend_and_close";
+  }
+  if (CRM_PAYMENT_STATUS_TAB_IDS.includes(value as CrmPaymentStatusTabId)) {
+    return value as CrmPaymentStatusTabId;
+  }
+  return undefined;
+}
+
 export const crmPaymentsSearchSchema = z.object({
-  status: z.enum(CRM_PAYMENT_STATUS_TAB_IDS).optional(),
+  status: z.preprocess(normalizePaymentStatusTab, z.enum(CRM_PAYMENT_STATUS_TAB_IDS).optional()),
   salesManager: z.string().optional(),
   supportManager1: z.string().optional(),
   supportManager2: z.string().optional(),
@@ -38,13 +47,7 @@ export const crmPaymentsSearchSchema = z.object({
 export type CrmPaymentsSearch = z.infer<typeof crmPaymentsSearchSchema>;
 
 export function parseCrmPaymentStatusTab(value: unknown): CrmPaymentStatusTabId {
-  if (
-    typeof value === "string" &&
-    CRM_PAYMENT_STATUS_TAB_IDS.includes(value as CrmPaymentStatusTabId)
-  ) {
-    return value as CrmPaymentStatusTabId;
-  }
-  return "all";
+  return normalizePaymentStatusTab(value) ?? "all";
 }
 
 export function crmPaymentsSearchToApiFilters(search: CrmPaymentsSearch) {

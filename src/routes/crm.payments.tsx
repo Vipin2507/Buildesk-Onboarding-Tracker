@@ -64,9 +64,6 @@ const STATUS_TABS: { id: CrmPaymentStatusTabId; label: string }[] = [
   { id: "renewal", label: "Renewal payments" },
   { id: "suspended", label: "Suspend" },
   { id: "suspend_and_close", label: "Suspend and Close" },
-  { id: "sales_lost", label: "Sales Lost" },
-  { id: "customer_lost", label: "Customer Lost" },
-  { id: "lost", label: "All lost" },
 ];
 
 const STATUS_TAB_TONE: Record<CrmPaymentStatusTabId, string> = {
@@ -81,9 +78,6 @@ const STATUS_TAB_TONE: Record<CrmPaymentStatusTabId, string> = {
   renewal: "text-violet-600 dark:text-violet-400",
   suspended: "text-amber-700 dark:text-amber-400",
   suspend_and_close: "text-destructive",
-  sales_lost: "text-rose-700 dark:text-rose-400",
-  customer_lost: "text-fuchsia-700 dark:text-fuchsia-400",
-  lost: "text-muted-foreground",
 };
 
 type ManagerField = "salesManagerName" | "supportManager1" | "supportManager2";
@@ -429,45 +423,42 @@ function CrmPaymentsPage() {
               </div>
             </div>
             <div className="overflow-x-auto rounded-lg border border-border bg-card">
-              <div className="flex min-w-[640px] divide-x divide-border">
-                {[
-                  {
-                    label: "Suspend",
-                    value: String(summary.suspendedCount ?? 0),
-                    sub: "On hold — not lost",
-                    tone: "text-amber-700 dark:text-amber-400",
-                  },
-                  {
-                    label: "Suspend and Close",
-                    value: String(summary.suspendAndCloseCount ?? 0),
-                    sub: "Closed after suspend",
-                    tone: "text-destructive",
-                  },
-                  {
-                    label: "Sales Lost",
-                    value: formatInr(summary.salesLostAmount ?? 0),
-                    sub: `${summary.salesLostCount ?? 0} first-time`,
-                    tone: "text-rose-700 dark:text-rose-400",
-                  },
-                  {
-                    label: "Customer Lost",
-                    value: formatInr(summary.customerLostAmount ?? 0),
-                    sub: `${summary.customerLostCount ?? 0} renewal`,
-                    tone: "text-fuchsia-700 dark:text-fuchsia-400",
-                  },
-                ].map((item) => (
-                  <div key={item.label} className="min-w-0 flex-1 px-3 py-2">
-                    <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                      Account status · {item.label}
+              <div className="flex min-w-[480px] divide-x divide-border">
+                <div className="min-w-0 flex-1 px-3 py-2">
+                  <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Account status · Suspend
+                  </div>
+                  <div className="mt-0.5 text-sm font-semibold tabular-nums text-amber-700 dark:text-amber-400">
+                    {summary.suspendedCount ?? 0}
+                  </div>
+                  <div className="text-[10px] tabular-nums text-amber-700 dark:text-amber-400">
+                    On hold — not lost
+                  </div>
+                </div>
+                <div className="min-w-0 flex-1 px-3 py-2">
+                  <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Account status · Suspend and Close
+                  </div>
+                  <div className="mt-0.5 text-sm font-semibold tabular-nums text-destructive">
+                    {summary.suspendAndCloseCount ?? 0}
+                  </div>
+                  <div className="mt-0.5 space-y-0.5 text-[10px] tabular-nums">
+                    <div className="text-rose-700 dark:text-rose-400">
+                      Sales Lost {formatInr(summary.salesLostAmount ?? 0)}
+                      <span className="text-muted-foreground">
+                        {" "}
+                        · {summary.salesLostCount ?? 0} first-time
+                      </span>
                     </div>
-                    <div className={cn("mt-0.5 text-sm font-semibold tabular-nums", item.tone)}>
-                      {item.value}
-                    </div>
-                    <div className={cn("text-[10px] tabular-nums", item.tone)}>
-                      {item.sub}
+                    <div className="text-fuchsia-700 dark:text-fuchsia-400">
+                      Customer Lost {formatInr(summary.customerLostAmount ?? 0)}
+                      <span className="text-muted-foreground">
+                        {" "}
+                        · {summary.customerLostCount ?? 0} renewal
+                      </span>
                     </div>
                   </div>
-                ))}
+                </div>
               </div>
             </div>
           </div>

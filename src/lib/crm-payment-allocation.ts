@@ -89,9 +89,7 @@ export type PaymentListFilterStatus =
   | "due_in_90_days"
   | "lost"
   | "suspended"
-  | "suspend_and_close"
-  | "sales_lost"
-  | "customer_lost";
+  | "suspend_and_close";
 
 export type CrmPaymentsLostKind = "sales_lost" | "customer_lost";
 
@@ -194,13 +192,7 @@ export function matchesPaymentDueFilter(
   todayYmd?: string,
 ): boolean {
   if (filter === "all") return true;
-  if (
-    filter === "lost" ||
-    filter === "suspended" ||
-    filter === "suspend_and_close" ||
-    filter === "sales_lost" ||
-    filter === "customer_lost"
-  ) {
+  if (filter === "lost" || filter === "suspended" || filter === "suspend_and_close") {
     return false;
   }
 
