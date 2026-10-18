@@ -89,13 +89,18 @@ export type PaymentListFilterStatus =
   | "due_in_90_days"
   | "lost"
   | "suspended"
-  | "suspend_and_close";
+  | "suspend_and_close"
+  | "inactive";
 
 export type CrmPaymentsLostKind = "sales_lost" | "customer_lost";
 
 /** Legacy inactive + Suspend and Close — out of active collection. */
 export function isInactiveCrmAccountForPayments(accountStatus: string): boolean {
   return accountStatus === "inactive" || accountStatus === "suspend_and_close";
+}
+
+export function isLegacyInactiveCrmAccountForPayments(accountStatus: string): boolean {
+  return accountStatus === "inactive";
 }
 
 export function isSuspendedCrmAccountForPayments(accountStatus: string): boolean {
@@ -192,7 +197,12 @@ export function matchesPaymentDueFilter(
   todayYmd?: string,
 ): boolean {
   if (filter === "all") return true;
-  if (filter === "lost" || filter === "suspended" || filter === "suspend_and_close") {
+  if (
+    filter === "lost" ||
+    filter === "suspended" ||
+    filter === "suspend_and_close" ||
+    filter === "inactive"
+  ) {
     return false;
   }
 

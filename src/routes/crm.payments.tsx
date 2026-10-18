@@ -64,6 +64,7 @@ const STATUS_TABS: { id: CrmPaymentStatusTabId; label: string }[] = [
   { id: "renewal", label: "Renewal payments" },
   { id: "suspended", label: "Suspend" },
   { id: "suspend_and_close", label: "Suspend and Close" },
+  { id: "inactive", label: "Inactive" },
 ];
 
 const STATUS_TAB_TONE: Record<CrmPaymentStatusTabId, string> = {
@@ -78,6 +79,7 @@ const STATUS_TAB_TONE: Record<CrmPaymentStatusTabId, string> = {
   renewal: "text-violet-600 dark:text-violet-400",
   suspended: "text-amber-700 dark:text-amber-400",
   suspend_and_close: "text-destructive",
+  inactive: "text-muted-foreground",
 };
 
 type ManagerField = "salesManagerName" | "supportManager1" | "supportManager2";

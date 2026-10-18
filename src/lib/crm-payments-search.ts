@@ -14,17 +14,18 @@ export const CRM_PAYMENT_STATUS_TAB_IDS = [
   "renewal",
   "suspended",
   "suspend_and_close",
+  "inactive",
 ] as const;
 
 export type CrmPaymentStatusTabId = (typeof CRM_PAYMENT_STATUS_TAB_IDS)[number];
 
-/** Legacy Sales/Customer Lost filters map onto Suspend and Close (not inactive). */
+/** Legacy Sales/Customer Lost → Suspend and Close; All lost → Inactive. */
 function normalizePaymentStatusTab(value: unknown): CrmPaymentStatusTabId | undefined {
   if (typeof value !== "string") return undefined;
   if (value === "sales_lost" || value === "customer_lost") {
     return "suspend_and_close";
   }
-  if (value === "lost") return undefined;
+  if (value === "lost") return "inactive";
   if (CRM_PAYMENT_STATUS_TAB_IDS.includes(value as CrmPaymentStatusTabId)) {
     return value as CrmPaymentStatusTabId;
   }

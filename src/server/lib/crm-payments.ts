@@ -6,6 +6,7 @@ import {
   classifyPaymentTransactionRenewal,
   classifyCrmPaymentsLostOutcome,
   isInactiveCrmAccountForPayments,
+  isLegacyInactiveCrmAccountForPayments,
   isSuspendedCrmAccountForPayments,
   isRenewalPaymentAccount,
   matchesPaymentDueFilter,
@@ -544,6 +545,9 @@ function applyPaymentsStatusFilter(
   if (status === "suspend_and_close") {
     return items.filter((row) => row.accountStatus === "suspend_and_close");
   }
+  if (status === "inactive") {
+    return items.filter((row) => isLegacyInactiveCrmAccountForPayments(row.accountStatus));
+  }
   if (status === "lost") {
     return items.filter((row) => isInactiveCrmAccountForPayments(row.accountStatus));
   }
@@ -782,6 +786,9 @@ export function summarizePaymentList(
   const suspendAndCloseRows = countScope.filter(
     (row) => row.accountStatus === "suspend_and_close",
   );
+  const inactiveRows = countScope.filter((row) =>
+    isLegacyInactiveCrmAccountForPayments(row.accountStatus),
+  );
   const salesLostRows = suspendAndCloseRows.filter(
     (row) => classifyCrmPaymentsLostOutcome(row)?.kind === "sales_lost",
   );
@@ -810,6 +817,7 @@ export function summarizePaymentList(
     collectionRatePercent,
     suspendedCount: suspendedRows.length,
     suspendAndCloseCount: suspendAndCloseRows.length,
+    inactiveCount: inactiveRows.length,
     salesLostCount: salesLostRows.length,
     salesLostAmount,
     customerLostCount: customerLostRows.length,
@@ -828,6 +836,7 @@ export function summarizePaymentList(
       renewal: countByStatusTab(countScope, "renewal", today),
       suspended: countByStatusTab(countScope, "suspended", today),
       suspend_and_close: countByStatusTab(countScope, "suspend_and_close", today),
+      inactive: countByStatusTab(countScope, "inactive", today),
     },
   };
 }

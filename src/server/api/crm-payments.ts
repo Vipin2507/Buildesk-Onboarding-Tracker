@@ -50,6 +50,7 @@ const paymentStatusSchema = z.enum([
   "renewal",
   "suspended",
   "suspend_and_close",
+  "inactive",
 ]);
 
 const listFiltersSchema = z.object({
