@@ -551,9 +551,12 @@ function applyPaymentsStatusFilter(
   if (status === "lost") {
     return items.filter((row) => isInactiveCrmAccountForPayments(row.accountStatus));
   }
+  if (status === "all") {
+    return items;
+  }
 
+  // Due / collection tabs stay on active accounts (exclude inactive + suspend and close).
   const active = items.filter((row) => !isInactiveCrmAccountForPayments(row.accountStatus));
-  if (status === "all") return active;
   if (status === "renewal") {
     return active.filter((row) => isRenewalPaymentAccount(row));
   }
