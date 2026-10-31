@@ -21,7 +21,7 @@ export function CrmAccountProductModulesPicker({ selected, onChange, compact }: 
   const items = useMemo(
     () =>
       getCrmMasterModulesList()
-        .filter((m) => m.enabled && m.kind === "core" && m.key !== "sales-crm")
+        .filter((m) => m.enabled && m.kind === "core")
         .sort((a, b) => a.order - b.order),
     [],
   );
