@@ -62,14 +62,15 @@ export function CrmAccountGoLiveActions({
   const setAccountStatus = useCrmAccountStore((s) => s.setAccountStatus);
   const completeAllGoLiveItems = useCrmOnboardingStore((s) => s.completeAllGoLiveItems);
   const updateTracker = useCrmOnboardingStore((s) => s.updateTracker);
-  const getRecord = useCrmOnboardingStore((s) => s.getByCompanyId);
+  const ensureForCompany = useCrmOnboardingStore((s) => s.ensureForCompany);
+  const record = useCrmOnboardingStore((s) => s.getByCompanyId(companyId));
 
   const isLive = accountStatus === "live";
   const isSuspended = accountStatus === "suspended";
   const isSuspendAndClose = accountStatus === "suspend_and_close";
   const isInactive = accountStatus === "inactive";
   const isEnded = isCrmAccountEnded(accountStatus);
-  const ready = crmGoLiveReady(getRecord(companyId)!);
+  const ready = crmGoLiveReady(record);
 
   const [confirmApprove, setConfirmApprove] = useState(false);
   const [confirmForce, setConfirmForce] = useState(false);
@@ -78,7 +79,9 @@ export function CrmAccountGoLiveActions({
   const [confirmInactive, setConfirmInactive] = useState(false);
 
   function approveGoLive() {
-    if (!crmGoLiveReady(getRecord(companyId)!)) {
+    ensureForCompany(companyId);
+    const latest = useCrmOnboardingStore.getState().getByCompanyId(companyId);
+    if (!crmGoLiveReady(latest)) {
       toast.error("Complete all go-live checklist items first");
       return;
     }
@@ -89,6 +92,7 @@ export function CrmAccountGoLiveActions({
   }
 
   function forceCompleteAccount() {
+    ensureForCompany(companyId);
     completeAllGoLiveItems(companyId);
     markLive(companyId, who);
     updateTracker(companyId, { stage: "post_go_live_handover", priority: "medium" }, who);

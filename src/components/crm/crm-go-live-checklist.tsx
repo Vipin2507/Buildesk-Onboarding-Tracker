@@ -55,7 +55,8 @@ type Props = {
 };
 
 export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who }: Props) {
-  const record = useCrmOnboardingStore((s) => s.getByCompanyId(companyId))!;
+  const ensureForCompany = useCrmOnboardingStore((s) => s.ensureForCompany);
+  const record = useCrmOnboardingStore((s) => s.getByCompanyId(companyId));
   const users = useUserStore((s) => s.users);
   const account = useCrmAccountStore((s) => s.getById(companyId));
   const markLive = useCrmAccountStore((s) => s.markLive);
@@ -166,7 +167,9 @@ export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who 
   }
 
   function approveGoLive() {
-    if (!crmGoLiveReady(useCrmOnboardingStore.getState().getByCompanyId(companyId)!)) {
+    ensureForCompany(companyId);
+    const latest = useCrmOnboardingStore.getState().getByCompanyId(companyId);
+    if (!crmGoLiveReady(latest)) {
       toast.error("Complete all go-live checklist items first");
       return;
     }
@@ -177,6 +180,7 @@ export function CrmGoLiveChecklist({ companyId, accountName, accountStatus, who 
   }
 
   function forceCompleteAccount() {
+    ensureForCompany(companyId);
     completeAllGoLiveItems(companyId);
     markLive(companyId, who);
     updateTracker(companyId, { stage: "post_go_live_handover", priority: "medium" }, who);

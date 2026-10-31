@@ -310,7 +310,8 @@ function needsTrainingUpgrade(items: CrmTrainingSession[], companyType?: Company
   return false;
 }
 
-function needsGoLiveUpgrade(items: CrmGoLiveChecklistItem[]) {
+function needsGoLiveUpgrade(items: CrmGoLiveChecklistItem[] | null | undefined) {
+  if (!Array.isArray(items) || items.length === 0) return true;
   const existingKeys = new Set(items.map((i) => i.key));
   if (CRM_GO_LIVE_CHECKLIST_LABELS.some((d) => !existingKeys.has(d.key))) return true;
   if (items.some((i) => i.category === undefined)) return true;
@@ -1168,50 +1169,65 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
     const nextCompletedAt =
       status === "completed" ? (completedAt?.slice(0, 10) || undefined) : undefined;
     set((s) => ({
-      records: updateRecord(s.records, companyId, (r) => ({
-        ...r,
-        goLiveChecklist: r.goLiveChecklist.map((g) =>
-          g.key === key
-            ? {
-                ...g,
-                status,
-                completedAt: nextCompletedAt,
-                notApplicable: false,
-              }
-            : g,
-        ),
-      })),
+      records: updateRecord(s.records, companyId, (r) => {
+        const checklist = Array.isArray(r.goLiveChecklist)
+          ? r.goLiveChecklist
+          : mergeCrmGoLiveChecklist(r.goLiveChecklist);
+        return {
+          ...r,
+          goLiveChecklist: checklist.map((g) =>
+            g.key === key
+              ? {
+                  ...g,
+                  status,
+                  completedAt: nextCompletedAt,
+                  notApplicable: false,
+                }
+              : g,
+          ),
+        };
+      }),
     }));
   },
 
   setGoLiveNotApplicable: (companyId, key, notApplicable) => {
     get().ensureForCompany(companyId);
     set((s) => ({
-      records: updateRecord(s.records, companyId, (r) => ({
-        ...r,
-        goLiveChecklist: r.goLiveChecklist.map((g) =>
-          g.key === key
-            ? {
-                ...g,
-                notApplicable,
-                status: notApplicable ? ("pending" as const) : g.status,
-                completedAt: notApplicable ? undefined : g.completedAt,
-              }
-            : g,
-        ),
-      })),
+      records: updateRecord(s.records, companyId, (r) => {
+        const checklist = Array.isArray(r.goLiveChecklist)
+          ? r.goLiveChecklist
+          : mergeCrmGoLiveChecklist(r.goLiveChecklist);
+        return {
+          ...r,
+          goLiveChecklist: checklist.map((g) =>
+            g.key === key
+              ? {
+                  ...g,
+                  notApplicable,
+                  status: notApplicable ? ("pending" as const) : g.status,
+                  completedAt: notApplicable ? undefined : g.completedAt,
+                }
+              : g,
+          ),
+        };
+      }),
     }));
   },
 
   updateGoLiveMeta: (companyId, key, patch) => {
     get().ensureForCompany(companyId);
     set((s) => ({
-      records: updateRecord(s.records, companyId, (r) => ({
-        ...r,
-        goLiveChecklist: r.goLiveChecklist.map((g) =>
-          g.key === key ? { ...g, ...patch } : g,
-        ),
-      })),
+      records: updateRecord(s.records, companyId, (r) => {
+        const checklist = Array.isArray(r.goLiveChecklist)
+          ? r.goLiveChecklist
+          : mergeCrmGoLiveChecklist(r.goLiveChecklist);
+        return {
+          ...r,
+          goLiveChecklist: checklist.map((g) =>
+            g.key === key ? { ...g, ...patch } : g,
+          ),
+        };
+      }),
     }));
   },
 
@@ -1219,14 +1235,19 @@ export const useCrmOnboardingStore = createStore<CrmOnboardingState>((rawSet, ge
     get().ensureForCompany(companyId);
     const completedAt = nowIso().slice(0, 10);
     set((s) => ({
-      records: updateRecord(s.records, companyId, (r) => ({
-        ...r,
-        goLiveChecklist: r.goLiveChecklist.map((g) =>
-          g.notApplicable
-            ? g
-            : { ...g, status: "completed" as const, completedAt },
-        ),
-      })),
+      records: updateRecord(s.records, companyId, (r) => {
+        const checklist = Array.isArray(r.goLiveChecklist)
+          ? r.goLiveChecklist
+          : mergeCrmGoLiveChecklist(r.goLiveChecklist);
+        return {
+          ...r,
+          goLiveChecklist: checklist.map((g) =>
+            g.notApplicable
+              ? g
+              : { ...g, status: "completed" as const, completedAt },
+          ),
+        };
+      }),
     }));
   },
 

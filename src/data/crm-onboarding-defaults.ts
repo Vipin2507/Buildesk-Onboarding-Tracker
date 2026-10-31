@@ -661,9 +661,11 @@ export function isCrmGoLiveItemVisible(
 }
 
 export function getApplicableGoLiveChecklist(
-  record: CrmOnboardingRecord,
+  record: CrmOnboardingRecord | null | undefined,
 ): CrmGoLiveChecklistItem[] {
-  return record.goLiveChecklist.filter((item) => isCrmGoLiveItemVisible(record, item.key));
+  if (!record) return [];
+  const checklist = Array.isArray(record.goLiveChecklist) ? record.goLiveChecklist : [];
+  return checklist.filter((item) => isCrmGoLiveItemVisible(record, item.key));
 }
 
 export const CRM_DEVELOPER_TRAINING: { key: string; label: string; category: string }[] = [
@@ -1031,9 +1033,12 @@ function defaultGoLiveChecklist(): CrmGoLiveChecklistItem[] {
 }
 
 export function mergeCrmGoLiveChecklist(
-  existing: Array<Partial<CrmGoLiveChecklistItem> & { key: string; label?: string }>,
+  existing:
+    | Array<Partial<CrmGoLiveChecklistItem> & { key: string; label?: string }>
+    | null
+    | undefined,
 ): CrmGoLiveChecklistItem[] {
-  const byKey = new Map(existing.map((item) => [item.key, item]));
+  const byKey = new Map((existing ?? []).map((item) => [item.key, item]));
   return CRM_GO_LIVE_CHECKLIST_LABELS.map((def) => {
     const prev = byKey.get(def.key);
     if (!prev) {
@@ -1400,7 +1405,8 @@ export function crmPendingActivityCount(record: CrmOnboardingRecord): number {
   return count;
 }
 
-export function crmGoLiveReady(record: CrmOnboardingRecord): boolean {
+export function crmGoLiveReady(record: CrmOnboardingRecord | null | undefined): boolean {
+  if (!record) return false;
   const applicable = getApplicableGoLiveChecklist(record);
   if (!applicable.length) return true;
   return applicable.every((g) => isCrmGoLiveItemComplete(g));
