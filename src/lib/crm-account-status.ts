@@ -1,3 +1,4 @@
+import { isCrmGoLiveStage } from "@/lib/crm-implementation-stages";
 import type { CrmAccount } from "@/types/crm-account";
 
 export const CRM_ACCOUNT_STATUSES = [
@@ -17,6 +18,20 @@ export function isCrmAccountEnded(status: CrmAccount["status"]) {
     status === "suspend_and_close" ||
     status === "inactive"
   );
+}
+
+/**
+ * Live list filter: status is live, or still onboarding at a go-live stage.
+ * Ended statuses (suspend / suspend-and-close / inactive / closed) never count as Live
+ * even if the tracker stage is still Post Go-Live.
+ */
+export function isCrmAccountLiveForList(row: {
+  status: CrmAccount["status"] | string;
+  stage?: string;
+}): boolean {
+  if (row.status === "live") return true;
+  if (row.status === "onboarding" && isCrmGoLiveStage(row.stage)) return true;
+  return false;
 }
 
 /** Hold only — not classified as lost in Payments. */

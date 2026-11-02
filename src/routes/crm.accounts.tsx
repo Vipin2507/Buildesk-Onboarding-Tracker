@@ -25,6 +25,7 @@ import { CrmAccountExportModal } from "@/components/crm/crm-account-export-modal
 import { CrmAccountGoLiveActions } from "@/components/crm/crm-account-go-live-actions";
 import { CrmAccountRenewDialog } from "@/components/crm/crm-account-renew-dialog";
 import { CrmAccountStageSelect } from "@/components/crm/crm-account-stage-select";
+import { CrmAccountStatusSelect } from "@/components/crm/crm-account-status-select";
 import { CrmAccountWhatsappSyncModal } from "@/components/crm/crm-account-whatsapp-sync-modal";
 import { CrmAccountModulesCell } from "@/components/crm/crm-account-modules-cell";
 import {
@@ -61,6 +62,7 @@ import { isCrmGoLiveStage } from "@/lib/crm-implementation-stages";
 import {
   CRM_ACCOUNT_STATUSES,
   crmAccountStatusLabel,
+  isCrmAccountLiveForList,
 } from "@/lib/crm-account-status";
 import {
   crmRenewalWindowLabel,
@@ -173,6 +175,7 @@ const STATUS_CHIPS = [
   { id: "live", label: "Live", status: "live" as const },
   { id: "active", label: "Active", status: "active" as const },
   { id: "suspended", label: "Suspended", status: "suspended" as const },
+  { id: "suspend_and_close", label: "Suspend and Close", status: "suspend_and_close" as const },
   { id: "inactive", label: "Inactive", status: "inactive" as const },
   { id: "closed", label: "Closed", status: "closed" as const },
   { id: "critical", label: "Critical", status: null },
@@ -193,8 +196,9 @@ const FILTER_BOX_COUNT_TONE: Record<AccountFilterTone, string> = {
 function filterPillTone(id: AccountFilterPillId): AccountFilterTone {
   if (id === "onboarding") return "warning";
   if (id === "live") return "success";
-  if (id === "critical") return "danger";
+  if (id === "critical" || id === "suspend_and_close") return "danger";
   if (id === "active") return "info";
+  if (id === "suspended") return "warning";
   return "muted";
 }
 
@@ -224,7 +228,7 @@ function matchesAccountKpi(row: CrmAccountRow, filter: AccountKpiFilter) {
   if (filter === "onboarding") {
     return row.status === "onboarding" && !isCrmGoLiveStage(row.stage);
   }
-  if (filter === "live") return row.status === "live" || isCrmGoLiveStage(row.stage);
+  if (filter === "live") return isCrmAccountLiveForList(row);
   if (filter === "critical") return row.healthBucket === "Critical" || row.overdue;
   return true;
 }
@@ -254,7 +258,7 @@ function matchesAccountListFilters(row: CrmAccountRow, f: AccountListFilters) {
     if (f.statusFilter === "onboarding") {
       if (row.status !== "onboarding" || isCrmGoLiveStage(row.stage)) return false;
     } else if (f.statusFilter === "live") {
-      if (row.status !== "live" && !isCrmGoLiveStage(row.stage)) return false;
+      if (!isCrmAccountLiveForList(row)) return false;
     } else if (row.status !== f.statusFilter) {
       return false;
     }
@@ -670,9 +674,7 @@ function CrmAccountsPage() {
       ).length;
     }
     if (id === "live") {
-      return toolbarScopedRows.filter(
-        (r) => r.status === "live" || isCrmGoLiveStage(r.stage),
-      ).length;
+      return toolbarScopedRows.filter((r) => isCrmAccountLiveForList(r)).length;
     }
     return toolbarScopedRows.filter((r) => r.status === id).length;
   }
@@ -1533,11 +1535,19 @@ function CrmAccountsPage() {
                     key: "status",
                     header: "Status",
                     sortable: true,
-                    render: (r) => (
-                      <Pill tone={accountStatusTone(r.status)}>
-                        {crmAccountStatusLabel(r.status)}
-                      </Pill>
-                    ),
+                    render: (r) =>
+                      isAdmin ? (
+                        <CrmAccountStatusSelect
+                          companyId={r.id}
+                          status={r.status}
+                          who={currentUser?.name}
+                          compact
+                        />
+                      ) : (
+                        <Pill tone={accountStatusTone(r.status)}>
+                          {crmAccountStatusLabel(r.status)}
+                        </Pill>
+                      ),
                   },
                 ]}
                 actions={(r) => (

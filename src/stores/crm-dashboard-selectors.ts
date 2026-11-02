@@ -24,7 +24,7 @@ import {
   matchCrmExecutiveDrillFilter,
 } from "@/lib/crm-executive-analysis";
 import { formatTaskPreviewTitle } from "@/lib/task-display";
-import { isCrmAccountEnded } from "@/lib/crm-account-status";
+import { isCrmAccountEnded, isCrmAccountLiveForList } from "@/lib/crm-account-status";
 import { isCrmGoLiveStage } from "@/lib/crm-implementation-stages";
 import { sortCrmAccountsByStartDateDesc } from "@/lib/crm-account-sort";
 import { resolveCrmMigrationCatalog } from "@/lib/crm-migration-catalog";
@@ -264,8 +264,10 @@ export function useCrmDashboardOverview() {
 
     const rows: CrmAccountRow[] = accounts.map((account) => {
       const record = recordFor(account, records);
-      const isLive =
-        account.status === "live" || isCrmGoLiveStage(record.tracker.stage);
+      const isLive = isCrmAccountLiveForList({
+        status: account.status,
+        stage: record.tracker.stage,
+      });
       const progress = isLive ? 100 : calcCrmOnboardingProgress(record);
       const openTickets = tickets.filter(
         (t) => t.companyId === account.id && isTicketOpen(t),
@@ -319,9 +321,7 @@ export function useCrmDashboardOverview() {
     const allMasters = accounts.flatMap((account) => recordFor(account, records).masterChecklist);
     const phaseStats = summarizeChecklistPhases(allMasters);
 
-    const live = rows.filter(
-      (r) => r.status === "live" || isCrmGoLiveStage(r.stage),
-    ).length;
+    const live = rows.filter((r) => isCrmAccountLiveForList(r)).length;
     const onboarding = rows.filter(
       (r) => r.status === "onboarding" && !isCrmGoLiveStage(r.stage),
     ).length;
