@@ -35,7 +35,7 @@ export function CrmAccountStatusSelect({
   }
 
   return (
-    <div onClick={(e) => e.stopPropagation()}>
+    <div className="min-w-0 max-w-[9.5rem]" onClick={(e) => e.stopPropagation()}>
       <DesignTicketSelect
         compact={compact}
         value={status}
@@ -44,7 +44,7 @@ export function CrmAccountStatusSelect({
           value: s,
           label: crmAccountStatusLabel(s),
         }))}
-        className="min-w-[9rem] max-w-[12rem]"
+        className="min-w-0 max-w-full"
       />
     </div>
   );

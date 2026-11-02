@@ -119,6 +119,34 @@ function removeOrphanPortalsForSameClient(
   }
 }
 
+function isOrphanCrmPortalCompany(
+  db: ReturnType<typeof getDb>,
+  companyId: string,
+): boolean {
+  const crmAccount = lookupCrmAccountIdentity(db, companyId);
+  if (crmAccount) return false;
+  const company = db
+    .select({ id: t.companies.id, billingInfo: t.companies.billingInfo })
+    .from(t.companies)
+    .where(eq(t.companies.id, companyId))
+    .get();
+  // No company row, or CRM stub left after account delete — safe to reclaim the slug.
+  if (!company) return true;
+  return company.billingInfo === CRM_ACCOUNT_COMPANY_MARKER;
+}
+
+function deletePortalAndCrmStub(db: ReturnType<typeof getDb>, companyId: string) {
+  deletePortalForCompany(db, companyId);
+  const company = db
+    .select({ id: t.companies.id, billingInfo: t.companies.billingInfo })
+    .from(t.companies)
+    .where(eq(t.companies.id, companyId))
+    .get();
+  if (company?.billingInfo === CRM_ACCOUNT_COMPANY_MARKER) {
+    db.delete(t.companies).where(eq(t.companies.id, companyId)).run();
+  }
+}
+
 function assertPortalSlugAvailable(
   db: ReturnType<typeof getDb>,
   slug: string,
@@ -134,6 +162,10 @@ function assertPortalSlugAvailable(
     .where(eq(t.companyPortalAccess.slug, slug))
     .get();
   if (taken && taken.companyId !== excludeCompanyId) {
+    if (isOrphanCrmPortalCompany(db, taken.companyId)) {
+      deletePortalAndCrmStub(db, taken.companyId);
+      return;
+    }
     if (
       isSameCrmAccountIdentity(
         taken.companyId,

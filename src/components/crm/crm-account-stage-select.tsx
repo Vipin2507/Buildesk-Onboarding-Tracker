@@ -31,13 +31,13 @@ export function CrmAccountStageSelect({
   }
 
   return (
-    <div onClick={(e) => e.stopPropagation()}>
+    <div className="min-w-0 max-w-[10.5rem]" onClick={(e) => e.stopPropagation()}>
       <DesignTicketSelect
         compact={compact}
         value={stage}
         onChange={handleChange}
         options={options.map((s) => ({ value: s.key, label: s.label }))}
-        className="min-w-[10rem] max-w-[12rem]"
+        className="min-w-0 max-w-full"
       />
     </div>
   );

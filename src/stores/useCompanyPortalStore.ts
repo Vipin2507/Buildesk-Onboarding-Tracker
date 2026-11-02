@@ -47,6 +47,8 @@ type CompanyPortalState = {
   ) => void;
   getBySlug: (slug: string) => CompanyPortalAccess | undefined;
   getByCompanyId: (companyId: string) => CompanyPortalAccess | undefined;
+  /** Drop portal API key when a CRM account is deleted. */
+  removeAccessForCompany: (companyId: string) => void;
 };
 
 function syncPortal(record: CompanyPortalAccess) {
@@ -323,5 +325,11 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
     getBySlug: (slug) => get().access.find((a) => a.slug === slug),
 
     getByCompanyId: (companyId) => get().access.find((a) => a.companyId === companyId),
+
+    removeAccessForCompany: (companyId) => {
+      set((s) => ({
+        access: s.access.filter((a) => a.companyId !== companyId),
+      }));
+    },
   }),
 );

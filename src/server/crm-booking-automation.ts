@@ -17,6 +17,7 @@ import {
 } from "@/services/automationTemplate";
 import { appendAutomationLogToConfig } from "@/server/automation-log-persistence";
 import { resolveCrmQueryResponseRecipientUserIds } from "@/server/api/notifications";
+import { buildServerCrmN8nEmailBody } from "@/server/crm-n8n-email-payload";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { nowIso } from "@/types";
@@ -229,31 +230,39 @@ async function dispatchServerBookingEmail(
   const url = buildN8nUrl(n8nBase, N8N_EMAIL_SEGMENT);
 
   for (const rule of rules) {
+    if (!recipientEmail?.trim()) continue;
     const message = renderAutomationTemplate(rule.templateBody, vars);
     const subject = renderAutomationSubject(rule.templateSubject, vars);
-    const body = {
-      channel: "email" as const,
-      templateId: rule.id,
-      templateName: rule.name,
+    const body = buildServerCrmN8nEmailBody({
+      rule,
+      settings: config.settings,
+      waha: config.waha,
       trigger: opts.trigger,
       recipientEmail,
       recipientName,
       messageBody: message,
       emailSubject: subject,
       entityType: "crm-booking",
-      productScope: "crm",
       entityId: opts.appointment.id,
       entityName: opts.eventTitle,
       companyName: opts.accountName,
-      customerName: recipientName,
-      customerEmail: recipientEmail,
-      guestName: opts.appointment.guestName,
-      guestEmail: opts.appointment.guestEmail,
-      startsAt: vars.startsAt,
-      endsAt: vars.endsAt,
-      bookingId: opts.appointment.id,
-      bookingUrl,
-    };
+      status: vars.status,
+      fields: {
+        guestName: opts.appointment.guestName,
+        guestEmail: opts.appointment.guestEmail,
+        hostName: opts.hostName,
+        startsAt: vars.startsAt,
+        endsAt: vars.endsAt,
+        bookingId: opts.appointment.id,
+        bookingUrl,
+        ticketUrl: bookingUrl,
+        eventTypeTitle: opts.eventTitle,
+        meetUrl: opts.appointment.meetUrl ?? "",
+        supportManager1: vars.supportManager1,
+        supportManager2: vars.supportManager2,
+        salesManagerName: vars.salesManagerName,
+      },
+    });
 
     const attemptedAt = nowIso();
     const logId = serverLogId();

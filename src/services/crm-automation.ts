@@ -70,7 +70,6 @@ function buildN8nPayload(
     messageBody: payload.message,
     emailSubject: payload.subject,
     emailCc: mergeEmailCc(settings.emailCc, ruleMeta?.emailCc),
-    delayHours: 0,
     entityType: payload.taskId
       ? "crm-task"
       : payload.bookingId
@@ -100,6 +99,13 @@ function buildN8nPayload(
     hostName: payload.hostName,
     guestName: payload.guestName,
     guestEmail: payload.guestEmail,
+    // String so n8n Wait does not treat reminder offset as delayHours.
+    ...(payload.offsetMinutes != null
+      ? { offsetMinutes: String(payload.offsetMinutes) }
+      : {}),
+    // Always last — n8n Wait requires a number ≥ 0 ("Invalid wait amount" if missing).
+    delayHours: 0,
+    waitAmount: 0,
   };
 }
 

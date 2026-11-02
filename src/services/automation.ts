@@ -62,7 +62,6 @@ function buildN8nPayload(
     messageBody: payload.message,
     emailSubject: payload.subject,
     emailCc: mergeEmailCc(settings.emailCc, ruleMeta?.emailCc),
-    delayHours: 0,
     entityType: "ticket",
     productScope: "erp",
     entityId: payload.ticketNumber,
@@ -80,6 +79,9 @@ function buildN8nPayload(
     status: payload.status,
     message: payload.message,
     ticketUrl: payload.ticketUrl,
+    // Always last — n8n Wait requires a number ≥ 0 ("Invalid wait amount" if missing).
+    delayHours: 0,
+    waitAmount: 0,
   };
 }
 

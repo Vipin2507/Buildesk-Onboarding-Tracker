@@ -982,11 +982,11 @@ function CrmAccountsPage() {
           </div>
         </div>
 
-        <div className="mt-2 flex flex-col gap-2 lg:flex-row lg:items-stretch">
+        <div className="mt-2 flex items-stretch gap-1.5">
           <div
             role="tablist"
             aria-label="Account filters"
-            className="grid min-w-0 flex-1 grid-cols-2 gap-1.5 sm:grid-cols-4 xl:grid-cols-8"
+            className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto pb-0.5"
           >
             {STATUS_CHIPS.map((chip) => {
               const tone = filterPillTone(chip.id);
@@ -1000,7 +1000,7 @@ function CrmAccountsPage() {
                   aria-selected={active}
                   onClick={() => selectAccountFilterPill(chip.id)}
                   className={cn(
-                    "flex min-w-0 flex-col rounded-lg border bg-card px-2.5 py-2 text-left shadow-sm transition-all",
+                    "flex min-w-[4.75rem] flex-1 flex-col rounded-lg border bg-card px-2.5 py-2 text-left shadow-sm transition-all",
                     "hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
                     active
                       ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"
@@ -1022,7 +1022,7 @@ function CrmAccountsPage() {
               );
             })}
           </div>
-          <div className="flex shrink-0 flex-col justify-center rounded-lg border border-border/80 bg-card px-3 py-2 shadow-sm lg:min-w-[5.5rem]">
+          <div className="flex shrink-0 flex-col justify-center rounded-lg border border-border/80 bg-card px-3 py-2 shadow-sm min-w-[4.75rem]">
             <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
               Avg
             </span>

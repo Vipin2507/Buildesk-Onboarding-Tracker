@@ -50,6 +50,10 @@ export function findPortalSlugConflictMessage(
 ): string | null {
   const taken = portals.find((p) => p.slug === slug && p.companyId !== excludeCompanyId);
   if (!taken) return null;
+  // Deleted CRM accounts leave portal rows behind; allow reuse (server reclaims the slug).
+  if (getAccount && !getAccount(taken.companyId)) {
+    return null;
+  }
   if (
     isSameCrmAccountIdentity(taken.companyId, excludeCompanyId, getAccount, {
       ownerPortalCompanyName: taken.companyName,

@@ -43,30 +43,43 @@ async function readResponse(res: Response): Promise<IntegrationFetchResult> {
   return { ok: res.ok, status: res.status, text };
 }
 
+/** Ensure n8n Wait always receives a numeric wait amount (≥ 0). */
+function withN8nWaitSafeBody(body: Record<string, unknown>): Record<string, unknown> {
+  const delayRaw = body.delayHours;
+  const delay =
+    typeof delayRaw === "number" && Number.isFinite(delayRaw) && delayRaw >= 0 ? delayRaw : 0;
+  return {
+    ...body,
+    delayHours: delay,
+    waitAmount: 0,
+  };
+}
+
 /** Email / SMS → n8n webhook segment (buildesk-email, buildesk-health, …). */
 export async function fetchN8nWebhook(
   segment: string,
   body: Record<string, unknown>,
   n8nWebhookBase: string,
 ): Promise<IntegrationFetchResult> {
+  const safeBody = withN8nWaitSafeBody(body);
   if (isDevClient()) {
     const res = await fetch(`/n8n/webhook/${segment.replace(/^\/+/, "")}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify(safeBody),
     });
     return readResponse(res);
   }
 
   if (isHttpsClient()) {
     const { proxyN8nWebhook } = await import("@/server/api/integrations");
-    return proxyN8nWebhook({ data: { segment, body, n8nWebhookBase } });
+    return proxyN8nWebhook({ data: { segment, body: safeBody, n8nWebhookBase } });
   }
 
   const res = await fetch(buildN8nWebhookUrl(n8nWebhookBase, segment), {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify(safeBody),
   });
   return readResponse(res);
 }

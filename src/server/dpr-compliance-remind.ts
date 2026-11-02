@@ -57,7 +57,14 @@ async function sendDprReminderEmail(userId: string, entryDate: string) {
         body,
         recipientName: user.name,
         recipientEmail: email,
+        recipientEmailAddress: email,
+        messageBody: body,
+        emailSubject: subject,
         trigger: "dpr-compliance-remind",
+        channel: "email",
+        // n8n Wait requires a number ≥ 0 ("Invalid wait amount" if missing).
+        delayHours: 0,
+        waitAmount: 0,
       }),
     });
     return res.ok;

@@ -4,6 +4,7 @@ import { calcCrmOnboardingProgress } from "@/data/crm-onboarding-defaults";
 import { absoluteAppUrl } from "@/lib/app-base-url";
 import { phoneToWahaChatId } from "@/lib/automationEndpoints";
 import {
+  accountOnboardingStartYmd,
   daysSinceOnboardingStart,
   isOnboardingBehindTarget,
   onboardingTargetBucketLabel,
@@ -12,6 +13,7 @@ import {
 } from "@/lib/crm-onboarding-sla";
 import { isCrmGoLiveStage } from "@/lib/crm-implementation-stages";
 import { normalizeCrmOnboardingTargetSettings } from "@/data/crm-onboarding-targets-seed";
+import { formatDate } from "@/lib/utils";
 import {
   appendServerCrmAutomationLog,
   loadCrmAutomationConfig,
@@ -251,11 +253,16 @@ export async function processCrmOnboardingSlaReminders(db: Db): Promise<number> 
     const recipients = resolveOnboardingSlaRecipients(db, account);
     if (recipients.length === 0) continue;
 
+    const onboardingStartYmd = accountOnboardingStartYmd({
+      startDate: account.startDate,
+      createdAt: account.createdAt,
+    });
     const varsBase: Record<string, string> = {
       accountName: account.name,
       companyName: account.name,
       customerName: account.pocName || account.contact || account.name,
       daysSinceStart: String(days),
+      onboardingDate: formatDate(onboardingStartYmd),
       targetDays: String(targets.targetDays),
       targetLabel: onboardingTargetBucketLabel(bucket),
       currentProgress: String(progress),

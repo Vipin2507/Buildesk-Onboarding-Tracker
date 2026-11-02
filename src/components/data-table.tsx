@@ -297,7 +297,7 @@ export function DataTable<T>({
             <thead className={cn("bg-muted/60 text-muted-foreground", headText)}>
               <tr>
                 {selection && (
-                  <th className={cn("w-9", headPad)}>
+                  <th className={cn("w-9 align-middle", headPad)}>
                     <Checkbox
                       checked={allFilteredSelected ? true : someFilteredSelected ? "indeterminate" : false}
                       onCheckedChange={(checked) =>
@@ -312,7 +312,7 @@ export function DataTable<T>({
                     key={col.key}
                     className={cn(
                       headPad,
-                      "whitespace-nowrap text-left font-medium",
+                      "align-middle whitespace-nowrap text-left font-medium",
                       col.sortable && "cursor-pointer select-none",
                     )}
                     onClick={() => {
@@ -338,7 +338,9 @@ export function DataTable<T>({
                   </th>
                 ))}
                 {actions && (
-                  <th className={cn(headPad, "whitespace-nowrap text-right font-medium")}>Actions</th>
+                  <th className={cn(headPad, "align-middle whitespace-nowrap text-right font-medium")}>
+                    Actions
+                  </th>
                 )}
               </tr>
             </thead>
@@ -363,7 +365,10 @@ export function DataTable<T>({
                       onClick={() => onRowClick?.(row)}
                     >
                       {selection && (
-                        <td className={cn(cellPad, "w-9")} onClick={(e) => e.stopPropagation()}>
+                        <td
+                          className={cn(cellPad, "w-9 align-middle")}
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <Checkbox
                             checked={selected}
                             onCheckedChange={(checked) => selection.onToggle(id, checked === true)}
@@ -372,12 +377,15 @@ export function DataTable<T>({
                         </td>
                       )}
                       {columns.map((col) => (
-                        <td key={col.key} className={cellPad}>
+                        <td key={col.key} className={cn(cellPad, "align-middle")}>
                           {col.render(row)}
                         </td>
                       ))}
                       {actions && (
-                        <td className={cn(cellPad, "text-right")} onClick={(e) => e.stopPropagation()}>
+                        <td
+                          className={cn(cellPad, "align-middle text-right")}
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           {actions(row)}
                         </td>
                       )}

@@ -126,6 +126,7 @@ const CRM_AUTOMATION_SEED_SYNC_RULE_IDS = new Set([
   "crm-rule-account-renewal-whatsapp",
   "crm-rule-booking-created-whatsapp",
   "crm-rule-booking-created-email",
+  "crm-rule-onboarding-sla-whatsapp",
 ]);
 
 /** True when a saved rule still has pre-digest / legacy copy and should pick up seed defaults once. */
@@ -190,6 +191,12 @@ export function crmAutomationRuleNeedsSeedSync(
     if (seed.templateBody?.includes("{{sentAt}}") && !existing.templateBody?.includes("{{sentAt}}")) {
       return true;
     }
+    return false;
+  }
+
+  if (seed.id === "crm-rule-onboarding-sla-whatsapp") {
+    if (existing.templateBody?.includes("{{onboardingDate}}")) return false;
+    if (existing.templateBody?.includes("Onboarding behind target")) return true;
     return false;
   }
 
@@ -466,7 +473,7 @@ export const DEFAULT_CRM_AUTOMATION_RULES: AutomationRule[] = [
     channel: "whatsapp",
     isActive: true,
     templateBody:
-      "Hi {{recipientName}},\n\n⚠️ *Onboarding behind target* — {{accountName}}\n\nDay {{daysSinceStart}} of {{targetDays}} ({{targetLabel}})\nProgress: {{currentProgress}}% · Target: {{targetProgress}}%\n\n*Support 1:* {{supportManager1}}\n*Support 2:* {{supportManager2}}\n*Sales:* {{salesManagerName}}\n\n{{targetRemarks}}\n\nOpen in CRM: {{onboardingUrl}}",
+      "Hi {{recipientName}},\n\n⚠️ *Onboarding behind target* — {{accountName}}\n\nOnboarding date: {{onboardingDate}}\nDay {{daysSinceStart}} of {{targetDays}} ({{targetLabel}})\nProgress: {{currentProgress}}% · Target: {{targetProgress}}%\n\n*Support 1:* {{supportManager1}}\n*Support 2:* {{supportManager2}}\n*Sales:* {{salesManagerName}}\n\n{{targetRemarks}}\n\nOpen in CRM: {{onboardingUrl}}",
   }),
 ];
 
@@ -525,6 +532,7 @@ export const CRM_AUTOMATION_TEMPLATE_VARS = [
   "{{renewalWindowLabel}}",
   "{{daysUntilEnd}}",
   "{{daysSinceStart}}",
+  "{{onboardingDate}}",
   "{{targetDays}}",
   "{{targetLabel}}",
   "{{currentProgress}}",
@@ -586,6 +594,7 @@ export const CRM_AUTOMATION_SAMPLE_VARS: Record<string, string> = {
   chatUrl: "https://track.example.com/crm/live-chat",
   sessionId: "CS-1001",
   daysSinceStart: "12",
+  onboardingDate: "20 Sept 2026",
   targetDays: "45",
   targetLabel: "Day 6–20 · 50%",
   currentProgress: "35",

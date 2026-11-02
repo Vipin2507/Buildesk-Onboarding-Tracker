@@ -7,6 +7,7 @@ import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { canViewCrmAccount, crmSalesManagerNamesMatch } from "@/lib/crm-account-access";
 import { sortCrmAccountsByStartDateDesc } from "@/lib/crm-account-sort";
+import { CRM_ACCOUNT_COMPANY_MARKER } from "@/lib/design-ticket-portal";
 import { isAdminRoleKey, roleHasPermission } from "@/lib/permissions";
 import { loadServerRoles } from "@/server/auth/permissions";
 import { parseInstallmentsJson } from "@/lib/crm-account-commercial";
@@ -337,6 +338,15 @@ export const deleteCrmAccount = createServerFn({ method: "POST" })
       throw new ApiError(403, "You can only delete accounts assigned to you");
     }
     db.delete(t.crmOnboardingRecords).where(eq(t.crmOnboardingRecords.companyId, data.id)).run();
+    db.delete(t.companyPortalAccess).where(eq(t.companyPortalAccess.companyId, data.id)).run();
+    const companyStub = db
+      .select({ id: t.companies.id, billingInfo: t.companies.billingInfo })
+      .from(t.companies)
+      .where(eq(t.companies.id, data.id))
+      .get();
+    if (companyStub?.billingInfo === CRM_ACCOUNT_COMPANY_MARKER) {
+      db.delete(t.companies).where(eq(t.companies.id, data.id)).run();
+    }
     db.delete(t.crmAccounts).where(eq(t.crmAccounts.id, data.id)).run();
     return mapRow(existing);
   });

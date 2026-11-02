@@ -225,6 +225,10 @@ export const useCrmAccountStore = createStore<CrmAccountState>((set, get) => ({
     const existing = get().getById(id);
     if (!existing) return undefined;
     set((s) => ({ accounts: s.accounts.filter((a) => a.id !== id) }));
+    // Free portal API key so recreating the account can reuse the same slug.
+    void import("./useCompanyPortalStore").then(({ useCompanyPortalStore }) => {
+      useCompanyPortalStore.getState().removeAccessForCompany(id);
+    });
     serverSync("delete crm account", () => apiDeleteCrmAccount({ data: { id } }));
     return existing;
   },

@@ -47,10 +47,25 @@ export type ServerCrmN8nEmailInput = {
   fields?: Record<string, unknown>;
 };
 
+/**
+ * n8n Wait nodes read `delayHours` as the wait amount.
+ * Must always be a finite number ≥ 0 — missing/NaN/negative → "Invalid wait amount".
+ */
+export function n8nSafeDelayHours(value?: unknown): number {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return n;
+}
+
 /** Canonical CRM email webhook body — matches client `buildN8nPayload` in crm-automation.ts. */
 export function buildServerCrmN8nEmailBody(input: ServerCrmN8nEmailInput): Record<string, unknown> {
   const waha = input.waha ?? DEFAULT_CRM_WAHA_CONFIG;
   const customerPhone = normalizeIndiaPhone(input.recipientPhone) ?? input.recipientPhone ?? "";
+  const fields = { ...(input.fields ?? {}) };
+  // Never let entity fields wipe / poison the Wait amount.
+  delete fields.delayHours;
+  delete fields.waitAmount;
+  delete fields.amount;
 
   return {
     channel: "email",
@@ -63,7 +78,6 @@ export function buildServerCrmN8nEmailBody(input: ServerCrmN8nEmailInput): Recor
     messageBody: input.messageBody,
     emailSubject: input.emailSubject,
     emailCc: mergeServerEmailCc(input.settings.emailCc, input.rule.emailCc, input.extraCc),
-    delayHours: 0,
     entityType: input.entityType,
     productScope: "crm",
     entityId: input.entityId,
@@ -80,6 +94,9 @@ export function buildServerCrmN8nEmailBody(input: ServerCrmN8nEmailInput): Recor
     subject: input.emailSubject,
     status: input.status ?? "",
     message: input.messageBody,
-    ...(input.fields ?? {}),
+    ...fields,
+    // Always last — n8n Wait requires a number ≥ 0.
+    delayHours: n8nSafeDelayHours(0),
+    waitAmount: 0,
   };
 }
