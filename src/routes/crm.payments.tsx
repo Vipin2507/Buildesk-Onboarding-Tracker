@@ -146,7 +146,17 @@ function CrmPaymentsPage() {
 
   const statusTab = parseCrmPaymentStatusTab(search.status);
   const page = search.page ?? 1;
-  const pageSize = search.pageSize ?? 15;
+  const pageSize = useMemo(() => {
+    if (search.pageSize) return search.pageSize;
+    try {
+      const raw = window.localStorage.getItem("buildesk.table.pageSize");
+      const n = raw ? Number(raw) : NaN;
+      if (n === 15 || n === 50 || n === 100) return n;
+    } catch {
+      /* ignore */
+    }
+    return 15;
+  }, [search.pageSize]);
 
   const [searchDraft, setSearchDraft] = useState(search.search ?? "");
   const [expandedRowIds, setExpandedRowIds] = useState<Set<string>>(() => new Set());
@@ -876,11 +886,39 @@ function CrmPaymentsPage() {
             ]}
           />
 
-          {total > pageSize ? (
+          {total > 0 ? (
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-3 pb-3 text-[11px] text-muted-foreground">
-              <span className="min-w-0 tabular-nums">
-                Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total}
-              </span>
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <span className="min-w-0 tabular-nums">
+                  Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total}
+                </span>
+                <label className="inline-flex items-center gap-1.5">
+                  <span>Rows</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      const next = Number(e.target.value);
+                      try {
+                        window.localStorage.setItem("buildesk.table.pageSize", String(next));
+                      } catch {
+                        /* ignore */
+                      }
+                      patchSearch({
+                        pageSize: next === 15 ? undefined : next,
+                        page: undefined,
+                      });
+                    }}
+                    className="h-7 rounded-md border border-input bg-background px-1.5 text-[11px] text-foreground outline-none focus:ring-2 focus:ring-ring/40"
+                    aria-label="Rows per page"
+                  >
+                    {[15, 50, 100].map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
               <div className="flex shrink-0 gap-1">
                 <Button
                   size="sm"

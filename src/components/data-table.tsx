@@ -29,6 +29,23 @@ export type DataTableSelection = {
   onToggleAll: (ids: string[], checked: boolean) => void;
 };
 
+const TABLE_PAGE_SIZE_STORAGE_KEY = "buildesk.table.pageSize";
+export const DATA_TABLE_PAGE_SIZE_OPTIONS = [15, 50, 100] as const;
+
+function readStoredTablePageSize(fallback: number): number {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(TABLE_PAGE_SIZE_STORAGE_KEY);
+    const n = raw ? Number(raw) : NaN;
+    if (DATA_TABLE_PAGE_SIZE_OPTIONS.includes(n as (typeof DATA_TABLE_PAGE_SIZE_OPTIONS)[number])) {
+      return n;
+    }
+  } catch {
+    /* ignore */
+  }
+  return fallback;
+}
+
 export function DataTable<T>({
   data,
   columns,
@@ -36,7 +53,8 @@ export function DataTable<T>({
   hideSearch = false,
   searchQuery,
   onSearchQueryChange,
-  pageSize = 10,
+  pageSize: pageSizeProp = 15,
+  pageSizeOptions = DATA_TABLE_PAGE_SIZE_OPTIONS,
   onRowClick,
   emptyState,
   actions,
@@ -64,7 +82,10 @@ export function DataTable<T>({
   /** Controlled search (optional — falls back to internal state). */
   searchQuery?: string;
   onSearchQueryChange?: (value: string) => void;
+  /** Initial rows per page (overridden by saved preference when present). */
   pageSize?: number;
+  /** Rows-per-page choices shown in the footer. Pass `[]` to hide the selector. */
+  pageSizeOptions?: readonly number[];
   onRowClick?: (row: T) => void;
   emptyState?: ReactNode;
   actions?: (row: T) => ReactNode;
@@ -88,10 +109,19 @@ export function DataTable<T>({
   const [sortKey, setSortKey] = useState<string | null>(initialSortKey);
   const [sortDir, setSortDir] = useState<"asc" | "desc">(initialSortDir);
   const [page, setPage] = useState(0);
+  const allowPageSizeSelect = pageSizeOptions.length > 0;
+  const resolvedOptions = allowPageSizeSelect
+    ? [...pageSizeOptions]
+    : [pageSizeProp];
+  const [pageSize, setPageSize] = useState(() => {
+    if (!allowPageSizeSelect) return pageSizeProp;
+    const stored = readStoredTablePageSize(pageSizeProp);
+    return resolvedOptions.includes(stored) ? stored : pageSizeProp;
+  });
 
   useEffect(() => {
     setPage(0);
-  }, [search]);
+  }, [search, pageSize]);
 
   const filtered = useMemo(() => {
     let rows = data;
@@ -124,6 +154,18 @@ export function DataTable<T>({
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages - 1);
   const paged = filtered.slice(safePage * pageSize, (safePage + 1) * pageSize);
+  const showPager =
+    filtered.length > 0 && (allowPageSizeSelect || filtered.length > pageSize || totalPages > 1);
+
+  function handlePageSizeChange(next: number) {
+    setPageSize(next);
+    setPage(0);
+    try {
+      window.localStorage.setItem(TABLE_PAGE_SIZE_STORAGE_KEY, String(next));
+    } catch {
+      /* ignore */
+    }
+  }
 
   const filteredIds = useMemo(
     () => filtered.map((row, i) => getRowId?.(row) ?? String(i)),
@@ -423,17 +465,40 @@ export function DataTable<T>({
         )}
       </div>
 
-      {filtered.length > pageSize && (
+      {showPager ? (
         <div
           className={cn(
             "mt-2 flex flex-wrap items-center justify-between gap-2 text-muted-foreground",
             compact ? "text-[11px]" : "text-xs",
           )}
         >
-          <span className="min-w-0">
-            Showing {safePage * pageSize + 1}–
-            {Math.min((safePage + 1) * pageSize, filtered.length)} of {filtered.length}
-          </span>
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <span className="min-w-0 tabular-nums">
+              {filtered.length === 0
+                ? "No rows"
+                : `Showing ${safePage * pageSize + 1}–${Math.min((safePage + 1) * pageSize, filtered.length)} of ${filtered.length}`}
+            </span>
+            {allowPageSizeSelect ? (
+              <label className="inline-flex items-center gap-1.5">
+                <span className="whitespace-nowrap">Rows</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                  className={cn(
+                    "rounded-md border border-input bg-background text-foreground outline-none focus:ring-2 focus:ring-ring/40",
+                    compact ? "h-7 px-1.5 text-[11px]" : "h-8 px-2 text-xs",
+                  )}
+                  aria-label="Rows per page"
+                >
+                  {resolvedOptions.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+          </div>
           <div className="flex shrink-0 gap-1">
             <Button
               size="sm"
@@ -458,7 +523,7 @@ export function DataTable<T>({
             </Button>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

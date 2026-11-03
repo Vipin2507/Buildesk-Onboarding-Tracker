@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Copy, Link2, ShieldCheck, ShieldOff } from "lucide-react";
 import { toast } from "sonner";
@@ -11,34 +11,40 @@ import {
   DesignTicketSection,
   ticketSectionVariants,
 } from "@/components/design-ticket/design-ticket-shared";
+import { DesignTicketSelect } from "@/components/design-ticket/design-ticket-fields";
 import { DataTable } from "@/components/data-table";
 import { PageWrap } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { CrmTicketsNav } from "@/components/crm/crm-tickets-nav";
-import { portalPublicCreateUrl } from "@/lib/design-ticket-portal";
+import { isValidPortalSlug, portalPublicCreateUrl } from "@/lib/design-ticket-portal";
 import { copyTextToClipboard } from "@/lib/copy-to-clipboard";
+import { cn } from "@/lib/utils";
 import { useCompanyPortalStore, useCrmAccountStore } from "@/stores";
 
 export const Route = createFileRoute("/crm/tickets/links")({
   component: CrmTicketLinksPage,
 });
 
+type PortalApiFilter = "all" | "has_api" | "no_api" | "inactive";
+
+/** Proper API = portal exists, active, and slug is a valid non-UUID key. */
+function hasProperPortalApi(row: { hasPortal: boolean; slug: string; isActive: boolean }) {
+  if (!row.hasPortal || !row.isActive) return false;
+  const slug = row.slug.trim();
+  if (!slug || !isValidPortalSlug(slug)) return false;
+  // Account UUID used as slug is not a proper portal API key.
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)) {
+    return false;
+  }
+  return true;
+}
+
 function CrmTicketLinksPage() {
   const accounts = useCrmAccountStore((s) => s.accounts);
   const access = useCompanyPortalStore((s) => s.access);
   const setActive = useCompanyPortalStore((s) => s.setActive);
   const generateAccess = useCompanyPortalStore((s) => s.generateAccessForCompany);
-
-  useEffect(() => {
-    for (const account of accounts) {
-      generateAccess({
-        id: account.id,
-        name: account.name,
-        contact: account.contact,
-        email: account.email,
-      });
-    }
-  }, [accounts, generateAccess]);
+  const [apiFilter, setApiFilter] = useState<PortalApiFilter>("all");
 
   const rows = useMemo(
     () =>
@@ -56,6 +62,18 @@ function CrmTicketLinksPage() {
     [accounts, access],
   );
 
+  const total = rows.length;
+  const active = rows.filter((r) => r.isActive && hasProperPortalApi(r)).length;
+  const inactive = rows.filter((r) => r.hasPortal && !r.isActive).length;
+  const noApi = rows.filter((r) => !hasProperPortalApi(r)).length;
+
+  const filteredRows = useMemo(() => {
+    if (apiFilter === "has_api") return rows.filter((r) => hasProperPortalApi(r));
+    if (apiFilter === "no_api") return rows.filter((r) => !hasProperPortalApi(r));
+    if (apiFilter === "inactive") return rows.filter((r) => r.hasPortal && !r.isActive);
+    return rows;
+  }, [rows, apiFilter]);
+
   async function copy(url: string) {
     const ok = await copyTextToClipboard(url);
     if (ok) {
@@ -65,10 +83,10 @@ function CrmTicketLinksPage() {
     toast.error("Auto-copy blocked. Please copy manually.");
   }
 
-  const total = rows.length;
-  const active = rows.filter((r) => r.isActive).length;
-  const inactive = rows.filter((r) => r.hasPortal && !r.isActive).length;
-  const missing = rows.filter((r) => !r.hasPortal).length;
+  function ensurePortal(accountId: string, accountName: string, contact: string, email: string) {
+    generateAccess({ id: accountId, name: accountName, contact, email });
+    toast.success("Portal API key generated");
+  }
 
   return (
     <PageWrap compact>
@@ -85,19 +103,79 @@ function CrmTicketLinksPage() {
           size="compact"
           columns={4}
           items={[
-            { id: "total", label: "Accounts", value: total, icon: Link2 },
-            { id: "active", label: "Active links", value: active, tone: "text-success", icon: ShieldCheck },
-            { id: "inactive", label: "Inactive links", value: inactive, tone: "text-warning-foreground", icon: ShieldOff },
-            { id: "missing", label: "Not generated", value: missing, tone: "text-muted-foreground" },
+            {
+              id: "total",
+              label: "Accounts",
+              value: total,
+              icon: Link2,
+              onClick: () => setApiFilter("all"),
+              active: apiFilter === "all",
+            },
+            {
+              id: "active",
+              label: "Active links",
+              value: active,
+              tone: "text-success",
+              icon: ShieldCheck,
+              onClick: () => setApiFilter("has_api"),
+              active: apiFilter === "has_api",
+            },
+            {
+              id: "inactive",
+              label: "Inactive links",
+              value: inactive,
+              tone: "text-warning-foreground",
+              icon: ShieldOff,
+              onClick: () => setApiFilter("inactive"),
+              active: apiFilter === "inactive",
+            },
+            {
+              id: "missing",
+              label: "No API key",
+              value: noApi,
+              tone: "text-destructive",
+              onClick: () => setApiFilter("no_api"),
+              active: apiFilter === "no_api",
+            },
           ]}
         />
       </div>
 
       <motion.div variants={ticketSectionVariants} initial="hidden" animate="show">
         <DesignTicketSection title="Portal Access by Account" compact>
+          <div className="mb-2 flex flex-wrap items-center gap-2 px-0.5">
+            <label className="text-[11px] font-medium text-muted-foreground">API status</label>
+            <div className="w-[12rem]">
+              <DesignTicketSelect
+                compact
+                value={apiFilter}
+                onChange={(v) => setApiFilter(v as PortalApiFilter)}
+                options={[
+                  { value: "all", label: "All accounts" },
+                  { value: "has_api", label: "Has proper API" },
+                  { value: "no_api", label: "No proper API" },
+                  { value: "inactive", label: "Inactive only" },
+                ]}
+              />
+            </div>
+            {apiFilter !== "all" ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-8 text-xs"
+                onClick={() => setApiFilter("all")}
+              >
+                Clear filter
+              </Button>
+            ) : null}
+            <span className="text-[11px] tabular-nums text-muted-foreground">
+              {filteredRows.length} shown
+            </span>
+          </div>
           <div className="card-soft overflow-hidden p-0.5">
             <DataTable
-              data={rows}
+              data={filteredRows}
               getRowId={(r) => r.id}
               searchKeys={["accountName", "slug", "url"]}
               pageSize={15}
@@ -111,12 +189,19 @@ function CrmTicketLinksPage() {
                 },
                 {
                   key: "slug",
-                  header: "Slug",
+                  header: "API key / Slug",
                   render: (r) =>
                     r.hasPortal ? (
-                      <code className="rounded bg-muted px-1.5 py-px text-[11px]">{r.slug}</code>
+                      <code
+                        className={cn(
+                          "rounded px-1.5 py-px text-[11px]",
+                          hasProperPortalApi(r) ? "bg-muted" : "bg-destructive/10 text-destructive",
+                        )}
+                      >
+                        {r.slug || "—"}
+                      </code>
                     ) : (
-                      <span className="text-muted-foreground">—</span>
+                      <span className="text-muted-foreground">Not set</span>
                     ),
                   sortable: true,
                 },
@@ -133,54 +218,73 @@ function CrmTicketLinksPage() {
                 {
                   key: "isActive",
                   header: "Status",
-                  render: (r) =>
-                    r.hasPortal ? (
-                      <span
-                        className={`inline-flex rounded px-1.5 py-px text-[10px] font-medium ${
-                          r.isActive
-                            ? "bg-success/15 text-success"
-                            : "bg-warning/15 text-warning-foreground"
-                        }`}
-                      >
-                        {r.isActive ? "Active" : "Inactive"}
+                  render: (r) => {
+                    if (!r.hasPortal) {
+                      return <span className="text-muted-foreground">No API</span>;
+                    }
+                    if (!hasProperPortalApi(r)) {
+                      return (
+                        <span className="inline-flex rounded bg-destructive/15 px-1.5 py-px text-[10px] font-medium text-destructive">
+                          {r.isActive ? "Invalid API" : "Inactive"}
+                        </span>
+                      );
+                    }
+                    return (
+                      <span className="inline-flex rounded bg-success/15 px-1.5 py-px text-[10px] font-medium text-success">
+                        Active
                       </span>
-                    ) : (
-                      <span className="text-muted-foreground">Unavailable</span>
-                    ),
+                    );
+                  },
                 },
               ]}
-              actions={(r) => (
-                <div className="flex items-center justify-end gap-1.5">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-7 px-2 text-xs"
-                    disabled={!r.hasPortal}
-                    onClick={() => void copy(r.url)}
-                  >
-                    <Copy className="mr-1 h-3 w-3" />
-                    Copy
-                  </Button>
-                  <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" asChild>
-                    <Link to="/crm/accounts/$accountId" params={{ accountId: r.id }}>
-                      Account
-                    </Link>
-                  </Button>
-                  <label className="inline-flex h-7 items-center gap-1.5 rounded border px-2 text-xs">
-                    <input
-                      type="checkbox"
-                      checked={r.isActive}
+              actions={(r) => {
+                const account = accounts.find((a) => a.id === r.id);
+                return (
+                  <div className="flex items-center justify-end gap-1.5">
+                    {!r.hasPortal && account ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-xs"
+                        onClick={() =>
+                          ensurePortal(account.id, account.name, account.contact, account.email)
+                        }
+                      >
+                        Generate API
+                      </Button>
+                    ) : null}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-7 px-2 text-xs"
                       disabled={!r.hasPortal}
-                      onChange={(e) => {
-                        setActive(r.id, e.target.checked);
-                        toast.success(e.target.checked ? "Portal activated" : "Portal deactivated");
-                      }}
-                    />
-                    Active
-                  </label>
-                </div>
-              )}
+                      onClick={() => void copy(r.url)}
+                    >
+                      <Copy className="mr-1 h-3 w-3" />
+                      Copy
+                    </Button>
+                    <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" asChild>
+                      <Link to="/crm/accounts/$accountId" params={{ accountId: r.id }}>
+                        Account
+                      </Link>
+                    </Button>
+                    <label className="inline-flex h-7 items-center gap-1.5 rounded border px-2 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={r.isActive}
+                        disabled={!r.hasPortal}
+                        onChange={(e) => {
+                          setActive(r.id, e.target.checked);
+                          toast.success(e.target.checked ? "Portal activated" : "Portal deactivated");
+                        }}
+                      />
+                      Active
+                    </label>
+                  </div>
+                );
+              }}
             />
           </div>
         </DesignTicketSection>
@@ -188,8 +292,9 @@ function CrmTicketLinksPage() {
 
       <div className="mt-3">
         <DesignTicketInfoBanner compact>
-          Portal links are shared with clients. After regenerating a link on an account, old URLs stop
-          working.
+          Use <strong>No API key</strong> to find accounts without a portal key, with an inactive
+          link, or with an invalid slug. Set or regenerate keys from the account page or{" "}
+          <em>Update API keys</em> on Accounts.
         </DesignTicketInfoBanner>
       </div>
     </PageWrap>

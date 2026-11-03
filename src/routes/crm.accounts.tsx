@@ -143,7 +143,8 @@ const ACCOUNT_LIST_FILTER_DEFAULTS: {
   tableSearch: string;
 } = {
   kpiFilter: "all",
-  statusFilter: "all",
+  /** Comma-separated statuses; empty / "all" = any status. */
+  statusFilter: "",
   typeFilter: "all",
   cityFilter: "all",
   regionFilter: "all",
@@ -151,7 +152,8 @@ const ACCOUNT_LIST_FILTER_DEFAULTS: {
   managerFilter: "all",
   supportManager1Filter: "all",
   supportManager2Filter: "all",
-  stageFilter: "all",
+  /** Comma-separated stages; empty / "all" = any stage. */
+  stageFilter: "",
   providerFilter: "all",
   moduleFilter: "",
   dateFrom: "",
@@ -164,9 +166,23 @@ const ACCOUNT_LIST_FILTER_DEFAULTS: {
   tableSearch: "",
 };
 
-function parseModuleFilterKeys(value: string): string[] {
-  if (!value.trim()) return [];
+function parseCsvFilterKeys(value: string): string[] {
+  if (!value.trim() || value.trim() === "all") return [];
   return [...new Set(value.split(",").map((item) => item.trim()).filter(Boolean))];
+}
+
+function parseModuleFilterKeys(value: string): string[] {
+  return parseCsvFilterKeys(value);
+}
+
+function rowMatchesStatusFilter(row: CrmAccountRow, statusKey: string): boolean {
+  if (statusKey === "onboarding") {
+    return row.status === "onboarding" && !isCrmGoLiveStage(row.stage);
+  }
+  if (statusKey === "live") {
+    return isCrmAccountLiveForList(row);
+  }
+  return row.status === statusKey;
 }
 
 const STATUS_CHIPS = [
@@ -204,12 +220,12 @@ function filterPillTone(id: AccountFilterPillId): AccountFilterTone {
 
 function isAccountFilterPillActive(
   id: AccountFilterPillId,
-  statusFilter: string,
+  statusKeys: string[],
   kpiFilter: AccountKpiFilter,
 ) {
   if (id === "critical") return kpiFilter === "critical";
-  if (id === "all") return statusFilter === "all" && kpiFilter === "all";
-  return statusFilter === id && kpiFilter === "all";
+  if (id === "all") return statusKeys.length === 0 && kpiFilter === "all";
+  return statusKeys.includes(id) && kpiFilter === "all";
 }
 
 function accountStatusTone(status: CrmAccount["status"]) {
@@ -254,14 +270,9 @@ type AccountListFilters = {
 };
 
 function matchesAccountListFilters(row: CrmAccountRow, f: AccountListFilters) {
-  if (f.statusFilter && f.statusFilter !== "all") {
-    if (f.statusFilter === "onboarding") {
-      if (row.status !== "onboarding" || isCrmGoLiveStage(row.stage)) return false;
-    } else if (f.statusFilter === "live") {
-      if (!isCrmAccountLiveForList(row)) return false;
-    } else if (row.status !== f.statusFilter) {
-      return false;
-    }
+  const statusKeys = parseCsvFilterKeys(f.statusFilter ?? "");
+  if (statusKeys.length > 0 && !statusKeys.some((key) => rowMatchesStatusFilter(row, key))) {
+    return false;
   }
   if (f.typeFilter !== "all" && row.companyType !== f.typeFilter) return false;
   if (f.cityFilter !== "all" && row.city !== f.cityFilter) return false;
@@ -292,7 +303,8 @@ function matchesAccountListFilters(row: CrmAccountRow, f: AccountListFilters) {
   ) {
     return false;
   }
-  if (f.stageFilter !== "all" && row.stage !== f.stageFilter) return false;
+  const stageKeys = parseCsvFilterKeys(f.stageFilter);
+  if (stageKeys.length > 0 && !stageKeys.includes(row.stage)) return false;
   if (f.providerFilter === "none" && row.providers.length > 0) return false;
   if (
     f.providerFilter !== "all" &&
@@ -373,13 +385,20 @@ function CrmAccountsPage() {
   } = listFilters;
 
   const moduleFilterKeys = useMemo(() => parseModuleFilterKeys(moduleFilter), [moduleFilter]);
+  const statusFilterKeys = useMemo(() => parseCsvFilterKeys(statusFilter), [statusFilter]);
+  const stageFilterKeys = useMemo(() => parseCsvFilterKeys(stageFilter), [stageFilter]);
 
   const setKpiFilter = useCallback(
     (value: AccountKpiFilter) => setListFilters({ kpiFilter: value }),
     [setListFilters],
   );
-  const setStatusFilter = useCallback(
-    (value: string) => setListFilters({ statusFilter: value }),
+  const setStatusFilterKeys = useCallback(
+    (keys: string[]) => {
+      setListFilters({
+        statusFilter: keys.join(","),
+        kpiFilter: "all",
+      });
+    },
     [setListFilters],
   );
   const setTypeFilter = useCallback(
@@ -410,8 +429,8 @@ function CrmAccountsPage() {
     (value: string) => setListFilters({ supportManager2Filter: value }),
     [setListFilters],
   );
-  const setStageFilter = useCallback(
-    (value: string) => setListFilters({ stageFilter: value }),
+  const setStageFilterKeys = useCallback(
+    (keys: string[]) => setListFilters({ stageFilter: keys.join(",") }),
     [setListFilters],
   );
   const setProviderFilter = useCallback(
@@ -681,17 +700,16 @@ function CrmAccountsPage() {
 
   function selectAccountFilterPill(id: AccountFilterPillId) {
     if (id === "critical") {
-      setStatusFilter("all");
+      setStatusFilterKeys([]);
       setKpiFilter("critical");
       return;
     }
     if (id === "all") {
-      setStatusFilter("all");
+      setStatusFilterKeys([]);
       setKpiFilter("all");
       return;
     }
-    setStatusFilter(id);
-    setKpiFilter("all");
+    setStatusFilterKeys([id]);
   }
 
   const filtered = useMemo(() => {
@@ -723,7 +741,7 @@ function CrmAccountsPage() {
   );
 
   const activeFilterCount = [
-    statusFilter !== "all",
+    statusFilterKeys.length > 0,
     typeFilter !== "all",
     cityFilter !== "all",
     regionFilter !== "all",
@@ -731,7 +749,7 @@ function CrmAccountsPage() {
     managerFilter !== "all",
     supportManager1Filter !== "all",
     supportManager2Filter !== "all",
-    stageFilter !== "all",
+    stageFilterKeys.length > 0,
     providerFilter !== "all",
     moduleFilterKeys.length > 0,
     Boolean(dateFrom),
@@ -990,7 +1008,7 @@ function CrmAccountsPage() {
           >
             {STATUS_CHIPS.map((chip) => {
               const tone = filterPillTone(chip.id);
-              const active = isAccountFilterPillActive(chip.id, statusFilter, kpiFilter);
+              const active = isAccountFilterPillActive(chip.id, statusFilterKeys, kpiFilter);
               const count = accountFilterPillCount(chip.id);
               return (
                 <button
@@ -1079,20 +1097,16 @@ function CrmAccountsPage() {
           />
         </DesignTicketFilterField>
         <DesignTicketFilterField label="Status" compact>
-          <DesignTicketSelect
+          <DesignTicketMultiSelect
             compact
-            value={statusFilter}
-            onChange={(value) => {
-              setKpiFilter("all");
-              setStatusFilter(value);
-            }}
-            options={[
-              { value: "all", label: "All statuses" },
-              ...CRM_ACCOUNT_STATUSES.map((status) => ({
-                value: status,
-                label: crmAccountStatusLabel(status),
-              })),
-            ]}
+            values={statusFilterKeys}
+            onChange={setStatusFilterKeys}
+            placeholder="All statuses"
+            searchPlaceholder="Search statuses…"
+            options={CRM_ACCOUNT_STATUSES.map((status) => ({
+              value: status,
+              label: crmAccountStatusLabel(status),
+            }))}
           />
         </DesignTicketFilterField>
         <DesignTicketFilterField label="Progress" compact>
@@ -1110,17 +1124,16 @@ function CrmAccountsPage() {
           />
         </DesignTicketFilterField>
         <DesignTicketFilterField label="Stage" compact>
-          <DesignTicketSelect
+          <DesignTicketMultiSelect
             compact
-            value={stageFilter}
-            onChange={setStageFilter}
-            options={[
-              { value: "all", label: "All stages" },
-              ...stages.map((s) => ({
-                value: s,
-                label: resolveCrmStageLabel(s),
-              })),
-            ]}
+            values={stageFilterKeys}
+            onChange={setStageFilterKeys}
+            placeholder="All stages"
+            searchPlaceholder="Search stages…"
+            options={stages.map((s) => ({
+              value: s,
+              label: resolveCrmStageLabel(s),
+            }))}
           />
         </DesignTicketFilterField>
         <DesignTicketFilterField label="Sales Manager" compact>
