@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { ArrowLeft, Loader2, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { ArrowLeft, Download, Loader2, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Bar,
+  BarChart,
   CartesianGrid,
   Legend,
   Line,
@@ -24,7 +26,7 @@ import { getCrmUsageAccountPage, refreshCrmUsageAccount } from "@/lib/api";
 import { crmAccountStatusLabel } from "@/lib/crm-account-status";
 import { eachIsoDay, usageFocus, usageTag, usageTagTone } from "@/lib/crm-usage";
 import { cn } from "@/lib/utils";
-import type { CrmUsageAccountPage } from "@/types/crm-usage";
+import type { CrmUsageAccountPage, CrmUsageDay } from "@/types/crm-usage";
 
 const searchSchema = z.object({
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -51,13 +53,45 @@ function defaultRange() {
   return { from: isoDate(start), to: isoDate(end) };
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="rounded-lg border border-border bg-card px-3 py-2">
       <div className="text-[11px] text-muted-foreground">{label}</div>
       <div className="text-lg font-semibold tabular-nums">{value}</div>
+      {hint ? <div className="truncate text-[10px] text-muted-foreground">{hint}</div> : null}
     </div>
   );
+}
+
+function percent(part: number, whole: number) {
+  if (!whole) return "—";
+  return `${Math.round((part / whole) * 100)}%`;
+}
+
+function downloadCsv(filename: string, rows: (string | number)[][]) {
+  const body = rows
+    .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(","))
+    .join("\n");
+  const url = URL.createObjectURL(new Blob([body], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+type PeopleFilter = "all" | "productive" | "leads" | "idle";
+type PeopleSort = "leads" | "followups" | "calls" | "bookings" | "activeDays";
+type DayFilter = "all" | "used" | "quiet" | "failed" | "missing";
+
+function dayStatus(day: CrmUsageDay) {
+  if (!day.saved) return "Not saved";
+  if (!day.ok) return "Failed";
+  if (day.hasCrmActivity) return "Used CRM";
+  if (day.leadOnly) return "Leads only";
+  return "No CRM use";
 }
 
 function CrmUsageAccountPageView() {
@@ -70,6 +104,10 @@ function CrmUsageAccountPageView() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [peopleQuery, setPeopleQuery] = useState("");
+  const [peopleFilter, setPeopleFilter] = useState<PeopleFilter>("all");
+  const [peopleSort, setPeopleSort] = useState<PeopleSort>("leads");
+  const [dayFilter, setDayFilter] = useState<DayFilter>("all");
 
   const load = useCallback(async (range: { from: string; to: string }) => {
     setLoading(true);
@@ -130,6 +168,67 @@ function CrmUsageAccountPageView() {
     Bookings: day.ok ? day.bookings : null,
     Calls: day.ok ? day.calls : null,
   }));
+  const weekdayData = useMemo(() => {
+    const buckets = WEEKDAYS.map((day) => ({ day, Leads: 0, Calls: 0, "Follow-ups": 0 }));
+    for (const day of page?.days ?? []) {
+      if (!day.ok) continue;
+      const index = new Date(`${day.date}T00:00:00`).getDay();
+      buckets[index].Leads += day.leads;
+      buckets[index].Calls += day.calls;
+      buckets[index]["Follow-ups"] += day.followups;
+    }
+    return buckets;
+  }, [page?.days]);
+  const people = useMemo(() => {
+    const query = peopleQuery.trim().toLowerCase();
+    const rows = (page?.people ?? []).filter((person) => {
+      if (peopleFilter === "productive" && !person.productive) return false;
+      if (peopleFilter === "leads" && !person.leadOnly) return false;
+      if (peopleFilter === "idle" && (person.productive || person.leadOnly)) return false;
+      if (!query) return true;
+      return person.name.toLowerCase().includes(query) || person.team.toLowerCase().includes(query);
+    });
+    return rows.sort((a, b) => b[peopleSort] - a[peopleSort] || a.name.localeCompare(b.name));
+  }, [page?.people, peopleFilter, peopleQuery, peopleSort]);
+  const days = useMemo(() => {
+    return (page?.days ?? []).filter((day) => {
+      if (dayFilter === "used") return day.ok && day.hasCrmActivity;
+      if (dayFilter === "quiet") return day.ok && !day.hasCrmActivity;
+      if (dayFilter === "failed") return day.saved && !day.ok;
+      if (dayFilter === "missing") return !day.saved;
+      return true;
+    });
+  }, [page?.days, dayFilter]);
+  const leadPeak = Math.max(1, ...(page?.people ?? []).map((person) => person.leads));
+
+  function applyWindow(daysBack: number) {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - (daysBack - 1));
+    setFrom(isoDate(start));
+    setTo(isoDate(end));
+  }
+
+  function exportAccount() {
+    if (!page || !account) return;
+    const dayRows: (string | number)[][] = [
+      ["Date", "Status", "Users", "Leads", "Follow-ups", "Visits conducted", "Visits scheduled", "Bookings", "Calls", "Connected calls", "Score"],
+      ...page.days.map((day) => [
+        day.date,
+        dayStatus(day),
+        day.ok ? day.activeUsers : "",
+        day.ok ? day.leads : "",
+        day.ok ? day.followups : "",
+        day.ok ? day.visitsConducted : "",
+        day.ok ? day.visitsScheduled : "",
+        day.ok && day.bookings != null ? day.bookings : "",
+        day.ok ? day.calls : "",
+        day.ok ? day.connectedCalls : "",
+        day.ok ? day.score : "",
+      ]),
+    ];
+    downloadCsv(`${account.name.replaceAll(/\s+/g, "-").toLowerCase()}-usage-${page.from}-to-${page.to}.csv`, dayRows);
+  }
 
   return (
     <PageWrap>
@@ -155,10 +254,23 @@ function CrmUsageAccountPageView() {
               </div>
             ) : null}
           </div>
-          <Button size="sm" onClick={() => void refreshAccount()} disabled={refreshing || loading || !account?.connected}>
-            {refreshing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-            {refreshing ? `Refreshing ${progress.done}/${progress.total}` : "Refresh this account"}
-          </Button>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {account ? (
+              <Button size="sm" variant="outline" asChild>
+                <Link to="/crm/accounts/$accountId" params={{ accountId: account.id }}>
+                  Open account
+                </Link>
+              </Button>
+            ) : null}
+            <Button size="sm" variant="outline" onClick={exportAccount} disabled={!page || !summary?.ok}>
+              <Download className="h-3.5 w-3.5" />
+              Export days
+            </Button>
+            <Button size="sm" onClick={() => void refreshAccount()} disabled={refreshing || loading || !account?.connected}>
+              {refreshing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              {refreshing ? `Refreshing ${progress.done}/${progress.total}` : "Refresh this account"}
+            </Button>
+          </div>
         </div>
 
         <p className="mb-3 max-w-3xl text-sm text-muted-foreground">
@@ -168,6 +280,13 @@ function CrmUsageAccountPageView() {
           {summary?.ok ? ` ${usageFocus(summary, account?.licensedUsers ?? 0)}` : ""}
         </p>
 
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {[7, 15, 30].map((daysBack) => (
+            <Button key={daysBack} type="button" size="sm" variant="outline" onClick={() => applyWindow(daysBack)}>
+              {daysBack} days
+            </Button>
+          ))}
+        </div>
         <DesignTicketFilterBar className="mb-4">
           <DesignTicketDateField compact label="From" value={from} onChange={setFrom} />
           <DesignTicketDateField compact label="To" value={to} onChange={setTo} />
@@ -181,19 +300,31 @@ function CrmUsageAccountPageView() {
         ) : page && summary?.ok ? (
           <div className="space-y-4">
             <motion.div
-              className="grid grid-cols-2 gap-2 sm:grid-cols-4"
+              className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, delay: 0.05, ease: EASE }}
             >
-              <Metric label="Peak active users" value={`${summary.activeUsers}/${account?.licensedUsers || "—"}`} />
-              <Metric label="Leads" value={String(summary.leads)} />
-              <Metric label="Follow-ups" value={String(summary.followups)} />
-              <Metric label="Bookings" value={summary.bookings == null ? "—" : String(summary.bookings)} />
-              <Metric label="Visits conducted" value={`${summary.visitsConducted}/${summary.visitsScheduled}`} />
-              <Metric label="Calls" value={String(summary.calls)} />
-              <Metric label="Connected calls" value={String(summary.connectedCalls)} />
-              <Metric label="Pattern" value={page.pattern} />
+              <Metric
+                label="Peak active users"
+                value={`${summary.activeUsers}/${account?.licensedUsers || "—"}`}
+                hint={account?.licensedUsers ? `${percent(summary.activeUsers, account.licensedUsers)} of seats` : "No licensed seats"}
+              />
+              <Metric label="Leads" value={String(summary.leads)} hint={page.pattern} />
+              <Metric label="Follow-ups" value={String(summary.followups)} hint={`${percent(summary.followups, summary.leads)} of leads`} />
+              <Metric
+                label="Bookings"
+                value={summary.bookings == null ? "—" : String(summary.bookings)}
+                hint={summary.bookings == null ? "Not loaded" : `${percent(summary.bookings, summary.leads)} of leads`}
+              />
+              <Metric label="Visits" value={`${summary.visitsConducted}/${summary.visitsScheduled}`} hint={`${percent(summary.visitsConducted, summary.visitsScheduled)} closed`} />
+              <Metric label="Calls" value={String(summary.calls)} hint={`${percent(summary.connectedCalls, summary.calls)} connected`} />
+              <Metric label="Connected" value={String(summary.connectedCalls)} />
+              <Metric
+                label="Active days"
+                value={`${page.days.filter((day) => day.ok && day.hasCrmActivity).length}/${page.savedDays}`}
+                hint="Days with CRM use"
+              />
             </motion.div>
 
             {summary.bookingWarning ? (
@@ -203,29 +334,53 @@ function CrmUsageAccountPageView() {
               <p className="text-xs text-amber-700 dark:text-amber-400">{summary.callWarning}</p>
             ) : null}
 
-            <motion.section
-              className="rounded-lg border border-border bg-card p-3"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.1, ease: EASE }}
-            >
-              <h2 className="mb-2 text-sm font-medium">Daily activity</h2>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                    <Tooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="Leads" stroke="var(--color-primary, #2563eb)" strokeWidth={2} dot={false} connectNulls={false} />
-                    <Line type="monotone" dataKey="Follow-ups" stroke="#0f766e" strokeWidth={2} dot={false} connectNulls={false} />
-                    <Line type="monotone" dataKey="Bookings" stroke="#b45309" strokeWidth={2} dot={false} connectNulls={false} />
-                    <Line type="monotone" dataKey="Calls" stroke="#7c3aed" strokeWidth={2} dot={false} connectNulls={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </motion.section>
+            <div className="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.8fr)]">
+              <motion.section
+                className="rounded-lg border border-border bg-card p-3"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.1, ease: EASE }}
+              >
+                <h2 className="mb-2 text-sm font-medium">Daily activity</h2>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <Tooltip />
+                      <Legend />
+                      <Line type="monotone" dataKey="Leads" stroke="var(--color-primary, #2563eb)" strokeWidth={2} dot={false} connectNulls={false} />
+                      <Line type="monotone" dataKey="Follow-ups" stroke="#0f766e" strokeWidth={2} dot={false} connectNulls={false} />
+                      <Line type="monotone" dataKey="Bookings" stroke="#b45309" strokeWidth={2} dot={false} connectNulls={false} />
+                      <Line type="monotone" dataKey="Calls" stroke="#7c3aed" strokeWidth={2} dot={false} connectNulls={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </motion.section>
+              <motion.section
+                className="rounded-lg border border-border bg-card p-3"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.12, ease: EASE }}
+              >
+                <h2 className="mb-2 text-sm font-medium">Weekday pattern</h2>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={weekdayData}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="day" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="Leads" fill="#2563eb" radius={[3, 3, 0, 0]} />
+                      <Bar dataKey="Follow-ups" fill="#0f766e" radius={[3, 3, 0, 0]} />
+                      <Bar dataKey="Calls" fill="#7c3aed" radius={[3, 3, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </motion.section>
+            </div>
 
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
               <motion.section
@@ -234,22 +389,62 @@ function CrmUsageAccountPageView() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.15, ease: EASE }}
               >
-                <h2 className="border-b border-border px-3 py-2 text-sm font-medium">People</h2>
-                <table className="w-full min-w-[720px] text-left text-xs">
+                <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2">
+                  <h2 className="text-sm font-medium">People</h2>
+                  <input
+                    value={peopleQuery}
+                    onChange={(event) => setPeopleQuery(event.target.value)}
+                    placeholder="Search people"
+                    className="h-7 w-36 rounded-md border bg-background px-2 text-xs outline-none focus:ring-2 focus:ring-ring/40"
+                  />
+                  {(["all", "productive", "leads", "idle"] as const).map((id) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setPeopleFilter(id)}
+                      className={cn(
+                        "rounded-md px-2 py-1 text-[11px]",
+                        peopleFilter === id ? "bg-foreground text-background" : "bg-muted text-muted-foreground",
+                      )}
+                    >
+                      {id === "all" ? "All" : id === "productive" ? "Active" : id === "leads" ? "Leads only" : "Idle"}
+                    </button>
+                  ))}
+                  <select
+                    value={peopleSort}
+                    onChange={(event) => setPeopleSort(event.target.value as PeopleSort)}
+                    className="ml-auto h-7 rounded-md border bg-background px-2 text-xs"
+                  >
+                    <option value="leads">Sort by leads</option>
+                    <option value="followups">Sort by follow-ups</option>
+                    <option value="calls">Sort by calls</option>
+                    <option value="bookings">Sort by bookings</option>
+                    <option value="activeDays">Sort by active days</option>
+                  </select>
+                </div>
+                <table className="w-full min-w-[760px] text-left text-xs">
                   <thead className="bg-muted/40 text-muted-foreground">
                     <tr>
-                      {["Name", "Active days", "Leads", "Follow-ups", "Visits", "Bookings", "Calls", "Connected"].map((label) => (
+                      {["Name", "Share of leads", "Active days", "Leads", "Follow-ups", "Visits", "Bookings", "Calls", "Connected"].map((label) => (
                         <th key={label} className="px-2 py-1.5 font-medium">{label}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {page.people.length ? page.people.map((person) => (
+                    {people.length ? people.map((person) => (
                       <tr key={person.name} className="border-t border-border">
                         <td className="px-2 py-1.5">
                           <div className="font-medium">{person.name}</div>
                           <div className="text-[11px] text-muted-foreground">
                             {person.leadOnly ? "Leads only" : person.productive ? person.team || "Active" : "No activity"}
+                          </div>
+                        </td>
+                        <td className="w-36 px-2 py-1.5">
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                            <div
+                              className="h-full rounded-full bg-primary"
+                              style={{ width: `${Math.round((person.leads / leadPeak) * 100)}%` }}
+                            />
                           </div>
                         </td>
                         <td className="px-2 py-1.5 tabular-nums">{person.activeDays}</td>
@@ -262,7 +457,7 @@ function CrmUsageAccountPageView() {
                       </tr>
                     )) : (
                       <tr>
-                        <td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">No people saved for this window.</td>
+                        <td colSpan={9} className="px-3 py-6 text-center text-muted-foreground">No people match this filter.</td>
                       </tr>
                     )}
                   </tbody>
@@ -294,28 +489,51 @@ function CrmUsageAccountPageView() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.25, ease: EASE }}
             >
-              <h2 className="border-b border-border px-3 py-2 text-sm font-medium">Day by day</h2>
+              <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2">
+                <h2 className="text-sm font-medium">Day by day</h2>
+                {(["all", "used", "quiet", "failed", "missing"] as const).map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setDayFilter(id)}
+                    className={cn(
+                      "rounded-md px-2 py-1 text-[11px]",
+                      dayFilter === id ? "bg-foreground text-background" : "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {id === "all" ? "All" : id === "used" ? "Used CRM" : id === "quiet" ? "Quiet" : id === "failed" ? "Failed" : "Not saved"}
+                  </button>
+                ))}
+                <span className="ml-auto text-[11px] text-muted-foreground">{days.length} days</span>
+              </div>
               <table className="w-full min-w-[680px] text-left text-xs">
                 <thead className="bg-muted/40 text-muted-foreground">
                   <tr>
-                    {["Date", "Status", "Users", "Leads", "Follow-ups", "Visits", "Bookings", "Calls"].map((label) => (
+                    {["Date", "Status", "Users", "Leads", "Follow-ups", "Visits", "Bookings", "Calls", "Connected", "Score"].map((label) => (
                       <th key={label} className="px-2 py-1.5 font-medium">{label}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {page.days.map((day) => (
+                  {days.map((day) => (
                     <tr key={day.date} className={cn("border-t border-border", !day.ok && "text-muted-foreground")}>
                       <td className="px-2 py-1.5">{day.date}</td>
-                      <td className="px-2 py-1.5">{day.ok ? (day.hasCrmActivity ? "Used CRM" : day.leadOnly ? "Leads only" : "No CRM use") : day.saved ? "Failed" : "Not saved"}</td>
+                      <td className="px-2 py-1.5">{dayStatus(day)}</td>
                       <td className="px-2 py-1.5 tabular-nums">{day.ok ? day.activeUsers : "—"}</td>
                       <td className="px-2 py-1.5 tabular-nums">{day.ok ? day.leads : "—"}</td>
                       <td className="px-2 py-1.5 tabular-nums">{day.ok ? day.followups : "—"}</td>
                       <td className="px-2 py-1.5 tabular-nums">{day.ok ? `${day.visitsConducted}/${day.visitsScheduled}` : "—"}</td>
                       <td className="px-2 py-1.5 tabular-nums">{day.ok && day.bookings != null ? day.bookings : "—"}</td>
                       <td className="px-2 py-1.5 tabular-nums">{day.ok ? day.calls : "—"}</td>
+                      <td className="px-2 py-1.5 tabular-nums">{day.ok ? day.connectedCalls : "—"}</td>
+                      <td className="px-2 py-1.5 tabular-nums">{day.ok ? day.score : "—"}</td>
                     </tr>
                   ))}
+                  {days.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="px-3 py-6 text-center text-muted-foreground">No days match this filter.</td>
+                    </tr>
+                  ) : null}
                 </tbody>
               </table>
             </motion.section>

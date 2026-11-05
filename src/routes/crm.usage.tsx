@@ -54,6 +54,15 @@ function rangeFor(days: number) {
   return { from: isoDate(start), to: isoDate(end) };
 }
 
+function UsageStat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="min-w-0 rounded-md bg-muted/50 px-1.5 py-1">
+      <div className="truncate text-[10px] text-muted-foreground">{label}</div>
+      <div className="truncate text-xs font-semibold tabular-nums">{value}</div>
+    </div>
+  );
+}
+
 function needsFill(row: CrmUsageBoardRow) {
   return row.connected && (row.savedDays < row.expectedDays || row.failedDays > 0);
 }
@@ -80,6 +89,7 @@ function CrmUsagePage() {
   const [card, setCard] = useState<CardId>("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [managerFilter, setManagerFilter] = useState("all");
+  const [query, setQuery] = useState("");
 
   const load = useCallback(async (range: { from: string; to: string }) => {
     setLoading(true);
@@ -219,7 +229,7 @@ function CrmUsagePage() {
         {board?.sync?.message ? ` ${board.sync.message}` : ""}
       </p>
 
-      <div className="mb-3 flex flex-wrap gap-1.5">
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
         {WINDOWS.map((item) => (
           <Button
             key={item.id}
@@ -237,6 +247,12 @@ function CrmUsagePage() {
             {item.label}
           </Button>
         ))}
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search account, city, or manager"
+          className="h-8 min-w-[12rem] flex-1 rounded-md border bg-background px-2.5 text-xs outline-none focus:ring-2 focus:ring-ring/40"
+        />
       </div>
 
       <DesignTicketFilterBar className="mb-3">
@@ -286,6 +302,9 @@ function CrmUsagePage() {
       <DataTable
         data={tableRows}
         density="compact"
+        layout="fixed"
+        hideSearch
+        searchQuery={query}
         searchKeys={["name", "salesManagerName", "city", "tag", "focus"]}
         getRowId={(row) => row.id}
         onRowClick={(row) =>
@@ -305,68 +324,56 @@ function CrmUsagePage() {
             key: "name",
             header: "Account",
             sortable: true,
-            render: (row) => (
-              <div>
-                <div className="font-medium">{row.name}</div>
-                <div className="text-[11px] text-muted-foreground">
-                  {crmAccountStatusLabel(row.status)}
-                  {row.city ? ` · ${row.city}` : ""}
+            className: "w-[28%]",
+            render: (row) => {
+              const coverage = row.expectedDays > 0 ? Math.round((row.savedDays / row.expectedDays) * 100) : 0;
+              return (
+                <div className="min-w-0">
+                  <div className="truncate font-medium">{row.name}</div>
+                  <div className="truncate text-[11px] text-muted-foreground">
+                    {crmAccountStatusLabel(row.status)}
+                    {row.city ? ` · ${row.city}` : ""}
+                    {row.salesManagerName ? ` · ${row.salesManagerName}` : ""}
+                  </div>
+                  <div className="mt-1 flex items-center gap-2">
+                    <div className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
+                      <div className="h-full rounded-full bg-primary" style={{ width: `${coverage}%` }} />
+                    </div>
+                    <span className="shrink-0 tabular-nums text-[10px] text-muted-foreground">
+                      {row.savedDays}/{row.expectedDays}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ),
-          },
-          {
-            key: "salesManagerName",
-            header: "Manager",
-            sortable: true,
-            render: (row) => row.salesManagerName || "—",
-          },
-          {
-            key: "savedDays",
-            header: "Saved",
-            sortable: true,
-            render: (row) => `${row.savedDays}/${row.expectedDays}`,
-          },
-          {
-            key: "activeUsers",
-            header: "Peak users",
-            sortable: true,
-            render: (row) => (row.activeUsers >= 0 ? `${row.activeUsers}/${row.licensedUsers || "—"}` : "—"),
+              );
+            },
           },
           {
             key: "leads",
-            header: "Leads",
+            header: "Activity",
             sortable: true,
-            render: (row) => (row.leads >= 0 ? row.leads : "—"),
-          },
-          {
-            key: "followups",
-            header: "Follow-ups",
-            sortable: true,
-            render: (row) => (row.followups >= 0 ? row.followups : "—"),
-          },
-          {
-            key: "bookings",
-            header: "Bookings",
-            sortable: true,
-            render: (row) => (row.bookings >= 0 ? row.bookings : "—"),
-          },
-          {
-            key: "calls",
-            header: "Calls",
-            sortable: true,
-            render: (row) => (row.calls >= 0 ? row.calls : "—"),
+            className: "w-[42%]",
+            render: (row) => (
+              <div className="grid grid-cols-5 gap-1">
+                <UsageStat label="Users" value={row.activeUsers >= 0 ? `${row.activeUsers}/${row.licensedUsers || "—"}` : "—"} />
+                <UsageStat label="Leads" value={row.leads >= 0 ? row.leads : "—"} />
+                <UsageStat label="Follow-ups" value={row.followups >= 0 ? row.followups : "—"} />
+                <UsageStat label="Bookings" value={row.bookings >= 0 ? row.bookings : "—"} />
+                <UsageStat label="Calls" value={row.calls >= 0 ? row.calls : "—"} />
+              </div>
+            ),
           },
           {
             key: "tag",
             header: "Usage",
             sortable: true,
+            className: "w-[12%]",
             render: (row) => <Pill tone={usageTagTone(row.tag)}>{row.tag}</Pill>,
           },
           {
             key: "focus",
             header: "Customer success",
-            render: (row) => <span className="block max-w-xs text-xs text-muted-foreground">{row.focus}</span>,
+            className: "w-[18%]",
+            render: (row) => <span className="block text-[11px] leading-snug text-muted-foreground">{row.focus}</span>,
           },
         ]}
       />

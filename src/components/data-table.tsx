@@ -68,6 +68,7 @@ export function DataTable<T>({
   renderExpandedRow,
   flush = false,
   getRowClassName,
+  layout = "auto",
 }: {
   data: T[];
   columns: {
@@ -75,6 +76,8 @@ export function DataTable<T>({
     header: string;
     render: (row: T) => ReactNode;
     sortable?: boolean;
+    /** Width and alignment for both the header and the cell. */
+    className?: string;
   }[];
   searchKeys?: (keyof T)[];
   /** When parent toolbar owns search. */
@@ -102,6 +105,8 @@ export function DataTable<T>({
   /** Edge-to-edge table — no side border/radius (for dense list pages). */
   flush?: boolean;
   getRowClassName?: (row: T) => string | undefined;
+  /** `fixed` keeps percentage column widths from stretching short values. */
+  layout?: "auto" | "fixed";
 }) {
   const [internalSearch, setInternalSearch] = useState("");
   const search = searchQuery ?? internalSearch;
@@ -335,7 +340,7 @@ export function DataTable<T>({
         )}
       >
         <div className="overflow-x-auto">
-          <table className={cn("w-full", tableText)}>
+          <table className={cn("w-full", layout === "fixed" && "table-fixed", tableText)}>
             <thead className={cn("bg-muted/60 text-muted-foreground", headText)}>
               <tr>
                 {selection && (
@@ -356,6 +361,7 @@ export function DataTable<T>({
                       headPad,
                       "align-middle whitespace-nowrap text-left font-medium",
                       col.sortable && "cursor-pointer select-none",
+                      col.className,
                     )}
                     onClick={() => {
                       if (!col.sortable) return;
@@ -419,7 +425,7 @@ export function DataTable<T>({
                         </td>
                       )}
                       {columns.map((col) => (
-                        <td key={col.key} className={cn(cellPad, "align-middle")}>
+                        <td key={col.key} className={cn(cellPad, "align-middle", col.className)}>
                           {col.render(row)}
                         </td>
                       ))}
