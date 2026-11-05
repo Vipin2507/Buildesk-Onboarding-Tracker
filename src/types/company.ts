@@ -136,6 +136,9 @@ export type Company = Timestamps & {
   installmentAmount?: number;
   installmentDueDate?: string;
   cancelledOn?: string;
+  /** WAHA WhatsApp group JID (`…@g.us`) bound for the company chat tab */
+  whatsappGroupId?: string | null;
+  whatsappGroupName?: string | null;
 };
 
 export type OtherCharge = Timestamps & {

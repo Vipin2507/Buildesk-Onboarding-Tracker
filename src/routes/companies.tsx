@@ -8,6 +8,7 @@ import {
   UserRound,
   FileSpreadsheet,
   Download,
+  MessageCircle,
   Search,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -30,6 +31,7 @@ import { EmptyState } from "@/components/empty-state";
 import { ConfirmDeleteDialog, EntityFormModal } from "@/components/entity-form-modal";
 import { ProjectImportModal } from "@/components/project-import-modal";
 import { CompanyCommercialBulkUpdateModal } from "@/components/companies/company-commercial-bulk-update-modal";
+import { CompanyWhatsappSyncModal } from "@/components/crm/crm-account-whatsapp-sync-modal";
 import { inDateRange } from "@/components/list-toolbar";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
@@ -347,6 +349,7 @@ function CompaniesPage() {
 }
 
 function CompaniesListPage() {
+  const companies = useCompanyStore((s) => s.companies);
   const addCompany = useCompanyStore((s) => s.addCompany);
   const updateCompany = useCompanyStore((s) => s.updateCompany);
   const deleteCompany = useCompanyStore((s) => s.deleteCompany);
@@ -380,6 +383,7 @@ function CompaniesListPage() {
   const [assignOpen, setAssignOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [commercialUpdateOpen, setCommercialUpdateOpen] = useState(false);
+  const [whatsappSyncOpen, setWhatsappSyncOpen] = useState(false);
   const [assignManagerId, setAssignManagerId] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [editing, setEditing] = useState<Company | null>(null);
@@ -823,6 +827,15 @@ function CompaniesListPage() {
             </Button>
             {canManageCompanies ? (
               <>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 gap-1 px-3 text-xs"
+                  onClick={() => setWhatsappSyncOpen(true)}
+                >
+                  <MessageCircle className="h-3.5 w-3.5" />
+                  Sync accounts
+                </Button>
                 <Button
                   size="sm"
                   variant="ghost"
@@ -1709,6 +1722,12 @@ function CompaniesListPage() {
       <CompanyCommercialBulkUpdateModal
         open={commercialUpdateOpen}
         onOpenChange={setCommercialUpdateOpen}
+      />
+
+      <CompanyWhatsappSyncModal
+        open={whatsappSyncOpen}
+        onOpenChange={setWhatsappSyncOpen}
+        companies={companies}
       />
     </PageWrap>
   );

@@ -98,6 +98,8 @@ export const companies = sqliteTable("companies", {
   installmentAmount: text("installment_amount"),
   installmentDueDate: text("installment_due_date"),
   cancelledOn: text("cancelled_on"),
+  whatsappGroupId: text("whatsapp_group_id"),
+  whatsappGroupName: text("whatsapp_group_name"),
   ...timestamps,
 });
 
@@ -216,6 +218,39 @@ export const crmAccounts = sqliteTable(
     index("crm_accounts_name_idx").on(t.name),
     index("crm_accounts_user_id_idx").on(t.userId),
     index("crm_accounts_status_idx").on(t.status),
+  ],
+);
+
+/** Cached WAHA WhatsApp group messages for ERP companies. */
+export const companyWhatsappGroupMessages = sqliteTable(
+  "company_whatsapp_group_messages",
+  {
+    id: text("id").primaryKey(),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    groupId: text("group_id").notNull(),
+    wahaMessageId: text("waha_message_id").notNull(),
+    timestamp: integer("timestamp").notNull().default(0),
+    fromMe: integer("from_me", { mode: "boolean" }).notNull().default(false),
+    fromJid: text("from_jid").notNull().default(""),
+    participantName: text("participant_name"),
+    body: text("body").notNull().default(""),
+    hasMedia: integer("has_media", { mode: "boolean" }).notNull().default(false),
+    mediaType: text("media_type"),
+    mimetype: text("mimetype"),
+    mediaUrl: text("media_url"),
+    filename: text("filename"),
+    ack: integer("ack"),
+    replyTo: text("reply_to"),
+    replyPreview: text("reply_preview"),
+    ...timestamps,
+  },
+  (t) => [
+    index("company_wa_group_msgs_company_idx").on(t.companyId),
+    index("company_wa_group_msgs_group_idx").on(t.groupId),
+    index("company_wa_group_msgs_ts_idx").on(t.companyId, t.groupId, t.timestamp),
+    uniqueIndex("company_wa_group_msgs_company_waha_uidx").on(t.companyId, t.wahaMessageId),
   ],
 );
 

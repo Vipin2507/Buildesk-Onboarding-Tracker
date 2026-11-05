@@ -111,6 +111,8 @@ export function mapCompany(row: typeof t.companies.$inferSelect, modules: Compan
     installmentAmount: num(row.installmentAmount),
     installmentDueDate: row.installmentDueDate ?? undefined,
     cancelledOn: row.cancelledOn ?? undefined,
+    whatsappGroupId: row.whatsappGroupId ?? undefined,
+    whatsappGroupName: row.whatsappGroupName ?? undefined,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

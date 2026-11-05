@@ -33,6 +33,7 @@ import { CompanyDesignTicketsPanel } from "@/components/company-design-tickets-p
 import { CompanyTasksPanel } from "@/components/company-tasks-panel";
 import { CompanyVisitsPanel } from "@/components/company-visits-panel";
 import { CompanyMeetingsPanel } from "@/components/company-meetings-panel";
+import { CrmAccountWhatsappGroupPanel } from "@/components/crm/crm-account-whatsapp-group-panel";
 import { EntityNotFound } from "@/components/empty-state";
 import { DetailPageSkeleton } from "@/components/loading-skeleton";
 import { ConfirmDeleteDialog } from "@/components/entity-form-modal";
@@ -70,6 +71,7 @@ const tabSchema = z.enum([
   "History",
   "Payments",
   "Billing",
+  "WhatsApp",
 ]);
 
 const searchSchema = z.object({
@@ -100,6 +102,7 @@ const TABS = [
   { id: "History", label: "History" },
   { id: "Payments", label: "Payments" },
   { id: "Billing", label: "Billing" },
+  { id: "WhatsApp", label: "WhatsApp" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -371,6 +374,10 @@ function CompanyDetailContent() {
       {tab === "History" && <CompanyHistoryTab companyId={companyId} />}
 
       {tab === "Payments" && <CompanyPaymentsTab companyId={companyId} />}
+
+      {tab === "WhatsApp" && (
+        <CrmAccountWhatsappGroupPanel accountId={companyId} scope="company" />
+      )}
 
       {tab === "Billing" && (
         <DesignTicketSection compact title="Billing & subscription" delay={0.02}>

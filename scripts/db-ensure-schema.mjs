@@ -257,6 +257,8 @@ const EXTRA_COLUMNS = [
   { table: "companies", name: "installment_amount", ddl: "TEXT" },
   { table: "companies", name: "installment_due_date", ddl: "TEXT" },
   { table: "companies", name: "cancelled_on", ddl: "TEXT" },
+  { table: "companies", name: "whatsapp_group_id", ddl: "TEXT" },
+  { table: "companies", name: "whatsapp_group_name", ddl: "TEXT" },
   { table: "companies", name: "plan_name", ddl: "TEXT" },
   { table: "users", name: "product_scope", ddl: "TEXT NOT NULL DEFAULT 'erp'" },
   { table: "users", name: "work_email", ddl: "TEXT" },
@@ -1332,6 +1334,37 @@ if (!tableExists("crm_whatsapp_group_messages")) {
     CREATE UNIQUE INDEX IF NOT EXISTS crm_wa_group_msgs_account_waha_uidx ON crm_whatsapp_group_messages(account_id, waha_message_id);
   `);
   console.log("+ CREATE TABLE crm_whatsapp_group_messages");
+}
+
+if (!tableExists("company_whatsapp_group_messages")) {
+  sqlite.exec(`
+    CREATE TABLE company_whatsapp_group_messages (
+      id TEXT PRIMARY KEY NOT NULL,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      group_id TEXT NOT NULL,
+      waha_message_id TEXT NOT NULL,
+      timestamp INTEGER NOT NULL DEFAULT 0,
+      from_me INTEGER NOT NULL DEFAULT 0,
+      from_jid TEXT NOT NULL DEFAULT '',
+      participant_name TEXT,
+      body TEXT NOT NULL DEFAULT '',
+      has_media INTEGER NOT NULL DEFAULT 0,
+      media_type TEXT,
+      mimetype TEXT,
+      media_url TEXT,
+      filename TEXT,
+      ack INTEGER,
+      reply_to TEXT,
+      reply_preview TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS company_wa_group_msgs_company_idx ON company_whatsapp_group_messages(company_id);
+    CREATE INDEX IF NOT EXISTS company_wa_group_msgs_group_idx ON company_whatsapp_group_messages(group_id);
+    CREATE INDEX IF NOT EXISTS company_wa_group_msgs_ts_idx ON company_whatsapp_group_messages(company_id, group_id, timestamp);
+    CREATE UNIQUE INDEX IF NOT EXISTS company_wa_group_msgs_company_waha_uidx ON company_whatsapp_group_messages(company_id, waha_message_id);
+  `);
+  console.log("+ CREATE TABLE company_whatsapp_group_messages");
 }
 
 if (!tableExists("crm_whatsapp_broadcasts")) {

@@ -180,6 +180,11 @@ export {
 } from "@/server/api/crm-whatsapp-group-messages";
 
 export {
+  listCompanyWhatsappGroupMessages,
+  upsertCompanyWhatsappGroupMessages,
+} from "@/server/api/company-whatsapp-group-messages";
+
+export {
   listCrmWhatsappBroadcasts,
   getCrmWhatsappBroadcast,
   createCrmWhatsappBroadcast,

@@ -28,7 +28,9 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  listCompanyWhatsappGroupMessages,
   listCrmWhatsappGroupMessages,
+  upsertCompanyWhatsappGroupMessages,
   upsertCrmWhatsappGroupMessages,
 } from "@/lib/api";
 import { applyCrmWhatsappTemplate } from "@/lib/crm-whatsapp-templates";
@@ -49,6 +51,9 @@ import {
   type WahaMediaKind,
 } from "@/services/waha";
 import { pullCrmAutomationConfigFromServer } from "@/lib/crm-automation-refresh";
+import { pullErpAutomationConfigFromServer } from "@/lib/erp-automation-refresh";
+import { useAutomationStore } from "@/stores/useAutomationStore";
+import { useCompanyStore } from "@/stores/useCompanyStore";
 import { useCrmAccountStore } from "@/stores/useCrmAccountStore";
 import { useCrmAutomationStore } from "@/stores/useCrmAutomationStore";
 import {
@@ -823,11 +828,41 @@ function normalizeGroupId(raw: string) {
 const COMPOSER_MIN_H = 36;
 const COMPOSER_MAX_H = 144;
 
-export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string }) {
-  const account = useCrmAccountStore((s) => s.accounts.find((a) => a.id === accountId));
-  const accounts = useCrmAccountStore((s) => s.accounts);
+export function CrmAccountWhatsappGroupPanel({
+  accountId,
+  scope = "crm",
+}: {
+  accountId: string;
+  /** `company` uses ERP companies and the ERP Automation WAHA session. */
+  scope?: "crm" | "company";
+}) {
+  const crmAccount = useCrmAccountStore((s) => s.accounts.find((a) => a.id === accountId));
+  const crmAccounts = useCrmAccountStore((s) => s.accounts);
+  const company = useCompanyStore((s) => s.companies.find((c) => c.id === accountId));
+  const companies = useCompanyStore((s) => s.companies);
   const updateAccount = useCrmAccountStore((s) => s.updateAccount);
-  const waha = useCrmAutomationStore((s) => s.waha);
+  const updateCompany = useCompanyStore((s) => s.updateCompany);
+  const crmWaha = useCrmAutomationStore((s) => s.waha);
+  const erpWaha = useAutomationStore((s) => s.waha);
+  const account = scope === "company" ? company : crmAccount;
+  const linkedPeers = scope === "company" ? companies : crmAccounts;
+  const waha = scope === "company" ? erpWaha : crmWaha;
+  const peerLabel = scope === "company" ? "companies" : "accounts";
+
+  const persistMessages = useCallback(
+    (chatId: string, stored: ReturnType<typeof uiToStoredPayload>[]) => {
+      if (scope === "company") {
+        void upsertCompanyWhatsappGroupMessages({
+          data: { companyId: accountId, groupId: chatId, messages: stored },
+        }).catch(() => null);
+        return;
+      }
+      void upsertCrmWhatsappGroupMessages({
+        data: { accountId, groupId: chatId, messages: stored },
+      }).catch(() => null);
+    },
+    [accountId, scope],
+  );
 
   const [editing, setEditing] = useState(!account?.whatsappGroupId);
   const [groupIdInput, setGroupIdInput] = useState(account?.whatsappGroupId ?? "");
@@ -957,13 +992,13 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
 
   const takenGroupIds = useMemo(() => {
     const ids = new Set<string>();
-    for (const a of accounts) {
+    for (const a of linkedPeers) {
       const id = a.whatsappGroupId?.trim();
       if (!id) continue;
       ids.add(normalizeGroupId(id));
     }
     return ids;
-  }, [accounts]);
+  }, [linkedPeers]);
 
   const availablePickerGroups = useMemo(() => {
     if (!pickerGroups) return null;
@@ -1018,9 +1053,14 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
         // 1) Hydrate from SQLite once (skip on silent polls that only want WAHA delta).
         if (!opts?.recentOnly) {
           try {
-            const stored = await listCrmWhatsappGroupMessages({
-              data: { accountId, groupId, limit: 120 },
-            });
+            const stored =
+              scope === "company"
+                ? await listCompanyWhatsappGroupMessages({
+                    data: { companyId: accountId, groupId, limit: 120 },
+                  })
+                : await listCrmWhatsappGroupMessages({
+                    data: { accountId, groupId, limit: 120 },
+                  });
             if (stored.length > 0) {
               const ui = stripEmptyMessageShells(
                 stored
@@ -1067,11 +1107,9 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
             next = stripEmptyMessageShells(next);
             const byId = new Map(next.map((m) => [m.id, m]));
             // Upsert with local media previews preserved so SQLite is not wiped by WAHA stubs.
-            void upsertCrmWhatsappGroupMessages({
-              data: {
-                accountId,
-                groupId,
-                messages: normalized.map((incoming) => {
+            persistMessages(
+              groupId,
+              normalized.map((incoming) => {
                   const local = byId.get(incoming.id);
                   return uiToStoredPayload(
                     local
@@ -1091,8 +1129,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                       : incoming,
                   );
                 }),
-              },
-            }).catch(() => null);
+            );
             return next;
           });
           setHasMoreHistory(!opts?.recentOnly ? result.messages.length >= 100 : true);
@@ -1111,7 +1148,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
         if (!opts?.silent) setLoadingMsgs(false);
       }
     },
-    [accountId, groupId, waha],
+    [accountId, groupId, persistMessages, scope, waha],
   );
 
   const loadOlderMessages = useCallback(async () => {
@@ -1133,17 +1170,11 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
       }
       setMessages((prev) => mergeMessages(prev, result.messages));
       setHasMoreHistory(result.messages.length >= 100);
-      void upsertCrmWhatsappGroupMessages({
-        data: {
-          accountId,
-          groupId,
-          messages: result.messages.map(uiToStoredPayload),
-        },
-      }).catch(() => null);
+      persistMessages(groupId, result.messages.map(uiToStoredPayload));
     } finally {
       setLoadingOlder(false);
     }
-  }, [accountId, groupId, waha, messages.length, loadingOlder]);
+  }, [groupId, persistMessages, waha, messages.length, loadingOlder]);
 
   useEffect(() => {
     setEditing(!account?.whatsappGroupId);
@@ -1310,13 +1341,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
 
           setMessages((prev) => mergeMessages(prev, [enriched]));
 
-          void upsertCrmWhatsappGroupMessages({
-            data: {
-              accountId,
-              groupId,
-              messages: [uiToStoredPayload(enriched)],
-            },
-          }).catch(() => null);
+          persistMessages(groupId, [uiToStoredPayload(enriched)]);
         } catch {
           const nextFails = (mediaHydrateFailCount.current.get(msg.id) ?? 0) + 1;
           mediaHydrateFailCount.current.set(msg.id, nextFails);
@@ -1330,7 +1355,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
     return () => {
       cancelled = true;
     };
-  }, [messages, groupId, editing, waha, accountId, mediaHydrateEpoch, mediaBrokenIds, markMediaBroken, clearMediaBroken, setLocalMediaPreview]);
+  }, [messages, groupId, editing, waha, persistMessages, mediaHydrateEpoch, mediaBrokenIds, markMediaBroken, clearMediaBroken, setLocalMediaPreview]);
 
   useEffect(() => {
     const el = threadRef.current;
@@ -1351,13 +1376,21 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
       return;
     }
     const name = groupNameInput.trim() || id;
-    updateAccount(accountId, { whatsappGroupId: id, whatsappGroupName: name });
+    if (scope === "company") {
+      updateCompany(accountId, { whatsappGroupId: id, whatsappGroupName: name });
+    } else {
+      updateAccount(accountId, { whatsappGroupId: id, whatsappGroupName: name });
+    }
     setEditing(false);
     toast.success("WhatsApp group linked");
   }
 
   function clearBinding() {
-    updateAccount(accountId, { whatsappGroupId: undefined, whatsappGroupName: undefined });
+    if (scope === "company") {
+      updateCompany(accountId, { whatsappGroupId: null, whatsappGroupName: null });
+    } else {
+      updateAccount(accountId, { whatsappGroupId: undefined, whatsappGroupName: undefined });
+    }
     setMessages([]);
     setGroupIdInput("");
     setGroupNameInput("");
@@ -1369,7 +1402,10 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
     setLoadingPicker(true);
     setGroupSearch("");
     try {
-      const liveWaha = await pullCrmAutomationConfigFromServer();
+      const liveWaha =
+        scope === "company"
+          ? await pullErpAutomationConfigFromServer()
+          : await pullCrmAutomationConfigFromServer();
       const result = await listWahaGroups(liveWaha);
       if (!result.ok) {
         toast.error(result.error ?? "Could not load groups");
@@ -1541,13 +1577,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
           mediaUrl: durableUrl || persistableMediaUrl(kept.mediaUrl) || kept.mediaUrl,
         };
 
-        void upsertCrmWhatsappGroupMessages({
-          data: {
-            accountId,
-            groupId,
-            messages: [uiToStoredPayload(enriched)],
-          },
-        }).catch(() => null);
+        persistMessages(groupId, [uiToStoredPayload(enriched)]);
 
         return collapsed.map((m) => (m.id === kept.id ? enriched : m));
       });
@@ -1567,7 +1597,11 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
   }
 
   if (!account) {
-    return <p className="text-sm text-muted-foreground">Account not found.</p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        {scope === "company" ? "Company not found." : "Account not found."}
+      </p>
+    );
   }
 
   if (editing || !groupId) {
@@ -1636,7 +1670,7 @@ export function CrmAccountWhatsappGroupPanel({ accountId }: { accountId: string 
                   {groupSearch.trim()
                     ? `No available groups match “${groupSearch.trim()}”`
                     : availablePickerGroups?.length === 0 && (pickerGroups?.length ?? 0) > 0
-                      ? "All connected groups are already linked to accounts"
+                      ? `All connected groups are already linked to ${peerLabel}`
                       : "No groups found"}
                 </li>
               ) : (

@@ -197,6 +197,8 @@ const companyInput = z.object({
   gstAmount: optionalNumber,
   paymentStatus: z.enum(COMPANY_PAYMENT_STATUSES).optional().nullable(),
   commercialStatus: z.enum(COMPANY_COMMERCIAL_STATUSES).optional().nullable(),
+  whatsappGroupId: z.string().optional().nullable(),
+  whatsappGroupName: z.string().optional().nullable(),
   installmentCount: optionalNumber,
   installmentAmount: optionalNumber,
   installmentDueDate: z.string().optional().nullable(),

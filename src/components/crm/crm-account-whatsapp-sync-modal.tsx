@@ -13,10 +13,14 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { isCrmAccountEnded } from "@/lib/crm-account-status";
-import { cn } from "@/lib/utils";
 import { pullCrmAutomationConfigFromServer } from "@/lib/crm-automation-refresh";
+import { pullErpAutomationConfigFromServer } from "@/lib/erp-automation-refresh";
+import { cn } from "@/lib/utils";
 import { listWahaGroups, type WahaGroupSummary } from "@/services/waha";
+import { useCompanyStore } from "@/stores/useCompanyStore";
 import { useCrmAccountStore } from "@/stores/useCrmAccountStore";
+import type { WahaConfig } from "@/types/automation";
+import type { Company } from "@/types/company";
 import type { CrmAccount } from "@/types/crm-account";
 
 const UNLINK = "__unlink__";
@@ -31,18 +35,26 @@ function normalizeGroupId(raw: string) {
   return id;
 }
 
-function isActiveAccount(account: CrmAccount) {
-  return !isCrmAccountEnded(account.status);
-}
+type SyncRow = {
+  id: string;
+  name: string;
+  pocName?: string | null;
+  city?: string | null;
+  status?: string | null;
+  userId?: string | null;
+  whatsappGroupId?: string | null;
+  whatsappGroupName?: string | null;
+  commercialStatus?: string | null;
+};
 
 type RowDraft = {
   accountId: string;
   groupId: string;
 };
 
-function draftFromAccounts(accounts: CrmAccount[]): RowDraft[] {
+function draftFromAccounts(accounts: SyncRow[], isActive: (row: SyncRow) => boolean): RowDraft[] {
   return accounts
-    .filter(isActiveAccount)
+    .filter(isActive)
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((a) => ({
@@ -51,16 +63,27 @@ function draftFromAccounts(accounts: CrmAccount[]): RowDraft[] {
     }));
 }
 
-export function CrmAccountWhatsappSyncModal({
+function WhatsappGroupSyncDialog({
   open,
   onOpenChange,
   accounts,
+  noun,
+  pullWaha,
+  isActive,
+  saveLink,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  accounts: CrmAccount[];
+  accounts: SyncRow[];
+  noun: "account" | "company";
+  pullWaha: () => Promise<WahaConfig>;
+  isActive: (row: SyncRow) => boolean;
+  saveLink: (
+    id: string,
+    patch: { whatsappGroupId: string | null; whatsappGroupName: string | null },
+  ) => void;
 }) {
-  const updateAccount = useCrmAccountStore((s) => s.updateAccount);
+  const plural = noun === "company" ? "companies" : "accounts";
 
   const [accountSearch, setAccountSearch] = useState("");
   const [linkFilter, setLinkFilter] = useState<LinkFilter>("all");
@@ -69,7 +92,7 @@ export function CrmAccountWhatsappSyncModal({
   const [groupsError, setGroupsError] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<RowDraft[]>([]);
   /** Snapshot of accounts at open time — used for dirty checks so live store updates don't reset picks. */
-  const [baselineAccounts, setBaselineAccounts] = useState<CrmAccount[]>([]);
+  const [baselineAccounts, setBaselineAccounts] = useState<SyncRow[]>([]);
   const [saving, setSaving] = useState(false);
 
   const accountsRef = useRef(accounts);
@@ -79,7 +102,7 @@ export function CrmAccountWhatsappSyncModal({
   const loadGroups = useCallback(async (opts?: { quiet?: boolean }) => {
     setLoadingGroups(true);
     if (!opts?.quiet) setGroupsError(null);
-    const live = await pullCrmAutomationConfigFromServer();
+    const live = await pullWaha();
     if (!live.apiUrl || !live.apiKey || !live.sessionName) {
       setGroups([]);
       setGroupsError("WAHA is not configured — set API URL, key, and session in Automation.");
@@ -102,7 +125,7 @@ export function CrmAccountWhatsappSyncModal({
       if (!opts?.quiet) toast.success(`Loaded ${result.groups.length} WhatsApp groups`);
     }
     setLoadingGroups(false);
-  }, []);
+  }, [pullWaha]);
 
   // Initialize drafts + load groups once per open. Do NOT depend on `accounts` /
   // store object identity — that was resetting selections on every refresh.
@@ -114,17 +137,17 @@ export function CrmAccountWhatsappSyncModal({
     if (sessionOpenRef.current) return;
     sessionOpenRef.current = true;
 
-    const snapshot = accountsRef.current.filter(isActiveAccount).map((a) => ({ ...a }));
+    const snapshot = accountsRef.current.filter(isActive).map((a) => ({ ...a }));
     setBaselineAccounts(snapshot);
-    setDrafts(draftFromAccounts(snapshot));
+    setDrafts(draftFromAccounts(snapshot, isActive));
     setAccountSearch("");
     setLinkFilter("all");
     setGroupsError(null);
     void loadGroups({ quiet: true });
-  }, [open, loadGroups]);
+  }, [open, loadGroups, isActive]);
 
   const accountById = useMemo(() => {
-    const map = new Map<string, CrmAccount>();
+    const map = new Map<string, SyncRow>();
     for (const a of baselineAccounts) map.set(a.id, a);
     return map;
   }, [baselineAccounts]);
@@ -212,14 +235,14 @@ export function CrmAccountWhatsappSyncModal({
         if (prev === next) continue;
 
         if (!next) {
-          updateAccount(a.id, { whatsappGroupId: undefined, whatsappGroupName: undefined });
+          saveLink(a.id, { whatsappGroupId: null, whatsappGroupName: null });
           unlinked += 1;
           continue;
         }
 
         const group = groups.find((g) => normalizeGroupId(g.id) === next);
         const name = group?.subject?.trim() || a.whatsappGroupName?.trim() || next;
-        updateAccount(a.id, { whatsappGroupId: next, whatsappGroupName: name });
+        saveLink(a.id, { whatsappGroupId: next, whatsappGroupName: name });
         linked += 1;
       }
 
@@ -277,11 +300,11 @@ export function CrmAccountWhatsappSyncModal({
         <DialogHeader className="shrink-0 border-b px-4 py-3">
           <DialogTitle className="flex items-center gap-2 text-sm">
             <MessageCircle className="h-4 w-4 text-teal-700" />
-            Sync accounts · WhatsApp groups
+            Sync {plural} · WhatsApp groups
           </DialogTitle>
           <p className="text-[11px] text-muted-foreground">
-            Map each active CRM account to a WhatsApp group. After sync, open the account’s WhatsApp
-            tab to load messages.
+            Map each {noun === "company" ? "company that is not canceled" : "active CRM account"} to a
+            WhatsApp group. After sync, open the {noun}’s WhatsApp tab to load messages.
           </p>
         </DialogHeader>
 
@@ -289,7 +312,7 @@ export function CrmAccountWhatsappSyncModal({
           <Input
             value={accountSearch}
             onChange={(e) => setAccountSearch(e.target.value)}
-            placeholder="Search accounts…"
+            placeholder={`Search ${plural}…`}
             className="h-8 max-w-xs text-xs"
           />
           <div className="flex flex-wrap items-center gap-1">
@@ -346,14 +369,14 @@ export function CrmAccountWhatsappSyncModal({
           ) : filteredDrafts.length === 0 ? (
             <div className="py-12 text-center text-xs text-muted-foreground">
               {drafts.length === 0
-                ? "No active accounts to sync."
-                : "No accounts match this filter."}
+                ? `No ${plural} to sync.`
+                : `No ${plural} match this filter.`}
             </div>
           ) : (
             <table className="w-full text-left text-xs">
               <thead className="sticky top-0 z-10 border-b bg-background">
                 <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                  <th className="px-4 py-2 font-medium">Account</th>
+                  <th className="px-4 py-2 font-medium">{noun === "company" ? "Company" : "Account"}</th>
                   <th className="px-4 py-2 font-medium">WhatsApp group</th>
                 </tr>
               </thead>
@@ -411,10 +434,76 @@ export function CrmAccountWhatsappSyncModal({
             onClick={applySync}
           >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-            Sync {dirtyCount > 0 ? `(${dirtyCount})` : "accounts"}
+            Sync {dirtyCount > 0 ? `(${dirtyCount})` : plural}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+export function CrmAccountWhatsappSyncModal({
+  open,
+  onOpenChange,
+  accounts,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  accounts: CrmAccount[];
+}) {
+  const updateAccount = useCrmAccountStore((s) => s.updateAccount);
+  const isActive = useCallback(
+    (row: SyncRow) => !isCrmAccountEnded((row.status || "onboarding") as CrmAccount["status"]),
+    [],
+  );
+  const saveLink = useCallback(
+    (id: string, patch: { whatsappGroupId: string | null; whatsappGroupName: string | null }) => {
+      updateAccount(id, {
+        whatsappGroupId: patch.whatsappGroupId || undefined,
+        whatsappGroupName: patch.whatsappGroupName || undefined,
+      });
+    },
+    [updateAccount],
+  );
+  return (
+    <WhatsappGroupSyncDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      accounts={accounts}
+      noun="account"
+      pullWaha={pullCrmAutomationConfigFromServer}
+      isActive={isActive}
+      saveLink={saveLink}
+    />
+  );
+}
+
+export function CompanyWhatsappSyncModal({
+  open,
+  onOpenChange,
+  companies,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  companies: Company[];
+}) {
+  const updateCompany = useCompanyStore((s) => s.updateCompany);
+  const isActive = useCallback((row: SyncRow) => row.commercialStatus !== "Canceled", []);
+  const saveLink = useCallback(
+    (id: string, patch: { whatsappGroupId: string | null; whatsappGroupName: string | null }) => {
+      updateCompany(id, patch);
+    },
+    [updateCompany],
+  );
+  return (
+    <WhatsappGroupSyncDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      accounts={companies}
+      noun="company"
+      pullWaha={pullErpAutomationConfigFromServer}
+      isActive={isActive}
+      saveLink={saveLink}
+    />
   );
 }
