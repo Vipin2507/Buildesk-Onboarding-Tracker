@@ -195,8 +195,9 @@ export function crmAutomationRuleNeedsSeedSync(
   }
 
   if (seed.id === "crm-rule-onboarding-sla-whatsapp") {
-    if (existing.templateBody?.includes("{{onboardingDate}}")) return false;
-    if (existing.templateBody?.includes("Onboarding behind target")) return true;
+    // The current default includes "Onboarding behind target". Treating that phrase as
+    // legacy copy wiped operator edits on every Automation page load and wrote the
+    // seed back to SQLite. Keep whatever is already saved.
     return false;
   }
 
