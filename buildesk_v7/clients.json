@@ -1,0 +1,588 @@
+[
+  {
+    "id": "9d1f7fd38ee24eb99dae48b774443e19",
+    "name": "Paradise World",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/97e2c374-5931-4403-b392-447ad57bab4e",
+    "userCount": 3,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "97e2c374-5931-4403-b392-447ad57bab4e"
+  },
+  {
+    "id": "9612f1ff9a304dbfbbc3e75e7dc2792f",
+    "name": "Fly Realty",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/94e65e60-9480-4d57-ac7c-ba726b397b9f",
+    "userCount": 50,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "94e65e60-9480-4d57-ac7c-ba726b397b9f"
+  },
+  {
+    "id": "d6e261b0d98947568cce2f4f42f0ee9f",
+    "name": "Hifly Group",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/214f4690-1009-4ade-a156-eaa28f2c1c64",
+    "userCount": 5,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "214f4690-1009-4ade-a156-eaa28f2c1c64"
+  },
+  {
+    "id": "1a127d3e4091480283489999677f601f",
+    "name": "Jonisha Developer",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/8BC82E1E-3EED-4E30-A994-A1C569519961",
+    "userCount": 20,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "8BC82E1E-3EED-4E30-A994-A1C569519961"
+  },
+  {
+    "id": "2d5fa61589c44a63a09ee1c038114b7a",
+    "name": "RELIABLE GROUP",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/8570789b-e5cb-436c-ad02-ad5342e3d1c0",
+    "userCount": 40,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "8570789b-e5cb-436c-ad02-ad5342e3d1c0"
+  },
+  {
+    "id": "1562b8f9b5d84d9cb02df3e2fc64cbe7",
+    "name": "Midtown Realtors",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/cd0f86f5-000f-4701-90a1-ea76a7e36fff",
+    "userCount": 5,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "cd0f86f5-000f-4701-90a1-ea76a7e36fff"
+  },
+  {
+    "id": "49f159ac9c4c4caab27b7b69f3f0bacd",
+    "name": "AGRANTE REALTY LIMITED",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/4e41ba7b-2ede-4c72-aac9-2e024a579e02",
+    "userCount": 10,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "4e41ba7b-2ede-4c72-aac9-2e024a579e02"
+  },
+  {
+    "id": "0a7c6157be3442a7bf5395370eedd79e",
+    "name": "Mahaavir Superstructures Pvt Ltd",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/aaf7286f-6ac6-4aa7-8ee7-7833d3ea51bc",
+    "userCount": 16,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "aaf7286f-6ac6-4aa7-8ee7-7833d3ea51bc"
+  },
+  {
+    "id": "6572602f229b486fbef27d129c9f6777",
+    "name": "WS REALTORS",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/53e71ffc-2e3e-43cf-a32f-5462ddd7e6c5",
+    "userCount": 3,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "53e71ffc-2e3e-43cf-a32f-5462ddd7e6c5"
+  },
+  {
+    "id": "a46c16bc40eb4a488008c3111898ce8b",
+    "name": "SHRI GARGI BUILDCON PRIVATE LIMITED",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/46fa8155-fc96-43e2-9707-e57ad44495c5",
+    "userCount": 4,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "46fa8155-fc96-43e2-9707-e57ad44495c5"
+  },
+  {
+    "id": "82f1bf32ab9b43ad91dccf9d6cebde05",
+    "name": "SHANSHIV HOSPITALITY LLP",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/ca2736c2-bbdc-4a73-94b6-05435a66099c",
+    "userCount": 4,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "ca2736c2-bbdc-4a73-94b6-05435a66099c"
+  },
+  {
+    "id": "fe51f65010204e0880c6b5c91b47e600",
+    "name": "SAGAROM DB INFRA LLP",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/f936c852-da00-403a-b0b4-e1bd1c0a9943",
+    "userCount": 5,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "f936c852-da00-403a-b0b4-e1bd1c0a9943"
+  },
+  {
+    "id": "59a6c59817824811b9ac3c0bf4ec436f",
+    "name": "SUNRISE GROUP (Blue Zone)",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/ac1659bb-a57f-4095-a2fa-f5d1d7dcf881",
+    "userCount": 5,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "ac1659bb-a57f-4095-a2fa-f5d1d7dcf881"
+  },
+  {
+    "id": "86a16c194e454dddaae705bc8c61ac69",
+    "name": "GOLDHOMZ DEVELOPERS PRIVATE LIMITED",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/9addef8e-2137-4598-9556-7729569c97c7",
+    "userCount": 5,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "9addef8e-2137-4598-9556-7729569c97c7"
+  },
+  {
+    "id": "d93f24b6f5b84cc8b27b44361cba3a6b",
+    "name": "SKY BUILDCON",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/8f94905b-07bb-46ac-9cca-5e049393f2dd",
+    "userCount": 4,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "8f94905b-07bb-46ac-9cca-5e049393f2dd"
+  },
+  {
+    "id": "08ac0c72abed461f94813b30fa6e371a",
+    "name": "REALTY BUDDY LLP",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/b8a4b27a-8378-40fd-87e8-7603de603670",
+    "userCount": 10,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "b8a4b27a-8378-40fd-87e8-7603de603670"
+  },
+  {
+    "id": "a0305fd863d04261b68415e48d36ffc8",
+    "name": "AVS INFRA",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/1390234f-f0fe-4fef-ab8e-e16fc45460c1",
+    "userCount": 4,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "1390234f-f0fe-4fef-ab8e-e16fc45460c1"
+  },
+  {
+    "id": "8d4a5d24a69744f7b547722fd9dbe950",
+    "name": "FAIR SKY REALTORS",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/4a1ac087-e94b-4631-b978-f98238e3a337",
+    "userCount": 5,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "4a1ac087-e94b-4631-b978-f98238e3a337"
+  },
+  {
+    "id": "0675620600c745bb9da8277a063e99f6",
+    "name": "VISHVANI DEVELOPERS LLP",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/abb84d46-4aeb-4638-8562-f7c7723a4674",
+    "userCount": 3,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "abb84d46-4aeb-4638-8562-f7c7723a4674"
+  },
+  {
+    "id": "36f6dd069eaa4910826a60c1b9bc6c3f",
+    "name": "Kasha Developers and Builders LLP",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/d42b1377-7c0d-4ee1-8d88-054518d53ad7",
+    "userCount": 20,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "d42b1377-7c0d-4ee1-8d88-054518d53ad7"
+  },
+  {
+    "id": "3f91c98197334db7b8235467bab8dac4",
+    "name": "DHARAM SONS INFRASTRUCTURE PRIVATE LIMITED",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/1ea4bf35-f35b-46a2-b4ef-3aa686a977ff",
+    "userCount": 6,
+    "salesExecutive": "Vaibhav",
+    "onboardingDate": "",
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "1ea4bf35-f35b-46a2-b4ef-3aa686a977ff"
+  },
+  {
+    "id": "1fbd9c67c6df4034a297d9539bf14bdf",
+    "name": "LANDBITT PRIVATE LIMITED",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/dbbb9cfd-28ea-42f1-94d4-e37aec84ae62",
+    "userCount": 4,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "dbbb9cfd-28ea-42f1-94d4-e37aec84ae62"
+  },
+  {
+    "id": "e678436ce93141cd916d64e5dc627629",
+    "name": "PRIME GOLD REALTY PRIVATE LIMITED",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/ed6006fd-82a8-4869-9fb8-eab76e97555f",
+    "userCount": 7,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "ed6006fd-82a8-4869-9fb8-eab76e97555f"
+  },
+  {
+    "id": "19b890471f154db7bd50043a0211b736",
+    "name": "JVJ Dream Developers",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/9852f8b4-5cd0-476c-8767-3ffb50be4144",
+    "userCount": 6,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "9852f8b4-5cd0-476c-8767-3ffb50be4144"
+  },
+  {
+    "id": "299ab451a62a4d9d9f4ab3157ea27019",
+    "name": "P2P",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/e28f798f-34a0-46bf-b47d-ca8fa2c85cc1",
+    "userCount": 4,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "e28f798f-34a0-46bf-b47d-ca8fa2c85cc1"
+  },
+  {
+    "id": "95d71e6bc0274f5d868d5203dd24ce29",
+    "name": "Mahima Infra Estates LLP",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/2e59b279-618d-451e-85d8-6c612305ce3f",
+    "userCount": 2,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "2e59b279-618d-451e-85d8-6c612305ce3f"
+  },
+  {
+    "id": "48e0bc9d27ed41beb4625e9e7a6130f0",
+    "name": "Vedam Homes",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/41e9b17e-8210-480a-83e9-707fab5bfba9",
+    "userCount": 5,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "41e9b17e-8210-480a-83e9-707fab5bfba9"
+  },
+  {
+    "id": "7038172af46d4c45b175fff65f56fa15",
+    "name": "The Domus Group",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/fcea7ff0-9f02-425b-ae28-389f162afab8",
+    "userCount": 9,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "fcea7ff0-9f02-425b-ae28-389f162afab8"
+  },
+  {
+    "id": "9060968a28ca40048e02f24232c10671",
+    "name": "TIMES SQUARE PROPERTY SERVICE",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/3ad0172e-57fa-4900-bb23-d34de3261401",
+    "userCount": 5,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "3ad0172e-57fa-4900-bb23-d34de3261401"
+  },
+  {
+    "id": "2f63a3248b404e879b4935eb17b025a9",
+    "name": "Magnus Realty",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/9dc97d07-732b-44fe-bcc2-619d3ca0eb40",
+    "userCount": 6,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "9dc97d07-732b-44fe-bcc2-619d3ca0eb40"
+  },
+  {
+    "id": "2ecc904574744166bfc54e5216a4c9df",
+    "name": "PARMAR PROPERTIES",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/158382b1-25ea-4d56-912b-4db348c1f167",
+    "userCount": 40,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "158382b1-25ea-4d56-912b-4db348c1f167"
+  },
+  {
+    "id": "13348b982cf34c9cb586f55d3bf3217d",
+    "name": "TRIGUNA PROJECTS",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/b8cb9a48-764b-42c5-851c-92200e0806fe",
+    "userCount": 6,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "b8cb9a48-764b-42c5-851c-92200e0806fe"
+  },
+  {
+    "id": "81f7ba2958004f43becfce98bafc3d23",
+    "name": "Investors Heaven",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/7f49e1be-b895-4050-9600-c90fe4de97d8",
+    "userCount": 2,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "7f49e1be-b895-4050-9600-c90fe4de97d8"
+  },
+  {
+    "id": "d3a9f87d3ecf4f48bb36f6bc83e21d72",
+    "name": "Risa Horizon Pvt Ltd",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/3ba1de0e-ad5f-4487-99b2-96ce9c76bf67",
+    "userCount": 1,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "3ba1de0e-ad5f-4487-99b2-96ce9c76bf67"
+  },
+  {
+    "id": "4e10d52c9a854f8db61aa5ab536c7233",
+    "name": "ISTA SPACES LLP",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/ba3b8ffa-31e4-49d0-9d30-5944a9298b60",
+    "userCount": 45,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "ba3b8ffa-31e4-49d0-9d30-5944a9298b60"
+  },
+  {
+    "id": "2007be078c7245b191150fb9a2359aeb",
+    "name": "PLATINUM CORP",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/04e79512-3846-4a0c-90e5-4acec7cb3e88",
+    "userCount": 30,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "04e79512-3846-4a0c-90e5-4acec7cb3e88"
+  },
+  {
+    "id": "9bb87e1614734b85a4827a9cfa40813f",
+    "name": "LUXESTATES REALTY LLP",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/248052ac-661c-424f-8c5d-ca07f573b662",
+    "userCount": 6,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "248052ac-661c-424f-8c5d-ca07f573b662"
+  },
+  {
+    "id": "b139c3e4cbcb4b5f8facff062ad8b422",
+    "name": "KM DEVELOPERS",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/182b80bb-71b2-42ed-9827-81f77f6495da",
+    "userCount": 5,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "182b80bb-71b2-42ed-9827-81f77f6495da"
+  },
+  {
+    "id": "1476b4d20ee14295b9fa9c6dd2b2f53a",
+    "name": "SURYA PROPERTIES",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/853e8b8f-f60e-4d04-a183-53014cca34f0",
+    "userCount": 4,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "853e8b8f-f60e-4d04-a183-53014cca34f0"
+  },
+  {
+    "id": "3c6495b87e97407886b023f98545244f",
+    "name": "AB BUILDCON",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/4d9fe2d9-384a-4b1b-80b9-cb1231664a67",
+    "userCount": 5,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "4d9fe2d9-384a-4b1b-80b9-cb1231664a67"
+  },
+  {
+    "id": "9f6800240c774b58b59fe2804e8cf640",
+    "name": "RIO DREAM CONSTRUCTION LLP",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/9e5a1692-8c49-4b04-9b7d-8ba7f508dbac",
+    "userCount": 5,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "9e5a1692-8c49-4b04-9b7d-8ba7f508dbac"
+  },
+  {
+    "id": "8c9a74bdd8e443958a51fa0a22f1d732",
+    "name": "I3 REALTORS",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/47ff8d59-2c45-42c7-b143-b0f9536814f8",
+    "userCount": 41,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "47ff8d59-2c45-42c7-b143-b0f9536814f8"
+  },
+  {
+    "id": "bd30bcfcaed54f5187bb9e8469dc5489",
+    "name": "SKYLINE BUILDESTATES PRIVATE LIMITED",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/c25872f1-f8a3-435d-9415-864302c8dfac",
+    "userCount": 7,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "c25872f1-f8a3-435d-9415-864302c8dfac"
+  },
+  {
+    "id": "a75ea5f06bf94d45b9375f43c5952e48",
+    "name": "Sales Studio",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/2e07ab54-3ef1-4ce9-b560-55d51309895d",
+    "userCount": 8,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "2e07ab54-3ef1-4ce9-b560-55d51309895d"
+  },
+  {
+    "id": "f8db98aed15943f1a02aeef59970cf10",
+    "name": "Spectical Asset Pvt Ltd ( SAPL)",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/96a8c385-0062-4d41-883e-d19afb16976c",
+    "userCount": 21,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "96a8c385-0062-4d41-883e-d19afb16976c"
+  },
+  {
+    "id": "f14e565fd51d4dd6b6ef06a7d1de95ba",
+    "name": "HARSH TIRUPATI",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/0ef6e096-ba93-47da-be2c-6d67d820c9c6",
+    "userCount": 8,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "0ef6e096-ba93-47da-be2c-6d67d820c9c6"
+  },
+  {
+    "id": "d25c7b1744514b97aec78a04f40d3fa0",
+    "name": "LAXMI GOLDORNA HOUSE LIMITED",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/b2497ca1-b1a4-4aea-951e-d74673a404f6",
+    "userCount": 40,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "b2497ca1-b1a4-4aea-951e-d74673a404f6"
+  },
+  {
+    "id": "402f96674ed0417fb19249e4486f6b79",
+    "name": "Daksh Realty",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/8ddbd890-c464-4aff-b74d-e3fe54250eb9",
+    "userCount": 10,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "8ddbd890-c464-4aff-b74d-e3fe54250eb9"
+  },
+  {
+    "id": "995054285a164b6f92dac5c6b6e31f12",
+    "name": "Aura Realtors",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/0c1add9f-2081-4dfb-93be-9b6bfd7448ea",
+    "userCount": 34,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "0c1add9f-2081-4dfb-93be-9b6bfd7448ea"
+  },
+  {
+    "id": "213aa09e0bf8441c997545649b3fcf39",
+    "name": "Terra Rise",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/6810c5c5-1053-4162-80df-47176e682c1c",
+    "userCount": 4,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "6810c5c5-1053-4162-80df-47176e682c1c"
+  },
+  {
+    "id": "c8f94f8cac3846839b48affdf9f6a257",
+    "name": "Capital Acres",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/942445b2-95e0-46e3-af64-377d08c555c4",
+    "userCount": 34,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "942445b2-95e0-46e3-af64-377d08c555c4"
+  },
+  {
+    "id": "7bfb3f9c3e9e46a69535e4acd6b939ee",
+    "name": "GRUHAM REALTY",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/2802da13-62b5-4dbf-a001-edc096cd758a",
+    "userCount": 2,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "2802da13-62b5-4dbf-a001-edc096cd758a"
+  },
+  {
+    "id": "adb57d3f6e0047bdb84a50733450b34e",
+    "name": "BALAJI ESTATE",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/3dce24c7-daa3-4267-a2ac-345c4cf809d9",
+    "userCount": 20,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "3dce24c7-daa3-4267-a2ac-345c4cf809d9"
+  },
+  {
+    "id": "922128fd70794792afd4f5e5020fb09b",
+    "name": "Propango Strategic Solutions Pvt. Ltd",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/28c2366b-75ae-4356-8555-1fa0d379b6b9",
+    "userCount": 65,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "28c2366b-75ae-4356-8555-1fa0d379b6b9"
+  },
+  {
+    "id": "be0b7f5a1863422cbb6a15e25db9805f",
+    "name": "MASTRO RealTech Pvt. Ltd.",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/0e745a7f-5eab-43a9-9fe7-08e9a1924b07",
+    "userCount": 29,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "0e745a7f-5eab-43a9-9fe7-08e9a1924b07"
+  },
+  {
+    "id": "6dcc8d6241444acc8f89381cbdd80fe8",
+    "name": "Sahara Venture",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/13ec0532-6393-4880-8ca1-7b34a5465ece",
+    "userCount": 20,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "13ec0532-6393-4880-8ca1-7b34a5465ece"
+  },
+  {
+    "id": "1b3f992eb33a461699eaab18d1f1cff6",
+    "name": "E Square Homes",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/5d3b3a07-33cd-427f-86b4-ad79e9a01a59",
+    "userCount": 7,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "5d3b3a07-33cd-427f-86b4-ad79e9a01a59"
+  },
+  {
+    "id": "8f16f1202d614f8f89e3697f2f0d0e0b",
+    "name": "Hundredx Advisory LLP",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/d33f8e9b-715c-43da-b6f3-5dde26682a47",
+    "userCount": 34,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "d33f8e9b-715c-43da-b6f3-5dde26682a47"
+  },
+  {
+    "id": "67cc5fb8d59b4c48a62eb2b2df0bd4d0",
+    "name": "Acres Authority",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/ffbab031-95cc-40b5-aa5f-77827592b7b9",
+    "userCount": 18,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "ffbab031-95cc-40b5-aa5f-77827592b7b9"
+  },
+  {
+    "id": "3469d7eee88446389e2a68aa782f5d34",
+    "name": "Nora Group",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/ceaba0f8-e14d-48ca-98c9-6c2796ba48aa",
+    "userCount": 40,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "ceaba0f8-e14d-48ca-98c9-6c2796ba48aa"
+  },
+  {
+    "id": "8b543f9442dd4736964f83be2b2d4290",
+    "name": "Purple Group",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/3ed75831-48bf-4266-86a7-14fbbc97d9ee",
+    "userCount": 9,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "3ed75831-48bf-4266-86a7-14fbbc97d9ee"
+  },
+  {
+    "id": "9ab2a71de9e74c3fa5f17e5a63a821e1",
+    "name": "ONE KEY REALTORS",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/d4c11fd6-ee35-4c1e-96d7-4d51b5e3698c",
+    "userCount": 4,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "d4c11fd6-ee35-4c1e-96d7-4d51b5e3698c"
+  },
+  {
+    "id": "8551740745c24ef693356584818f38f9",
+    "name": "Locality Master",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/d14f2290-d0bd-4fcc-a9c8-c8249f7588d2",
+    "userCount": 150,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "d14f2290-d0bd-4fcc-a9c8-c8249f7588d2"
+  },
+  {
+    "id": "3fda0a2bd5b44b58bba074487db09032",
+    "name": "AveNew Spaces",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/8ac0c050-d10a-4f7a-a40e-ff5324a6fbfb",
+    "userCount": 6,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "8ac0c050-d10a-4f7a-a40e-ff5324a6fbfb"
+  },
+  {
+    "id": "aca4f374976f4ad5a8c3bd48c1970758",
+    "name": "SWASTIK Realty Lucknow",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/c8f36f4a-69b8-400d-adfc-e97b4c8a9f5a",
+    "userCount": 1,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "c8f36f4a-69b8-400d-adfc-e97b4c8a9f5a"
+  },
+  {
+    "id": "b0593c61cc9a412997830ec29ee93bd9",
+    "name": "Realtevo Channels",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/71874f0d-b6e0-43cc-80d2-2117669d7e0e",
+    "userCount": 27,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "71874f0d-b6e0-43cc-80d2-2117669d7e0e"
+  },
+  {
+    "id": "327a3dd2344347db809842d7bb0a450f",
+    "name": "Balaji Group",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/cd8e2aea-a903-4644-9456-675982cc54f1",
+    "userCount": 35,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "cd8e2aea-a903-4644-9456-675982cc54f1"
+  },
+  {
+    "id": "f2c6a2deb63e43d2a43816509ac0be48",
+    "name": "ORION",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/bcef108f-d318-4cf1-b667-9069c62d6e02",
+    "userCount": 5,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "bcef108f-d318-4cf1-b667-9069c62d6e02"
+  },
+  {
+    "id": "90cb00f635364e21b25d4ea4b7ae672f",
+    "name": "TBS REALTORS",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/57c1adf8-3b42-4dfa-a1c3-5ecebc649d47",
+    "userCount": 2,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "57c1adf8-3b42-4dfa-a1c3-5ecebc649d47"
+  },
+  {
+    "id": "7af1905083d841809fb2148dd1f578c2",
+    "name": "AMPM REALTORS",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/85bef198-8218-451a-922c-ebe160d5f2f3",
+    "userCount": 2,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "85bef198-8218-451a-922c-ebe160d5f2f3"
+  },
+  {
+    "id": "9f36137fc85a446ba8548afabaf712b4",
+    "name": "SANKALP GROUP",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/d9073802-e494-4216-bd76-c44b63e9a7af",
+    "userCount": 7,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "d9073802-e494-4216-bd76-c44b63e9a7af"
+  },
+  {
+    "id": "aa26d5b6dcb5496ea05704c479d9e8a9",
+    "name": "Mithun Waghela",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/aff79659-53c3-47fe-957d-ad3b6c02b1ee",
+    "userCount": 1,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "aff79659-53c3-47fe-957d-ad3b6c02b1ee"
+  },
+  {
+    "id": "a56a9b4a5dca4d9580c2e8db7b409804",
+    "name": "Skyline Builders and Developers",
+    "reportUrl": "https://app.buildesk.in/#/apps/dashboard/fc7a93a2-0535-40b9-95f1-1d52f223908c",
+    "userCount": 4,
+    "endpoint": "https://buildeskapi.azurewebsites.net/api/GetExecutiveAcitvitySummaryReport",
+    "apiKey": "fc7a93a2-0535-40b9-95f1-1d52f223908c"
+  }
+]

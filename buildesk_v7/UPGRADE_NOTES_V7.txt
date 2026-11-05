@@ -1,0 +1,58 @@
+Buildesk Customer Success Intelligence V7 — Upgrade notes
+
+WHAT IS NEW
+1. Added a dedicated QBR section in the left navigation.
+2. QBR defaults to the last three completed calendar months. You can change the From/To dates.
+3. QBR preview reads saved daily reports only. It does not call the API.
+4. “Fetch missing & build QBR” fetches only missing daily reports for the selected account. It does not fetch other accounts.
+5. QBR includes lead, call, follow-up, task/meeting, site-visit and booking totals; daily charts for leads/calls/bookings/follow-ups; monthly totals; employee activity ranking; module usage; data coverage; usage trend; and evidence-based recommendations.
+6. “Print / Save PDF” opens the browser print dialog. Choose “Save as PDF” to create the client-facing PDF.
+7. Automatic all-account daily API fetching at server startup/midnight is disabled. Use explicit fetch actions in the dashboard.
+8. The large JSON report cache is now kept in memory between file changes to avoid repeatedly reading the 32 MB file for every day. QBR batch-fetches missing reports and writes the cache once after the batch.
+9. Added account-scoped API routes: /api/qbr and /api/account-analysis.
+
+RUN
+- Extract the ZIP to a folder.
+- Keep clients.json and report_cache.json in the same folder as server.py.
+- Double-click start_windows.bat.
+- Open http://127.0.0.1:8765
+- Use Ctrl+F5 once after upgrading to refresh the browser files.
+
+QBR WORKFLOW
+1. Click QBR in the left navigation.
+2. Select the client account.
+3. Confirm the default period (last three completed calendar months) or choose a custom date range.
+4. Click “Preview saved QBR” to inspect local history without API calls.
+5. If dates are missing, click “Fetch missing & build QBR”. This fetch is limited to the selected account and selected date range.
+6. Review the data coverage and observations. Then click “Print / Save PDF” and choose Save as PDF.
+
+IMPORTANT DATA LIMITATIONS
+- Current configured Buildesk APIs return employee-wise aggregate summaries and call-log counts. They do not provide full lead-level event history, stable lead IDs, individual lead stage transitions, or a verified lead-to-booking cohort in the current project.
+- Therefore, QBR currently reports leads recorded, calls, follow-ups, visits, bookings and usage trends as separate period metrics. It does not claim that bookings in the quarter came from the leads created in the same quarter.
+- Lead-source and stage-conversion charts can be added when the corresponding Buildesk API endpoint and sample response are available.
+- Daily QBR charts depend on daily reports. Missing days are shown in data coverage and are not treated as zero activity.
+- Employee engagement means recorded CRM activity, not overall employee productivity. Lead receipt alone is not counted as productive CRM usage under the existing V6 rule.
+- Confirm whether each module is included in the client's subscription before discussing low adoption.
+
+SAFETY / BACKUP
+- This upgrade preserves the existing clients.json and report_cache.json content.
+- Before replacing an existing local folder, make a full backup of it.
+- API keys are stored in clients.json. Keep this folder private and do not share it publicly.
+
+TECHNICAL CHECKS PERFORMED
+- Python syntax compilation passed.
+- Embedded browser JavaScript syntax check passed.
+- Local HTTP smoke test passed for /api/clients, /api/qbr (cache-only), and /api/account-analysis (cache-only).
+- Live Buildesk API fetch was not performed during this build, so verify API connectivity from your Windows machine before relying on new missing-day fetches.
+
+V7 BOOKING DATA FIX (2026-11-03)
+- Added the dedicated GetDashboardBookingCountSummaryDaywise endpoint as the authoritative account-level booking source.
+- Booking requests use the API's FromDate/ToDate millisecond timestamp format.
+- Maps the API's Days/Count arrays to full ISO dates, including month/year boundaries and days omitted by the API (filled as zero only after a successful response).
+- BookingCount/NewBookingCount totals used by account KPIs, daily analysis, and QBR are set from the daywise endpoint.
+- Booking API failures are reported separately; they are not silently converted into a successful zero-booking result.
+- Existing cached reports retry only the booking endpoint when booking data has not yet been refreshed; other CRM/call reports are not re-fetched for that retry.
+- QBR/deep analysis refreshes older booking records only when the user explicitly requests fetching missing data.
+- Employee-level booking attribution remains based on the executive activity report because the daywise endpoint provides account-level counts only.
+- Added booking-source indicator and QBR warning for days where the dedicated booking endpoint could not be refreshed.
+- Retained the Buildesk Daily Progress Report dashboard reference in the QBR section.

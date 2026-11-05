@@ -168,6 +168,13 @@ export {
 } from "@/server/api/crm-accounts";
 
 export {
+  listCrmUsageAccounts,
+  scanCrmUsage,
+  getCrmUsageDetail,
+  getCrmUsageDays,
+} from "@/server/api/crm-usage";
+
+export {
   listCrmWhatsappGroupMessages,
   upsertCrmWhatsappGroupMessages,
   listCrmWhatsappLastEngaged,
