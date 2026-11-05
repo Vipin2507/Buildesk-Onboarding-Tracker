@@ -147,27 +147,24 @@ export function normalizeCrmWhatsappTemplates(
   return out.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
 }
 
-/** Minimal account shape for `{{variable}}` fill (client store or DB row). */
+/** Minimal account or company shape for `{{variable}}` fill (client store or DB row). */
 export type CrmWhatsappTemplateAccountSource = Pick<
   CrmAccount,
-  | "name"
-  | "contact"
-  | "phone"
-  | "email"
-  | "city"
-  | "status"
-> &
-  Partial<
-    Pick<
-      CrmAccount,
-      | "ownerName"
-      | "ownerPhone"
-      | "ownerEmail"
-      | "pocName"
-      | "accountManagerName"
-      | "salesManagerName"
-    >
-  >;
+  "name" | "contact" | "phone" | "email" | "city"
+> & {
+  /** CRM account status or ERP company status. */
+  status: string;
+} & Partial<
+  Pick<
+    CrmAccount,
+    | "ownerName"
+    | "ownerPhone"
+    | "ownerEmail"
+    | "pocName"
+    | "accountManagerName"
+    | "salesManagerName"
+  >
+>;
 
 /** Build `{{variable}}` map from a CRM account for template fill. */
 export function buildCrmWhatsappTemplateVars(
