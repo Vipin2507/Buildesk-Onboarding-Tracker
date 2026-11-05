@@ -11,9 +11,11 @@ import {
 import { handleDbBackupRequest } from "./server/lib/db-backup-storage";
 import { handleProjectFileRequest } from "./server/lib/project-file-storage";
 import { startCrmReminderScheduler } from "./server/crm-reminder-scheduler";
+import { startCrmUsageScheduler } from "./server/crm-usage-scheduler";
 import { startDbBackupScheduler } from "./server/db-backup-scheduler";
 
 startCrmReminderScheduler();
+startCrmUsageScheduler();
 startDbBackupScheduler();
 
 type ServerEntry = {

@@ -70,6 +70,7 @@ export type CrmUsageDetail = CrmUsageScanRow & {
 
 export type CrmUsageDay = {
   date: string;
+  saved: boolean;
   ok: boolean;
   error: string;
   hasCrmActivity: boolean;
@@ -77,9 +78,61 @@ export type CrmUsageDay = {
   hasCalls: boolean;
   leads: number;
   followups: number;
-  visits: number;
+  visitsScheduled: number;
+  visitsConducted: number;
   bookings: number | null;
   calls: number;
+  connectedCalls: number;
   activeUsers: number;
   score: number;
+  fetchedAt: string;
+};
+
+export type CrmUsageSyncState = {
+  lastDay: string;
+  status: string;
+  message: string;
+  updatedAt: string;
+};
+
+export type CrmUsageBoardRow = CrmUsageAccount & {
+  savedDays: number;
+  failedDays: number;
+  expectedDays: number;
+  lastFetchedAt: string;
+  summary: CrmUsageScanRow | null;
+};
+
+export type CrmUsageBoard = {
+  from: string;
+  to: string;
+  expectedDays: number;
+  sync: CrmUsageSyncState | null;
+  rows: CrmUsageBoardRow[];
+};
+
+export type CrmUsagePersonTotal = CrmUsageExecutive & {
+  activeDays: number;
+};
+
+export type CrmUsageAccountPage = {
+  account: CrmUsageAccount;
+  from: string;
+  to: string;
+  expectedDays: number;
+  savedDays: number;
+  failedDays: number;
+  lastFetchedAt: string;
+  summary: CrmUsageScanRow | null;
+  days: CrmUsageDay[];
+  people: CrmUsagePersonTotal[];
+  recommendations: CrmUsageRecommendation[];
+  pattern: string;
+};
+
+export type CrmUsageRefreshResult = {
+  fetched: number;
+  skipped: number;
+  failed: number;
+  kept: number;
 };

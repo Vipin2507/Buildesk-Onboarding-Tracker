@@ -1437,5 +1437,77 @@ if (!tableExists("company_payment_installments")) {
   console.log("+ CREATE TABLE company_payment_installments");
 }
 
+if (!tableExists("crm_usage_days")) {
+  sqlite.exec(`
+    CREATE TABLE crm_usage_days (
+      account_id TEXT NOT NULL REFERENCES crm_accounts(id) ON DELETE CASCADE,
+      day TEXT NOT NULL,
+      ok INTEGER NOT NULL DEFAULT 0,
+      error TEXT NOT NULL DEFAULT '',
+      leads INTEGER NOT NULL DEFAULT 0,
+      followups INTEGER NOT NULL DEFAULT 0,
+      meetings INTEGER NOT NULL DEFAULT 0,
+      visits_scheduled INTEGER NOT NULL DEFAULT 0,
+      visits_conducted INTEGER NOT NULL DEFAULT 0,
+      bookings INTEGER,
+      calls INTEGER NOT NULL DEFAULT 0,
+      connected_calls INTEGER NOT NULL DEFAULT 0,
+      active_users INTEGER NOT NULL DEFAULT 0,
+      executive_count INTEGER NOT NULL DEFAULT 0,
+      crm_score INTEGER NOT NULL DEFAULT 0,
+      activity_score INTEGER NOT NULL DEFAULT 0,
+      has_crm_activity INTEGER NOT NULL DEFAULT 0,
+      has_calls INTEGER NOT NULL DEFAULT 0,
+      lead_only INTEGER NOT NULL DEFAULT 0,
+      usage_type TEXT NOT NULL DEFAULT '',
+      booking_warning TEXT NOT NULL DEFAULT '',
+      call_warning TEXT NOT NULL DEFAULT '',
+      fetched_at TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS crm_usage_days_account_day_uidx ON crm_usage_days(account_id, day);
+    CREATE INDEX IF NOT EXISTS crm_usage_days_day_idx ON crm_usage_days(day);
+  `);
+  console.log("+ CREATE TABLE crm_usage_days");
+}
+
+if (!tableExists("crm_usage_people")) {
+  sqlite.exec(`
+    CREATE TABLE crm_usage_people (
+      account_id TEXT NOT NULL REFERENCES crm_accounts(id) ON DELETE CASCADE,
+      day TEXT NOT NULL,
+      name TEXT NOT NULL,
+      team TEXT NOT NULL DEFAULT '',
+      leads INTEGER NOT NULL DEFAULT 0,
+      followups INTEGER NOT NULL DEFAULT 0,
+      meetings INTEGER NOT NULL DEFAULT 0,
+      visits_scheduled INTEGER NOT NULL DEFAULT 0,
+      visits_conducted INTEGER NOT NULL DEFAULT 0,
+      bookings INTEGER NOT NULL DEFAULT 0,
+      calls INTEGER NOT NULL DEFAULT 0,
+      connected_calls INTEGER NOT NULL DEFAULT 0,
+      has_crm_activity INTEGER NOT NULL DEFAULT 0,
+      has_calls INTEGER NOT NULL DEFAULT 0,
+      lead_only INTEGER NOT NULL DEFAULT 0,
+      productive INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS crm_usage_people_uidx ON crm_usage_people(account_id, day, name);
+    CREATE INDEX IF NOT EXISTS crm_usage_people_account_day_idx ON crm_usage_people(account_id, day);
+  `);
+  console.log("+ CREATE TABLE crm_usage_people");
+}
+
+if (!tableExists("crm_usage_sync")) {
+  sqlite.exec(`
+    CREATE TABLE crm_usage_sync (
+      id TEXT PRIMARY KEY NOT NULL,
+      last_day TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'idle',
+      message TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL
+    );
+  `);
+  console.log("+ CREATE TABLE crm_usage_sync");
+}
+
 sqlite.close();
 console.log("db:ensure complete");

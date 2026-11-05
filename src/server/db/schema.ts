@@ -1323,6 +1323,80 @@ export const dprSubmissions = sqliteTable(
   (t) => [uniqueIndex("dpr_submissions_exec_date_uidx").on(t.executiveId, t.entryDate)],
 );
 
+/** One Buildesk usage snapshot per CRM account per calendar day. */
+export const crmUsageDays = sqliteTable(
+  "crm_usage_days",
+  {
+    accountId: text("account_id")
+      .notNull()
+      .references(() => crmAccounts.id, { onDelete: "cascade" }),
+    day: text("day").notNull(),
+    ok: integer("ok", { mode: "boolean" }).notNull().default(false),
+    error: text("error").notNull().default(""),
+    leads: integer("leads").notNull().default(0),
+    followups: integer("followups").notNull().default(0),
+    meetings: integer("meetings").notNull().default(0),
+    visitsScheduled: integer("visits_scheduled").notNull().default(0),
+    visitsConducted: integer("visits_conducted").notNull().default(0),
+    bookings: integer("bookings"),
+    calls: integer("calls").notNull().default(0),
+    connectedCalls: integer("connected_calls").notNull().default(0),
+    activeUsers: integer("active_users").notNull().default(0),
+    executiveCount: integer("executive_count").notNull().default(0),
+    crmScore: integer("crm_score").notNull().default(0),
+    activityScore: integer("activity_score").notNull().default(0),
+    hasCrmActivity: integer("has_crm_activity", { mode: "boolean" }).notNull().default(false),
+    hasCalls: integer("has_calls", { mode: "boolean" }).notNull().default(false),
+    leadOnly: integer("lead_only", { mode: "boolean" }).notNull().default(false),
+    usageType: text("usage_type").notNull().default(""),
+    bookingWarning: text("booking_warning").notNull().default(""),
+    callWarning: text("call_warning").notNull().default(""),
+    fetchedAt: text("fetched_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("crm_usage_days_account_day_uidx").on(t.accountId, t.day),
+    index("crm_usage_days_day_idx").on(t.day),
+  ],
+);
+
+/** Executive rows for a saved usage day. Replaced whenever that day is refreshed. */
+export const crmUsagePeople = sqliteTable(
+  "crm_usage_people",
+  {
+    accountId: text("account_id")
+      .notNull()
+      .references(() => crmAccounts.id, { onDelete: "cascade" }),
+    day: text("day").notNull(),
+    name: text("name").notNull(),
+    team: text("team").notNull().default(""),
+    leads: integer("leads").notNull().default(0),
+    followups: integer("followups").notNull().default(0),
+    meetings: integer("meetings").notNull().default(0),
+    visitsScheduled: integer("visits_scheduled").notNull().default(0),
+    visitsConducted: integer("visits_conducted").notNull().default(0),
+    bookings: integer("bookings").notNull().default(0),
+    calls: integer("calls").notNull().default(0),
+    connectedCalls: integer("connected_calls").notNull().default(0),
+    hasCrmActivity: integer("has_crm_activity", { mode: "boolean" }).notNull().default(false),
+    hasCalls: integer("has_calls", { mode: "boolean" }).notNull().default(false),
+    leadOnly: integer("lead_only", { mode: "boolean" }).notNull().default(false),
+    productive: integer("productive", { mode: "boolean" }).notNull().default(false),
+  },
+  (t) => [
+    uniqueIndex("crm_usage_people_uidx").on(t.accountId, t.day, t.name),
+    index("crm_usage_people_account_day_idx").on(t.accountId, t.day),
+  ],
+);
+
+/** Last nightly usage sync. */
+export const crmUsageSync = sqliteTable("crm_usage_sync", {
+  id: text("id").primaryKey(),
+  lastDay: text("last_day").notNull().default(""),
+  status: text("status").notNull().default("idle"),
+  message: text("message").notNull().default(""),
+  updatedAt: text("updated_at").notNull(),
+});
+
 export const projectFiles = sqliteTable(
   "project_files",
   {

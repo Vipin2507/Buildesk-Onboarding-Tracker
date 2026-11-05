@@ -354,10 +354,12 @@ function toScan(accountId: string, report: Report): CrmUsageScanRow {
   };
 }
 
-async function fetchReport(apiKey: string, from: string, to: string): Promise<Report> {
+async function fetchReport(apiKey: string, from: string, to: string, fresh = false): Promise<Report> {
   const cacheKey = `${apiKey}|${from}|${to}`;
-  const cached = reportCache.get(cacheKey);
-  if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.report;
+  if (!fresh) {
+    const cached = reportCache.get(cacheKey);
+    if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.report;
+  }
 
   let data: unknown;
   try {
@@ -548,6 +550,10 @@ export async function loadUsageDetail(
   };
 }
 
+export async function fetchUsageDay(apiKey: string, day: string, fresh = false) {
+  return fetchReport(apiKey, day, day, fresh);
+}
+
 export async function loadUsageDays(apiKey: string, from: string, to: string): Promise<CrmUsageDay[]> {
   const days = eachDay(from, to);
   return mapPool(days, 3, async (date) => {
@@ -555,6 +561,7 @@ export async function loadUsageDays(apiKey: string, from: string, to: string): P
       const report = await fetchReport(apiKey, date, date);
       return {
         date,
+        saved: true,
         ok: true,
         error: "",
         hasCrmActivity: report.hasCrmActivity,
@@ -562,15 +569,19 @@ export async function loadUsageDays(apiKey: string, from: string, to: string): P
         hasCalls: report.hasCalls,
         leads: report.leads,
         followups: report.followups,
-        visits: report.visitsScheduled + report.visitsConducted,
+        visitsScheduled: report.visitsScheduled,
+        visitsConducted: report.visitsConducted,
         bookings: report.bookings,
         calls: report.calls,
+        connectedCalls: report.connectedCalls,
         activeUsers: report.activeUsers,
         score: report.activityScore,
+        fetchedAt: "",
       };
     } catch (error) {
       return {
         date,
+        saved: false,
         ok: false,
         error: error instanceof Error ? error.message.slice(0, 180) : "Fetch failed",
         hasCrmActivity: false,
@@ -578,11 +589,14 @@ export async function loadUsageDays(apiKey: string, from: string, to: string): P
         hasCalls: false,
         leads: 0,
         followups: 0,
-        visits: 0,
+        visitsScheduled: 0,
+        visitsConducted: 0,
         bookings: null,
         calls: 0,
+        connectedCalls: 0,
         activeUsers: 0,
         score: 0,
+        fetchedAt: "",
       };
     }
   });

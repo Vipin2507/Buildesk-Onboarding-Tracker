@@ -21,7 +21,7 @@ export function usageTagTone(
   if (tag === "Using CRM" || tag === "Calls + CRM") return "success";
   if (tag === "Calls only" || tag === "Leads only") return "warning";
   if (tag === "API error") return "danger";
-  if (tag === "No CRM activity" || tag === "Not connected") return "muted";
+  if (tag === "No CRM activity" || tag === "Not connected" || tag === "Not saved") return "muted";
   return "accent";
 }
 
@@ -147,6 +147,42 @@ export function usagePatternLabel(days: { ok: boolean; hasCrmActivity: boolean }
   if (ratio >= 0.4) return "Frequent use";
   if (active <= 3) return "2–3 days use";
   return "Low use";
+}
+
+export function shiftIsoDate(iso: string, delta: number) {
+  const [year, month, day] = iso.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + delta);
+  return date.toISOString().slice(0, 10);
+}
+
+export function eachIsoDay(from: string, to: string) {
+  const days: string[] = [];
+  let cursor = from;
+  while (cursor <= to && days.length < 120) {
+    days.push(cursor);
+    cursor = shiftIsoDate(cursor, 1);
+  }
+  return days;
+}
+
+/** Calendar date in India, where the nightly usage refresh runs. */
+export function istToday(now = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
+export function istHour(now = new Date()) {
+  const hour = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).format(now);
+  return Number(hour);
 }
 
 export function chunkIds<T>(items: T[], size: number): T[][] {
