@@ -103,3 +103,10 @@ export function normalizePortalSlug(input: string): string {
 export function isValidPortalSlug(slug: string): boolean {
   return /^[a-z0-9](?:[a-z0-9-]{1,46}[a-z0-9])?$/.test(slug);
 }
+
+/** Active portal whose slug is a usable key, including a Buildesk dashboard UUID. */
+export function hasProperPortalApi(row: { hasPortal: boolean; slug: string; isActive: boolean }) {
+  if (!row.hasPortal || !row.isActive) return false;
+  const slug = row.slug.trim();
+  return Boolean(slug) && isValidPortalSlug(slug);
+}

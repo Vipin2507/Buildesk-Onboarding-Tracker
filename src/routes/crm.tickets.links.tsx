@@ -16,7 +16,7 @@ import { DataTable } from "@/components/data-table";
 import { PageWrap } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { CrmTicketsNav } from "@/components/crm/crm-tickets-nav";
-import { isValidPortalSlug, portalPublicCreateUrl } from "@/lib/design-ticket-portal";
+import { hasProperPortalApi, portalPublicCreateUrl } from "@/lib/design-ticket-portal";
 import { copyTextToClipboard } from "@/lib/copy-to-clipboard";
 import { cn } from "@/lib/utils";
 import { useCompanyPortalStore, useCrmAccountStore } from "@/stores";
@@ -26,18 +26,6 @@ export const Route = createFileRoute("/crm/tickets/links")({
 });
 
 type PortalApiFilter = "all" | "has_api" | "no_api" | "inactive";
-
-/** Proper API = portal exists, active, and slug is a valid non-UUID key. */
-function hasProperPortalApi(row: { hasPortal: boolean; slug: string; isActive: boolean }) {
-  if (!row.hasPortal || !row.isActive) return false;
-  const slug = row.slug.trim();
-  if (!slug || !isValidPortalSlug(slug)) return false;
-  // Account UUID used as slug is not a proper portal API key.
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)) {
-    return false;
-  }
-  return true;
-}
 
 function CrmTicketLinksPage() {
   const accounts = useCrmAccountStore((s) => s.accounts);
@@ -65,11 +53,11 @@ function CrmTicketLinksPage() {
   const total = rows.length;
   const active = rows.filter((r) => r.isActive && hasProperPortalApi(r)).length;
   const inactive = rows.filter((r) => r.hasPortal && !r.isActive).length;
-  const noApi = rows.filter((r) => !hasProperPortalApi(r)).length;
+  const noApi = rows.filter((r) => !r.hasPortal || !r.slug.trim()).length;
 
   const filteredRows = useMemo(() => {
     if (apiFilter === "has_api") return rows.filter((r) => hasProperPortalApi(r));
-    if (apiFilter === "no_api") return rows.filter((r) => !hasProperPortalApi(r));
+    if (apiFilter === "no_api") return rows.filter((r) => !r.hasPortal || !r.slug.trim());
     if (apiFilter === "inactive") return rows.filter((r) => r.hasPortal && !r.isActive);
     return rows;
   }, [rows, apiFilter]);
@@ -292,8 +280,8 @@ function CrmTicketLinksPage() {
 
       <div className="mt-3">
         <DesignTicketInfoBanner compact>
-          Use <strong>No API key</strong> to find accounts without a portal key, with an inactive
-          link, or with an invalid slug. Set or regenerate keys from the account page or{" "}
+          Use <strong>No API key</strong> to find accounts that do not have a portal key yet.
+          Dashboard UUIDs are valid keys. Change a key from the account page or{" "}
           <em>Update API keys</em> on Accounts.
         </DesignTicketInfoBanner>
       </div>

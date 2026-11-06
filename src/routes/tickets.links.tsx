@@ -16,7 +16,7 @@ import { DesignTicketSelect } from "@/components/design-ticket/design-ticket-fie
 import { DataTable } from "@/components/data-table";
 import { PageWrap } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { isValidPortalSlug, portalPublicCreateUrl } from "@/lib/design-ticket-portal";
+import { hasProperPortalApi, portalPublicCreateUrl } from "@/lib/design-ticket-portal";
 import { copyTextToClipboard } from "@/lib/copy-to-clipboard";
 import { cn } from "@/lib/utils";
 import { useCompanyPortalStore, useCompanyStore } from "@/stores";
@@ -26,16 +26,6 @@ export const Route = createFileRoute("/tickets/links")({
 });
 
 type PortalApiFilter = "all" | "has_api" | "no_api" | "inactive";
-
-function hasProperPortalApi(row: { hasPortal: boolean; slug: string; isActive: boolean }) {
-  if (!row.hasPortal || !row.isActive) return false;
-  const slug = row.slug.trim();
-  if (!slug || !isValidPortalSlug(slug)) return false;
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)) {
-    return false;
-  }
-  return true;
-}
 
 function TicketLinksPage() {
   const companies = useCompanyStore((s) => s.companies);
@@ -65,11 +55,11 @@ function TicketLinksPage() {
   const total = rows.length;
   const active = rows.filter((r) => hasProperPortalApi(r)).length;
   const inactive = rows.filter((r) => r.hasPortal && !r.isActive).length;
-  const noApi = rows.filter((r) => !hasProperPortalApi(r)).length;
+  const noApi = rows.filter((r) => !r.hasPortal || !r.slug.trim()).length;
 
   const filteredRows = useMemo(() => {
     if (apiFilter === "has_api") return rows.filter((r) => hasProperPortalApi(r));
-    if (apiFilter === "no_api") return rows.filter((r) => !hasProperPortalApi(r));
+    if (apiFilter === "no_api") return rows.filter((r) => !r.hasPortal || !r.slug.trim());
     if (apiFilter === "inactive") return rows.filter((r) => r.hasPortal && !r.isActive);
     return rows;
   }, [rows, apiFilter]);
@@ -285,8 +275,8 @@ function TicketLinksPage() {
 
       <div className="mt-3">
         <DesignTicketInfoBanner compact>
-          Use <strong>No API key</strong> to find companies without a portal key or with an inactive /
-          invalid link.
+          Use <strong>No API key</strong> to find companies that do not have a portal key yet.
+          Dashboard UUIDs are valid keys. Inactive links stay in their own count.
         </DesignTicketInfoBanner>
       </div>
     </PageWrap>
