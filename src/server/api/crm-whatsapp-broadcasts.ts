@@ -1,8 +1,12 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { canViewCrmAccount } from "@/lib/crm-account-access";
+import {
+  CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT,
+  broadcastScheduleConflict,
+} from "@/lib/crm-whatsapp-broadcast-limits";
 import { isAdminRoleKey } from "@/lib/permissions";
 import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
 import { loadCrmAutomationConfig } from "@/server/crm-booking-automation";
@@ -24,6 +28,32 @@ import type {
   CrmWhatsappBroadcastDeliveryStatus,
   CrmWhatsappBroadcastStatus,
 } from "@/types/crm-whatsapp-broadcast";
+
+function formatBroadcastWhen(iso: string) {
+  const parsed = Date.parse(iso);
+  if (!Number.isFinite(parsed)) return iso;
+  return new Date(parsed).toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function assertBroadcastGap(db: ReturnType<typeof getDb>, scheduledAtIso: string, ignoreId?: string) {
+  const busy = db
+    .select()
+    .from(t.crmWhatsappBroadcasts)
+    .where(inArray(t.crmWhatsappBroadcasts.status, ["pending", "running"]))
+    .all();
+  const conflict = broadcastScheduleConflict(Date.parse(scheduledAtIso), busy, ignoreId);
+  if (!conflict) return;
+  throw new ApiError(
+    400,
+    `Another broadcast is already scheduled for ${formatBroadcastWhen(conflict.scheduledAt)}. Leave at least 30 minutes between broadcasts.`,
+  );
+}
 
 function normalizeGroupId(raw: string | null | undefined) {
   const id = (raw ?? "").trim();
@@ -185,7 +215,7 @@ export const createCrmWhatsappBroadcast = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z
       .object({
-        accountIds: z.array(z.string().min(1)).min(1).max(200),
+        accountIds: z.array(z.string().min(1)).min(1).max(CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT),
         templateId: z.string().min(1).optional().nullable(),
         body: z.string().max(8000).optional().nullable(),
         scheduledAt: z.string().optional().nullable(),
@@ -224,6 +254,12 @@ export const createCrmWhatsappBroadcast = createServerFn({ method: "POST" })
     }
 
     const uniqueIds = [...new Set(data.accountIds.map((id) => id.trim()).filter(Boolean))];
+    if (uniqueIds.length > CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT) {
+      throw new ApiError(
+        400,
+        `A broadcast can include at most ${CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT} recipients.`,
+      );
+    }
     const accounts = listAccountIdsWithGroups(db, uniqueIds).filter((a) =>
       canViewCrmAccount(
         {
@@ -255,6 +291,8 @@ export const createCrmWhatsappBroadcast = createServerFn({ method: "POST" })
       if (!Number.isFinite(parsed)) throw new ApiError(400, "Invalid schedule time");
       scheduledAt = parsed <= Date.now() ? now : new Date(parsed).toISOString();
     }
+
+    assertBroadcastGap(db, scheduledAt);
 
     const shouldRunNow = Date.parse(scheduledAt) <= Date.now() + 2_000;
     if (shouldRunNow) {
@@ -390,6 +428,7 @@ export const runCrmWhatsappBroadcastNow = createServerFn({ method: "POST" })
       throw new ApiError(400, "WhatsApp (WAHA) is not enabled. Ask an admin to configure it.");
     }
     const now = nowIso();
+    assertBroadcastGap(db, now, row.id);
     if (row.status === "pending") {
       db.update(t.crmWhatsappBroadcasts)
         .set({ scheduledAt: now, updatedAt: now })

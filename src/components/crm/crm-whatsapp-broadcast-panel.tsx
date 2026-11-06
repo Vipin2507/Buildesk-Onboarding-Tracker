@@ -17,13 +17,17 @@ import {
 import { toast } from "sonner";
 
 import { DatePickerField } from "@/components/date-picker-field";
-import { DesignTicketSelect } from "@/components/design-ticket/design-ticket-fields";
+import { DesignTicketMultiSelect, DesignTicketSelect } from "@/components/design-ticket/design-ticket-fields";
 import { TimePickerField } from "@/components/time-picker-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { filterCrmAccountsForUser } from "@/lib/crm-account-access";
-import { isCrmAccountEnded } from "@/lib/crm-account-status";
+import {
+  CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT,
+  broadcastScheduleConflict,
+} from "@/lib/crm-whatsapp-broadcast-limits";
+import { CRM_ACCOUNT_STATUSES, crmAccountStatusLabel, isCrmAccountEnded } from "@/lib/crm-account-status";
 import { applyCrmWhatsappTemplate } from "@/lib/crm-whatsapp-templates";
 import { cn } from "@/lib/utils";
 import { format, isValid, parse } from "date-fns";
@@ -151,12 +155,13 @@ export function CrmWhatsappBroadcastPanel() {
 
   const linkedAccounts = useMemo(() => {
     return filterCrmAccountsForUser(accounts, user)
-      .filter((a) => !isCrmAccountEnded(a.status) && hasGroup(a))
+      .filter((a) => hasGroup(a))
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [accounts, user]);
 
   const [accountSearch, setAccountSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [mode, setMode] = useState<"template" | "custom">("template");
   const [templateId, setTemplateId] = useState("");
@@ -197,20 +202,35 @@ export function CrmWhatsappBroadcastPanel() {
     [templates],
   );
 
+  const statusOptions = useMemo(() => {
+    const present = new Set(linkedAccounts.map((account) => account.status));
+    return CRM_ACCOUNT_STATUSES.filter((status) => present.has(status)).map((status) => ({
+      value: status,
+      label: crmAccountStatusLabel(status),
+    }));
+  }, [linkedAccounts]);
+
   const filteredAccounts = useMemo(() => {
     const q = accountSearch.trim().toLowerCase();
-    if (!q) return linkedAccounts;
-    return linkedAccounts.filter(
-      (a) =>
-        a.name.toLowerCase().includes(q) ||
-        a.city?.toLowerCase().includes(q) ||
-        a.whatsappGroupName?.toLowerCase().includes(q),
-    );
-  }, [linkedAccounts, accountSearch]);
+    return linkedAccounts.filter((account) => {
+      const statusAllowed =
+        statusFilter.length > 0
+          ? statusFilter.includes(account.status)
+          : !isCrmAccountEnded(account.status);
+      if (!statusAllowed) return false;
+      if (!q) return true;
+      return (
+        account.name.toLowerCase().includes(q) ||
+        account.city?.toLowerCase().includes(q) ||
+        account.whatsappGroupName?.toLowerCase().includes(q) ||
+        crmAccountStatusLabel(account.status).toLowerCase().includes(q)
+      );
+    });
+  }, [linkedAccounts, accountSearch, statusFilter]);
 
   const selectedTemplate = templates.find((t) => t.id === templateId);
   const messageBody = (mode === "template" ? selectedTemplate?.body || body : body).trim();
-  const previewAccount = linkedAccounts.find((a) => selectedIds.has(a.id)) ?? linkedAccounts[0];
+  const previewAccount = filteredAccounts.find((a) => selectedIds.has(a.id)) ?? filteredAccounts[0];
   const previewBody = applyCrmWhatsappTemplate(messageBody, previewAccount);
 
   const scheduled = useMemo(
@@ -250,8 +270,15 @@ export function CrmWhatsappBroadcastPanel() {
   function toggleAccount(id: string) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+        return next;
+      }
+      if (next.size >= CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT) {
+        toast.error(`A broadcast can include at most ${CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT} recipients`);
+        return prev;
+      }
+      next.add(id);
       return next;
     });
   }
@@ -304,6 +331,10 @@ export function CrmWhatsappBroadcastPanel() {
       toast.error("Select at least one account");
       return;
     }
+    if (selectedIds.size > CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT) {
+      toast.error(`A broadcast can include at most ${CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT} recipients`);
+      return;
+    }
     if (!messageBody && !pendingMedia) {
       toast.error("Add a message or attachment");
       return;
@@ -321,6 +352,15 @@ export function CrmWhatsappBroadcastPanel() {
         toast.error("Schedule time must be in the future");
         return;
       }
+    }
+
+    const whenMs = scheduledAt ? Date.parse(scheduledAt) : Date.now();
+    const conflict = broadcastScheduleConflict(whenMs, broadcasts);
+    if (conflict) {
+      toast.error(
+        `Another broadcast is already scheduled for ${formatWhen(conflict.scheduledAt)}. Leave at least 30 minutes between broadcasts.`,
+      );
+      return;
     }
 
     setSubmitting(true);
@@ -395,7 +435,8 @@ export function CrmWhatsappBroadcastPanel() {
         <div className="border-b px-4 py-3">
           <h2 className="text-sm font-semibold tracking-tight">Compose</h2>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
-            Message WhatsApp groups linked to your accounts. Use {"{{clientName}}"} and other
+            Message WhatsApp groups linked to your accounts. Up to {CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT}{" "}
+            recipients, with at least 30 minutes between broadcasts. Use {"{{clientName}}"} and other
             variables for personalization.
           </p>
         </div>
@@ -407,16 +448,20 @@ export function CrmWhatsappBroadcastPanel() {
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-semibold text-foreground">Recipients</span>
                 <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
-                  {selectedIds.size}/{linkedAccounts.length}
+                  {selectedIds.size}/{CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT} selected · {filteredAccounts.length} shown
                 </span>
               </div>
               <div className="flex gap-2 text-[10px] font-medium">
                 <button
                   type="button"
                   className="text-primary hover:underline"
-                  onClick={() =>
-                    setSelectedIds(new Set(filteredAccounts.map((a) => a.id)))
-                  }
+                  onClick={() => {
+                    const ids = filteredAccounts.slice(0, CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT).map((a) => a.id);
+                    setSelectedIds(new Set(ids));
+                    if (filteredAccounts.length > CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT) {
+                      toast.message(`Selected the first ${CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT} recipients`);
+                    }
+                  }}
                 >
                   Select all
                 </button>
@@ -429,19 +474,34 @@ export function CrmWhatsappBroadcastPanel() {
                 </button>
               </div>
             </div>
-            <div className="relative mb-2">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={accountSearch}
-                onChange={(e) => setAccountSearch(e.target.value)}
-                placeholder="Search by account or group…"
-                className="h-9 rounded-lg border-border/80 bg-background pl-8 text-xs shadow-none"
-              />
+            <div className="mb-2 flex gap-2">
+              <div className="relative min-w-0 flex-1">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={accountSearch}
+                  onChange={(e) => setAccountSearch(e.target.value)}
+                  placeholder="Search by account or group…"
+                  className="h-9 rounded-lg border-border/80 bg-background pl-8 text-xs shadow-none"
+                />
+              </div>
+              <div className="w-[9.5rem] shrink-0">
+                <DesignTicketMultiSelect
+                  compact
+                  values={statusFilter}
+                  onChange={setStatusFilter}
+                  placeholder="All active"
+                  searchPlaceholder="Search statuses…"
+                  options={statusOptions}
+                  className="h-9 rounded-lg text-xs"
+                />
+              </div>
             </div>
             <div className="max-h-52 overflow-y-auto rounded-xl border border-border/80 bg-background">
               {filteredAccounts.length === 0 ? (
                 <p className="px-3 py-8 text-center text-[11px] text-muted-foreground">
-                  No linked WhatsApp groups in your accounts.
+                  {statusFilter.length
+                    ? "No linked groups match this status."
+                    : "No linked WhatsApp groups in your accounts."}
                 </p>
               ) : (
                 filteredAccounts.map((a) => {
@@ -471,6 +531,8 @@ export function CrmWhatsappBroadcastPanel() {
                           {a.name}
                         </span>
                         <span className="mt-0.5 block truncate text-[10px] leading-snug text-muted-foreground">
+                          {crmAccountStatusLabel(a.status)}
+                          {" · "}
                           {a.whatsappGroupName || "WhatsApp group linked"}
                           {a.city ? ` · ${a.city}` : ""}
                         </span>
