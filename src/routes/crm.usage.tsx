@@ -224,8 +224,8 @@ function CrmUsagePage() {
         }
       />
       <p className="mb-3 max-w-3xl text-sm text-muted-foreground">
-        Saved daily reports open immediately. Every night at 12:10am IST, yesterday is fetched again
-        and replaces the stored day. Lead receipt alone is not CRM use.
+        Onboarding, Live, and Active accounts. Saved daily reports open immediately. Every night at
+        12:10am IST, yesterday is fetched again and replaces the stored day. Lead receipt alone is not CRM use.
         {board?.sync?.message ? ` ${board.sync.message}` : ""}
       </p>
 

@@ -156,6 +156,12 @@ export const CORE_MODULE_WORKFLOWS: Partial<
     { key: "sign_off", label: "Sign off", kind: "date" },
     { key: "remarks", label: "Remarks", kind: "remarks" },
   ],
+  "target-vs-achievement": [
+    { key: "training_done", label: "Training Done", kind: "date" },
+    { key: "target_added", label: "Target Added", kind: "date" },
+    { key: "live_deployed", label: "Live / Deployed", kind: "date" },
+    { key: "remarks", label: "Remarks", kind: "remarks" },
+  ],
 };
 
 /** Optional Master catalog lookup (registered by useCrmMasterStore to avoid import cycles). */
@@ -493,6 +499,7 @@ export const CRM_CORE_MODULES: { key: CrmProductModuleKey; label: string }[] = [
   { key: "waha", label: "WAHA" },
   { key: "auto-dialer", label: "Auto Dialer" },
   { key: "wavly", label: "Wavly" },
+  { key: "target-vs-achievement", label: "Target Vs Achievement" },
 ];
 
 /** Third-party / channel integrations. */

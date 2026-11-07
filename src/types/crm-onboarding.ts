@@ -37,6 +37,7 @@ export type CrmBuiltInProductModuleKey =
   | "waha"
   | "auto-dialer"
   | "wavly"
+  | "target-vs-achievement"
   | CrmLegacyProductModuleKey;
 
 /**

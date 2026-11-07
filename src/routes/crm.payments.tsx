@@ -15,6 +15,7 @@ import { CrmAccountPaymentBulkUpdateModal } from "@/components/crm/crm-account-p
 import { CrmAccountRenewDialog } from "@/components/crm/crm-account-renew-dialog";
 import { CrmExecutivePaymentReminderDialog } from "@/components/crm/crm-executive-payment-reminder-dialog";
 import { CrmPaymentsExpandedRow } from "@/components/crm/crm-payments-expanded-row";
+import { ConfirmDeleteDialog } from "@/components/entity-form-modal";
 import { DataTable } from "@/components/data-table";
 import {
   DesignTicketDateField,
@@ -143,6 +144,7 @@ function CrmPaymentsPage() {
   const navigate = useNavigate({ from: "/crm/payments" });
   const search = Route.useSearch();
   const accounts = useCrmAccountStore((s) => s.accounts);
+  const markRenewalCancelled = useCrmAccountStore((s) => s.markRenewalCancelled);
 
   const statusTab = parseCrmPaymentStatusTab(search.status);
   const page = search.page ?? 1;
@@ -164,6 +166,8 @@ function CrmPaymentsPage() {
   const [bulkPaymentOpen, setBulkPaymentOpen] = useState(false);
   const [executiveDigestOpen, setExecutiveDigestOpen] = useState(false);
   const [renewAccountId, setRenewAccountId] = useState<string | null>(null);
+  const [renewalCancelId, setRenewalCancelId] = useState<string | null>(null);
+  const [cancellingRenewal, setCancellingRenewal] = useState(false);
   const renewAccount = useMemo(
     () => (renewAccountId ? accounts.find((a) => a.id === renewAccountId) ?? null : null),
     [accounts, renewAccountId],
@@ -677,22 +681,39 @@ function CrmPaymentsPage() {
               onToggleAll: toggleSelectionAll,
             }}
             renderExpandedRow={(r) => <CrmPaymentsExpandedRow row={r} search={search} />}
-            actions={(r) =>
-              isCrmAccountInRenewalWindow({ endDate: r.renewalDate }) ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-7 border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-800 hover:bg-amber-500/20 dark:text-amber-300"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setRenewAccountId(r.id);
-                  }}
-                >
-                  Renew
-                </Button>
-              ) : null
-            }
+            actions={(r) => (
+              <div className="flex items-center justify-end gap-1">
+                {isCrmAccountInRenewalWindow({ endDate: r.renewalDate }) ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-800 hover:bg-amber-500/20 dark:text-amber-300"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRenewAccountId(r.id);
+                    }}
+                  >
+                    Renew
+                  </Button>
+                ) : null}
+                {r.renewalCancelled ? null : (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-[10px]"
+                    disabled={cancellingRenewal}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRenewalCancelId(r.id);
+                    }}
+                  >
+                    Renewal cancelled
+                  </Button>
+                )}
+              </div>
+            )}
             columns={[
               {
                 key: "expand",
@@ -951,6 +972,35 @@ function CrmPaymentsPage() {
         open={executiveDigestOpen}
         onOpenChange={setExecutiveDigestOpen}
         accountIdsScope={selectedIds.size > 0 ? [...selectedIds] : undefined}
+      />
+      <ConfirmDeleteDialog
+        open={Boolean(renewalCancelId)}
+        onOpenChange={(open) => {
+          if (!open && !cancellingRenewal) setRenewalCancelId(null);
+        }}
+        title="Mark renewal cancelled?"
+        description={
+          renewalCancelId
+            ? `${rows.find((row) => row.id === renewalCancelId)?.accountName ?? "This account"} will be Suspend and Close. The full deal value (${formatInr(rows.find((row) => row.id === renewalCancelId)?.totalDealValue ?? 0)}) is counted as Customer Lost.`
+            : undefined
+        }
+        confirmLabel="Renewal cancelled"
+        confirmTone="destructive"
+        onConfirm={() => {
+          if (!renewalCancelId) return;
+          const accountId = renewalCancelId;
+          setCancellingRenewal(true);
+          void markRenewalCancelled(accountId)
+            .then(async () => {
+              toast.success("Renewal cancelled. Full deal value is Customer Lost.");
+              setRenewalCancelId(null);
+              await Promise.all([listQuery.refetch(), summaryQuery.refetch()]);
+            })
+            .catch((error) => {
+              toast.error(error instanceof Error ? error.message : "Could not mark renewal cancelled");
+            })
+            .finally(() => setCancellingRenewal(false));
+        }}
       />
       <CrmAccountRenewDialog
         account={renewAccount}

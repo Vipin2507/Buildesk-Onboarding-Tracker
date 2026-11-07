@@ -608,6 +608,8 @@ export type PaymentListItem = {
   /** Sales Lost / Customer Lost when Suspend and Close (or inactive). */
   lostKind?: "sales_lost" | "customer_lost";
   lostValue?: number;
+  /** Payments action: full deal value is Customer Lost. */
+  renewalCancelled?: boolean;
 };
 
 function mapAccountsToPaymentListItems(
@@ -646,6 +648,7 @@ function mapAccountsToPaymentListItems(
       paymentStatus: snap.paymentStatus,
       renewalAmount: snap.renewalAmount,
       paymentCycleBaseline,
+      renewalCancelled: account.renewalCancelled === true,
     };
     const lost = classifyCrmPaymentsLostOutcome(base);
     return {

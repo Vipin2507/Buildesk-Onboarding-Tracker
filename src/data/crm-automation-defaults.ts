@@ -126,7 +126,6 @@ const CRM_AUTOMATION_SEED_SYNC_RULE_IDS = new Set([
   "crm-rule-account-renewal-whatsapp",
   "crm-rule-booking-created-whatsapp",
   "crm-rule-booking-created-email",
-  "crm-rule-onboarding-sla-whatsapp",
 ]);
 
 /** True when a saved rule still has pre-digest / legacy copy and should pick up seed defaults once. */
@@ -194,13 +193,6 @@ export function crmAutomationRuleNeedsSeedSync(
     return false;
   }
 
-  if (seed.id === "crm-rule-onboarding-sla-whatsapp") {
-    // The current default includes "Onboarding behind target". Treating that phrase as
-    // legacy copy wiped operator edits on every Automation page load and wrote the
-    // seed back to SQLite. Keep whatever is already saved.
-    return false;
-  }
-
   return false;
 }
 
@@ -232,6 +224,14 @@ export function mergeCrmAutomationRules(existing: AutomationRule[]): AutomationR
     if (!current) {
       // New seed rule — add once. Operator can disable afterward; we won't reset it.
       byId.set(seed.id, { ...seed });
+      continue;
+    }
+    if (seed.id === "crm-rule-onboarding-sla-whatsapp") {
+      // Operator edits this WhatsApp body. Never replace it with the built-in copy.
+      byId.set(seed.id, {
+        ...current,
+        isActive: typeof current.isActive === "boolean" ? current.isActive : seed.isActive,
+      });
       continue;
     }
     byId.set(seed.id, applyCrmAutomationSeedSync(current, seed));

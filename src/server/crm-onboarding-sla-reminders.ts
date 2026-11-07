@@ -197,17 +197,35 @@ async function dispatchOnboardingSlaWhatsapp(
   }
 }
 
+/** Saved rule bodies only. Seed merge must not swap in the built-in Onboarding SLA text. */
+function loadSavedOnboardingSlaRules(db: Db): AutomationRule[] {
+  const row = db.select().from(t.appConfig).where(eq(t.appConfig.key, "crm-automation")).get();
+  if (!row?.valueJson) return [];
+  try {
+    const snapshot = JSON.parse(row.valueJson) as { rules?: AutomationRule[] };
+    if (!Array.isArray(snapshot.rules)) return [];
+    return snapshot.rules.filter(
+      (rule) =>
+        rule.isActive &&
+        rule.trigger === "onboarding-sla-remind" &&
+        rule.channel === "whatsapp" &&
+        Boolean(rule.templateBody?.trim()),
+    );
+  } catch {
+    return [];
+  }
+}
+
 /**
  * WhatsApp Support 1/2 + Admins when overall onboarding % is below Master day-bucket targets.
  * Dedupe: once per account × rule × bucket (via automation_reminders_sent).
+ * The message is the saved Automation rule body, not the built-in default.
  */
 export async function processCrmOnboardingSlaReminders(db: Db): Promise<number> {
   const config = loadCrmAutomationConfig(db);
   if (!config.settings.automationsEnabled) return 0;
 
-  const rules = config.rules.filter(
-    (r) => r.isActive && r.trigger === "onboarding-sla-remind" && r.channel === "whatsapp",
-  );
+  const rules = loadSavedOnboardingSlaRules(db);
   if (rules.length === 0) return 0;
 
   const targets = loadCrmOnboardingTargets(db);

@@ -40,6 +40,8 @@ export type CrmAccount = Timestamps & {
    * are computed as max(0, lifetimeReceived − paymentCycleBaseline).
    */
   paymentCycleBaseline?: number;
+  /** Set from Payments → Renewal cancelled. Full deal value is Customer Lost. */
+  renewalCancelled?: boolean;
   /** `endDate` value for which the 30-day renewal bell notification was already sent. */
   renewalWindowNotifiedForEndDate?: string;
   /** GST rate applied to deal value (deal size is inclusive of GST). */

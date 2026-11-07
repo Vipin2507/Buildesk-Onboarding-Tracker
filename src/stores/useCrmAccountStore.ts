@@ -22,6 +22,7 @@ type CrmAccountState = {
   upsertAccount: (data: CrmAccountInput) => Promise<CrmAccount>;
   upsertAccountsBatch: (rows: CrmAccountInput[]) => Promise<CrmAccount[]>;
   updateAccount: (id: string, patch: Partial<CrmAccount>) => void;
+  markRenewalCancelled: (id: string) => Promise<void>;
   markLive: (id: string, who?: string) => void;
   setAccountStatus: (
     id: string,
@@ -66,6 +67,7 @@ function toApiPayload(account: CrmAccount) {
     paymentReceived: account.paymentReceived,
     pendingAmount: account.pendingAmount,
     paymentCycleBaseline: account.paymentCycleBaseline ?? null,
+    renewalCancelled: account.renewalCancelled ?? null,
     renewalWindowNotifiedForEndDate: account.renewalWindowNotifiedForEndDate ?? null,
     installmentCount: account.installmentCount,
     installmentsJson:
@@ -181,6 +183,28 @@ export const useCrmAccountStore = createStore<CrmAccountState>((set, get) => ({
       const message = e instanceof Error ? e.message : "Failed to save accounts";
       toast.error(message, { description: "Account import was not saved." });
       throw e;
+    }
+  },
+
+  markRenewalCancelled: async (id: string) => {
+    const existing = get().getById(id);
+    if (!existing) throw new Error("Account not found");
+    const updated = touch({
+      ...existing,
+      status: "suspend_and_close" as const,
+      renewalCancelled: true,
+      statusRemarks: existing.statusRemarks?.trim() || "Renewal cancelled",
+    });
+    set((s) => ({
+      accounts: s.accounts.map((a) => (a.id === id ? updated : a)),
+    }));
+    try {
+      await apiUpsertCrmAccount({ data: toApiPayload(updated) });
+    } catch (error) {
+      set((s) => ({
+        accounts: s.accounts.map((a) => (a.id === id ? existing : a)),
+      }));
+      throw error;
     }
   },
 

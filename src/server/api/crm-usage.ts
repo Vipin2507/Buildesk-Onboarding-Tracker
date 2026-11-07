@@ -3,9 +3,8 @@ import { z } from "zod";
 
 import { eachIsoDay } from "@/lib/crm-usage";
 import { canViewCrmAccount } from "@/lib/crm-account-access";
-import { isAdminRoleKey, roleHasPermission } from "@/lib/permissions";
+import { isCrmAccountEnded } from "@/lib/crm-account-status";
 import { ApiError, requireUser } from "@/server/auth/session";
-import { loadServerRoles } from "@/server/auth/permissions";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { resolveUsageKey } from "@/server/lib/buildesk-usage";
@@ -15,6 +14,7 @@ import {
   readUsageSync,
   refreshUsageRange,
 } from "@/server/lib/crm-usage-store";
+import type { CrmAccount } from "@/types/crm-account";
 import type { CrmUsageAccount } from "@/types/crm-usage";
 
 const daySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -24,11 +24,6 @@ function assertRange(from: string, to: string, maxDays: number) {
   if (eachIsoDay(from, to).length > maxDays) throw new ApiError(400, `Choose ${maxDays} days or fewer`);
 }
 
-function canManageAll(user: { role: string }) {
-  if (isAdminRoleKey(user.role)) return true;
-  return roleHasPermission(loadServerRoles(), user.role, "manageCompanies");
-}
-
 type UsageAccount = CrmUsageAccount & { apiKey: string | null };
 
 function loadUsageAccounts(user: { name: string; role: string }): UsageAccount[] {
@@ -36,26 +31,26 @@ function loadUsageAccounts(user: { name: string; role: string }): UsageAccount[]
   const accounts = db.select().from(t.crmAccounts).all();
   const portals = db.select().from(t.companyPortalAccess).all();
   const portalByCompany = new Map(portals.map((row) => [row.companyId, row]));
-  const visible = !canManageAll(user)
-    ? accounts.filter((account) =>
-          canViewCrmAccount(
-            {
-              salesManagerName: account.salesManagerName ?? undefined,
-              supportManager1: account.supportManager1 ?? undefined,
-              supportManager2: account.supportManager2 ?? undefined,
-              accountManagerName: account.accountManagerName ?? undefined,
-            },
-            user,
-          ),
-        )
-    : accounts;
-  return visible.map((account) => {
+  const visible = accounts.filter((account) =>
+    canViewCrmAccount(
+      {
+        salesManagerName: account.salesManagerName ?? undefined,
+        supportManager1: account.supportManager1 ?? undefined,
+        supportManager2: account.supportManager2 ?? undefined,
+        accountManagerName: account.accountManagerName ?? undefined,
+      },
+      user,
+    ),
+  );
+  return visible.flatMap((account) => {
+    const status = account.status === "churned" ? "closed" : account.status;
+    if (isCrmAccountEnded(status as CrmAccount["status"])) return [];
     const portal = portalByCompany.get(account.id);
     const key = resolveUsageKey(account.name, portal?.slug);
-    return {
+    return [{
       id: account.id,
       name: account.name,
-      status: account.status === "churned" ? "closed" : account.status,
+      status,
       city: account.city,
       salesManagerName: account.salesManagerName ?? "",
       supportManager1: account.supportManager1 ?? "",
@@ -63,7 +58,7 @@ function loadUsageAccounts(user: { name: string; role: string }): UsageAccount[]
       connected: Boolean(key),
       keySource: key?.source ?? "none",
       apiKey: key?.apiKey ?? null,
-    };
+    }];
   });
 }
 
