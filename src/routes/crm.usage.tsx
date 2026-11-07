@@ -208,7 +208,7 @@ function CrmUsagePage() {
     { id: "quiet", label: "No CRM activity", value: counts.quiet },
     { id: "leads", label: "Leads only", value: counts.leads },
     { id: "missing", label: "Missing days", value: counts.missing },
-    { id: "error", label: "API errors", value: counts.error },
+    { id: "error", label: "Account suspended", value: counts.error },
     { id: "disconnected", label: "Not connected", value: counts.disconnected },
   ];
 

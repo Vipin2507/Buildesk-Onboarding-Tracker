@@ -125,6 +125,10 @@ export function DataTable<T>({
   });
 
   useEffect(() => {
+    if (!allowPageSizeSelect) setPageSize(pageSizeProp);
+  }, [allowPageSizeSelect, pageSizeProp]);
+
+  useEffect(() => {
     setPage(0);
   }, [search, pageSize]);
 

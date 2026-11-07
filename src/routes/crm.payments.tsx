@@ -178,6 +178,22 @@ function CrmPaymentsPage() {
   }, [search.search]);
 
   useEffect(() => {
+    if (search.pageSize) return;
+    let stored = 15;
+    try {
+      const n = Number(window.localStorage.getItem("buildesk.table.pageSize"));
+      if (n === 50 || n === 100) stored = n;
+    } catch {
+      /* ignore */
+    }
+    if (stored === 15) return;
+    void navigate({
+      search: (prev: typeof search) => ({ ...prev, pageSize: stored }),
+      replace: true,
+    });
+  }, [search.pageSize, navigate]);
+
+  useEffect(() => {
     const handle = window.setTimeout(() => {
       const trimmed = searchDraft.trim();
       if ((search.search ?? "") === trimmed) return;
@@ -666,7 +682,8 @@ function CrmPaymentsPage() {
             data={rows}
             getRowId={(r) => r.id}
             hideSearch
-            pageSize={rows.length || pageSize}
+            pageSize={Math.max(rows.length, 1)}
+            pageSizeOptions={[]}
             density="compact"
             expandedRowIds={expandedRowIds}
             onRowClick={(r) => toggleExpanded(r.id)}
@@ -702,7 +719,7 @@ function CrmPaymentsPage() {
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-7 px-2 text-[10px]"
+                    className="h-7 shrink-0 whitespace-nowrap px-2 text-[10px]"
                     disabled={cancellingRenewal}
                     onClick={(e) => {
                       e.stopPropagation();
