@@ -4,7 +4,7 @@ import path from "node:path";
 import { ApiError } from "@/server/auth/session";
 import { getProjectRoot } from "@/server/db/resolve-db-path";
 
-const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
 function uploadsRoot() {
   return path.join(getProjectRoot(), "data", "uploads", "crm-wa-broadcasts");
@@ -19,7 +19,7 @@ export function decodeBroadcastMediaBase64(dataBase64: string): Buffer {
   const buffer = Buffer.from(raw, "base64");
   if (!buffer.length) throw new ApiError(400, "Empty media payload");
   if (buffer.length > MAX_UPLOAD_BYTES) {
-    throw new ApiError(400, "Media exceeds 12 MB limit");
+    throw new ApiError(400, "Media exceeds 25 MB limit");
   }
   return buffer;
 }

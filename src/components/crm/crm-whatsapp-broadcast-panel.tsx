@@ -163,6 +163,7 @@ export function CrmWhatsappBroadcastPanel() {
   const [accountSearch, setAccountSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [selectionStart, setSelectionStart] = useState(0);
   const [mode, setMode] = useState<"template" | "custom">("template");
   const [templateId, setTemplateId] = useState("");
   const [body, setBody] = useState("");
@@ -267,6 +268,23 @@ export function CrmWhatsappBroadcastPanel() {
     return () => window.clearInterval(id);
   }, [broadcasts, refreshList]);
 
+  function selectRecipientBatch(start: number) {
+    const total = filteredAccounts.length;
+    if (total === 0) return;
+    const safeStart = Math.max(0, Math.min(start, total - 1));
+    const ids = filteredAccounts
+      .slice(safeStart, safeStart + CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT)
+      .map((account) => account.id);
+    setSelectionStart(safeStart);
+    setSelectedIds(new Set(ids));
+  }
+
+  const nextBatchStart = selectionStart + CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT;
+  const nextBatchCount = Math.min(
+    CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT,
+    Math.max(0, filteredAccounts.length - nextBatchStart),
+  );
+
   function toggleAccount(id: string) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -311,8 +329,8 @@ export function CrmWhatsappBroadcastPanel() {
   function onMediaPicked(files: FileList | null) {
     const file = files?.[0];
     if (!file) return;
-    if (file.size > 12 * 1024 * 1024) {
-      toast.error("File must be 12 MB or smaller");
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error("File must be 25 MB or smaller");
       return;
     }
     if (pendingMedia?.previewUrl) URL.revokeObjectURL(pendingMedia.previewUrl);
@@ -455,16 +473,19 @@ export function CrmWhatsappBroadcastPanel() {
                 <button
                   type="button"
                   className="text-primary hover:underline"
-                  onClick={() => {
-                    const ids = filteredAccounts.slice(0, CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT).map((a) => a.id);
-                    setSelectedIds(new Set(ids));
-                    if (filteredAccounts.length > CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT) {
-                      toast.message(`Selected the first ${CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT} recipients`);
-                    }
-                  }}
+                  onClick={() => selectRecipientBatch(0)}
                 >
                   Select all
                 </button>
+                {nextBatchCount > 0 ? (
+                  <button
+                    type="button"
+                    className="text-primary hover:underline"
+                    onClick={() => selectRecipientBatch(nextBatchStart)}
+                  >
+                    Next {nextBatchCount}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="text-muted-foreground hover:text-foreground hover:underline"
@@ -693,7 +714,7 @@ export function CrmWhatsappBroadcastPanel() {
                     Switch to Custom to edit
                   </span>
                 ) : (
-                  <span className="text-[10px] text-muted-foreground">Up to 12 MB</span>
+                  <span className="text-[10px] text-muted-foreground">Up to 25 MB</span>
                 )}
               </div>
             </div>

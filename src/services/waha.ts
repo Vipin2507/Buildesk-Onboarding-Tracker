@@ -908,9 +908,9 @@ export async function sendWahaMedia(
 
 /** Read a browser File into WAHA base64 payload (strips data-URL prefix). */
 export async function fileToWahaMedia(file: File): Promise<WahaMediaFile> {
-  const MAX = 12 * 1024 * 1024;
+  const MAX = 25 * 1024 * 1024;
   if (file.size > MAX) {
-    throw new Error("File is larger than 12 MB");
+    throw new Error("File is larger than 25 MB");
   }
   const buffer = await file.arrayBuffer();
   const bytes = new Uint8Array(buffer);
