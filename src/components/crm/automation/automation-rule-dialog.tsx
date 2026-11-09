@@ -424,8 +424,7 @@ export function AutomationRuleDialog({
       if (!rule) throw new Error("Could not save this rule");
       const { saveCrmAutomationRule } = await import("@/lib/api");
       const saved = await saveCrmAutomationRule({ data: { rule } });
-      const savedRule = saved.rule as AutomationRule;
-      updateRule(savedRule.id, savedRule);
+      updateRule(saved.rule.id, saved.rule);
       toast.success(editing ? "Rule updated" : "Rule created");
       onOpenChange(false);
       onSaved?.();
