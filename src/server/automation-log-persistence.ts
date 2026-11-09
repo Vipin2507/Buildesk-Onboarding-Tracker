@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 
-import { getDb } from "@/server/db/client";
+import { getDb, getSqlite } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { nowIso } from "@/types";
 import type { AutomationLog } from "@/types/automation";
@@ -48,20 +48,26 @@ export function readAutomationLogsFromConfig(
   return Array.isArray(snapshot.logs) ? (snapshot.logs as AutomationLog[]) : [];
 }
 
-/** Upsert a log entry into app_config (used by server cron and client API). */
+/**
+ * Upsert a log entry into app_config (used by server cron and client API).
+ * Read and write stay in one transaction so a reminder log cannot put an older
+ * rules snapshot back over a template the operator just saved.
+ */
 export function appendAutomationLogToConfig(
   db: ReturnType<typeof getDb>,
   key: AutomationConfigKey,
   log: AutomationLog,
 ) {
-  const { row, snapshot } = readSnapshot(db, key);
-  const existing = Array.isArray(snapshot.logs) ? (snapshot.logs as AutomationLog[]) : [];
-  const idx = existing.findIndex((entry) => entry.id === log.id);
-  const nextLogs =
-    idx >= 0
-      ? existing.map((entry, i) => (i === idx ? log : entry))
-      : [log, ...existing];
-  writeSnapshot(db, key, { ...snapshot, logs: nextLogs.slice(0, MAX_LOGS) }, row);
+  getSqlite().transaction(() => {
+    const { row, snapshot } = readSnapshot(db, key);
+    const existing = Array.isArray(snapshot.logs) ? (snapshot.logs as AutomationLog[]) : [];
+    const idx = existing.findIndex((entry) => entry.id === log.id);
+    const nextLogs =
+      idx >= 0
+        ? existing.map((entry, i) => (i === idx ? log : entry))
+        : [log, ...existing];
+    writeSnapshot(db, key, { ...snapshot, logs: nextLogs.slice(0, MAX_LOGS) }, row);
+  })();
 }
 
 export function replaceAutomationLogsInConfig(
@@ -69,6 +75,8 @@ export function replaceAutomationLogsInConfig(
   key: AutomationConfigKey,
   logs: AutomationLog[],
 ) {
-  const { row, snapshot } = readSnapshot(db, key);
-  writeSnapshot(db, key, { ...snapshot, logs: logs.slice(0, MAX_LOGS) }, row);
+  getSqlite().transaction(() => {
+    const { row, snapshot } = readSnapshot(db, key);
+    writeSnapshot(db, key, { ...snapshot, logs: logs.slice(0, MAX_LOGS) }, row);
+  })();
 }

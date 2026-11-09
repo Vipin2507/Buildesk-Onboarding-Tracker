@@ -150,6 +150,18 @@ export function flushMasterConfigPersistence() {
   void setAppConfig({ data: { key: "master", value: masterSnapshot() } });
 }
 
+/** Write the current CRM automation rules to SQLite and wait until the write finishes. */
+export async function persistCrmAutomationConfigNow() {
+  if (!canPersistAppConfig()) {
+    throw new Error("Only an admin can save automation rules");
+  }
+  if (!crmAutomationConfigPersistReady) {
+    throw new Error("Automation settings are still loading. Wait a moment and save again.");
+  }
+  cancelServerSyncDebounced("crm-automation-config");
+  await setAppConfig({ data: { key: "crm-automation", value: crmAutomationSnapshot() } });
+}
+
 /** Force pending automation config to SQLite now (settings/rules — logs sync separately). */
 export function flushAutomationConfigPersistence(opts?: { erp?: boolean; crm?: boolean }) {
   if (!canPersistAppConfig()) return;

@@ -419,17 +419,16 @@ export function AutomationRuleDialog({
       const payload = buildPayload();
       if (editing) {
         updateRule(editing.id, payload);
-        toast.success("Rule updated");
       } else {
         addRule(payload);
-        toast.success("Rule created");
       }
-      // Ensure SQLite crm-automation snapshot has the new template before the
-      // server reminder scheduler ticks (debounced subscribe alone can lag).
-      const { flushAutomationConfigPersistence } = await import("@/lib/config-persistence");
-      flushAutomationConfigPersistence({ crm: true, erp: false });
+      const { persistCrmAutomationConfigNow } = await import("@/lib/config-persistence");
+      await persistCrmAutomationConfigNow();
+      toast.success(editing ? "Rule updated" : "Rule created");
       onOpenChange(false);
       onSaved?.();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save this rule");
     } finally {
       setSaving(false);
     }

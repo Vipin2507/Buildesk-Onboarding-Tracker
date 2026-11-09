@@ -10,7 +10,8 @@ import {
   replaceAutomationLogsInConfig,
 } from "@/server/automation-log-persistence";
 import { automationLogWireSchema } from "@/server/automation-log-schema";
-import { getDb } from "@/server/db/client";
+import { DEFAULT_CRM_AUTOMATION_RULES } from "@/data/crm-automation-defaults";
+import { getDb, getSqlite } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { loadCompanies, loadProjects } from "@/server/api/mappers";
 import { isTicketOpen, mapTicket, mapTicketActivity } from "@/lib/tickets";
@@ -633,6 +634,39 @@ export const clearAutomationLogs = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
+/**
+ * Page load used to merge the built-in Onboarding SLA text over a saved edit and
+ * write that blob back. If this save would restore that built-in body, keep the
+ * template already stored.
+ */
+function keepSavedOnboardingSlaTemplate(
+  existingJson: string | undefined,
+  incoming: Record<string, unknown>,
+) {
+  if (!existingJson || !Array.isArray(incoming.rules)) return incoming;
+  let previous: { rules?: { id?: string; name?: string; description?: string; templateBody?: string }[] };
+  try {
+    previous = JSON.parse(existingJson) as typeof previous;
+  } catch {
+    return incoming;
+  }
+  const seed = DEFAULT_CRM_AUTOMATION_RULES.find((rule) => rule.id === "crm-rule-onboarding-sla-whatsapp");
+  const saved = previous.rules?.find((rule) => rule.id === "crm-rule-onboarding-sla-whatsapp");
+  if (!seed || !saved?.templateBody || saved.templateBody === seed.templateBody) return incoming;
+  const rules = incoming.rules as { id?: string; templateBody?: string; name?: string; description?: string }[];
+  const index = rules.findIndex((rule) => rule?.id === "crm-rule-onboarding-sla-whatsapp");
+  if (index < 0) return incoming;
+  const next = rules[index];
+  if (next?.templateBody !== seed.templateBody) return incoming;
+  rules[index] = {
+    ...next,
+    name: saved.name ?? next.name,
+    description: saved.description ?? next.description,
+    templateBody: saved.templateBody,
+  };
+  return incoming;
+}
+
 export const setAppConfig = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z
@@ -645,24 +679,29 @@ export const setAppConfig = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     requireUser(["Admin"]);
     const db = getDb();
-    const existing = db.select().from(t.appConfig).where(eq(t.appConfig.key, data.key)).get();
-    const now = nowIso();
-    let value = data.value as Record<string, unknown>;
-    // Never wipe durable automation logs when persisting settings/rules from the client.
-    if ((data.key === "automation" || data.key === "crm-automation") && !("logs" in value)) {
-      value = { ...value, logs: readAutomationLogsFromConfig(db, data.key) };
-    }
-    const valueJson = JSON.stringify(value);
-    if (existing) {
-      db.update(t.appConfig)
-        .set({ valueJson, updatedAt: now })
-        .where(eq(t.appConfig.key, data.key))
-        .run();
-    } else {
-      db.insert(t.appConfig)
-        .values({ key: data.key, valueJson, updatedAt: now })
-        .run();
-    }
+    getSqlite().transaction(() => {
+      const existing = db.select().from(t.appConfig).where(eq(t.appConfig.key, data.key)).get();
+      const now = nowIso();
+      let value = data.value as Record<string, unknown>;
+      // Never wipe durable automation logs when persisting settings/rules from the client.
+      if ((data.key === "automation" || data.key === "crm-automation") && !("logs" in value)) {
+        value = { ...value, logs: readAutomationLogsFromConfig(db, data.key) };
+      }
+      if (data.key === "crm-automation") {
+        value = keepSavedOnboardingSlaTemplate(existing?.valueJson, value);
+      }
+      const valueJson = JSON.stringify(value);
+      if (existing) {
+        db.update(t.appConfig)
+          .set({ valueJson, updatedAt: now })
+          .where(eq(t.appConfig.key, data.key))
+          .run();
+      } else {
+        db.insert(t.appConfig)
+          .values({ key: data.key, valueJson, updatedAt: now })
+          .run();
+      }
+    })();
     return { ok: true };
   });
 
