@@ -7,6 +7,7 @@ export type CrmUsageAccount = {
   city: string;
   salesManagerName: string;
   supportManager1: string;
+  supportManager2: string;
   licensedUsers: number;
   connected: boolean;
   keySource: CrmUsageKeySource;

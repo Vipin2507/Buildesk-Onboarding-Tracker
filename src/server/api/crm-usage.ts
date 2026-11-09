@@ -54,6 +54,7 @@ function loadUsageAccounts(user: { name: string; role: string }): UsageAccount[]
       city: account.city,
       salesManagerName: account.salesManagerName ?? "",
       supportManager1: account.supportManager1 ?? "",
+      supportManager2: account.supportManager2 ?? "",
       licensedUsers: account.usersPurchased || key?.monitorUsers || 0,
       connected: Boolean(key),
       keySource: key?.source ?? "none",

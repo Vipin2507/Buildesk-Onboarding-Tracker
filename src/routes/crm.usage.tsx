@@ -32,6 +32,8 @@ export const Route = createFileRoute("/crm/usage")({
 
 type WindowId = "1" | "3" | "7" | "15" | "30" | "custom";
 type CardId = "all" | "using" | "quiet" | "leads" | "error" | "disconnected" | "missing";
+type UserGroupId = "all" | "0-5" | "6-10" | "11-20" | "21-50" | "51-100" | "100+";
+type ConnectionFilter = "all" | "connected" | "disconnected";
 
 const WINDOWS: { id: Exclude<WindowId, "custom">; label: string }[] = [
   { id: "1", label: "Today" },
@@ -40,6 +42,51 @@ const WINDOWS: { id: Exclude<WindowId, "custom">; label: string }[] = [
   { id: "15", label: "15 days" },
   { id: "30", label: "30 days" },
 ];
+
+const USER_GROUP_OPTIONS: { value: UserGroupId; label: string }[] = [
+  { value: "all", label: "All user groups" },
+  { value: "0-5", label: "0 – 5 users" },
+  { value: "6-10", label: "6 – 10 users" },
+  { value: "11-20", label: "11 – 20 users" },
+  { value: "21-50", label: "21 – 50 users" },
+  { value: "51-100", label: "51 – 100 users" },
+  { value: "100+", label: "100+ users" },
+];
+
+const CONNECTION_OPTIONS: { value: ConnectionFilter; label: string }[] = [
+  { value: "all", label: "All connections" },
+  { value: "connected", label: "Connected" },
+  { value: "disconnected", label: "Not connected" },
+];
+
+function matchesUserGroup(licensedUsers: number, group: UserGroupId) {
+  const count = Math.max(0, Math.round(licensedUsers || 0));
+  if (group === "all") return true;
+  if (group === "0-5") return count <= 5;
+  if (group === "6-10") return count >= 6 && count <= 10;
+  if (group === "11-20") return count >= 11 && count <= 20;
+  if (group === "21-50") return count >= 21 && count <= 50;
+  if (group === "51-100") return count >= 51 && count <= 100;
+  return count >= 100;
+}
+
+function managerFilterOptions(values: string[], allLabel: string) {
+  const names = [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b),
+  );
+  return [
+    { value: "all", label: allLabel },
+    { value: "unassigned", label: "Unassigned" },
+    ...names.map((name) => ({ value: name, label: name })),
+  ];
+}
+
+function matchesManagerFilter(value: string | undefined, filter: string) {
+  const assigned = value?.trim() || "";
+  if (filter === "all") return true;
+  if (filter === "unassigned") return !assigned;
+  return assigned === filter;
+}
 
 function isoDate(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -89,6 +136,11 @@ function CrmUsagePage() {
   const [card, setCard] = useState<CardId>("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [managerFilter, setManagerFilter] = useState("all");
+  const [support1Filter, setSupport1Filter] = useState("all");
+  const [support2Filter, setSupport2Filter] = useState("all");
+  const [userGroupFilter, setUserGroupFilter] = useState<UserGroupId>("all");
+  const [cityFilter, setCityFilter] = useState("all");
+  const [connectionFilter, setConnectionFilter] = useState<ConnectionFilter>("all");
   const [query, setQuery] = useState("");
 
   const load = useCallback(async (range: { from: string; to: string }) => {
@@ -115,19 +167,41 @@ function CrmUsagePage() {
       ...values.map((status) => ({ value: status, label: crmAccountStatusLabel(status) })),
     ];
   }, [rows]);
-  const managerOptions = useMemo(() => {
-    const names = [...new Set(rows.map((row) => row.salesManagerName).filter(Boolean))].sort();
+  const managerOptions = useMemo(
+    () => managerFilterOptions(rows.map((row) => row.salesManagerName), "All sales managers"),
+    [rows],
+  );
+  const support1Options = useMemo(
+    () => managerFilterOptions(rows.map((row) => row.supportManager1), "All Support 1"),
+    [rows],
+  );
+  const support2Options = useMemo(
+    () => managerFilterOptions(rows.map((row) => row.supportManager2), "All Support 2"),
+    [rows],
+  );
+  const cityOptions = useMemo(() => {
+    const cities = [...new Set(rows.map((row) => row.city.trim()).filter(Boolean))].sort((a, b) =>
+      a.localeCompare(b),
+    );
     return [
-      { value: "all", label: "All managers" },
-      { value: "unassigned", label: "Unassigned" },
-      ...names.map((name) => ({ value: name, label: name })),
+      { value: "all", label: "All cities" },
+      { value: "unassigned", label: "No city" },
+      ...cities.map((city) => ({ value: city, label: city })),
     ];
   }, [rows]);
 
   const filtered = rows.filter((row) => {
     if (statusFilter !== "all" && row.status !== statusFilter) return false;
-    if (managerFilter === "unassigned") return !row.salesManagerName;
-    if (managerFilter !== "all" && row.salesManagerName !== managerFilter) return false;
+    if (!matchesManagerFilter(row.salesManagerName, managerFilter)) return false;
+    if (!matchesManagerFilter(row.supportManager1, support1Filter)) return false;
+    if (!matchesManagerFilter(row.supportManager2, support2Filter)) return false;
+    if (!matchesUserGroup(row.licensedUsers, userGroupFilter)) return false;
+    if (cityFilter === "unassigned" && row.city.trim()) return false;
+    if (cityFilter !== "all" && cityFilter !== "unassigned" && row.city.trim() !== cityFilter) {
+      return false;
+    }
+    if (connectionFilter === "connected" && !row.connected) return false;
+    if (connectionFilter === "disconnected" && row.connected) return false;
     return true;
   });
 
@@ -250,7 +324,7 @@ function CrmUsagePage() {
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search account, city, or manager"
+          placeholder="Search account, city, sales, or support"
           className="h-8 min-w-[12rem] flex-1 rounded-md border bg-background px-2.5 text-xs outline-none focus:ring-2 focus:ring-ring/40"
         />
       </div>
@@ -280,6 +354,31 @@ function CrmUsagePage() {
         <DesignTicketFilterField label="Sales manager" compact>
           <DesignTicketSelect compact value={managerFilter} onChange={setManagerFilter} options={managerOptions} />
         </DesignTicketFilterField>
+        <DesignTicketFilterField label="Support 1" compact>
+          <DesignTicketSelect compact value={support1Filter} onChange={setSupport1Filter} options={support1Options} />
+        </DesignTicketFilterField>
+        <DesignTicketFilterField label="Support 2" compact>
+          <DesignTicketSelect compact value={support2Filter} onChange={setSupport2Filter} options={support2Options} />
+        </DesignTicketFilterField>
+        <DesignTicketFilterField label="User group" compact>
+          <DesignTicketSelect
+            compact
+            value={userGroupFilter}
+            onChange={(value) => setUserGroupFilter(value as UserGroupId)}
+            options={USER_GROUP_OPTIONS}
+          />
+        </DesignTicketFilterField>
+        <DesignTicketFilterField label="City" compact>
+          <DesignTicketSelect compact value={cityFilter} onChange={setCityFilter} options={cityOptions} />
+        </DesignTicketFilterField>
+        <DesignTicketFilterField label="Connection" compact>
+          <DesignTicketSelect
+            compact
+            value={connectionFilter}
+            onChange={(value) => setConnectionFilter(value as ConnectionFilter)}
+            options={CONNECTION_OPTIONS}
+          />
+        </DesignTicketFilterField>
       </DesignTicketFilterBar>
 
       <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
@@ -305,7 +404,15 @@ function CrmUsagePage() {
         layout="fixed"
         hideSearch
         searchQuery={query}
-        searchKeys={["name", "salesManagerName", "city", "tag", "focus"]}
+        searchKeys={[
+          "name",
+          "salesManagerName",
+          "supportManager1",
+          "supportManager2",
+          "city",
+          "tag",
+          "focus",
+        ]}
         getRowId={(row) => row.id}
         onRowClick={(row) =>
           void navigate({
@@ -334,6 +441,9 @@ function CrmUsagePage() {
                     {crmAccountStatusLabel(row.status)}
                     {row.city ? ` · ${row.city}` : ""}
                     {row.salesManagerName ? ` · ${row.salesManagerName}` : ""}
+                    {row.supportManager1 ? ` · S1 ${row.supportManager1}` : ""}
+                    {row.supportManager2 ? ` · S2 ${row.supportManager2}` : ""}
+                    {` · ${row.licensedUsers || 0} users`}
                   </div>
                   <div className="mt-1 flex items-center gap-2">
                     <div className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
