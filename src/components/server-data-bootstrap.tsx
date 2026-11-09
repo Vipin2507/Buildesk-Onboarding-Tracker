@@ -500,9 +500,11 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
               erp: automationConfigAuthoritative,
               crm: crmAutomationConfigAuthoritative,
             });
+            // Do not write the CRM rules blob from this browser. A machine that still
+            // has the previous copy would put that older Updated time back on the server.
             flushAutomationConfigPersistence({
               erp: automationConfigAuthoritative,
-              crm: crmAutomationConfigAuthoritative,
+              crm: false,
             });
           } else {
             console.warn(

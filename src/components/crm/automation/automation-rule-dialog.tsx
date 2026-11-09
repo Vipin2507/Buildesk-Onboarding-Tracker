@@ -417,13 +417,15 @@ export function AutomationRuleDialog({
     setSaving(true);
     try {
       const payload = buildPayload();
-      if (editing) {
-        updateRule(editing.id, payload);
-      } else {
-        addRule(payload);
-      }
-      const { persistCrmAutomationConfigNow } = await import("@/lib/config-persistence");
-      await persistCrmAutomationConfigNow();
+      const savedLocal = editing
+        ? (updateRule(editing.id, payload), useCrmAutomationStore.getState().rules.find((item) => item.id === editing.id))
+        : addRule(payload);
+      const rule = savedLocal;
+      if (!rule) throw new Error("Could not save this rule");
+      const { saveCrmAutomationRule } = await import("@/lib/api");
+      const saved = await saveCrmAutomationRule({ data: { rule } });
+      const savedRule = saved.rule as AutomationRule;
+      updateRule(savedRule.id, savedRule);
       toast.success(editing ? "Rule updated" : "Rule created");
       onOpenChange(false);
       onSaved?.();

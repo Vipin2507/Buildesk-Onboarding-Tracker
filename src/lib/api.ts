@@ -105,6 +105,7 @@ export {
   mutateIntegration,
   getAppConfig,
   setAppConfig,
+  saveCrmAutomationRule,
   getAutomationLogs,
   appendAutomationLog,
   clearAutomationLogs,

@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Link } from "@tanstack/react-router";
 import { CalendarDays, ClipboardList, IndianRupee, Mail, MessageCircle, MessageSquare, Pencil, Play, Plus, Power, RefreshCw, Target, Trash2, Ticket, Zap } from "lucide-react";
@@ -27,6 +27,7 @@ import {
 } from "@/types/automation";
 import { useCrmAutomationStore } from "@/stores/useCrmAutomationStore";
 import { notifyCrmAutomationResult, testCrmAutomationRule } from "@/services/crm-automation";
+import { pullCrmAutomationConfigFromServer } from "@/lib/crm-automation-refresh";
 import { formatRelativeTime } from "@/types/common";
 import { cn } from "@/lib/utils";
 
@@ -138,6 +139,10 @@ export function AutomationRulesPanel() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [testingRuleId, setTestingRuleId] = useState<string | null>(null);
   const [editing, setEditing] = useState<AutomationRule | null>(null);
+
+  useEffect(() => {
+    void pullCrmAutomationConfigFromServer();
+  }, []);
 
   const {
     ticketRules,

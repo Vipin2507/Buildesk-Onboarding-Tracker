@@ -667,6 +667,56 @@ function keepSavedOnboardingSlaTemplate(
   return incoming;
 }
 
+const automationRuleSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string(),
+    trigger: z.string(),
+    channel: z.string(),
+    isActive: z.boolean(),
+    templateBody: z.string(),
+  })
+  .passthrough();
+
+/** Patch one CRM automation rule inside the shared config so other PCs see the same Updated time. */
+export const saveCrmAutomationRule = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ rule: automationRuleSchema }).parse(data))
+  .handler(async ({ data }) => {
+    requireUser(["Admin"]);
+    const db = getDb();
+    const now = nowIso();
+    let saved: Record<string, unknown> = { ...data.rule, updatedAt: now };
+    getSqlite().transaction(() => {
+      const existing = db.select().from(t.appConfig).where(eq(t.appConfig.key, "crm-automation")).get();
+      const snapshot = existing?.valueJson
+        ? (JSON.parse(existing.valueJson) as Record<string, unknown>)
+        : {};
+      const rules = Array.isArray(snapshot.rules) ? [...snapshot.rules] : [];
+      const index = rules.findIndex(
+        (rule) => rule && typeof rule === "object" && (rule as { id?: string }).id === data.rule.id,
+      );
+      const previous =
+        index >= 0 && rules[index] && typeof rules[index] === "object"
+          ? (rules[index] as Record<string, unknown>)
+          : {};
+      saved = { ...previous, ...data.rule, updatedAt: now };
+      if (!saved.createdAt) saved.createdAt = now;
+      if (index >= 0) rules[index] = saved;
+      else rules.push(saved);
+      snapshot.rules = rules;
+      const valueJson = JSON.stringify(snapshot);
+      if (existing) {
+        db.update(t.appConfig)
+          .set({ valueJson, updatedAt: now })
+          .where(eq(t.appConfig.key, "crm-automation"))
+          .run();
+      } else {
+        db.insert(t.appConfig).values({ key: "crm-automation", valueJson, updatedAt: now }).run();
+      }
+    })();
+    return { rule: saved };
+  });
+
 export const setAppConfig = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z
