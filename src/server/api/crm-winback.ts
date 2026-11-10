@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -14,13 +14,20 @@ import { loadCrmAutomationConfig } from "@/server/crm-booking-automation";
 import { processWinbackCampaigns, renderWinbackTemplate } from "@/server/crm-winback";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
+import {
+  decodeWinbackMediaBase64,
+  inferWinbackMediaKind,
+  saveWinbackMedia,
+} from "@/server/lib/crm-winback-media";
 import type {
   CrmWinbackCampaign,
   CrmWinbackCampaignStatus,
   CrmWinbackContact,
   CrmWinbackDelivery,
   CrmWinbackDeliveryStatus,
+  CrmWinbackMediaKind,
   CrmWinbackOutcome,
+  CrmWinbackTemplate,
 } from "@/types/crm-winback";
 
 const outcomeSchema = z.enum([
@@ -105,6 +112,13 @@ function mapCampaign(
   row: typeof t.crmWinbackCampaigns.$inferSelect,
   counts: ReturnType<typeof campaignCounts>,
 ): CrmWinbackCampaign {
+  const mediaKind =
+    row.mediaKind === "image" ||
+    row.mediaKind === "video" ||
+    row.mediaKind === "voice" ||
+    row.mediaKind === "file"
+      ? (row.mediaKind as CrmWinbackMediaKind)
+      : undefined;
   return {
     id: row.id,
     name: row.name,
@@ -113,6 +127,10 @@ function mapCampaign(
     status: row.status as CrmWinbackCampaignStatus,
     scheduledAt: row.scheduledAt ?? undefined,
     waveSize: row.waveSize || CRM_WINBACK_WAVE_LIMIT,
+    mediaKind,
+    mediaFilename: row.mediaFilename ?? undefined,
+    mediaMimetype: row.mediaMimetype ?? undefined,
+    hasMedia: Boolean(row.mediaStorageKey && mediaKind),
     createdByUserId: row.createdByUserId ?? undefined,
     createdByName: row.createdByName ?? undefined,
     startedAt: row.startedAt ?? undefined,
@@ -120,6 +138,19 @@ function mapCampaign(
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     ...counts,
+  };
+}
+
+function mapTemplate(row: typeof t.crmWinbackTemplates.$inferSelect): CrmWinbackTemplate {
+  return {
+    id: row.id,
+    name: row.name,
+    category: row.category || "General",
+    body: row.body,
+    active: Boolean(row.active),
+    sortOrder: row.sortOrder || 1,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   };
 }
 
@@ -377,11 +408,18 @@ export const createCrmWinbackCampaign = createServerFn({ method: "POST" })
     z
       .object({
         name: z.string().min(1).max(120),
-        body: z.string().min(1).max(4000),
+        body: z.string().max(4000).optional().default(""),
         contactIds: z.array(z.string().min(1)).min(1).max(5000),
         scheduledAt: z.string().optional(),
         sendNow: z.boolean().optional(),
         waveSize: z.coerce.number().int().min(1).max(CRM_WINBACK_WAVE_LIMIT).optional(),
+        media: z
+          .object({
+            filename: z.string().min(1).max(180),
+            mimetype: z.string().min(1).max(120),
+            dataBase64: z.string().min(1),
+          })
+          .optional(),
       })
       .parse(data),
   )
@@ -391,6 +429,12 @@ export const createCrmWinbackCampaign = createServerFn({ method: "POST" })
     const config = loadCrmAutomationConfig(db);
     if (!config.waha.isEnabled || !config.waha.apiUrl?.trim() || !config.waha.apiKey?.trim()) {
       throw new ApiError(400, "Enable CRM WhatsApp (WAHA) before scheduling Win-back campaigns");
+    }
+
+    const body = (data.body ?? "").trim();
+    const hasMedia = Boolean(data.media?.dataBase64);
+    if (!body && !hasMedia) {
+      throw new ApiError(400, "Message body or media is required");
     }
 
     const uniqueIds = [...new Set(data.contactIds)];
@@ -417,15 +461,37 @@ export const createCrmWinbackCampaign = createServerFn({ method: "POST" })
     const now = nowIso();
     const id = newId();
     const waveSize = data.waveSize ?? CRM_WINBACK_WAVE_LIMIT;
+
+    let mediaKind: string | null = null;
+    let mediaFilename: string | null = null;
+    let mediaMimetype: string | null = null;
+    let mediaStorageKey: string | null = null;
+    if (data.media?.dataBase64) {
+      const buffer = decodeWinbackMediaBase64(data.media.dataBase64);
+      mediaFilename = data.media.filename.trim() || "file";
+      mediaMimetype = data.media.mimetype.trim() || "application/octet-stream";
+      mediaKind = inferWinbackMediaKind(mediaMimetype);
+      mediaStorageKey = saveWinbackMedia({
+        campaignId: id,
+        fileName: mediaFilename,
+        mimeType: mediaMimetype,
+        buffer,
+      }).storageKey;
+    }
+
     db.insert(t.crmWinbackCampaigns)
       .values({
         id,
         name: data.name.trim(),
         channel: "whatsapp",
-        body: data.body.trim(),
+        body,
         status: "scheduled",
         scheduledAt,
         waveSize,
+        mediaKind,
+        mediaFilename,
+        mediaMimetype,
+        mediaStorageKey,
         createdByUserId: user.id,
         createdByName: user.name,
         startedAt: null,
@@ -444,7 +510,7 @@ export const createCrmWinbackCampaign = createServerFn({ method: "POST" })
           companyName: contact.companyName,
           contactPerson: contact.contactPerson,
           mobile: contact.mobile,
-          renderedBody: renderWinbackTemplate(data.body.trim(), {
+          renderedBody: renderWinbackTemplate(body, {
             companyName: contact.companyName,
             contactPerson: contact.contactPerson,
             mobile: contact.mobile,
@@ -465,6 +531,95 @@ export const createCrmWinbackCampaign = createServerFn({ method: "POST" })
 
     const row = db.select().from(t.crmWinbackCampaigns).where(eq(t.crmWinbackCampaigns.id, id)).get()!;
     return mapCampaign(row, campaignCounts(db, id));
+  });
+
+export const listCrmWinbackTemplates = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({ includeInactive: z.boolean().optional() })
+      .optional()
+      .parse(data ?? {}),
+  )
+  .handler(async ({ data }) => {
+    requireCrmAccess();
+    const db = getDb();
+    let rows = db
+      .select()
+      .from(t.crmWinbackTemplates)
+      .orderBy(asc(t.crmWinbackTemplates.sortOrder), asc(t.crmWinbackTemplates.name))
+      .all();
+    if (!data?.includeInactive) rows = rows.filter((row) => row.active);
+    return { templates: rows.map(mapTemplate) };
+  });
+
+export const upsertCrmWinbackTemplate = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string().min(1).optional(),
+        name: z.string().min(1).max(120),
+        category: z.string().max(80).optional(),
+        body: z.string().min(1).max(4000),
+        active: z.boolean().optional(),
+        sortOrder: z.coerce.number().int().min(1).max(999).optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    requireCrmAccess();
+    const db = getDb();
+    const now = nowIso();
+    const name = data.name.trim();
+    const body = data.body.trim();
+    const category = (data.category ?? "General").trim() || "General";
+    const active = data.active ?? true;
+    const sortOrder = data.sortOrder ?? 1;
+
+    if (data.id) {
+      const existing = db
+        .select()
+        .from(t.crmWinbackTemplates)
+        .where(eq(t.crmWinbackTemplates.id, data.id))
+        .get();
+      if (!existing) throw new ApiError(404, "Template not found");
+      db.update(t.crmWinbackTemplates)
+        .set({ name, category, body, active, sortOrder, updatedAt: now })
+        .where(eq(t.crmWinbackTemplates.id, data.id))
+        .run();
+      const row = db.select().from(t.crmWinbackTemplates).where(eq(t.crmWinbackTemplates.id, data.id)).get()!;
+      return mapTemplate(row);
+    }
+
+    const id = newId();
+    db.insert(t.crmWinbackTemplates)
+      .values({
+        id,
+        name,
+        category,
+        body,
+        active,
+        sortOrder,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+    const row = db.select().from(t.crmWinbackTemplates).where(eq(t.crmWinbackTemplates.id, id)).get()!;
+    return mapTemplate(row);
+  });
+
+export const deleteCrmWinbackTemplate = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
+  .handler(async ({ data }) => {
+    requireCrmAccess();
+    const db = getDb();
+    const existing = db
+      .select()
+      .from(t.crmWinbackTemplates)
+      .where(eq(t.crmWinbackTemplates.id, data.id))
+      .get();
+    if (!existing) throw new ApiError(404, "Template not found");
+    db.delete(t.crmWinbackTemplates).where(eq(t.crmWinbackTemplates.id, data.id)).run();
+    return { ok: true as const };
   });
 
 export const pauseCrmWinbackCampaign = createServerFn({ method: "POST" })

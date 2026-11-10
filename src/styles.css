@@ -876,18 +876,44 @@ html.portal-embed-active {
   border-color: var(--wb-primary-300) !important;
 }
 
+.crm-winback-chip-row {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+@media (max-width: 1100px) {
+  .crm-winback-chip-row {
+    display: flex;
+    min-width: 0;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+  }
+}
+
 .crm-winback-chip {
   display: flex;
-  min-width: 4.5rem;
-  flex: 1;
+  min-width: 0;
+  min-height: 4.25rem;
+  flex: 1 1 0;
   flex-direction: column;
+  justify-content: space-between;
   border-radius: 0.75rem;
   border: 1px solid var(--wb-neutral-200);
   background: var(--wb-neutral-50);
-  padding: 0.5rem 0.65rem;
+  padding: 0.55rem 0.7rem;
   text-align: left;
   box-shadow: 0 1px 2px rgb(15 23 42 / 0.03);
   transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+@media (max-width: 1100px) {
+  .crm-winback-chip {
+    flex: 0 0 7.25rem;
+    min-width: 7.25rem;
+  }
 }
 
 .crm-winback-chip:hover {
@@ -937,15 +963,20 @@ html.portal-embed-active {
 }
 
 .crm-winback-chip-label {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--wb-neutral-500);
+  line-height: 1.2;
 }
 
 .crm-winback-chip-count {
-  margin-top: 0.3rem;
+  margin-top: 0.45rem;
   font-size: 1.125rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;

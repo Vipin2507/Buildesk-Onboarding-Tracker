@@ -205,6 +205,9 @@ export {
   resumeCrmWinbackCampaign,
   cancelCrmWinbackCampaign,
   listCrmWinbackActivity,
+  listCrmWinbackTemplates,
+  upsertCrmWinbackTemplate,
+  deleteCrmWinbackTemplate,
 } from "@/server/api/crm-winback";
 
 export {

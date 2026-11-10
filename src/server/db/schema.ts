@@ -379,6 +379,10 @@ export const crmWinbackCampaigns = sqliteTable(
     status: text("status").notNull().default("draft"),
     scheduledAt: text("scheduled_at"),
     waveSize: integer("wave_size").notNull().default(50),
+    mediaKind: text("media_kind"),
+    mediaFilename: text("media_filename"),
+    mediaMimetype: text("media_mimetype"),
+    mediaStorageKey: text("media_storage_key"),
     createdByUserId: text("created_by_user_id"),
     createdByName: text("created_by_name"),
     startedAt: text("started_at"),
@@ -389,6 +393,21 @@ export const crmWinbackCampaigns = sqliteTable(
     index("crm_winback_campaigns_status_idx").on(t.status),
     index("crm_winback_campaigns_scheduled_idx").on(t.scheduledAt),
   ],
+);
+
+/** Reusable Win-back WhatsApp message templates. */
+export const crmWinbackTemplates = sqliteTable(
+  "crm_winback_templates",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    category: text("category").notNull().default("General"),
+    body: text("body").notNull(),
+    active: integer("active", { mode: "boolean" }).notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(1),
+    ...timestamps,
+  },
+  (t) => [index("crm_winback_templates_active_idx").on(t.active)],
 );
 
 export const crmWinbackDeliveries = sqliteTable(

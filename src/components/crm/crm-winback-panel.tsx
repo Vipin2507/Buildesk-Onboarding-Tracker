@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { CrmWinbackComposeDialog } from "@/components/crm/crm-winback-compose-dialog";
+import { CrmWinbackTemplatesPanel } from "@/components/crm/crm-winback-templates-panel";
 import { DataTable } from "@/components/data-table";
 import {
   DesignTicketFilterField,
@@ -22,12 +24,9 @@ import {
 } from "@/components/design-ticket/design-ticket-shared";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   bulkUpdateCrmWinbackContacts,
   cancelCrmWinbackCampaign,
-  createCrmWinbackCampaign,
   getCrmWinbackCampaign,
   importCrmWinbackContacts,
   listCrmWinbackActivity,
@@ -53,7 +52,7 @@ import type {
 } from "@/types/crm-winback";
 import { CRM_WINBACK_OUTCOME_LABELS } from "@/types/crm-winback";
 
-type TabId = "contacts" | "campaigns" | "activity";
+type TabId = "contacts" | "campaigns" | "activity" | "templates";
 type OutcomeChipId = "all" | CrmWinbackOutcome;
 type ContactedFilter = "all" | "yes" | "no";
 type CampaignStatusFilter = "all" | CrmWinbackCampaign["status"];
@@ -63,16 +62,17 @@ const TABS = [
   { id: "contacts" as const, label: "Contacts" },
   { id: "campaigns" as const, label: "Campaigns" },
   { id: "activity" as const, label: "Activity" },
+  { id: "templates" as const, label: "Templates" },
 ];
 
 const OUTCOME_CHIPS: { id: OutcomeChipId; label: string }[] = [
   { id: "all", label: "All" },
-  { id: "none", label: "Not contacted" },
+  { id: "none", label: "Open" },
   { id: "interested", label: "Interested" },
   { id: "callback", label: "Callback" },
-  { id: "not_interested", label: "Not interested" },
-  { id: "wrong_number", label: "Wrong number" },
-  { id: "do_not_contact", label: "Do not contact" },
+  { id: "not_interested", label: "Not int." },
+  { id: "wrong_number", label: "Wrong #" },
+  { id: "do_not_contact", label: "DNC" },
 ];
 
 const OUTCOME_OPTIONS = Object.entries(CRM_WINBACK_OUTCOME_LABELS).map(([value, label]) => ({
@@ -106,13 +106,6 @@ export function CrmWinbackPanel() {
   const [batchOffset, setBatchOffset] = useState(0);
   const [importing, setImporting] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
-  const [campaignName, setCampaignName] = useState("");
-  const [campaignBody, setCampaignBody] = useState(
-    "Hi {{contactPerson}},\n\nWe miss working with {{companyName}}. Ready to restart Buildesk CRM?\n\nReply YES and we will connect you with your account team.",
-  );
-  const [scheduleLocal, setScheduleLocal] = useState("");
-  const [sendNow, setSendNow] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [expandedCampaignId, setExpandedCampaignId] = useState<string | null>(null);
   const [campaignDetail, setCampaignDetail] = useState<CrmWinbackDelivery[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -302,42 +295,6 @@ export function CrmWinbackPanel() {
     }
   }
 
-  async function createCampaign() {
-    if (selectedIds.size === 0) {
-      toast.error("Select at least one contact");
-      return;
-    }
-    if (!campaignName.trim() || !campaignBody.trim()) {
-      toast.error("Campaign name and message are required");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const scheduledAt =
-        !sendNow && scheduleLocal ? new Date(scheduleLocal).toISOString() : undefined;
-      await createCrmWinbackCampaign({
-        data: {
-          name: campaignName.trim(),
-          body: campaignBody.trim(),
-          contactIds: [...selectedIds],
-          sendNow,
-          scheduledAt,
-          waveSize: CRM_WINBACK_WAVE_LIMIT,
-        },
-      });
-      toast.success(sendNow ? "Campaign started" : "Campaign scheduled");
-      setComposeOpen(false);
-      setCampaignName("");
-      setSelectedIds(new Set());
-      setTab("campaigns");
-      await refresh();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not create campaign");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
   async function openCampaign(id: string) {
     if (expandedCampaignId === id) {
       setExpandedCampaignId(null);
@@ -400,27 +357,31 @@ export function CrmWinbackPanel() {
         </div>
 
         {tab === "contacts" ? (
-          <div
-            className="relative z-[1] mt-3 flex min-w-0 gap-1.5 overflow-x-auto pb-0.5"
-            role="tablist"
-            aria-label="Outcome filters"
-          >
+          <div className="crm-winback-chip-row relative z-[1] mt-3" role="tablist" aria-label="Outcome filters">
             {OUTCOME_CHIPS.map((chip) => {
               const active = outcomeChip === chip.id;
               const count = outcomeCounts[chip.id];
               const tone = outcomeSemantic(chip.id);
+              const fullLabel =
+                chip.id === "all"
+                  ? "All"
+                  : chip.id === "none"
+                    ? CRM_WINBACK_OUTCOME_LABELS.none
+                    : CRM_WINBACK_OUTCOME_LABELS[chip.id];
               return (
                 <button
                   key={chip.id}
                   type="button"
                   role="tab"
+                  title={fullLabel}
+                  aria-label={fullLabel}
                   aria-selected={active}
                   data-active={active}
                   data-tone={tone}
                   onClick={() => setOutcomeChip(chip.id)}
                   className="crm-winback-chip focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--wb-primary-400)]"
                 >
-                  <span className="crm-winback-chip-label truncate">{chip.label}</span>
+                  <span className="crm-winback-chip-label">{chip.label}</span>
                   <span className="crm-winback-chip-count">{count}</span>
                 </button>
               );
@@ -1046,83 +1007,19 @@ export function CrmWinbackPanel() {
         </>
       ) : null}
 
-      {composeOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3 sm:items-center">
-          <div className="crm-winback-modal w-full max-w-lg rounded-xl p-4">
-            <div className="mb-3 flex items-start justify-between gap-2">
-              <div>
-                <h3 className="crm-winback-title text-sm">New Win-back campaign</h3>
-                <p className="crm-winback-subtitle">
-                  {eligibleSelected} recipients · WhatsApp · waves of {CRM_WINBACK_WAVE_LIMIT}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setComposeOpen(false)}
-                className="crm-winback-muted"
-                aria-label="Close"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="space-y-3">
-              <label className="block text-[11px] font-medium">
-                Campaign name
-                <Input
-                  value={campaignName}
-                  onChange={(e) => setCampaignName(e.target.value)}
-                  className="mt-1 h-8 text-xs"
-                  placeholder="Mar 2026 closed renewals"
-                />
-              </label>
-              <label className="block text-[11px] font-medium">
-                Message
-                <Textarea
-                  value={campaignBody}
-                  onChange={(e) => setCampaignBody(e.target.value)}
-                  className="mt-1 min-h-[8rem] text-xs"
-                />
-                <span className="mt-1 block text-[10px] font-normal text-muted-foreground">
-                  Variables: {"{{companyName}}"}, {"{{contactPerson}}"}, {"{{mobile}}"}
-                </span>
-              </label>
-              <div className="flex flex-wrap items-center gap-3 text-[11px]">
-                <label className="inline-flex items-center gap-1.5">
-                  <input type="checkbox" checked={sendNow} onChange={(e) => setSendNow(e.target.checked)} />
-                  Send first wave now
-                </label>
-                {!sendNow ? (
-                  <Input
-                    type="datetime-local"
-                    value={scheduleLocal}
-                    onChange={(e) => setScheduleLocal(e.target.value)}
-                    className="h-8 w-auto text-xs"
-                  />
-                ) : null}
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="crm-winback-btn-ghost h-8 text-xs"
-                  onClick={() => setComposeOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  size="sm"
-                  className="crm-winback-btn-primary h-8 gap-1 text-xs"
-                  disabled={submitting}
-                  onClick={() => void createCampaign()}
-                >
-                  {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                  {sendNow ? "Start campaign" : "Schedule campaign"}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {tab === "templates" ? <CrmWinbackTemplatesPanel /> : null}
+
+      <CrmWinbackComposeDialog
+        open={composeOpen}
+        eligibleCount={eligibleSelected}
+        contactIds={[...selectedIds]}
+        onClose={() => setComposeOpen(false)}
+        onCreated={() => {
+          setSelectedIds(new Set());
+          setTab("campaigns");
+          void refresh();
+        }}
+      />
     </div>
   );
 }

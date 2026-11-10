@@ -10,6 +10,7 @@ import { PAYMENT_AUTOMATION_SEND_PAUSE_MS } from "@/server/crm-payment-reminder-
 import type { Db } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { nowIso } from "@/server/auth/session";
+import { readWinbackMedia } from "@/server/lib/crm-winback-media";
 import type { AutomationLog, WahaConfig } from "@/types/automation";
 
 function trimSlash(url: string) {
@@ -30,6 +31,13 @@ function serverLogId() {
   return `WB-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
+function wahaMediaPath(kind: "image" | "video" | "voice" | "file") {
+  if (kind === "image") return "/api/sendImage";
+  if (kind === "video") return "/api/sendVideo";
+  if (kind === "voice") return "/api/sendVoice";
+  return "/api/sendFile";
+}
+
 async function sendServerWahaText(waha: WahaConfig, chatId: string, text: string) {
   const res = await fetch(`${trimSlash(waha.apiUrl)}/api/sendText`, {
     method: "POST",
@@ -43,6 +51,32 @@ async function sendServerWahaText(waha: WahaConfig, chatId: string, text: string
       chatId,
       text,
     }),
+  });
+  const body = await res.text();
+  return { ok: res.ok, status: res.status, text: body };
+}
+
+async function sendServerWahaMedia(
+  waha: WahaConfig,
+  kind: "image" | "video" | "voice" | "file",
+  chatId: string,
+  file: { mimetype: string; filename: string; data: string },
+  caption?: string,
+) {
+  const payload: Record<string, unknown> = {
+    session: waha.sessionName,
+    chatId,
+    file,
+  };
+  if (caption?.trim()) payload.caption = caption;
+  const res = await fetch(`${trimSlash(waha.apiUrl)}${wahaMediaPath(kind)}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "X-Api-Key": waha.apiKey,
+    },
+    body: JSON.stringify(payload),
   });
   const body = await res.text();
   return { ok: res.ok, status: res.status, text: body };
@@ -217,7 +251,39 @@ export async function processWinbackCampaigns(db: Db): Promise<number> {
       };
 
       try {
-        const res = await sendServerWahaText(config.waha, chatId, rendered);
+        const mediaKind = (campaign.mediaKind ?? "").trim() as
+          | "image"
+          | "video"
+          | "voice"
+          | "file"
+          | "";
+        const hasMedia =
+          Boolean(campaign.mediaStorageKey) &&
+          (mediaKind === "image" ||
+            mediaKind === "video" ||
+            mediaKind === "voice" ||
+            mediaKind === "file");
+
+        let res: { ok: boolean; status: number; text: string };
+        if (hasMedia) {
+          const { buffer } = readWinbackMedia(campaign.mediaStorageKey!);
+          res = await sendServerWahaMedia(
+            config.waha,
+            mediaKind,
+            chatId,
+            {
+              mimetype: campaign.mediaMimetype || "application/octet-stream",
+              filename: campaign.mediaFilename || "file",
+              data: buffer.toString("base64"),
+            },
+            rendered || undefined,
+          );
+        } else if (rendered.trim()) {
+          res = await sendServerWahaText(config.waha, chatId, rendered);
+        } else {
+          throw new Error("Empty message and no media");
+        }
+
         if (!res.ok) {
           db.update(t.crmWinbackDeliveries)
             .set({

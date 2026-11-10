@@ -9,7 +9,7 @@ export const Route = createFileRoute("/crm/win-back")({
 
 function CrmWinbackPage() {
   return (
-    <PageWrap compact flushTop>
+    <PageWrap compact>
       <CrmWinbackPanel />
     </PageWrap>
   );

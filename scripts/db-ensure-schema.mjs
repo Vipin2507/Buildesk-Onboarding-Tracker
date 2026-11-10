@@ -1579,6 +1579,10 @@ if (!tableExists("crm_winback_campaigns")) {
       status TEXT NOT NULL DEFAULT 'draft',
       scheduled_at TEXT,
       wave_size INTEGER NOT NULL DEFAULT 50,
+      media_kind TEXT,
+      media_filename TEXT,
+      media_mimetype TEXT,
+      media_storage_key TEXT,
       created_by_user_id TEXT,
       created_by_name TEXT,
       started_at TEXT,
@@ -1615,6 +1619,37 @@ if (!tableExists("crm_winback_deliveries")) {
     CREATE UNIQUE INDEX IF NOT EXISTS crm_winback_deliv_uidx ON crm_winback_deliveries(campaign_id, contact_id);
   `);
   console.log("+ CREATE TABLE crm_winback_deliveries");
+}
+
+if (tableExists("crm_winback_campaigns")) {
+  const winbackCampaignCols = existingColumns("crm_winback_campaigns");
+  for (const [name, ddl] of [
+    ["media_kind", "TEXT"],
+    ["media_filename", "TEXT"],
+    ["media_mimetype", "TEXT"],
+    ["media_storage_key", "TEXT"],
+  ]) {
+    if (winbackCampaignCols.has(name)) continue;
+    sqlite.exec(`ALTER TABLE crm_winback_campaigns ADD COLUMN ${name} ${ddl}`);
+    console.log(`+ ALTER TABLE crm_winback_campaigns ADD ${name}`);
+  }
+}
+
+if (!tableExists("crm_winback_templates")) {
+  sqlite.exec(`
+    CREATE TABLE crm_winback_templates (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'General',
+      body TEXT NOT NULL,
+      active INTEGER NOT NULL DEFAULT 1,
+      sort_order INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS crm_winback_templates_active_idx ON crm_winback_templates(active);
+  `);
+  console.log("+ CREATE TABLE crm_winback_templates");
 }
 
 sqlite.close();
