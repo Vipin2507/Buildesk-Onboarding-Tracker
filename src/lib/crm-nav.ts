@@ -12,6 +12,7 @@ import {
   Megaphone,
   MessageSquareText,
   MessagesSquare,
+  RotateCcw,
   Settings,
   Zap,
 } from "lucide-react";
@@ -27,6 +28,7 @@ export const CRM_NAV: NavItem[] = [
   { to: "/crm/tasks", label: "Tasks", icon: CheckSquare },
   { to: "/crm/queries", label: "Account queries", icon: HelpCircle },
   { to: "/crm/broadcasts", label: "Broadcast", icon: Megaphone },
+  { to: "/crm/win-back", label: "Win-back", icon: RotateCcw },
   { to: "/crm/activity", label: "Activity history", icon: History },
   { to: "/crm/support", label: "Support Desk", icon: LifeBuoy },
   { to: "/crm/tickets", label: "Ticket Tracking", icon: MessageSquareText },

@@ -1543,5 +1543,79 @@ if (!tableExists("crm_usage_sync")) {
   console.log("+ CREATE TABLE crm_usage_sync");
 }
 
+if (!tableExists("crm_winback_contacts")) {
+  sqlite.exec(`
+    CREATE TABLE crm_winback_contacts (
+      id TEXT PRIMARY KEY NOT NULL,
+      company_name TEXT NOT NULL,
+      contact_person TEXT NOT NULL DEFAULT '',
+      mobile TEXT NOT NULL,
+      mobile_normalized TEXT NOT NULL,
+      email TEXT,
+      city TEXT,
+      outcome TEXT NOT NULL DEFAULT 'none',
+      notes TEXT,
+      owner_name TEXT,
+      tags_json TEXT,
+      last_contacted_at TEXT,
+      archived INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS crm_winback_contacts_mobile_uidx ON crm_winback_contacts(mobile_normalized);
+    CREATE INDEX IF NOT EXISTS crm_winback_contacts_company_idx ON crm_winback_contacts(company_name);
+    CREATE INDEX IF NOT EXISTS crm_winback_contacts_outcome_idx ON crm_winback_contacts(outcome);
+  `);
+  console.log("+ CREATE TABLE crm_winback_contacts");
+}
+
+if (!tableExists("crm_winback_campaigns")) {
+  sqlite.exec(`
+    CREATE TABLE crm_winback_campaigns (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL,
+      channel TEXT NOT NULL DEFAULT 'whatsapp',
+      body TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'draft',
+      scheduled_at TEXT,
+      wave_size INTEGER NOT NULL DEFAULT 50,
+      created_by_user_id TEXT,
+      created_by_name TEXT,
+      started_at TEXT,
+      finished_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS crm_winback_campaigns_status_idx ON crm_winback_campaigns(status);
+    CREATE INDEX IF NOT EXISTS crm_winback_campaigns_scheduled_idx ON crm_winback_campaigns(scheduled_at);
+  `);
+  console.log("+ CREATE TABLE crm_winback_campaigns");
+}
+
+if (!tableExists("crm_winback_deliveries")) {
+  sqlite.exec(`
+    CREATE TABLE crm_winback_deliveries (
+      id TEXT PRIMARY KEY NOT NULL,
+      campaign_id TEXT NOT NULL REFERENCES crm_winback_campaigns(id) ON DELETE CASCADE,
+      contact_id TEXT NOT NULL REFERENCES crm_winback_contacts(id) ON DELETE CASCADE,
+      company_name TEXT NOT NULL DEFAULT '',
+      contact_person TEXT NOT NULL DEFAULT '',
+      mobile TEXT NOT NULL DEFAULT '',
+      rendered_body TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      error_message TEXT,
+      wave_number INTEGER NOT NULL DEFAULT 1,
+      sent_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS crm_winback_deliv_campaign_idx ON crm_winback_deliveries(campaign_id);
+    CREATE INDEX IF NOT EXISTS crm_winback_deliv_contact_idx ON crm_winback_deliveries(contact_id);
+    CREATE INDEX IF NOT EXISTS crm_winback_deliv_status_idx ON crm_winback_deliveries(status);
+    CREATE UNIQUE INDEX IF NOT EXISTS crm_winback_deliv_uidx ON crm_winback_deliveries(campaign_id, contact_id);
+  `);
+  console.log("+ CREATE TABLE crm_winback_deliveries");
+}
+
 sqlite.close();
 console.log("db:ensure complete");

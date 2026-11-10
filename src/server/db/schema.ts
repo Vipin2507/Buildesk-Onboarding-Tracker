@@ -342,6 +342,83 @@ export const crmWhatsappBroadcastDeliveries = sqliteTable(
   ],
 );
 
+/** Former / closed clients for Win-back outreach (sheet import). */
+export const crmWinbackContacts = sqliteTable(
+  "crm_winback_contacts",
+  {
+    id: text("id").primaryKey(),
+    companyName: text("company_name").notNull(),
+    contactPerson: text("contact_person").notNull().default(""),
+    mobile: text("mobile").notNull(),
+    mobileNormalized: text("mobile_normalized").notNull(),
+    email: text("email"),
+    city: text("city"),
+    outcome: text("outcome").notNull().default("none"),
+    notes: text("notes"),
+    ownerName: text("owner_name"),
+    tagsJson: text("tags_json"),
+    lastContactedAt: text("last_contacted_at"),
+    archived: integer("archived", { mode: "boolean" }).notNull().default(false),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("crm_winback_contacts_mobile_uidx").on(t.mobileNormalized),
+    index("crm_winback_contacts_company_idx").on(t.companyName),
+    index("crm_winback_contacts_outcome_idx").on(t.outcome),
+  ],
+);
+
+/** Win-back WhatsApp campaigns (wave sends to former clients). */
+export const crmWinbackCampaigns = sqliteTable(
+  "crm_winback_campaigns",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    channel: text("channel").notNull().default("whatsapp"),
+    body: text("body").notNull(),
+    status: text("status").notNull().default("draft"),
+    scheduledAt: text("scheduled_at"),
+    waveSize: integer("wave_size").notNull().default(50),
+    createdByUserId: text("created_by_user_id"),
+    createdByName: text("created_by_name"),
+    startedAt: text("started_at"),
+    finishedAt: text("finished_at"),
+    ...timestamps,
+  },
+  (t) => [
+    index("crm_winback_campaigns_status_idx").on(t.status),
+    index("crm_winback_campaigns_scheduled_idx").on(t.scheduledAt),
+  ],
+);
+
+export const crmWinbackDeliveries = sqliteTable(
+  "crm_winback_deliveries",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references(() => crmWinbackCampaigns.id, { onDelete: "cascade" }),
+    contactId: text("contact_id")
+      .notNull()
+      .references(() => crmWinbackContacts.id, { onDelete: "cascade" }),
+    companyName: text("company_name").notNull().default(""),
+    contactPerson: text("contact_person").notNull().default(""),
+    mobile: text("mobile").notNull().default(""),
+    renderedBody: text("rendered_body"),
+    status: text("status").notNull().default("pending"),
+    errorMessage: text("error_message"),
+    waveNumber: integer("wave_number").notNull().default(1),
+    sentAt: text("sent_at"),
+    ...timestamps,
+  },
+  (t) => [
+    index("crm_winback_deliv_campaign_idx").on(t.campaignId),
+    index("crm_winback_deliv_contact_idx").on(t.contactId),
+    index("crm_winback_deliv_status_idx").on(t.status),
+    uniqueIndex("crm_winback_deliv_uidx").on(t.campaignId, t.contactId),
+  ],
+);
+
 /** CRM account payment ledger — source of truth for collections. */
 export const paymentTransactions = sqliteTable(
   "payment_transactions",

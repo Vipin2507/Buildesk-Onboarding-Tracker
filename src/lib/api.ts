@@ -194,6 +194,20 @@ export {
 } from "@/server/api/crm-whatsapp-broadcasts";
 
 export {
+  listCrmWinbackContacts,
+  importCrmWinbackContacts,
+  updateCrmWinbackContact,
+  bulkUpdateCrmWinbackContacts,
+  listCrmWinbackCampaigns,
+  getCrmWinbackCampaign,
+  createCrmWinbackCampaign,
+  pauseCrmWinbackCampaign,
+  resumeCrmWinbackCampaign,
+  cancelCrmWinbackCampaign,
+  listCrmWinbackActivity,
+} from "@/server/api/crm-winback";
+
+export {
   listCrmPayments,
   exportCrmPayments,
   getCrmPaymentsSummary,
