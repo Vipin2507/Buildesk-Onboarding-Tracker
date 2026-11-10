@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { motion } from "framer-motion";
 import {
-  Check,
   Loader2,
   Pause,
   Play,
@@ -11,11 +11,16 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { DataTable } from "@/components/data-table";
 import {
   DesignTicketFilterField,
   DesignTicketSelect,
 } from "@/components/design-ticket/design-ticket-fields";
-import { DesignTicketTabNav } from "@/components/design-ticket/design-ticket-shared";
+import {
+  DesignTicketFilterBar,
+  DesignTicketTabNav,
+} from "@/components/design-ticket/design-ticket-shared";
+import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,7 +39,12 @@ import {
 } from "@/lib/api";
 import { CRM_WINBACK_WAVE_LIMIT } from "@/lib/crm-winback-limits";
 import { parseWinbackCsv } from "@/lib/crm-winback-import";
-import { cn, formatDate } from "@/lib/utils";
+import {
+  campaignSemantic,
+  outcomeSemantic,
+  type WbSemantic,
+} from "@/lib/crm-winback-tokens";
+import { formatDate, formatDateTime } from "@/lib/utils";
 import type {
   CrmWinbackCampaign,
   CrmWinbackContact,
@@ -44,6 +54,10 @@ import type {
 import { CRM_WINBACK_OUTCOME_LABELS } from "@/types/crm-winback";
 
 type TabId = "contacts" | "campaigns" | "activity";
+type OutcomeChipId = "all" | CrmWinbackOutcome;
+type ContactedFilter = "all" | "yes" | "no";
+type CampaignStatusFilter = "all" | CrmWinbackCampaign["status"];
+type ActivityStatusFilter = "all" | CrmWinbackDelivery["status"];
 
 const TABS = [
   { id: "contacts" as const, label: "Contacts" },
@@ -51,17 +65,28 @@ const TABS = [
   { id: "activity" as const, label: "Activity" },
 ];
 
-const OUTCOME_OPTIONS = [
-  { value: "all", label: "All outcomes" },
-  ...Object.entries(CRM_WINBACK_OUTCOME_LABELS).map(([value, label]) => ({ value, label })),
+const OUTCOME_CHIPS: { id: OutcomeChipId; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "none", label: "Not contacted" },
+  { id: "interested", label: "Interested" },
+  { id: "callback", label: "Callback" },
+  { id: "not_interested", label: "Not interested" },
+  { id: "wrong_number", label: "Wrong number" },
+  { id: "do_not_contact", label: "Do not contact" },
 ];
 
-function statusTone(status: string) {
-  if (status === "sent" || status === "done") return "text-emerald-700 dark:text-emerald-400";
-  if (status === "failed" || status === "cancelled") return "text-destructive";
-  if (status === "running" || status === "scheduled") return "text-sky-700 dark:text-sky-400";
-  if (status === "paused") return "text-amber-700 dark:text-amber-400";
-  return "text-muted-foreground";
+const OUTCOME_OPTIONS = Object.entries(CRM_WINBACK_OUTCOME_LABELS).map(([value, label]) => ({
+  value,
+  label,
+}));
+
+function WbPill({ tone, children }: { tone: WbSemantic; children: ReactNode }) {
+  return (
+    <span className="crm-winback-pill" data-tone={tone}>
+      <span className="crm-winback-dot" data-tone={tone} aria-hidden />
+      {children}
+    </span>
+  );
 }
 
 export function CrmWinbackPanel() {
@@ -71,8 +96,14 @@ export function CrmWinbackPanel() {
   const [activity, setActivity] = useState<CrmWinbackDelivery[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
-  const [outcomeFilter, setOutcomeFilter] = useState("all");
+  const [outcomeChip, setOutcomeChip] = useState<OutcomeChipId>("all");
+  const [cityFilter, setCityFilter] = useState("all");
+  const [contactedFilter, setContactedFilter] = useState<ContactedFilter>("all");
+  const [campaignStatusFilter, setCampaignStatusFilter] = useState<CampaignStatusFilter>("all");
+  const [activityStatusFilter, setActivityStatusFilter] = useState<ActivityStatusFilter>("all");
+  const [activityQuery, setActivityQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [batchOffset, setBatchOffset] = useState(0);
   const [importing, setImporting] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
   const [campaignName, setCampaignName] = useState("");
@@ -90,15 +121,9 @@ export function CrmWinbackPanel() {
     setLoading(true);
     try {
       const [contactRes, campaignRes, activityRes] = await Promise.all([
-        listCrmWinbackContacts({
-          data: {
-            search: query.trim() || undefined,
-            outcome: outcomeFilter === "all" ? undefined : (outcomeFilter as CrmWinbackOutcome),
-            limit: 1000,
-          },
-        }),
+        listCrmWinbackContacts({ data: { limit: 2000 } }),
         listCrmWinbackCampaigns({ data: { limit: 50 } }),
-        listCrmWinbackActivity({ data: { limit: 100 } }),
+        listCrmWinbackActivity({ data: { limit: 200 } }),
       ]);
       setContacts(contactRes.contacts);
       setCampaigns(campaignRes.campaigns);
@@ -108,7 +133,7 @@ export function CrmWinbackPanel() {
     } finally {
       setLoading(false);
     }
-  }, [outcomeFilter, query]);
+  }, []);
 
   useEffect(() => {
     void refresh();
@@ -121,21 +146,116 @@ export function CrmWinbackPanel() {
     return () => window.clearInterval(id);
   }, [campaigns, refresh]);
 
-  const filteredContacts = contacts;
+  const cityOptions = useMemo(() => {
+    const cities = [
+      ...new Set(contacts.map((c) => c.city?.trim()).filter((c): c is string => Boolean(c))),
+    ].sort((a, b) => a.localeCompare(b));
+    return [{ value: "all", label: "All cities" }, ...cities.map((c) => ({ value: c, label: c }))];
+  }, [contacts]);
 
-  function toggleContact(id: string) {
+  const filteredContacts = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return contacts.filter((contact) => {
+      if (outcomeChip !== "all" && contact.outcome !== outcomeChip) return false;
+      if (cityFilter !== "all" && (contact.city?.trim() || "") !== cityFilter) return false;
+      if (contactedFilter === "yes" && !contact.lastContactedAt) return false;
+      if (contactedFilter === "no" && contact.lastContactedAt) return false;
+      if (!q) return true;
+      return (
+        contact.companyName.toLowerCase().includes(q) ||
+        contact.contactPerson.toLowerCase().includes(q) ||
+        contact.mobile.toLowerCase().includes(q) ||
+        (contact.city ?? "").toLowerCase().includes(q) ||
+        (contact.email ?? "").toLowerCase().includes(q)
+      );
+    });
+  }, [contacts, query, outcomeChip, cityFilter, contactedFilter]);
+
+  const outcomeCounts = useMemo(() => {
+    const counts: Record<OutcomeChipId, number> = {
+      all: contacts.length,
+      none: 0,
+      interested: 0,
+      callback: 0,
+      not_interested: 0,
+      wrong_number: 0,
+      do_not_contact: 0,
+    };
+    for (const contact of contacts) {
+      counts[contact.outcome] += 1;
+    }
+    return counts;
+  }, [contacts]);
+
+  const activeFilterCount =
+    (cityFilter !== "all" ? 1 : 0) + (contactedFilter !== "all" ? 1 : 0) + (query.trim() ? 1 : 0);
+
+  const filteredCampaigns = useMemo(() => {
+    if (campaignStatusFilter === "all") return campaigns;
+    return campaigns.filter((c) => c.status === campaignStatusFilter);
+  }, [campaigns, campaignStatusFilter]);
+
+  const filteredActivity = useMemo(() => {
+    const q = activityQuery.trim().toLowerCase();
+    return activity.filter((row) => {
+      if (activityStatusFilter !== "all" && row.status !== activityStatusFilter) return false;
+      if (!q) return true;
+      return (
+        row.companyName.toLowerCase().includes(q) ||
+        row.contactPerson.toLowerCase().includes(q) ||
+        row.mobile.toLowerCase().includes(q)
+      );
+    });
+  }, [activity, activityQuery, activityStatusFilter]);
+
+  const eligibleContacts = useMemo(
+    () => filteredContacts.filter((c) => c.outcome !== "do_not_contact"),
+    [filteredContacts],
+  );
+
+  const eligibleSelected = useMemo(
+    () => contacts.filter((c) => selectedIds.has(c.id) && c.outcome !== "do_not_contact").length,
+    [contacts, selectedIds],
+  );
+
+  function clearFilters() {
+    setQuery("");
+    setCityFilter("all");
+    setContactedFilter("all");
+  }
+
+  function toggleSelection(id: string, checked: boolean) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  function toggleSelectionAll(ids: string[], checked: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (checked) next.add(id);
+        else next.delete(id);
+      }
       return next;
     });
   }
 
   function selectEligibleBatch(start: number) {
-    const eligible = filteredContacts.filter((c) => c.outcome !== "do_not_contact");
-    const slice = eligible.slice(start, start + CRM_WINBACK_WAVE_LIMIT).map((c) => c.id);
+    const slice = eligibleContacts.slice(start, start + CRM_WINBACK_WAVE_LIMIT).map((c) => c.id);
     setSelectedIds(new Set(slice));
+    setBatchOffset(start);
+  }
+
+  function selectNextBatch() {
+    const nextStart =
+      batchOffset + CRM_WINBACK_WAVE_LIMIT < eligibleContacts.length
+        ? batchOffset + CRM_WINBACK_WAVE_LIMIT
+        : 0;
+    selectEligibleBatch(nextStart);
   }
 
   async function onImportFile(file: File | null) {
@@ -173,6 +293,15 @@ export function CrmWinbackPanel() {
     }
   }
 
+  async function onOutcomeChange(id: string, outcome: CrmWinbackOutcome) {
+    try {
+      await updateCrmWinbackContact({ data: { id, outcome } });
+      setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, outcome } : c)));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Update failed");
+    }
+  }
+
   async function createCampaign() {
     if (selectedIds.size === 0) {
       toast.error("Select at least one contact");
@@ -185,9 +314,7 @@ export function CrmWinbackPanel() {
     setSubmitting(true);
     try {
       const scheduledAt =
-        !sendNow && scheduleLocal
-          ? new Date(scheduleLocal).toISOString()
-          : undefined;
+        !sendNow && scheduleLocal ? new Date(scheduleLocal).toISOString() : undefined;
       await createCrmWinbackCampaign({
         data: {
           name: campaignName.trim(),
@@ -226,13 +353,82 @@ export function CrmWinbackPanel() {
     }
   }
 
-  const eligibleSelected = useMemo(
-    () => contacts.filter((c) => selectedIds.has(c.id) && c.outcome !== "do_not_contact").length,
-    [contacts, selectedIds],
+  const nextBatchCount = Math.min(
+    CRM_WINBACK_WAVE_LIMIT,
+    Math.max(0, eligibleContacts.length - (batchOffset + CRM_WINBACK_WAVE_LIMIT)),
   );
 
   return (
-    <div className="space-y-3">
+    <div className="crm-winback space-y-0">
+      <div className="crm-winback-hero mb-3">
+        <div className="relative z-[1] flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h1 className="crm-winback-title">Win-back</h1>
+            <p className="crm-winback-subtitle">
+              {contacts.length} {contacts.length === 1 ? "former client" : "former clients"} · waves of{" "}
+              {CRM_WINBACK_WAVE_LIMIT} · WhatsApp outreach
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={(e) => void onImportFile(e.target.files?.[0] ?? null)}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              className="crm-winback-btn-ghost h-8 gap-1 px-3 text-xs"
+              disabled={importing}
+              onClick={() => fileRef.current?.click()}
+            >
+              {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+              Import CSV
+            </Button>
+            <Button
+              size="sm"
+              className="crm-winback-btn-primary h-8 gap-1 px-3 text-xs"
+              disabled={selectedIds.size === 0}
+              onClick={() => setComposeOpen(true)}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New campaign ({eligibleSelected})
+            </Button>
+          </div>
+        </div>
+
+        {tab === "contacts" ? (
+          <div
+            className="relative z-[1] mt-3 flex min-w-0 gap-1.5 overflow-x-auto pb-0.5"
+            role="tablist"
+            aria-label="Outcome filters"
+          >
+            {OUTCOME_CHIPS.map((chip) => {
+              const active = outcomeChip === chip.id;
+              const count = outcomeCounts[chip.id];
+              const tone = outcomeSemantic(chip.id);
+              return (
+                <button
+                  key={chip.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  data-active={active}
+                  data-tone={tone}
+                  onClick={() => setOutcomeChip(chip.id)}
+                  className="crm-winback-chip focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--wb-primary-400)]"
+                >
+                  <span className="crm-winback-chip-label truncate">{chip.label}</span>
+                  <span className="crm-winback-chip-count">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+
       <DesignTicketTabNav
         compact
         tabs={TABS.map((item) => ({ id: item.id, label: item.label }))}
@@ -241,321 +437,631 @@ export function CrmWinbackPanel() {
       />
 
       {tab === "contacts" ? (
-        <section className="overflow-hidden rounded-xl border bg-card shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
-            <div>
-              <h2 className="text-sm font-semibold">Former clients</h2>
-              <p className="text-[11px] text-muted-foreground">
-                Import CompanyName, ContactPerson, Mobile. Waves send up to {CRM_WINBACK_WAVE_LIMIT}{" "}
-                contacts with a 30-minute gap.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".csv,text/csv"
-                className="hidden"
-                onChange={(e) => void onImportFile(e.target.files?.[0] ?? null)}
+        <>
+          <DesignTicketFilterBar
+            variant="inline"
+            compact
+            className="xl:grid-cols-4"
+            activeFilterCount={activeFilterCount}
+            onClear={clearFilters}
+            resultCount={filteredContacts.length}
+            resultLabel={filteredContacts.length === 1 ? "contact" : "contacts"}
+            trailing={
+              <div className="relative min-w-[140px] flex-1 sm:max-w-xs">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search company, contact, mobile…"
+                  aria-label="Search contacts"
+                  className="h-8 w-full rounded-md border border-input bg-background pl-8 pr-3 text-xs outline-none focus:ring-2 focus:ring-ring/40"
+                />
+              </div>
+            }
+          >
+            <DesignTicketFilterField label="City" compact>
+              <DesignTicketSelect compact value={cityFilter} onChange={setCityFilter} options={cityOptions} />
+            </DesignTicketFilterField>
+            <DesignTicketFilterField label="Contacted" compact>
+              <DesignTicketSelect
+                compact
+                value={contactedFilter}
+                onChange={(v) => setContactedFilter(v as ContactedFilter)}
+                options={[
+                  { value: "all", label: "Any" },
+                  { value: "no", label: "Never contacted" },
+                  { value: "yes", label: "Contacted before" },
+                ]}
               />
+            </DesignTicketFilterField>
+            <DesignTicketFilterField label="Outcome" compact>
+              <DesignTicketSelect
+                compact
+                value={outcomeChip}
+                onChange={(v) => setOutcomeChip(v as OutcomeChipId)}
+                options={[
+                  { value: "all", label: "All outcomes" },
+                  ...OUTCOME_OPTIONS,
+                ]}
+              />
+            </DesignTicketFilterField>
+          </DesignTicketFilterBar>
+
+          {selectedIds.size > 0 ? (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="crm-winback-selection"
+            >
+              <span className="text-xs font-semibold" style={{ color: "var(--wb-primary-700)" }}>
+                {selectedIds.size} {selectedIds.size === 1 ? "contact" : "contacts"} selected
+              </span>
               <Button
                 size="sm"
-                variant="outline"
-                className="h-8 gap-1 text-xs"
-                disabled={importing}
-                onClick={() => fileRef.current?.click()}
-              >
-                {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                Import CSV
-              </Button>
-              <Button
-                size="sm"
-                className="h-8 gap-1 text-xs"
-                disabled={selectedIds.size === 0}
+                className="crm-winback-btn-primary h-7 gap-1 text-xs"
                 onClick={() => setComposeOpen(true)}
               >
                 <Plus className="h-3.5 w-3.5" />
-                New campaign ({eligibleSelected})
+                Campaign ({eligibleSelected})
               </Button>
-            </div>
-          </div>
-
-          <div className="space-y-2 border-b px-4 py-3">
-            <div className="flex flex-wrap gap-2">
-              <div className="relative min-w-[12rem] flex-1">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search company, contact, or mobile"
-                  className="h-8 pl-8 text-xs"
-                />
-              </div>
-              <DesignTicketFilterField label="Outcome" compact>
-                <DesignTicketSelect compact value={outcomeFilter} onChange={setOutcomeFilter} options={OUTCOME_OPTIONS} />
-              </DesignTicketFilterField>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-[10px]">
-              <span className="tabular-nums text-muted-foreground">
-                {selectedIds.size} selected · {filteredContacts.length} shown
-              </span>
-              <button type="button" className="text-primary hover:underline" onClick={() => selectEligibleBatch(0)}>
-                Select first {CRM_WINBACK_WAVE_LIMIT}
-              </button>
-              {filteredContacts.length > CRM_WINBACK_WAVE_LIMIT ? (
-                <button
-                  type="button"
-                  className="text-primary hover:underline"
-                  onClick={() => selectEligibleBatch(CRM_WINBACK_WAVE_LIMIT)}
-                >
-                  Next {Math.min(CRM_WINBACK_WAVE_LIMIT, filteredContacts.length - CRM_WINBACK_WAVE_LIMIT)}
-                </button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs"
+                style={{ borderColor: "var(--wb-success-200)", color: "var(--wb-success-700)" }}
+                onClick={() => void setOutcome([...selectedIds], "interested")}
+              >
+                Mark interested
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs"
+                style={{ borderColor: "var(--wb-warning-200)", color: "var(--wb-warning-700)" }}
+                onClick={() => void setOutcome([...selectedIds], "callback")}
+              >
+                Callback
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs"
+                style={{ borderColor: "var(--wb-error-200)", color: "var(--wb-error-700)" }}
+                onClick={() => void setOutcome([...selectedIds], "do_not_contact")}
+              >
+                Do not contact
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs"
+                onClick={() => selectEligibleBatch(0)}
+              >
+                First {CRM_WINBACK_WAVE_LIMIT}
+              </Button>
+              {eligibleContacts.length > CRM_WINBACK_WAVE_LIMIT ? (
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={selectNextBatch}>
+                  Next {nextBatchCount || CRM_WINBACK_WAVE_LIMIT}
+                </Button>
               ) : null}
-              <button
-                type="button"
-                className="text-muted-foreground hover:underline"
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs"
                 onClick={() => setSelectedIds(new Set())}
               >
                 Clear
+              </Button>
+            </motion.div>
+          ) : (
+            <div className="crm-winback-muted mb-2 flex flex-wrap items-center gap-2 text-[11px]">
+              <span className="tabular-nums">
+                {filteredContacts.length} shown · {eligibleContacts.length} eligible
+              </span>
+              <button type="button" className="crm-winback-link" onClick={() => selectEligibleBatch(0)}>
+                Select first{" "}
+                {Math.min(CRM_WINBACK_WAVE_LIMIT, eligibleContacts.length || CRM_WINBACK_WAVE_LIMIT)}
               </button>
-              {selectedIds.size > 0 ? (
-                <>
-                  <button
-                    type="button"
-                    className="text-emerald-700 hover:underline dark:text-emerald-400"
-                    onClick={() => void setOutcome([...selectedIds], "interested")}
-                  >
-                    Mark interested
-                  </button>
-                  <button
-                    type="button"
-                    className="text-destructive hover:underline"
-                    onClick={() => void setOutcome([...selectedIds], "do_not_contact")}
-                  >
-                    Do not contact
-                  </button>
-                </>
+              {eligibleContacts.length > CRM_WINBACK_WAVE_LIMIT ? (
+                <button type="button" className="crm-winback-link" onClick={selectNextBatch}>
+                  Next {CRM_WINBACK_WAVE_LIMIT}
+                </button>
               ) : null}
             </div>
-          </div>
+          )}
 
-          <div className="max-h-[28rem] overflow-y-auto">
-            {loading ? (
-              <p className="px-4 py-8 text-center text-sm text-muted-foreground">Loading contacts…</p>
-            ) : filteredContacts.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-                No former clients yet. Import a CSV with CompanyName, ContactPerson, Mobile.
-              </p>
-            ) : (
-              filteredContacts.map((contact) => {
-                const on = selectedIds.has(contact.id);
-                return (
-                  <div
-                    key={contact.id}
-                    className={cn(
-                      "flex items-start gap-2.5 border-b border-border/50 px-4 py-2.5 last:border-0",
-                      on && "bg-primary/[0.05]",
-                    )}
-                  >
-                    <button
-                      type="button"
-                      className={cn(
-                        "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] border",
-                        on ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/30",
-                      )}
-                      onClick={() => toggleContact(contact.id)}
-                    >
-                      {on ? <Check className="h-2.5 w-2.5" strokeWidth={3} /> : null}
-                    </button>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-xs font-medium">{contact.companyName}</div>
-                      <div className="truncate text-[10px] text-muted-foreground">
-                        {contact.contactPerson || "—"} · {contact.mobile}
-                        {contact.city ? ` · ${contact.city}` : ""}
+          {loading && contacts.length === 0 ? (
+            <p className="px-1 py-10 text-center text-sm text-muted-foreground">Loading contacts…</p>
+          ) : contacts.length === 0 ? (
+            <EmptyState
+              title="No former clients yet"
+              description="Import a CSV with CompanyName, ContactPerson, and Mobile to start win-back outreach."
+              actionLabel="Import CSV"
+              onAction={() => fileRef.current?.click()}
+            />
+          ) : filteredContacts.length === 0 ? (
+            <EmptyState
+              title="No matches"
+              description="Try another filter, clear filters, or adjust your search."
+              actionLabel="Clear filters"
+              onAction={clearFilters}
+            />
+          ) : (
+            <div className="crm-winback-table-shell [&_tbody_tr]:bg-transparent [&_thead]:bg-[var(--wb-neutral-50)]">
+              <DataTable
+                flush
+                data={filteredContacts}
+                getRowId={(r) => r.id}
+                hideSearch
+                searchQuery={query}
+                onSearchQueryChange={setQuery}
+                density="compact"
+                pageSize={50}
+                selection={{
+                  selectedIds,
+                  onToggle: toggleSelection,
+                  onToggleAll: toggleSelectionAll,
+                }}
+                getRowClassName={(r) =>
+                  r.outcome === "do_not_contact"
+                    ? "crm-winback-row-dnc"
+                    : r.outcome === "interested"
+                      ? "crm-winback-row-interested"
+                      : undefined
+                }
+                columns={[
+                  {
+                    key: "companyName",
+                    header: "Company",
+                    sortable: true,
+                    className: "min-w-[11rem]",
+                    render: (r) => (
+                      <div className="min-w-0">
+                        <div className="truncate font-medium" style={{ color: "var(--wb-neutral-900)" }}>
+                          {r.companyName}
+                        </div>
+                        {r.email ? (
+                          <div className="crm-winback-muted truncate text-[10px]">{r.email}</div>
+                        ) : null}
                       </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px]">
-                        <span className="text-muted-foreground">
-                          {CRM_WINBACK_OUTCOME_LABELS[contact.outcome]}
-                          {contact.lastContactedAt
-                            ? ` · last ${formatDate(contact.lastContactedAt)}`
-                            : ""}
-                        </span>
+                    ),
+                  },
+                  {
+                    key: "contactPerson",
+                    header: "Contact",
+                    sortable: true,
+                    className: "min-w-[8rem]",
+                    render: (r) => (
+                      <div className="min-w-0 text-xs">
+                        <div className="truncate font-medium" style={{ color: "var(--wb-neutral-800)" }}>
+                          {r.contactPerson || "—"}
+                        </div>
+                        <div className="crm-winback-muted font-mono tabular-nums">{r.mobile}</div>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "city",
+                    header: "City",
+                    sortable: true,
+                    className: "w-[7rem]",
+                    render: (r) => (
+                      <span className="crm-winback-muted text-xs">{r.city || "—"}</span>
+                    ),
+                  },
+                  {
+                    key: "outcome",
+                    header: "Outcome",
+                    sortable: true,
+                    className: "w-[10.5rem]",
+                    render: (r) => (
+                      <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        <span
+                          className="crm-winback-dot"
+                          data-tone={outcomeSemantic(r.outcome)}
+                          aria-hidden
+                        />
                         <select
-                          className="h-6 rounded border bg-background px-1 text-[10px]"
-                          value={contact.outcome}
-                          onChange={(e) => {
-                            void updateCrmWinbackContact({
-                              data: { id: contact.id, outcome: e.target.value as CrmWinbackOutcome },
-                            })
-                              .then(() => refresh())
-                              .catch((err) =>
-                                toast.error(err instanceof Error ? err.message : "Update failed"),
-                              );
-                          }}
+                          className="crm-winback-select"
+                          value={r.outcome}
+                          aria-label={`Outcome for ${r.companyName}`}
+                          onChange={(e) =>
+                            void onOutcomeChange(r.id, e.target.value as CrmWinbackOutcome)
+                          }
                         >
-                          {Object.entries(CRM_WINBACK_OUTCOME_LABELS).map(([value, label]) => (
-                            <option key={value} value={value}>
-                              {label}
+                          {OUTCOME_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
                             </option>
                           ))}
                         </select>
                       </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </section>
+                    ),
+                  },
+                  {
+                    key: "lastContactedAt",
+                    header: "Last contact",
+                    sortable: true,
+                    className: "w-[7.5rem]",
+                    render: (r) => (
+                      <span className="crm-winback-muted text-xs tabular-nums">
+                        {r.lastContactedAt ? formatDate(r.lastContactedAt) : "—"}
+                      </span>
+                    ),
+                  },
+                ]}
+              />
+            </div>
+          )}
+        </>
       ) : null}
 
       {tab === "campaigns" ? (
-        <section className="overflow-hidden rounded-xl border bg-card shadow-sm">
-          <div className="border-b px-4 py-3">
-            <h2 className="text-sm font-semibold">Campaigns</h2>
-            <p className="text-[11px] text-muted-foreground">
-              Scheduled waves run automatically. Pause, resume, or cancel anytime.
-            </p>
-          </div>
-          <div className="divide-y">
-            {loading ? (
-              <p className="px-4 py-8 text-center text-sm text-muted-foreground">Loading campaigns…</p>
-            ) : campaigns.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-                No campaigns yet. Select contacts and create one.
-              </p>
-            ) : (
-              campaigns.map((campaign) => (
-                <div key={campaign.id} className="px-4 py-3">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <button type="button" className="min-w-0 text-left" onClick={() => void openCampaign(campaign.id)}>
-                      <div className="text-xs font-semibold">{campaign.name}</div>
-                      <div className={cn("text-[10px] font-medium capitalize", statusTone(campaign.status))}>
-                        {campaign.status}
-                        {campaign.scheduledAt ? ` · next ${formatDate(campaign.scheduledAt)}` : ""}
-                      </div>
-                      <div className="mt-0.5 text-[10px] text-muted-foreground">
-                        {campaign.sentCount} sent · {campaign.pendingCount} pending · {campaign.failedCount} failed ·{" "}
-                        {campaign.recipientCount} total
-                      </div>
-                    </button>
-                    <div className="flex gap-1">
-                      {campaign.status === "scheduled" || campaign.status === "running" ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 gap-1 px-2 text-[10px]"
-                          onClick={() =>
-                            void pauseCrmWinbackCampaign({ data: { id: campaign.id } })
-                              .then(() => refresh())
-                              .catch((e) => toast.error(e instanceof Error ? e.message : "Pause failed"))
-                          }
+        <>
+          <DesignTicketFilterBar
+            variant="inline"
+            compact
+            className="xl:grid-cols-3"
+            activeFilterCount={campaignStatusFilter !== "all" ? 1 : 0}
+            onClear={() => setCampaignStatusFilter("all")}
+            resultCount={filteredCampaigns.length}
+            resultLabel={filteredCampaigns.length === 1 ? "campaign" : "campaigns"}
+          >
+            <DesignTicketFilterField label="Status" compact>
+              <DesignTicketSelect
+                compact
+                value={campaignStatusFilter}
+                onChange={(v) => setCampaignStatusFilter(v as CampaignStatusFilter)}
+                options={[
+                  { value: "all", label: "All statuses" },
+                  { value: "scheduled", label: "Scheduled" },
+                  { value: "running", label: "Running" },
+                  { value: "paused", label: "Paused" },
+                  { value: "done", label: "Done" },
+                  { value: "cancelled", label: "Cancelled" },
+                ]}
+              />
+            </DesignTicketFilterField>
+          </DesignTicketFilterBar>
+
+          {loading && campaigns.length === 0 ? (
+            <p className="px-1 py-10 text-center text-sm text-muted-foreground">Loading campaigns…</p>
+          ) : campaigns.length === 0 ? (
+            <EmptyState
+              title="No campaigns yet"
+              description="Select contacts on the Contacts tab, then create a WhatsApp win-back campaign."
+              actionLabel="Go to contacts"
+              onAction={() => setTab("contacts")}
+            />
+          ) : filteredCampaigns.length === 0 ? (
+            <EmptyState
+              title="No matches"
+              description="No campaigns match this status filter."
+              actionLabel="Clear filters"
+              onAction={() => setCampaignStatusFilter("all")}
+            />
+          ) : (
+            <div className="crm-winback-table-shell">
+              <DataTable
+                flush
+                data={filteredCampaigns}
+                getRowId={(r) => r.id}
+                hideSearch
+                density="compact"
+                pageSize={15}
+                expandedRowId={expandedCampaignId}
+                onRowClick={(r) => void openCampaign(r.id)}
+                renderExpandedRow={() => (
+                  <div
+                    className="max-h-56 overflow-y-auto rounded-md border"
+                    style={{
+                      borderColor: "var(--wb-neutral-200)",
+                      background: "var(--wb-neutral-50)",
+                    }}
+                  >
+                    {campaignDetail.length === 0 ? (
+                      <p className="crm-winback-muted px-3 py-4 text-center text-[11px]">
+                        No deliveries
+                      </p>
+                    ) : (
+                      <table className="w-full text-left text-[11px]">
+                        <thead
+                          className="sticky top-0 border-b"
+                          style={{
+                            borderColor: "var(--wb-neutral-200)",
+                            color: "var(--wb-neutral-500)",
+                            background: "var(--wb-primary-50)",
+                          }}
                         >
-                          <Pause className="h-3 w-3" /> Pause
-                        </Button>
-                      ) : null}
-                      {campaign.status === "paused" ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 gap-1 px-2 text-[10px]"
-                          onClick={() =>
-                            void resumeCrmWinbackCampaign({ data: { id: campaign.id } })
-                              .then(() => refresh())
-                              .catch((e) => toast.error(e instanceof Error ? e.message : "Resume failed"))
-                          }
-                        >
-                          <Play className="h-3 w-3" /> Resume
-                        </Button>
-                      ) : null}
-                      {campaign.status !== "done" && campaign.status !== "cancelled" ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 gap-1 px-2 text-[10px] text-destructive"
-                          onClick={() =>
-                            void cancelCrmWinbackCampaign({ data: { id: campaign.id } })
-                              .then(() => refresh())
-                              .catch((e) => toast.error(e instanceof Error ? e.message : "Cancel failed"))
-                          }
-                        >
-                          <X className="h-3 w-3" /> Cancel
-                        </Button>
-                      ) : null}
-                    </div>
+                          <tr>
+                            <th className="px-3 py-1.5 font-medium">Company</th>
+                            <th className="px-3 py-1.5 font-medium">Mobile</th>
+                            <th className="px-3 py-1.5 font-medium">Status</th>
+                            <th className="px-3 py-1.5 font-medium">Wave</th>
+                            <th className="px-3 py-1.5 font-medium">Detail</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {campaignDetail.slice(0, 100).map((row) => (
+                            <tr
+                              key={row.id}
+                              className="border-b last:border-0"
+                              style={{ borderColor: "var(--wb-neutral-200)" }}
+                            >
+                              <td className="px-3 py-1.5 font-medium">{row.companyName}</td>
+                              <td className="crm-winback-muted px-3 py-1.5 font-mono tabular-nums">
+                                {row.mobile}
+                              </td>
+                              <td className="px-3 py-1.5">
+                                <WbPill tone={campaignSemantic(row.status)}>{row.status}</WbPill>
+                              </td>
+                              <td className="crm-winback-muted px-3 py-1.5 tabular-nums">
+                                {row.waveNumber}
+                              </td>
+                              <td className="crm-winback-muted px-3 py-1.5">
+                                {row.errorMessage || "—"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
                   </div>
-                  {expandedCampaignId === campaign.id ? (
-                    <div className="mt-2 max-h-48 overflow-y-auto rounded-md border bg-muted/20">
-                      {campaignDetail.length === 0 ? (
-                        <p className="px-3 py-4 text-center text-[10px] text-muted-foreground">No deliveries</p>
-                      ) : (
-                        campaignDetail.slice(0, 80).map((row) => (
-                          <div key={row.id} className="border-b border-border/40 px-3 py-1.5 text-[10px] last:border-0">
-                            <span className="font-medium">{row.companyName}</span>
-                            <span className={cn("ml-2 capitalize", statusTone(row.status))}>{row.status}</span>
-                            {row.errorMessage ? (
-                              <span className="ml-2 text-muted-foreground">{row.errorMessage}</span>
-                            ) : null}
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  ) : null}
-                </div>
-              ))
-            )}
-          </div>
-        </section>
+                )}
+                columns={[
+                  {
+                    key: "name",
+                    header: "Campaign",
+                    sortable: true,
+                    className: "min-w-[12rem]",
+                    render: (r) => (
+                      <div className="min-w-0">
+                        <div className="truncate font-medium" style={{ color: "var(--wb-neutral-900)" }}>
+                          {r.name}
+                        </div>
+                        <div className="crm-winback-muted truncate text-[10px]">
+                          {r.createdByName || "—"}
+                          {r.scheduledAt ? ` · next ${formatDateTime(r.scheduledAt)}` : ""}
+                        </div>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "status",
+                    header: "Status",
+                    sortable: true,
+                    className: "w-[7rem]",
+                    render: (r) => <WbPill tone={campaignSemantic(r.status)}>{r.status}</WbPill>,
+                  },
+                  {
+                    key: "sentCount",
+                    header: "Progress",
+                    sortable: true,
+                    className: "w-[11rem]",
+                    render: (r) => (
+                      <div className="crm-winback-muted text-xs tabular-nums">
+                        <span className="font-semibold" style={{ color: "var(--wb-success-600)" }}>
+                          {r.sentCount}
+                        </span>{" "}
+                        sent · {r.pendingCount} pending
+                        <div className="text-[10px]">
+                          <span style={{ color: "var(--wb-error-600)" }}>{r.failedCount}</span> failed ·{" "}
+                          {r.recipientCount} total
+                        </div>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "actions",
+                    header: "",
+                    className: "w-[12rem]",
+                    render: (r) => (
+                      <div className="flex flex-wrap justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                        {r.status === "scheduled" || r.status === "running" ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="crm-winback-btn-ghost h-7 gap-1 px-2 text-[10px]"
+                            onClick={() =>
+                              void pauseCrmWinbackCampaign({ data: { id: r.id } })
+                                .then(() => refresh())
+                                .catch((e) =>
+                                  toast.error(e instanceof Error ? e.message : "Pause failed"),
+                                )
+                            }
+                          >
+                            <Pause className="h-3 w-3" /> Pause
+                          </Button>
+                        ) : null}
+                        {r.status === "paused" ? (
+                          <Button
+                            size="sm"
+                            className="crm-winback-btn-primary h-7 gap-1 px-2 text-[10px]"
+                            onClick={() =>
+                              void resumeCrmWinbackCampaign({ data: { id: r.id } })
+                                .then(() => refresh())
+                                .catch((e) =>
+                                  toast.error(e instanceof Error ? e.message : "Resume failed"),
+                                )
+                            }
+                          >
+                            <Play className="h-3 w-3" /> Resume
+                          </Button>
+                        ) : null}
+                        {r.status !== "done" && r.status !== "cancelled" ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 gap-1 px-2 text-[10px]"
+                            style={{ borderColor: "var(--wb-error-200)", color: "var(--wb-error-700)" }}
+                            onClick={() =>
+                              void cancelCrmWinbackCampaign({ data: { id: r.id } })
+                                .then(() => refresh())
+                                .catch((e) =>
+                                  toast.error(e instanceof Error ? e.message : "Cancel failed"),
+                                )
+                            }
+                          >
+                            <X className="h-3 w-3" /> Cancel
+                          </Button>
+                        ) : null}
+                      </div>
+                    ),
+                  },
+                ]}
+              />
+            </div>
+          )}
+        </>
       ) : null}
 
       {tab === "activity" ? (
-        <section className="overflow-hidden rounded-xl border bg-card shadow-sm">
-          <div className="border-b px-4 py-3">
-            <h2 className="text-sm font-semibold">Activity</h2>
-            <p className="text-[11px] text-muted-foreground">Recent Win-back WhatsApp sends and failures.</p>
-          </div>
-          <div className="max-h-[32rem] overflow-y-auto divide-y">
-            {loading ? (
-              <p className="px-4 py-8 text-center text-sm text-muted-foreground">Loading activity…</p>
-            ) : activity.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-muted-foreground">No sends yet.</p>
-            ) : (
-              activity.map((row) => (
-                <div key={row.id} className="px-4 py-2.5">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="truncate text-xs font-medium">{row.companyName}</div>
-                      <div className="text-[10px] text-muted-foreground">
-                        {row.contactPerson || "—"} · {row.mobile}
-                        {row.sentAt ? ` · ${formatDate(row.sentAt)}` : ""}
-                        {` · wave ${row.waveNumber}`}
+        <>
+          <DesignTicketFilterBar
+            variant="inline"
+            compact
+            className="xl:grid-cols-3"
+            activeFilterCount={
+              (activityStatusFilter !== "all" ? 1 : 0) + (activityQuery.trim() ? 1 : 0)
+            }
+            onClear={() => {
+              setActivityStatusFilter("all");
+              setActivityQuery("");
+            }}
+            resultCount={filteredActivity.length}
+            resultLabel={filteredActivity.length === 1 ? "delivery" : "deliveries"}
+            trailing={
+              <div className="relative min-w-[140px] flex-1 sm:max-w-xs">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={activityQuery}
+                  onChange={(e) => setActivityQuery(e.target.value)}
+                  placeholder="Search deliveries…"
+                  aria-label="Search activity"
+                  className="h-8 w-full rounded-md border border-input bg-background pl-8 pr-3 text-xs outline-none focus:ring-2 focus:ring-ring/40"
+                />
+              </div>
+            }
+          >
+            <DesignTicketFilterField label="Status" compact>
+              <DesignTicketSelect
+                compact
+                value={activityStatusFilter}
+                onChange={(v) => setActivityStatusFilter(v as ActivityStatusFilter)}
+                options={[
+                  { value: "all", label: "All statuses" },
+                  { value: "sent", label: "Sent" },
+                  { value: "failed", label: "Failed" },
+                  { value: "pending", label: "Pending" },
+                  { value: "skipped", label: "Skipped" },
+                ]}
+              />
+            </DesignTicketFilterField>
+          </DesignTicketFilterBar>
+
+          {loading && activity.length === 0 ? (
+            <p className="px-1 py-10 text-center text-sm text-muted-foreground">Loading activity…</p>
+          ) : activity.length === 0 ? (
+            <EmptyState
+              title="No sends yet"
+              description="Activity appears here after win-back campaigns start sending WhatsApp messages."
+            />
+          ) : filteredActivity.length === 0 ? (
+            <EmptyState
+              title="No matches"
+              description="No deliveries match these filters."
+              actionLabel="Clear filters"
+              onAction={() => {
+                setActivityStatusFilter("all");
+                setActivityQuery("");
+              }}
+            />
+          ) : (
+            <div className="crm-winback-table-shell">
+              <DataTable
+                flush
+                data={filteredActivity}
+                getRowId={(r) => r.id}
+                hideSearch
+                density="compact"
+                pageSize={50}
+                columns={[
+                  {
+                    key: "companyName",
+                    header: "Company",
+                    sortable: true,
+                    className: "min-w-[10rem]",
+                    render: (r) => (
+                      <div className="min-w-0">
+                        <div className="truncate font-medium" style={{ color: "var(--wb-neutral-900)" }}>
+                          {r.companyName}
+                        </div>
+                        <div className="crm-winback-muted truncate text-[10px]">
+                          {r.contactPerson || "—"} · {r.mobile}
+                        </div>
                       </div>
-                    </div>
-                    <span className={cn("text-[10px] font-medium capitalize", statusTone(row.status))}>
-                      {row.status}
-                    </span>
-                  </div>
-                  {row.errorMessage ? (
-                    <p className="mt-1 text-[10px] text-destructive">{row.errorMessage}</p>
-                  ) : null}
-                </div>
-              ))
-            )}
-          </div>
-        </section>
+                    ),
+                  },
+                  {
+                    key: "status",
+                    header: "Status",
+                    sortable: true,
+                    className: "w-[6.5rem]",
+                    render: (r) => <WbPill tone={campaignSemantic(r.status)}>{r.status}</WbPill>,
+                  },
+                  {
+                    key: "waveNumber",
+                    header: "Wave",
+                    sortable: true,
+                    className: "w-[4.5rem]",
+                    render: (r) => (
+                      <span className="crm-winback-muted text-xs tabular-nums">{r.waveNumber}</span>
+                    ),
+                  },
+                  {
+                    key: "sentAt",
+                    header: "When",
+                    sortable: true,
+                    className: "w-[9rem]",
+                    render: (r) => (
+                      <span className="crm-winback-muted text-xs tabular-nums">
+                        {r.sentAt ? formatDateTime(r.sentAt) : "—"}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: "errorMessage",
+                    header: "Detail",
+                    className: "min-w-[8rem]",
+                    render: (r) => (
+                      <span className="crm-winback-muted line-clamp-2 text-[11px]">
+                        {r.errorMessage || "—"}
+                      </span>
+                    ),
+                  },
+                ]}
+              />
+            </div>
+          )}
+        </>
       ) : null}
 
       {composeOpen ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3 sm:items-center">
-          <div className="w-full max-w-lg rounded-xl border bg-card p-4 shadow-xl">
+          <div className="crm-winback-modal w-full max-w-lg rounded-xl p-4">
             <div className="mb-3 flex items-start justify-between gap-2">
               <div>
-                <h3 className="text-sm font-semibold">New Win-back campaign</h3>
-                <p className="text-[11px] text-muted-foreground">
+                <h3 className="crm-winback-title text-sm">New Win-back campaign</h3>
+                <p className="crm-winback-subtitle">
                   {eligibleSelected} recipients · WhatsApp · waves of {CRM_WINBACK_WAVE_LIMIT}
                 </p>
               </div>
-              <button type="button" onClick={() => setComposeOpen(false)} className="text-muted-foreground">
+              <button
+                type="button"
+                onClick={() => setComposeOpen(false)}
+                className="crm-winback-muted"
+                aria-label="Close"
+              >
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -595,10 +1101,20 @@ export function CrmWinbackPanel() {
                 ) : null}
               </div>
               <div className="flex justify-end gap-2">
-                <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setComposeOpen(false)}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="crm-winback-btn-ghost h-8 text-xs"
+                  onClick={() => setComposeOpen(false)}
+                >
                   Cancel
                 </Button>
-                <Button size="sm" className="h-8 text-xs" disabled={submitting} onClick={() => void createCampaign()}>
+                <Button
+                  size="sm"
+                  className="crm-winback-btn-primary h-8 gap-1 text-xs"
+                  disabled={submitting}
+                  onClick={() => void createCampaign()}
+                >
                   {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
                   {sendNow ? "Start campaign" : "Schedule campaign"}
                 </Button>
