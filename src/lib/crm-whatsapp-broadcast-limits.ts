@@ -1,4 +1,6 @@
-export const CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT = 50;
+export const CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT = 30;
+/** Pause between each WhatsApp send in a broadcast (4–5s). */
+export const CRM_WHATSAPP_BROADCAST_SEND_PAUSE_MS = 4500;
 export const CRM_WHATSAPP_BROADCAST_GAP_MS = 30 * 60 * 1000;
 
 export function broadcastScheduleConflict<T extends { id?: string; status: string; scheduledAt: string }>(

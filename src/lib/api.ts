@@ -204,6 +204,7 @@ export {
   pauseCrmWinbackCampaign,
   resumeCrmWinbackCampaign,
   cancelCrmWinbackCampaign,
+  retryCrmWinbackCampaign,
   listCrmWinbackActivity,
   listCrmWinbackTemplates,
   upsertCrmWinbackTemplate,

@@ -1578,7 +1578,7 @@ if (!tableExists("crm_winback_campaigns")) {
       body TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'draft',
       scheduled_at TEXT,
-      wave_size INTEGER NOT NULL DEFAULT 50,
+      wave_size INTEGER NOT NULL DEFAULT 30,
       media_kind TEXT,
       media_filename TEXT,
       media_mimetype TEXT,

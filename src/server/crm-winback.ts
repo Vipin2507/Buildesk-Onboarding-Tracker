@@ -1,12 +1,15 @@
 import { and, asc, eq, inArray, lte, sql } from "drizzle-orm";
 
 import { phoneToWahaChatId } from "@/lib/automationEndpoints";
-import { CRM_WINBACK_GAP_MS, CRM_WINBACK_WAVE_LIMIT } from "@/lib/crm-winback-limits";
+import {
+  CRM_WINBACK_GAP_MS,
+  CRM_WINBACK_SEND_PAUSE_MS,
+  CRM_WINBACK_WAVE_LIMIT,
+} from "@/lib/crm-winback-limits";
 import {
   appendServerCrmAutomationLog,
   loadCrmAutomationConfig,
 } from "@/server/crm-booking-automation";
-import { PAYMENT_AUTOMATION_SEND_PAUSE_MS } from "@/server/crm-payment-reminder-automation";
 import type { Db } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { nowIso } from "@/server/auth/session";
@@ -18,7 +21,7 @@ function trimSlash(url: string) {
 }
 
 function pauseBetweenSends() {
-  return new Promise<void>((resolve) => setTimeout(resolve, PAYMENT_AUTOMATION_SEND_PAUSE_MS));
+  return new Promise<void>((resolve) => setTimeout(resolve, CRM_WINBACK_SEND_PAUSE_MS));
 }
 
 function summarizeResponse(text: string, max = 200) {
@@ -94,7 +97,7 @@ export function renderWinbackTemplate(
 }
 
 /**
- * Process due Win-back campaigns: send one wave (up to waveSize / 50), then either
+ * Process due Win-back campaigns: send one wave (up to waveSize / 30), then either
  * finish or schedule the next wave 30 minutes later.
  */
 export async function processWinbackCampaigns(db: Db): Promise<number> {

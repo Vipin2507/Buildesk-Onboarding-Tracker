@@ -690,6 +690,87 @@ export const cancelCrmWinbackCampaign = createServerFn({ method: "POST" })
     return mapCampaign(next, campaignCounts(db, data.id));
   });
 
+/** Re-queue failed deliveries and schedule the campaign to send again. */
+export const retryCrmWinbackCampaign = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string().min(1),
+        /** When true (default), process the first wave immediately if the schedule allows. */
+        sendNow: z.boolean().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    requireCrmAccess();
+    const db = getDb();
+    const row = db.select().from(t.crmWinbackCampaigns).where(eq(t.crmWinbackCampaigns.id, data.id)).get();
+    if (!row) throw new ApiError(404, "Campaign not found");
+
+    const counts = campaignCounts(db, data.id);
+    if (counts.failedCount === 0) {
+      throw new ApiError(400, "No failed deliveries to retry");
+    }
+
+    const config = loadCrmAutomationConfig(db);
+    if (!config.waha.isEnabled || !config.waha.apiUrl?.trim() || !config.waha.apiKey?.trim()) {
+      throw new ApiError(400, "Enable CRM WhatsApp (WAHA) before retrying Win-back campaigns");
+    }
+
+    const now = nowIso();
+    db.update(t.crmWinbackDeliveries)
+      .set({
+        status: "pending",
+        errorMessage: null,
+        sentAt: null,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(t.crmWinbackDeliveries.campaignId, data.id),
+          eq(t.crmWinbackDeliveries.status, "failed"),
+        ),
+      )
+      .run();
+
+    const sendNow = data.sendNow !== false;
+    let scheduledAt = sendNow ? now : new Date(Date.now() + 60_000).toISOString();
+    const busy = db
+      .select()
+      .from(t.crmWinbackCampaigns)
+      .where(inArray(t.crmWinbackCampaigns.status, ["scheduled", "running"]))
+      .all();
+    const conflict = winbackScheduleConflict(Date.parse(scheduledAt), busy, data.id);
+    if (conflict?.scheduledAt) {
+      const conflictMs = Date.parse(conflict.scheduledAt);
+      scheduledAt = new Date(
+        (Number.isFinite(conflictMs) ? conflictMs : Date.now()) + CRM_WINBACK_GAP_MS,
+      ).toISOString();
+    }
+
+    db.update(t.crmWinbackCampaigns)
+      .set({
+        status: "scheduled",
+        scheduledAt,
+        finishedAt: null,
+        updatedAt: now,
+      })
+      .where(eq(t.crmWinbackCampaigns.id, data.id))
+      .run();
+
+    const canRunNow = sendNow && Date.parse(scheduledAt) <= Date.now() + 5_000;
+    if (canRunNow) {
+      await processWinbackCampaigns(db);
+    }
+
+    const next = db.select().from(t.crmWinbackCampaigns).where(eq(t.crmWinbackCampaigns.id, data.id)).get()!;
+    return {
+      ...mapCampaign(next, campaignCounts(db, data.id)),
+      retriedCount: counts.failedCount,
+      ranImmediately: canRunNow,
+    };
+  });
+
 export const listCrmWinbackActivity = createServerFn({ method: "GET" })
   .inputValidator((data: unknown) =>
     z.object({ limit: z.coerce.number().int().min(1).max(200).optional() }).optional().parse(data ?? {}),

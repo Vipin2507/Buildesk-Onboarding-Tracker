@@ -378,7 +378,7 @@ export const crmWinbackCampaigns = sqliteTable(
     body: text("body").notNull(),
     status: text("status").notNull().default("draft"),
     scheduledAt: text("scheduled_at"),
-    waveSize: integer("wave_size").notNull().default(50),
+    waveSize: integer("wave_size").notNull().default(30),
     mediaKind: text("media_kind"),
     mediaFilename: text("media_filename"),
     mediaMimetype: text("media_mimetype"),

@@ -1,11 +1,11 @@
 import { and, eq, inArray, lte, sql } from "drizzle-orm";
 
 import { applyCrmWhatsappTemplate, normalizeCrmWhatsappTemplates } from "@/lib/crm-whatsapp-templates";
+import { CRM_WHATSAPP_BROADCAST_SEND_PAUSE_MS } from "@/lib/crm-whatsapp-broadcast-limits";
 import {
   appendServerCrmAutomationLog,
   loadCrmAutomationConfig,
 } from "@/server/crm-booking-automation";
-import { PAYMENT_AUTOMATION_SEND_PAUSE_MS } from "@/server/crm-payment-reminder-automation";
 import type { Db } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { nowIso } from "@/server/auth/session";
@@ -19,7 +19,7 @@ function trimSlash(url: string) {
 }
 
 function pauseBetweenSends() {
-  return new Promise<void>((resolve) => setTimeout(resolve, PAYMENT_AUTOMATION_SEND_PAUSE_MS));
+  return new Promise<void>((resolve) => setTimeout(resolve, CRM_WHATSAPP_BROADCAST_SEND_PAUSE_MS));
 }
 
 function summarizeResponse(text: string, max = 200) {

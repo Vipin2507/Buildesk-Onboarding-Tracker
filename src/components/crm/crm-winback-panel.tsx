@@ -5,6 +5,7 @@ import {
   Pause,
   Play,
   Plus,
+  RotateCcw,
   Search,
   Upload,
   X,
@@ -34,6 +35,7 @@ import {
   listCrmWinbackContacts,
   pauseCrmWinbackCampaign,
   resumeCrmWinbackCampaign,
+  retryCrmWinbackCampaign,
   updateCrmWinbackContact,
 } from "@/lib/api";
 import { CRM_WINBACK_WAVE_LIMIT } from "@/lib/crm-winback-limits";
@@ -815,7 +817,7 @@ export function CrmWinbackPanel() {
                   {
                     key: "actions",
                     header: "",
-                    className: "w-[12rem]",
+                    className: "w-[14rem]",
                     render: (r) => (
                       <div className="flex flex-wrap justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                         {r.status === "scheduled" || r.status === "running" ? (
@@ -847,6 +849,30 @@ export function CrmWinbackPanel() {
                             }
                           >
                             <Play className="h-3 w-3" /> Resume
+                          </Button>
+                        ) : null}
+                        {r.failedCount > 0 ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 gap-1 px-2 text-[10px]"
+                            style={{ borderColor: "var(--wb-warning-200)", color: "var(--wb-warning-700)" }}
+                            onClick={() =>
+                              void retryCrmWinbackCampaign({ data: { id: r.id, sendNow: true } })
+                                .then((res) => {
+                                  toast.success(
+                                    res.ranImmediately
+                                      ? `Retrying ${res.retriedCount} failed ${res.retriedCount === 1 ? "send" : "sends"}`
+                                      : `Queued ${res.retriedCount} failed ${res.retriedCount === 1 ? "send" : "sends"} for retry`,
+                                  );
+                                  return refresh();
+                                })
+                                .catch((e) =>
+                                  toast.error(e instanceof Error ? e.message : "Retry failed"),
+                                )
+                            }
+                          >
+                            <RotateCcw className="h-3 w-3" /> Retry failed
                           </Button>
                         ) : null}
                         {r.status !== "done" && r.status !== "cancelled" ? (

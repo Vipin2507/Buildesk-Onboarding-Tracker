@@ -1,4 +1,6 @@
-export const CRM_WINBACK_WAVE_LIMIT = 50;
+export const CRM_WINBACK_WAVE_LIMIT = 30;
+/** Pause between each WhatsApp send in a win-back wave (4–5s). */
+export const CRM_WINBACK_SEND_PAUSE_MS = 4500;
 export const CRM_WINBACK_GAP_MS = 30 * 60 * 1000;
 
 export function winbackScheduleConflict<T extends { id?: string; status: string; scheduledAt?: string | null }>(
