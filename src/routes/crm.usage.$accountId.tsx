@@ -232,7 +232,7 @@ function CrmUsageAccountPageView() {
 
   function setTab(next: TabId) {
     void navigate({
-      search: (prev) => ({
+      search: (prev: typeof search) => ({
         ...prev,
         tab: next === "overview" ? undefined : next,
       }),
