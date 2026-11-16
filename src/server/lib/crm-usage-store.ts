@@ -26,6 +26,7 @@ function emptySummary(accountId: string, connected: boolean, error = ""): CrmUsa
     connected,
     error,
     leads: 0,
+    contacts: 0,
     followups: 0,
     visitsScheduled: 0,
     visitsConducted: 0,
@@ -65,6 +66,7 @@ export function summarizeStoredDays(accountId: string, rows: DayRow[]): CrmUsage
     if (row.callWarning) callWarning = row.callWarning;
   }
   const leads = okRows.reduce((sum, row) => sum + row.leads, 0);
+  const contacts = okRows.reduce((sum, row) => sum + (row.contacts ?? 0), 0);
   const followups = okRows.reduce((sum, row) => sum + row.followups, 0);
   const visitsScheduled = okRows.reduce((sum, row) => sum + row.visitsScheduled, 0);
   const visitsConducted = okRows.reduce((sum, row) => sum + row.visitsConducted, 0);
@@ -88,6 +90,7 @@ export function summarizeStoredDays(accountId: string, rows: DayRow[]): CrmUsage
     connected: true,
     error: "",
     leads,
+    contacts,
     followups,
     visitsScheduled,
     visitsConducted,
@@ -118,6 +121,7 @@ function toUsageDay(date: string, row: DayRow | undefined): CrmUsageDay {
       leadOnly: false,
       hasCalls: false,
       leads: 0,
+      contacts: 0,
       followups: 0,
       visitsScheduled: 0,
       visitsConducted: 0,
@@ -138,6 +142,7 @@ function toUsageDay(date: string, row: DayRow | undefined): CrmUsageDay {
     leadOnly: row.leadOnly,
     hasCalls: row.hasCalls,
     leads: row.leads,
+    contacts: row.contacts ?? 0,
     followups: row.followups,
     visitsScheduled: row.visitsScheduled,
     visitsConducted: row.visitsConducted,
@@ -176,6 +181,7 @@ export function replaceUsageDay(db: Db, accountId: string, day: string, report: 
         ok: true,
         error: "",
         leads: report.leads,
+        contacts: report.contacts,
         followups: report.followups,
         meetings: report.meetings,
         visitsScheduled: report.visitsScheduled,
@@ -206,6 +212,7 @@ export function replaceUsageDay(db: Db, accountId: string, day: string, report: 
             name: person.name,
             team: person.team,
             leads: person.leads,
+            contacts: person.contacts,
             followups: person.followups,
             meetings: person.meetings,
             visitsScheduled: person.visitsScheduled,
@@ -393,6 +400,7 @@ export function readUsageAccountPage(
       name: row.name,
       team: row.team,
       leads: 0,
+      contacts: 0,
       followups: 0,
       meetings: 0,
       visitsScheduled: 0,
@@ -408,6 +416,7 @@ export function readUsageAccountPage(
     };
     current.team ||= row.team;
     current.leads += row.leads;
+    current.contacts += row.contacts ?? 0;
     current.followups += row.followups;
     current.meetings += row.meetings;
     current.visitsScheduled += row.visitsScheduled;

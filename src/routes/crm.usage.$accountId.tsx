@@ -248,9 +248,11 @@ function CrmUsageAccountPageView() {
         "Status",
         "Users",
         "Leads",
+        "Contacts",
         "Follow-ups",
-        "Visits conducted",
         "Visits scheduled",
+        "Visits completed",
+        "Visits pending",
         "Bookings",
         "Calls",
         "Connected calls",
@@ -261,9 +263,11 @@ function CrmUsageAccountPageView() {
         dayStatus(day),
         day.ok ? day.activeUsers : "",
         day.ok ? day.leads : "",
+        day.ok ? day.contacts : "",
         day.ok ? day.followups : "",
-        day.ok ? day.visitsConducted : "",
         day.ok ? day.visitsScheduled : "",
+        day.ok ? day.visitsConducted : "",
+        day.ok ? Math.max(0, day.visitsScheduled - day.visitsConducted) : "",
         day.ok && day.bookings != null ? day.bookings : "",
         day.ok ? day.calls : "",
         day.ok ? day.connectedCalls : "",
@@ -455,8 +459,9 @@ function CrmUsageAccountPageView() {
                           "Share of leads",
                           "Active days",
                           "Leads",
+                          "Contacts",
                           "Follow-ups",
-                          "Visits",
+                          "Visits S/C/P",
                           "Bookings",
                           "Calls",
                           "Connected",
@@ -493,9 +498,11 @@ function CrmUsageAccountPageView() {
                             </td>
                             <td className="px-2 py-1.5 tabular-nums">{person.activeDays}</td>
                             <td className="px-2 py-1.5 tabular-nums">{person.leads}</td>
+                            <td className="px-2 py-1.5 tabular-nums">{person.contacts}</td>
                             <td className="px-2 py-1.5 tabular-nums">{person.followups}</td>
                             <td className="px-2 py-1.5 tabular-nums">
-                              {person.visitsConducted}/{person.visitsScheduled}
+                              {person.visitsScheduled}/{person.visitsConducted}/
+                              {Math.max(0, person.visitsScheduled - person.visitsConducted)}
                             </td>
                             <td className="px-2 py-1.5 tabular-nums">{person.bookings}</td>
                             <td className="px-2 py-1.5 tabular-nums">{person.calls}</td>
@@ -505,7 +512,7 @@ function CrmUsageAccountPageView() {
                       ) : (
                         <tr>
                           <td
-                            colSpan={9}
+                            colSpan={10}
                             className="px-3 py-6 text-center text-muted-foreground"
                           >
                             No people match this filter.
@@ -536,7 +543,12 @@ function CrmUsageAccountPageView() {
                     />
                     <Metric label="Leads" value={String(summary.leads)} hint={page.pattern} />
                     <Metric
-                      label="Follow-ups"
+                      label="Contacts"
+                      value={String(summary.contacts ?? 0)}
+                      hint="Customers / contacts"
+                    />
+                    <Metric
+                      label="Follow-ups done"
                       value={String(summary.followups)}
                       hint={`${percent(summary.followups, summary.leads)} of leads`}
                     />
@@ -550,16 +562,15 @@ function CrmUsageAccountPageView() {
                       }
                     />
                     <Metric
-                      label="Visits"
-                      value={`${summary.visitsConducted}/${summary.visitsScheduled}`}
-                      hint={`${percent(summary.visitsConducted, summary.visitsScheduled)} closed`}
+                      label="Visits S/C/P"
+                      value={`${summary.visitsScheduled}/${summary.visitsConducted}/${Math.max(0, summary.visitsScheduled - summary.visitsConducted)}`}
+                      hint={`${percent(summary.visitsConducted, summary.visitsScheduled)} completed`}
                     />
                     <Metric
                       label="Calls"
                       value={String(summary.calls)}
                       hint={`${percent(summary.connectedCalls, summary.calls)} connected`}
                     />
-                    <Metric label="Connected" value={String(summary.connectedCalls)} />
                     <Metric
                       label="Active days"
                       value={`${page.days.filter((day) => day.ok && day.hasCrmActivity).length}/${page.savedDays}`}
@@ -773,7 +784,7 @@ function CrmUsageAccountPageView() {
                         {days.length} days
                       </span>
                     </div>
-                    <table className="w-full min-w-[680px] text-left text-xs">
+                    <table className="w-full min-w-[780px] text-left text-xs">
                       <thead className="bg-muted/40 text-muted-foreground">
                         <tr>
                           {[
@@ -781,8 +792,9 @@ function CrmUsageAccountPageView() {
                             "Status",
                             "Users",
                             "Leads",
+                            "Contacts",
                             "Follow-ups",
-                            "Visits",
+                            "Visits S/C/P",
                             "Bookings",
                             "Calls",
                             "Connected",
@@ -812,11 +824,14 @@ function CrmUsageAccountPageView() {
                               {day.ok ? day.leads : "—"}
                             </td>
                             <td className="px-2 py-1.5 tabular-nums">
+                              {day.ok ? day.contacts : "—"}
+                            </td>
+                            <td className="px-2 py-1.5 tabular-nums">
                               {day.ok ? day.followups : "—"}
                             </td>
                             <td className="px-2 py-1.5 tabular-nums">
                               {day.ok
-                                ? `${day.visitsConducted}/${day.visitsScheduled}`
+                                ? `${day.visitsScheduled}/${day.visitsConducted}/${Math.max(0, day.visitsScheduled - day.visitsConducted)}`
                                 : "—"}
                             </td>
                             <td className="px-2 py-1.5 tabular-nums">
@@ -836,7 +851,7 @@ function CrmUsageAccountPageView() {
                         {days.length === 0 ? (
                           <tr>
                             <td
-                              colSpan={10}
+                              colSpan={11}
                               className="px-3 py-6 text-center text-muted-foreground"
                             >
                               No days match this filter.

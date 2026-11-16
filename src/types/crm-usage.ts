@@ -19,6 +19,8 @@ export type CrmUsageScanRow = {
   connected: boolean;
   error: string;
   leads: number;
+  /** Customers / contacts from Buildesk (`max(ContactCount, CustomerCount)`). */
+  contacts: number;
   followups: number;
   visitsScheduled: number;
   visitsConducted: number;
@@ -42,6 +44,7 @@ export type CrmUsageExecutive = {
   name: string;
   team: string;
   leads: number;
+  contacts: number;
   followups: number;
   meetings: number;
   visitsScheduled: number;
@@ -78,6 +81,7 @@ export type CrmUsageDay = {
   leadOnly: boolean;
   hasCalls: boolean;
   leads: number;
+  contacts: number;
   followups: number;
   visitsScheduled: number;
   visitsConducted: number;

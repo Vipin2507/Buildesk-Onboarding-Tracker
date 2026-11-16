@@ -38,7 +38,9 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 
 const METRICS = [
   { id: "leads", label: "Leads", color: "#009bff", dayKey: "leads" as const },
+  { id: "contacts", label: "Contacts", color: "#0ea5e9", dayKey: "contacts" as const },
   { id: "followups", label: "Follow-ups", color: "#0d9488", dayKey: "followups" as const },
+  { id: "visitsSched", label: "Visits sched.", color: "#d97706", dayKey: "visitsScheduled" as const },
   { id: "visits", label: "Visits done", color: "#f59e0b", dayKey: "visitsConducted" as const },
   { id: "bookings", label: "Bookings", color: "#ea580c", dayKey: "bookings" as const },
   { id: "calls", label: "Calls", color: "#6366f1", dayKey: "calls" as const },
@@ -47,8 +49,12 @@ const METRICS = [
 
 type MetricId = (typeof METRICS)[number]["id"];
 type TrendMode = "area" | "line" | "bar";
-type PeopleMetric = "leads" | "calls" | "bookings" | "followups" | "visitsConducted";
+type PeopleMetric = "leads" | "contacts" | "calls" | "bookings" | "followups" | "visitsConducted";
 type CoverageFilter = "ok" | "all";
+
+function visitsPending(scheduled: number, conducted: number) {
+  return Math.max(0, scheduled - conducted);
+}
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -184,13 +190,33 @@ function RatioRow({
   );
 }
 
+function StatusChip({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string | number;
+  tone: string;
+}) {
+  return (
+    <div className="rounded-lg border border-border/60 bg-muted/15 px-2 py-1.5 text-center">
+      <div className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
+      <div className={cn("mt-0.5 text-sm font-semibold tabular-nums", tone)}>{value}</div>
+    </div>
+  );
+}
+
 export function CrmUsageReportsPanel({ page }: { page: CrmUsageAccountPage }) {
   const summary = page.summary;
   const [enabledMetrics, setEnabledMetrics] = useState<MetricId[]>([
     "leads",
+    "contacts",
     "followups",
+    "visits",
     "calls",
-    "bookings",
   ]);
   const [trendMode, setTrendMode] = useState<TrendMode>("area");
   const [coverage, setCoverage] = useState<CoverageFilter>("ok");
@@ -269,6 +295,7 @@ export function CrmUsageReportsPanel({ page }: { page: CrmUsageAccountPage }) {
 
   const totals = useMemo(() => {
     const leads = summary?.leads ?? 0;
+    const contacts = summary?.contacts ?? 0;
     const followups = summary?.followups ?? 0;
     const visitsDone = summary?.visitsConducted ?? 0;
     const visitsSched = summary?.visitsScheduled ?? 0;
@@ -278,9 +305,11 @@ export function CrmUsageReportsPanel({ page }: { page: CrmUsageAccountPage }) {
     const activeDays = page.days.filter((d) => d.ok && d.hasCrmActivity).length;
     return {
       leads,
+      contacts,
       followups,
       visitsDone,
       visitsSched,
+      visitsPending: visitsPending(visitsSched, visitsDone),
       bookings,
       calls,
       connected,
@@ -292,6 +321,33 @@ export function CrmUsageReportsPanel({ page }: { page: CrmUsageAccountPage }) {
       licensed: page.account.licensedUsers,
     };
   }, [page, summary]);
+
+  const leadContactMix = useMemo(
+    () =>
+      [
+        { name: "Leads", value: totals.leads, fill: "#009bff" },
+        { name: "Contacts", value: totals.contacts, fill: "#0ea5e9" },
+      ].filter((row) => row.value > 0),
+    [totals.contacts, totals.leads],
+  );
+
+  const visitStatusBars = useMemo(
+    () => [
+      { name: "Scheduled", value: totals.visitsSched, fill: "#d97706" },
+      { name: "Completed", value: totals.visitsDone, fill: "#22c55e" },
+      { name: "Pending", value: totals.visitsPending, fill: "#f59e0b" },
+    ],
+    [totals.visitsDone, totals.visitsPending, totals.visitsSched],
+  );
+
+  const followupStatusBars = useMemo(
+    () => [
+      { name: "Done", value: totals.followups, fill: "#0d9488" },
+      { name: "Scheduled", value: 0, fill: "#94a3b8" },
+      { name: "Pending", value: 0, fill: "#cbd5e1" },
+    ],
+    [totals.followups],
+  );
 
   const activeMetrics = METRICS.filter((m) => enabledMetrics.includes(m.id));
 
@@ -361,7 +417,7 @@ export function CrmUsageReportsPanel({ page }: { page: CrmUsageAccountPage }) {
         </div>
       </motion.div>
 
-      <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-5">
+      <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-6">
         <KpiTile
           label="Leads received"
           value={String(totals.leads)}
@@ -370,18 +426,32 @@ export function CrmUsageReportsPanel({ page }: { page: CrmUsageAccountPage }) {
           delay={0.02}
         />
         <KpiTile
+          label="Contacts"
+          value={String(totals.contacts)}
+          hint="Customers / contacts from Buildesk"
+          accent="#0ea5e9"
+          delay={0.04}
+        />
+        <KpiTile
           label="Calls done"
           value={String(totals.calls)}
           hint={`${formatPct(totals.connected, totals.calls)} connected`}
           accent="#6366f1"
-          delay={0.05}
+          delay={0.06}
         />
         <KpiTile
-          label="Site visits done"
-          value={String(totals.visitsDone)}
-          hint={`${totals.visitsSched} scheduled`}
+          label="Site visits"
+          value={`${totals.visitsDone}/${totals.visitsSched}`}
+          hint={`${totals.visitsPending} pending`}
           accent="#f59e0b"
           delay={0.08}
+        />
+        <KpiTile
+          label="Follow-ups done"
+          value={String(totals.followups)}
+          hint="Buildesk activity count"
+          accent="#0d9488"
+          delay={0.1}
         />
         <KpiTile
           label="Booked"
@@ -392,15 +462,133 @@ export function CrmUsageReportsPanel({ page }: { page: CrmUsageAccountPage }) {
               : `${formatPct(totals.bookings, totals.leads)} of leads`
           }
           accent="#ea580c"
-          delay={0.11}
+          delay={0.12}
         />
-        <KpiTile
-          label="CRM active days"
-          value={`${totals.activeDays}/${totals.savedDays}`}
-          hint={`${formatPct(totals.peakUsers, totals.licensed)} peak seat use`}
-          accent="#22c55e"
-          delay={0.14}
-        />
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-3">
+        <ReportCard
+          title="Leads vs contacts"
+          subtitle="Entity counts · call log is not split by record type"
+          icon={Users}
+          delay={0.06}
+        >
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            <div className="rounded-lg border border-border/60 bg-sky-50/70 px-3 py-2 dark:bg-sky-950/30">
+              <div className="text-[10px] uppercase text-muted-foreground">Leads</div>
+              <div className="text-lg font-semibold tabular-nums text-foreground">{totals.leads}</div>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-cyan-50/70 px-3 py-2 dark:bg-cyan-950/30">
+              <div className="text-[10px] uppercase text-muted-foreground">Contacts</div>
+              <div className="text-lg font-semibold tabular-nums text-foreground">{totals.contacts}</div>
+            </div>
+          </div>
+          {leadContactMix.length ? (
+            <div className="h-36">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={leadContactMix}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={36}
+                    outerRadius={54}
+                    paddingAngle={3}
+                    strokeWidth={0}
+                  >
+                    {leadContactMix.map((entry) => (
+                      <Cell key={entry.name} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <EmptyBlock label="No leads or contacts in this window" />
+          )}
+          <p className="mt-2 text-[10px] text-muted-foreground">
+            Total calls {totals.calls.toLocaleString("en-IN")} · connected{" "}
+            {totals.connected.toLocaleString("en-IN")}. Buildesk does not label calls as lead vs
+            contact.
+          </p>
+        </ReportCard>
+
+        <ReportCard
+          title="Follow-ups"
+          subtitle="Scheduled / pending are not provided by Buildesk"
+          icon={Activity}
+          delay={0.08}
+        >
+          <div className="mb-3 grid grid-cols-3 gap-1.5">
+            <StatusChip label="Done" value={totals.followups} tone="text-teal-700 dark:text-teal-400" />
+            <StatusChip label="Scheduled" value="—" tone="text-muted-foreground" />
+            <StatusChip label="Pending" value="—" tone="text-muted-foreground" />
+          </div>
+          <div className="h-36">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={followupStatusBars} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
+                <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                  {followupStatusBars.map((row) => (
+                    <Cell key={row.name} fill={row.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </ReportCard>
+
+        <ReportCard
+          title="Site visits"
+          subtitle="Pending = max(0, scheduled − completed)"
+          icon={CalendarDays}
+          delay={0.1}
+        >
+          <div className="mb-3 grid grid-cols-3 gap-1.5">
+            <StatusChip
+              label="Scheduled"
+              value={totals.visitsSched}
+              tone="text-amber-700 dark:text-amber-400"
+            />
+            <StatusChip
+              label="Completed"
+              value={totals.visitsDone}
+              tone="text-emerald-700 dark:text-emerald-400"
+            />
+            <StatusChip
+              label="Pending"
+              value={totals.visitsPending}
+              tone="text-orange-700 dark:text-orange-400"
+            />
+          </div>
+          <div className="h-36">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={visitStatusBars} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
+                <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                  {visitStatusBars.map((row) => (
+                    <Cell key={row.name} fill={row.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="mt-2">
+            <RatioRow
+              label="Visit completion"
+              value={formatPct(totals.visitsDone, totals.visitsSched)}
+              tone="#22c55e"
+            />
+          </div>
+        </ReportCard>
       </div>
 
       <div className="flex flex-wrap gap-1.5">
@@ -525,9 +713,19 @@ export function CrmUsageReportsPanel({ page }: { page: CrmUsageAccountPage }) {
               tone="#0d9488"
             />
             <RatioRow
+              label="Contact vs lead"
+              value={formatPct(totals.contacts, totals.leads)}
+              tone="#0ea5e9"
+            />
+            <RatioRow
               label="Visit close rate"
               value={formatPct(totals.visitsDone, totals.visitsSched)}
               tone="#f59e0b"
+            />
+            <RatioRow
+              label="Visit pending share"
+              value={formatPct(totals.visitsPending, totals.visitsSched)}
+              tone="#d97706"
             />
             <RatioRow
               label="Booking rate"
@@ -542,11 +740,6 @@ export function CrmUsageReportsPanel({ page }: { page: CrmUsageAccountPage }) {
               label="Call connect rate"
               value={formatPct(totals.connected, totals.calls)}
               tone="#22c55e"
-            />
-            <RatioRow
-              label="CRM active day rate"
-              value={formatPct(totals.activeDays, totals.savedDays)}
-              tone="#009bff"
             />
             <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
               Peak seats{" "}
@@ -673,10 +866,10 @@ export function CrmUsageReportsPanel({ page }: { page: CrmUsageAccountPage }) {
                   {[
                     "Executive",
                     "Calls",
-                    "Connected",
                     "Leads",
+                    "Contacts",
                     "Follow-ups",
-                    "Visits",
+                    "Visits S/C/P",
                     "Bookings",
                     "Active days",
                   ].map((label) => (
@@ -709,12 +902,18 @@ export function CrmUsageReportsPanel({ page }: { page: CrmUsageAccountPage }) {
                               : "Idle"}
                         </div>
                       </td>
-                      <td className="px-2.5 py-2 tabular-nums">{person.calls}</td>
-                      <td className="px-2.5 py-2 tabular-nums">{person.connectedCalls}</td>
+                      <td className="px-2.5 py-2 tabular-nums">
+                        {person.calls}
+                        <div className="text-[10px] font-normal text-muted-foreground">
+                          {person.connectedCalls} connected
+                        </div>
+                      </td>
                       <td className="px-2.5 py-2 tabular-nums">{person.leads}</td>
+                      <td className="px-2.5 py-2 tabular-nums">{person.contacts}</td>
                       <td className="px-2.5 py-2 tabular-nums">{person.followups}</td>
                       <td className="px-2.5 py-2 tabular-nums">
-                        {person.visitsConducted}/{person.visitsScheduled}
+                        {person.visitsScheduled}/{person.visitsConducted}/
+                        {visitsPending(person.visitsScheduled, person.visitsConducted)}
                       </td>
                       <td className="px-2.5 py-2 tabular-nums">{person.bookings}</td>
                       <td className="px-2.5 py-2 tabular-nums">{person.activeDays}</td>
@@ -737,17 +936,21 @@ export function CrmUsageReportsPanel({ page }: { page: CrmUsageAccountPage }) {
                       {sumPeople(executiveTable, "calls")}
                     </td>
                     <td className="px-2.5 py-2 tabular-nums">
-                      {sumPeople(executiveTable, "connectedCalls")}
+                      {sumPeople(executiveTable, "leads")}
                     </td>
                     <td className="px-2.5 py-2 tabular-nums">
-                      {sumPeople(executiveTable, "leads")}
+                      {sumPeople(executiveTable, "contacts")}
                     </td>
                     <td className="px-2.5 py-2 tabular-nums">
                       {sumPeople(executiveTable, "followups")}
                     </td>
                     <td className="px-2.5 py-2 tabular-nums">
+                      {sumPeople(executiveTable, "visitsScheduled")}/
                       {sumPeople(executiveTable, "visitsConducted")}/
-                      {sumPeople(executiveTable, "visitsScheduled")}
+                      {visitsPending(
+                        sumPeople(executiveTable, "visitsScheduled"),
+                        sumPeople(executiveTable, "visitsConducted"),
+                      )}
                     </td>
                     <td className="px-2.5 py-2 tabular-nums">
                       {sumPeople(executiveTable, "bookings")}
@@ -771,6 +974,7 @@ export function CrmUsageReportsPanel({ page }: { page: CrmUsageAccountPage }) {
                 [
                   ["calls", "Calls"],
                   ["leads", "Leads"],
+                  ["contacts", "Contacts"],
                   ["followups", "Follow-ups"],
                   ["visitsConducted", "Visits"],
                   ["bookings", "Bookings"],
@@ -851,6 +1055,7 @@ export function CrmUsageReportsPanel({ page }: { page: CrmUsageAccountPage }) {
 function peopleMetricLabel(metric: PeopleMetric) {
   if (metric === "visitsConducted") return "Visits";
   if (metric === "followups") return "Follow-ups";
+  if (metric === "contacts") return "Contacts";
   return metric.charAt(0).toUpperCase() + metric.slice(1);
 }
 
@@ -860,6 +1065,7 @@ function sumPeople(
     | "calls"
     | "connectedCalls"
     | "leads"
+    | "contacts"
     | "followups"
     | "visitsConducted"
     | "visitsScheduled"

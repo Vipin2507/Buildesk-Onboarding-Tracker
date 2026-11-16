@@ -28,6 +28,7 @@ const CRM_KEYS = [
   "CPAddedCount",
   "CPContactedCount",
   "CustomerCount",
+  "ContactCount",
   "LeadLostCount",
 ] as const;
 
@@ -38,6 +39,7 @@ type Counts = Record<string, number>;
 type Report = {
   executives: CrmUsageExecutive[];
   leads: number;
+  contacts: number;
   followups: number;
   meetings: number;
   visitsScheduled: number;
@@ -97,6 +99,11 @@ function conductedVisits(row: Counts) {
 
 function bookingCount(row: Counts) {
   return Math.max(row.BookingCount ?? 0, row.NewBookingCount ?? 0);
+}
+
+/** Buildesk exposes ContactCount + CustomerCount; ContactCount is often 0 in practice. */
+function contactCount(row: Counts) {
+  return Math.max(row.ContactCount ?? 0, row.CustomerCount ?? 0);
 }
 
 function hasCrm(row: Counts) {
@@ -243,6 +250,7 @@ function executiveFrom(raw: Record<string, unknown>, counts: Counts): CrmUsageEx
     name,
     team: String(raw.Team || "").trim(),
     leads,
+    contacts: contactCount(counts),
     followups: counts.FollowupCount ?? 0,
     meetings: counts.MeetingsCount ?? 0,
     visitsScheduled: scheduledVisits(counts),
@@ -309,6 +317,7 @@ function emptyScan(accountId: string, connected: boolean, error = ""): CrmUsageS
     connected,
     error,
     leads: 0,
+    contacts: 0,
     followups: 0,
     visitsScheduled: 0,
     visitsConducted: 0,
@@ -335,6 +344,7 @@ function toScan(accountId: string, report: Report): CrmUsageScanRow {
     connected: true,
     error: "",
     leads: report.leads,
+    contacts: report.contacts,
     followups: report.followups,
     visitsScheduled: report.visitsScheduled,
     visitsConducted: report.visitsConducted,
@@ -419,6 +429,7 @@ async function fetchReport(apiKey: string, from: string, to: string, fresh = fal
   }
 
   const leads = leadCount(totals);
+  const contacts = contactCount(totals);
   const followups = totals.FollowupCount ?? 0;
   const meetings = totals.MeetingsCount ?? 0;
   const visitsScheduled = scheduledVisits(totals);
@@ -455,6 +466,7 @@ async function fetchReport(apiKey: string, from: string, to: string, fresh = fal
   const leadOnly = leads > 0 && !crmActivity && !callActivity;
   const crmScore =
     leads +
+    contacts +
     followups +
     visitsScheduled +
     visitsConducted +
@@ -462,7 +474,6 @@ async function fetchReport(apiKey: string, from: string, to: string, fresh = fal
     (bookings ?? 0) +
     (totals.CPAddedCount ?? 0) +
     (totals.CPContactedCount ?? 0) +
-    (totals.CustomerCount ?? 0) +
     (totals.LeadLostCount ?? 0);
 
   const usageType = callActivity && crmActivity
@@ -478,6 +489,7 @@ async function fetchReport(apiKey: string, from: string, to: string, fresh = fal
   const report: Report = {
     executives,
     leads,
+    contacts,
     followups,
     meetings,
     visitsScheduled,
@@ -568,6 +580,7 @@ export async function loadUsageDays(apiKey: string, from: string, to: string): P
         leadOnly: report.leadOnly,
         hasCalls: report.hasCalls,
         leads: report.leads,
+        contacts: report.contacts,
         followups: report.followups,
         visitsScheduled: report.visitsScheduled,
         visitsConducted: report.visitsConducted,
@@ -588,6 +601,7 @@ export async function loadUsageDays(apiKey: string, from: string, to: string): P
         leadOnly: false,
         hasCalls: false,
         leads: 0,
+        contacts: 0,
         followups: 0,
         visitsScheduled: 0,
         visitsConducted: 0,

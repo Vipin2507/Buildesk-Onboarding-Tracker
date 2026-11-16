@@ -1479,6 +1479,7 @@ if (!tableExists("crm_usage_days")) {
       ok INTEGER NOT NULL DEFAULT 0,
       error TEXT NOT NULL DEFAULT '',
       leads INTEGER NOT NULL DEFAULT 0,
+      contacts INTEGER NOT NULL DEFAULT 0,
       followups INTEGER NOT NULL DEFAULT 0,
       meetings INTEGER NOT NULL DEFAULT 0,
       visits_scheduled INTEGER NOT NULL DEFAULT 0,
@@ -1512,6 +1513,7 @@ if (!tableExists("crm_usage_people")) {
       name TEXT NOT NULL,
       team TEXT NOT NULL DEFAULT '',
       leads INTEGER NOT NULL DEFAULT 0,
+      contacts INTEGER NOT NULL DEFAULT 0,
       followups INTEGER NOT NULL DEFAULT 0,
       meetings INTEGER NOT NULL DEFAULT 0,
       visits_scheduled INTEGER NOT NULL DEFAULT 0,
@@ -1541,6 +1543,22 @@ if (!tableExists("crm_usage_sync")) {
     );
   `);
   console.log("+ CREATE TABLE crm_usage_sync");
+}
+
+if (tableExists("crm_usage_days")) {
+  const usageDayCols = existingColumns("crm_usage_days");
+  if (!usageDayCols.has("contacts")) {
+    sqlite.exec(`ALTER TABLE crm_usage_days ADD COLUMN contacts INTEGER NOT NULL DEFAULT 0`);
+    console.log("+ ALTER TABLE crm_usage_days ADD contacts");
+  }
+}
+
+if (tableExists("crm_usage_people")) {
+  const usagePeopleCols = existingColumns("crm_usage_people");
+  if (!usagePeopleCols.has("contacts")) {
+    sqlite.exec(`ALTER TABLE crm_usage_people ADD COLUMN contacts INTEGER NOT NULL DEFAULT 0`);
+    console.log("+ ALTER TABLE crm_usage_people ADD contacts");
+  }
 }
 
 if (!tableExists("crm_winback_contacts")) {
