@@ -239,6 +239,26 @@ function accountStatusTone(status: CrmAccount["status"]) {
   return "muted" as const;
 }
 
+/** Split a person name into two lines for consistent table row height. */
+function twoLinePersonName(value?: string | null) {
+  const name = value?.trim();
+  if (!name) {
+    return (
+      <span className="block min-h-[2rem] text-xs leading-4 text-muted-foreground">—</span>
+    );
+  }
+  const parts = name.split(/\s+/).filter(Boolean);
+  const splitAt = Math.max(1, Math.ceil(parts.length / 2));
+  const first = parts.slice(0, splitAt).join(" ");
+  const second = parts.slice(splitAt).join(" ");
+  return (
+    <span className="block min-h-[2rem] text-xs leading-4">
+      <span className="block truncate">{first}</span>
+      <span className="block truncate text-muted-foreground">{second || "\u00A0"}</span>
+    </span>
+  );
+}
+
 function matchesAccountKpi(row: CrmAccountRow, filter: AccountKpiFilter) {
   if (filter === "all") return true;
   if (filter === "onboarding") {
@@ -1405,48 +1425,36 @@ function CrmAccountsPage() {
                     key: "name",
                     header: "Account",
                     sortable: true,
-                    render: (r) => (
-                      <div>
-                        <div className="font-medium">
-                          <a
-                            href={`/crm/accounts/${r.id}`}
-                            className="hover:underline"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {r.name}
-                          </a>
-                        </div>
-                        <div className="font-mono text-xs text-muted-foreground">
-                          {r.userId?.trim() || "—"}
-                        </div>
-                        {crmRenewalWindowLabel(r) ? (
-                          <div className="mt-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
-                            {crmRenewalWindowLabel(r)}
+                    render: (r) => {
+                      const location = [r.city?.trim(), r.region?.trim()].filter(Boolean).join(" · ");
+                      return (
+                        <div className="min-w-[10rem]">
+                          <div className="font-medium">
+                            <a
+                              href={`/crm/accounts/${r.id}`}
+                              className="hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {r.name}
+                            </a>
                           </div>
-                        ) : null}
-                      </div>
-                    ),
-                  },
-                  {
-                    key: "city",
-                    header: "Location",
-                    sortable: true,
-                    render: (r) => (
-                      <div className="min-w-0 text-xs text-muted-foreground">
-                        <div className="font-medium text-foreground">{r.city || "—"}</div>
-                        {r.region ? (
-                          <div className="truncate">{r.region}</div>
-                        ) : null}
-                      </div>
-                    ),
-                  },
-                  {
-                    key: "companyType",
-                    header: "Type",
-                    sortable: true,
-                    render: (r) => (
-                      <span className="text-xs text-muted-foreground">{r.companyType}</span>
-                    ),
+                          <div className="font-mono text-xs text-muted-foreground">
+                            {r.userId?.trim() || "—"}
+                          </div>
+                          <div className="mt-0.5 text-[11px] text-muted-foreground">
+                            <span>{location || "—"}</span>
+                            {r.companyType ? (
+                              <span className="text-muted-foreground/80"> · {r.companyType}</span>
+                            ) : null}
+                          </div>
+                          {crmRenewalWindowLabel(r) ? (
+                            <div className="mt-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+                              {crmRenewalWindowLabel(r)}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    },
                   },
                   {
                     key: "subscribedModules",
@@ -1467,25 +1475,19 @@ function CrmAccountsPage() {
                     key: "supportManager1",
                     header: "Support 1",
                     sortable: true,
-                    render: (r) => (
-                      <span className="text-xs">{r.supportManager1?.trim() || "—"}</span>
-                    ),
+                    render: (r) => twoLinePersonName(r.supportManager1),
                   },
                   {
                     key: "supportManager2",
                     header: "Support 2",
                     sortable: true,
-                    render: (r) => (
-                      <span className="text-xs">{r.supportManager2?.trim() || "—"}</span>
-                    ),
+                    render: (r) => twoLinePersonName(r.supportManager2),
                   },
                   {
                     key: "salesManagerName",
                     header: "Sales Manager",
                     sortable: true,
-                    render: (r) => (
-                      <span className="text-xs">{r.salesManagerName || "—"}</span>
-                    ),
+                    render: (r) => twoLinePersonName(r.salesManagerName),
                   },
                   {
                     key: "startDate",
