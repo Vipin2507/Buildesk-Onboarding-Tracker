@@ -35,6 +35,7 @@ import { CrmAccountMeetingsPanel } from "@/components/crm/crm-account-meetings-p
 import { CrmAccountModulesOverview } from "@/components/crm/crm-account-modules-overview";
 import { CrmAccountModulesTab } from "@/components/crm/crm-account-modules-tab";
 import { CrmAccountStageSelect } from "@/components/crm/crm-account-stage-select";
+import { CrmAccountStatusSelect } from "@/components/crm/crm-account-status-select";
 import { CrmAccountPortalPanel } from "@/components/crm/crm-account-portal-panel";
 import { CrmAccountGoLiveActions } from "@/components/crm/crm-account-go-live-actions";
 import { CrmAccountInstallmentSchedule } from "@/components/crm/crm-account-installment-schedule";
@@ -64,6 +65,7 @@ import {
   isCrmIntegrationModule,
 } from "@/data/crm-onboarding-defaults";
 import { resolveCrmStageLabel } from "@/stores/useCrmMasterStore";
+import { crmAccountStatusLabel } from "@/lib/crm-account-status";
 import { isAdminRoleKey } from "@/lib/permissions";
 import { calcChecklistProgress } from "@/lib/checklist";
 import { portalPublicCreateUrl } from "@/lib/design-ticket-portal";
@@ -516,20 +518,35 @@ function DashboardTab({
         <div className="card-soft p-3">
           <div className="text-[10px] uppercase text-muted-foreground">Health & stage</div>
           <div className="mt-1 text-xl font-semibold tabular-nums">{healthScore}</div>
-          <div className="mt-2 space-y-1">
-            <div className="text-[10px] uppercase text-muted-foreground">Stage</div>
-            {isAdmin ? (
-              <CrmAccountStageSelect
-                companyId={accountId}
-                stage={record.tracker.stage}
-                who={who}
-                compact
-              />
-            ) : (
-              <div className="text-xs font-medium">{resolveCrmStageLabel(record.tracker.stage)}</div>
-            )}
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <div className="space-y-1">
+              <div className="text-[10px] uppercase text-muted-foreground">Status</div>
+              {isAdmin ? (
+                <CrmAccountStatusSelect
+                  companyId={accountId}
+                  status={account.status}
+                  who={who}
+                  compact
+                />
+              ) : (
+                <div className="text-xs font-medium">{crmAccountStatusLabel(account.status)}</div>
+              )}
+            </div>
+            <div className="space-y-1">
+              <div className="text-[10px] uppercase text-muted-foreground">Stage</div>
+              {isAdmin ? (
+                <CrmAccountStageSelect
+                  companyId={accountId}
+                  stage={record.tracker.stage}
+                  who={who}
+                  compact
+                />
+              ) : (
+                <div className="text-xs font-medium">{resolveCrmStageLabel(record.tracker.stage)}</div>
+              )}
+            </div>
           </div>
-          <div className="mt-1 text-xs text-muted-foreground">
+          <div className="mt-2 text-xs text-muted-foreground">
             Sales Manager: {account.salesManagerName || "—"}
           </div>
           <div className="mt-0.5 text-xs text-muted-foreground">
