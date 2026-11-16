@@ -120,12 +120,13 @@ function CrmPortalTicketDetail() {
     );
   }
 
-  const account = accounts.find((a) => a.id === ticket.companyId);
-  const accountLabel = account?.name ?? crmAccountName(ticket.companyId);
+  const current = ticket;
+  const account = accounts.find((a) => a.id === current.companyId);
+  const accountLabel = account?.name ?? crmAccountName(current.companyId);
   const assigneeName =
-    assigneeOptions.find((o) => o.id === ticket.assigneeId)?.name ?? "Unassigned";
-  const daysOpen = daysOpenForTicket(ticket);
-  const aging = isTicketAging(ticket, daysOpen);
+    assigneeOptions.find((o) => o.id === current.assigneeId)?.name ?? "Unassigned";
+  const daysOpen = daysOpenForTicket(current);
+  const aging = isTicketAging(current, daysOpen);
 
   const statusOptions = DESIGN_TICKET_STATUSES.map((s) => ({
     value: s,
@@ -143,7 +144,7 @@ function CrmPortalTicketDetail() {
   ];
 
   function copyTicketId() {
-    void navigator.clipboard.writeText(ticket.ticketNumber);
+    void navigator.clipboard.writeText(current.ticketNumber);
     toast.success("Ticket ID copied");
   }
 
@@ -178,11 +179,11 @@ function CrmPortalTicketDetail() {
                     className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-primary transition hover:bg-primary/15"
                     title="Copy ticket ID"
                   >
-                    {ticket.ticketNumber}
+                    {current.ticketNumber}
                     <Copy className="h-3 w-3 opacity-70" />
                   </button>
-                  <DesignTicketStatusPill status={ticket.status} />
-                  <DesignTicketPriorityChip priority={ticket.priority} />
+                  <DesignTicketStatusPill status={current.status} />
+                  <DesignTicketPriorityChip priority={current.priority} />
                   <span
                     className={cn(
                       "rounded-full border px-2.5 py-0.5 text-[10px] font-semibold",
@@ -198,7 +199,7 @@ function CrmPortalTicketDetail() {
                 </div>
 
                 <h1 className="text-lg font-semibold leading-snug tracking-tight text-foreground sm:text-xl">
-                  {ticket.subject}
+                  {current.subject}
                 </h1>
 
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
@@ -206,14 +207,14 @@ function CrmPortalTicketDetail() {
                     <Building2 className="h-3.5 w-3.5 shrink-0" />
                     <Link
                       to="/crm/accounts/$accountId"
-                      params={{ accountId: ticket.companyId }}
+                      params={{ accountId: current.companyId }}
                       className="truncate font-medium text-primary hover:underline"
                     >
                       {accountLabel}
                     </Link>
                   </span>
                   <span className="text-border">·</span>
-                  <span>Updated {formatDate(ticket.updatedAt)}</span>
+                  <span>Updated {formatDate(current.updatedAt)}</span>
                   {aging ? (
                     <>
                       <span className="text-border">·</span>
@@ -224,14 +225,14 @@ function CrmPortalTicketDetail() {
                   ) : null}
                 </div>
 
-                {ticket.description?.trim() ? (
+                {current.description?.trim() ? (
                   <motion.p
                     initial={{ opacity: 0, y: 4 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.28, ease: TICKET_EASE }}
                     className="max-w-3xl whitespace-pre-wrap rounded-lg border border-border/60 bg-background/70 px-3 py-2 text-xs leading-relaxed text-foreground/85"
                   >
-                    {ticket.description.trim()}
+                    {current.description.trim()}
                   </motion.p>
                 ) : null}
               </div>
@@ -240,7 +241,7 @@ function CrmPortalTicketDetail() {
                 <DesignTicketFilterField label="Status" compact>
                   <DesignTicketSelect
                     compact
-                    value={ticket.status}
+                    value={current.status}
                     onChange={(value) => {
                       updateStatus(ticketId, value as DesignTicketStatus, actorName);
                       toast.success("Status updated");
@@ -251,7 +252,7 @@ function CrmPortalTicketDetail() {
                 <DesignTicketFilterField label="Priority" compact>
                   <DesignTicketSelect
                     compact
-                    value={ticket.priority}
+                    value={current.priority}
                     onChange={(value) => {
                       updatePriority(ticketId, value as DesignTicketPriority, actorName);
                       toast.success("Priority updated");
@@ -262,7 +263,7 @@ function CrmPortalTicketDetail() {
                 <DesignTicketFilterField label="Assignee" compact>
                   <DesignTicketSelect
                     compact
-                    value={ticket.assigneeId ?? UNASSIGNED}
+                    value={current.assigneeId ?? UNASSIGNED}
                     onChange={(value) => {
                       const id = value === UNASSIGNED ? undefined : value;
                       const name = assigneeOptions.find((o) => o.id === id)?.name ?? "Unassigned";
@@ -283,7 +284,7 @@ function CrmPortalTicketDetail() {
         >
           <div className="flex min-h-0 min-w-0 flex-col">
             <DesignTicketThread
-              ticket={ticket}
+              ticket={current}
               mode="internal"
               reply={{
                 placeholder: "Reply to client…",
@@ -300,7 +301,7 @@ function CrmPortalTicketDetail() {
             />
           </div>
 
-          <CrmTicketDetailMeta ticket={ticket} assigneeName={assigneeName} />
+          <CrmTicketDetailMeta ticket={current} assigneeName={assigneeName} />
         </motion.div>
       </motion.div>
     </PageWrap>
