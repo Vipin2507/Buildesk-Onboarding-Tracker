@@ -1,11 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   Bell,
-  Users,
   ChevronDown,
   ChevronRight,
-  Download,
-  FileSpreadsheet,
+  MoreHorizontal,
   Search,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -15,6 +13,13 @@ import { CrmAccountPaymentBulkUpdateModal } from "@/components/crm/crm-account-p
 import { CrmAccountRenewDialog } from "@/components/crm/crm-account-renew-dialog";
 import { CrmExecutivePaymentReminderDialog } from "@/components/crm/crm-executive-payment-reminder-dialog";
 import { CrmPaymentsExpandedRow } from "@/components/crm/crm-payments-expanded-row";
+import { PaymentsAnalytics } from "@/components/crm/payments/payments-analytics";
+import { formatPaymentsInr } from "@/components/crm/payments/payments-format";
+import { PaymentsHeader } from "@/components/crm/payments/payments-header";
+import { PaymentsKpiCards } from "@/components/crm/payments/payments-kpi-cards";
+import { PaymentsLostSummary } from "@/components/crm/payments/payments-lost-summary";
+import { PaymentsStatusTabs } from "@/components/crm/payments/payments-status-tabs";
+import { PaymentsUpcomingPerformance } from "@/components/crm/payments/payments-upcoming-performance";
 import { ConfirmDeleteDialog } from "@/components/entity-form-modal";
 import { DataTable } from "@/components/data-table";
 import {
@@ -27,6 +32,12 @@ import { PageWrap } from "@/components/page-header";
 import { ProgressBar } from "@/components/progress-bar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   useCrmPaymentsList,
@@ -68,24 +79,12 @@ const STATUS_TABS: { id: CrmPaymentStatusTabId; label: string }[] = [
   { id: "inactive", label: "Inactive" },
 ];
 
-const STATUS_TAB_TONE: Record<CrmPaymentStatusTabId, string> = {
-  all: "text-foreground",
-  overdue: "text-destructive",
-  due_this_week: "text-amber-600 dark:text-amber-400",
-  due_this_month: "text-orange-600 dark:text-orange-400",
-  due_in_45_days: "text-primary",
-  due_in_90_days: "text-sky-600 dark:text-sky-400",
-  upcoming: "text-muted-foreground",
-  fully_paid: "text-emerald-600 dark:text-emerald-400",
-  renewal: "text-violet-600 dark:text-violet-400",
-  suspended: "text-amber-700 dark:text-amber-400",
-  suspend_and_close: "text-destructive",
-  inactive: "text-muted-foreground",
-};
-
 type ManagerField = "salesManagerName" | "supportManager1" | "supportManager2";
 
-function buildManagerFilterOptions(accounts: { salesManagerName?: string; supportManager1?: string; supportManager2?: string }[], field: ManagerField) {
+function buildManagerFilterOptions(
+  accounts: { salesManagerName?: string; supportManager1?: string; supportManager2?: string }[],
+  field: ManagerField,
+) {
   const names = new Set<string>();
   for (const a of accounts) {
     const n = a[field]?.trim();
@@ -96,18 +95,6 @@ function buildManagerFilterOptions(accounts: { salesManagerName?: string; suppor
     { value: "unassigned", label: "Unassigned" },
     ...[...names].sort().map((n) => ({ value: n, label: n })),
   ];
-}
-
-function formatInr(value: number) {
-  return `₹${value.toLocaleString("en-IN")}`;
-}
-
-function managerCell(value?: string) {
-  return value?.trim() ? (
-    <span className="text-xs">{value}</span>
-  ) : (
-    <span className="text-xs text-muted-foreground">—</span>
-  );
 }
 
 function paymentStatusBadge(status: PaymentStatus) {
@@ -231,6 +218,16 @@ function CrmPaymentsPage() {
     [accounts],
   );
 
+  const statusTabItems = useMemo(
+    () =>
+      STATUS_TABS.map((tab) => ({
+        id: tab.id,
+        label: tab.label,
+        count: statusCounts?.[tab.id as keyof typeof statusCounts] ?? 0,
+      })),
+    [statusCounts],
+  );
+
   const patchSearch = useCallback(
     (patch: Partial<typeof search>) => {
       void navigate({
@@ -250,7 +247,14 @@ function CrmPaymentsPage() {
         replace: true,
       });
     },
-    [navigate, search],
+    [navigate],
+  );
+
+  const onStatusFilter = useCallback(
+    (id: CrmPaymentStatusTabId) => {
+      patchSearch({ status: id === "all" ? undefined : id });
+    },
+    [patchSearch],
   );
 
   function toggleExpanded(id: string) {
@@ -349,244 +353,40 @@ function CrmPaymentsPage() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const accountCount = summary?.accountCount ?? total;
 
   return (
-    <PageWrap compact flushTop>
-      <div className="mb-0 border-b border-border pb-2 pt-1">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="min-w-0">
-            <h1 className="text-base font-medium tracking-tight">Payments</h1>
-            <p className="text-xs text-muted-foreground">
-              {total} {total === 1 ? "account" : "accounts"}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 gap-1 px-3 text-xs"
-              onClick={() => setExecutiveDigestOpen(true)}
-            >
-              <Users className="h-3.5 w-3.5" />
-              Remind executives
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 gap-1 px-3 text-xs"
-              onClick={() => setBulkPaymentOpen(true)}
-            >
-              <FileSpreadsheet className="h-3.5 w-3.5" />
-              Bulk update
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 gap-1 px-3 text-xs"
-              onClick={() => void handleExport()}
-            >
-              <Download className="h-3.5 w-3.5" />
-              Export
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 gap-1 px-3 text-xs"
-              disabled={selectedIds.size === 0 || bulkRemind.isPending}
-              onClick={() => void handleBulkRemind()}
-            >
-              <Bell className="h-3.5 w-3.5" />
-              Send reminders
-            </Button>
-          </div>
-        </div>
+    <PageWrap compact>
+      <div className="space-y-4 pb-4">
+        <PaymentsHeader
+          accountCount={accountCount}
+          selectedCount={selectedIds.size}
+          reminding={bulkRemind.isPending}
+          onSendReminders={() => void handleBulkRemind()}
+          onRemindExecutives={() => setExecutiveDigestOpen(true)}
+          onExport={() => void handleExport()}
+          onBulkUpdate={() => setBulkPaymentOpen(true)}
+        />
 
-        {summary ? (
-          <div className="mt-2 space-y-2">
-            <div className="overflow-x-auto rounded-lg border border-border bg-card">
-              <div className="flex min-w-[880px] divide-x divide-border">
-                {[
-                  { label: "Contract value", value: formatInr(summary.totalContractValue) },
-                  { label: "Received", value: formatInr(summary.totalReceived) },
-                  { label: "Pending", value: formatInr(summary.totalPending) },
-                  {
-                    label: "Overdue",
-                    value: formatInr(summary.totalOverdueAmount),
-                    sub: `${summary.overdueAccountCount} accounts`,
-                    tone: "text-destructive",
-                  },
-                  {
-                    label: "Due this week",
-                    value: formatInr(summary.dueThisWeekAmount),
-                    sub: `${summary.dueThisWeekCount} accounts`,
-                    tone: "text-amber-600 dark:text-amber-400",
-                  },
-                  {
-                    label: "Due this month",
-                    value: formatInr(summary.dueThisMonthAmount),
-                    sub: `${summary.dueThisMonthCount} accounts`,
-                    tone: "text-orange-600 dark:text-orange-400",
-                  },
-                  {
-                    label: "Due in 45 days",
-                    value: formatInr(summary.dueIn45DaysAmount),
-                    sub: `${summary.dueIn45DaysCount} accounts`,
-                    tone: "text-primary",
-                  },
-                  {
-                    label: "Collection rate",
-                    value: `${summary.collectionRatePercent}%`,
-                  },
-                ].map((item) => (
-                  <div key={item.label} className="min-w-0 flex-1 px-3 py-2">
-                    <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                      {item.label}
-                    </div>
-                    <div className={cn("mt-0.5 text-sm font-semibold tabular-nums", item.tone)}>
-                      {item.value}
-                    </div>
-                    {item.sub ? (
-                      <div className={cn("text-[10px] tabular-nums", item.tone ?? "text-muted-foreground")}>
-                        {item.sub}
-                      </div>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="overflow-x-auto rounded-lg border border-border bg-card">
-              <div className="flex min-w-[720px] divide-x divide-border">
-                <div className="min-w-0 flex-1 px-3 py-2.5">
-                  <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Suspend
-                  </div>
-                  <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                    <span className="text-sm font-semibold tabular-nums text-amber-700 dark:text-amber-400">
-                      {summary.suspendedCount ?? 0}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">accounts · on hold</span>
-                  </div>
-                  <div className="mt-1.5 space-y-0.5 text-[10px] tabular-nums">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-muted-foreground">Total value</span>
-                      <span className="font-medium text-amber-700 dark:text-amber-400">
-                        {formatInr(summary.suspendedDealValue ?? 0)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="min-w-0 flex-1 px-3 py-2.5">
-                  <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Suspend &amp; Close · Sales Lost
-                  </div>
-                  <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                    <span className="text-sm font-semibold tabular-nums text-rose-700 dark:text-rose-400">
-                      {summary.salesLostCount ?? 0}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">first-time</span>
-                  </div>
-                  <div className="mt-1.5 space-y-0.5 text-[10px] tabular-nums">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-muted-foreground">Total deal value</span>
-                      <span className="font-medium text-foreground">
-                        {formatInr(summary.salesLostDealValue ?? 0)}
-                      </span>
-                    </div>
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-muted-foreground">Already paid</span>
-                      <span className="font-medium text-emerald-700 dark:text-emerald-400">
-                        {formatInr(summary.salesLostPaidAmount ?? 0)}
-                      </span>
-                    </div>
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="font-medium text-rose-700 dark:text-rose-400">Sales lost</span>
-                      <span className="font-semibold text-rose-700 dark:text-rose-400">
-                        {formatInr(summary.salesLostAmount ?? 0)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="min-w-0 flex-1 px-3 py-2.5">
-                  <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Suspend &amp; Close · Customer Lost
-                  </div>
-                  <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                    <span className="text-sm font-semibold tabular-nums text-fuchsia-700 dark:text-fuchsia-400">
-                      {summary.customerLostCount ?? 0}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">renewal</span>
-                  </div>
-                  <div className="mt-1.5 space-y-0.5 text-[10px] tabular-nums">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-muted-foreground">Total deal value</span>
-                      <span className="font-medium text-foreground">
-                        {formatInr(summary.customerLostDealValue ?? 0)}
-                      </span>
-                    </div>
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-muted-foreground">Already paid</span>
-                      <span className="font-medium text-emerald-700 dark:text-emerald-400">
-                        {formatInr(summary.customerLostPaidAmount ?? 0)}
-                      </span>
-                    </div>
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="font-medium text-fuchsia-700 dark:text-fuchsia-400">
-                        Customer lost
-                      </span>
-                      <span className="font-semibold text-fuchsia-700 dark:text-fuchsia-400">
-                        {formatInr(summary.customerLostAmount ?? 0)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
+        <PaymentsKpiCards summary={summary} loading={summaryQuery.isLoading} />
 
-        <div
-          role="tablist"
-          aria-label="Payment status filters"
-          className="mt-2 flex gap-1.5 overflow-x-auto pb-1"
-        >
-          {STATUS_TABS.map((tab) => {
-            const active = statusTab === tab.id;
-            const countKey = tab.id === "all" ? "all" : tab.id;
-            const count = statusCounts?.[countKey as keyof typeof statusCounts] ?? "—";
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() =>
-                  patchSearch({ status: tab.id === "all" ? undefined : tab.id })
-                }
-                className={cn(
-                  "flex min-w-[5.5rem] shrink-0 flex-col rounded-lg border bg-card px-2.5 py-2 text-left shadow-sm transition-all",
-                  "hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-                  active
-                    ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"
-                    : "border-border/80",
-                )}
-              >
-                <span className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                  {tab.label}
-                </span>
-                <span
-                  className={cn(
-                    "mt-1 text-lg font-semibold tabular-nums leading-none",
-                    STATUS_TAB_TONE[tab.id],
-                  )}
-                >
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        <PaymentsUpcomingPerformance
+          summary={summary}
+          loading={summaryQuery.isLoading}
+          onFilter={onStatusFilter}
+        />
 
-        <div className="mt-2">
+        <PaymentsLostSummary
+          summary={summary}
+          loading={summaryQuery.isLoading}
+          onFilter={onStatusFilter}
+        />
+
+        <PaymentsAnalytics summary={summary} loading={summaryQuery.isLoading} />
+
+        <PaymentsStatusTabs tabs={statusTabItems} active={statusTab} onChange={onStatusFilter} />
+
+        <div className="space-y-2">
           <div className="relative max-w-md">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -597,441 +397,427 @@ function CrmPaymentsPage() {
               className="h-9 pl-8 text-xs"
             />
           </div>
-        </div>
 
-        <DesignTicketFilterBar
-          className="mt-2"
-          variant="inline"
-          onClear={() =>
-            void navigate({
-              search: (prev: typeof search) => ({
-                ...prev,
-                salesManager: undefined,
-                supportManager1: undefined,
-                supportManager2: undefined,
-                dueDateFrom: undefined,
-                dueDateTo: undefined,
-                sortBy: undefined,
-                sortDir: undefined,
-                page: undefined,
-              }),
-              replace: true,
-            })
-          }
-        >
-          <DesignTicketFilterField label="Support 1" className="min-w-[8.5rem]">
-            <DesignTicketSelect
-              compact
-              value={search.supportManager1 ?? "all"}
-              onChange={(v) =>
-                patchSearch({ supportManager1: v === "all" ? undefined : v })
-              }
-              options={supportManager1Options}
-            />
-          </DesignTicketFilterField>
-          <DesignTicketFilterField label="Support 2" className="min-w-[8.5rem]">
-            <DesignTicketSelect
-              compact
-              value={search.supportManager2 ?? "all"}
-              onChange={(v) =>
-                patchSearch({ supportManager2: v === "all" ? undefined : v })
-              }
-              options={supportManager2Options}
-            />
-          </DesignTicketFilterField>
-          <DesignTicketFilterField label="Sales manager" className="min-w-[8.5rem]">
-            <DesignTicketSelect
-              compact
-              value={search.salesManager ?? "all"}
-              onChange={(v) =>
-                patchSearch({ salesManager: v === "all" ? undefined : v })
-              }
-              options={salesManagerOptions}
-            />
-          </DesignTicketFilterField>
-          <DesignTicketDateField
-            compact
-            label={statusTab === "renewal" ? "Renewal from" : "Due from"}
-            value={search.dueDateFrom ?? ""}
-            onChange={(v) => patchSearch({ dueDateFrom: v || undefined })}
-          />
-          <DesignTicketDateField
-            compact
-            label={statusTab === "renewal" ? "Renewal to" : "Due to"}
-            value={search.dueDateTo ?? ""}
-            onChange={(v) => patchSearch({ dueDateTo: v || undefined })}
-          />
-          <DesignTicketFilterField label="Sort" className="min-w-[9rem]">
-            <DesignTicketSelect
-              compact
-              value={`${search.sortBy ?? (statusTab === "renewal" ? "renewalDate" : "nextDueDate")}:${search.sortDir ?? "asc"}`}
-              onChange={(v) => {
-                const [sortBy, sortDir] = v.split(":") as [
-                  "nextDueDate" | "overdueAmount" | "collectionPercent" | "renewalDate",
-                  "asc" | "desc",
-                ];
-                patchSearch({
-                  sortBy:
-                    sortBy === "nextDueDate" && statusTab !== "renewal"
-                      ? undefined
-                      : sortBy === "renewalDate" && statusTab === "renewal"
-                        ? undefined
-                        : sortBy,
-                  sortDir: sortDir === "asc" ? undefined : sortDir,
-                });
-              }}
-              options={[
-                ...(statusTab === "renewal"
-                  ? [
-                      { value: "renewalDate:asc", label: "Renewal ↑" },
-                      { value: "renewalDate:desc", label: "Renewal ↓" },
-                    ]
-                  : [
-                      { value: "nextDueDate:asc", label: "Next due ↑" },
-                      { value: "nextDueDate:desc", label: "Next due ↓" },
-                    ]),
-                { value: "overdueAmount:desc", label: "Overdue ↓" },
-                { value: "collectionPercent:asc", label: "Collected % ↑" },
-                { value: "collectionPercent:desc", label: "Collected % ↓" },
-              ]}
-            />
-          </DesignTicketFilterField>
-        </DesignTicketFilterBar>
-      </div>
-
-      {selectedIds.size > 0 ? (
-        <div className="flex items-center justify-between gap-2 border-b border-border bg-primary/5 px-3 py-2 text-xs">
-          <span>{selectedIds.size} selected</span>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 gap-1 text-xs"
-            disabled={bulkRemind.isPending}
-            onClick={() => void handleBulkRemind()}
-          >
-            <Bell className="h-3 w-3" />
-            Send reminders to {selectedIds.size} accounts
-          </Button>
-        </div>
-      ) : null}
-
-      {listQuery.isLoading ? (
-        <p className="px-3 py-6 text-center text-sm text-muted-foreground">Loading payments…</p>
-      ) : rows.length === 0 ? (
-        <div className="border-t px-4 py-6 text-center text-sm text-muted-foreground">
-          {total === 0 && !search.search && statusTab === "all"
-            ? "No payment data yet — payments appear when accounts have deal values and installments."
-            : "No results match your filters."}
-        </div>
-      ) : (
-        <div className="bg-card [&_tbody_tr]:bg-card [&_thead]:bg-card">
-          <DataTable
-            flush
-            data={rows}
-            getRowId={(r) => r.id}
-            hideSearch
-            pageSize={Math.max(rows.length, 1)}
-            pageSizeOptions={[]}
-            density="compact"
-            expandedRowIds={expandedRowIds}
-            onRowClick={(r) => toggleExpanded(r.id)}
-            getRowClassName={(r) =>
-              isCrmAccountInRenewalWindow({ endDate: r.renewalDate })
-                ? "border-amber-500/50 bg-amber-500/[0.07] dark:bg-amber-500/10"
-                : undefined
+          <DesignTicketFilterBar
+            variant="inline"
+            onClear={() =>
+              void navigate({
+                search: (prev: typeof search) => ({
+                  ...prev,
+                  salesManager: undefined,
+                  supportManager1: undefined,
+                  supportManager2: undefined,
+                  dueDateFrom: undefined,
+                  dueDateTo: undefined,
+                  sortBy: undefined,
+                  sortDir: undefined,
+                  page: undefined,
+                }),
+                replace: true,
+              })
             }
-            selection={{
-              selectedIds,
-              onToggle: toggleSelection,
-              onToggleAll: toggleSelectionAll,
-            }}
-            renderExpandedRow={(r) => <CrmPaymentsExpandedRow row={r} search={search} />}
-            actions={(r) => (
-              <div className="flex items-center justify-end gap-1">
-                {isCrmAccountInRenewalWindow({ endDate: r.renewalDate }) ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-7 border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-800 hover:bg-amber-500/20 dark:text-amber-300"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setRenewAccountId(r.id);
-                    }}
-                  >
-                    Renew
-                  </Button>
-                ) : null}
-                {r.renewalCancelled ? null : (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-7 shrink-0 whitespace-nowrap px-2 text-[10px]"
-                    disabled={cancellingRenewal}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setRenewalCancelId(r.id);
-                    }}
-                  >
-                    Renewal cancelled
-                  </Button>
-                )}
-              </div>
-            )}
-            columns={[
-              {
-                key: "expand",
-                header: "",
-                render: (r) =>
-                  expandedRowIds.has(r.id) ? (
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  ),
-              },
-              {
-                key: "accountName",
-                header: "Account",
-                render: (r) => (
-                  <div>
-                    <Link
-                      to="/crm/accounts/$accountId"
-                      params={{ accountId: r.id }}
-                      className="font-medium hover:underline"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {r.accountName}
-                    </Link>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                      <span className="text-[10px] text-muted-foreground">
-                        {crmAccountStatusLabel(r.accountStatus)}
-                      </span>
-                      {r.lostKind ? (
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "h-5 px-1.5 text-[9px] font-medium",
-                            r.lostKind === "sales_lost"
-                              ? "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-400"
-                              : "border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400",
-                          )}
+          >
+            <DesignTicketFilterField label="Support 1" className="min-w-[8.5rem]">
+              <DesignTicketSelect
+                compact
+                value={search.supportManager1 ?? "all"}
+                onChange={(v) =>
+                  patchSearch({ supportManager1: v === "all" ? undefined : v })
+                }
+                options={supportManager1Options}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketFilterField label="Support 2" className="min-w-[8.5rem]">
+              <DesignTicketSelect
+                compact
+                value={search.supportManager2 ?? "all"}
+                onChange={(v) =>
+                  patchSearch({ supportManager2: v === "all" ? undefined : v })
+                }
+                options={supportManager2Options}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketFilterField label="Sales manager" className="min-w-[8.5rem]">
+              <DesignTicketSelect
+                compact
+                value={search.salesManager ?? "all"}
+                onChange={(v) =>
+                  patchSearch({ salesManager: v === "all" ? undefined : v })
+                }
+                options={salesManagerOptions}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketDateField
+              compact
+              label={statusTab === "renewal" ? "Renewal from" : "Due from"}
+              value={search.dueDateFrom ?? ""}
+              onChange={(v) => patchSearch({ dueDateFrom: v || undefined })}
+            />
+            <DesignTicketDateField
+              compact
+              label={statusTab === "renewal" ? "Renewal to" : "Due to"}
+              value={search.dueDateTo ?? ""}
+              onChange={(v) => patchSearch({ dueDateTo: v || undefined })}
+            />
+            <DesignTicketFilterField label="Sort" className="min-w-[9rem]">
+              <DesignTicketSelect
+                compact
+                value={`${search.sortBy ?? (statusTab === "renewal" ? "renewalDate" : "nextDueDate")}:${search.sortDir ?? "asc"}`}
+                onChange={(v) => {
+                  const [sortBy, sortDir] = v.split(":") as [
+                    "nextDueDate" | "overdueAmount" | "collectionPercent" | "renewalDate",
+                    "asc" | "desc",
+                  ];
+                  patchSearch({
+                    sortBy:
+                      sortBy === "nextDueDate" && statusTab !== "renewal"
+                        ? undefined
+                        : sortBy === "renewalDate" && statusTab === "renewal"
+                          ? undefined
+                          : sortBy,
+                    sortDir: sortDir === "asc" ? undefined : sortDir,
+                  });
+                }}
+                options={[
+                  ...(statusTab === "renewal"
+                    ? [
+                        { value: "renewalDate:asc", label: "Renewal ↑" },
+                        { value: "renewalDate:desc", label: "Renewal ↓" },
+                      ]
+                    : [
+                        { value: "nextDueDate:asc", label: "Next due ↑" },
+                        { value: "nextDueDate:desc", label: "Next due ↓" },
+                      ]),
+                  { value: "overdueAmount:desc", label: "Overdue ↓" },
+                  { value: "collectionPercent:asc", label: "Collected % ↑" },
+                  { value: "collectionPercent:desc", label: "Collected % ↓" },
+                ]}
+              />
+            </DesignTicketFilterField>
+          </DesignTicketFilterBar>
+        </div>
+
+        {selectedIds.size > 0 ? (
+          <div className="flex items-center justify-between gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs">
+            <span>{selectedIds.size} selected</span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1 text-xs"
+              disabled={bulkRemind.isPending}
+              onClick={() => void handleBulkRemind()}
+            >
+              <Bell className="h-3 w-3" />
+              Send reminders to {selectedIds.size} accounts
+            </Button>
+          </div>
+        ) : null}
+
+        {listQuery.isLoading ? (
+          <p className="rounded-xl border bg-card px-3 py-8 text-center text-sm text-muted-foreground">
+            Loading payments…
+          </p>
+        ) : rows.length === 0 ? (
+          <div className="rounded-xl border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
+            {total === 0 && !search.search && statusTab === "all"
+              ? "No payment data yet — payments appear when accounts have deal values and installments."
+              : "No results match your filters."}
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm [&_tbody_tr]:bg-card [&_thead]:bg-card">
+            <DataTable
+              flush
+              data={rows}
+              getRowId={(r) => r.id}
+              hideSearch
+              pageSize={Math.max(rows.length, 1)}
+              pageSizeOptions={[]}
+              density="compact"
+              expandedRowIds={expandedRowIds}
+              onRowClick={(r) => toggleExpanded(r.id)}
+              getRowClassName={(r) =>
+                isCrmAccountInRenewalWindow({ endDate: r.renewalDate })
+                  ? "border-amber-500/50 bg-amber-500/[0.07] dark:bg-amber-500/10"
+                  : undefined
+              }
+              selection={{
+                selectedIds,
+                onToggle: toggleSelection,
+                onToggleAll: toggleSelectionAll,
+              }}
+              renderExpandedRow={(r) => <CrmPaymentsExpandedRow row={r} search={search} />}
+              actions={(r) => {
+                const canRenew = isCrmAccountInRenewalWindow({ endDate: r.renewalDate });
+                return (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0"
+                        aria-label="Row actions"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44" onClick={(e) => e.stopPropagation()}>
+                      {canRenew ? (
+                        <DropdownMenuItem
+                          onClick={() => setRenewAccountId(r.id)}
+                          className="text-xs"
                         >
-                          {r.lostKind === "sales_lost" ? "Sales Lost" : "Customer Lost"}
-                          {typeof r.lostValue === "number"
-                            ? ` · ${formatInr(r.lostValue)}`
-                            : ""}
-                        </Badge>
+                          Renew
+                        </DropdownMenuItem>
                       ) : null}
-                    </div>
-                    {crmRenewalWindowLabel({ endDate: r.renewalDate }) ? (
-                      <div className="mt-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
-                        {crmRenewalWindowLabel({ endDate: r.renewalDate })}
-                      </div>
-                    ) : null}
-                  </div>
-                ),
-              },
-              {
-                key: "supportManager1",
-                header: "Support 1",
-                render: (r) => managerCell(r.supportManager1),
-              },
-              {
-                key: "supportManager2",
-                header: "Support 2",
-                render: (r) => managerCell(r.supportManager2),
-              },
-              {
-                key: "salesManager",
-                header: "Sales manager",
-                render: (r) => managerCell(r.salesManager),
-              },
-              {
-                key: "dealDate",
-                header: "Deal date",
-                render: (r) =>
-                  r.dealDate ? (
-                    <span className="text-xs tabular-nums text-muted-foreground">
-                      {formatDate(r.dealDate)}
-                    </span>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">—</span>
-                  ),
-              },
-              {
-                key: "usersPurchased",
-                header: "Users",
-                render: (r) =>
-                  r.usersPurchased != null ? (
-                    <span className="tabular-nums text-xs">{r.usersPurchased}</span>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">—</span>
-                  ),
-              },
-              {
-                key: "totalDealValue",
-                header: "Deal value",
-                render: (r) => (
-                  <span className="tabular-nums text-xs">{formatInr(r.totalDealValue)}</span>
-                ),
-              },
-              {
-                key: "paymentReceived",
-                header: "Received",
-                render: (r) => (
-                  <div className="text-xs">
-                    <div className="tabular-nums">{formatInr(r.paymentReceived)}</div>
-                    {r.renewalAmount > 0.01 ? (
-                      <div className="text-[10px] text-violet-600 dark:text-violet-400">
-                        Renewal {formatInr(r.renewalAmount)}
-                      </div>
-                    ) : null}
-                  </div>
-                ),
-              },
-              {
-                key: "pendingAmount",
-                header: "Pending",
-                render: (r) => (
-                  <span className="tabular-nums text-xs">{formatInr(r.pendingAmount)}</span>
-                ),
-              },
-              {
-                key: "nextDue",
-                header: statusTab === "renewal" ? "Renewal date" : "Next due",
-                render: (r) =>
-                  statusTab === "renewal" ? (
-                    r.renewalDate ? (
-                      <span className="text-xs tabular-nums">{formatDate(r.renewalDate)}</span>
+                      {r.renewalCancelled ? null : (
+                        <DropdownMenuItem
+                          disabled={cancellingRenewal}
+                          onClick={() => setRenewalCancelId(r.id)}
+                          className="text-xs"
+                        >
+                          Renewal cancelled
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem asChild className="text-xs">
+                        <Link to="/crm/accounts/$accountId" params={{ accountId: r.id }}>
+                          View account
+                        </Link>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                );
+              }}
+              columns={[
+                {
+                  key: "expand",
+                  header: "",
+                  render: (r) =>
+                    expandedRowIds.has(r.id) ? (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
                     ) : (
-                      <span className="text-xs text-muted-foreground">No end date</span>
-                    )
-                  ) : r.nextDueInstallment ? (
-                    <div className="text-xs">
-                      <div className="tabular-nums font-medium">
-                        {formatInr(r.nextDueInstallment.remainingAmount)}
-                        {r.nextDueInstallment.remainingAmount < r.nextDueInstallment.amount ? (
-                          <span className="ml-1 font-normal text-muted-foreground">
-                            / {formatInr(r.nextDueInstallment.amount)}
-                          </span>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    ),
+                },
+                {
+                  key: "accountName",
+                  header: "Account",
+                  render: (r) => (
+                    <div>
+                      <Link
+                        to="/crm/accounts/$accountId"
+                        params={{ accountId: r.id }}
+                        className="font-medium hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {r.accountName}
+                      </Link>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                        <span className="text-[10px] text-muted-foreground">
+                          {crmAccountStatusLabel(r.accountStatus)}
+                        </span>
+                        {r.lostKind ? (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "h-5 px-1.5 text-[9px] font-medium",
+                              r.lostKind === "sales_lost"
+                                ? "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-400"
+                                : "border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400",
+                            )}
+                          >
+                            {r.lostKind === "sales_lost" ? "Sales Lost" : "Customer Lost"}
+                            {typeof r.lostValue === "number"
+                              ? ` · ${formatPaymentsInr(r.lostValue)}`
+                              : ""}
+                          </Badge>
                         ) : null}
                       </div>
-                      <div className="text-[10px] text-muted-foreground">
-                        {formatDate(r.nextDueInstallment.dueDate)}
-                      </div>
+                      {crmRenewalWindowLabel({ endDate: r.renewalDate }) ? (
+                        <div className="mt-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+                          {crmRenewalWindowLabel({ endDate: r.renewalDate })}
+                        </div>
+                      ) : null}
                     </div>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">—</span>
                   ),
-              },
-              {
-                key: "overdue",
-                header: "Overdue",
-                render: (r) =>
-                  r.overdueAmount > 0 ? (
-                    <Badge
-                      variant="outline"
-                      className="rounded-md border-destructive/30 bg-destructive/10 text-[10px] text-destructive"
-                    >
-                      {formatInr(r.overdueAmount)}
-                      {r.overdueDays != null ? ` · ${r.overdueDays}d` : ""}
-                    </Badge>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">—</span>
-                  ),
-              },
-              {
-                key: "collectionPercent",
-                header: "Collected",
-                render: (r) => (
-                  <div className="min-w-[5rem]">
-                    <div className="mb-0.5 text-[10px] tabular-nums text-muted-foreground">
-                      {Math.min(r.collectionPercent, 100)}%
-                      {r.renewalAmount > 0.01 ? " + renewal" : ""}
-                    </div>
-                    <ProgressBar value={Math.min(r.collectionPercent, 100)} className="h-1.5" />
-                  </div>
-                ),
-              },
-              {
-                key: "paymentStatus",
-                header: "Status",
-                render: (r) => {
-                  const badge = paymentStatusBadge(r.paymentStatus);
-                  return (
-                    <Badge
-                      variant="outline"
-                      className={cn("rounded-md text-[10px] font-medium", badge.className)}
-                    >
-                      {badge.label}
-                    </Badge>
-                  );
                 },
-              },
-            ]}
-          />
+                {
+                  key: "totalDealValue",
+                  header: "Deal value",
+                  render: (r) => (
+                    <span className="tabular-nums text-xs">
+                      {formatPaymentsInr(r.totalDealValue)}
+                    </span>
+                  ),
+                },
+                {
+                  key: "payment",
+                  header: "Payment",
+                  render: (r) => (
+                    <div className="text-xs">
+                      <div className="tabular-nums text-emerald-700 dark:text-emerald-400">
+                        {formatPaymentsInr(r.paymentReceived)}
+                      </div>
+                      <div className="tabular-nums text-muted-foreground">
+                        {formatPaymentsInr(r.pendingAmount)} pending
+                      </div>
+                      {r.renewalAmount > 0.01 ? (
+                        <div className="text-[10px] text-violet-600 dark:text-violet-400">
+                          Renewal {formatPaymentsInr(r.renewalAmount)}
+                        </div>
+                      ) : null}
+                    </div>
+                  ),
+                },
+                {
+                  key: "nextDue",
+                  header: statusTab === "renewal" ? "Renewal date" : "Next due",
+                  render: (r) =>
+                    statusTab === "renewal" ? (
+                      r.renewalDate ? (
+                        <span className="text-xs tabular-nums">{formatDate(r.renewalDate)}</span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">No end date</span>
+                      )
+                    ) : r.nextDueInstallment ? (
+                      <div className="text-xs">
+                        <div className="tabular-nums font-medium">
+                          {formatPaymentsInr(r.nextDueInstallment.remainingAmount)}
+                          {r.nextDueInstallment.remainingAmount < r.nextDueInstallment.amount ? (
+                            <span className="ml-1 font-normal text-muted-foreground">
+                              / {formatPaymentsInr(r.nextDueInstallment.amount)}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {formatDate(r.nextDueInstallment.dueDate)}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    ),
+                },
+                {
+                  key: "overdue",
+                  header: "Overdue",
+                  render: (r) =>
+                    r.overdueAmount > 0 ? (
+                      <div className="text-xs">
+                        <div className="tabular-nums font-medium text-destructive">
+                          {formatPaymentsInr(r.overdueAmount)}
+                        </div>
+                        {r.overdueDays != null ? (
+                          <div className="text-[10px] text-destructive/80">{r.overdueDays}d overdue</div>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    ),
+                },
+                {
+                  key: "collectionPercent",
+                  header: "Progress",
+                  render: (r) => (
+                    <div className="min-w-[5.5rem]">
+                      <div className="mb-0.5 text-[10px] tabular-nums text-muted-foreground">
+                        {Math.min(r.collectionPercent, 100)}%
+                        {r.renewalAmount > 0.01 ? " + renewal" : ""}
+                      </div>
+                      <ProgressBar value={Math.min(r.collectionPercent, 100)} className="h-1.5" />
+                    </div>
+                  ),
+                },
+                {
+                  key: "salesManager",
+                  header: "Executive",
+                  render: (r) =>
+                    r.salesManager?.trim() ? (
+                      <span className="text-xs">{r.salesManager}</span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    ),
+                },
+                {
+                  key: "paymentStatus",
+                  header: "Status",
+                  render: (r) => {
+                    const badge = paymentStatusBadge(r.paymentStatus);
+                    return (
+                      <Badge
+                        variant="outline"
+                        className={cn("rounded-full px-2 text-[10px] font-medium", badge.className)}
+                      >
+                        {badge.label}
+                      </Badge>
+                    );
+                  },
+                },
+              ]}
+            />
 
-          {total > 0 ? (
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-3 pb-3 text-[11px] text-muted-foreground">
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <span className="min-w-0 tabular-nums">
-                  Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total}
-                </span>
-                <label className="inline-flex items-center gap-1.5">
-                  <span>Rows</span>
-                  <select
-                    value={pageSize}
-                    onChange={(e) => {
-                      const next = Number(e.target.value);
-                      try {
-                        window.localStorage.setItem("buildesk.table.pageSize", String(next));
-                      } catch {
-                        /* ignore */
-                      }
-                      patchSearch({
-                        pageSize: next === 15 ? undefined : next,
-                        page: undefined,
-                      });
-                    }}
-                    className="h-7 rounded-md border border-input bg-background px-1.5 text-[11px] text-foreground outline-none focus:ring-2 focus:ring-ring/40"
-                    aria-label="Rows per page"
+            {total > 0 ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 px-3 py-2.5 text-[11px] text-muted-foreground">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <span className="min-w-0 tabular-nums">
+                    Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total}
+                  </span>
+                  <label className="inline-flex items-center gap-1.5">
+                    <span>Rows</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => {
+                        const next = Number(e.target.value);
+                        try {
+                          window.localStorage.setItem("buildesk.table.pageSize", String(next));
+                        } catch {
+                          /* ignore */
+                        }
+                        patchSearch({
+                          pageSize: next === 15 ? undefined : next,
+                          page: undefined,
+                        });
+                      }}
+                      className="h-7 rounded-md border border-input bg-background px-1.5 text-[11px] text-foreground outline-none focus:ring-2 focus:ring-ring/40"
+                      aria-label="Rows per page"
+                    >
+                      {[15, 50, 100].map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <div className="flex shrink-0 gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-xs"
+                    disabled={page <= 1}
+                    onClick={() => patchSearch({ page: page <= 2 ? undefined : page - 1 })}
                   >
-                    {[15, 50, 100].map((n) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    Prev
+                  </Button>
+                  <span className="flex items-center px-2 tabular-nums">
+                    {page} / {totalPages}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-xs"
+                    disabled={page >= totalPages}
+                    onClick={() => patchSearch({ page: page + 1 })}
+                  >
+                    Next
+                  </Button>
+                </div>
               </div>
-              <div className="flex shrink-0 gap-1">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 px-2 text-xs"
-                  disabled={page <= 1}
-                  onClick={() => patchSearch({ page: page <= 2 ? undefined : page - 1 })}
-                >
-                  Prev
-                </Button>
-                <span className="flex items-center px-2 tabular-nums">
-                  {page} / {totalPages}
-                </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 px-2 text-xs"
-                  disabled={page >= totalPages}
-                  onClick={() => patchSearch({ page: page + 1 })}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          ) : null}
-        </div>
-      )}
+            ) : null}
+          </div>
+        )}
+      </div>
+
       <CrmAccountPaymentBulkUpdateModal open={bulkPaymentOpen} onOpenChange={setBulkPaymentOpen} />
       <CrmExecutivePaymentReminderDialog
         open={executiveDigestOpen}
@@ -1046,7 +832,7 @@ function CrmPaymentsPage() {
         title="Mark renewal cancelled?"
         description={
           renewalCancelId
-            ? `${rows.find((row) => row.id === renewalCancelId)?.accountName ?? "This account"} will be Suspend and Close. The full deal value (${formatInr(rows.find((row) => row.id === renewalCancelId)?.totalDealValue ?? 0)}) is counted as Customer Lost.`
+            ? `${rows.find((row) => row.id === renewalCancelId)?.accountName ?? "This account"} will be Suspend and Close. The full deal value (${formatPaymentsInr(rows.find((row) => row.id === renewalCancelId)?.totalDealValue ?? 0)}) is counted as Customer Lost.`
             : undefined
         }
         confirmLabel="Renewal cancelled"

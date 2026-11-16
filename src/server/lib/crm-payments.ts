@@ -739,6 +739,36 @@ function countByStatusTab(rows: PaymentListItem[], filter: PaymentListFilterStat
   return applyPaymentsStatusFilter(rows, filter, today).length;
 }
 
+/** Last 6 calendar months of collected amounts from payment_transactions (real ledger only). */
+function buildCollectionTrend(db: ReturnType<typeof getDb>) {
+  const now = new Date();
+  const months: { month: string; label: string; collected: number }[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const label = d.toLocaleString("en-IN", { month: "short", year: "2-digit" });
+    months.push({ month, label, collected: 0 });
+  }
+  const monthSet = new Set(months.map((m) => m.month));
+  const txs = db
+    .select({
+      paidDate: t.paymentTransactions.paidDate,
+      amount: t.paymentTransactions.amount,
+    })
+    .from(t.paymentTransactions)
+    .all();
+  let any = false;
+  for (const tx of txs) {
+    const key = (tx.paidDate ?? "").slice(0, 7);
+    if (!monthSet.has(key)) continue;
+    const bucket = months.find((m) => m.month === key);
+    if (!bucket) continue;
+    bucket.collected = roundMoney(bucket.collected + (Number(tx.amount) || 0));
+    any = true;
+  }
+  return any ? months : [];
+}
+
 export function summarizePaymentList(
   db: ReturnType<typeof getDb>,
   filters: PaymentsListFilters,
@@ -823,6 +853,23 @@ export function summarizePaymentList(
     customerLostRows.reduce((s, r) => s + r.paymentReceived, 0),
   );
 
+  const statusCounts = {
+    all: countByStatusTab(countScope, "all", today),
+    overdue: countByStatusTab(countScope, "overdue", today),
+    due_this_week: countByStatusTab(countScope, "due_this_week", today),
+    due_this_month: countByStatusTab(countScope, "due_this_month", today),
+    due_in_45_days: countByStatusTab(countScope, "due_in_45_days", today),
+    due_in_90_days: countByStatusTab(countScope, "due_in_90_days", today),
+    upcoming: countByStatusTab(countScope, "upcoming", today),
+    fully_paid: countByStatusTab(countScope, "fully_paid", today),
+    not_started: countByStatusTab(countScope, "not_started", today),
+    lost: countByStatusTab(countScope, "lost", today),
+    renewal: countByStatusTab(countScope, "renewal", today),
+    suspended: countByStatusTab(countScope, "suspended", today),
+    suspend_and_close: countByStatusTab(countScope, "suspend_and_close", today),
+    inactive: countByStatusTab(countScope, "inactive", today),
+  };
+
   return {
     totalContractValue,
     totalReceived,
@@ -836,6 +883,7 @@ export function summarizePaymentList(
     dueIn45DaysAmount,
     dueIn45DaysCount,
     collectionRatePercent,
+    accountCount: statusCounts.all,
     suspendedCount: suspendedRows.length,
     suspendedDealValue,
     suspendAndCloseCount: suspendAndCloseRows.length,
@@ -848,22 +896,8 @@ export function summarizePaymentList(
     customerLostAmount,
     customerLostDealValue,
     customerLostPaidAmount,
-    statusCounts: {
-      all: countByStatusTab(countScope, "all", today),
-      overdue: countByStatusTab(countScope, "overdue", today),
-      due_this_week: countByStatusTab(countScope, "due_this_week", today),
-      due_this_month: countByStatusTab(countScope, "due_this_month", today),
-      due_in_45_days: countByStatusTab(countScope, "due_in_45_days", today),
-      due_in_90_days: countByStatusTab(countScope, "due_in_90_days", today),
-      upcoming: countByStatusTab(countScope, "upcoming", today),
-      fully_paid: countByStatusTab(countScope, "fully_paid", today),
-      not_started: countByStatusTab(countScope, "not_started", today),
-      lost: countByStatusTab(countScope, "lost", today),
-      renewal: countByStatusTab(countScope, "renewal", today),
-      suspended: countByStatusTab(countScope, "suspended", today),
-      suspend_and_close: countByStatusTab(countScope, "suspend_and_close", today),
-      inactive: countByStatusTab(countScope, "inactive", today),
-    },
+    collectionTrend: buildCollectionTrend(db),
+    statusCounts,
   };
 }
 
