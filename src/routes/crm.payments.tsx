@@ -455,38 +455,86 @@ function CrmPaymentsPage() {
               </div>
             </div>
             <div className="overflow-x-auto rounded-lg border border-border bg-card">
-              <div className="flex min-w-[480px] divide-x divide-border">
-                <div className="min-w-0 flex-1 px-3 py-2">
+              <div className="flex min-w-[720px] divide-x divide-border">
+                <div className="min-w-0 flex-1 px-3 py-2.5">
                   <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Account status · Suspend
+                    Suspend
                   </div>
-                  <div className="mt-0.5 text-sm font-semibold tabular-nums text-amber-700 dark:text-amber-400">
-                    {summary.suspendedCount ?? 0}
+                  <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                    <span className="text-sm font-semibold tabular-nums text-amber-700 dark:text-amber-400">
+                      {summary.suspendedCount ?? 0}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">accounts · on hold</span>
                   </div>
-                  <div className="text-[10px] tabular-nums text-amber-700 dark:text-amber-400">
-                    On hold — not lost
-                  </div>
-                </div>
-                <div className="min-w-0 flex-1 px-3 py-2">
-                  <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Account status · Suspend and Close
-                  </div>
-                  <div className="mt-0.5 text-sm font-semibold tabular-nums text-destructive">
-                    {summary.suspendAndCloseCount ?? 0}
-                  </div>
-                  <div className="mt-0.5 space-y-0.5 text-[10px] tabular-nums">
-                    <div className="text-rose-700 dark:text-rose-400">
-                      Sales Lost {formatInr(summary.salesLostAmount ?? 0)}
-                      <span className="text-muted-foreground">
-                        {" "}
-                        · {summary.salesLostCount ?? 0} first-time
+                  <div className="mt-1.5 space-y-0.5 text-[10px] tabular-nums">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-muted-foreground">Total value</span>
+                      <span className="font-medium text-amber-700 dark:text-amber-400">
+                        {formatInr(summary.suspendedDealValue ?? 0)}
                       </span>
                     </div>
-                    <div className="text-fuchsia-700 dark:text-fuchsia-400">
-                      Customer Lost {formatInr(summary.customerLostAmount ?? 0)}
-                      <span className="text-muted-foreground">
-                        {" "}
-                        · {summary.customerLostCount ?? 0} renewal
+                  </div>
+                </div>
+                <div className="min-w-0 flex-1 px-3 py-2.5">
+                  <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Suspend &amp; Close · Sales Lost
+                  </div>
+                  <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                    <span className="text-sm font-semibold tabular-nums text-rose-700 dark:text-rose-400">
+                      {summary.salesLostCount ?? 0}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">first-time</span>
+                  </div>
+                  <div className="mt-1.5 space-y-0.5 text-[10px] tabular-nums">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-muted-foreground">Total deal value</span>
+                      <span className="font-medium text-foreground">
+                        {formatInr(summary.salesLostDealValue ?? 0)}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-muted-foreground">Already paid</span>
+                      <span className="font-medium text-emerald-700 dark:text-emerald-400">
+                        {formatInr(summary.salesLostPaidAmount ?? 0)}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="font-medium text-rose-700 dark:text-rose-400">Sales lost</span>
+                      <span className="font-semibold text-rose-700 dark:text-rose-400">
+                        {formatInr(summary.salesLostAmount ?? 0)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="min-w-0 flex-1 px-3 py-2.5">
+                  <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Suspend &amp; Close · Customer Lost
+                  </div>
+                  <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                    <span className="text-sm font-semibold tabular-nums text-fuchsia-700 dark:text-fuchsia-400">
+                      {summary.customerLostCount ?? 0}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">renewal</span>
+                  </div>
+                  <div className="mt-1.5 space-y-0.5 text-[10px] tabular-nums">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-muted-foreground">Total deal value</span>
+                      <span className="font-medium text-foreground">
+                        {formatInr(summary.customerLostDealValue ?? 0)}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-muted-foreground">Already paid</span>
+                      <span className="font-medium text-emerald-700 dark:text-emerald-400">
+                        {formatInr(summary.customerLostPaidAmount ?? 0)}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="font-medium text-fuchsia-700 dark:text-fuchsia-400">
+                        Customer lost
+                      </span>
+                      <span className="font-semibold text-fuchsia-700 dark:text-fuchsia-400">
+                        {formatInr(summary.customerLostAmount ?? 0)}
                       </span>
                     </div>
                   </div>

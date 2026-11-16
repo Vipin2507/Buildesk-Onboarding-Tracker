@@ -807,6 +807,21 @@ export function summarizePaymentList(
   const customerLostAmount = roundMoney(
     customerLostRows.reduce((s, r) => s + (r.lostValue ?? 0), 0),
   );
+  const suspendedDealValue = roundMoney(
+    suspendedRows.reduce((s, r) => s + r.totalDealValue, 0),
+  );
+  const salesLostDealValue = roundMoney(
+    salesLostRows.reduce((s, r) => s + r.totalDealValue, 0),
+  );
+  const salesLostPaidAmount = roundMoney(
+    salesLostRows.reduce((s, r) => s + r.paymentReceived, 0),
+  );
+  const customerLostDealValue = roundMoney(
+    customerLostRows.reduce((s, r) => s + r.totalDealValue, 0),
+  );
+  const customerLostPaidAmount = roundMoney(
+    customerLostRows.reduce((s, r) => s + r.paymentReceived, 0),
+  );
 
   return {
     totalContractValue,
@@ -822,12 +837,17 @@ export function summarizePaymentList(
     dueIn45DaysCount,
     collectionRatePercent,
     suspendedCount: suspendedRows.length,
+    suspendedDealValue,
     suspendAndCloseCount: suspendAndCloseRows.length,
     inactiveCount: inactiveRows.length,
     salesLostCount: salesLostRows.length,
     salesLostAmount,
+    salesLostDealValue,
+    salesLostPaidAmount,
     customerLostCount: customerLostRows.length,
     customerLostAmount,
+    customerLostDealValue,
+    customerLostPaidAmount,
     statusCounts: {
       all: countByStatusTab(countScope, "all", today),
       overdue: countByStatusTab(countScope, "overdue", today),
