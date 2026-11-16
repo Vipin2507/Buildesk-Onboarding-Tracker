@@ -168,12 +168,17 @@ function MessageBubble({
 
 function SystemEntry({ msg }: { msg: DesignTicketMessage }) {
   return (
-    <div className="flex justify-center py-1">
-      <span className="max-w-[90%] rounded-full bg-muted px-3 py-1 text-center text-[11px] text-muted-foreground">
+    <motion.div
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.2, ease: TICKET_EASE }}
+      className="flex justify-center py-1.5"
+    >
+      <span className="max-w-[92%] rounded-full border border-border/70 bg-muted/70 px-3 py-1 text-center text-[11px] leading-snug text-muted-foreground shadow-sm">
         {msg.message}
         <span className="ml-1.5 tabular-nums opacity-70">{formatTime(msg.createdAt)}</span>
       </span>
-    </div>
+    </motion.div>
   );
 }
 
@@ -275,7 +280,7 @@ export function DesignTicketThread({
   const messageCount = sorted.filter((m) => m.kind !== "system").length;
 
   return (
-    <div className="card-soft flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm">
       <AnimatePresence>
         {showResolvedBanner && ticket.status === "resolved" ? (
           <motion.div
@@ -290,16 +295,16 @@ export function DesignTicketThread({
         ) : null}
       </AnimatePresence>
 
-      <div className="flex items-center justify-between gap-2 border-b border-border/70 px-3 py-2">
+      <div className="flex items-center justify-between gap-2 border-b border-border/70 bg-gradient-to-r from-sky-500/[0.06] to-transparent px-3.5 py-2.5">
         <h2 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           Conversation
         </h2>
-        <span className="text-[11px] tabular-nums text-muted-foreground">
+        <span className="rounded-full bg-muted/80 px-2 py-0.5 text-[11px] tabular-nums text-muted-foreground">
           {messageCount} {messageCount === 1 ? "message" : "messages"}
         </span>
       </div>
 
-      <div className="min-h-[220px] max-h-[min(48dvh,480px)] flex-1 space-y-1.5 overflow-y-auto bg-muted/15 px-3 py-3 sm:min-h-[280px]">
+      <div className="min-h-[240px] max-h-[min(52dvh,560px)] flex-1 space-y-2 overflow-y-auto bg-gradient-to-b from-muted/25 to-muted/10 px-3 py-3 sm:min-h-[300px]">
         {sorted.length === 0 ? (
           <p className="py-10 text-center text-sm text-muted-foreground">
             No messages yet.{" "}
@@ -356,7 +361,7 @@ export function DesignTicketThread({
             </div>
           ) : null}
 
-          <div className="flex items-end gap-1.5 rounded-xl border border-border bg-background p-1 focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/15">
+          <div className="flex items-end gap-1.5 rounded-xl border border-border bg-background p-1 shadow-sm transition-shadow focus-within:border-primary/40 focus-within:shadow-md focus-within:ring-2 focus-within:ring-primary/15">
             <div className="relative mb-0.5 flex shrink-0 items-center">
               <label
                 className={cn(

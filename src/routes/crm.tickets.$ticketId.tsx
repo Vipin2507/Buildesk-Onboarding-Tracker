@@ -1,10 +1,17 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Building2, History } from "lucide-react";
+import { ArrowLeft, Building2, Copy } from "lucide-react";
 import { toast } from "sonner";
 
 import { CrmTicketsNav } from "@/components/crm/crm-tickets-nav";
+import { CrmTicketDetailMeta } from "@/components/crm/tickets/crm-ticket-detail-meta";
+import {
+  daysOpenForTicket,
+  formatDaysOpen,
+  isTicketAging,
+  TICKET_AGING_DAYS,
+} from "@/components/crm/tickets/crm-tickets-format";
 import { DesignTicketThread } from "@/components/design-ticket/design-ticket-thread";
 import {
   DesignTicketPriorityChip,
@@ -18,6 +25,7 @@ import {
 } from "@/components/design-ticket/design-ticket-fields";
 import {
   DesignTicketDetailSkeleton,
+  TICKET_EASE,
   ticketPageVariants,
   ticketSectionVariants,
 } from "@/components/design-ticket/design-ticket-shared";
@@ -88,13 +96,14 @@ function CrmPortalTicketDetail() {
 
   const actorName = currentUser?.name ?? "Team";
 
-  const assigneeOptions = useMemo(
-    () => [
-      ...users.filter((u) => u.active).map((u) => ({ id: u.id, name: u.name })),
-      ...employees.map((e) => ({ id: e.id, name: e.name })),
-    ],
-    [users, employees],
-  );
+  const assigneeOptions = useMemo(() => {
+    const fromUsers = users.filter((u) => u.active).map((u) => ({ id: u.id, name: u.name }));
+    const seen = new Set(fromUsers.map((u) => u.id));
+    const fromEmployees = employees
+      .filter((e) => !seen.has(e.id))
+      .map((e) => ({ id: e.id, name: e.name }));
+    return [...fromUsers, ...fromEmployees].sort((a, b) => a.name.localeCompare(b.name));
+  }, [users, employees]);
 
   if (loading && !ticket) {
     return (
@@ -113,9 +122,10 @@ function CrmPortalTicketDetail() {
 
   const account = accounts.find((a) => a.id === ticket.companyId);
   const accountLabel = account?.name ?? crmAccountName(ticket.companyId);
-  const statusHistory = ticket.messages.filter((m) => m.kind === "system");
   const assigneeName =
     assigneeOptions.find((o) => o.id === ticket.assigneeId)?.name ?? "Unassigned";
+  const daysOpen = daysOpenForTicket(ticket);
+  const aging = isTicketAging(ticket, daysOpen);
 
   const statusOptions = DESIGN_TICKET_STATUSES.map((s) => ({
     value: s,
@@ -132,102 +142,144 @@ function CrmPortalTicketDetail() {
     ...assigneeOptions.map((o) => ({ value: o.id, label: o.name })),
   ];
 
+  function copyTicketId() {
+    void navigator.clipboard.writeText(ticket.ticketNumber);
+    toast.success("Ticket ID copied");
+  }
+
   return (
     <PageWrap>
       <CrmTicketsNav />
 
-      <motion.div variants={ticketPageVariants} initial="hidden" animate="show" className="space-y-3">
+      <motion.div variants={ticketPageVariants} initial="hidden" animate="show" className="space-y-3 pb-4">
         <motion.div variants={ticketSectionVariants}>
           <Button
             variant="ghost"
             size="sm"
-            className="-ml-2 h-7 gap-1.5 px-2 text-xs text-muted-foreground"
+            className="-ml-2 h-8 gap-1.5 px-2 text-xs font-medium text-primary hover:bg-primary/10 hover:text-primary"
             onClick={() => void navigate({ to: "/crm/tickets" })}
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            All Tickets
+            Back to All Tickets
           </Button>
         </motion.div>
 
-        {/* Title + account + inline controls */}
         <motion.section
           variants={ticketSectionVariants}
-          className="card-soft space-y-3 p-3 sm:p-4"
+          className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm"
         >
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0 flex-1 space-y-1.5">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-md bg-primary/10 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-primary">
-                  {ticket.ticketNumber}
-                </span>
-                <DesignTicketStatusPill status={ticket.status} />
-                <DesignTicketPriorityChip priority={ticket.priority} />
-              </div>
-              <h1 className="text-base font-semibold leading-snug tracking-tight text-foreground sm:text-lg">
-                {ticket.subject}
-              </h1>
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                <span className="inline-flex min-w-0 items-center gap-1.5">
-                  <Building2 className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate font-medium text-foreground/80">{accountLabel}</span>
-                </span>
-                <span className="text-border">·</span>
-                <Link
-                  to="/crm/accounts/$accountId"
-                  params={{ accountId: ticket.companyId }}
-                  className="text-primary hover:underline"
-                >
-                  View account
-                </Link>
-                <span className="text-border">·</span>
-                <span>Updated {formatDate(ticket.updatedAt)}</span>
-              </div>
-            </div>
+          <div className="bg-gradient-to-br from-primary/[0.07] via-sky-500/[0.04] to-transparent p-3.5 sm:p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0 flex-1 space-y-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={copyTicketId}
+                    className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-primary transition hover:bg-primary/15"
+                    title="Copy ticket ID"
+                  >
+                    {ticket.ticketNumber}
+                    <Copy className="h-3 w-3 opacity-70" />
+                  </button>
+                  <DesignTicketStatusPill status={ticket.status} />
+                  <DesignTicketPriorityChip priority={ticket.priority} />
+                  <span
+                    className={cn(
+                      "rounded-full border px-2.5 py-0.5 text-[10px] font-semibold",
+                      aging
+                        ? "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300"
+                        : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+                    )}
+                  >
+                    {aging
+                      ? `Aging · ${formatDaysOpen(daysOpen)}`
+                      : `On track · ${formatDaysOpen(daysOpen)}`}
+                  </span>
+                </div>
 
-            <div className="grid w-full gap-2 sm:grid-cols-3 lg:w-auto lg:min-w-[22rem] lg:shrink-0">
-              <DesignTicketFilterField label="Status" compact>
-                <DesignTicketSelect
-                  compact
-                  value={ticket.status}
-                  onChange={(value) => {
-                    updateStatus(ticketId, value as DesignTicketStatus, actorName);
-                    toast.success("Status updated");
-                  }}
-                  options={statusOptions}
-                />
-              </DesignTicketFilterField>
-              <DesignTicketFilterField label="Priority" compact>
-                <DesignTicketSelect
-                  compact
-                  value={ticket.priority}
-                  onChange={(value) => {
-                    updatePriority(ticketId, value as DesignTicketPriority, actorName);
-                    toast.success("Priority updated");
-                  }}
-                  options={priorityOptions}
-                />
-              </DesignTicketFilterField>
-              <DesignTicketFilterField label="Assignee" compact>
-                <DesignTicketSelect
-                  compact
-                  value={ticket.assigneeId ?? UNASSIGNED}
-                  onChange={(value) => {
-                    const id = value === UNASSIGNED ? undefined : value;
-                    const name = assigneeOptions.find((o) => o.id === id)?.name ?? "Unassigned";
-                    assignTicket(ticketId, id, name, actorName);
-                    toast.success("Assignee updated");
-                  }}
-                  options={assigneeSelectOptions}
-                />
-              </DesignTicketFilterField>
+                <h1 className="text-lg font-semibold leading-snug tracking-tight text-foreground sm:text-xl">
+                  {ticket.subject}
+                </h1>
+
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                  <span className="inline-flex min-w-0 items-center gap-1.5">
+                    <Building2 className="h-3.5 w-3.5 shrink-0" />
+                    <Link
+                      to="/crm/accounts/$accountId"
+                      params={{ accountId: ticket.companyId }}
+                      className="truncate font-medium text-primary hover:underline"
+                    >
+                      {accountLabel}
+                    </Link>
+                  </span>
+                  <span className="text-border">·</span>
+                  <span>Updated {formatDate(ticket.updatedAt)}</span>
+                  {aging ? (
+                    <>
+                      <span className="text-border">·</span>
+                      <span className="text-rose-600 dark:text-rose-400">
+                        Open ≥ {TICKET_AGING_DAYS} days
+                      </span>
+                    </>
+                  ) : null}
+                </div>
+
+                {ticket.description?.trim() ? (
+                  <motion.p
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.28, ease: TICKET_EASE }}
+                    className="max-w-3xl whitespace-pre-wrap rounded-lg border border-border/60 bg-background/70 px-3 py-2 text-xs leading-relaxed text-foreground/85"
+                  >
+                    {ticket.description.trim()}
+                  </motion.p>
+                ) : null}
+              </div>
+
+              <div className="grid w-full gap-2 rounded-xl border border-border/70 bg-background/80 p-2.5 shadow-sm backdrop-blur-sm sm:grid-cols-3 lg:w-auto lg:min-w-[24rem] lg:shrink-0">
+                <DesignTicketFilterField label="Status" compact>
+                  <DesignTicketSelect
+                    compact
+                    value={ticket.status}
+                    onChange={(value) => {
+                      updateStatus(ticketId, value as DesignTicketStatus, actorName);
+                      toast.success("Status updated");
+                    }}
+                    options={statusOptions}
+                  />
+                </DesignTicketFilterField>
+                <DesignTicketFilterField label="Priority" compact>
+                  <DesignTicketSelect
+                    compact
+                    value={ticket.priority}
+                    onChange={(value) => {
+                      updatePriority(ticketId, value as DesignTicketPriority, actorName);
+                      toast.success("Priority updated");
+                    }}
+                    options={priorityOptions}
+                  />
+                </DesignTicketFilterField>
+                <DesignTicketFilterField label="Assignee" compact>
+                  <DesignTicketSelect
+                    compact
+                    value={ticket.assigneeId ?? UNASSIGNED}
+                    onChange={(value) => {
+                      const id = value === UNASSIGNED ? undefined : value;
+                      const name = assigneeOptions.find((o) => o.id === id)?.name ?? "Unassigned";
+                      assignTicket(ticketId, id, name, actorName);
+                      toast.success("Assignee updated");
+                    }}
+                    options={assigneeSelectOptions}
+                  />
+                </DesignTicketFilterField>
+              </div>
             </div>
           </div>
         </motion.section>
 
-        {/* Conversation + meta */}
         <motion.div
           variants={ticketSectionVariants}
-          className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_240px]"
+          className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(260px,300px)]"
         >
           <div className="flex min-h-0 min-w-0 flex-col">
             <DesignTicketThread
@@ -248,71 +300,9 @@ function CrmPortalTicketDetail() {
             />
           </div>
 
-          <aside className="card-soft space-y-0 overflow-hidden p-0 text-sm lg:sticky lg:top-20 lg:self-start">
-            <div className="border-b border-border/70 px-3 py-2">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Details
-              </h2>
-            </div>
-            <dl className="divide-y divide-border/60">
-              <MetaRow label="Created by" value={`${ticket.createdBy.name}`} hint={ticket.createdBy.type} />
-              <MetaRow label="Created" value={formatDate(ticket.createdAt)} />
-              <MetaRow label="Category" value={ticket.category ?? "—"} />
-              <MetaRow label="Assignee" value={assigneeName} />
-              <MetaRow label="Updated" value={formatDate(ticket.updatedAt)} />
-            </dl>
-
-            <div className="border-t border-border/70 px-3 py-2.5">
-              <div className="mb-2 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                <History className="h-3.5 w-3.5" />
-                Status history
-              </div>
-              {statusHistory.length === 0 ? (
-                <p className="text-[11px] text-muted-foreground">No status changes yet.</p>
-              ) : (
-                <ol className="max-h-44 space-y-1.5 overflow-y-auto">
-                  {statusHistory
-                    .slice()
-                    .reverse()
-                    .map((m) => (
-                      <li
-                        key={m.id}
-                        className="rounded-md border border-border/70 bg-muted/25 px-2 py-1.5 text-[11px]"
-                      >
-                        <div className="font-medium leading-snug text-foreground">{m.message}</div>
-                        <div className="mt-0.5 text-muted-foreground">{formatDate(m.createdAt)}</div>
-                      </li>
-                    ))}
-                </ol>
-              )}
-            </div>
-          </aside>
+          <CrmTicketDetailMeta ticket={ticket} assigneeName={assigneeName} />
         </motion.div>
       </motion.div>
     </PageWrap>
-  );
-}
-
-function MetaRow({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-3 px-3 py-2">
-      <dt className="shrink-0 text-[11px] text-muted-foreground">{label}</dt>
-      <dd className="min-w-0 text-right text-xs font-medium text-foreground">
-        <span className={cn("break-words")}>{value}</span>
-        {hint ? (
-          <span className="mt-0.5 block text-[10px] font-normal capitalize text-muted-foreground">
-            {hint}
-          </span>
-        ) : null}
-      </dd>
-    </div>
   );
 }
