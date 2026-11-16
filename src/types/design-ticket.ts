@@ -34,6 +34,8 @@ export type DesignTicket = Timestamps & {
   priority: DesignTicketPriority;
   status: DesignTicketStatus;
   assigneeId?: string;
+  /** Linked Support Desk ticket id (TKT-…), if cloned to Support Desk. */
+  supportTicketId?: string;
   createdBy: { type: "client" | "team"; name: string };
   resolvedAt?: string;
   messages: DesignTicketMessage[];

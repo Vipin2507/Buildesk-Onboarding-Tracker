@@ -271,6 +271,7 @@ export {
   updateDesignTicketPriority,
   assignDesignTicket,
   deleteDesignTicket,
+  linkDesignTicketToSupportDesk,
   listPortalDesignTickets,
   getPortalDesignTicket,
   createPortalDesignTicket,

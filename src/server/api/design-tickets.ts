@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { requirePermission } from "@/server/auth/permissions";
 import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
@@ -65,6 +66,7 @@ function mapTicket(
     priority: row.priority as DesignTicketPriority,
     status: row.status as DesignTicketStatus,
     assigneeId: row.assigneeId ?? undefined,
+    supportTicketId: row.supportTicketId ?? undefined,
     createdBy: {
       type: row.createdByType as "client" | "team",
       name: row.createdByName,
@@ -629,4 +631,60 @@ export const addPortalDesignTicketMessage = createServerFn({ method: "POST" })
       body: data.message.trim().slice(0, 120),
     });
     return updated;
+  });
+
+/** Persist DT ↔ Support Desk link after client clones a design ticket into Support Desk. */
+export const linkDesignTicketToSupportDesk = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        designTicketId: z.string().min(1),
+        supportTicketId: z.string().min(1),
+        actorName: z.string().min(1),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    requirePermission("manageTickets");
+    const db = getDb();
+    const design = db
+      .select()
+      .from(t.designTickets)
+      .where(eq(t.designTickets.id, data.designTicketId))
+      .get();
+    if (!design) throw new ApiError(404, "Design ticket not found");
+
+    const support = db.select().from(t.tickets).where(eq(t.tickets.id, data.supportTicketId)).get();
+    if (!support) throw new ApiError(404, "Support Desk ticket not found");
+
+    if (design.supportTicketId && design.supportTicketId !== data.supportTicketId) {
+      throw new ApiError(409, "Design ticket is already linked to another Support Desk ticket");
+    }
+
+    const now = nowIso();
+    db.update(t.designTickets)
+      .set({
+        supportTicketId: data.supportTicketId,
+        updatedAt: now,
+      })
+      .where(eq(t.designTickets.id, data.designTicketId))
+      .run();
+
+    db.update(t.tickets)
+      .set({
+        sourceDesignTicketId: data.designTicketId,
+        updatedAt: now,
+      })
+      .where(eq(t.tickets.id, data.supportTicketId))
+      .run();
+
+    if (!design.supportTicketId) {
+      insertSystemMessage(
+        db,
+        data.designTicketId,
+        `Linked to Support Desk ticket ${data.supportTicketId} by ${data.actorName}`,
+      );
+    }
+
+    return loadTicket(db, data.designTicketId)!;
   });

@@ -1,6 +1,11 @@
 import type { Ticket, TicketActivity, TicketStatus } from "@/types";
 import { nowIso } from "@/types";
 import { isCrmTicket } from "@/lib/crm-tickets";
+import {
+  isTicketLinkSyncing,
+  supportStatusToDesignStatus,
+  withTicketLinkSyncGuard,
+} from "@/lib/ticket-link-sync";
 import { logActivity } from "./useActivityStore";
 import { notifyInApp } from "./useNotificationStore";
 import { createStore, touch } from "./persist";
@@ -16,6 +21,16 @@ import {
   isClosedTicketStatus,
 } from "@/services/automation";
 import { dispatchCrmAutomationTrigger } from "@/services/crm-automation";
+
+function syncLinkedDesignTicketStatus(ticket: Ticket, status: TicketStatus) {
+  if (!ticket.sourceDesignTicketId || isTicketLinkSyncing()) return;
+  withTicketLinkSyncGuard(() => {
+    // Lazy import avoids circular init with useDesignTicketStore.
+    const { useDesignTicketStore } = require("./useDesignTicketStore") as typeof import("./useDesignTicketStore");
+    const designStatus = supportStatusToDesignStatus(status);
+    useDesignTicketStore.getState().updateStatus(ticket.sourceDesignTicketId!, designStatus, "Support Desk");
+  });
+}
 
 function ticketNotifyHref(ticket: Pick<Ticket, "id" | "projectId" | "companyId">) {
   return isCrmTicket(ticket as Ticket) ? `/crm/support/${ticket.id}` : `/support/${ticket.id}`;
@@ -57,7 +72,11 @@ type TicketState = {
       Partial<
         Pick<
           Ticket,
-          "backendAssigned" | "resolutionStatus" | "actionTaken" | "resolutionNotes"
+          | "backendAssigned"
+          | "resolutionStatus"
+          | "actionTaken"
+          | "resolutionNotes"
+          | "sourceDesignTicketId"
         >
       >,
   ) => Ticket;
@@ -83,6 +102,7 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
       ...data,
       description: data.description ?? "",
       projectId: data.projectId ?? "",
+      sourceDesignTicketId: data.sourceDesignTicketId,
       assignedUserId: data.assignedUserId,
       actionTaken: data.actionTaken ?? "",
       backendAssigned: data.backendAssigned ?? false,
@@ -122,6 +142,7 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
           companyId: ticket.companyId,
           projectId: ticket.projectId || undefined,
           description: ticket.description,
+          sourceDesignTicketId: ticket.sourceDesignTicketId,
           assignedUserId: ticket.assignedUserId,
           actionTaken: ticket.actionTaken,
           backendAssigned: ticket.backendAssigned,
@@ -202,11 +223,13 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
           isClosedTicketStatus(data.status) ? "ticket-closed" : "ticket-updated",
           updated,
         );
+        syncLinkedDesignTicketStatus(updated, data.status);
       } else if (data.status && !prev) {
         dispatchTicketAutomation(
           isClosedTicketStatus(data.status) ? "ticket-closed" : "ticket-updated",
           updated,
         );
+        syncLinkedDesignTicketStatus(updated, data.status);
       }
     }
   },
@@ -243,6 +266,7 @@ export const useTicketStore = createStore<TicketState>((set, get) => ({
         isClosedTicketStatus(status) ? "ticket-closed" : "ticket-updated",
         updated,
       );
+      syncLinkedDesignTicketStatus(updated, status);
     }
   },
 

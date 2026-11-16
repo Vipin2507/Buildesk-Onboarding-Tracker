@@ -13,12 +13,38 @@ import {
   createDesignTicket,
   createPortalDesignTicket,
   deleteDesignTicket,
+  linkDesignTicketToSupportDesk,
   listPortalDesignTickets,
   updateDesignTicketPriority,
   updateDesignTicketStatus,
 } from "@/lib/api";
+import { CRM_TICKET_PROJECT_ID } from "@/lib/crm-tickets";
+import {
+  designCategoryToSupportType,
+  designPriorityToSupportPriority,
+  designStatusToSupportStatus,
+  isTicketLinkSyncing,
+  withTicketLinkSyncGuard,
+} from "@/lib/ticket-link-sync";
 import { serverSync } from "@/lib/sync";
 import { createStore, touch } from "./persist";
+import { useCrmAccountStore } from "./useCrmAccountStore";
+import { useTicketStore } from "./useTicketStore";
+
+function syncLinkedSupportTicketStatus(ticket: DesignTicket, status: DesignTicketStatus) {
+  if (!ticket.supportTicketId || isTicketLinkSyncing()) return;
+  withTicketLinkSyncGuard(() => {
+    const supportStatus = designStatusToSupportStatus(status);
+    const support = useTicketStore.getState().getById(ticket.supportTicketId!);
+    if (!support || support.status === supportStatus) return;
+    useTicketStore.getState().moveTicket(ticket.supportTicketId!, supportStatus);
+    if (supportStatus === "Resolved" || supportStatus === "Closed") {
+      useTicketStore.getState().updateTicket(ticket.supportTicketId!, {
+        resolutionStatus: "Resolved",
+      });
+    }
+  });
+}
 
 export type CreateDesignTicketInput = {
   companyId: string;
@@ -82,6 +108,11 @@ type DesignTicketState = {
     actorName: string,
   ) => void;
   updatePriority: (ticketId: string, priority: DesignTicketPriority, actorName: string) => void;
+  /** Clone this tracking ticket into Support Desk and link both sides. */
+  linkToSupportDesk: (
+    ticketId: string,
+    actorName: string,
+  ) => { supportTicketId: string; alreadyLinked: boolean } | null;
   deleteTicket: (ticketId: string) => void;
   getById: (id: string) => DesignTicket | undefined;
   clearHighlight: (ticketId: string) => void;
@@ -297,6 +328,75 @@ export const useDesignTicketStore = createStore<DesignTicketState>((set, get) =>
           get().mergeTicket(ticket),
         ),
       );
+      const updated = get().getById(ticketId);
+      if (updated) syncLinkedSupportTicketStatus(updated, status);
+    },
+
+    linkToSupportDesk: (ticketId, actorName) => {
+      const design = get().getById(ticketId);
+      if (!design) return null;
+
+      if (design.supportTicketId) {
+        return { supportTicketId: design.supportTicketId, alreadyLinked: true };
+      }
+
+      const isCrm = Boolean(useCrmAccountStore.getState().getById(design.companyId));
+      const today = new Date().toISOString().slice(0, 10);
+      const title = isCrm ? `[CRM] ${design.subject}` : design.subject;
+      const description = [
+        `Cloned from Ticket Tracking ${design.ticketNumber}`,
+        `Raised by: ${design.createdBy.name} (${design.createdBy.type})`,
+        design.category ? `Category: ${design.category}` : null,
+        "",
+        design.description.trim(),
+      ]
+        .filter((line) => line !== null)
+        .join("\n");
+
+      const supportTicket = useTicketStore.getState().addTicket({
+        type: designCategoryToSupportType(design.category),
+        title,
+        priority: designPriorityToSupportPriority(design.priority),
+        status: designStatusToSupportStatus(design.status),
+        raisedOn: today,
+        eta: "",
+        developerId: design.assigneeId ?? "",
+        companyId: design.companyId,
+        projectId: isCrm ? CRM_TICKET_PROJECT_ID : "",
+        description,
+        assignedUserId: design.assigneeId,
+        sourceDesignTicketId: design.id,
+        resolutionStatus:
+          design.status === "resolved" || design.status === "closed" ? "Resolved" : "Not Resolved",
+      });
+
+      const log = systemMessage(
+        ticketId,
+        `Linked to Support Desk ticket ${supportTicket.id} by ${actorName}`,
+      );
+      set((s) => ({
+        tickets: s.tickets.map((t) =>
+          t.id === ticketId
+            ? touch({
+                ...t,
+                supportTicketId: supportTicket.id,
+                messages: [...t.messages, log],
+              })
+            : t,
+        ),
+      }));
+
+      serverSync("link design ticket to support desk", () =>
+        linkDesignTicketToSupportDesk({
+          data: {
+            designTicketId: ticketId,
+            supportTicketId: supportTicket.id,
+            actorName,
+          },
+        }).then((ticket) => get().mergeTicket(ticket)),
+      );
+
+      return { supportTicketId: supportTicket.id, alreadyLinked: false };
     },
 
     assignTicket: (ticketId, assigneeId, assigneeName, actorName) => {

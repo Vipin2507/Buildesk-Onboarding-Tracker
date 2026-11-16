@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { CrmTicketsNav } from "@/components/crm/crm-tickets-nav";
 import { CrmTicketDetailMeta } from "@/components/crm/tickets/crm-ticket-detail-meta";
+import { CrmTicketSupportDeskAction } from "@/components/crm/tickets/crm-ticket-support-desk-action";
 import {
   daysOpenForTicket,
   formatDaysOpen,
@@ -237,42 +238,45 @@ function CrmPortalTicketDetail() {
                 ) : null}
               </div>
 
-              <div className="grid w-full gap-2 rounded-xl border border-border/70 bg-background/80 p-2.5 shadow-sm backdrop-blur-sm sm:grid-cols-3 lg:w-auto lg:min-w-[24rem] lg:shrink-0">
-                <DesignTicketFilterField label="Status" compact>
-                  <DesignTicketSelect
-                    compact
-                    value={current.status}
-                    onChange={(value) => {
-                      updateStatus(ticketId, value as DesignTicketStatus, actorName);
-                      toast.success("Status updated");
-                    }}
-                    options={statusOptions}
-                  />
-                </DesignTicketFilterField>
-                <DesignTicketFilterField label="Priority" compact>
-                  <DesignTicketSelect
-                    compact
-                    value={current.priority}
-                    onChange={(value) => {
-                      updatePriority(ticketId, value as DesignTicketPriority, actorName);
-                      toast.success("Priority updated");
-                    }}
-                    options={priorityOptions}
-                  />
-                </DesignTicketFilterField>
-                <DesignTicketFilterField label="Assignee" compact>
-                  <DesignTicketSelect
-                    compact
-                    value={current.assigneeId ?? UNASSIGNED}
-                    onChange={(value) => {
-                      const id = value === UNASSIGNED ? undefined : value;
-                      const name = assigneeOptions.find((o) => o.id === id)?.name ?? "Unassigned";
-                      assignTicket(ticketId, id, name, actorName);
-                      toast.success("Assignee updated");
-                    }}
-                    options={assigneeSelectOptions}
-                  />
-                </DesignTicketFilterField>
+              <div className="flex w-full flex-col gap-2 lg:w-auto lg:min-w-[24rem] lg:shrink-0">
+                <div className="grid gap-2 rounded-xl border border-border/70 bg-background/80 p-2.5 shadow-sm backdrop-blur-sm sm:grid-cols-3">
+                  <DesignTicketFilterField label="Status" compact>
+                    <DesignTicketSelect
+                      compact
+                      value={current.status}
+                      onChange={(value) => {
+                        updateStatus(ticketId, value as DesignTicketStatus, actorName);
+                        toast.success("Status updated");
+                      }}
+                      options={statusOptions}
+                    />
+                  </DesignTicketFilterField>
+                  <DesignTicketFilterField label="Priority" compact>
+                    <DesignTicketSelect
+                      compact
+                      value={current.priority}
+                      onChange={(value) => {
+                        updatePriority(ticketId, value as DesignTicketPriority, actorName);
+                        toast.success("Priority updated");
+                      }}
+                      options={priorityOptions}
+                    />
+                  </DesignTicketFilterField>
+                  <DesignTicketFilterField label="Assignee" compact>
+                    <DesignTicketSelect
+                      compact
+                      value={current.assigneeId ?? UNASSIGNED}
+                      onChange={(value) => {
+                        const id = value === UNASSIGNED ? undefined : value;
+                        const name = assigneeOptions.find((o) => o.id === id)?.name ?? "Unassigned";
+                        assignTicket(ticketId, id, name, actorName);
+                        toast.success("Assignee updated");
+                      }}
+                      options={assigneeSelectOptions}
+                    />
+                  </DesignTicketFilterField>
+                </div>
+                <CrmTicketSupportDeskAction ticket={current} actorName={actorName} preferCrm />
               </div>
             </div>
           </div>

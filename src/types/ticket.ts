@@ -32,6 +32,8 @@ export type Ticket = Timestamps & {
   companyId: string;
   projectId: string;
   description: string;
+  /** Design / Ticket Tracking ticket id this Support Desk ticket was cloned from. */
+  sourceDesignTicketId?: string;
   /** Internal owner responsible for the ticket. */
   assignedUserId?: string;
   actionTaken?: string;

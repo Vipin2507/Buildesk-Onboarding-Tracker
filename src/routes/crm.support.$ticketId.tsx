@@ -23,6 +23,7 @@ import {
   useTicketStore,
   useUserStore,
 } from "@/stores";
+import { useDesignTicketStore } from "@/stores/useDesignTicketStore";
 import type { TicketPriority, TicketStatus, TicketType } from "@/types";
 
 export const Route = createFileRoute("/crm/support/$ticketId")({
@@ -40,6 +41,9 @@ function CrmSupportTicketDetail() {
     ticket ? s.getById(ticket.companyId) : undefined,
   );
   const users = useUserStore((s) => s.users);
+  const linkedDesign = useDesignTicketStore((s) =>
+    ticket?.sourceDesignTicketId ? s.getById(ticket.sourceDesignTicketId) : undefined,
+  );
   const crmUsers = useMemo(
     () => users.filter((u) => u.active && (u.productScope === "crm" || u.role === "Admin")),
     [users],
@@ -89,6 +93,40 @@ function CrmSupportTicketDetail() {
               <dt className="text-[10px] uppercase text-muted-foreground">Description</dt>
               <dd className="mt-0.5 whitespace-pre-wrap text-sm">{ticket.description || "—"}</dd>
             </div>
+            {ticket.sourceDesignTicketId ? (
+              <div className="sm:col-span-2">
+                <dt className="text-[10px] uppercase text-muted-foreground">Ticket Tracking</dt>
+                <dd className="mt-0.5 text-sm">
+                  <Link
+                    to="/crm/tickets/$ticketId"
+                    params={{ ticketId: ticket.sourceDesignTicketId }}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    Open linked tracking ticket
+                  </Link>
+                  <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                    Status syncs both ways with Ticket Tracking
+                  </span>
+                </dd>
+              </div>
+            ) : null}
+            {ticket.sourceDesignTicketId ? (
+              <div className="sm:col-span-2">
+                <dt className="text-[10px] uppercase text-muted-foreground">Ticket Tracking</dt>
+                <dd className="mt-0.5 text-sm">
+                  <Link
+                    to="/crm/tickets/$ticketId"
+                    params={{ ticketId: ticket.sourceDesignTicketId }}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    {linkedDesign?.ticketNumber ?? ticket.sourceDesignTicketId}
+                  </Link>
+                  <span className="ml-1.5 text-xs text-muted-foreground">
+                    Linked · status syncs both ways
+                  </span>
+                </dd>
+              </div>
+            ) : null}
             <div>
               <dt className="text-[10px] uppercase text-muted-foreground">Type</dt>
               <dd className="mt-1">

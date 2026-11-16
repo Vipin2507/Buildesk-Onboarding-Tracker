@@ -14,6 +14,7 @@ import {
   ticketCategoryStyle,
   TICKET_AGING_DAYS,
 } from "@/components/crm/tickets/crm-tickets-format";
+import { CrmTicketSupportDeskAction } from "@/components/crm/tickets/crm-ticket-support-desk-action";
 import {
   DESIGN_TICKET_PRIORITIES,
   DESIGN_TICKET_STATUSES,
@@ -366,6 +367,7 @@ export function CrmTicketPreviewSheet({
                 <Button type="button" size="sm" className="h-8 text-xs" onClick={saveChanges}>
                   Update Ticket
                 </Button>
+                <CrmTicketSupportDeskAction ticket={current} actorName={actorName} preferCrm />
                 <Button
                   type="button"
                   size="sm"

@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Building2, History } from "lucide-react";
 import { toast } from "sonner";
 
+import { CrmTicketSupportDeskAction } from "@/components/crm/tickets/crm-ticket-support-desk-action";
 import { DesignTicketThread } from "@/components/design-ticket/design-ticket-thread";
 import {
   DesignTicketPriorityChip,
@@ -205,6 +206,9 @@ function InternalTicketDetail() {
               options={assigneeSelectOptions}
             />
           </DesignTicketFilterField>
+          <div className="sm:col-span-2 lg:col-span-3">
+            <CrmTicketSupportDeskAction ticket={ticket} actorName={actorName} preferCrm={false} />
+          </div>
         </motion.div>
 
         <motion.div variants={ticketSectionVariants} className="grid gap-3 lg:grid-cols-[1fr_280px]">

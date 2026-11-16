@@ -5,6 +5,7 @@ import {
   Archive,
   CheckCircle2,
   Clock,
+  LifeBuoy,
   Link2,
   MoreHorizontal,
   Plus,
@@ -114,6 +115,7 @@ function TicketsDashboard() {
   const updateStatus = useDesignTicketStore((s) => s.updateStatus);
   const updatePriority = useDesignTicketStore((s) => s.updatePriority);
   const assignTicket = useDesignTicketStore((s) => s.assignTicket);
+  const linkToSupportDesk = useDesignTicketStore((s) => s.linkToSupportDesk);
   const bulkDeleteTickets = useDesignTicketStore((s) => s.bulkDeleteTickets);
   const bulkAssignTickets = useDesignTicketStore((s) => s.bulkAssignTickets);
   const bulkUpdateStatus = useDesignTicketStore((s) => s.bulkUpdateStatus);
@@ -567,6 +569,7 @@ function TicketsDashboard() {
               ]}
               actions={(row) => (
                 <TicketRowActions
+                  supportTicketId={row.supportTicketId}
                   assigneeOptions={assigneeOptions}
                   currentUserId={currentUser?.id}
                   onAssign={(assigneeId, assigneeName) => {
@@ -580,6 +583,29 @@ function TicketsDashboard() {
                   onPriority={(priority) => {
                     updatePriority(row.id, priority, actorName);
                     toast.success("Priority updated");
+                  }}
+                  onAddToSupportDesk={() => {
+                    const result = linkToSupportDesk(row.id, actorName);
+                    if (!result) {
+                      toast.error("Could not add to Support Desk");
+                      return;
+                    }
+                    if (result.alreadyLinked) {
+                      toast.message(`Already linked to ${result.supportTicketId}`);
+                    } else {
+                      toast.success(`Cloned to Support Desk as ${result.supportTicketId}`);
+                    }
+                    void navigate({
+                      to: "/support/$ticketId",
+                      params: { ticketId: result.supportTicketId },
+                    });
+                  }}
+                  onOpenSupportDesk={() => {
+                    if (!row.supportTicketId) return;
+                    void navigate({
+                      to: "/support/$ticketId",
+                      params: { ticketId: row.supportTicketId },
+                    });
                   }}
                   onDelete={() => setDeleteConfirm({ mode: "single", id: row.id })}
                 />
@@ -698,18 +724,24 @@ function TicketsDashboard() {
 }
 
 function TicketRowActions({
+  supportTicketId,
   assigneeOptions,
   currentUserId,
   onAssign,
   onStatus,
   onPriority,
+  onAddToSupportDesk,
+  onOpenSupportDesk,
   onDelete,
 }: {
+  supportTicketId?: string;
   assigneeOptions: { id: string; name: string }[];
   currentUserId?: string;
   onAssign: (assigneeId: string | undefined, assigneeName: string) => void;
   onStatus: (status: DesignTicketStatus) => void;
   onPriority: (priority: DesignTicketPriority) => void;
+  onAddToSupportDesk: () => void;
+  onOpenSupportDesk: () => void;
   onDelete: () => void;
 }) {
   return (
@@ -770,6 +802,18 @@ function TicketRowActions({
             ))}
           </DropdownMenuSubContent>
         </DropdownMenuSub>
+        <DropdownMenuSeparator />
+        {supportTicketId ? (
+          <DropdownMenuItem onClick={onOpenSupportDesk}>
+            <LifeBuoy className="mr-2 h-4 w-4" />
+            Open Support Desk
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuItem onClick={onAddToSupportDesk}>
+            <LifeBuoy className="mr-2 h-4 w-4" />
+            Add to Support Desk
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={onDelete}>
           <Trash2 className="mr-2 h-4 w-4" />

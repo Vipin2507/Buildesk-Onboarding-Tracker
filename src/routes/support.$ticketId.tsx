@@ -222,6 +222,20 @@ function TicketDetail() {
                 ? ticket.description
                 : "No description provided."}
             </p>
+            {ticket.sourceDesignTicketId ? (
+              <p className="mt-3 text-sm">
+                <Link
+                  to="/tickets/$ticketId"
+                  params={{ ticketId: ticket.sourceDesignTicketId }}
+                  className="font-medium text-primary hover:underline"
+                >
+                  Open linked Ticket Tracking item
+                </Link>
+                <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                  Status syncs both ways with Ticket Tracking
+                </span>
+              </p>
+            ) : null}
           </div>
 
           <div>

@@ -1,8 +1,10 @@
+import { Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import {
   CalendarClock,
   FolderKanban,
   History,
+  LifeBuoy,
   Tag,
   UserRound,
   UserRoundPen,
@@ -100,6 +102,22 @@ export function CrmTicketDetailMeta({
             hint={aging ? `Aging ≥ ${TICKET_AGING_DAYS}d` : `Target < ${TICKET_AGING_DAYS}d`}
           />
           <MetaRow icon={CalendarClock} label="Updated" value={formatDate(ticket.updatedAt)} />
+          {ticket.supportTicketId ? (
+            <MetaRow
+              icon={LifeBuoy}
+              label="Support Desk"
+              value={
+                <Link
+                  to="/crm/support/$ticketId"
+                  params={{ ticketId: ticket.supportTicketId }}
+                  className="text-primary hover:underline"
+                >
+                  {ticket.supportTicketId}
+                </Link>
+              }
+              hint="Linked · status syncs both ways"
+            />
+          ) : null}
         </dl>
       </motion.section>
 

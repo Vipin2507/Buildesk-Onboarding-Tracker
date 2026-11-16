@@ -29,6 +29,7 @@ export function mapTicket(row: Record<string, unknown>): Ticket {
     companyId: String(row.companyId ?? ""),
     projectId: String(row.projectId ?? ""),
     description: String(row.description ?? ""),
+    sourceDesignTicketId: (row.sourceDesignTicketId as string | null | undefined) || undefined,
     assignedUserId: (row.assignedUserId as string | null | undefined) || undefined,
     actionTaken: String(row.actionTaken ?? ""),
     backendAssigned: Boolean(row.backendAssigned),

@@ -54,6 +54,7 @@ const ticketInput = z.object({
   companyId: z.string().optional().nullable(),
   projectId: z.string().optional().nullable(),
   description: z.string().optional(),
+  sourceDesignTicketId: z.string().optional().nullable(),
   assignedUserId: z.string().optional().nullable(),
   actionTaken: z.string().optional(),
   backendAssigned: z.boolean().optional(),
@@ -144,6 +145,7 @@ export const createTicket = createServerFn({ method: "POST" })
       projectId: input.projectId || null,
       assignedUserId: input.assignedUserId || null,
       description: input.description ?? "",
+      sourceDesignTicketId: input.sourceDesignTicketId || null,
       actionTaken: input.actionTaken ?? "",
       backendAssigned: Boolean(input.backendAssigned),
       backendAssigneeId: input.backendAssigneeId || null,
@@ -201,6 +203,10 @@ export const updateTicket = createServerFn({ method: "POST" })
         requested.assignedUserId === undefined
           ? existing.assignedUserId
           : requested.assignedUserId || null,
+      sourceDesignTicketId:
+        requested.sourceDesignTicketId === undefined
+          ? existing.sourceDesignTicketId
+          : requested.sourceDesignTicketId || null,
       backendAssigneeId:
         requested.backendAssigneeId === undefined
           ? existing.backendAssigneeId
