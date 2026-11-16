@@ -356,8 +356,8 @@ function CrmPaymentsPage() {
   const accountCount = summary?.accountCount ?? total;
 
   return (
-    <PageWrap compact>
-      <div className="space-y-2.5 pb-3">
+    <PageWrap compact flushTop>
+      <div className="mb-0 space-y-2.5 border-b border-border pb-2.5 pt-1">
         <PaymentsHeader
           accountCount={accountCount}
           selectedCount={selectedIds.size}
@@ -497,326 +497,340 @@ function CrmPaymentsPage() {
           </DesignTicketFilterBar>
         </div>
 
-        {selectedIds.size > 0 ? (
-          <div className="flex items-center justify-between gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs">
-            <span>{selectedIds.size} selected</span>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 gap-1 text-xs"
-              disabled={bulkRemind.isPending}
-              onClick={() => void handleBulkRemind()}
-            >
-              <Bell className="h-3 w-3" />
-              Send reminders to {selectedIds.size} accounts
-            </Button>
-          </div>
-        ) : null}
-
-        {listQuery.isLoading ? (
-          <p className="rounded-xl border bg-card px-3 py-8 text-center text-sm text-muted-foreground">
-            Loading payments…
-          </p>
-        ) : rows.length === 0 ? (
-          <div className="rounded-xl border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
-            {total === 0 && !search.search && statusTab === "all"
-              ? "No payment data yet — payments appear when accounts have deal values and installments."
-              : "No results match your filters."}
-          </div>
-        ) : (
-          <div className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm [&_tbody_tr]:bg-card [&_thead]:bg-card">
-            <DataTable
-              flush
-              data={rows}
-              getRowId={(r) => r.id}
-              hideSearch
-              pageSize={Math.max(rows.length, 1)}
-              pageSizeOptions={[]}
-              density="compact"
-              expandedRowIds={expandedRowIds}
-              onRowClick={(r) => toggleExpanded(r.id)}
-              getRowClassName={(r) =>
-                isCrmAccountInRenewalWindow({ endDate: r.renewalDate })
-                  ? "border-amber-500/50 bg-amber-500/[0.07] dark:bg-amber-500/10"
-                  : undefined
-              }
-              selection={{
-                selectedIds,
-                onToggle: toggleSelection,
-                onToggleAll: toggleSelectionAll,
-              }}
-              renderExpandedRow={(r) => <CrmPaymentsExpandedRow row={r} search={search} />}
-              actions={(r) => {
-                const canRenew = isCrmAccountInRenewalWindow({ endDate: r.renewalDate });
-                return (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 w-7 p-0"
-                        aria-label="Row actions"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-44" onClick={(e) => e.stopPropagation()}>
-                      {canRenew ? (
-                        <DropdownMenuItem
-                          onClick={() => setRenewAccountId(r.id)}
-                          className="text-xs"
-                        >
-                          Renew
-                        </DropdownMenuItem>
-                      ) : null}
-                      {r.renewalCancelled ? null : (
-                        <DropdownMenuItem
-                          disabled={cancellingRenewal}
-                          onClick={() => setRenewalCancelId(r.id)}
-                          className="text-xs"
-                        >
-                          Renewal cancelled
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuItem asChild className="text-xs">
-                        <Link to="/crm/accounts/$accountId" params={{ accountId: r.id }}>
-                          View account
-                        </Link>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                );
-              }}
-              columns={[
-                {
-                  key: "expand",
-                  header: "",
-                  render: (r) =>
-                    expandedRowIds.has(r.id) ? (
-                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    ),
-                },
-                {
-                  key: "accountName",
-                  header: "Account",
-                  render: (r) => (
-                    <div>
-                      <Link
-                        to="/crm/accounts/$accountId"
-                        params={{ accountId: r.id }}
-                        className="font-medium hover:underline"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {r.accountName}
-                      </Link>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                        <span className="text-[10px] text-muted-foreground">
-                          {crmAccountStatusLabel(r.accountStatus)}
-                        </span>
-                        {r.lostKind ? (
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              "h-5 px-1.5 text-[9px] font-medium",
-                              r.lostKind === "sales_lost"
-                                ? "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-400"
-                                : "border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400",
-                            )}
-                          >
-                            {r.lostKind === "sales_lost" ? "Sales Lost" : "Customer Lost"}
-                            {typeof r.lostValue === "number"
-                              ? ` · ${formatPaymentsInr(r.lostValue)}`
-                              : ""}
-                          </Badge>
-                        ) : null}
-                      </div>
-                      {crmRenewalWindowLabel({ endDate: r.renewalDate }) ? (
-                        <div className="mt-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
-                          {crmRenewalWindowLabel({ endDate: r.renewalDate })}
-                        </div>
-                      ) : null}
-                    </div>
-                  ),
-                },
-                {
-                  key: "totalDealValue",
-                  header: "Deal value",
-                  render: (r) => (
-                    <span className="tabular-nums text-xs">
-                      {formatPaymentsInr(r.totalDealValue)}
-                    </span>
-                  ),
-                },
-                {
-                  key: "payment",
-                  header: "Payment",
-                  render: (r) => (
-                    <div className="text-xs">
-                      <div className="tabular-nums text-emerald-700 dark:text-emerald-400">
-                        {formatPaymentsInr(r.paymentReceived)}
-                      </div>
-                      <div className="tabular-nums text-muted-foreground">
-                        {formatPaymentsInr(r.pendingAmount)} pending
-                      </div>
-                      {r.renewalAmount > 0.01 ? (
-                        <div className="text-[10px] text-violet-600 dark:text-violet-400">
-                          Renewal {formatPaymentsInr(r.renewalAmount)}
-                        </div>
-                      ) : null}
-                    </div>
-                  ),
-                },
-                {
-                  key: "nextDue",
-                  header: statusTab === "renewal" ? "Renewal date" : "Next due",
-                  render: (r) =>
-                    statusTab === "renewal" ? (
-                      r.renewalDate ? (
-                        <span className="text-xs tabular-nums">{formatDate(r.renewalDate)}</span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">No end date</span>
-                      )
-                    ) : r.nextDueInstallment ? (
-                      <div className="text-xs">
-                        <div className="tabular-nums font-medium">
-                          {formatPaymentsInr(r.nextDueInstallment.remainingAmount)}
-                          {r.nextDueInstallment.remainingAmount < r.nextDueInstallment.amount ? (
-                            <span className="ml-1 font-normal text-muted-foreground">
-                              / {formatPaymentsInr(r.nextDueInstallment.amount)}
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="text-[10px] text-muted-foreground">
-                          {formatDate(r.nextDueInstallment.dueDate)}
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    ),
-                },
-                {
-                  key: "overdue",
-                  header: "Overdue",
-                  render: (r) =>
-                    r.overdueAmount > 0 ? (
-                      <div className="text-xs">
-                        <div className="tabular-nums font-medium text-destructive">
-                          {formatPaymentsInr(r.overdueAmount)}
-                        </div>
-                        {r.overdueDays != null ? (
-                          <div className="text-[10px] text-destructive/80">{r.overdueDays}d overdue</div>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    ),
-                },
-                {
-                  key: "collectionPercent",
-                  header: "Progress",
-                  render: (r) => (
-                    <div className="min-w-[5.5rem]">
-                      <div className="mb-0.5 text-[10px] tabular-nums text-muted-foreground">
-                        {Math.min(r.collectionPercent, 100)}%
-                        {r.renewalAmount > 0.01 ? " + renewal" : ""}
-                      </div>
-                      <ProgressBar value={Math.min(r.collectionPercent, 100)} className="h-1.5" />
-                    </div>
-                  ),
-                },
-                {
-                  key: "salesManager",
-                  header: "Executive",
-                  render: (r) =>
-                    r.salesManager?.trim() ? (
-                      <span className="text-xs">{r.salesManager}</span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    ),
-                },
-                {
-                  key: "paymentStatus",
-                  header: "Status",
-                  render: (r) => {
-                    const badge = paymentStatusBadge(r.paymentStatus);
-                    return (
-                      <Badge
-                        variant="outline"
-                        className={cn("rounded-full px-2 text-[10px] font-medium", badge.className)}
-                      >
-                        {badge.label}
-                      </Badge>
-                    );
-                  },
-                },
-              ]}
-            />
-
-            {total > 0 ? (
-              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 px-3 py-2.5 text-[11px] text-muted-foreground">
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <span className="min-w-0 tabular-nums">
-                    Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total}
-                  </span>
-                  <label className="inline-flex items-center gap-1.5">
-                    <span>Rows</span>
-                    <select
-                      value={pageSize}
-                      onChange={(e) => {
-                        const next = Number(e.target.value);
-                        try {
-                          window.localStorage.setItem("buildesk.table.pageSize", String(next));
-                        } catch {
-                          /* ignore */
-                        }
-                        patchSearch({
-                          pageSize: next === 15 ? undefined : next,
-                          page: undefined,
-                        });
-                      }}
-                      className="h-7 rounded-md border border-input bg-background px-1.5 text-[11px] text-foreground outline-none focus:ring-2 focus:ring-ring/40"
-                      aria-label="Rows per page"
-                    >
-                      {[15, 50, 100].map((n) => (
-                        <option key={n} value={n}>
-                          {n}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                <div className="flex shrink-0 gap-1">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 px-2 text-xs"
-                    disabled={page <= 1}
-                    onClick={() => patchSearch({ page: page <= 2 ? undefined : page - 1 })}
-                  >
-                    Prev
-                  </Button>
-                  <span className="flex items-center px-2 tabular-nums">
-                    {page} / {totalPages}
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 px-2 text-xs"
-                    disabled={page >= totalPages}
-                    onClick={() => patchSearch({ page: page + 1 })}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        )}
       </div>
+
+      {selectedIds.size > 0 ? (
+        <div className="flex items-center justify-between gap-2 border-b border-border bg-primary/5 px-0 py-2 text-xs">
+          <span>{selectedIds.size} selected</span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 gap-1 text-xs"
+            disabled={bulkRemind.isPending}
+            onClick={() => void handleBulkRemind()}
+          >
+            <Bell className="h-3 w-3" />
+            Send reminders to {selectedIds.size} accounts
+          </Button>
+        </div>
+      ) : null}
+
+      {listQuery.isLoading ? (
+        <p className="px-0 py-8 text-center text-sm text-muted-foreground">Loading payments…</p>
+      ) : rows.length === 0 ? (
+        <div className="border-t px-0 py-8 text-center text-sm text-muted-foreground">
+          {total === 0 && !search.search && statusTab === "all"
+            ? "No payment data yet — payments appear when accounts have deal values and installments."
+            : "No results match your filters."}
+        </div>
+      ) : (
+        <div className="bg-card [&_tbody_tr]:bg-card [&_thead]:bg-card">
+          <DataTable
+            flush
+            data={rows}
+            getRowId={(r) => r.id}
+            hideSearch
+            pageSize={Math.max(rows.length, 1)}
+            pageSizeOptions={[]}
+            density="compact"
+            expandedRowIds={expandedRowIds}
+            onRowClick={(r) => toggleExpanded(r.id)}
+            getRowClassName={(r) =>
+              isCrmAccountInRenewalWindow({ endDate: r.renewalDate })
+                ? "border-amber-500/50 bg-amber-500/[0.07] dark:bg-amber-500/10"
+                : undefined
+            }
+            selection={{
+              selectedIds,
+              onToggle: toggleSelection,
+              onToggleAll: toggleSelectionAll,
+            }}
+            renderExpandedRow={(r) => <CrmPaymentsExpandedRow row={r} search={search} />}
+            actions={(r) => {
+              const canRenew = isCrmAccountInRenewalWindow({ endDate: r.renewalDate });
+              return (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0"
+                      aria-label="Row actions"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-44" onClick={(e) => e.stopPropagation()}>
+                    {canRenew ? (
+                      <DropdownMenuItem onClick={() => setRenewAccountId(r.id)} className="text-xs">
+                        Renew
+                      </DropdownMenuItem>
+                    ) : null}
+                    {r.renewalCancelled ? null : (
+                      <DropdownMenuItem
+                        disabled={cancellingRenewal}
+                        onClick={() => setRenewalCancelId(r.id)}
+                        className="text-xs"
+                      >
+                        Renewal cancelled
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem asChild className="text-xs">
+                      <Link to="/crm/accounts/$accountId" params={{ accountId: r.id }}>
+                        View account
+                      </Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              );
+            }}
+            columns={[
+              {
+                key: "expand",
+                header: "",
+                render: (r) =>
+                  expandedRowIds.has(r.id) ? (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  ),
+              },
+              {
+                key: "accountName",
+                header: "Account",
+                render: (r) => (
+                  <div>
+                    <Link
+                      to="/crm/accounts/$accountId"
+                      params={{ accountId: r.id }}
+                      className="font-medium hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {r.accountName}
+                    </Link>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                      <span className="text-[10px] text-muted-foreground">
+                        {crmAccountStatusLabel(r.accountStatus)}
+                      </span>
+                      {r.lostKind ? (
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "h-5 px-1.5 text-[9px] font-medium",
+                            r.lostKind === "sales_lost"
+                              ? "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-400"
+                              : "border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400",
+                          )}
+                        >
+                          {r.lostKind === "sales_lost" ? "Sales Lost" : "Customer Lost"}
+                          {typeof r.lostValue === "number"
+                            ? ` · ${formatPaymentsInr(r.lostValue)}`
+                            : ""}
+                        </Badge>
+                      ) : null}
+                    </div>
+                    {crmRenewalWindowLabel({ endDate: r.renewalDate }) ? (
+                      <div className="mt-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+                        {crmRenewalWindowLabel({ endDate: r.renewalDate })}
+                      </div>
+                    ) : null}
+                  </div>
+                ),
+              },
+              {
+                key: "supportManager1",
+                header: "Support 1",
+                render: (r) =>
+                  r.supportManager1?.trim() ? (
+                    <span className="text-xs">{r.supportManager1}</span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  ),
+              },
+              {
+                key: "supportManager2",
+                header: "Support 2",
+                render: (r) =>
+                  r.supportManager2?.trim() ? (
+                    <span className="text-xs">{r.supportManager2}</span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  ),
+              },
+              {
+                key: "salesManager",
+                header: "Sales manager",
+                render: (r) =>
+                  r.salesManager?.trim() ? (
+                    <span className="text-xs">{r.salesManager}</span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  ),
+              },
+              {
+                key: "totalDealValue",
+                header: "Deal value",
+                render: (r) => (
+                  <span className="tabular-nums text-xs">{formatPaymentsInr(r.totalDealValue)}</span>
+                ),
+              },
+              {
+                key: "payment",
+                header: "Payment",
+                render: (r) => (
+                  <div className="text-xs">
+                    <div className="tabular-nums text-emerald-700 dark:text-emerald-400">
+                      {formatPaymentsInr(r.paymentReceived)}
+                    </div>
+                    <div className="tabular-nums text-muted-foreground">
+                      {formatPaymentsInr(r.pendingAmount)} pending
+                    </div>
+                    {r.renewalAmount > 0.01 ? (
+                      <div className="text-[10px] text-violet-600 dark:text-violet-400">
+                        Renewal {formatPaymentsInr(r.renewalAmount)}
+                      </div>
+                    ) : null}
+                  </div>
+                ),
+              },
+              {
+                key: "nextDue",
+                header: statusTab === "renewal" ? "Renewal date" : "Next due",
+                render: (r) =>
+                  statusTab === "renewal" ? (
+                    r.renewalDate ? (
+                      <span className="text-xs tabular-nums">{formatDate(r.renewalDate)}</span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No end date</span>
+                    )
+                  ) : r.nextDueInstallment ? (
+                    <div className="text-xs">
+                      <div className="tabular-nums font-medium">
+                        {formatPaymentsInr(r.nextDueInstallment.remainingAmount)}
+                        {r.nextDueInstallment.remainingAmount < r.nextDueInstallment.amount ? (
+                          <span className="ml-1 font-normal text-muted-foreground">
+                            / {formatPaymentsInr(r.nextDueInstallment.amount)}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">
+                        {formatDate(r.nextDueInstallment.dueDate)}
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  ),
+              },
+              {
+                key: "overdue",
+                header: "Overdue",
+                render: (r) =>
+                  r.overdueAmount > 0 ? (
+                    <div className="text-xs">
+                      <div className="tabular-nums font-medium text-destructive">
+                        {formatPaymentsInr(r.overdueAmount)}
+                      </div>
+                      {r.overdueDays != null ? (
+                        <div className="text-[10px] text-destructive/80">{r.overdueDays}d overdue</div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  ),
+              },
+              {
+                key: "collectionPercent",
+                header: "Progress",
+                render: (r) => (
+                  <div className="min-w-[5.5rem]">
+                    <div className="mb-0.5 text-[10px] tabular-nums text-muted-foreground">
+                      {Math.min(r.collectionPercent, 100)}%
+                      {r.renewalAmount > 0.01 ? " + renewal" : ""}
+                    </div>
+                    <ProgressBar value={Math.min(r.collectionPercent, 100)} className="h-1.5" />
+                  </div>
+                ),
+              },
+              {
+                key: "paymentStatus",
+                header: "Status",
+                render: (r) => {
+                  const badge = paymentStatusBadge(r.paymentStatus);
+                  return (
+                    <Badge
+                      variant="outline"
+                      className={cn("rounded-full px-2 text-[10px] font-medium", badge.className)}
+                    >
+                      {badge.label}
+                    </Badge>
+                  );
+                },
+              },
+            ]}
+          />
+
+          {total > 0 ? (
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-0 pb-3 text-[11px] text-muted-foreground">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <span className="min-w-0 tabular-nums">
+                  Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total}
+                </span>
+                <label className="inline-flex items-center gap-1.5">
+                  <span>Rows</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      const next = Number(e.target.value);
+                      try {
+                        window.localStorage.setItem("buildesk.table.pageSize", String(next));
+                      } catch {
+                        /* ignore */
+                      }
+                      patchSearch({
+                        pageSize: next === 15 ? undefined : next,
+                        page: undefined,
+                      });
+                    }}
+                    className="h-7 rounded-md border border-input bg-background px-1.5 text-[11px] text-foreground outline-none focus:ring-2 focus:ring-ring/40"
+                    aria-label="Rows per page"
+                  >
+                    {[15, 50, 100].map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="flex shrink-0 gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2 text-xs"
+                  disabled={page <= 1}
+                  onClick={() => patchSearch({ page: page <= 2 ? undefined : page - 1 })}
+                >
+                  Prev
+                </Button>
+                <span className="flex items-center px-2 tabular-nums">
+                  {page} / {totalPages}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2 text-xs"
+                  disabled={page >= totalPages}
+                  onClick={() => patchSearch({ page: page + 1 })}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
 
       <CrmAccountPaymentBulkUpdateModal open={bulkPaymentOpen} onOpenChange={setBulkPaymentOpen} />
       <CrmExecutivePaymentReminderDialog
