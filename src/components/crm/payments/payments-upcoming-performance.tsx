@@ -1,4 +1,4 @@
-import { CalendarClock, Info, TrendingUp } from "lucide-react";
+import { Info } from "lucide-react";
 
 import { formatPaymentsInr, type PaymentsSummaryView } from "@/components/crm/payments/payments-format";
 import { Button } from "@/components/ui/button";
@@ -36,12 +36,7 @@ export function PaymentsUpcomingPerformance({
   onFilter: (statusTab: CrmPaymentStatusTabId) => void;
 }) {
   if (loading && !summary) {
-    return (
-      <div className="grid gap-3 lg:grid-cols-2">
-        <div className="h-48 animate-pulse rounded-xl border bg-card" />
-        <div className="h-48 animate-pulse rounded-xl border bg-card" />
-      </div>
-    );
+    return <div className="h-16 animate-pulse rounded-lg border bg-card" />;
   }
   if (!summary) return null;
 
@@ -50,87 +45,68 @@ export function PaymentsUpcomingPerformance({
     summary.dueThisMonthAmount === 0 &&
     summary.dueIn45DaysAmount === 0;
   const rate = summary.collectionRatePercent;
-  const target = summary.totalContractValue;
-  const collected = summary.totalReceived;
 
   return (
-    <div className="grid gap-3 lg:grid-cols-2">
-      <div className="rounded-xl border border-border/80 bg-card p-4 shadow-sm">
-        <div className="mb-3 flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <CalendarClock className="h-4 w-4" />
-          </span>
-          <div>
-            <div className="text-sm font-semibold text-foreground">Upcoming collections</div>
-            <div className="text-[11px] text-muted-foreground">Filter the table by due window</div>
+    <div className="rounded-lg border border-border/80 bg-card shadow-sm">
+      <div className="grid divide-y divide-border/60 lg:grid-cols-[1fr_minmax(14rem,18rem)] lg:divide-x lg:divide-y-0">
+        <div className="min-w-0 px-3 py-2">
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Upcoming collections
+            </div>
+            {allZero ? (
+              <span className="inline-flex items-center gap-1 text-[10px] text-sky-700 dark:text-sky-300">
+                <Info className="h-3 w-3" />
+                No dues in 45 days
+              </span>
+            ) : null}
           </div>
-        </div>
-        {allZero ? (
-          <div className="mb-3 flex items-start gap-2 rounded-lg border border-sky-200/80 bg-sky-50/80 px-3 py-2.5 text-[12px] text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/40 dark:text-sky-100">
-            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>No dues scheduled in the next 45 days for the current filter.</span>
-          </div>
-        ) : null}
-        <div className="space-y-2.5">
-          {UPCOMING.map((row) => {
-            const amount = row.amount(summary);
-            const count = row.count(summary);
-            return (
-              <div
-                key={row.id}
-                className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5"
-              >
-                <div className="min-w-0">
-                  <div className="text-[12px] font-medium text-foreground">{row.label}</div>
-                  <div className="text-[11px] text-muted-foreground tabular-nums">
-                    {count} {count === 1 ? "account" : "accounts"}
+          <div className="grid gap-1.5 sm:grid-cols-3">
+            {UPCOMING.map((row) => {
+              const amount = row.amount(summary);
+              const count = row.count(summary);
+              return (
+                <div
+                  key={row.id}
+                  className="flex items-center justify-between gap-2 rounded-md border border-border/50 bg-muted/15 px-2.5 py-1.5"
+                >
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-medium text-foreground">{row.label}</div>
+                    <div className="text-[10px] tabular-nums text-muted-foreground">
+                      {count} acct · {formatPaymentsInr(amount)}
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold tabular-nums text-foreground">
-                    {formatPaymentsInr(amount)}
-                  </span>
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-7 px-2 text-[11px] text-primary"
+                    className="h-6 shrink-0 px-1.5 text-[10px] text-primary"
                     onClick={() => onFilter(row.id)}
                   >
                     View
                   </Button>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </div>
 
-      <div className="rounded-xl border border-border/80 bg-card p-4 shadow-sm">
-        <div className="mb-3 flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-            <TrendingUp className="h-4 w-4" />
-          </span>
-          <div>
-            <div className="text-sm font-semibold text-foreground">Collection performance</div>
-            <div className="text-[11px] text-muted-foreground">Received vs contract value</div>
-          </div>
-        </div>
-        <div className="mt-2 flex items-end justify-between gap-3">
-          <div>
-            <div className="text-3xl font-semibold tabular-nums tracking-tight text-emerald-700 dark:text-emerald-400">
-              {rate}%
+        <div className="flex flex-col justify-center gap-1.5 px-3 py-2">
+          <div className="flex items-end justify-between gap-2">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Collection rate
+              </div>
+              <div className="text-xl font-semibold tabular-nums leading-none text-emerald-700 dark:text-emerald-400">
+                {rate}%
+              </div>
             </div>
-            <div className="mt-1 text-[11px] text-muted-foreground">Collection rate</div>
-          </div>
-          <div className="text-right text-[11px] text-muted-foreground">
-            <div className="tabular-nums text-foreground">
-              {formatPaymentsInr(collected)}
-              <span className="text-muted-foreground"> / {formatPaymentsInr(target)}</span>
+            <div className="text-right text-[10px] tabular-nums text-muted-foreground">
+              <div className="text-foreground">{formatPaymentsInr(summary.totalReceived)}</div>
+              <div>/ {formatPaymentsInr(summary.totalContractValue)}</div>
             </div>
-            <div className="mt-0.5">Collected / target</div>
           </div>
+          <Progress value={Math.min(100, Math.max(0, rate))} className="h-1.5" />
         </div>
-        <Progress value={Math.min(100, Math.max(0, rate))} className="mt-4 h-2.5" />
       </div>
     </div>
   );

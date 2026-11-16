@@ -26,20 +26,20 @@ export function PaymentsHeader({
   onBulkUpdate: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="flex flex-wrap items-center justify-between gap-2">
       <div className="min-w-0">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">Payments</h1>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          Track collections, manage overdue accounts and send reminders.
+        <h1 className="text-lg font-semibold tracking-tight text-foreground">Payments</h1>
+        <p className="text-[11px] text-muted-foreground">
+          Collections, overdue & reminders
           {accountCount > 0 ? (
             <span className="tabular-nums"> · {accountCount} accounts</span>
           ) : null}
         </p>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-1.5">
         <Button
           size="sm"
-          className="h-9 gap-1.5 rounded-[10px] px-3.5 text-xs"
+          className="h-8 gap-1.5 rounded-lg px-3 text-xs"
           disabled={selectedCount === 0 || reminding}
           onClick={onSendReminders}
         >
@@ -50,7 +50,7 @@ export function PaymentsHeader({
         <Button
           size="sm"
           variant="outline"
-          className="h-9 gap-1.5 rounded-[10px] px-3 text-xs"
+          className="h-8 gap-1.5 rounded-lg px-2.5 text-xs"
           onClick={onRemindExecutives}
         >
           <Users className="h-3.5 w-3.5" />
@@ -59,7 +59,7 @@ export function PaymentsHeader({
         <Button
           size="sm"
           variant="outline"
-          className="h-9 gap-1.5 rounded-[10px] px-3 text-xs"
+          className="h-8 gap-1.5 rounded-lg px-2.5 text-xs"
           onClick={onExport}
         >
           <Download className="h-3.5 w-3.5" />
@@ -67,7 +67,7 @@ export function PaymentsHeader({
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="sm" variant="outline" className="h-9 w-9 rounded-[10px] p-0" aria-label="More actions">
+            <Button size="sm" variant="outline" className="h-8 w-8 rounded-lg p-0" aria-label="More actions">
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>

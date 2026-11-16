@@ -41,7 +41,7 @@ export function PaymentsAnalytics({
   const [open, setOpen] = useState(false);
 
   if (loading && !summary) {
-    return <div className="h-12 animate-pulse rounded-xl border bg-card" />;
+    return <div className="h-9 animate-pulse rounded-lg border bg-card" />;
   }
   if (!summary) return null;
 
@@ -61,25 +61,23 @@ export function PaymentsAnalytics({
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <div className="rounded-xl border border-border/80 bg-card shadow-sm">
+      <div className="rounded-lg border border-border/80 bg-card shadow-sm">
         <CollapsibleTrigger asChild>
           <button
             type="button"
-            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+            className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
           >
             <div className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <PieChartIcon className="h-4 w-4" />
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <PieChartIcon className="h-3.5 w-3.5" />
               </span>
-              <div>
-                <div className="text-sm font-semibold text-foreground">Payment analytics</div>
-                <div className="text-[11px] text-muted-foreground">
-                  Collection mix, account filters, and monthly receipts
-                </div>
+              <div className="text-[12px] font-semibold text-foreground">Payment analytics</div>
+              <div className="hidden text-[10px] text-muted-foreground sm:block">
+                Collection mix, filters & monthly receipts
               </div>
             </div>
             <ChevronDown
-              className={cn("h-4 w-4 text-muted-foreground transition-transform", open && "rotate-180")}
+              className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform", open && "rotate-180")}
             />
           </button>
         </CollapsibleTrigger>

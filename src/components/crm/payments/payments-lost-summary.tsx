@@ -14,13 +14,7 @@ export function PaymentsLostSummary({
   onFilter: (statusTab: CrmPaymentStatusTabId) => void;
 }) {
   if (loading && !summary) {
-    return (
-      <div className="grid gap-3 md:grid-cols-3">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="h-36 animate-pulse rounded-xl border bg-card" />
-        ))}
-      </div>
-    );
+    return <div className="h-12 animate-pulse rounded-lg border bg-card" />;
   }
   if (!summary) return null;
 
@@ -32,9 +26,8 @@ export function PaymentsLostSummary({
       iconWrap: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
       count: summary.suspendedCount ?? 0,
       deal: summary.suspendedDealValue ?? 0,
-      paid: 0,
+      paid: null as number | null,
       lost: summary.suspendedDealValue ?? 0,
-      showPaid: false,
       filter: "suspended" as CrmPaymentStatusTabId,
     },
     {
@@ -46,7 +39,6 @@ export function PaymentsLostSummary({
       deal: summary.salesLostDealValue ?? 0,
       paid: summary.salesLostPaidAmount ?? 0,
       lost: summary.salesLostAmount ?? 0,
-      showPaid: true,
       filter: "suspend_and_close" as CrmPaymentStatusTabId,
     },
     {
@@ -58,54 +50,55 @@ export function PaymentsLostSummary({
       deal: summary.customerLostDealValue ?? 0,
       paid: summary.customerLostPaidAmount ?? 0,
       lost: summary.customerLostAmount ?? 0,
-      showPaid: true,
       filter: "suspend_and_close" as CrmPaymentStatusTabId,
     },
   ];
 
   return (
-    <div className="grid gap-3 md:grid-cols-3">
+    <div className="grid gap-2 md:grid-cols-3">
       {cards.map((card) => {
         const Icon = card.icon;
         return (
-          <div key={card.id} className="rounded-xl border border-border/80 bg-card p-4 shadow-sm">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className={`flex h-8 w-8 items-center justify-center rounded-full ${card.iconWrap}`}>
-                  <Icon className="h-4 w-4" />
-                </span>
-                <div>
-                  <div className="text-sm font-semibold text-foreground">{card.title}</div>
-                  <div className="text-[11px] text-muted-foreground tabular-nums">
-                    {card.count} {card.count === 1 ? "account" : "accounts"}
-                  </div>
-                </div>
-              </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 px-2 text-[11px] text-primary"
-                onClick={() => onFilter(card.filter)}
-              >
-                View details
-              </Button>
-            </div>
-            <div className="mt-3 space-y-1.5 text-[12px]">
-              <div className="flex justify-between gap-2">
-                <span className="text-muted-foreground">Deal value</span>
-                <span className="font-medium tabular-nums text-foreground">{formatPaymentsInr(card.deal)}</span>
-              </div>
-              {card.showPaid ? (
-                <div className="flex justify-between gap-2">
-                  <span className="text-muted-foreground">Paid</span>
-                  <span className="font-medium tabular-nums text-emerald-700 dark:text-emerald-400">
-                    {formatPaymentsInr(card.paid)}
+          <div
+            key={card.id}
+            className="flex items-center gap-2 rounded-lg border border-border/80 bg-card px-2.5 py-1.5 shadow-sm"
+          >
+            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${card.iconWrap}`}>
+              <Icon className="h-3.5 w-3.5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-1">
+                <div className="truncate text-[11px] font-semibold text-foreground">
+                  {card.title}
+                  <span className="ml-1 font-normal tabular-nums text-muted-foreground">
+                    · {card.count}
                   </span>
                 </div>
-              ) : null}
-              <div className="flex justify-between gap-2 border-t border-border/60 pt-1.5">
-                <span className="text-muted-foreground">Lost</span>
-                <span className="font-semibold tabular-nums text-destructive">{formatPaymentsInr(card.lost)}</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 shrink-0 px-1.5 text-[10px] text-primary"
+                  onClick={() => onFilter(card.filter)}
+                >
+                  View
+                </Button>
+              </div>
+              <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] tabular-nums">
+                <span className="text-muted-foreground">
+                  Deal <span className="font-medium text-foreground">{formatPaymentsInr(card.deal)}</span>
+                </span>
+                {card.paid != null ? (
+                  <span className="text-muted-foreground">
+                    Paid{" "}
+                    <span className="font-medium text-emerald-700 dark:text-emerald-400">
+                      {formatPaymentsInr(card.paid)}
+                    </span>
+                  </span>
+                ) : null}
+                <span className="text-muted-foreground">
+                  Lost{" "}
+                  <span className="font-semibold text-destructive">{formatPaymentsInr(card.lost)}</span>
+                </span>
               </div>
             </div>
           </div>

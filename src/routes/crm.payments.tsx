@@ -357,7 +357,7 @@ function CrmPaymentsPage() {
 
   return (
     <PageWrap compact>
-      <div className="space-y-4 pb-4">
+      <div className="space-y-2.5 pb-3">
         <PaymentsHeader
           accountCount={accountCount}
           selectedCount={selectedIds.size}
@@ -386,7 +386,7 @@ function CrmPaymentsPage() {
 
         <PaymentsStatusTabs tabs={statusTabItems} active={statusTab} onChange={onStatusFilter} />
 
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <div className="relative max-w-md">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -394,7 +394,7 @@ function CrmPaymentsPage() {
               onChange={(e) => setSearchDraft(e.target.value)}
               placeholder="Search account…"
               aria-label="Search account"
-              className="h-9 pl-8 text-xs"
+              className="h-8 pl-8 text-xs"
             />
           </div>
 
