@@ -26,6 +26,8 @@ export type CreateDesignTicketInput = {
   description: string;
   category?: string;
   priority?: DesignTicketPriority;
+  /** Pass empty string for unassigned; omit to let server default to Support 1. */
+  assigneeId?: string;
   createdBy: { type: "client" | "team"; name: string };
   attachments?: DesignTicketAttachment[];
 };
@@ -189,6 +191,7 @@ export const useDesignTicketStore = createStore<DesignTicketState>((set, get) =>
           description: input.description,
           category: input.category,
           priority: input.priority ?? "medium",
+          assigneeId: input.assigneeId,
           createdBy: { type: "team", name: actorName },
           attachments: input.attachments,
         },

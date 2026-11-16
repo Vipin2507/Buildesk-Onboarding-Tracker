@@ -54,11 +54,24 @@ type TicketListRow = DesignTicket & {
   daysOpen: number;
 };
 
-function daysSinceRaised(createdAt: string, now = new Date()): number {
-  const raw = createdAt.trim();
+function parseTicketDate(value: string) {
+  const raw = value.trim();
   const d = raw.includes("T") || raw.includes(" ") ? parseISO(raw) : new Date(raw);
-  if (!isValid(d)) return 0;
-  return Math.max(0, differenceInCalendarDays(now, d));
+  return isValid(d) ? d : null;
+}
+
+/** Calendar days from create → end. Closed/resolved tickets freeze at resolvedAt (not today). */
+function daysOpenForTicket(
+  ticket: Pick<DesignTicket, "createdAt" | "resolvedAt" | "updatedAt" | "status">,
+  now = new Date(),
+): number {
+  const created = parseTicketDate(ticket.createdAt);
+  if (!created) return 0;
+  const closed =
+    ticket.status === "resolved" || ticket.status === "closed"
+      ? parseTicketDate(ticket.resolvedAt ?? ticket.updatedAt) ?? now
+      : now;
+  return Math.max(0, differenceInCalendarDays(closed, created));
 }
 
 function formatDaysOpen(days: number) {
@@ -135,7 +148,11 @@ function CrmTicketTrackingPage() {
   const accountOptions = useMemo(
     () =>
       filterCrmAccountsForUser(accounts, authUser)
-        .map((a) => ({ id: a.id, name: a.name }))
+        .map((a) => ({
+          id: a.id,
+          name: a.name,
+          supportManager1: a.supportManager1?.trim() || undefined,
+        }))
         .sort((a, b) => a.name.localeCompare(b.name)),
     [accounts, authUser],
   );
@@ -204,7 +221,7 @@ function CrmTicketTrackingPage() {
         supportManager2: account?.supportManager2?.trim() || "",
         salesManagerName: account?.salesManagerName?.trim() || "",
         raisedByName: t.createdBy.name,
-        daysOpen: daysSinceRaised(t.createdAt, now),
+        daysOpen: daysOpenForTicket(t, now),
       };
     });
   }, [crmTickets, accountById]);

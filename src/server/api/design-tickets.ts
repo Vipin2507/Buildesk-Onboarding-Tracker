@@ -7,6 +7,7 @@ import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { insertNotificationsForAdmins } from "@/server/api/notifications";
 import { dispatchCrmPortalTicketCreatedAutomation } from "@/server/crm-portal-ticket-automation";
+import { resolveSupportManager1Assignee } from "@/server/lib/design-ticket-assignee";
 import { isCrmAccountCompanyStub } from "@/lib/design-ticket-portal";
 import { isPlaceholderContactName, isValidEmail, isValidPortalPhone } from "@/lib/utils";
 import type {
@@ -204,6 +205,8 @@ const createInputSchema = z.object({
   description: z.string(),
   category: z.string().optional(),
   priority: z.enum(["low", "medium", "high"]).optional(),
+  /** Optional; when omitted, Support Manager 1 is used when resolvable. */
+  assigneeId: z.string().optional(),
   createdBy: z.object({
     type: z.enum(["client", "team"]),
     name: z.string(),
@@ -242,6 +245,23 @@ export const createDesignTicket = createServerFn({ method: "POST" })
     const id = data.id ?? newId();
     const ticketNumber = nextDesignTicketNumber(db);
 
+    const supportDefault = resolveSupportManager1Assignee(db, data.companyId);
+    const assigneeId =
+      data.assigneeId !== undefined
+        ? data.assigneeId.trim() || null
+        : (supportDefault?.assigneeId ?? null);
+    let assigneeName: string | null = null;
+    if (assigneeId) {
+      if (supportDefault?.assigneeId === assigneeId) {
+        assigneeName = supportDefault.assigneeName;
+      } else {
+        assigneeName =
+          db.select().from(t.users).where(eq(t.users.id, assigneeId)).get()?.name ??
+          db.select().from(t.employees).where(eq(t.employees.id, assigneeId)).get()?.name ??
+          "Assignee";
+      }
+    }
+
     db.insert(t.designTickets)
       .values({
         id,
@@ -252,7 +272,7 @@ export const createDesignTicket = createServerFn({ method: "POST" })
         category: data.category ?? null,
         priority: data.priority ?? "medium",
         status: "open",
-        assigneeId: null,
+        assigneeId,
         createdByType: data.createdBy.type,
         createdByName: data.createdBy.name,
         resolvedAt: null,
@@ -274,6 +294,14 @@ export const createDesignTicket = createServerFn({ method: "POST" })
           createdAt: now,
         })
         .run();
+    }
+
+    if (assigneeId && assigneeName) {
+      insertSystemMessage(
+        db,
+        id,
+        `Assignee set to ${assigneeName} by ${data.createdBy.name}`,
+      );
     }
 
     return loadTicket(db, id)!;
@@ -499,6 +527,8 @@ export const createPortalDesignTicket = createServerFn({ method: "POST" })
       data.description.trim(),
     ].join("\n");
 
+    const supportAssignee = resolveSupportManager1Assignee(db, portal.companyId);
+
     db.insert(t.designTickets)
       .values({
         id,
@@ -509,7 +539,7 @@ export const createPortalDesignTicket = createServerFn({ method: "POST" })
         category: data.category ?? null,
         priority: data.priority ?? "medium",
         status: "open",
-        assigneeId: null,
+        assigneeId: supportAssignee?.assigneeId ?? null,
         createdByType: "client",
         createdByName: authorName,
         resolvedAt: null,
@@ -530,6 +560,14 @@ export const createPortalDesignTicket = createServerFn({ method: "POST" })
         createdAt: now,
       })
       .run();
+
+    if (supportAssignee) {
+      insertSystemMessage(
+        db,
+        id,
+        `Assignee set to ${supportAssignee.assigneeName} (Support 1) automatically`,
+      );
+    }
 
     // Keep portal contact in sync with the person who submitted.
     if (!isPlaceholderContactName(authorName) || authorEmail) {
