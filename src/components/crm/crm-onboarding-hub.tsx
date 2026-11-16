@@ -64,7 +64,6 @@ import {
   crmPendingActivityCount,
   isCrmIntegrationModule,
 } from "@/data/crm-onboarding-defaults";
-import { resolveCrmStageLabel } from "@/stores/useCrmMasterStore";
 import { crmAccountStatusLabel } from "@/lib/crm-account-status";
 import { isAdminRoleKey } from "@/lib/permissions";
 import { calcChecklistProgress } from "@/lib/checklist";
@@ -534,16 +533,12 @@ function DashboardTab({
             </div>
             <div className="space-y-1">
               <div className="text-[10px] uppercase text-muted-foreground">Stage</div>
-              {isAdmin ? (
-                <CrmAccountStageSelect
-                  companyId={accountId}
-                  stage={record.tracker.stage}
-                  who={who}
-                  compact
-                />
-              ) : (
-                <div className="text-xs font-medium">{resolveCrmStageLabel(record.tracker.stage)}</div>
-              )}
+              <CrmAccountStageSelect
+                companyId={accountId}
+                stage={record.tracker.stage}
+                who={who}
+                compact
+              />
             </div>
           </div>
           <div className="mt-2 text-xs text-muted-foreground">

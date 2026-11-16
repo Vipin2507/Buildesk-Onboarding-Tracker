@@ -1532,17 +1532,14 @@ function CrmAccountsPage() {
                     key: "stage",
                     header: "Stage",
                     sortable: true,
-                    render: (r) =>
-                      isAdmin ? (
-                        <CrmAccountStageSelect
-                          companyId={r.id}
-                          stage={r.stage}
-                          who={currentUser?.name}
-                          compact
-                        />
-                      ) : (
-                        <span className="text-xs text-muted-foreground">{r.stageLabel}</span>
-                      ),
+                    render: (r) => (
+                      <CrmAccountStageSelect
+                        companyId={r.id}
+                        stage={r.stage}
+                        who={currentUser?.name}
+                        compact
+                      />
+                    ),
                   },
                   {
                     key: "status",
