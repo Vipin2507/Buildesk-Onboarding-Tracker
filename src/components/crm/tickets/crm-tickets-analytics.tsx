@@ -19,36 +19,63 @@ import {
   daysOpenForTicket,
   isTicketAging,
   parseTicketDate,
-  ticketCategoryLabel,
-  ticketCategoryStyle,
 } from "@/components/crm/tickets/crm-tickets-format";
 import { TICKET_EASE } from "@/components/design-ticket/design-ticket-shared";
 import { isDesignTicketActive } from "@/stores/design-ticket-selectors";
 import type { DesignTicket } from "@/types/design-ticket";
 import { cn } from "@/lib/utils";
 
+const EXEC_CHART_COLORS = [
+  "#009bff",
+  "#8b5cf6",
+  "#f59e0b",
+  "#14b8a6",
+  "#ef4444",
+  "#22c55e",
+  "#ec4899",
+  "#64748b",
+  "#0ea5e9",
+  "#a855f7",
+];
+
 type TicketAnalyticsRow = Pick<
   DesignTicket,
-  "category" | "status" | "createdAt" | "resolvedAt" | "updatedAt"
->;
+  "status" | "createdAt" | "resolvedAt" | "updatedAt"
+> & {
+  /** Account Support 1 label (executive). */
+  supportManager1?: string;
+};
 
-export function CrmTicketsAnalytics({ tickets }: { tickets: TicketAnalyticsRow[] }) {
-  const categoryData = useMemo(() => {
+export function CrmTicketsAnalytics({
+  tickets,
+  onSelectExecutive,
+}: {
+  tickets: TicketAnalyticsRow[];
+  /** Optional: click a Support 1 slice/legend to filter the table. */
+  onSelectExecutive?: (name: string) => void;
+}) {
+  const pendingByExecutive = useMemo(() => {
+    const pending = tickets.filter((t) => isDesignTicketActive(t.status));
     const counts = new Map<string, number>();
-    for (const ticket of tickets) {
-      const label = ticketCategoryLabel(ticket.category);
-      counts.set(label, (counts.get(label) ?? 0) + 1);
+    for (const ticket of pending) {
+      const name = ticket.supportManager1?.trim() || "Unassigned";
+      counts.set(name, (counts.get(name) ?? 0) + 1);
     }
-    const total = tickets.length || 1;
+    const total = pending.length || 1;
     return [...counts.entries()]
-      .map(([name, value]) => ({
+      .map(([name, value], index) => ({
         name,
         value,
         pct: Math.round((value / total) * 100),
-        fill: ticketCategoryStyle(name).chart,
+        fill: EXEC_CHART_COLORS[index % EXEC_CHART_COLORS.length]!,
       }))
       .sort((a, b) => b.value - a.value);
   }, [tickets]);
+
+  const pendingTotal = useMemo(
+    () => tickets.filter((t) => isDesignTicketActive(t.status)).length,
+    [tickets],
+  );
 
   const trendData = useMemo(() => {
     const end = startOfDay(new Date());
@@ -113,55 +140,79 @@ export function CrmTicketsAnalytics({ tickets }: { tickets: TicketAnalyticsRow[]
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: TICKET_EASE }}
-        className="rounded-xl border border-border/80 bg-gradient-to-b from-rose-500/[0.06] via-card to-card p-3 shadow-sm"
+        className="rounded-xl border border-border/80 bg-gradient-to-b from-violet-500/[0.06] via-card to-card p-3 shadow-sm"
       >
         <div className="mb-2 flex items-center justify-between gap-2">
           <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Ticket by Category
+            Pending by Support 1
           </h3>
-          <span className="text-[10px] tabular-nums text-muted-foreground">{tickets.length} total</span>
+          <span className="text-[10px] tabular-nums text-muted-foreground">
+            {pendingTotal} open / in progress
+          </span>
         </div>
-        {categoryData.length === 0 ? (
-          <EmptyChart label="No tickets to chart" />
+        {pendingByExecutive.length === 0 ? (
+          <EmptyChart label="No pending tickets" />
         ) : (
           <>
             <div className="relative h-44">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={categoryData}
+                    data={pendingByExecutive}
                     dataKey="value"
                     nameKey="name"
                     innerRadius={52}
                     outerRadius={70}
                     paddingAngle={2}
                     strokeWidth={0}
+                    cursor={onSelectExecutive ? "pointer" : undefined}
+                    onClick={(_, index) => {
+                      const entry = pendingByExecutive[index];
+                      if (entry && onSelectExecutive) {
+                        onSelectExecutive(
+                          entry.name === "Unassigned" ? "unassigned" : entry.name,
+                        );
+                      }
+                    }}
                   >
-                    {categoryData.map((entry) => (
+                    {pendingByExecutive.map((entry) => (
                       <Cell key={entry.name} fill={entry.fill} />
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value: number, name: string) => [`${value}`, name]}
+                    formatter={(value: number, name: string) => [`${value} pending`, name]}
                     contentStyle={{ fontSize: 12, borderRadius: 8 }}
                   />
                 </PieChart>
               </ResponsiveContainer>
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
                 <div className="text-lg font-semibold tabular-nums text-foreground">
-                  {categoryData[0]?.pct ?? 0}%
+                  {pendingByExecutive[0]?.pct ?? 0}%
                 </div>
                 <div className="max-w-[6.5rem] truncate text-center text-[10px] text-muted-foreground">
-                  {categoryData[0]?.name ?? "—"}
+                  {pendingByExecutive[0]?.name ?? "—"}
                 </div>
               </div>
             </div>
             <div className="mt-1 flex flex-wrap justify-center gap-x-3 gap-y-1">
-              {categoryData.slice(0, 5).map((entry) => (
-                <span key={entry.name} className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground">
+              {pendingByExecutive.slice(0, 6).map((entry) => (
+                <button
+                  key={entry.name}
+                  type="button"
+                  className={cn(
+                    "inline-flex items-center gap-1.5 text-[10px] text-muted-foreground",
+                    onSelectExecutive && "hover:text-foreground",
+                  )}
+                  onClick={() =>
+                    onSelectExecutive?.(
+                      entry.name === "Unassigned" ? "unassigned" : entry.name,
+                    )
+                  }
+                  disabled={!onSelectExecutive}
+                >
                   <span className="h-2 w-2 rounded-full" style={{ background: entry.fill }} />
-                  {entry.name} {entry.pct}%
-                </span>
+                  {entry.name} {entry.value}
+                </button>
               ))}
             </div>
           </>

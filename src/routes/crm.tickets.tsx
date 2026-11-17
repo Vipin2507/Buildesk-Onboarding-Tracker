@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, useChildMatches, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { Eye, Headset, Link2, MoreHorizontal, Plus, Search } from "lucide-react";
+import { Eye, Headset, Link2, MoreHorizontal, Plus, Search, UserRoundPlus } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -40,7 +40,10 @@ import { PageWrap } from "@/components/page-header";
 import { TicketCreateDialog } from "@/components/tickets/ticket-create-dialog";
 import { Button } from "@/components/ui/button";
 import { useSessionFilterState } from "@/hooks/use-session-filter";
-import { filterCrmAccountsForUser } from "@/lib/crm-account-access";
+import {
+  crmSalesManagerNamesMatch,
+  filterCrmAccountsForUser,
+} from "@/lib/crm-account-access";
 import { filterCrmDesignTickets } from "@/lib/crm-tickets";
 import { resolveAssigneeLabel } from "@/lib/managers";
 import { cn, formatDate } from "@/lib/utils";
@@ -139,6 +142,7 @@ function CrmTicketTrackingPage() {
   const tickets = useDesignTicketStore((s) => s.tickets);
   const updateStatus = useDesignTicketStore((s) => s.updateStatus);
   const updatePriority = useDesignTicketStore((s) => s.updatePriority);
+  const assignTicket = useDesignTicketStore((s) => s.assignTicket);
   const accounts = useCrmAccountStore((s) => s.accounts);
   const users = useUserStore((s) => s.users);
   const employees = useEmployeeStore((s) => s.employees);
@@ -146,6 +150,7 @@ function CrmTicketTrackingPage() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const [assigningSupport1, setAssigningSupport1] = useState(false);
 
   const accountOptions = useMemo(
     () =>
@@ -240,6 +245,10 @@ function CrmTicketTrackingPage() {
     () => uniqueSortedNames(ticketRows.map((r) => r.supportManager1)),
     [ticketRows],
   );
+  const unassignedSupport1Count = useMemo(
+    () => ticketRows.filter((r) => !r.supportManager1.trim()).length,
+    [ticketRows],
+  );
   const support2Options = useMemo(
     () => uniqueSortedNames(ticketRows.map((r) => r.supportManager2)),
     [ticketRows],
@@ -278,7 +287,11 @@ function CrmTicketTrackingPage() {
       if (priorityFilter !== "all" && t.priority !== priorityFilter) return false;
       if (categoryFilter !== "all" && t.categoryLabel !== categoryFilter) return false;
       if (accountFilter !== "all" && t.companyId !== accountFilter) return false;
-      if (support1Filter !== "all" && t.supportManager1 !== support1Filter) return false;
+      if (support1Filter === "unassigned") {
+        if (t.supportManager1.trim()) return false;
+      } else if (support1Filter !== "all" && t.supportManager1 !== support1Filter) {
+        return false;
+      }
       if (support2Filter !== "all" && t.supportManager2 !== support2Filter) return false;
       if (salesFilter !== "all" && t.salesManagerName !== salesFilter) return false;
       if (!q) return true;
@@ -327,12 +340,84 @@ function CrmTicketTrackingPage() {
 
   const actorName = currentUser?.name ?? "Team";
 
+  const unassignedPending = useMemo(
+    () =>
+      ticketRows.filter(
+        (t) => !t.assigneeId?.trim() && isDesignTicketActive(t.status),
+      ),
+    [ticketRows],
+  );
+
+  const assigneePeople = useMemo(() => {
+    const fromUsers = users
+      .filter((u) => u.active !== false)
+      .map((u) => ({ id: u.id, name: u.name }));
+    const seen = new Set(fromUsers.map((u) => u.id));
+    const fromEmployees = employees
+      .filter((e) => !seen.has(e.id))
+      .map((e) => ({ id: e.id, name: e.name }));
+    return [...fromUsers, ...fromEmployees];
+  }, [users, employees]);
+
+  function findPersonBySupport1Label(label: string) {
+    return (
+      assigneePeople.find((p) => crmSalesManagerNamesMatch(label, p.name)) ?? null
+    );
+  }
+
   function clearFilters() {
     setListFilters({ ...TICKET_LIST_FILTER_DEFAULTS });
   }
 
   function applyFilters() {
     tableRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function assignUnassignedToSupport1() {
+    if (assigningSupport1) return;
+    if (unassignedPending.length === 0) {
+      toast.message("No unassigned open / in-progress tickets");
+      return;
+    }
+    setAssigningSupport1(true);
+    let assigned = 0;
+    let skippedNoSupport = 0;
+    let skippedNoMatch = 0;
+    try {
+      for (const ticket of unassignedPending) {
+        const support = ticket.supportManager1.trim();
+        if (!support) {
+          skippedNoSupport += 1;
+          continue;
+        }
+        const match = findPersonBySupport1Label(support);
+        if (!match) {
+          skippedNoMatch += 1;
+          continue;
+        }
+        assignTicket(ticket.id, match.id, match.name, actorName);
+        assigned += 1;
+      }
+      if (assigned > 0) {
+        toast.success(
+          `Assigned ${assigned} ticket${assigned === 1 ? "" : "s"} to Support 1`,
+        );
+      } else {
+        toast.message("No tickets could be matched to Support 1 users");
+      }
+      if (skippedNoSupport > 0 || skippedNoMatch > 0) {
+        toast.message(
+          [
+            skippedNoSupport > 0 ? `${skippedNoSupport} missing Support 1 on account` : null,
+            skippedNoMatch > 0 ? `${skippedNoMatch} Support 1 name not found in users` : null,
+          ]
+            .filter(Boolean)
+            .join(" · "),
+        );
+      }
+    } finally {
+      setAssigningSupport1(false);
+    }
   }
 
   return (
@@ -368,6 +453,20 @@ function CrmTicketTrackingPage() {
               <Button
                 type="button"
                 size="sm"
+                variant="outline"
+                className="h-8 gap-1.5 text-xs"
+                onClick={assignUnassignedToSupport1}
+                disabled={assigningSupport1 || unassignedPending.length === 0}
+                title="Assign each unassigned open/in-progress ticket to that account’s Support 1"
+              >
+                <UserRoundPlus className="h-3.5 w-3.5" />
+                {assigningSupport1
+                  ? "Assigning…"
+                  : `Assign to Support 1${unassignedPending.length ? ` (${unassignedPending.length})` : ""}`}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
                 className="h-8 gap-1 bg-primary px-3 text-xs shadow-sm shadow-primary/20"
                 onClick={() => setCreateOpen(true)}
                 disabled={accountOptions.length === 0}
@@ -385,7 +484,13 @@ function CrmTicketTrackingPage() {
         </motion.div>
 
         <motion.div variants={ticketSectionVariants}>
-          <CrmTicketsAnalytics tickets={crmTickets} />
+          <CrmTicketsAnalytics
+            tickets={ticketRows}
+            onSelectExecutive={(name) => {
+              setSupport1Filter(name);
+              tableRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            }}
+          />
         </motion.div>
 
         <motion.div variants={ticketSectionVariants} className="-mx-3 sm:-mx-4 lg:-mx-5">
@@ -469,6 +574,14 @@ function CrmTicketTrackingPage() {
                   onChange={setSupport1Filter}
                   options={[
                     { value: "all", label: "All support 1" },
+                    ...(unassignedSupport1Count > 0
+                      ? [
+                          {
+                            value: "unassigned",
+                            label: `Unassigned (${unassignedSupport1Count})`,
+                          },
+                        ]
+                      : []),
                     ...support1Options.map((name) => ({ value: name, label: name })),
                   ]}
                 />
