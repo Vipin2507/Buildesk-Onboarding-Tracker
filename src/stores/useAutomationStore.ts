@@ -14,6 +14,7 @@ import {
   DEFAULT_HEALTH_CONFIG,
   DEFAULT_WAHA_CONFIG,
   mergeAutomationEndpoints,
+  upgradeCompanyCreatedAutomationRules,
 } from "@/data/automationDefaults";
 import { createPersistedStore, touch } from "./persist";
 import {
@@ -22,9 +23,12 @@ import {
 } from "@/lib/automation-log-sync";
 
 function flushAutomationToggles() {
-  void import("@/lib/config-persistence").then(({ flushAutomationConfigPersistence }) => {
-    flushAutomationConfigPersistence();
-  });
+  void import("@/lib/config-persistence").then(
+    ({ flushAutomationConfigPersistence, persistAutomationConfigNow }) => {
+      flushAutomationConfigPersistence({ erp: true, crm: false });
+      void persistAutomationConfigNow().catch(() => {});
+    },
+  );
 }
 
 type AutomationState = {
@@ -94,12 +98,15 @@ export const useAutomationStore = createPersistedStore<AutomationState>(
       );
       const existingIds = new Set(s.rules.map((r) => r.id));
       const missingSeeds = DEFAULT_AUTOMATION_RULES.filter((r) => !existingIds.has(r.id));
-      const mergedRules =
+      const withMissing =
         s.rules.length > 0 ? [...s.rules, ...missingSeeds] : DEFAULT_AUTOMATION_RULES;
+      const upgraded = upgradeCompanyCreatedAutomationRules(withMissing);
+      const mergedRules = upgraded.rules;
       if (
         s.seeded &&
         s.rules.length > 0 &&
         missingSeeds.length === 0 &&
+        !upgraded.changed &&
         !needsWaha &&
         !needsProvider &&
         !needsSettings
@@ -129,7 +136,7 @@ export const useAutomationStore = createPersistedStore<AutomationState>(
         rules: mergedRules,
         seeded: true,
       });
-      if (missingSeeds.length > 0) flushAutomationToggles();
+      if (missingSeeds.length > 0 || upgraded.changed) flushAutomationToggles();
     },
 
     setSettings: (partial) => {
@@ -140,13 +147,12 @@ export const useAutomationStore = createPersistedStore<AutomationState>(
           n8nWebhookBase: partial.n8nWebhookBase?.trim() ?? s.settings.n8nWebhookBase,
         },
       }));
-      if (partial.automationsEnabled !== undefined) {
-        flushAutomationToggles();
-      }
+      flushAutomationToggles();
     },
 
     restoreDefaultSettings: () => {
       set({ settings: { ...DEFAULT_AUTOMATION_SETTINGS } });
+      flushAutomationToggles();
     },
 
     setEndpointUrl: (channel, webhookUrl) => {
@@ -155,6 +161,7 @@ export const useAutomationStore = createPersistedStore<AutomationState>(
           e.channel === channel ? { ...e, webhookUrl: webhookUrl.trim() } : e,
         ),
       }));
+      flushAutomationToggles();
     },
 
     setEndpointEnabled: (channel, isEnabled) => {
@@ -167,6 +174,7 @@ export const useAutomationStore = createPersistedStore<AutomationState>(
 
     restoreDefaultEndpoints: () => {
       set({ endpoints: DEFAULT_AUTOMATION_ENDPOINTS.map((e: AutomationEndpoint) => ({ ...e })) });
+      flushAutomationToggles();
     },
 
     setWahaConfig: (partial) => {
@@ -185,10 +193,12 @@ export const useAutomationStore = createPersistedStore<AutomationState>(
               )
             : s.endpoints,
       }));
+      flushAutomationToggles();
     },
 
     restoreDefaultWaha: () => {
       set({ waha: { ...DEFAULT_WAHA_CONFIG } });
+      flushAutomationToggles();
     },
 
     setWahaHealth: (check) => {
@@ -204,14 +214,17 @@ export const useAutomationStore = createPersistedStore<AutomationState>(
       set((s) => ({
         healthCheck: { ...s.healthCheck, webhookUrl: webhookUrl.trim() },
       }));
+      flushAutomationToggles();
     },
 
     setHealthCheckMethod: (httpMethod) => {
       set((s) => ({ healthCheck: { ...s.healthCheck, httpMethod } }));
+      flushAutomationToggles();
     },
 
     restoreDefaultHealth: () => {
       set({ healthCheck: { ...DEFAULT_HEALTH_CONFIG } });
+      flushAutomationToggles();
     },
 
     setEndpointHealth: (channel, check) => {

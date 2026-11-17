@@ -81,55 +81,105 @@ function rule(
   return { ...partial, createdAt: now, updatedAt: now };
 }
 
-export const DEFAULT_AUTOMATION_RULES: AutomationRule[] = [
-  rule({
-    id: "rule-ticket-created-email",
-    name: "Ticket Created — Email",
-    trigger: "ticket-created",
-    channel: "email",
-    isActive: true,
-    templateSubject: "New support ticket {{ticketNumber}} — {{companyName}}",
-    templateBody:
-      "Hi {{customerName}},\n\nYour support ticket {{ticketNumber}} has been created.\n\nSubject: {{title}}\nStatus: {{status}}\n\nView details: {{ticketUrl}}",
-  }),
-  rule({
-    id: "rule-ticket-closed-email",
-    name: "Ticket Closed — Email",
-    trigger: "ticket-closed",
-    channel: "email",
-    isActive: true,
-    templateSubject: "Ticket {{ticketNumber}} closed — {{companyName}}",
-    templateBody:
-      "Hi {{customerName}},\n\nYour ticket {{ticketNumber}} is now closed.\n\nSubject: {{title}}\nStatus: {{status}}\n\nThank you for working with us.",
-  }),
-  rule({
-    id: "rule-ticket-created-whatsapp",
-    name: "Ticket Created — WhatsApp",
-    trigger: "ticket-created",
-    channel: "whatsapp",
-    isActive: false,
-    templateBody:
-      "Hi {{customerName}}, ticket {{ticketNumber}} was created for {{companyName}}. Status: {{status}}. {{ticketUrl}}",
-  }),
-  rule({
-    id: "rule-ticket-closed-whatsapp",
-    name: "Ticket Closed — WhatsApp",
-    trigger: "ticket-closed",
-    channel: "whatsapp",
-    isActive: false,
-    templateBody:
-      "Hi {{customerName}}, ticket {{ticketNumber}} for {{companyName}} is now closed. Status: {{status}}.",
-  }),
-  rule({
-    id: "rule-company-created-email",
-    name: "Company Created — Implementation Email",
-    description:
-      "Sends kickoff document request to POC; Owner is CC’d when different. Attach Excel templates on this rule (or the WhatsApp twin) — they go out with the email.",
-    trigger: "company-created",
-    channel: "email",
-    isActive: true,
-    templateSubject: "ERP Implementation — Required Information & Documents | {{companyName}}",
-    templateBody: `Dear Team,
+/** Formatted kickoff email (*bold* → HTML via automationMessageToEmailHtml). */
+export const COMPANY_CREATED_EMAIL_TEMPLATE = `👋 *Dear Team,*
+
+✨ Greetings from *Buildesk*!
+
+As part of the *ERP implementation* process for *{{companyName}}*, please share the required information and documents so we can start project setup and data migration.
+
+📋 *Required Information & Documents*
+• Project Name, Total Units & Project Address
+• Company Name & GST Details
+• Site Address
+• Complete Payment Plan Details
+• Unit Configuration Details _(Excel format)_
+• Existing Demand Letter Format
+• High-Resolution Project Logo
+• Existing Payment Receipt Format
+• Historical Customer Data _(if any)_
+• Historical Payment Data _(if any)_
+
+🙏 Please share the above details along with the relevant Excel sheets and document formats at the earliest.
+
+⚠️ *Important:* Once we receive the complete information, our implementation team will proceed with master setup, data verification and migration.
+
+For any clarification or assistance, feel free to contact us.
+
+*Regards,*
+*Gaurav Singh*
+ERP Implementation | Buildesk
+📞 +91 88531 77075
+📧 gaurav@cravingcode.in`;
+
+/** Formatted kickoff WhatsApp (*bold* / _italic_ + emojis for WAHA). */
+export const COMPANY_CREATED_WHATSAPP_TEMPLATE = `👋 *Dear Team,*
+✨ Greetings from *Buildesk*!
+
+As discussed, we are initiating the *ERP implementation* process for *{{companyName}}*.
+
+To ensure a smooth implementation, accurate master configuration and seamless data migration, please share the following:
+
+📁 *1. Project Information*
+• Project Name
+• Total Number of Units
+• Complete Project Address
+• Other Charges _(excluding Agreement Value)_
+
+🏢 *2. Company Information*
+• Company Name
+• GST Registration Details
+
+📍 *3. Site Address Information*
+• Complete Site Address
+
+💳 *4. Payment Plans*
+• Complete Payment Plan Details _(installment %, milestones & conditions)_
+
+🏠 *5. Unit Configuration*
+• Excel sheet with unit numbers, configurations, carpet area and other details
+
+📄 *6. Demand Letter Formats*
+• Existing Demand Letter Templates/Formats
+
+🖼 *7. Project Logos*
+• High-resolution project logo files
+
+🧾 *8. Payment Receipt Formats*
+• Existing Payment Receipt Templates/Formats
+
+👥 *9. Customer Details*
+• Historical/Previous Customer Data _(beyond the Excel sheets, if available)_
+
+💰 *10. Payment Details*
+• Historical/Previous Payment Data _(beyond the Excel sheets, if available)_
+
+⚙️ *Implementation Process*
+Once we receive the required information, our team will:
+1️⃣ Review and verify the submitted information
+2️⃣ Configure company, project and other master data
+3️⃣ Set up and verify the unit master
+4️⃣ Migrate customer and payment data
+5️⃣ Validate and reconcile data with your team
+6️⃣ Complete ERP configuration and prepare for training
+
+⏱ *Implementation Timeline:* Initial master setup and verification generally takes approximately *7–8 working days* after receiving complete information _(subject to data quality)_.
+
+🙏 Please share the above details at the earliest so we can proceed without delays.
+
+Looking forward to your cooperation.
+
+*Best Regards,*
+*Gaurav Singh*
+ERP Implementation SPOC
+Buildesk | Craving Code
+📱 +91 88531 77075
+📧 gaurav@cravingcode.in
+🛠 support@buildesk.in`;
+
+/** Prior plain templates — used to upgrade stored seeds without overwriting custom edits. */
+export const LEGACY_COMPANY_CREATED_EMAIL_TEMPLATES = [
+  `Dear Team,
 
 Greetings from Buildesk!
 
@@ -158,16 +208,10 @@ Gaurav Singh
 ERP Implementation | Buildesk
 📞 +91 88531 77075
 📧 gaurav@cravingcode.in`,
-  }),
-  rule({
-    id: "rule-company-created-whatsapp",
-    name: "Company Created — Implementation WhatsApp",
-    description:
-      "Posts kickoff checklist to the company WhatsApp group. Attach Excel templates on this rule.",
-    trigger: "company-created",
-    channel: "whatsapp",
-    isActive: true,
-    templateBody: `Dear Team,
+];
+
+export const LEGACY_COMPANY_CREATED_WHATSAPP_TEMPLATES = [
+  `Dear Team,
 Greetings from Buildesk!
 
 As discussed, we are initiating the ERP implementation process for {{companyName}}.
@@ -232,5 +276,110 @@ Buildesk | Craving Code
 Mobile: +91 88531 77075
 Email: gaurav@cravingcode.in
 Support: support@buildesk.in`,
+];
+
+function normalizeTemplateBody(body: string) {
+  return body.replace(/\r\n/g, "\n").trim();
+}
+
+/** Upgrade legacy company-created seed copy to formatted templates; keep custom edits. */
+export function upgradeCompanyCreatedAutomationRules(rules: AutomationRule[]): {
+  rules: AutomationRule[];
+  changed: boolean;
+} {
+  const legacyEmail = new Set(LEGACY_COMPANY_CREATED_EMAIL_TEMPLATES.map(normalizeTemplateBody));
+  const legacyWa = new Set(LEGACY_COMPANY_CREATED_WHATSAPP_TEMPLATES.map(normalizeTemplateBody));
+  let changed = false;
+  const next = rules.map((r) => {
+    if (r.id === "rule-company-created-email") {
+      const body = normalizeTemplateBody(r.templateBody);
+      const subject = r.templateSubject?.trim() ?? "";
+      const needsBody = legacyEmail.has(body);
+      const needsSubject =
+        !subject ||
+        subject === "ERP Implementation — Required Information & Documents | {{companyName}}";
+      if (!needsBody && !needsSubject) return r;
+      changed = true;
+      return {
+        ...r,
+        templateSubject: "ERP Implementation — Required Information & Documents | {{companyName}}",
+        templateBody: needsBody ? COMPANY_CREATED_EMAIL_TEMPLATE : r.templateBody,
+        updatedAt: nowIso(),
+      };
+    }
+    if (r.id === "rule-company-created-whatsapp") {
+      const body = normalizeTemplateBody(r.templateBody);
+      if (!legacyWa.has(body)) return r;
+      changed = true;
+      return {
+        ...r,
+        templateBody: COMPANY_CREATED_WHATSAPP_TEMPLATE,
+        updatedAt: nowIso(),
+      };
+    }
+    return r;
+  });
+  return { rules: next, changed };
+}
+
+export const DEFAULT_AUTOMATION_RULES: AutomationRule[] = [
+  rule({
+    id: "rule-ticket-created-email",
+    name: "Ticket Created — Email",
+    trigger: "ticket-created",
+    channel: "email",
+    isActive: true,
+    templateSubject: "New support ticket {{ticketNumber}} — {{companyName}}",
+    templateBody:
+      "Hi {{customerName}},\n\nYour support ticket {{ticketNumber}} has been created.\n\nSubject: {{title}}\nStatus: {{status}}\n\nView details: {{ticketUrl}}",
+  }),
+  rule({
+    id: "rule-ticket-closed-email",
+    name: "Ticket Closed — Email",
+    trigger: "ticket-closed",
+    channel: "email",
+    isActive: true,
+    templateSubject: "Ticket {{ticketNumber}} closed — {{companyName}}",
+    templateBody:
+      "Hi {{customerName}},\n\nYour ticket {{ticketNumber}} is now closed.\n\nSubject: {{title}}\nStatus: {{status}}\n\nThank you for working with us.",
+  }),
+  rule({
+    id: "rule-ticket-created-whatsapp",
+    name: "Ticket Created — WhatsApp",
+    trigger: "ticket-created",
+    channel: "whatsapp",
+    isActive: false,
+    templateBody:
+      "Hi {{customerName}}, ticket {{ticketNumber}} was created for {{companyName}}. Status: {{status}}. {{ticketUrl}}",
+  }),
+  rule({
+    id: "rule-ticket-closed-whatsapp",
+    name: "Ticket Closed — WhatsApp",
+    trigger: "ticket-closed",
+    channel: "whatsapp",
+    isActive: false,
+    templateBody:
+      "Hi {{customerName}}, ticket {{ticketNumber}} for {{companyName}} is now closed. Status: {{status}}.",
+  }),
+  rule({
+    id: "rule-company-created-email",
+    name: "Company Created — Implementation Email",
+    description:
+      "Sends kickoff document request to POC; Owner is CC’d when different. Attach Excel templates on this rule (or the WhatsApp twin) — they go out with the email.",
+    trigger: "company-created",
+    channel: "email",
+    isActive: true,
+    templateSubject: "ERP Implementation — Required Information & Documents | {{companyName}}",
+    templateBody: COMPANY_CREATED_EMAIL_TEMPLATE,
+  }),
+  rule({
+    id: "rule-company-created-whatsapp",
+    name: "Company Created — Implementation WhatsApp",
+    description:
+      "Posts kickoff checklist to the company WhatsApp group. Attach Excel templates on this rule.",
+    trigger: "company-created",
+    channel: "whatsapp",
+    isActive: true,
+    templateBody: COMPANY_CREATED_WHATSAPP_TEMPLATE,
   }),
 ];

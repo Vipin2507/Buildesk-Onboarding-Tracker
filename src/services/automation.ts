@@ -18,6 +18,7 @@ import {
 } from "@/services/automationTemplate";
 import { checkWahaSession, phoneToWahaChatId, sendWahaMedia, sendWahaText } from "@/services/waha";
 import { fetchN8nHealth, fetchN8nWebhook, normalizeIndiaPhone } from "@/lib/automationEndpoints";
+import { automationMessageToEmailHtml } from "@/lib/automation-message-format";
 import {
   n8nEmailFileFieldName,
   stripAttachmentBinariesFromPayload,
@@ -64,6 +65,9 @@ function buildN8nPayload(
     recipientEmail: payload.customerEmail,
     recipientName: payload.customerName,
     messageBody: payload.message,
+    /** HTML for n8n Email node (maps *bold* / _italic_ from the template). */
+    messageHtml: automationMessageToEmailHtml(payload.message),
+    emailHtml: automationMessageToEmailHtml(payload.message),
     emailSubject: payload.subject,
     emailCc: mergeEmailCc(settings.emailCc, ruleMeta?.emailCc),
     entityType: payload.trigger === "company-created" ? "company" : "ticket",

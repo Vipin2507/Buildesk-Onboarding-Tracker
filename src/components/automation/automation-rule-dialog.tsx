@@ -447,15 +447,20 @@ export function AutomationRuleDialog({
     setSaving(true);
     try {
       const payload = buildPayload();
-      if (editing) {
-        updateRule(editing.id, payload);
-        toast.success("Rule updated");
-      } else {
-        addRule(payload);
-        toast.success("Rule created");
-      }
+      const savedLocal = editing
+        ? (updateRule(editing.id, payload),
+          useAutomationStore.getState().rules.find((item) => item.id === editing.id))
+        : addRule(payload);
+      const rule = savedLocal;
+      if (!rule) throw new Error("Could not save this rule");
+      const { saveAutomationRule } = await import("@/lib/api");
+      const saved = await saveAutomationRule({ data: { rule } });
+      updateRule(saved.rule.id, saved.rule);
+      toast.success(editing ? "Rule updated" : "Rule created");
       onOpenChange(false);
       onSaved?.();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save this rule");
     } finally {
       setSaving(false);
     }
@@ -469,6 +474,13 @@ export function AutomationRuleDialog({
       if (!ruleId) {
         const created = addRule(buildPayload());
         ruleId = created.id;
+        try {
+          const { saveAutomationRule } = await import("@/lib/api");
+          const saved = await saveAutomationRule({ data: { rule: created } });
+          updateRule(saved.rule.id, saved.rule);
+        } catch {
+          /* local rule still usable for this test */
+        }
         toast.success("Rule saved — sending test…");
       }
 

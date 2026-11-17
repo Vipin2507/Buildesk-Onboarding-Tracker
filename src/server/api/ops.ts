@@ -673,6 +673,12 @@ function keepSavedOnboardingSlaTemplate(
   return incoming;
 }
 
+const automationRuleAttachmentSchema = z.object({
+  filename: z.string().min(1),
+  mimetype: z.string().min(1),
+  dataBase64: z.string().min(1),
+});
+
 const automationRuleSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
@@ -684,6 +690,7 @@ const automationRuleSchema = z.object({
   templateBody: z.string(),
   emailCc: z.string().optional(),
   offsetMinutes: z.number().optional(),
+  attachments: z.array(automationRuleAttachmentSchema).optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });
@@ -704,42 +711,58 @@ function toSavedAutomationRule(
     templateBody: input.templateBody,
     emailCc: input.emailCc,
     offsetMinutes: input.offsetMinutes,
+    attachments: input.attachments?.length ? input.attachments : undefined,
     createdAt,
     updatedAt,
   };
 }
+
+function upsertAutomationRuleInConfig(
+  configKey: "automation" | "crm-automation",
+  ruleInput: z.infer<typeof automationRuleSchema>,
+): AutomationRule {
+  const db = getDb();
+  const now = nowIso();
+  let saved = toSavedAutomationRule(ruleInput, ruleInput.createdAt ?? now, now);
+  getSqlite().transaction(() => {
+    const existing = db.select().from(t.appConfig).where(eq(t.appConfig.key, configKey)).get();
+    const snapshot = existing?.valueJson
+      ? (JSON.parse(existing.valueJson) as { rules?: AutomationRule[] })
+      : {};
+    const rules = Array.isArray(snapshot.rules) ? [...snapshot.rules] : [];
+    const index = rules.findIndex((rule) => rule?.id === ruleInput.id);
+    const createdAt = rules[index]?.createdAt || ruleInput.createdAt || now;
+    saved = toSavedAutomationRule(ruleInput, createdAt, now);
+    if (index >= 0) rules[index] = saved;
+    else rules.push(saved);
+    snapshot.rules = rules;
+    const valueJson = JSON.stringify(snapshot);
+    if (existing) {
+      db.update(t.appConfig)
+        .set({ valueJson, updatedAt: now })
+        .where(eq(t.appConfig.key, configKey))
+        .run();
+    } else {
+      db.insert(t.appConfig).values({ key: configKey, valueJson, updatedAt: now }).run();
+    }
+  })();
+  return saved;
+}
+
+/** Patch one ERP automation rule in SQLite so toggles/edits survive deploy. */
+export const saveAutomationRule = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ rule: automationRuleSchema }).parse(data))
+  .handler(async ({ data }): Promise<{ rule: AutomationRule }> => {
+    requireUser(["Admin"]);
+    return { rule: upsertAutomationRuleInConfig("automation", data.rule) };
+  });
 
 /** Patch one CRM automation rule inside the shared config so other PCs see the same Updated time. */
 export const saveCrmAutomationRule = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ rule: automationRuleSchema }).parse(data))
   .handler(async ({ data }): Promise<{ rule: AutomationRule }> => {
     requireUser(["Admin"]);
-    const db = getDb();
-    const now = nowIso();
-    let saved = toSavedAutomationRule(data.rule, data.rule.createdAt ?? now, now);
-    getSqlite().transaction(() => {
-      const existing = db.select().from(t.appConfig).where(eq(t.appConfig.key, "crm-automation")).get();
-      const snapshot = existing?.valueJson
-        ? (JSON.parse(existing.valueJson) as { rules?: AutomationRule[] })
-        : {};
-      const rules = Array.isArray(snapshot.rules) ? [...snapshot.rules] : [];
-      const index = rules.findIndex((rule) => rule?.id === data.rule.id);
-      const createdAt = rules[index]?.createdAt || data.rule.createdAt || now;
-      saved = toSavedAutomationRule(data.rule, createdAt, now);
-      if (index >= 0) rules[index] = saved;
-      else rules.push(saved);
-      snapshot.rules = rules;
-      const valueJson = JSON.stringify(snapshot);
-      if (existing) {
-        db.update(t.appConfig)
-          .set({ valueJson, updatedAt: now })
-          .where(eq(t.appConfig.key, "crm-automation"))
-          .run();
-      } else {
-        db.insert(t.appConfig).values({ key: "crm-automation", valueJson, updatedAt: now }).run();
-      }
-    })();
-    return { rule: saved };
+    return { rule: upsertAutomationRuleInConfig("crm-automation", data.rule) };
   });
 
 export const setAppConfig = createServerFn({ method: "POST" })

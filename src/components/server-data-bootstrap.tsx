@@ -500,10 +500,11 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
               erp: automationConfigAuthoritative,
               crm: crmAutomationConfigAuthoritative,
             });
-            // Do not write the CRM rules blob from this browser. A machine that still
-            // has the previous copy would put that older Updated time back on the server.
+            // Do not write-back after hydrate. Empty DB was already seeded with await
+            // setAppConfig above; flushing here can push stale localStorage over SQLite
+            // after deploy and reset toggles / edited rules.
             flushAutomationConfigPersistence({
-              erp: automationConfigAuthoritative,
+              erp: false,
               crm: false,
             });
           } else {

@@ -144,7 +144,7 @@ export function CrmTicketsAnalytics({
       >
         <div className="mb-2 flex items-center justify-between gap-2">
           <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Pending by Support 1
+            Pending
           </h3>
           <span className="text-[10px] tabular-nums text-muted-foreground">
             {pendingTotal} open / in progress

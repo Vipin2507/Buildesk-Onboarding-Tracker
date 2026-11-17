@@ -33,15 +33,14 @@ function escapeHtml(text: string): string {
 
 /** Turn *bold* / _italic_ lines into simple HTML for email webhooks. */
 export function automationMessageToEmailHtml(body: string): string {
-  return body
-    .split("\n")
-    .map((line) => {
-      const escaped = escapeHtml(line);
-      return escaped
-        .replace(/\*([^*]+)\*/g, "<strong>$1</strong>")
-        .replace(/_([^_]+)_/g, "<em>$1</em>");
-    })
-    .join("<br />\n");
+  const lines = body.replace(/\r\n/g, "\n").split("\n").map((line) => {
+    if (!line.trim()) return "";
+    const escaped = escapeHtml(line);
+    return escaped
+      .replace(/\*([^*\n]+)\*/g, "<strong>$1</strong>")
+      .replace(/_([^_\n]+)_/g, "<em>$1</em>");
+  });
+  return `<div style="font-family:Segoe UI,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.55;color:#111827;">${lines.join("<br />\n")}</div>`;
 }
 
 export const AUTOMATION_FORMAT_HINT =

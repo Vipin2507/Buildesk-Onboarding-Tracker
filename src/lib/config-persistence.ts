@@ -150,6 +150,18 @@ export function flushMasterConfigPersistence() {
   void setAppConfig({ data: { key: "master", value: masterSnapshot() } });
 }
 
+/** Write the current ERP automation config to SQLite and wait until the write finishes. */
+export async function persistAutomationConfigNow() {
+  if (!canPersistAppConfig()) {
+    throw new Error("Only an admin can save automation settings");
+  }
+  if (!erpAutomationConfigPersistReady) {
+    throw new Error("Automation settings are still loading. Wait a moment and save again.");
+  }
+  cancelServerSyncDebounced("automation-config");
+  await setAppConfig({ data: { key: "automation", value: automationSnapshot() } });
+}
+
 /** Write the current CRM automation rules to SQLite and wait until the write finishes. */
 export async function persistCrmAutomationConfigNow() {
   if (!canPersistAppConfig()) {
