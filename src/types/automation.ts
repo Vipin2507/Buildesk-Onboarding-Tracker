@@ -72,7 +72,7 @@ export interface AutomationRule {
   emailCc?: string;
   /** Minutes before a scheduled task start (task-before-start trigger only). */
   offsetMinutes?: number;
-  /** Optional Excel/docs sent with WhatsApp (and email when supported) for this rule. */
+  /** Optional Excel/docs/PDFs: WhatsApp media + email multipart (`email_file`). */
   attachments?: AutomationRuleAttachment[];
   createdAt: string;
   updatedAt: string;

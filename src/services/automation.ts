@@ -18,6 +18,10 @@ import {
 } from "@/services/automationTemplate";
 import { checkWahaSession, phoneToWahaChatId, sendWahaMedia, sendWahaText } from "@/services/waha";
 import { fetchN8nHealth, fetchN8nWebhook, normalizeIndiaPhone } from "@/lib/automationEndpoints";
+import {
+  n8nEmailFileFieldName,
+  stripAttachmentBinariesFromPayload,
+} from "@/lib/n8n-email-multipart";
 import { N8N_EMAIL_SEGMENT, N8N_HEALTH_SEGMENT } from "@/data/automationDefaults";
 import type { AutomationRule } from "@/types/automation";
 import type { Company, TicketStatus } from "@/types";
@@ -82,19 +86,18 @@ function buildN8nPayload(
     // Always last — n8n Wait requires a number ≥ 0 ("Invalid wait amount" if missing).
     delayHours: 0,
     waitAmount: 0,
-    // Email attachments for n8n (Gmail / SMTP / custom nodes).
+    // Attachment metadata only — binaries go as multipart `email_file` / `email_file_N`.
     hasAttachments: (payload.attachments?.length ?? 0) > 0,
     attachmentCount: payload.attachments?.length ?? 0,
-    attachments: (payload.attachments ?? []).map((a) => ({
+    attachments: (payload.attachments ?? []).map((a, i) => ({
       filename: a.filename,
       name: a.filename,
       mimetype: a.mimetype,
       contentType: a.mimetype,
       type: a.mimetype,
-      dataBase64: a.dataBase64,
-      content: a.dataBase64,
-      data: a.dataBase64,
+      field: n8nEmailFileFieldName(i),
     })),
+    attachmentFields: (payload.attachments ?? []).map((_, i) => n8nEmailFileFieldName(i)),
     ownerName: payload.ownerName,
     ownerEmail: payload.ownerEmail,
     pocName: payload.pocName,
@@ -171,10 +174,20 @@ export async function sendAutomationRequest(
     templateName: meta?.templateName,
     emailCc: meta?.emailCc,
   });
+  const emailFiles = (payload.attachments ?? [])
+    .filter((a) => a.dataBase64?.trim())
+    .map((a) => ({
+      filename: a.filename,
+      mimetype: a.mimetype,
+      dataBase64: a.dataBase64,
+    }));
+  // Logs stay lean — never persist multi-MB base64 blobs.
+  const logPayload =
+    emailFiles.length > 0 ? stripAttachmentBinariesFromPayload(n8nBody, emailFiles) : n8nBody;
 
   store.upsertLog({
     ...baseLog,
-    requestPayload: n8nBody,
+    requestPayload: logPayload,
   });
 
   try {
@@ -182,6 +195,7 @@ export async function sendAutomationRequest(
       N8N_EMAIL_SEGMENT,
       n8nBody,
       store.settings.n8nWebhookBase,
+      emailFiles.length > 0 ? { files: emailFiles } : undefined,
     );
     if (!result.ok) {
       const log: AutomationLog = {
@@ -189,7 +203,7 @@ export async function sendAutomationRequest(
         status: "failed",
         errorMessage: `HTTP ${result.status}: ${summarizeResponse(result.text, 240)}`,
         responseSummary: summarizeResponse(result.text),
-        requestPayload: n8nBody,
+        requestPayload: logPayload,
       };
       store.upsertLog(log);
       return log;
@@ -198,7 +212,7 @@ export async function sendAutomationRequest(
       ...baseLog,
       status: "success",
       responseSummary: summarizeResponse(result.text),
-      requestPayload: n8nBody,
+      requestPayload: logPayload,
     };
     store.upsertLog(log);
     return log;
@@ -208,7 +222,7 @@ export async function sendAutomationRequest(
       ...baseLog,
       status: "failed",
       errorMessage: message,
-      requestPayload: n8nBody,
+      requestPayload: logPayload,
     };
     store.upsertLog(log);
     return log;

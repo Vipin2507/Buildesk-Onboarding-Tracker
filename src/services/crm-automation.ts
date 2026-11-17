@@ -23,6 +23,10 @@ import {
 } from "@/services/automationTemplate";
 import { checkWahaSession, phoneToWahaChatId, sendWahaText } from "@/services/waha";
 import { fetchN8nHealth, fetchN8nWebhook, normalizeIndiaPhone } from "@/lib/automationEndpoints";
+import {
+  n8nEmailFileFieldName,
+  stripAttachmentBinariesFromPayload,
+} from "@/lib/n8n-email-multipart";
 import { absoluteAppUrl } from "@/lib/app-base-url";
 import {
   CRM_AUTOMATION_SAMPLE_VARS,
@@ -106,6 +110,18 @@ function buildN8nPayload(
     // Always last — n8n Wait requires a number ≥ 0 ("Invalid wait amount" if missing).
     delayHours: 0,
     waitAmount: 0,
+    // Attachment metadata only — binaries go as multipart `email_file` / `email_file_N`.
+    hasAttachments: (payload.attachments?.length ?? 0) > 0,
+    attachmentCount: payload.attachments?.length ?? 0,
+    attachments: (payload.attachments ?? []).map((a, i) => ({
+      filename: a.filename,
+      name: a.filename,
+      mimetype: a.mimetype,
+      contentType: a.mimetype,
+      type: a.mimetype,
+      field: n8nEmailFileFieldName(i),
+    })),
+    attachmentFields: (payload.attachments ?? []).map((_, i) => n8nEmailFileFieldName(i)),
   };
 }
 
@@ -178,10 +194,19 @@ export async function sendCrmAutomationRequest(
     templateName: meta?.templateName,
     emailCc: meta?.emailCc,
   });
+  const emailFiles = (payload.attachments ?? [])
+    .filter((a) => a.dataBase64?.trim())
+    .map((a) => ({
+      filename: a.filename,
+      mimetype: a.mimetype,
+      dataBase64: a.dataBase64,
+    }));
+  const logPayload =
+    emailFiles.length > 0 ? stripAttachmentBinariesFromPayload(n8nBody, emailFiles) : n8nBody;
 
   store.upsertLog({
     ...baseLog,
-    requestPayload: n8nBody,
+    requestPayload: logPayload,
   });
 
   try {
@@ -189,6 +214,7 @@ export async function sendCrmAutomationRequest(
       N8N_EMAIL_SEGMENT,
       n8nBody,
       store.settings.n8nWebhookBase,
+      emailFiles.length > 0 ? { files: emailFiles } : undefined,
     );
     if (!result.ok) {
       const log: AutomationLog = {
@@ -196,7 +222,7 @@ export async function sendCrmAutomationRequest(
         status: "failed",
         errorMessage: `HTTP ${result.status}: ${summarizeResponse(result.text, 240)}`,
         responseSummary: summarizeResponse(result.text),
-        requestPayload: n8nBody,
+        requestPayload: logPayload,
       };
       store.upsertLog(log);
       return log;
@@ -205,7 +231,7 @@ export async function sendCrmAutomationRequest(
       ...baseLog,
       status: "success",
       responseSummary: summarizeResponse(result.text),
-      requestPayload: n8nBody,
+      requestPayload: logPayload,
     };
     store.upsertLog(log);
     return log;
@@ -215,7 +241,7 @@ export async function sendCrmAutomationRequest(
       ...baseLog,
       status: "failed",
       errorMessage: message,
-      requestPayload: n8nBody,
+      requestPayload: logPayload,
     };
     store.upsertLog(log);
     return log;

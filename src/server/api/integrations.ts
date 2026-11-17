@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+import { buildN8nEmailFormData } from "@/lib/n8n-email-multipart";
 import { requireUser } from "@/server/auth/session";
 
 function trimSlash(url: string) {
@@ -16,6 +17,12 @@ async function readProxyResponse(res: Response) {
   return { ok: res.ok, status: res.status, text };
 }
 
+const n8nWebhookFileSchema = z.object({
+  filename: z.string().min(1),
+  mimetype: z.string().min(1),
+  dataBase64: z.string().min(1),
+});
+
 export const proxyN8nWebhook = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z
@@ -23,12 +30,27 @@ export const proxyN8nWebhook = createServerFn({ method: "POST" })
         segment: z.string().min(1),
         body: z.record(z.unknown()),
         n8nWebhookBase: z.string().min(1),
+        /** When present, rebuild multipart/form-data for n8n Email attachments. */
+        files: z.array(n8nWebhookFileSchema).optional(),
       })
       .parse(data),
   )
   .handler(async ({ data }) => {
     requireUser();
-    const res = await fetch(buildN8nUrl(data.n8nWebhookBase, data.segment), {
+    const url = buildN8nUrl(data.n8nWebhookBase, data.segment);
+    const files = data.files?.filter((f) => f.dataBase64.trim()) ?? [];
+
+    if (files.length > 0) {
+      const form = buildN8nEmailFormData(data.body, files);
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { Accept: "application/json" },
+        body: form,
+      });
+      return readProxyResponse(res);
+    }
+
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify(data.body),

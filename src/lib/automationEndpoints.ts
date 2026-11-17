@@ -1,10 +1,17 @@
 import type { WahaConfig } from "@/types/automation";
+import {
+  buildN8nEmailFormData,
+  stripAttachmentBinariesFromPayload,
+  type N8nEmailFile,
+} from "@/lib/n8n-email-multipart";
 
 export type IntegrationFetchResult = {
   ok: boolean;
   status: number;
   text: string;
 };
+
+export type { N8nEmailFile };
 
 function trimSlash(url: string) {
   return url.replace(/\/+$/, "");
@@ -55,15 +62,35 @@ function withN8nWaitSafeBody(body: Record<string, unknown>): Record<string, unkn
   };
 }
 
-/** Email / SMS → n8n webhook segment (buildesk-email, buildesk-health, …). */
+/**
+ * Email / SMS → n8n webhook segment (buildesk-support, buildesk-health, …).
+ * When `opts.files` is present, POSTs multipart/form-data (binary attachments);
+ * otherwise POSTs application/json.
+ */
 export async function fetchN8nWebhook(
   segment: string,
   body: Record<string, unknown>,
   n8nWebhookBase: string,
+  opts?: { files?: N8nEmailFile[] },
 ): Promise<IntegrationFetchResult> {
-  const safeBody = withN8nWaitSafeBody(body);
+  const files = (opts?.files ?? []).filter((f) => f.dataBase64?.trim());
+  const useMultipart = files.length > 0;
+  const safeBody = withN8nWaitSafeBody(
+    useMultipart ? stripAttachmentBinariesFromPayload(body, files) : body,
+  );
+  const seg = segment.replace(/^\/+/, "");
+
   if (isDevClient()) {
-    const res = await fetch(`/n8n/webhook/${segment.replace(/^\/+/, "")}`, {
+    if (useMultipart) {
+      const form = buildN8nEmailFormData(safeBody, files);
+      const res = await fetch(`/n8n/webhook/${seg}`, {
+        method: "POST",
+        headers: { Accept: "application/json" },
+        body: form,
+      });
+      return readResponse(res);
+    }
+    const res = await fetch(`/n8n/webhook/${seg}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify(safeBody),
@@ -73,7 +100,24 @@ export async function fetchN8nWebhook(
 
   if (isHttpsClient()) {
     const { proxyN8nWebhook } = await import("@/server/api/integrations");
-    return proxyN8nWebhook({ data: { segment, body: safeBody, n8nWebhookBase } });
+    return proxyN8nWebhook({
+      data: {
+        segment,
+        body: safeBody,
+        n8nWebhookBase,
+        ...(useMultipart ? { files } : {}),
+      },
+    });
+  }
+
+  if (useMultipart) {
+    const form = buildN8nEmailFormData(safeBody, files);
+    const res = await fetch(buildN8nWebhookUrl(n8nWebhookBase, segment), {
+      method: "POST",
+      headers: { Accept: "application/json" },
+      body: form,
+    });
+    return readResponse(res);
   }
 
   const res = await fetch(buildN8nWebhookUrl(n8nWebhookBase, segment), {

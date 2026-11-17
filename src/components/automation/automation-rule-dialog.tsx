@@ -101,6 +101,14 @@ function ruleToForm(rule: AutomationRule): RuleFormState {
   };
 }
 
+function attachmentMimeType(file: File): string {
+  if (file.type?.trim()) return file.type;
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".rar")) return "application/vnd.rar";
+  if (name.endsWith(".zip")) return "application/zip";
+  return "application/octet-stream";
+}
+
 async function readFileAsAttachment(file: File): Promise<AutomationRuleAttachment> {
   if (file.size > MAX_ATTACHMENT_BYTES) {
     throw new Error(`“${file.name}” is larger than 8 MB`);
@@ -114,7 +122,7 @@ async function readFileAsAttachment(file: File): Promise<AutomationRuleAttachmen
   }
   return {
     filename: file.name || "attachment",
-    mimetype: file.type || "application/octet-stream",
+    mimetype: attachmentMimeType(file),
     dataBase64: btoa(binary),
   };
 }
@@ -656,7 +664,7 @@ export function AutomationRuleDialog({
                 title="Attachments"
                 description={
                   form.channel === "email"
-                    ? "Excel/docs are included on the email via n8n (filename + base64)."
+                    ? "Excel/docs/PDFs are attached on the email via n8n multipart (binary file fields)."
                     : form.trigger === "company-created"
                       ? "Excel/docs are sent to the company WhatsApp group after the message text. Files on either company-created rule are also shared with the email kickoff."
                       : "Optional Excel/docs sent with this WhatsApp message."
@@ -668,7 +676,7 @@ export function AutomationRuleDialog({
                   <input
                     type="file"
                     multiple
-                    accept=".xlsx,.xls,.csv,.pdf,.doc,.docx,image/*"
+                    accept=".xlsx,.xls,.csv,.pdf,.doc,.docx,.rar,.zip,image/*"
                     className="block w-full text-xs file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-primary hover:file:bg-primary/15"
                     onChange={(e) => {
                       const files = Array.from(e.target.files ?? []);
