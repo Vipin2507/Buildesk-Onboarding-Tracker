@@ -168,7 +168,14 @@ export function AutomationRulesPanel() {
           size="sm"
           onCheckedChange={(v) => {
             setSettings({ automationsEnabled: v === true });
-            toast.success(v ? "Automation rules enabled" : "All automation rules paused");
+            void import("@/lib/config-persistence")
+              .then(({ persistAutomationConfigNow }) => persistAutomationConfigNow())
+              .then(() =>
+                toast.success(v ? "Automation rules enabled" : "All automation rules paused"),
+              )
+              .catch((err: unknown) =>
+                toast.error(err instanceof Error ? err.message : "Could not save automation toggle"),
+              );
           }}
         />
       </motion.div>

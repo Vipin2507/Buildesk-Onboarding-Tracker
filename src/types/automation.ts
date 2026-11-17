@@ -228,4 +228,13 @@ export const AUTOMATION_TEMPLATE_VARS = [
   "{{pocEmail}}",
   "{{ownerName}}",
   "{{ownerEmail}}",
+  "{{managerName}}",
+  "{{managerPhone}}",
+  "{{managerEmail}}",
+  "{{supportManager1Name}}",
+  "{{supportManager1Phone}}",
+  "{{supportManager1Email}}",
+  "{{supportManager2Name}}",
+  "{{supportManager2Phone}}",
+  "{{supportManager2Email}}",
 ] as const;

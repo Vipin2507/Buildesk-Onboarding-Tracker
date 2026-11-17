@@ -31,6 +31,21 @@ export function AutomationWebhookSettings() {
   const emailEndpoint = endpoints.find((e) => e.channel === "email");
   const whatsappEndpoint = endpoints.find((e) => e.channel === "whatsapp");
   const [showApiKey, setShowApiKey] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  async function saveToServer(label: string) {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const { persistAutomationConfigNow } = await import("@/lib/config-persistence");
+      await persistAutomationConfigNow();
+      toast.success(`${label} saved`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save automation settings");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="space-y-2">
@@ -86,7 +101,7 @@ export function AutomationWebhookSettings() {
           </label>
         ) : null}
         <div className="mt-2 flex flex-wrap gap-1.5">
-          <Button size="sm" className="h-7 px-2.5 text-xs" onClick={() => toast.success("n8n settings saved")}>
+          <Button size="sm" className="h-7 px-2.5 text-xs" disabled={saving} onClick={() => void saveToServer("n8n settings")}>
             Save
           </Button>
           <Button
@@ -148,7 +163,7 @@ export function AutomationWebhookSettings() {
           WAHA enabled
         </label>
         <div className="mt-2 flex flex-wrap gap-1.5">
-          <Button size="sm" className="h-7 px-2.5 text-xs" onClick={() => toast.success("WAHA settings saved")}>
+          <Button size="sm" className="h-7 px-2.5 text-xs" disabled={saving} onClick={() => void saveToServer("WAHA settings")}>
             Save
           </Button>
           <Button
@@ -179,7 +194,7 @@ export function AutomationWebhookSettings() {
           <option value="GET">GET</option>
         </select>
         <div className="flex flex-wrap gap-1.5">
-          <Button size="sm" className="h-7 px-2.5 text-xs" onClick={() => toast.success("Health check method saved")}>
+          <Button size="sm" className="h-7 px-2.5 text-xs" disabled={saving} onClick={() => void saveToServer("Health check method")}>
             Save
           </Button>
           <Button

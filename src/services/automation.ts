@@ -11,6 +11,9 @@ import type { Ticket } from "@/types";
 import { useAutomationStore } from "@/stores/useAutomationStore";
 import { useCompanyPortalStore } from "@/stores/useCompanyPortalStore";
 import { useCompanyStore } from "@/stores/useCompanyStore";
+import { useEmployeeStore, useUserStore } from "@/stores";
+import { resolveCompanyManagerContact } from "@/lib/company-manager-contact";
+import { pullErpAutomationConfigFromServer } from "@/lib/erp-automation-refresh";
 import {
   AUTOMATION_SAMPLE_VARS,
   renderAutomationSubject,
@@ -510,6 +513,7 @@ function normalizeEmail(value?: string | null) {
 /** Kickoff email + WhatsApp when a company is created from Add Company. */
 export function dispatchCompanyCreatedAutomation(company: Company): void {
   void (async () => {
+    await pullErpAutomationConfigFromServer();
     const store = useAutomationStore.getState();
     if (!store.settings.automationsEnabled) return;
     const rules = store.rules.filter((r) => r.isActive && r.trigger === "company-created");
@@ -535,6 +539,11 @@ export function dispatchCompanyCreatedAutomation(company: Company): void {
       return [...byKey.values()];
     })();
 
+    const manager = resolveCompanyManagerContact(
+      company,
+      useUserStore.getState().users,
+      useEmployeeStore.getState().employees,
+    );
     const vars: Record<string, string> = {
       customerName: pocName,
       companyName: company.name,
@@ -548,6 +557,15 @@ export function dispatchCompanyCreatedAutomation(company: Company): void {
       subject: `ERP implementation — ${company.name}`,
       title: `ERP implementation — ${company.name}`,
       ticketUrl: "",
+      managerName: manager.managerName,
+      managerPhone: manager.managerPhone,
+      managerEmail: manager.managerEmail,
+      supportManager1Name: manager.supportManager1Name,
+      supportManager1Phone: manager.supportManager1Phone,
+      supportManager1Email: manager.supportManager1Email,
+      supportManager2Name: manager.supportManager2Name,
+      supportManager2Phone: manager.supportManager2Phone,
+      supportManager2Email: manager.supportManager2Email,
     };
 
     for (const rule of rules) {

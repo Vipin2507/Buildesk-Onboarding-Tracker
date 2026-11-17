@@ -107,10 +107,10 @@ As part of the *ERP implementation* process for *{{companyName}}*, please share 
 For any clarification or assistance, feel free to contact us.
 
 *Regards,*
-*Gaurav Singh*
+*{{managerName}}*
 ERP Implementation | Buildesk
-📞 +91 88531 77075
-📧 gaurav@cravingcode.in`;
+📞 {{managerPhone}}
+📧 {{managerEmail}}`;
 
 /** Formatted kickoff WhatsApp (*bold* / _italic_ + emojis for WAHA). */
 export const COMPANY_CREATED_WHATSAPP_TEMPLATE = `👋 *Dear Team,*
@@ -170,15 +170,44 @@ Once we receive the required information, our team will:
 Looking forward to your cooperation.
 
 *Best Regards,*
-*Gaurav Singh*
+*{{managerName}}*
 ERP Implementation SPOC
 Buildesk | Craving Code
-📱 +91 88531 77075
-📧 gaurav@cravingcode.in
+📱 {{managerPhone}}
+📧 {{managerEmail}}
 🛠 support@buildesk.in`;
 
-/** Prior plain templates — used to upgrade stored seeds without overwriting custom edits. */
+/** Prior templates — used to upgrade stored seeds without overwriting custom edits. */
 export const LEGACY_COMPANY_CREATED_EMAIL_TEMPLATES = [
+  `👋 *Dear Team,*
+
+✨ Greetings from *Buildesk*!
+
+As part of the *ERP implementation* process for *{{companyName}}*, please share the required information and documents so we can start project setup and data migration.
+
+📋 *Required Information & Documents*
+• Project Name, Total Units & Project Address
+• Company Name & GST Details
+• Site Address
+• Complete Payment Plan Details
+• Unit Configuration Details _(Excel format)_
+• Existing Demand Letter Format
+• High-Resolution Project Logo
+• Existing Payment Receipt Format
+• Historical Customer Data _(if any)_
+• Historical Payment Data _(if any)_
+
+🙏 Please share the above details along with the relevant Excel sheets and document formats at the earliest.
+
+⚠️ *Important:* Once we receive the complete information, our implementation team will proceed with master setup, data verification and migration.
+
+For any clarification or assistance, feel free to contact us.
+
+*Regards,*
+*Gaurav Singh*
+ERP Implementation | Buildesk
+📞 +91 88531 77075
+📧 gaurav@cravingcode.in`,
   `Dear Team,
 
 Greetings from Buildesk!
@@ -282,6 +311,22 @@ function normalizeTemplateBody(body: string) {
   return body.replace(/\r\n/g, "\n").trim();
 }
 
+/** Swap the old fixed implementation contact for per-company manager variables. */
+function personalizeCompanyCreatedBody(body: string): string {
+  if (
+    body.includes("{{managerName}}") &&
+    body.includes("{{managerPhone}}") &&
+    body.includes("{{managerEmail}}")
+  ) {
+    return body;
+  }
+  return body
+    .replace(/\*Gaurav Singh\*/g, "*{{managerName}}*")
+    .replace(/Gaurav Singh/g, "{{managerName}}")
+    .replace(/\+91 88531 77075/g, "{{managerPhone}}")
+    .replace(/gaurav@cravingcode\.in/gi, "{{managerEmail}}");
+}
+
 /** Upgrade legacy company-created seed copy to formatted templates; keep custom edits. */
 export function upgradeCompanyCreatedAutomationRules(rules: AutomationRule[]): {
   rules: AutomationRule[];
@@ -295,25 +340,32 @@ export function upgradeCompanyCreatedAutomationRules(rules: AutomationRule[]): {
       const body = normalizeTemplateBody(r.templateBody);
       const subject = r.templateSubject?.trim() ?? "";
       const needsBody = legacyEmail.has(body);
+      const personalized = personalizeCompanyCreatedBody(
+        needsBody ? COMPANY_CREATED_EMAIL_TEMPLATE : r.templateBody,
+      );
       const needsSubject =
         !subject ||
         subject === "ERP Implementation — Required Information & Documents | {{companyName}}";
-      if (!needsBody && !needsSubject) return r;
+      if (personalized === r.templateBody && !needsSubject && !needsBody) return r;
+      if (personalized === r.templateBody && !needsSubject) return r;
       changed = true;
       return {
         ...r,
-        templateSubject: "ERP Implementation — Required Information & Documents | {{companyName}}",
-        templateBody: needsBody ? COMPANY_CREATED_EMAIL_TEMPLATE : r.templateBody,
+        templateSubject: subject || "ERP Implementation — Required Information & Documents | {{companyName}}",
+        templateBody: personalized,
         updatedAt: nowIso(),
       };
     }
     if (r.id === "rule-company-created-whatsapp") {
       const body = normalizeTemplateBody(r.templateBody);
-      if (!legacyWa.has(body)) return r;
+      const personalized = personalizeCompanyCreatedBody(
+        legacyWa.has(body) ? COMPANY_CREATED_WHATSAPP_TEMPLATE : r.templateBody,
+      );
+      if (personalized === r.templateBody) return r;
       changed = true;
       return {
         ...r,
-        templateBody: COMPANY_CREATED_WHATSAPP_TEMPLATE,
+        templateBody: personalized,
         updatedAt: nowIso(),
       };
     }

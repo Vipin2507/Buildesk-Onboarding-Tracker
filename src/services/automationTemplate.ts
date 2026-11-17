@@ -26,4 +26,13 @@ export const AUTOMATION_SAMPLE_VARS: Record<string, string> = {
   pocEmail: "priya@skyline.example",
   ownerName: "Ravi Mehta",
   ownerEmail: "ravi@skyline.example",
+  managerName: "Anita Support",
+  managerPhone: "+91 98000 00000",
+  managerEmail: "anita@buildesk.in",
+  supportManager1Name: "Anita Support",
+  supportManager1Phone: "+91 98000 00000",
+  supportManager1Email: "anita@buildesk.in",
+  supportManager2Name: "Ravi Support",
+  supportManager2Phone: "+91 98000 00001",
+  supportManager2Email: "ravi.support@buildesk.in",
 };

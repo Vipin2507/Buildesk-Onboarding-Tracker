@@ -23,12 +23,14 @@ import {
 } from "@/lib/automation-log-sync";
 
 function flushAutomationToggles() {
-  void import("@/lib/config-persistence").then(
-    ({ flushAutomationConfigPersistence, persistAutomationConfigNow }) => {
-      flushAutomationConfigPersistence({ erp: true, crm: false });
-      void persistAutomationConfigNow().catch(() => {});
-    },
-  );
+  void import("@/lib/config-persistence").then(async ({ persistAutomationConfigNow }) => {
+    try {
+      await persistAutomationConfigNow();
+    } catch (err) {
+      const { toast } = await import("sonner");
+      toast.error(err instanceof Error ? err.message : "Could not save automation settings");
+    }
+  });
 }
 
 type AutomationState = {
