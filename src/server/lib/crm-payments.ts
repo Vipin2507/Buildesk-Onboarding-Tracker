@@ -555,8 +555,13 @@ function applyPaymentsStatusFilter(
     return items;
   }
 
-  // Due / collection tabs stay on active accounts (exclude inactive + suspend and close).
-  const active = items.filter((row) => !isInactiveCrmAccountForPayments(row.accountStatus));
+  // Due / collection tabs stay on active accounts (exclude inactive, suspend and close, and suspended).
+  const active = items.filter(
+    (row) =>
+      !isInactiveCrmAccountForPayments(row.accountStatus) &&
+      !isSuspendedCrmAccountForPayments(row.accountStatus) &&
+      row.accountStatus !== "closed",
+  );
   if (status === "renewal") {
     return active.filter((row) => isRenewalPaymentAccount(row));
   }
@@ -795,18 +800,14 @@ export function summarizePaymentList(
   const totalContractValue = roundMoney(tableRows.reduce((s, r) => s + r.totalDealValue, 0));
   const totalReceived = roundMoney(tableRows.reduce((s, r) => s + r.paymentReceived, 0));
   const totalPending = roundMoney(tableRows.reduce((s, r) => s + r.pendingAmount, 0));
-  const totalOverdueAmount = roundMoney(tableRows.reduce((s, r) => s + r.overdueAmount, 0));
-  const overdueRows = tableRows.filter((r) => matchesPaymentDueFilter(r, "overdue", today));
+  const overdueRows = applyPaymentsStatusFilter(tableRows, "overdue", today);
+  const totalOverdueAmount = roundMoney(
+    overdueRows.reduce((s, r) => s + r.overdueAmount, 0),
+  );
   const overdueAccountCount = overdueRows.length;
-  const dueThisWeekRows = tableRows.filter((r) =>
-    matchesPaymentDueFilter(r, "due_this_week", today),
-  );
-  const dueThisMonthRows = tableRows.filter((r) =>
-    matchesPaymentDueFilter(r, "due_this_month", today),
-  );
-  const dueIn45Rows = tableRows.filter((r) =>
-    matchesPaymentDueFilter(r, "due_in_45_days", today),
-  );
+  const dueThisWeekRows = applyPaymentsStatusFilter(tableRows, "due_this_week", today);
+  const dueThisMonthRows = applyPaymentsStatusFilter(tableRows, "due_this_month", today);
+  const dueIn45Rows = applyPaymentsStatusFilter(tableRows, "due_in_45_days", today);
   const dueThisWeekAmount = sumDueAmount(dueThisWeekRows);
   const dueThisWeekCount = dueThisWeekRows.length;
   const dueThisMonthAmount = sumDueAmount(dueThisMonthRows);

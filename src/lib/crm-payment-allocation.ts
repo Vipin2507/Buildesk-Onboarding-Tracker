@@ -220,25 +220,33 @@ export function matchesPaymentDueFilter(
 
   if (!due) return false;
 
-  if (filter === "overdue") return due < today;
+  if (filter === "overdue") {
+    if (row.paymentStatus === "fully_paid" || row.paymentStatus === "renewal") return false;
+    return due < today;
+  }
 
   if (filter === "due_this_week") {
+    if (row.paymentStatus === "fully_paid" || row.paymentStatus === "renewal") return false;
     return due >= today && due >= startOfWeekMonday(today) && due <= endOfWeekSunday(today);
   }
 
   if (filter === "due_this_month") {
+    if (row.paymentStatus === "fully_paid" || row.paymentStatus === "renewal") return false;
     return due >= startOfMonthYmd(today) && due <= endOfMonthYmd(today);
   }
 
   if (filter === "due_in_45_days") {
+    if (row.paymentStatus === "fully_paid" || row.paymentStatus === "renewal") return false;
     return due >= today && due <= addDaysYmd(today, 45);
   }
 
   if (filter === "due_in_90_days") {
+    if (row.paymentStatus === "fully_paid" || row.paymentStatus === "renewal") return false;
     return due >= today && due <= addDaysYmd(today, 90);
   }
 
   if (filter === "upcoming") {
+    if (row.paymentStatus === "fully_paid" || row.paymentStatus === "renewal") return false;
     return due > addDaysYmd(today, 90);
   }
 

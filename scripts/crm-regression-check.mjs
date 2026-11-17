@@ -108,6 +108,64 @@ check("timeline merge sorts by createdAt descending", () => {
   assert.equal(merged[1].id, "a");
 });
 
+check("overdue payments filter excludes suspended, closed, and inactive accounts", () => {
+  const today = "2026-11-17";
+  const rows = [
+    {
+      accountName: "Active Overdue",
+      accountStatus: "live",
+      paymentStatus: "overdue",
+      overdueAmount: 50000,
+      nextDueInstallment: { dueDate: "2026-11-01", remainingAmount: 50000 },
+    },
+    {
+      accountName: "Suspended Overdue",
+      accountStatus: "suspended",
+      paymentStatus: "overdue",
+      overdueAmount: 25000,
+      nextDueInstallment: { dueDate: "2026-10-01", remainingAmount: 25000 },
+    },
+    {
+      accountName: "Suspend and Close",
+      accountStatus: "suspend_and_close",
+      paymentStatus: "overdue",
+      overdueAmount: 15000,
+      nextDueInstallment: { dueDate: "2026-09-01", remainingAmount: 15000 },
+    },
+    {
+      accountName: "Inactive",
+      accountStatus: "inactive",
+      paymentStatus: "overdue",
+      overdueAmount: 10000,
+      nextDueInstallment: { dueDate: "2026-08-01", remainingAmount: 10000 },
+    },
+    {
+      accountName: "Active Future",
+      accountStatus: "live",
+      paymentStatus: "upcoming",
+      overdueAmount: 0,
+      nextDueInstallment: { dueDate: "2026-12-01", remainingAmount: 30000 },
+    },
+  ];
+
+  const isInactive = (s) => s === "inactive" || s === "suspend_and_close";
+  const isSuspended = (s) => s === "suspended";
+  const activeOverdue = rows.filter(
+    (r) =>
+      !isInactive(r.accountStatus) &&
+      !isSuspended(r.accountStatus) &&
+      r.accountStatus !== "closed" &&
+      r.nextDueInstallment?.dueDate < today &&
+      r.paymentStatus !== "fully_paid" &&
+      r.paymentStatus !== "renewal",
+  );
+
+  assert.equal(activeOverdue.length, 1);
+  assert.equal(activeOverdue[0].accountName, "Active Overdue");
+  const totalOverdue = activeOverdue.reduce((s, r) => s + r.overdueAmount, 0);
+  assert.equal(totalOverdue, 50000);
+});
+
 const candidates = [
   process.env.DATABASE_URL?.replace(/^file:/, ""),
   path.join(root, "data", "buildesk.db"),
