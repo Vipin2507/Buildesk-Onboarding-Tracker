@@ -6,8 +6,10 @@ import {
   Loader2,
   Mail,
   MessageCircle,
+  Paperclip,
   Play,
   Sparkles,
+  X,
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -38,6 +40,7 @@ import {
   AUTOMATION_TRIGGERS,
   type AutomationChannel,
   type AutomationRule,
+  type AutomationRuleAttachment,
   type AutomationTrigger,
 } from "@/types/automation";
 import {
@@ -51,6 +54,7 @@ import { useAutomationStore } from "@/stores/useAutomationStore";
 import { cn } from "@/lib/utils";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
+const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024;
 
 export type RuleFormState = {
   name: string;
@@ -61,6 +65,7 @@ export type RuleFormState = {
   templateSubject: string;
   templateBody: string;
   emailCc: string;
+  attachments: AutomationRuleAttachment[];
   testEmail: string;
   testPhone: string;
 };
@@ -75,6 +80,7 @@ const DEFAULT_FORM: RuleFormState = {
   templateBody:
     "Hi {{customerName}},\n\nYour support ticket {{ticketNumber}} has been updated.\n\nSubject: {{title}}\nStatus: {{status}}\n\nView details: {{ticketUrl}}",
   emailCc: "",
+  attachments: [],
   testEmail: "test@example.com",
   testPhone: "+919999999999",
 };
@@ -89,8 +95,27 @@ function ruleToForm(rule: AutomationRule): RuleFormState {
     templateSubject: rule.templateSubject ?? "",
     templateBody: rule.templateBody,
     emailCc: rule.emailCc ?? "",
+    attachments: rule.attachments ?? [],
     testEmail: "test@example.com",
     testPhone: "+919999999999",
+  };
+}
+
+async function readFileAsAttachment(file: File): Promise<AutomationRuleAttachment> {
+  if (file.size > MAX_ATTACHMENT_BYTES) {
+    throw new Error(`“${file.name}” is larger than 8 MB`);
+  }
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return {
+    filename: file.name || "attachment",
+    mimetype: file.type || "application/octet-stream",
+    dataBase64: btoa(binary),
   };
 }
 
@@ -405,6 +430,7 @@ export function AutomationRuleDialog({
       templateSubject: form.channel === "email" ? form.templateSubject.trim() : undefined,
       templateBody: form.templateBody.trim(),
       emailCc: form.channel === "email" ? form.emailCc.trim() || undefined : undefined,
+      attachments: form.attachments.length > 0 ? form.attachments : undefined,
     };
   }
 
@@ -558,7 +584,7 @@ export function AutomationRuleDialog({
                   >
                     <FormSection
                       title="Email delivery"
-                      description="Subject and CC recipients sent to n8n."
+                      description="Subject, CC, and attachments are sent to n8n."
                       icon={AtSign}
                       delay={0}
                     >
@@ -599,19 +625,103 @@ export function AutomationRuleDialog({
                   >
                     <FormSection
                       title="WhatsApp delivery"
-                      description="Sent directly via WAHA to the customer phone on the ticket."
+                      description={
+                        form.trigger === "company-created"
+                          ? "Sent via WAHA to the WhatsApp group linked on the company."
+                          : "Sent directly via WAHA to the customer phone on the ticket."
+                      }
                       icon={MessageCircle}
                       delay={0}
                     >
                       <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-3 py-3 text-xs leading-relaxed text-muted-foreground">
-                        Recipient phone is taken from the company / portal contact when a ticket
-                        fires. Numbers are normalized to India format (<code className="rounded bg-muted px-1">91XXXXXXXXXX</code>
-                        ) before sending.
+                        {form.trigger === "company-created" ? (
+                          <>
+                            Recipient is the company’s linked WhatsApp group from Add Company. Attach
+                            Excel templates below — they are sent after the message text.
+                          </>
+                        ) : (
+                          <>
+                            Recipient phone is taken from the company / portal contact when a ticket
+                            fires. Numbers are normalized to India format (
+                            <code className="rounded bg-muted px-1">91XXXXXXXXXX</code>) before sending.
+                          </>
+                        )}
                       </div>
                     </FormSection>
                   </motion.div>
                 )}
               </AnimatePresence>
+
+              <FormSection
+                title="Attachments"
+                description={
+                  form.channel === "email"
+                    ? "Excel/docs are included on the email via n8n (filename + base64)."
+                    : form.trigger === "company-created"
+                      ? "Excel/docs are sent to the company WhatsApp group after the message text. Files on either company-created rule are also shared with the email kickoff."
+                      : "Optional Excel/docs sent with this WhatsApp message."
+                }
+                icon={Paperclip}
+                delay={0.05}
+              >
+                <div className="space-y-2">
+                  <input
+                    type="file"
+                    multiple
+                    accept=".xlsx,.xls,.csv,.pdf,.doc,.docx,image/*"
+                    className="block w-full text-xs file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-primary hover:file:bg-primary/15"
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files ?? []);
+                      e.target.value = "";
+                      if (!files.length) return;
+                      void (async () => {
+                        try {
+                          const next = await Promise.all(files.map((f) => readFileAsAttachment(f)));
+                          setForm((f) => ({ ...f, attachments: [...f.attachments, ...next] }));
+                          toast.success(
+                            next.length === 1
+                              ? `Attached ${next[0].filename}`
+                              : `Attached ${next.length} files`,
+                          );
+                        } catch (err) {
+                          toast.error(err instanceof Error ? err.message : "Could not attach file");
+                        }
+                      })();
+                    }}
+                  />
+                  {form.attachments.length === 0 ? (
+                    <p className="text-[11px] text-muted-foreground">
+                      No files attached yet. Max 8 MB per file. For company kickoff, attach on the
+                      email and/or WhatsApp rule — files are shared across both.
+                    </p>
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {form.attachments.map((file, index) => (
+                        <li
+                          key={`${file.filename}-${index}`}
+                          className="flex items-center gap-2 rounded-lg border border-border/70 bg-background px-2.5 py-1.5 text-xs"
+                        >
+                          <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          <span className="min-w-0 flex-1 truncate font-medium">{file.filename}</span>
+                          <button
+                            type="button"
+                            className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                            aria-label={`Remove ${file.filename}`}
+                            onClick={() =>
+                              setForm((f) => ({
+                                ...f,
+                                attachments: f.attachments.filter((_, i) => i !== index),
+                              }))
+                            }
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </FormSection>
 
               <FormSection
                 title="Message template"

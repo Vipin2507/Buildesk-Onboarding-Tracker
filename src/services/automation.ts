@@ -16,11 +16,11 @@ import {
   renderAutomationSubject,
   renderAutomationTemplate,
 } from "@/services/automationTemplate";
-import { checkWahaSession, phoneToWahaChatId, sendWahaText } from "@/services/waha";
+import { checkWahaSession, phoneToWahaChatId, sendWahaMedia, sendWahaText } from "@/services/waha";
 import { fetchN8nHealth, fetchN8nWebhook, normalizeIndiaPhone } from "@/lib/automationEndpoints";
 import { N8N_EMAIL_SEGMENT, N8N_HEALTH_SEGMENT } from "@/data/automationDefaults";
 import type { AutomationRule } from "@/types/automation";
-import type { TicketStatus } from "@/types";
+import type { Company, TicketStatus } from "@/types";
 
 function logId() {
   return `AL-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -62,10 +62,10 @@ function buildN8nPayload(
     messageBody: payload.message,
     emailSubject: payload.subject,
     emailCc: mergeEmailCc(settings.emailCc, ruleMeta?.emailCc),
-    entityType: "ticket",
+    entityType: payload.trigger === "company-created" ? "company" : "ticket",
     productScope: "erp",
     entityId: payload.ticketNumber,
-    entityName: payload.subject,
+    entityName: payload.companyName || payload.subject,
     wahaApiUrl: waha.apiUrl,
     wahaApiKey: waha.apiKey,
     wahaSession: waha.sessionName,
@@ -82,6 +82,23 @@ function buildN8nPayload(
     // Always last — n8n Wait requires a number ≥ 0 ("Invalid wait amount" if missing).
     delayHours: 0,
     waitAmount: 0,
+    // Email attachments for n8n (Gmail / SMTP / custom nodes).
+    hasAttachments: (payload.attachments?.length ?? 0) > 0,
+    attachmentCount: payload.attachments?.length ?? 0,
+    attachments: (payload.attachments ?? []).map((a) => ({
+      filename: a.filename,
+      name: a.filename,
+      mimetype: a.mimetype,
+      contentType: a.mimetype,
+      type: a.mimetype,
+      dataBase64: a.dataBase64,
+      content: a.dataBase64,
+      data: a.dataBase64,
+    })),
+    ownerName: payload.ownerName,
+    ownerEmail: payload.ownerEmail,
+    pocName: payload.pocName,
+    pocEmail: payload.pocEmail,
   };
 }
 
@@ -215,12 +232,15 @@ async function sendViaWaha(
     return log;
   }
 
-  const chatId = phoneToWahaChatId(payload.customerPhone);
+  const chatId =
+    payload.whatsappChatId?.trim() || phoneToWahaChatId(payload.customerPhone) || null;
   if (!chatId) {
     const log: AutomationLog = {
       ...baseLog,
       status: "failed",
-      errorMessage: "No valid customer phone number for WhatsApp",
+      errorMessage: payload.whatsappChatId
+        ? "No WhatsApp group linked for this company"
+        : "No valid customer phone number for WhatsApp",
       requestPayload: {
         ...(payload as unknown as Record<string, unknown>),
         provider: "waha",
@@ -235,6 +255,7 @@ async function sendViaWaha(
     session: waha.sessionName,
     chatId,
     text: payload.message,
+    attachmentCount: payload.attachments?.length ?? 0,
   };
 
   store.upsertLog({
@@ -255,6 +276,33 @@ async function sendViaWaha(
       store.upsertLog(log);
       return log;
     }
+
+    const attachments = payload.attachments ?? [];
+    for (const file of attachments) {
+      const mediaResult = await sendWahaMedia(
+        waha,
+        "file",
+        chatId,
+        {
+          mimetype: file.mimetype || "application/octet-stream",
+          filename: file.filename,
+          data: file.dataBase64,
+        },
+        { caption: file.filename },
+      );
+      if (!mediaResult.ok) {
+        const log: AutomationLog = {
+          ...baseLog,
+          status: "failed",
+          errorMessage: `Message sent, but attachment “${file.filename}” failed (HTTP ${mediaResult.status})`,
+          responseSummary: summarizeResponse(mediaResult.body),
+          requestPayload: { ...(payload as unknown as Record<string, unknown>), ...wahaRequest },
+        };
+        store.upsertLog(log);
+        return log;
+      }
+    }
+
     const log: AutomationLog = {
       ...baseLog,
       status: "success",
@@ -435,6 +483,109 @@ export function dispatchAutomationTrigger(
 
 export function isClosedTicketStatus(status: string) {
   return status === "Closed" || status === "Resolved";
+}
+
+function normalizeEmail(value?: string | null) {
+  return value?.trim().toLowerCase() || "";
+}
+
+/** Kickoff email + WhatsApp when a company is created from Add Company. */
+export function dispatchCompanyCreatedAutomation(company: Company): void {
+  void (async () => {
+    const store = useAutomationStore.getState();
+    if (!store.settings.automationsEnabled) return;
+    const rules = store.rules.filter((r) => r.isActive && r.trigger === "company-created");
+    if (rules.length === 0) return;
+
+    const pocEmail = company.pocEmail?.trim() || company.email.trim();
+    const ownerEmail = company.ownerEmail?.trim() || "";
+    const ownerCc =
+      ownerEmail && normalizeEmail(ownerEmail) !== normalizeEmail(pocEmail) ? ownerEmail : "";
+    const pocName = company.pocName?.trim() || company.contact;
+    const ownerName = company.ownerName?.trim() || company.contact;
+    const groupId = company.whatsappGroupId?.trim() || "";
+
+    // Share Excel/docs across email + WhatsApp kickoff rules (attach once, send on both).
+    const sharedAttachments = (() => {
+      const byKey = new Map<string, NonNullable<AutomationPayload["attachments"]>[number]>();
+      for (const rule of rules) {
+        for (const file of rule.attachments ?? []) {
+          const key = `${file.filename}::${file.dataBase64.length}`;
+          if (!byKey.has(key)) byKey.set(key, file);
+        }
+      }
+      return [...byKey.values()];
+    })();
+
+    const vars: Record<string, string> = {
+      customerName: pocName,
+      companyName: company.name,
+      accountName: company.name,
+      pocName,
+      pocEmail,
+      ownerName,
+      ownerEmail: ownerEmail || ownerName,
+      ticketNumber: company.id,
+      status: company.status,
+      subject: `ERP implementation — ${company.name}`,
+      title: `ERP implementation — ${company.name}`,
+      ticketUrl: "",
+    };
+
+    for (const rule of rules) {
+      const endpoint = store.endpoints.find((e) => e.channel === rule.channel);
+      if (!endpoint) continue;
+
+      const message = renderAutomationTemplate(rule.templateBody, vars);
+      const ownAttachments = rule.attachments ?? [];
+      const attachments =
+        ownAttachments.length > 0
+          ? ownAttachments
+          : sharedAttachments.length > 0
+            ? sharedAttachments
+            : undefined;
+      const payload: AutomationPayload = {
+        channel: rule.channel,
+        trigger: "company-created",
+        ticketNumber: company.id,
+        companyName: company.name,
+        customerName: pocName,
+        customerEmail: pocEmail,
+        customerPhone: company.pocMobile || company.phone,
+        subject: renderAutomationSubject(rule.templateSubject, vars),
+        status: company.status,
+        message,
+        whatsappChatId: rule.channel === "whatsapp" ? groupId || undefined : undefined,
+        attachments,
+        ownerName,
+        ownerEmail: ownerEmail || undefined,
+        pocName,
+        pocEmail,
+      };
+
+      const log = await sendAutomationRequest(endpoint, payload, {
+        companyId: company.id,
+        templateId: rule.id,
+        templateName: rule.name,
+        emailCc: mergeEmailCc(ownerCc, rule.emailCc),
+      });
+
+      const channelLabel = rule.channel === "email" ? "Email" : "WhatsApp";
+      if (log.status === "success") {
+        toast.success(`${channelLabel} kickoff sent`, {
+          description: `${rule.name} · ${company.name}`,
+          duration: 3500,
+        });
+      } else {
+        toast.warning(`${channelLabel} kickoff failed`, {
+          description: log.errorMessage ?? "Check Automation logs",
+          duration: 5000,
+        });
+      }
+    }
+  })().catch((err) => {
+    console.warn("[automation] company-created dispatch failed", err);
+  });
 }
 
 function buildPayloadFromRule(

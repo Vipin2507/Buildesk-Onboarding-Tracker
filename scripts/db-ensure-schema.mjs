@@ -257,6 +257,8 @@ const EXTRA_COLUMNS = [
   { table: "companies", name: "installment_amount", ddl: "TEXT" },
   { table: "companies", name: "installment_due_date", ddl: "TEXT" },
   { table: "companies", name: "cancelled_on", ddl: "TEXT" },
+  { table: "companies", name: "owner_email", ddl: "TEXT" },
+  { table: "companies", name: "poc_email", ddl: "TEXT" },
   { table: "companies", name: "whatsapp_group_id", ddl: "TEXT" },
   { table: "companies", name: "whatsapp_group_name", ddl: "TEXT" },
   { table: "companies", name: "plan_name", ddl: "TEXT" },

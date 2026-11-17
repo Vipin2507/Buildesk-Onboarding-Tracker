@@ -91,8 +91,12 @@ export type Company = Timestamps & {
   region: CompanyRegion;
   ownerName: string;
   ownerMobile: string;
+  /** Owner email — used as CC on company-created implementation emails when different from POC. */
+  ownerEmail?: string;
   pocName: string;
   pocMobile: string;
+  /** POC email — defaults to primary contact email when empty. */
+  pocEmail?: string;
   officeAddress?: string;
   gstNumber?: string;
   billingInfo?: string;

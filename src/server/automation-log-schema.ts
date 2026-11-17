@@ -7,6 +7,7 @@ export const AUTOMATION_TRIGGER_VALUES = [
   "ticket-updated",
   "ticket-closed",
   "ticket-reply-from-team",
+  "company-created",
   "booking-created",
   "booking-status-changed",
   "task-before-start",
@@ -16,6 +17,7 @@ export const AUTOMATION_TRIGGER_VALUES = [
   "query-response",
   "live-chat-started",
   "portal-ticket-created",
+  "whatsapp-broadcast",
   "onboarding-sla-remind",
 ] as const satisfies readonly AutomationTrigger[];
 

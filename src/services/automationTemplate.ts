@@ -17,8 +17,13 @@ export const AUTOMATION_SAMPLE_VARS: Record<string, string> = {
   customerName: "Priya Sharma",
   ticketNumber: "TKT-1042",
   companyName: "Skyline Developers",
+  accountName: "Skyline Developers",
   status: "Open",
   ticketUrl: "https://portal.buildesk.app/portal/acme/support/TKT-1042",
   subject: "Dashboard login issue",
   title: "Dashboard login issue",
+  pocName: "Priya Sharma",
+  pocEmail: "priya@skyline.example",
+  ownerName: "Ravi Mehta",
+  ownerEmail: "ravi@skyline.example",
 };

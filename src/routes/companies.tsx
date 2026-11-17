@@ -31,6 +31,7 @@ import { EmptyState } from "@/components/empty-state";
 import { ConfirmDeleteDialog, EntityFormModal } from "@/components/entity-form-modal";
 import { ProjectImportModal } from "@/components/project-import-modal";
 import { CompanyCommercialBulkUpdateModal } from "@/components/companies/company-commercial-bulk-update-modal";
+import { CompanyWhatsappGroupFields } from "@/components/company-whatsapp-group-fields";
 import { CompanyWhatsappSyncModal } from "@/components/crm/crm-account-whatsapp-sync-modal";
 import { inDateRange } from "@/components/list-toolbar";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -84,8 +85,12 @@ function defaultCompanyFormValues(users: User[]): CompanyForm {
     region: "Rest of India",
     ownerName: "",
     ownerMobile: "",
+    ownerEmail: "",
     pocName: "",
     pocMobile: "",
+    pocEmail: "",
+    whatsappGroupId: "",
+    whatsappGroupName: "",
     onboardingManagerId: managers[0]?.id ?? "",
     csmId: "",
     salesAgentId: "",
@@ -147,8 +152,12 @@ function normalizeCompanyPayload(data: CompanyForm, users: User[]): CompanyWrite
     supportManager2Id,
     ownerName,
     ownerMobile,
+    ownerEmail,
     pocName,
     pocMobile,
+    pocEmail,
+    whatsappGroupId,
+    whatsappGroupName,
     csmId,
     ...rest
   } = data;
@@ -158,8 +167,12 @@ function normalizeCompanyPayload(data: CompanyForm, users: User[]): CompanyWrite
     phone,
     ownerName: (ownerName ?? "").trim() || data.contact.trim(),
     ownerMobile: (ownerMobile ?? "").trim() || phone,
+    ownerEmail: (ownerEmail ?? "").trim() || undefined,
     pocName: (pocName ?? "").trim() || data.contact.trim(),
     pocMobile: (pocMobile ?? "").trim() || phone,
+    pocEmail: (pocEmail ?? "").trim() || data.email.trim(),
+    whatsappGroupId: (whatsappGroupId ?? "").trim() || null,
+    whatsappGroupName: (whatsappGroupName ?? "").trim() || null,
     csmId: csmId ?? "",
     onboardingManagerId,
     salesAgentId: salesAgentId?.trim() || undefined,
@@ -205,8 +218,12 @@ const companySchema = z.object({
   region: z.enum(["NCR", "South", "West", "Rest of India"]),
   ownerName: z.string().optional(),
   ownerMobile: z.string().optional(),
+  ownerEmail: z.union([z.literal(""), z.string().email("Enter a valid owner email")]).optional(),
   pocName: z.string().optional(),
   pocMobile: z.string().optional(),
+  pocEmail: z.union([z.literal(""), z.string().email("Enter a valid POC email")]).optional(),
+  whatsappGroupId: z.string().optional(),
+  whatsappGroupName: z.string().optional(),
   onboardingManagerId: z.string().min(1, "Select an onboarding manager"),
   csmId: z.string().optional(),
   salesAgentId: z.string().optional(),
@@ -684,8 +701,12 @@ function CompaniesListPage() {
       region: c.region ?? "Rest of India",
       ownerName: c.ownerName || "",
       ownerMobile: c.ownerMobile || "",
+      ownerEmail: c.ownerEmail || "",
       pocName: c.pocName || c.contact,
       pocMobile: c.pocMobile || c.phone,
+      pocEmail: c.pocEmail || c.email,
+      whatsappGroupId: c.whatsappGroupId || "",
+      whatsappGroupName: c.whatsappGroupName || "",
       onboardingManagerId: c.onboardingManagerId, csmId: c.csmId,
       salesAgentId: c.salesAgentId ?? "",
       plan: c.plan,
@@ -1354,6 +1375,18 @@ function CompaniesListPage() {
                 <input {...form.register("ownerMobile")} placeholder="Defaults to mobile above" className={inputClass()} />
               </div>
               <div>
+                <label className="text-xs font-medium">Owner Email</label>
+                <input
+                  {...form.register("ownerEmail")}
+                  type="email"
+                  placeholder="CC on kickoff email if different from POC"
+                  className={inputClass(!!form.formState.errors.ownerEmail)}
+                />
+                {form.formState.errors.ownerEmail ? (
+                  <p className="mt-1 text-xs text-destructive">{form.formState.errors.ownerEmail.message}</p>
+                ) : null}
+              </div>
+              <div>
                 <label className="text-xs font-medium">POC Name</label>
                 <input {...form.register("pocName")} placeholder="Defaults to contact person" className={inputClass()} />
               </div>
@@ -1361,8 +1394,26 @@ function CompaniesListPage() {
                 <label className="text-xs font-medium">POC Mobile</label>
                 <input {...form.register("pocMobile")} placeholder="Defaults to mobile above" className={inputClass()} />
               </div>
+              <div className="sm:col-span-2">
+                <label className="text-xs font-medium">POC Email</label>
+                <input
+                  {...form.register("pocEmail")}
+                  type="email"
+                  placeholder="Defaults to primary contact email — kickoff email recipient"
+                  className={inputClass(!!form.formState.errors.pocEmail)}
+                />
+                {form.formState.errors.pocEmail ? (
+                  <p className="mt-1 text-xs text-destructive">{form.formState.errors.pocEmail.message}</p>
+                ) : (
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Implementation kickoff email goes here; Owner Email is CC’d when different.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
+
+          <CompanyWhatsappGroupFields form={form} />
 
           <div>
             <label className="text-xs font-medium">Onboarding Manager</label>

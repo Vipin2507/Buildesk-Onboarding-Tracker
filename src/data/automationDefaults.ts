@@ -120,4 +120,117 @@ export const DEFAULT_AUTOMATION_RULES: AutomationRule[] = [
     templateBody:
       "Hi {{customerName}}, ticket {{ticketNumber}} for {{companyName}} is now closed. Status: {{status}}.",
   }),
+  rule({
+    id: "rule-company-created-email",
+    name: "Company Created — Implementation Email",
+    description:
+      "Sends kickoff document request to POC; Owner is CC’d when different. Attach Excel templates on this rule (or the WhatsApp twin) — they go out with the email.",
+    trigger: "company-created",
+    channel: "email",
+    isActive: true,
+    templateSubject: "ERP Implementation — Required Information & Documents | {{companyName}}",
+    templateBody: `Dear Team,
+
+Greetings from Buildesk!
+
+As part of the ERP implementation process for {{companyName}}, we request you to kindly share the required information and documents to initiate the project setup and data migration.
+
+Required Information & Documents:
+Project Name, Total Units & Project Address
+Company Name & GST Details
+Site Address
+Complete Payment Plan Details
+Unit Configuration Details (Excel Format)
+Existing Demand Letter Format
+High-Resolution Project Logo
+Existing Payment Receipt Format
+Historical Customer Data (if any)
+Historical Payment Data (if any)
+
+We request you to share the above details along with the relevant Excel sheets and document formats at the earliest.
+
+Important: Once we receive the complete information, our implementation team will proceed with master setup, data verification and migration.
+
+For any clarification or assistance, please feel free to contact us.
+
+Regards,
+Gaurav Singh
+ERP Implementation | Buildesk
+📞 +91 88531 77075
+📧 gaurav@cravingcode.in`,
+  }),
+  rule({
+    id: "rule-company-created-whatsapp",
+    name: "Company Created — Implementation WhatsApp",
+    description:
+      "Posts kickoff checklist to the company WhatsApp group. Attach Excel templates on this rule.",
+    trigger: "company-created",
+    channel: "whatsapp",
+    isActive: true,
+    templateBody: `Dear Team,
+Greetings from Buildesk!
+
+As discussed, we are initiating the ERP implementation process for {{companyName}}.
+
+To ensure a smooth implementation, accurate master configuration and seamless data migration, we request you to share the following information and documents.
+
+1. Project Information
+Project Name
+Total Number of Units
+Complete Project Address
+Other Charges (excluding Agreement Value)
+
+2. Company Information
+Company Name
+GST Registration Details
+
+3. Site Address Information
+Complete Site Address
+
+4. Payment Plans
+Complete Payment Plan Details, including installment percentages, milestones and applicable conditions.
+
+5. Unit Configuration
+Excel sheet containing all unit configurations, including unit numbers, configurations, carpet area and other applicable details.
+
+6. Demand Letter Formats
+Existing Demand Letter Templates/Formats.
+
+7. Project Logos
+High-resolution project logo files.
+
+8. Payment Receipt Formats
+Existing Payment Receipt Templates/Formats.
+
+9. Customer Details
+Historical/Previous Customer Data, apart from the details already shared in the Excel sheets, if available.
+
+10. Payment Details
+Historical/Previous Payment Data, apart from the details already shared in the Excel sheets, if available.
+
+Implementation Process
+Once we receive the required information, our implementation team will follow the below process:
+Review and verification of the submitted information.
+Configuration of company, project and other master data.
+Unit master setup and verification.
+Customer and payment data migration.
+Data validation and reconciliation with your team.
+ERP configuration and readiness for further training.
+
+Implementation Timeline: The initial master setup and verification process generally requires approximately 7–8 working days after receiving the complete required information, subject to data quality and verification.
+
+We request you to share the above details at the earliest so that we can proceed without delays.
+
+For any assistance or clarification, please feel free to reach out to me.
+
+Looking forward to your cooperation.
+
+Best Regards,
+Gaurav Singh
+ERP Implementation SPOC
+Buildesk | Craving Code
+Mobile: +91 88531 77075
+Email: gaurav@cravingcode.in
+Support: support@buildesk.in`,
+  }),
 ];

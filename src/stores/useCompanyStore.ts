@@ -55,8 +55,10 @@ function serializeCompanyForApi(company: Company) {
     region: company.region,
     ownerName: company.ownerName,
     ownerMobile: company.ownerMobile,
+    ownerEmail: company.ownerEmail?.trim() || undefined,
     pocName: company.pocName,
     pocMobile: company.pocMobile,
+    pocEmail: company.pocEmail?.trim() || company.email,
     officeAddress: company.officeAddress,
     gstNumber: company.gstNumber,
     billingInfo: company.billingInfo,
@@ -93,6 +95,8 @@ function serializeCompanyForApi(company: Company) {
     installmentDueDate: company.installmentDueDate?.trim() || undefined,
     cancelledOn: company.cancelledOn?.trim() || undefined,
     paymentHistory: company.paymentHistory,
+    whatsappGroupId: company.whatsappGroupId?.trim() || null,
+    whatsappGroupName: company.whatsappGroupName?.trim() || null,
     modules: normalizeCompanyModules(company.modules).map((m) => ({
       moduleKey: m.moduleKey,
       label: m.label,
@@ -142,6 +146,9 @@ export const useCompanyStore = createStore<CompanyState>((set, get) => ({
 
       useCompanyPortalStore.getState().generateAccessForCompany(persisted);
       set({ companies: rows });
+      void import("@/services/automation").then(({ dispatchCompanyCreatedAutomation }) => {
+        dispatchCompanyCreatedAutomation(persisted);
+      });
       return persisted;
     } catch (err) {
       throw err instanceof Error ? err : new Error("Failed to save company");

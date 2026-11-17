@@ -48,7 +48,15 @@ export type AutomationTrigger =
   | "live-chat-started"
   | "portal-ticket-created"
   | "whatsapp-broadcast"
-  | "onboarding-sla-remind";
+  | "onboarding-sla-remind"
+  | "company-created";
+
+export type AutomationRuleAttachment = {
+  filename: string;
+  mimetype: string;
+  /** Raw base64 (no data: prefix) for WAHA / n8n attachment payloads. */
+  dataBase64: string;
+};
 
 export interface AutomationRule {
   id: string;
@@ -64,6 +72,8 @@ export interface AutomationRule {
   emailCc?: string;
   /** Minutes before a scheduled task start (task-before-start trigger only). */
   offsetMinutes?: number;
+  /** Optional Excel/docs sent with WhatsApp (and email when supported) for this rule. */
+  attachments?: AutomationRuleAttachment[];
   createdAt: string;
   updatedAt: string;
 }
@@ -159,6 +169,14 @@ export type AutomationPayload = {
   supportManager1?: string;
   supportManager2?: string;
   executiveName?: string;
+  /** Prefer this WAHA chat id (group or personal) over customerPhone. */
+  whatsappChatId?: string;
+  /** Optional media/files (Excel etc.) for WhatsApp / email. */
+  attachments?: AutomationRuleAttachment[];
+  ownerName?: string;
+  ownerEmail?: string;
+  pocName?: string;
+  pocEmail?: string;
 };
 
 export const AUTOMATION_TRIGGERS: { value: AutomationTrigger; label: string }[] = [
@@ -166,6 +184,7 @@ export const AUTOMATION_TRIGGERS: { value: AutomationTrigger; label: string }[] 
   { value: "ticket-updated", label: "Ticket updated" },
   { value: "ticket-closed", label: "Ticket closed" },
   { value: "ticket-reply-from-team", label: "Team reply on ticket" },
+  { value: "company-created", label: "Company created (implementation kickoff)" },
   { value: "booking-created", label: "Meeting request (executive)" },
   { value: "booking-status-changed", label: "Meeting status (customer)" },
   { value: "task-before-start", label: "Before scheduled task" },
@@ -205,4 +224,8 @@ export const AUTOMATION_TEMPLATE_VARS = [
   "{{taskUrl}}",
   "{{assigneeName}}",
   "{{offsetMinutes}}",
+  "{{pocName}}",
+  "{{pocEmail}}",
+  "{{ownerName}}",
+  "{{ownerEmail}}",
 ] as const;

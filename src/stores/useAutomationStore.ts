@@ -92,7 +92,20 @@ export const useAutomationStore = createPersistedStore<AutomationState>(
       const mergedEndpoints = mergeAutomationEndpoints(
         s.endpoints.length > 0 ? s.endpoints : DEFAULT_AUTOMATION_ENDPOINTS,
       );
-      if (s.seeded && s.rules.length > 0 && !needsWaha && !needsProvider && !needsSettings) return;
+      const existingIds = new Set(s.rules.map((r) => r.id));
+      const missingSeeds = DEFAULT_AUTOMATION_RULES.filter((r) => !existingIds.has(r.id));
+      const mergedRules =
+        s.rules.length > 0 ? [...s.rules, ...missingSeeds] : DEFAULT_AUTOMATION_RULES;
+      if (
+        s.seeded &&
+        s.rules.length > 0 &&
+        missingSeeds.length === 0 &&
+        !needsWaha &&
+        !needsProvider &&
+        !needsSettings
+      ) {
+        return;
+      }
       set({
         settings: s.settings?.n8nWebhookBase
           ? s.settings
@@ -113,9 +126,10 @@ export const useAutomationStore = createPersistedStore<AutomationState>(
               isEnabled: s.waha?.isEnabled ?? DEFAULT_WAHA_CONFIG.isEnabled,
             },
         healthCheck: s.healthCheck?.webhookUrl ? s.healthCheck : { ...DEFAULT_HEALTH_CONFIG },
-        rules: s.rules.length > 0 ? s.rules : DEFAULT_AUTOMATION_RULES,
+        rules: mergedRules,
         seeded: true,
       });
+      if (missingSeeds.length > 0) flushAutomationToggles();
     },
 
     setSettings: (partial) => {
