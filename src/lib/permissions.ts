@@ -155,13 +155,13 @@ export function roleHasPermission(
   roleKey: string | undefined,
   permission: RolePermissionKey,
 ) {
-  if (roleKey === "Admin") return true;
+  if (isAdminRoleKey(roleKey)) return true;
   const role = findRoleByKey(roles, roleKey);
   return Boolean(role?.permissions[permission]);
 }
 
 export function isAdminRoleKey(roleKey: string | undefined) {
-  return roleKey === "Admin";
+  return typeof roleKey === "string" && roleKey.trim().toLowerCase() === "admin";
 }
 
 export function countEnabledPermissions(permissions: RolePermissionMap) {

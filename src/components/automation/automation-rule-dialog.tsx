@@ -456,6 +456,10 @@ export function AutomationRuleDialog({
       const { saveAutomationRule } = await import("@/lib/api");
       const saved = await saveAutomationRule({ data: { rule } });
       updateRule(saved.rule.id, saved.rule);
+      const { persistAutomationConfigNow } = await import("@/lib/config-persistence");
+      await persistAutomationConfigNow().catch((err) => {
+        console.warn("[automation-rule-dialog] persist full config snapshot non-fatal error", err);
+      });
       toast.success(editing ? "Rule updated" : "Rule created");
       onOpenChange(false);
       onSaved?.();

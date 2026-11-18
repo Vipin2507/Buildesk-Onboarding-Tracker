@@ -64,7 +64,17 @@ export function AutomationWebhookSettings() {
           </div>
           <Switch
             checked={settings.automationsEnabled}
-            onCheckedChange={(v) => setSettings({ automationsEnabled: v })}
+            onCheckedChange={(v) => {
+              setSettings({ automationsEnabled: v === true });
+              void import("@/lib/config-persistence")
+                .then(({ persistAutomationConfigNow }) => persistAutomationConfigNow())
+                .then(() =>
+                  toast.success(v ? "Automations enabled" : "Automations disabled"),
+                )
+                .catch((err: unknown) =>
+                  toast.error(err instanceof Error ? err.message : "Could not save automation toggle"),
+                );
+            }}
             size="sm"
           />
         </label>

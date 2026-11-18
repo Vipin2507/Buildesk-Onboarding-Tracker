@@ -343,9 +343,7 @@ export function upgradeCompanyCreatedAutomationRules(rules: AutomationRule[]): {
       const personalized = personalizeCompanyCreatedBody(
         needsBody ? COMPANY_CREATED_EMAIL_TEMPLATE : r.templateBody,
       );
-      const needsSubject =
-        !subject ||
-        subject === "ERP Implementation — Required Information & Documents | {{companyName}}";
+      const needsSubject = !subject;
       if (personalized === r.templateBody && !needsSubject && !needsBody) return r;
       if (personalized === r.templateBody && !needsSubject) return r;
       changed = true;
@@ -435,3 +433,32 @@ export const DEFAULT_AUTOMATION_RULES: AutomationRule[] = [
     templateBody: COMPANY_CREATED_WHATSAPP_TEMPLATE,
   }),
 ];
+
+/** Merge seed rules; preserve user edits and isActive state across deploys. */
+export function mergeAutomationRules(
+  existing: AutomationRule[],
+  seeds: AutomationRule[] = DEFAULT_AUTOMATION_RULES,
+): AutomationRule[] {
+  const existingRules = Array.isArray(existing) ? existing : [];
+  const byId = new Map(existingRules.map((r) => [r.id, r]));
+  for (const seed of seeds) {
+    const current = byId.get(seed.id);
+    if (!current) {
+      byId.set(seed.id, { ...seed });
+      continue;
+    }
+    byId.set(seed.id, {
+      ...seed,
+      ...current,
+      name: current.name || seed.name,
+      description: current.description !== undefined ? current.description : seed.description,
+      trigger: current.trigger || seed.trigger,
+      channel: current.channel || seed.channel,
+      templateSubject: current.templateSubject !== undefined ? current.templateSubject : seed.templateSubject,
+      templateBody: current.templateBody || seed.templateBody,
+      isActive: typeof current.isActive === "boolean" ? current.isActive : seed.isActive,
+    });
+  }
+  const upgraded = upgradeCompanyCreatedAutomationRules([...byId.values()]);
+  return upgraded.rules;
+}

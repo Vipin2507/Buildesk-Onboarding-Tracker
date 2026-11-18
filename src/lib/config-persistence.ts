@@ -156,7 +156,11 @@ export async function persistAutomationConfigNow() {
     throw new Error("Only an admin can save automation settings");
   }
   if (!erpAutomationConfigPersistReady) {
-    throw new Error("Automation settings are still loading. Wait a moment and save again.");
+    if (useAutomationStore.getState().seeded) {
+      erpAutomationConfigPersistReady = true;
+    } else {
+      throw new Error("Automation settings are still loading. Wait a moment and save again.");
+    }
   }
   cancelServerSyncDebounced("automation-config");
   await setAppConfig({ data: { key: "automation", value: automationSnapshot() } });
@@ -168,7 +172,11 @@ export async function persistCrmAutomationConfigNow() {
     throw new Error("Only an admin can save automation rules");
   }
   if (!crmAutomationConfigPersistReady) {
-    throw new Error("Automation settings are still loading. Wait a moment and save again.");
+    if (useCrmAutomationStore.getState().seeded) {
+      crmAutomationConfigPersistReady = true;
+    } else {
+      throw new Error("Automation settings are still loading. Wait a moment and save again.");
+    }
   }
   cancelServerSyncDebounced("crm-automation-config");
   await setAppConfig({ data: { key: "crm-automation", value: crmAutomationSnapshot() } });

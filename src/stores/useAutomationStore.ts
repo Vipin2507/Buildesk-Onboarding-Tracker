@@ -14,6 +14,7 @@ import {
   DEFAULT_HEALTH_CONFIG,
   DEFAULT_WAHA_CONFIG,
   mergeAutomationEndpoints,
+  mergeAutomationRules,
   upgradeCompanyCreatedAutomationRules,
 } from "@/data/automationDefaults";
 import { createPersistedStore, touch } from "./persist";
@@ -23,13 +24,8 @@ import {
 } from "@/lib/automation-log-sync";
 
 function flushAutomationToggles() {
-  void import("@/lib/config-persistence").then(async ({ persistAutomationConfigNow }) => {
-    try {
-      await persistAutomationConfigNow();
-    } catch (err) {
-      const { toast } = await import("sonner");
-      toast.error(err instanceof Error ? err.message : "Could not save automation settings");
-    }
+  void import("@/lib/config-persistence").then(({ flushAutomationConfigPersistence }) => {
+    flushAutomationConfigPersistence({ erp: true, crm: false });
   });
 }
 
@@ -100,15 +96,19 @@ export const useAutomationStore = createPersistedStore<AutomationState>(
       );
       const existingIds = new Set(s.rules.map((r) => r.id));
       const missingSeeds = DEFAULT_AUTOMATION_RULES.filter((r) => !existingIds.has(r.id));
-      const withMissing =
-        s.rules.length > 0 ? [...s.rules, ...missingSeeds] : DEFAULT_AUTOMATION_RULES;
-      const upgraded = upgradeCompanyCreatedAutomationRules(withMissing);
-      const mergedRules = upgraded.rules;
+      const mergedRules = mergeAutomationRules(
+        s.rules.length > 0 ? s.rules : DEFAULT_AUTOMATION_RULES,
+      );
+      const rulesDiffer =
+        missingSeeds.length > 0 ||
+        mergedRules.length !== s.rules.length ||
+        mergedRules.some(
+          (r, i) => r.id !== s.rules[i]?.id || r.templateBody !== s.rules[i]?.templateBody,
+        );
       if (
         s.seeded &&
         s.rules.length > 0 &&
-        missingSeeds.length === 0 &&
-        !upgraded.changed &&
+        !rulesDiffer &&
         !needsWaha &&
         !needsProvider &&
         !needsSettings
@@ -138,7 +138,7 @@ export const useAutomationStore = createPersistedStore<AutomationState>(
         rules: mergedRules,
         seeded: true,
       });
-      if (missingSeeds.length > 0 || upgraded.changed) flushAutomationToggles();
+      if (rulesDiffer) flushAutomationToggles();
     },
 
     setSettings: (partial) => {
@@ -195,7 +195,9 @@ export const useAutomationStore = createPersistedStore<AutomationState>(
               )
             : s.endpoints,
       }));
-      flushAutomationToggles();
+      if (partial.isEnabled !== undefined) {
+        flushAutomationToggles();
+      }
     },
 
     restoreDefaultWaha: () => {
@@ -338,8 +340,8 @@ export function hydrateAutomationFromServer(snapshot: AutomationSnapshot | null 
     };
   }
   if (snapshot.healthCheck) patch.healthCheck = snapshot.healthCheck;
-  if (Array.isArray(snapshot.rules) && snapshot.rules.length > 0) {
-    patch.rules = snapshot.rules.map((r) => ({
+  if (Array.isArray(snapshot.rules)) {
+    patch.rules = mergeAutomationRules(snapshot.rules).map((r) => ({
       ...r,
       isActive: typeof r.isActive === "boolean" ? r.isActive : true,
     }));

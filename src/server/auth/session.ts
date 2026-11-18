@@ -112,8 +112,12 @@ export function getSessionUser(): User | null {
 export function requireUser(roles?: UserRole[]): User {
   const user = getSessionUser();
   if (!user) throw new ApiError(401, "Sign in required");
-  if (roles && !roles.includes(user.role)) {
-    throw new ApiError(403, "You do not have permission for this action");
+  if (roles) {
+    const userRole = (user.role ?? "").trim().toLowerCase();
+    const allowed = roles.some((r) => r.trim().toLowerCase() === userRole);
+    if (!allowed) {
+      throw new ApiError(403, "You do not have permission for this action");
+    }
   }
   return user;
 }

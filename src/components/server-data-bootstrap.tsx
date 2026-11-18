@@ -51,6 +51,7 @@ import {
   resetAutomationConfigPersistReady,
   wireConfigPersistence,
 } from "@/lib/config-persistence";
+import { isAdminRoleKey } from "@/lib/permissions";
 import { mapTicket, mapTicketActivity } from "@/lib/tickets";
 import {
   useActivityStore,
@@ -409,7 +410,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
 
         if (master && typeof master === "object" && Object.keys(master).length) {
           useMasterStore.setState((s) => ({ ...s, ...master }));
-        } else if (user.role === "Admin") {
+        } else if (isAdminRoleKey(user.role)) {
           const { flushMasterConfigPersistence } = await import("@/lib/config-persistence");
           flushMasterConfigPersistence();
         }
@@ -422,14 +423,14 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
         }
         if (crmMaster && typeof crmMaster === "object" && Object.keys(crmMaster).length > 0) {
           hydrateCrmMasterFromServer(crmMaster as Record<string, unknown>);
-        } else if (user.role === "Admin") {
+        } else if (isAdminRoleKey(user.role)) {
           // First-time setup: seed server from this admin's local master config.
           const { crmMasterSnapshot } = await import("@/stores/useCrmMasterStore");
           await setAppConfig({
             data: { key: "crm-master", value: crmMasterSnapshot() },
           }).catch(() => {});
         }
-        if (user.role === "Admin") {
+        if (isAdminRoleKey(user.role)) {
           const { syncMasterModuleLabelsToCompanies } = await import(
             "@/lib/sync-master-module-labels"
           );
@@ -443,7 +444,28 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           hydrateAutomationFromServer(automation as Record<string, unknown>);
           useAutomationStore.getState().ensureDefaults();
           automationConfigAuthoritative = true;
-        } else if (user.role === "Admin") {
+          // If server was missing seed rules (e.g. company-created rules), sync merged rules to SQLite now
+          const serverRules = (automation as { rules?: { id?: string }[] }).rules;
+          const serverRuleIds = new Set(Array.isArray(serverRules) ? serverRules.map((r) => r?.id) : []);
+          const needsSeedBackfill =
+            !serverRuleIds.has("rule-company-created-email") ||
+            !serverRuleIds.has("rule-company-created-whatsapp");
+          if (needsSeedBackfill && isAdminRoleKey(user.role)) {
+            const current = useAutomationStore.getState();
+            await setAppConfig({
+              data: {
+                key: "automation",
+                value: {
+                  settings: current.settings,
+                  endpoints: current.endpoints,
+                  waha: current.waha,
+                  healthCheck: current.healthCheck,
+                  rules: current.rules,
+                },
+              },
+            }).catch(() => {});
+          }
+        } else if (isAdminRoleKey(user.role)) {
           useAutomationStore.getState().ensureDefaults();
           const localAutomation = useAutomationStore.getState();
           await setAppConfig({
@@ -472,7 +494,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           hydrateCrmAutomationFromServer(crmAutomation as Record<string, unknown>);
           useCrmAutomationStore.getState().ensureDefaults();
           crmAutomationConfigAuthoritative = true;
-        } else if (user.role === "Admin") {
+        } else if (isAdminRoleKey(user.role)) {
           // Empty server only — seed from local after ensureDefaults so missing seed
           // rules exist, but never overwrite a non-empty SQLite row (handled above).
           useCrmAutomationStore.getState().ensureDefaults();
@@ -514,7 +536,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           }
         }
 
-        if (user.role === "Admin") {
+        if (isAdminRoleKey(user.role)) {
           const emptyLogs: AutomationLogWire[] = [];
           const [erpLogs, crmLogs] = await Promise.all([
             getAutomationLogs({ data: { key: "automation" } }).catch(() => emptyLogs),
