@@ -313,6 +313,23 @@ export const useCrmAutomationStore = createPersistedStore<AutomationState>(
       clearAutomationLogsOnServer("crm-automation");
     },
   }),
+  {
+    partialize: (s) => ({
+      settings: s.settings,
+      endpoints: s.endpoints,
+      waha: s.waha,
+      healthCheck: s.healthCheck,
+      rules: s.rules.map((r) => ({
+        ...r,
+        attachments: r.attachments?.map((a) => ({
+          filename: a.filename,
+          mimetype: a.mimetype,
+          dataBase64: "",
+        })),
+      })),
+      seeded: s.seeded,
+    }),
+  },
 );
 
 /** Hydrate automation state from server app_config snapshot. */

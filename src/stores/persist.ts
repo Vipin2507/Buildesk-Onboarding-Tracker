@@ -13,19 +13,19 @@ const BUILDESK_PREFIX = "buildesk-";
 /** Keys that are allowed to live in localStorage (small config only). */
 const PERSIST_ALLOWLIST = new Set([
   `${BUILDESK_PREFIX}master-config-v2`,
-  `${BUILDESK_PREFIX}app-settings-v1`,
+  `${BUILDESK_PREFIX}app-settings-v2`,
   `${BUILDESK_PREFIX}company-portal-v1`,
-  `${BUILDESK_PREFIX}automation-v1`,
-  `${BUILDESK_PREFIX}automation-v2`,
   `${BUILDESK_PREFIX}automation-v3`,
   `${BUILDESK_PREFIX}crm-automation-v1`,
-  `${BUILDESK_PREFIX}chat-v1`,
   `${BUILDESK_PREFIX}crm-master-config-v1`,
   `${BUILDESK_PREFIX}crm-app-settings-v1`,
 ]);
 
 /** Legacy / oversized entity caches — safe to wipe; SQLite is authoritative. */
 const LEGACY_CACHE_KEYS = [
+  "automation-v1",
+  "automation-v2",
+  "app-settings-v1",
   "users",
   "users-v2",
   "employees",
@@ -99,8 +99,16 @@ function stripHeavyPayloads(value: unknown): unknown {
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      if ((k === "avatarUrl" || k === "logoUrl") && typeof v === "string" && v.startsWith("data:")) {
+      if (
+        (k === "avatarUrl" || k === "logoUrl" || k === "dataBase64") &&
+        typeof v === "string" &&
+        (v.startsWith("data:") || v.length > 1000)
+      ) {
         out[k] = "";
+        continue;
+      }
+      if (k === "logs" && Array.isArray(v)) {
+        out[k] = [];
         continue;
       }
       out[k] = stripHeavyPayloads(v);
@@ -186,13 +194,18 @@ export function createStore<T extends object>(initializer: StateCreator<T>) {
 export function createPersistedStore<T extends object>(
   name: string,
   initializer: StateCreator<T, [], [["zustand/persist", T]]>,
+  options?: {
+    partialize?: (state: T) => unknown;
+    version?: number;
+  },
 ) {
   return create<T>()(
     persist(initializer, {
       name: `${BUILDESK_PREFIX}${name}`,
       storage: createJSONStorage(getStorage),
-      version: 1,
+      version: options?.version ?? 1,
       skipHydration: true,
+      partialize: (options?.partialize as (state: T) => T) ?? ((s) => s),
       onRehydrateStorage: () => (state, error) => {
         if (error && typeof window !== "undefined") {
           console.warn(`[buildesk] Clearing corrupt store "${name}"`, error);
