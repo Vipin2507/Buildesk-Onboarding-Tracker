@@ -1413,7 +1413,7 @@ function CompaniesListPage() {
             </div>
           </div>
 
-          <CompanyWhatsappGroupFields form={form} />
+          <CompanyWhatsappGroupFields form={form} companyId={editing?.id} />
 
           <div>
             <label className="text-xs font-medium">Onboarding Manager</label>
