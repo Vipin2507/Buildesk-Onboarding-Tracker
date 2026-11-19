@@ -10,6 +10,11 @@ import {
   replaceAutomationLogsInConfig,
 } from "@/server/automation-log-persistence";
 import { automationLogWireSchema } from "@/server/automation-log-schema";
+import {
+  DEFAULT_AUTOMATION_RULES,
+  LEGACY_COMPANY_CREATED_EMAIL_TEMPLATES,
+  LEGACY_COMPANY_CREATED_WHATSAPP_TEMPLATES,
+} from "@/data/automationDefaults";
 import { DEFAULT_CRM_AUTOMATION_RULES } from "@/data/crm-automation-defaults";
 import { getDb, getSqlite } from "@/server/db/client";
 import * as t from "@/server/db/schema";
@@ -640,37 +645,183 @@ export const clearAutomationLogs = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
+function normalizeBody(text: unknown): string {
+  if (typeof text !== "string") return "";
+  return text.replace(/\r\n/g, "\n").trim();
+}
+
 /**
- * Page load used to merge the built-in Onboarding SLA text over a saved edit and
- * write that blob back. If this save would restore that built-in body, keep the
- * template already stored.
+ * Merges incoming client automation snapshot with durable SQLite state:
+ * 1. Never lets a stale or unhydrated client overwrite user-customized rule templates with seed defaults.
+ * 2. Never lets a client wipe or revert user-configured WAHA sessionName.
+ * 3. Never wipes user's automationsEnabled setting or custom webhook URLs.
+ * 4. Preserves full attachments (dataBase64) when client partialize strips base64 data.
+ * 5. Preserves existing rules that were omitted by a partial write.
  */
-function keepSavedOnboardingSlaTemplate(
+export function mergeIncomingAutomationWithSaved(
   existingJson: string | undefined,
   incoming: Record<string, unknown>,
-) {
-  if (!existingJson || !Array.isArray(incoming.rules)) return incoming;
-  let previous: { rules?: { id?: string; name?: string; description?: string; templateBody?: string }[] };
+  configKey: "automation" | "crm-automation",
+): Record<string, unknown> {
+  if (!existingJson) return incoming;
+  let previous: Record<string, unknown>;
   try {
-    previous = JSON.parse(existingJson) as typeof previous;
+    previous = JSON.parse(existingJson) as Record<string, unknown>;
   } catch {
     return incoming;
   }
-  const seed = DEFAULT_CRM_AUTOMATION_RULES.find((rule) => rule.id === "crm-rule-onboarding-sla-whatsapp");
-  const saved = previous.rules?.find((rule) => rule.id === "crm-rule-onboarding-sla-whatsapp");
-  if (!seed || !saved?.templateBody || saved.templateBody === seed.templateBody) return incoming;
-  const rules = incoming.rules as { id?: string; templateBody?: string; name?: string; description?: string }[];
-  const index = rules.findIndex((rule) => rule?.id === "crm-rule-onboarding-sla-whatsapp");
-  if (index < 0) return incoming;
-  const next = rules[index];
-  if (next?.templateBody !== seed.templateBody) return incoming;
-  rules[index] = {
-    ...next,
-    name: saved.name ?? next.name,
-    description: saved.description ?? next.description,
-    templateBody: saved.templateBody,
-  };
-  return incoming;
+  if (!previous || typeof previous !== "object" || Object.keys(previous).length === 0) {
+    return incoming;
+  }
+
+  const result = { ...incoming };
+
+  // 1. Settings protection: preserve automationsEnabled & n8nWebhookBase
+  const prevSettings = previous.settings as Record<string, unknown> | undefined;
+  const incSettings = incoming.settings as Record<string, unknown> | undefined;
+  if (prevSettings && typeof prevSettings === "object") {
+    result.settings = {
+      ...prevSettings,
+      ...(incSettings || {}),
+      automationsEnabled:
+        typeof incSettings?.automationsEnabled === "boolean"
+          ? incSettings.automationsEnabled
+          : prevSettings.automationsEnabled ?? true,
+      n8nWebhookBase:
+        (typeof incSettings?.n8nWebhookBase === "string" && incSettings.n8nWebhookBase.trim()) ||
+        prevSettings.n8nWebhookBase,
+    };
+  }
+
+  // 2. WAHA protection: preserve sessionName and credentials
+  const prevWaha = previous.waha as Record<string, unknown> | undefined;
+  const incWaha = incoming.waha as Record<string, unknown> | undefined;
+  if (prevWaha && typeof prevWaha === "object") {
+    const incSession = typeof incWaha?.sessionName === "string" ? incWaha.sessionName.trim() : "";
+    const prevSession = typeof prevWaha.sessionName === "string" ? prevWaha.sessionName.trim() : "";
+    const defaultSession = configKey === "crm-automation" ? "first" : "second";
+    // If incoming session is empty or defaulted while previous had a custom session, retain previous
+    const sessionName =
+      incSession && incSession !== "first" && incSession !== defaultSession
+        ? incSession
+        : prevSession || incSession || defaultSession;
+
+    result.waha = {
+      ...prevWaha,
+      ...(incWaha || {}),
+      sessionName,
+      apiUrl: (typeof incWaha?.apiUrl === "string" && incWaha.apiUrl.trim()) || prevWaha.apiUrl,
+      apiKey: (typeof incWaha?.apiKey === "string" && incWaha.apiKey.trim()) || prevWaha.apiKey,
+      isEnabled:
+        typeof incWaha?.isEnabled === "boolean"
+          ? incWaha.isEnabled
+          : prevWaha.isEnabled ?? true,
+    };
+  }
+
+  // 3. Endpoints protection: keep existing if incoming omitted them
+  const prevEndpoints = Array.isArray(previous.endpoints) ? previous.endpoints : [];
+  const incEndpoints = Array.isArray(incoming.endpoints) ? incoming.endpoints : [];
+  if (prevEndpoints.length > 0 && incEndpoints.length === 0) {
+    result.endpoints = prevEndpoints;
+  }
+
+  // 4. Rules protection: preserve custom templates and attachments
+  const prevRules = Array.isArray(previous.rules) ? (previous.rules as AutomationRule[]) : [];
+  const incRules = Array.isArray(incoming.rules) ? (incoming.rules as AutomationRule[]) : [];
+
+  if (prevRules.length > 0) {
+    const seedRules =
+      configKey === "automation" ? DEFAULT_AUTOMATION_RULES : DEFAULT_CRM_AUTOMATION_RULES;
+    const seedById = new Map(seedRules.map((r) => [r.id, r]));
+    const prevById = new Map(prevRules.map((r) => [r.id, r]));
+    const incById = new Map(incRules.map((r) => [r.id, r]));
+
+    const knownSeeds = new Set<string>();
+    for (const s of seedRules) {
+      if (s.templateBody) knownSeeds.add(normalizeBody(s.templateBody));
+    }
+    if (configKey === "automation") {
+      for (const t of LEGACY_COMPANY_CREATED_EMAIL_TEMPLATES) knownSeeds.add(normalizeBody(t));
+      for (const t of LEGACY_COMPANY_CREATED_WHATSAPP_TEMPLATES) knownSeeds.add(normalizeBody(t));
+    }
+
+    const mergedRules: AutomationRule[] = [];
+
+    for (const incRule of incRules) {
+      const prevRule = prevById.get(incRule.id);
+      if (!prevRule) {
+        mergedRules.push(incRule);
+        continue;
+      }
+
+      const seedRule = seedById.get(incRule.id);
+      const prevBodyNorm = normalizeBody(prevRule.templateBody);
+      const incBodyNorm = normalizeBody(incRule.templateBody);
+      const seedBodyNorm = seedRule?.templateBody ? normalizeBody(seedRule.templateBody) : "";
+
+      const prevWasCustom =
+        prevBodyNorm &&
+        (!seedBodyNorm || prevBodyNorm !== seedBodyNorm) &&
+        !knownSeeds.has(prevBodyNorm);
+      const incIsSeed = knownSeeds.has(incBodyNorm) || (seedBodyNorm && incBodyNorm === seedBodyNorm);
+
+      let ruleBody = incRule.templateBody;
+      let ruleSubject = incRule.templateSubject;
+      let ruleName = incRule.name;
+      let ruleDesc = incRule.description;
+
+      if (prevWasCustom && incIsSeed) {
+        // Stale client or default merger is sending seed text — preserve user custom template!
+        ruleBody = prevRule.templateBody;
+        ruleSubject = prevRule.templateSubject ?? incRule.templateSubject;
+        ruleName = prevRule.name || incRule.name;
+        ruleDesc = prevRule.description ?? incRule.description;
+      } else if (!incRule.templateBody && prevRule.templateBody) {
+        ruleBody = prevRule.templateBody;
+        ruleSubject = prevRule.templateSubject ?? incRule.templateSubject;
+      }
+
+      // Preserve full attachments if client stripped dataBase64 (e.g. partialize)
+      let attachments = incRule.attachments;
+      if (prevRule.attachments && prevRule.attachments.length > 0) {
+        if (!attachments || attachments.length === 0) {
+          attachments = prevRule.attachments;
+        } else {
+          attachments = attachments.map((att) => {
+            if (!att.dataBase64) {
+              const matched = prevRule.attachments?.find((p) => p.filename === att.filename);
+              if (matched?.dataBase64) {
+                return { ...att, dataBase64: matched.dataBase64 };
+              }
+            }
+            return att;
+          });
+        }
+      }
+
+      mergedRules.push({
+        ...prevRule,
+        ...incRule,
+        name: ruleName,
+        description: ruleDesc,
+        templateSubject: ruleSubject,
+        templateBody: ruleBody,
+        attachments,
+      });
+    }
+
+    // Keep any existing rules that were omitted by incoming payload
+    for (const prevRule of prevRules) {
+      if (!incById.has(prevRule.id)) {
+        mergedRules.push(prevRule);
+      }
+    }
+
+    result.rules = mergedRules;
+  }
+
+  return result;
 }
 
 const automationRuleAttachmentSchema = z.object({
@@ -731,8 +882,24 @@ function upsertAutomationRuleInConfig(
       : {};
     const rules = Array.isArray(snapshot.rules) ? [...snapshot.rules] : [];
     const index = rules.findIndex((rule) => rule?.id === ruleInput.id);
-    const createdAt = rules[index]?.createdAt || ruleInput.createdAt || now;
-    saved = toSavedAutomationRule(ruleInput, createdAt, now);
+    const prev = index >= 0 ? rules[index] : undefined;
+    const createdAt = prev?.createdAt || ruleInput.createdAt || now;
+
+    // Preserve attachment dataBase64 if incoming attachment data was empty/missing
+    let attachments = ruleInput.attachments;
+    if (prev?.attachments && prev.attachments.length > 0 && attachments && attachments.length > 0) {
+      attachments = attachments.map((att) => {
+        if (!att.dataBase64) {
+          const matched = prev.attachments?.find((p) => p.filename === att.filename);
+          if (matched?.dataBase64) {
+            return { ...att, dataBase64: matched.dataBase64 };
+          }
+        }
+        return att;
+      });
+    }
+
+    saved = toSavedAutomationRule({ ...ruleInput, attachments }, createdAt, now);
     if (index >= 0) rules[index] = saved;
     else rules.push(saved);
     snapshot.rules = rules;
@@ -785,8 +952,8 @@ export const setAppConfig = createServerFn({ method: "POST" })
       if ((data.key === "automation" || data.key === "crm-automation") && !("logs" in value)) {
         value = { ...value, logs: readAutomationLogsFromConfig(db, data.key) };
       }
-      if (data.key === "crm-automation") {
-        value = keepSavedOnboardingSlaTemplate(existing?.valueJson, value);
+      if (data.key === "automation" || data.key === "crm-automation") {
+        value = mergeIncomingAutomationWithSaved(existing?.valueJson, value, data.key);
       }
       const valueJson = JSON.stringify(value);
       if (existing) {

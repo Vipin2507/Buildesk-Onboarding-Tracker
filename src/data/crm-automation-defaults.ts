@@ -90,11 +90,12 @@ export const DEFAULT_CRM_HEALTH_CONFIG: AutomationHealthConfig = {
   httpMethod: "POST",
 };
 
+export const SEED_CRM_RULES_BASELINE_AT = "2026-01-01T00:00:00.000Z";
+
 function rule(
   partial: Omit<AutomationRule, "createdAt" | "updatedAt"> & { isActive: boolean },
 ): AutomationRule {
-  const now = nowIso();
-  return { ...partial, createdAt: now, updatedAt: now };
+  return { ...partial, createdAt: SEED_CRM_RULES_BASELINE_AT, updatedAt: SEED_CRM_RULES_BASELINE_AT };
 }
 
 export const CRM_BOOKING_AUTOMATION_TRIGGERS = ["booking-created", "booking-status-changed"] as const;

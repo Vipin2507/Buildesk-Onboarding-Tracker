@@ -132,13 +132,13 @@ export const useAutomationStore = createPersistedStore<AutomationState>(
             }
           : {
               ...DEFAULT_WAHA_CONFIG,
+              sessionName: s.waha?.sessionName || DEFAULT_WAHA_CONFIG.sessionName,
               isEnabled: s.waha?.isEnabled ?? DEFAULT_WAHA_CONFIG.isEnabled,
             },
         healthCheck: s.healthCheck?.webhookUrl ? s.healthCheck : { ...DEFAULT_HEALTH_CONFIG },
         rules: mergedRules,
         seeded: true,
       });
-      if (rulesDiffer) flushAutomationToggles();
     },
 
     setSettings: (partial) => {
@@ -186,7 +186,7 @@ export const useAutomationStore = createPersistedStore<AutomationState>(
           ...partial,
           apiUrl: partial.apiUrl?.trim() ?? s.waha.apiUrl,
           apiKey: partial.apiKey?.trim() ?? s.waha.apiKey,
-          sessionName: partial.sessionName?.trim() ?? s.waha.sessionName,
+          sessionName: partial.sessionName !== undefined ? partial.sessionName.trim() : s.waha.sessionName,
         },
         endpoints:
           partial.isEnabled !== undefined
@@ -195,7 +195,7 @@ export const useAutomationStore = createPersistedStore<AutomationState>(
               )
             : s.endpoints,
       }));
-      if (partial.isEnabled !== undefined) {
+      if (partial.isEnabled !== undefined || partial.sessionName !== undefined) {
         flushAutomationToggles();
       }
     },

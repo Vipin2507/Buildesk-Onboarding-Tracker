@@ -74,11 +74,12 @@ export const DEFAULT_HEALTH_CONFIG: AutomationHealthConfig = {
   httpMethod: "POST",
 };
 
+export const SEED_RULES_BASELINE_AT = "2026-01-01T00:00:00.000Z";
+
 function rule(
   partial: Omit<AutomationRule, "createdAt" | "updatedAt"> & { isActive: boolean },
 ): AutomationRule {
-  const now = nowIso();
-  return { ...partial, createdAt: now, updatedAt: now };
+  return { ...partial, createdAt: SEED_RULES_BASELINE_AT, updatedAt: SEED_RULES_BASELINE_AT };
 }
 
 /** Formatted kickoff email (*bold* → HTML via automationMessageToEmailHtml). */
@@ -457,6 +458,9 @@ export function mergeAutomationRules(
       templateSubject: current.templateSubject !== undefined ? current.templateSubject : seed.templateSubject,
       templateBody: current.templateBody || seed.templateBody,
       isActive: typeof current.isActive === "boolean" ? current.isActive : seed.isActive,
+      attachments: current.attachments !== undefined ? current.attachments : seed.attachments,
+      updatedAt: current.updatedAt || seed.updatedAt,
+      createdAt: current.createdAt || seed.createdAt,
     });
   }
   const upgraded = upgradeCompanyCreatedAutomationRules([...byId.values()]);

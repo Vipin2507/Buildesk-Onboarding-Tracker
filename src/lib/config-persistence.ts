@@ -26,6 +26,60 @@ function canPersistAppConfig() {
  */
 let erpAutomationConfigPersistReady = false;
 let crmAutomationConfigPersistReady = false;
+let lastKnownErpConfigHash = "";
+let lastKnownCrmConfigHash = "";
+
+function computeAutomationConfigHash(snapshot: {
+  settings?: { automationsEnabled?: boolean; n8nWebhookBase?: string };
+  endpoints?: { channel: string; isEnabled?: boolean; webhookUrl?: string; provider?: string }[];
+  waha?: { apiUrl?: string; apiKey?: string; sessionName?: string; isEnabled?: boolean };
+  healthCheck?: { webhookUrl?: string; httpMethod?: string };
+  rules?: {
+    id: string;
+    name?: string;
+    isActive?: boolean;
+    templateSubject?: string;
+    templateBody?: string;
+    emailCc?: string;
+    offsetMinutes?: number;
+    attachments?: unknown[];
+    updatedAt?: string;
+  }[];
+}) {
+  return JSON.stringify({
+    settings: {
+      automationsEnabled: snapshot.settings?.automationsEnabled,
+      n8nWebhookBase: snapshot.settings?.n8nWebhookBase,
+    },
+    endpoints: (snapshot.endpoints || []).map((e) => ({
+      channel: e.channel,
+      isEnabled: e.isEnabled,
+      webhookUrl: e.webhookUrl,
+      provider: e.provider,
+    })),
+    waha: {
+      apiUrl: snapshot.waha?.apiUrl,
+      apiKey: snapshot.waha?.apiKey,
+      sessionName: snapshot.waha?.sessionName,
+      isEnabled: snapshot.waha?.isEnabled,
+    },
+    healthCheck: {
+      webhookUrl: snapshot.healthCheck?.webhookUrl,
+      httpMethod: snapshot.healthCheck?.httpMethod,
+    },
+    rules: (snapshot.rules || []).map((r) => ({
+      id: r.id,
+      name: r.name,
+      isActive: r.isActive,
+      templateSubject: r.templateSubject,
+      templateBody: r.templateBody,
+      emailCc: r.emailCc,
+      offsetMinutes: r.offsetMinutes,
+      attachmentsCount: r.attachments?.length ?? 0,
+      updatedAt: r.updatedAt,
+    })),
+  });
+}
 
 /** True once bootstrap has finished hydrating (or seeding) automation app_config. */
 export function isAutomationConfigPersistReady() {
@@ -42,10 +96,12 @@ export function markAutomationConfigPersistReady(opts?: { erp?: boolean; crm?: b
   if (markErp) {
     cancelServerSyncDebounced("automation-config");
     erpAutomationConfigPersistReady = true;
+    lastKnownErpConfigHash = computeAutomationConfigHash(automationSnapshot());
   }
   if (markCrm) {
     cancelServerSyncDebounced("crm-automation-config");
     crmAutomationConfigPersistReady = true;
+    lastKnownCrmConfigHash = computeAutomationConfigHash(crmAutomationSnapshot());
   }
 }
 
@@ -53,6 +109,8 @@ export function markAutomationConfigPersistReady(opts?: { erp?: boolean; crm?: b
 export function resetAutomationConfigPersistReady() {
   erpAutomationConfigPersistReady = false;
   crmAutomationConfigPersistReady = false;
+  lastKnownErpConfigHash = "";
+  lastKnownCrmConfigHash = "";
   cancelServerSyncDebounced("automation-config");
   cancelServerSyncDebounced("crm-automation-config");
 }
@@ -112,15 +170,23 @@ let wired = false;
 
 function persistAutomationConfig() {
   if (!canPersistAppConfig() || !erpAutomationConfigPersistReady) return;
+  const snap = automationSnapshot();
+  const hash = computeAutomationConfigHash(snap);
+  if (hash === lastKnownErpConfigHash) return;
+  lastKnownErpConfigHash = hash;
   serverSyncDebounced("automation-config", 400, () =>
-    setAppConfig({ data: { key: "automation", value: automationSnapshot() } }),
+    setAppConfig({ data: { key: "automation", value: snap } }),
   );
 }
 
 function persistCrmAutomationConfig() {
   if (!canPersistAppConfig() || !crmAutomationConfigPersistReady) return;
+  const snap = crmAutomationSnapshot();
+  const hash = computeAutomationConfigHash(snap);
+  if (hash === lastKnownCrmConfigHash) return;
+  lastKnownCrmConfigHash = hash;
   serverSyncDebounced("crm-automation-config", 400, () =>
-    setAppConfig({ data: { key: "crm-automation", value: crmAutomationSnapshot() } }),
+    setAppConfig({ data: { key: "crm-automation", value: snap } }),
   );
 }
 
@@ -163,7 +229,9 @@ export async function persistAutomationConfigNow() {
     }
   }
   cancelServerSyncDebounced("automation-config");
-  await setAppConfig({ data: { key: "automation", value: automationSnapshot() } });
+  const snap = automationSnapshot();
+  lastKnownErpConfigHash = computeAutomationConfigHash(snap);
+  await setAppConfig({ data: { key: "automation", value: snap } });
 }
 
 /** Write the current CRM automation rules to SQLite and wait until the write finishes. */
@@ -179,7 +247,9 @@ export async function persistCrmAutomationConfigNow() {
     }
   }
   cancelServerSyncDebounced("crm-automation-config");
-  await setAppConfig({ data: { key: "crm-automation", value: crmAutomationSnapshot() } });
+  const snap = crmAutomationSnapshot();
+  lastKnownCrmConfigHash = computeAutomationConfigHash(snap);
+  await setAppConfig({ data: { key: "crm-automation", value: snap } });
 }
 
 /** Force pending automation config to SQLite now (settings/rules — logs sync separately). */
@@ -188,11 +258,9 @@ export function flushAutomationConfigPersistence(opts?: { erp?: boolean; crm?: b
   const flushErp = opts?.erp !== false;
   const flushCrm = opts?.crm !== false;
   if (flushErp && erpAutomationConfigPersistReady) {
-    persistAutomationConfig();
     flushServerSyncDebounced("automation-config");
   }
   if (flushCrm && crmAutomationConfigPersistReady) {
-    persistCrmAutomationConfig();
     flushServerSyncDebounced("crm-automation-config");
   }
 }
