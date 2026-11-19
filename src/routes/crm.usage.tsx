@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, RotateCcw, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -14,6 +14,7 @@ import { DesignTicketFilterBar } from "@/components/design-ticket/design-ticket-
 import { PageHeader, PageWrap } from "@/components/page-header";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
+import { useSessionFilterState } from "@/hooks/use-session-filter";
 import { getCrmUsageBoard, refreshCrmUsageAccount } from "@/lib/api";
 import { crmAccountStatusLabel } from "@/lib/crm-account-status";
 import { eachIsoDay, usageFocus, usageTag, usageTagTone } from "@/lib/crm-usage";
@@ -34,6 +35,38 @@ type WindowId = "1" | "3" | "7" | "15" | "30" | "custom";
 type CardId = "all" | "using" | "quiet" | "leads" | "error" | "disconnected" | "missing";
 type UserGroupId = "all" | "0-5" | "6-10" | "11-20" | "21-50" | "51-100" | "100+";
 type ConnectionFilter = "all" | "connected" | "disconnected";
+
+export type CrmUsageFilters = {
+  windowId: WindowId;
+  from: string;
+  to: string;
+  card: CardId;
+  statusFilter: string;
+  managerFilter: string;
+  support1Filter: string;
+  support2Filter: string;
+  userGroupFilter: UserGroupId;
+  cityFilter: string;
+  connectionFilter: ConnectionFilter;
+  query: string;
+};
+
+const initialRange = rangeFor(7);
+
+export const CRM_USAGE_FILTER_DEFAULTS: CrmUsageFilters = {
+  windowId: "7",
+  from: initialRange.from,
+  to: initialRange.to,
+  card: "all",
+  statusFilter: "all",
+  managerFilter: "all",
+  support1Filter: "all",
+  support2Filter: "all",
+  userGroupFilter: "all",
+  cityFilter: "all",
+  connectionFilter: "all",
+  query: "",
+};
 
 const WINDOWS: { id: Exclude<WindowId, "custom">; label: string }[] = [
   { id: "1", label: "Today" },
@@ -125,23 +158,54 @@ function CrmUsageLayout() {
 function CrmUsagePage() {
   const navigate = useNavigate();
   const search = Route.useSearch();
-  const initial = search.from && search.to ? { from: search.from, to: search.to } : rangeFor(7);
-  const [windowId, setWindowId] = useState<WindowId>("7");
-  const [from, setFrom] = useState(initial.from);
-  const [to, setTo] = useState(initial.to);
+
+  const [filters, setFilters] = useSessionFilterState<CrmUsageFilters>(
+    "crm.usage.list",
+    CRM_USAGE_FILTER_DEFAULTS,
+  );
+
+  const {
+    windowId,
+    from,
+    to,
+    card,
+    statusFilter,
+    managerFilter,
+    support1Filter,
+    support2Filter,
+    userGroupFilter,
+    cityFilter,
+    connectionFilter,
+    query,
+  } = filters;
+
   const [board, setBoard] = useState<CrmUsageBoard | null>(null);
   const [loading, setLoading] = useState(true);
   const [filling, setFilling] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
-  const [card, setCard] = useState<CardId>("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [managerFilter, setManagerFilter] = useState("all");
-  const [support1Filter, setSupport1Filter] = useState("all");
-  const [support2Filter, setSupport2Filter] = useState("all");
-  const [userGroupFilter, setUserGroupFilter] = useState<UserGroupId>("all");
-  const [cityFilter, setCityFilter] = useState("all");
-  const [connectionFilter, setConnectionFilter] = useState<ConnectionFilter>("all");
-  const [query, setQuery] = useState("");
+
+  // Sync incoming route search params or roll over relative window if needed
+  useEffect(() => {
+    if (search.from && search.to) {
+      if (search.from !== from || search.to !== to) {
+        setFilters({
+          from: search.from,
+          to: search.to,
+          windowId: "custom",
+        });
+      }
+      return;
+    }
+    if (windowId !== "custom") {
+      const expected = rangeFor(Number(windowId));
+      if (to !== expected.to || from !== expected.from) {
+        setFilters({
+          from: expected.from,
+          to: expected.to,
+        });
+      }
+    }
+  }, [search.from, search.to, windowId, from, to, setFilters]);
 
   const load = useCallback(async (range: { from: string; to: string }) => {
     setLoading(true);
@@ -156,8 +220,41 @@ function CrmUsagePage() {
   }, []);
 
   useEffect(() => {
-    void load({ from, to });
+    if (from && to) {
+      void load({ from, to });
+    }
   }, [from, to, load]);
+
+  const hasActiveFilters = Boolean(
+    card !== "all" ||
+      statusFilter !== "all" ||
+      managerFilter !== "all" ||
+      support1Filter !== "all" ||
+      support2Filter !== "all" ||
+      userGroupFilter !== "all" ||
+      cityFilter !== "all" ||
+      connectionFilter !== "all" ||
+      query.trim() !== "" ||
+      windowId !== "7",
+  );
+
+  const clearFilters = useCallback(() => {
+    const fresh7 = rangeFor(7);
+    setFilters({
+      windowId: "7",
+      from: fresh7.from,
+      to: fresh7.to,
+      card: "all",
+      statusFilter: "all",
+      managerFilter: "all",
+      support1Filter: "all",
+      support2Filter: "all",
+      userGroupFilter: "all",
+      cityFilter: "all",
+      connectionFilter: "all",
+      query: "",
+    });
+  }, [setFilters]);
 
   const rows = board?.rows ?? [];
   const statusOptions = useMemo(() => {
@@ -312,21 +409,47 @@ function CrmUsagePage() {
             variant={windowId === item.id ? "default" : "outline"}
             onClick={() => {
               const next = rangeFor(Number(item.id));
-              setWindowId(item.id);
-              setFrom(next.from);
-              setTo(next.to);
-              setCard("all");
+              setFilters({
+                windowId: item.id,
+                from: next.from,
+                to: next.to,
+                card: "all",
+              });
             }}
           >
             {item.label}
           </Button>
         ))}
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search account, city, sales, or support"
-          className="h-8 min-w-[12rem] flex-1 rounded-md border bg-background px-2.5 text-xs outline-none focus:ring-2 focus:ring-ring/40"
-        />
+        <div className="relative flex-1 min-w-[12rem]">
+          <input
+            value={query}
+            onChange={(event) => setFilters({ query: event.target.value })}
+            placeholder="Search account, city, sales, or support"
+            className="h-8 w-full rounded-md border bg-background pl-2.5 pr-7 text-xs outline-none focus:ring-2 focus:ring-ring/40"
+          />
+          {query ? (
+            <button
+              type="button"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              onClick={() => setFilters({ query: "" })}
+              title="Clear search"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
+        </div>
+        {hasActiveFilters ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={clearFilters}
+            className="h-8 gap-1.5 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Reset filters
+          </Button>
+        ) : null}
       </div>
 
       <DesignTicketFilterBar className="mb-3">
@@ -335,8 +458,10 @@ function CrmUsagePage() {
           label="From"
           value={from}
           onChange={(value) => {
-            setWindowId("custom");
-            setFrom(value);
+            setFilters({
+              windowId: "custom",
+              from: value,
+            });
           }}
         />
         <DesignTicketDateField
@@ -344,38 +469,65 @@ function CrmUsagePage() {
           label="To"
           value={to}
           onChange={(value) => {
-            setWindowId("custom");
-            setTo(value);
+            setFilters({
+              windowId: "custom",
+              to: value,
+            });
           }}
         />
         <DesignTicketFilterField label="Status" compact>
-          <DesignTicketSelect compact value={statusFilter} onChange={setStatusFilter} options={statusOptions} />
+          <DesignTicketSelect
+            compact
+            value={statusFilter}
+            onChange={(val) => setFilters({ statusFilter: val })}
+            options={statusOptions}
+          />
         </DesignTicketFilterField>
         <DesignTicketFilterField label="Sales manager" compact>
-          <DesignTicketSelect compact value={managerFilter} onChange={setManagerFilter} options={managerOptions} />
+          <DesignTicketSelect
+            compact
+            value={managerFilter}
+            onChange={(val) => setFilters({ managerFilter: val })}
+            options={managerOptions}
+          />
         </DesignTicketFilterField>
         <DesignTicketFilterField label="Support 1" compact>
-          <DesignTicketSelect compact value={support1Filter} onChange={setSupport1Filter} options={support1Options} />
+          <DesignTicketSelect
+            compact
+            value={support1Filter}
+            onChange={(val) => setFilters({ support1Filter: val })}
+            options={support1Options}
+          />
         </DesignTicketFilterField>
         <DesignTicketFilterField label="Support 2" compact>
-          <DesignTicketSelect compact value={support2Filter} onChange={setSupport2Filter} options={support2Options} />
+          <DesignTicketSelect
+            compact
+            value={support2Filter}
+            onChange={(val) => setFilters({ support2Filter: val })}
+            options={support2Options}
+          />
         </DesignTicketFilterField>
         <DesignTicketFilterField label="User group" compact>
           <DesignTicketSelect
             compact
             value={userGroupFilter}
-            onChange={(value) => setUserGroupFilter(value as UserGroupId)}
+            onChange={(value) => setFilters({ userGroupFilter: value as UserGroupId })}
             options={USER_GROUP_OPTIONS}
           />
         </DesignTicketFilterField>
         <DesignTicketFilterField label="City" compact>
-          <DesignTicketSelect compact value={cityFilter} onChange={setCityFilter} options={cityOptions} />
+          <DesignTicketSelect
+            compact
+            value={cityFilter}
+            onChange={(val) => setFilters({ cityFilter: val })}
+            options={cityOptions}
+          />
         </DesignTicketFilterField>
         <DesignTicketFilterField label="Connection" compact>
           <DesignTicketSelect
             compact
             value={connectionFilter}
-            onChange={(value) => setConnectionFilter(value as ConnectionFilter)}
+            onChange={(value) => setFilters({ connectionFilter: value as ConnectionFilter })}
             options={CONNECTION_OPTIONS}
           />
         </DesignTicketFilterField>
@@ -386,7 +538,7 @@ function CrmUsagePage() {
           <button
             key={item.id}
             type="button"
-            onClick={() => setCard(item.id)}
+            onClick={() => setFilters({ card: item.id })}
             className={cn(
               "rounded-lg border px-3 py-2 text-left transition-colors",
               card === item.id ? "border-primary bg-primary/5" : "border-border hover:bg-muted/40",
@@ -422,8 +574,20 @@ function CrmUsagePage() {
           })
         }
         emptyState={
-          <div className="px-3 py-8 text-center text-sm text-muted-foreground">
-            {loading ? "Loading saved usage…" : "No accounts match these filters."}
+          <div className="flex flex-col items-center justify-center px-3 py-8 text-center text-sm text-muted-foreground">
+            <p>{loading ? "Loading saved usage…" : "No accounts match these filters."}</p>
+            {!loading && hasActiveFilters ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={clearFilters}
+                className="mt-3 h-8 gap-1.5 text-xs"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Clear filters
+              </Button>
+            ) : null}
           </div>
         }
         columns={[

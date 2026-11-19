@@ -127,6 +127,15 @@ function CrmUsageAccountPageView() {
 
   const tab: TabId = search.tab ?? "overview";
 
+  useEffect(() => {
+    if (search.from && search.from !== from) {
+      setFrom(search.from);
+    }
+    if (search.to && search.to !== to) {
+      setTo(search.to);
+    }
+  }, [search.from, search.to]);
+
   const load = useCallback(
     async (range: { from: string; to: string }) => {
       setLoading(true);
@@ -226,14 +235,26 @@ function CrmUsageAccountPageView() {
     const end = new Date();
     const start = new Date();
     start.setDate(end.getDate() - (daysBack - 1));
-    setFrom(isoDate(start));
-    setTo(isoDate(end));
+    const nextFrom = isoDate(start);
+    const nextTo = isoDate(end);
+    setFrom(nextFrom);
+    setTo(nextTo);
+    void navigate({
+      search: (prev: typeof search) => ({
+        ...prev,
+        from: nextFrom,
+        to: nextTo,
+      }),
+      replace: true,
+    });
   }
 
   function setTab(next: TabId) {
     void navigate({
       search: (prev: typeof search) => ({
         ...prev,
+        from,
+        to,
         tab: next === "overview" ? undefined : next,
       }),
       replace: true,
@@ -367,8 +388,30 @@ function CrmUsageAccountPageView() {
           ))}
         </div>
         <DesignTicketFilterBar className="mb-3">
-          <DesignTicketDateField compact label="From" value={from} onChange={setFrom} />
-          <DesignTicketDateField compact label="To" value={to} onChange={setTo} />
+          <DesignTicketDateField
+            compact
+            label="From"
+            value={from}
+            onChange={(nextFrom) => {
+              setFrom(nextFrom);
+              void navigate({
+                search: (prev: typeof search) => ({ ...prev, from: nextFrom }),
+                replace: true,
+              });
+            }}
+          />
+          <DesignTicketDateField
+            compact
+            label="To"
+            value={to}
+            onChange={(nextTo) => {
+              setTo(nextTo);
+              void navigate({
+                search: (prev: typeof search) => ({ ...prev, to: nextTo }),
+                replace: true,
+              });
+            }}
+          />
         </DesignTicketFilterBar>
 
         <DesignTicketTabNav
