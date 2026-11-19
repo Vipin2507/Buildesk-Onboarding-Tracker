@@ -10,6 +10,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export function ConfirmDeleteDialog({
   open,
@@ -76,13 +77,16 @@ export function EntityFormModal({
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent
-        className={["max-h-[90vh] max-w-lg overflow-y-auto", contentClassName].filter(Boolean).join(" ")}
+        className={cn(
+          "flex max-h-[90vh] flex-col overflow-hidden p-0 gap-0 max-w-lg sm:max-w-xl",
+          contentClassName,
+        )}
       >
-        <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
+        <AlertDialogHeader className="shrink-0 border-b border-border/80 px-6 py-4">
+          <AlertDialogTitle className="text-base font-semibold text-foreground">{title}</AlertDialogTitle>
         </AlertDialogHeader>
-        <div className="py-2">{children}</div>
-        <AlertDialogFooter>
+        <div className="flex-1 overflow-y-auto px-6 py-4">{children}</div>
+        <AlertDialogFooter className="shrink-0 border-t border-border/80 bg-muted/20 px-6 py-3">
           <AlertDialogCancel type="button" disabled={submitDisabled}>
             Cancel
           </AlertDialogCancel>

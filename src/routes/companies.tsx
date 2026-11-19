@@ -1292,6 +1292,7 @@ function CompaniesListPage() {
           setModalOpen(open);
         }}
         title={editing ? "Edit Company" : "Add Company"}
+        contentClassName="sm:max-w-3xl"
         onSubmit={onSubmit}
         submitLabel={savingCompany ? "Saving…" : editing ? "Update" : "Create"}
         submitDisabled={savingCompany}
@@ -1345,7 +1346,7 @@ function CompaniesListPage() {
             </p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {(["contact", "designation", "phone", "email"] as const).map((field) => (
-                <div key={field} className={field === "email" ? "col-span-2" : undefined}>
+                <div key={field}>
                   <label className="text-xs font-medium">{FIELD_LABELS[field]}</label>
                   <input
                     {...form.register(field)}
@@ -1366,120 +1367,145 @@ function CompaniesListPage() {
               Owner & POC <span className="font-normal normal-case text-muted-foreground">(optional)</span>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <label className="text-xs font-medium">Owner Name</label>
-                <input {...form.register("ownerName")} placeholder="Defaults to contact person" className={inputClass()} />
+              <div className="space-y-2.5 rounded-lg border border-border/70 bg-muted/20 p-3">
+                <div className="text-xs font-semibold text-foreground">Owner</div>
+                <div>
+                  <label className="text-xs font-medium">Owner Name</label>
+                  <input {...form.register("ownerName")} placeholder="Defaults to contact person" className={inputClass()} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium">Owner Mobile</label>
+                  <input {...form.register("ownerMobile")} placeholder="Defaults to mobile above" className={inputClass()} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium">Owner Email</label>
+                  <input
+                    {...form.register("ownerEmail")}
+                    type="email"
+                    placeholder="CC on kickoff email if different from POC"
+                    className={inputClass(!!form.formState.errors.ownerEmail)}
+                  />
+                  {form.formState.errors.ownerEmail ? (
+                    <p className="mt-1 text-xs text-destructive">{form.formState.errors.ownerEmail.message}</p>
+                  ) : null}
+                </div>
               </div>
-              <div>
-                <label className="text-xs font-medium">Owner Mobile</label>
-                <input {...form.register("ownerMobile")} placeholder="Defaults to mobile above" className={inputClass()} />
-              </div>
-              <div>
-                <label className="text-xs font-medium">Owner Email</label>
-                <input
-                  {...form.register("ownerEmail")}
-                  type="email"
-                  placeholder="CC on kickoff email if different from POC"
-                  className={inputClass(!!form.formState.errors.ownerEmail)}
-                />
-                {form.formState.errors.ownerEmail ? (
-                  <p className="mt-1 text-xs text-destructive">{form.formState.errors.ownerEmail.message}</p>
-                ) : null}
-              </div>
-              <div>
-                <label className="text-xs font-medium">POC Name</label>
-                <input {...form.register("pocName")} placeholder="Defaults to contact person" className={inputClass()} />
-              </div>
-              <div>
-                <label className="text-xs font-medium">POC Mobile</label>
-                <input {...form.register("pocMobile")} placeholder="Defaults to mobile above" className={inputClass()} />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="text-xs font-medium">POC Email</label>
-                <input
-                  {...form.register("pocEmail")}
-                  type="email"
-                  placeholder="Defaults to primary contact email — kickoff email recipient"
-                  className={inputClass(!!form.formState.errors.pocEmail)}
-                />
-                {form.formState.errors.pocEmail ? (
-                  <p className="mt-1 text-xs text-destructive">{form.formState.errors.pocEmail.message}</p>
-                ) : (
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    Implementation kickoff email goes here; Owner Email is CC’d when different.
-                  </p>
-                )}
+
+              <div className="space-y-2.5 rounded-lg border border-border/70 bg-muted/20 p-3">
+                <div className="text-xs font-semibold text-foreground">POC (Point of Contact)</div>
+                <div>
+                  <label className="text-xs font-medium">POC Name</label>
+                  <input {...form.register("pocName")} placeholder="Defaults to contact person" className={inputClass()} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium">POC Mobile</label>
+                  <input {...form.register("pocMobile")} placeholder="Defaults to mobile above" className={inputClass()} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium">POC Email</label>
+                  <input
+                    {...form.register("pocEmail")}
+                    type="email"
+                    placeholder="Kickoff email recipient"
+                    className={inputClass(!!form.formState.errors.pocEmail)}
+                  />
+                  {form.formState.errors.pocEmail ? (
+                    <p className="mt-1 text-xs text-destructive">{form.formState.errors.pocEmail.message}</p>
+                  ) : (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Kickoff recipient; Owner is CC’d when different.
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
           <CompanyWhatsappGroupFields form={form} companyId={editing?.id} />
 
-          <div>
-            <label className="text-xs font-medium">Onboarding Manager</label>
-            <select
-              {...form.register("onboardingManagerId")}
-              className={inputClass(!!form.formState.errors.onboardingManagerId)}
-              disabled={!isAdmin}
-            >
-              {assignableUsers.length === 0 ? (
-                <option value="">No users available — invite users first</option>
-              ) : (
-                assignableUsers.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name} · {u.role}
-                    {u.jobTitle ? ` · ${u.jobTitle}` : ""}
-                  </option>
-                ))
-              )}
-            </select>
-            {form.formState.errors.onboardingManagerId ? (
-              <p className="mt-1 text-xs text-destructive">{form.formState.errors.onboardingManagerId.message}</p>
-            ) : null}
-            {!isAdmin ? (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Assigned automatically to {resolveAssigneeLabel(form.watch("onboardingManagerId"), users, employees)}.
-              </p>
-            ) : null}
-          </div>
-          <div>
-            <label className="text-xs font-medium">Sales Agent</label>
-            <select
-              {...form.register("salesAgentId")}
-              className={inputClass()}
-              disabled={!canAssignSalesAgent}
-            >
-              <option value="">Unassigned</option>
-              {assignableUsers.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name} · {u.role}
-                </option>
-              ))}
-            </select>
-            {!canAssignSalesAgent ? (
-              <p className="mt-1 text-xs text-muted-foreground">
-                You do not have permission to assign sales agents.
-              </p>
-            ) : null}
-          </div>
-          <div>
-            <label className="text-xs font-medium">Plan</label>
-            <select {...form.register("plan")} className={inputClass()}>
-              {["Annual", "Half-Yearly", "AMC"].map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </div>
-          <label className="flex items-center gap-2 text-xs">
-            <input type="checkbox" {...form.register("annualLicense")} />
-            Annual License
-          </label>
-
           <div className="space-y-3">
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Commercial & Support
+              Assignment & Plan
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="text-xs font-medium">Onboarding Manager</label>
+                <select
+                  {...form.register("onboardingManagerId")}
+                  className={inputClass(!!form.formState.errors.onboardingManagerId)}
+                  disabled={!isAdmin}
+                >
+                  {assignableUsers.length === 0 ? (
+                    <option value="">No users available — invite users first</option>
+                  ) : (
+                    assignableUsers.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} · {u.role}
+                        {u.jobTitle ? ` · ${u.jobTitle}` : ""}
+                      </option>
+                    ))
+                  )}
+                </select>
+                {form.formState.errors.onboardingManagerId ? (
+                  <p className="mt-1 text-xs text-destructive">{form.formState.errors.onboardingManagerId.message}</p>
+                ) : null}
+                {!isAdmin ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Assigned automatically to {resolveAssigneeLabel(form.watch("onboardingManagerId"), users, employees)}.
+                  </p>
+                ) : null}
+              </div>
+
+              <div>
+                <label className="text-xs font-medium">Sales Agent</label>
+                <select
+                  {...form.register("salesAgentId")}
+                  className={inputClass()}
+                  disabled={!canAssignSalesAgent}
+                >
+                  <option value="">Unassigned</option>
+                  {assignableUsers.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name} · {u.role}
+                    </option>
+                  ))}
+                </select>
+                {!canAssignSalesAgent ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    You do not have permission to assign sales agents.
+                  </p>
+                ) : null}
+              </div>
+
+              <div>
+                <label className="text-xs font-medium">Plan</label>
+                <select {...form.register("plan")} className={inputClass()}>
+                  {["Annual", "Half-Yearly", "AMC"].map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center pt-5">
+                <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
+                  <input type="checkbox" {...form.register("annualLicense")} className="rounded border-border" />
+                  Annual License
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Commercial & Support
+              </div>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Enter deal value or amount with GST and GST % — taxable and GST amount auto-fill on blur. You can
+                override them manually.
+              </p>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
@@ -1616,7 +1642,7 @@ function CompaniesListPage() {
                 <label className="text-xs font-medium">Installments</label>
                 <input type="number" min={0} step={1} {...form.register("installmentCount")} className={inputClass()} />
               </div>
-              <div className="sm:col-span-2">
+              <div>
                 <label className="text-xs font-medium">GST Number</label>
                 <input {...form.register("gstNumber")} className={inputClass()} />
               </div>
@@ -1625,83 +1651,100 @@ function CompaniesListPage() {
                 <input {...form.register("billingInfo")} placeholder="e.g. Annual plan" className={inputClass()} />
               </div>
             </div>
-            <p className="text-[10px] text-muted-foreground">
-              Enter deal value or amount with GST and GST % — taxable and GST amount auto-fill on blur. You can
-              override them manually.
-            </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label className="text-xs font-medium">Start Date</label>
-              <DatePickerField
-                modal
-                compact
-                displayFormat="dd/MM/yyyy"
-                value={form.watch("startDate") ?? ""}
-                onChange={(v) => form.setValue("startDate", v, { shouldDirty: true, shouldValidate: true })}
-                className="mt-1"
-              />
-              {form.formState.errors.startDate ? (
-                <p className="mt-1 text-xs text-destructive">{form.formState.errors.startDate.message}</p>
-              ) : null}
+          <div className="space-y-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Contract & Implementation Dates
             </div>
-            <div>
-              <label className="text-xs font-medium">End Date</label>
-              <DatePickerField
-                modal
-                compact
-                displayFormat="dd/MM/yyyy"
-                value={form.watch("endDate") ?? ""}
-                onChange={(v) => form.setValue("endDate", v, { shouldDirty: true })}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium">Agreement Date</label>
-              <DatePickerField
-                modal
-                compact
-                displayFormat="dd/MM/yyyy"
-                value={form.watch("agreementDate") ?? ""}
-                onChange={(v) => form.setValue("agreementDate", v, { shouldDirty: true })}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium">Go-Live Target</label>
-              <DatePickerField
-                modal
-                compact
-                displayFormat="dd/MM/yyyy"
-                value={form.watch("goLiveTarget") ?? ""}
-                onChange={(v) => form.setValue("goLiveTarget", v, { shouldDirty: true })}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium">Plan Expiry</label>
-              <DatePickerField
-                modal
-                compact
-                displayFormat="dd/MM/yyyy"
-                value={form.watch("planExpiry") ?? ""}
-                onChange={(v) => form.setValue("planExpiry", v, { shouldDirty: true })}
-                className="mt-1"
-              />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="text-xs font-medium">Start Date</label>
+                <DatePickerField
+                  modal
+                  compact
+                  displayFormat="dd/MM/yyyy"
+                  value={form.watch("startDate") ?? ""}
+                  onChange={(v) => form.setValue("startDate", v, { shouldDirty: true, shouldValidate: true })}
+                  className="mt-1"
+                />
+                {form.formState.errors.startDate ? (
+                  <p className="mt-1 text-xs text-destructive">{form.formState.errors.startDate.message}</p>
+                ) : null}
+              </div>
+              <div>
+                <label className="text-xs font-medium">End Date</label>
+                <DatePickerField
+                  modal
+                  compact
+                  displayFormat="dd/MM/yyyy"
+                  value={form.watch("endDate") ?? ""}
+                  onChange={(v) => form.setValue("endDate", v, { shouldDirty: true })}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium">Agreement Date</label>
+                <DatePickerField
+                  modal
+                  compact
+                  displayFormat="dd/MM/yyyy"
+                  value={form.watch("agreementDate") ?? ""}
+                  onChange={(v) => form.setValue("agreementDate", v, { shouldDirty: true })}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium">Go-Live Target</label>
+                <DatePickerField
+                  modal
+                  compact
+                  displayFormat="dd/MM/yyyy"
+                  value={form.watch("goLiveTarget") ?? ""}
+                  onChange={(v) => form.setValue("goLiveTarget", v, { shouldDirty: true })}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium">Plan Expiry</label>
+                <DatePickerField
+                  modal
+                  compact
+                  displayFormat="dd/MM/yyyy"
+                  value={form.watch("planExpiry") ?? ""}
+                  onChange={(v) => form.setValue("planExpiry", v, { shouldDirty: true })}
+                  className="mt-1"
+                />
+              </div>
+              <div className="flex flex-col justify-center rounded-lg border border-dashed border-border/70 bg-muted/10 px-3 py-2 text-[11px] text-muted-foreground">
+                <span className="font-medium text-foreground">Subscription Renewal</span>
+                <span>Plan expiry date controls access lifecycle and automated renewal alerts.</span>
+              </div>
             </div>
           </div>
-          <div>
-            <div className="text-xs font-medium">Modules Purchased</div>
-            <div className="mt-2 grid gap-2 rounded-md border bg-muted/20 p-3">
+
+          <div className="space-y-2">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Modules Purchased
+            </div>
+            <div className="grid grid-cols-1 gap-2.5 rounded-lg border border-border/80 bg-muted/20 p-3 sm:grid-cols-2">
               {MODULE_CATALOG.map((m) => {
                 const selected = form.watch("modules");
                 const checked = selected.includes(m.key);
                 return (
-                  <label key={m.key} className="flex items-start gap-2 text-sm">
+                  <label
+                    key={m.key}
+                    className={cn(
+                      "flex items-start gap-2.5 rounded-md border p-2.5 transition-colors cursor-pointer",
+                      checked
+                        ? "border-primary/40 bg-primary/5 text-foreground dark:bg-primary/10"
+                        : "border-border/60 bg-background/60 hover:bg-muted/40",
+                    )}
+                  >
                     <input
                       type="checkbox"
                       checked={checked}
+                      className="mt-0.5 rounded border-border"
                       onChange={(e) => {
                         const next = e.target.checked
                           ? ([...selected, m.key] as ModuleKey[])
@@ -1709,9 +1752,9 @@ function CompaniesListPage() {
                         form.setValue("modules", next, { shouldDirty: true, shouldValidate: true });
                       }}
                     />
-                    <span>
-                      <span className="font-medium">{getModuleLabel(m.key)}</span>
-                      <span className="block text-xs text-muted-foreground">{m.description}</span>
+                    <span className="min-w-0">
+                      <span className="block text-xs font-medium">{getModuleLabel(m.key)}</span>
+                      <span className="block text-[11px] leading-snug text-muted-foreground">{m.description}</span>
                     </span>
                   </label>
                 );
