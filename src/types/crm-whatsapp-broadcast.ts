@@ -35,6 +35,9 @@ export type CrmWhatsappBroadcast = {
   sentCount: number;
   failedCount: number;
   skippedCount: number;
+  batchCount?: number;
+  totalRecipients?: number;
+  createdBroadcastIds?: string[];
 };
 
 export type CrmWhatsappBroadcastDelivery = {

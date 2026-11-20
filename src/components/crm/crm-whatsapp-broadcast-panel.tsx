@@ -6,6 +6,7 @@ import {
   ChevronRight,
   FileIcon,
   Image as ImageIcon,
+  Layers,
   Loader2,
   Mic,
   Paperclip,
@@ -268,6 +269,11 @@ export function CrmWhatsappBroadcastPanel() {
     return () => window.clearInterval(id);
   }, [broadcasts, refreshList]);
 
+  function selectAllFiltered() {
+    const ids = filteredAccounts.map((account) => account.id);
+    setSelectedIds(new Set(ids));
+  }
+
   function selectRecipientBatch(start: number) {
     const total = filteredAccounts.length;
     if (total === 0) return;
@@ -290,16 +296,15 @@ export function CrmWhatsappBroadcastPanel() {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
-        return next;
+      } else {
+        next.add(id);
       }
-      if (next.size >= CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT) {
-        toast.error(`A broadcast can include at most ${CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT} recipients`);
-        return prev;
-      }
-      next.add(id);
       return next;
     });
   }
+
+  const batchCount = Math.ceil(selectedIds.size / CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT);
+  const isMultiBatch = batchCount > 1;
 
   async function openDetail(id: string) {
     if (expandedId === id) {
@@ -349,10 +354,6 @@ export function CrmWhatsappBroadcastPanel() {
       toast.error("Select at least one account");
       return;
     }
-    if (selectedIds.size > CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT) {
-      toast.error(`A broadcast can include at most ${CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT} recipients`);
-      return;
-    }
     if (!messageBody && !pendingMedia) {
       toast.error("Add a message or attachment");
       return;
@@ -373,12 +374,14 @@ export function CrmWhatsappBroadcastPanel() {
     }
 
     const whenMs = scheduledAt ? Date.parse(scheduledAt) : Date.now();
-    const conflict = broadcastScheduleConflict(whenMs, broadcasts);
-    if (conflict) {
-      toast.error(
-        `Another broadcast is already scheduled for ${formatWhen(conflict.scheduledAt)}. Leave at least 30 minutes between broadcasts.`,
-      );
-      return;
+    if (!sendNow) {
+      const conflict = broadcastScheduleConflict(whenMs, broadcasts);
+      if (conflict) {
+        toast.error(
+          `Another broadcast is already scheduled for ${formatWhen(conflict.scheduledAt)}. Leave at least 30 minutes between broadcasts.`,
+        );
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -403,11 +406,19 @@ export function CrmWhatsappBroadcastPanel() {
           media,
         },
       });
-      toast.success(
-        sendNow
-          ? `Sent to ${created.sentCount} of ${created.accountCount} groups`
-          : `Scheduled for ${formatWhen(created.scheduledAt)}`,
-      );
+      if (created.batchCount && created.batchCount > 1) {
+        toast.success(
+          sendNow
+            ? `1st batch dispatched (${created.sentCount}/${created.accountCount} sent)! ${created.batchCount - 1} remaining batches scheduled 30 mins apart.`
+            : `Scheduled ${created.batchCount} safe batches across ${created.totalRecipients || selectedIds.size} accounts (spaced 30 mins apart).`,
+        );
+      } else {
+        toast.success(
+          sendNow
+            ? `Sent to ${created.sentCount} of ${created.accountCount} groups`
+            : `Scheduled for ${formatWhen(created.scheduledAt)}`,
+        );
+      }
       clearPendingMedia();
       setHistoryTab(sendNow ? "recent" : "scheduled");
       await refreshList();
@@ -453,8 +464,8 @@ export function CrmWhatsappBroadcastPanel() {
         <div className="border-b px-4 py-3">
           <h2 className="text-sm font-semibold tracking-tight">Compose</h2>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
-            Message WhatsApp groups linked to your accounts. Up to {CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT}{" "}
-            recipients, with at least 30 minutes between broadcasts. Use {"{{clientName}}"} and other
+            Message WhatsApp groups linked to your accounts. Broadcasts with more than {CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT}{" "}
+            recipients are automatically split into safe, 30-minute spaced batches to protect your WhatsApp number from spam bans. Use {"{{clientName}}"} and other
             variables for personalization.
           </p>
         </div>
@@ -466,21 +477,34 @@ export function CrmWhatsappBroadcastPanel() {
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-semibold text-foreground">Recipients</span>
                 <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
-                  {selectedIds.size}/{CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT} selected · {filteredAccounts.length} shown
+                  {selectedIds.size} selected · {filteredAccounts.length} shown
                 </span>
+                {isMultiBatch && (
+                  <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-semibold flex items-center gap-1">
+                    <Layers className="h-3 w-3" />
+                    {batchCount} safe batches
+                  </span>
+                )}
               </div>
               <div className="flex gap-2 text-[10px] font-medium">
                 <button
                   type="button"
-                  className="text-primary hover:underline"
+                  className="text-primary font-semibold hover:underline"
+                  onClick={selectAllFiltered}
+                >
+                  Select all ({filteredAccounts.length})
+                </button>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground hover:underline"
                   onClick={() => selectRecipientBatch(0)}
                 >
-                  Select all
+                  First 30
                 </button>
-                {nextBatchCount > 0 ? (
+                {filteredAccounts.length > CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT && nextBatchCount > 0 ? (
                   <button
                     type="button"
-                    className="text-primary hover:underline"
+                    className="text-muted-foreground hover:text-foreground hover:underline"
                     onClick={() => selectRecipientBatch(nextBatchStart)}
                   >
                     Next {nextBatchCount}
@@ -563,6 +587,47 @@ export function CrmWhatsappBroadcastPanel() {
                 })
               )}
             </div>
+
+            {isMultiBatch && (
+              <div className="mt-2.5 rounded-xl border border-primary/20 bg-primary/[0.04] p-3 text-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 font-semibold text-primary">
+                    <Layers className="h-4 w-4" />
+                    <span>Smart Auto-Batching Active ({batchCount} batches)</span>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">30-min cooling gap · 4.5s pacing</span>
+                </div>
+                <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
+                  Broadcasting to all {selectedIds.size} accounts at once. To protect your WhatsApp number from Meta spam bans, messages are scheduled in safe batches:
+                </p>
+                <div className="mt-2 grid gap-1.5 text-[11px] sm:grid-cols-2 lg:grid-cols-3">
+                  {Array.from({ length: batchCount }, (_, i) => {
+                    const count = Math.min(
+                      CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT,
+                      selectedIds.size - i * CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT,
+                    );
+                    const minsOffset = i * 30;
+                    return (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between rounded-md border border-border/60 bg-background/80 px-2.5 py-1.5"
+                      >
+                        <span className="font-medium text-foreground">
+                          Batch {i + 1} ({count} accounts)
+                        </span>
+                        <span className="text-muted-foreground text-[10px]">
+                          {i === 0
+                            ? scheduleMode === "now"
+                              ? "Immediate"
+                              : "Scheduled time"
+                            : `+${minsOffset} mins`}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Message source */}
@@ -804,7 +869,7 @@ export function CrmWhatsappBroadcastPanel() {
 
             <Button
               type="button"
-              className="h-9 w-full gap-1.5 text-xs"
+              className="h-9 w-full gap-1.5 text-xs font-medium"
               disabled={submitting || selectedIds.size === 0 || (!messageBody && !pendingMedia)}
               onClick={() => void onSubmit()}
             >
@@ -815,7 +880,13 @@ export function CrmWhatsappBroadcastPanel() {
               ) : (
                 <CalendarClock className="h-3.5 w-3.5" />
               )}
-              {scheduleMode === "now" ? "Send now" : "Schedule broadcast"}
+              {scheduleMode === "now"
+                ? isMultiBatch
+                  ? `Start Batch 1 (${Math.min(CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT, selectedIds.size)}) & Schedule ${batchCount - 1} Remaining`
+                  : `Send now (${selectedIds.size})`
+                : isMultiBatch
+                  ? `Schedule all ${batchCount} batches (${selectedIds.size} accounts)`
+                  : `Schedule broadcast (${selectedIds.size})`}
             </Button>
           </div>
 

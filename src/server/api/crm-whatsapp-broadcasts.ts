@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { canViewCrmAccount } from "@/lib/crm-account-access";
 import {
+  CRM_WHATSAPP_BROADCAST_GAP_MS,
   CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT,
   broadcastScheduleConflict,
 } from "@/lib/crm-whatsapp-broadcast-limits";
@@ -53,6 +54,77 @@ function assertBroadcastGap(db: ReturnType<typeof getDb>, scheduledAtIso: string
     400,
     `Another broadcast is already scheduled for ${formatBroadcastWhen(conflict.scheduledAt)}. Leave at least 30 minutes between broadcasts.`,
   );
+}
+
+function computeBatchSlots(
+  db: ReturnType<typeof getDb>,
+  baseScheduledAtIso: string,
+  batchCount: number,
+  shouldRunNow: boolean,
+): string[] {
+  const busy = db
+    .select({
+      id: t.crmWhatsappBroadcasts.id,
+      status: t.crmWhatsappBroadcasts.status,
+      scheduledAt: t.crmWhatsappBroadcasts.scheduledAt,
+    })
+    .from(t.crmWhatsappBroadcasts)
+    .where(inArray(t.crmWhatsappBroadcasts.status, ["pending", "running"]))
+    .all();
+
+  const busyTimes = busy
+    .map((b) => ({
+      id: b.id,
+      status: b.status,
+      scheduledAt: b.scheduledAt,
+      ms: Date.parse(b.scheduledAt),
+    }))
+    .filter((b) => Number.isFinite(b.ms));
+
+  const slots: string[] = [];
+  const baseMs = Date.parse(baseScheduledAtIso);
+  const gapMs = CRM_WHATSAPP_BROADCAST_GAP_MS;
+
+  let currentCandidateMs = baseMs;
+
+  for (let i = 0; i < batchCount; i++) {
+    if (i === 0 && shouldRunNow) {
+      const slotIso = new Date(baseMs).toISOString();
+      slots.push(slotIso);
+      busyTimes.push({
+        id: `batch-${i}`,
+        status: "pending",
+        scheduledAt: slotIso,
+        ms: baseMs,
+      });
+      currentCandidateMs = baseMs + gapMs;
+      continue;
+    }
+
+    let attempts = 0;
+    while (attempts < 500) {
+      attempts++;
+      const conflict = busyTimes.find(
+        (b) => Math.abs(currentCandidateMs - b.ms) < gapMs,
+      );
+      if (!conflict) {
+        break;
+      }
+      currentCandidateMs = conflict.ms + gapMs;
+    }
+
+    const slotIso = new Date(currentCandidateMs).toISOString();
+    slots.push(slotIso);
+    busyTimes.push({
+      id: `batch-${i}`,
+      status: "pending",
+      scheduledAt: slotIso,
+      ms: currentCandidateMs,
+    });
+    currentCandidateMs += gapMs;
+  }
+
+  return slots;
 }
 
 function normalizeGroupId(raw: string | null | undefined) {
@@ -215,7 +287,7 @@ export const createCrmWhatsappBroadcast = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z
       .object({
-        accountIds: z.array(z.string().min(1)).min(1).max(CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT),
+        accountIds: z.array(z.string().min(1)).min(1).max(1000),
         templateId: z.string().min(1).optional().nullable(),
         body: z.string().max(8000).optional().nullable(),
         scheduledAt: z.string().optional().nullable(),
@@ -254,12 +326,6 @@ export const createCrmWhatsappBroadcast = createServerFn({ method: "POST" })
     }
 
     const uniqueIds = [...new Set(data.accountIds.map((id) => id.trim()).filter(Boolean))];
-    if (uniqueIds.length > CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT) {
-      throw new ApiError(
-        400,
-        `A broadcast can include at most ${CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT} recipients.`,
-      );
-    }
     const accounts = listAccountIdsWithGroups(db, uniqueIds).filter((a) =>
       canViewCrmAccount(
         {
@@ -292,17 +358,25 @@ export const createCrmWhatsappBroadcast = createServerFn({ method: "POST" })
       scheduledAt = parsed <= Date.now() ? now : new Date(parsed).toISOString();
     }
 
-    assertBroadcastGap(db, scheduledAt);
-
     const shouldRunNow = Date.parse(scheduledAt) <= Date.now() + 2_000;
     if (shouldRunNow) {
       const config = loadCrmAutomationConfig(db);
       if (!config.waha.isEnabled || !config.waha.apiUrl?.trim() || !config.waha.apiKey?.trim()) {
         throw new ApiError(400, "WhatsApp (WAHA) is not enabled. Ask an admin to configure it.");
       }
+    } else {
+      assertBroadcastGap(db, scheduledAt);
     }
 
-    const broadcastId = newId();
+    // Split accounts into safe batches of at most CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT (30).
+    const batchSize = CRM_WHATSAPP_BROADCAST_RECIPIENT_LIMIT;
+    const batches: (typeof withGroups)[] = [];
+    for (let i = 0; i < withGroups.length; i += batchSize) {
+      batches.push(withGroups.slice(i, i + batchSize));
+    }
+    const batchCount = batches.length;
+    const slots = computeBatchSlots(db, scheduledAt, batchCount, shouldRunNow);
+
     let mediaKind: string | null = null;
     let mediaFilename: string | null = null;
     let mediaMimetype: string | null = null;
@@ -313,67 +387,88 @@ export const createCrmWhatsappBroadcast = createServerFn({ method: "POST" })
       mediaMimetype = data.media.mimetype.trim() || "application/octet-stream";
       mediaKind = inferBroadcastMediaKind(mediaMimetype);
       mediaStorageKey = saveBroadcastMedia({
-        broadcastId,
+        broadcastId: newId(),
         fileName: mediaFilename,
         mimeType: mediaMimetype,
         buffer,
       }).storageKey;
     }
 
-    db.insert(t.crmWhatsappBroadcasts)
-      .values({
-        id: broadcastId,
-        scheduledAt,
-        status: "pending",
-        templateId: resolved.templateId,
-        templateName: resolved.templateName,
-        body: resolved.body,
-        mediaKind,
-        mediaFilename,
-        mediaMimetype,
-        mediaStorageKey,
-        createdByUserId: user.id,
-        createdByName: user.name,
-        startedAt: null,
-        finishedAt: null,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+    const createdBroadcastIds: string[] = [];
+    const baseName = resolved.templateName || "Broadcast";
 
-    for (const account of accounts) {
-      const groupId = normalizeGroupId(account.whatsappGroupId) || null;
-      db.insert(t.crmWhatsappBroadcastDeliveries)
+    for (let i = 0; i < batchCount; i++) {
+      const batchAccounts = batches[i]!;
+      const batchId = newId();
+      createdBroadcastIds.push(batchId);
+      const batchScheduledAt = slots[i]!;
+      const batchTemplateName =
+        batchCount > 1
+          ? `${baseName} (Batch ${i + 1}/${batchCount})`
+          : resolved.templateName;
+
+      db.insert(t.crmWhatsappBroadcasts)
         .values({
-          id: newId(),
-          broadcastId,
-          accountId: account.id,
-          accountName: account.name,
-          groupId,
-          renderedBody: null,
-          status: groupId ? "pending" : "skipped",
-          errorMessage: groupId ? null : "No WhatsApp group linked",
-          sentAt: null,
+          id: batchId,
+          scheduledAt: batchScheduledAt,
+          status: "pending",
+          templateId: resolved.templateId,
+          templateName: batchTemplateName,
+          body: resolved.body,
+          mediaKind,
+          mediaFilename,
+          mediaMimetype,
+          mediaStorageKey,
+          createdByUserId: user.id,
+          createdByName: user.name,
+          startedAt: null,
+          finishedAt: null,
           createdAt: now,
           updatedAt: now,
         })
         .run();
+
+      for (const account of batchAccounts) {
+        const groupId = normalizeGroupId(account.whatsappGroupId) || null;
+        db.insert(t.crmWhatsappBroadcastDeliveries)
+          .values({
+            id: newId(),
+            broadcastId: batchId,
+            accountId: account.id,
+            accountName: account.name,
+            groupId,
+            renderedBody: null,
+            status: groupId ? "pending" : "skipped",
+            errorMessage: groupId ? null : "No WhatsApp group linked",
+            sentAt: null,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .run();
+      }
     }
 
+    const firstBroadcastId = createdBroadcastIds[0]!;
     if (shouldRunNow) {
       try {
-        await processWhatsappBroadcasts(db, { broadcastId });
+        await processWhatsappBroadcasts(db, { broadcastId: firstBroadcastId });
       } catch (err) {
         console.warn("[crm-whatsapp-broadcast] immediate process failed", err);
       }
     }
 
-    const row = db
+    const firstRow = db
       .select()
       .from(t.crmWhatsappBroadcasts)
-      .where(eq(t.crmWhatsappBroadcasts.id, broadcastId))
+      .where(eq(t.crmWhatsappBroadcasts.id, firstBroadcastId))
       .get()!;
-    return mapBroadcast(row, deliveryCounts(db, broadcastId));
+
+    return {
+      ...mapBroadcast(firstRow, deliveryCounts(db, firstBroadcastId)),
+      batchCount,
+      totalRecipients: withGroups.length,
+      createdBroadcastIds,
+    };
   });
 
 export const cancelCrmWhatsappBroadcast = createServerFn({ method: "POST" })
