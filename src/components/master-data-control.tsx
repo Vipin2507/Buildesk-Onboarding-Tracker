@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pencil, Search, Table2, Trash2 } from "lucide-react";
+import { CheckCircle2, Pencil, Search, Table2, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,6 +15,7 @@ import {
   AlertDialog,
   AlertDialogCancel,
   AlertDialogContent,
+  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -90,6 +91,10 @@ export function DataControlPanel() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteMode, setDeleteMode] = useState<"single" | "bulk">("single");
   const [pendingIds, setPendingIds] = useState<string[]>([]);
+
+  const [completeOpen, setCompleteOpen] = useState(false);
+  const [completeMode, setCompleteMode] = useState<"single" | "bulk">("single");
+  const [completePendingIds, setCompletePendingIds] = useState<string[]>([]);
 
   const filteredCompanies = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -196,6 +201,73 @@ export function DataControlPanel() {
     setPendingIds([]);
   }
 
+  function openCompleteSingle(id: string) {
+    setCompleteMode("single");
+    setCompletePendingIds([id]);
+    setCompleteOpen(true);
+  }
+
+  function openCompleteBulk() {
+    if (selected.size === 0) return;
+    setCompleteMode("bulk");
+    setCompletePendingIds([...selected]);
+    setCompleteOpen(true);
+  }
+
+  function confirmComplete() {
+    const completeCompany = useCompanyStore.getState().completeCompany;
+    const completeProject = useProjectStore.getState().completeProject;
+
+    if (tab === "companies") {
+      let totalProjects = 0;
+      for (const id of completePendingIds) {
+        totalProjects += getByCompany(id).length;
+        completeCompany(id);
+      }
+      toast.success(
+        `Completed ${completePendingIds.length} compan${completePendingIds.length === 1 ? "y" : "ies"}` +
+          (totalProjects > 0 ? ` and made ${totalProjects} project${totalProjects === 1 ? "" : "s"} live!` : " and made live!"),
+      );
+    } else {
+      for (const id of completePendingIds) {
+        completeProject(id);
+      }
+      toast.success(
+        `Completed ${completePendingIds.length} project${completePendingIds.length === 1 ? "" : "s"} and made 100% live!`,
+      );
+    }
+
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const id of completePendingIds) next.delete(id);
+      return next;
+    });
+    setCompleteOpen(false);
+    setCompletePendingIds([]);
+  }
+
+  const completeTitle =
+    tab === "companies"
+      ? completeMode === "bulk"
+        ? `Complete ${completePendingIds.length} companies & go live?`
+        : "Complete company & go live?"
+      : completeMode === "bulk"
+        ? `Complete ${completePendingIds.length} projects & go live?`
+        : "Complete project & go live?";
+
+  const completeDescription =
+    tab === "companies"
+      ? `This will mark ${
+          completePendingIds.length === 1
+            ? `"${companies.find((c) => c.id === completePendingIds[0])?.name ?? "this company"}"`
+            : `${completePendingIds.length} companies`
+        } as completed, mark modules live, and make all ${linkedProjectCount(completePendingIds)} linked project checklist items 100% complete and Go Live.`
+      : `This will mark ${
+          completePendingIds.length === 1
+            ? `"${projects.find((p) => p.id === completePendingIds[0])?.name ?? "this project"}"`
+            : `${completePendingIds.length} projects`
+        } as completed, mark onboarding checklist 100% (collected, uploaded, live), and mark all milestones complete.`;
+
   const deleteTitle =
     tab === "companies"
       ? deleteMode === "bulk"
@@ -253,14 +325,25 @@ export function DataControlPanel() {
       </div>
 
       {selected.size > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/20 bg-muted/40 px-3 py-2">
           <span className="text-xs font-medium">
             {selected.size} selected
             {tab === "companies" ? ` · ${linkedProjectCount([...selected])} linked projects` : ""}
           </span>
-          <Button type="button" size="sm" variant="destructive" className="h-7 gap-1 px-2.5 text-xs" onClick={openDeleteBulk}>
-            <Trash2 className="h-3.5 w-3.5" /> Delete selected
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              className="h-7 gap-1.5 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-xs"
+              onClick={openCompleteBulk}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              {tab === "companies" ? "Complete companies" : "Complete projects"}
+            </Button>
+            <Button type="button" size="sm" variant="destructive" className="h-7 gap-1 px-2.5 text-xs" onClick={openDeleteBulk}>
+              <Trash2 className="h-3.5 w-3.5" /> Delete selected
+            </Button>
+          </div>
         </div>
       )}
 
@@ -320,6 +403,16 @@ export function DataControlPanel() {
                         <td className="px-2.5 py-1.5 text-muted-foreground">{projectCount}</td>
                         <td className="px-2.5 py-1.5">
                           <div className="flex justify-end gap-1">
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                              title="Complete company & make projects live"
+                              onClick={() => openCompleteSingle(c.id)}
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                            </Button>
                             <Button
                               type="button"
                               size="icon"
@@ -399,6 +492,16 @@ export function DataControlPanel() {
                               type="button"
                               size="icon"
                               variant="ghost"
+                              className="h-7 w-7 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                              title="Complete project & mark checklist 100%"
+                              onClick={() => openCompleteSingle(p.id)}
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
                               className="h-7 w-7"
                               onClick={() => {
                                 setEditingProject(p);
@@ -463,6 +566,31 @@ export function DataControlPanel() {
         confirmLabel="Delete permanently"
         onConfirm={confirmDelete}
       />
+
+      <AlertDialog open={completeOpen} onOpenChange={setCompleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-base font-semibold">
+              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+              {completeTitle}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-xs text-muted-foreground leading-relaxed">
+              {completeDescription}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+              onClick={confirmComplete}
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Complete & Go Live
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

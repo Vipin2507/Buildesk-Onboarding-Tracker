@@ -13,6 +13,7 @@ import {
 } from "@/lib/api";
 import { serverSync, serverSyncTrackedWithRollback, serverSyncWithRollback } from "@/lib/sync";
 import { useCompanyPortalStore } from "./useCompanyPortalStore";
+import { useProjectStore } from "./useProjectStore";
 
 type CompanyState = {
   companies: Company[];
@@ -23,6 +24,8 @@ type CompanyState = {
     updates: { id: string; patch: Partial<Company> }[],
   ) => Promise<number>;
   deleteCompany: (id: string) => Company | undefined;
+  completeCompany: (id: string) => void;
+  completeCompaniesBulk: (ids: string[]) => void;
   getById: (id: string) => Company | undefined;
   transferManager: (companyId: string, managerId: string, who: string) => void;
   assignOnboardingManagerBulk: (companyIds: string[], managerId: string, who?: string) => void;
@@ -233,6 +236,61 @@ export const useCompanyStore = createStore<CompanyState>((set, get) => ({
       },
     );
     return company;
+  },
+
+  completeCompany: (id) => {
+    const company = get().getById(id);
+    if (!company) return;
+    const now = nowIso();
+
+    // 1. Mark all linked projects completed & 100% checklist + milestones
+    const linked = useProjectStore.getState().getByCompany(id);
+    for (const p of linked) {
+      useProjectStore.getState().completeProject(p.id);
+    }
+
+    // 2. Mark all opted-in modules (or all if none opted-in) live
+    let nextModules = normalizeCompanyModules(company.modules);
+    const hasOptedIn = nextModules.some((m) => m.optedIn);
+    if (!hasOptedIn) {
+      nextModules = nextModules.map((m) => ({ ...m, optedIn: true, liveAt: m.liveAt ?? now }));
+    } else {
+      nextModules = nextModules.map((m) =>
+        m.optedIn ? { ...m, liveAt: m.liveAt ?? now } : m,
+      );
+    }
+
+    set((s) => ({
+      companies: s.companies.map((c) =>
+        c.id === id ? touch({ ...c, status: "completed", modules: nextModules }) : c,
+      ),
+    }));
+
+    logActivity({
+      who: "You",
+      what: `Completed company ${company.name} and made all linked projects live`,
+      kind: "success",
+      companyId: id,
+    });
+
+    serverSync("completeCompany", () =>
+      apiUpdateCompany({
+        data: {
+          id,
+          patch: {
+            status: "completed",
+            modules: nextModules,
+          },
+        },
+      }),
+    );
+  },
+
+  completeCompaniesBulk: (ids) => {
+    if (ids.length === 0) return;
+    for (const id of ids) {
+      get().completeCompany(id);
+    }
   },
 
   getById: (id) => get().companies.find((c) => c.id === id),

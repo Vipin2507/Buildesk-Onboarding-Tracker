@@ -189,22 +189,51 @@ export const useOnboardingStore = createStore<OnboardingState>((set, get) => ({
 
   completeAllChecklistForProject: (projectId, who = "You") => {
     const now = nowIso();
-    set((s) => ({
-      checklistItems: s.checklistItems.map((i) => {
-        if (i.projectId !== projectId || i.notApplicable) return i;
-        if (i.collected && i.uploaded && i.live) return i;
-        return {
-          ...i,
-          collected: true,
-          uploaded: true,
-          live: true,
-          collectedAt: i.collectedAt ?? now,
-          uploadedAt: i.uploadedAt ?? now,
-          liveAt: i.liveAt ?? now,
-          updatedAt: now,
-        };
-      }),
-    }));
+    const hasItems = get().checklistItems.some((i) => i.projectId === projectId);
+    if (!hasItems) {
+      const seeded: OnboardingChecklistItem[] = [];
+      for (const [section, labels] of Object.entries(CHECKLIST_TEMPLATE)) {
+        for (const label of labels) {
+          seeded.push({
+            id: newId(),
+            projectId,
+            section,
+            label,
+            collected: true,
+            uploaded: true,
+            live: true,
+            collectedAt: now,
+            uploadedAt: now,
+            liveAt: now,
+            notApplicable: false,
+            remarks: "",
+            source: "default",
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+      }
+      set((s) => ({
+        checklistItems: [...s.checklistItems, ...seeded],
+      }));
+    } else {
+      set((s) => ({
+        checklistItems: s.checklistItems.map((i) => {
+          if (i.projectId !== projectId || i.notApplicable) return i;
+          if (i.collected && i.uploaded && i.live) return i;
+          return {
+            ...i,
+            collected: true,
+            uploaded: true,
+            live: true,
+            collectedAt: i.collectedAt ?? now,
+            uploadedAt: i.uploadedAt ?? now,
+            liveAt: i.liveAt ?? now,
+            updatedAt: now,
+          };
+        }),
+      }));
+    }
     logActivity({
       who,
       what: "Completed all onboarding checklist items",

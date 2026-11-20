@@ -254,6 +254,7 @@ export const completeProjectChecklist = createServerFn({ method: "POST" })
     const user = requireUser(["Admin", "Manager"]);
     const db = getDb();
     const now = nowIso();
+    ensureDefaultChecklist(data.projectId);
     const rows = db
       .select()
       .from(t.onboardingChecklistItems)
