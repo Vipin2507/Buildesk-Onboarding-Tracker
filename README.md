@@ -169,7 +169,7 @@ Route prefix: **`/`** (default for `productScope: erp`). Navigation in `src/lib/
 
 | Module | Route | Purpose |
 | --- | --- | --- |
-| **Dashboard** | `/` | Company/project KPIs, pipeline, module adoption, health, charts. See [ERP tracker dashboard](./ERP-TRACKER-DASHBOARD.md) for the UI and daily workflow. |
+| **Dashboard** | `/` | Company/project KPIs, pipeline, module adoption, health, charts |
 | **Companies** | `/companies` | Company CRUD and company hub |
 | **Onboarding Tracker** | `/onboarding` | Cross-company checklist / pipeline view |
 | **Modules & Add-ons** | `/modules` | Opt-in ERP modules (Post Sales, Vendor, Labor, Customer App, Construction, Project Mgmt, …) |
