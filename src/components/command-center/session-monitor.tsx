@@ -31,8 +31,9 @@ export function SessionMonitor() {
     const beat = () => {
       if (document.visibilityState === "hidden") return;
       void monitoringHeartbeat({ data: { application, module } }).then((result) => {
-        const seconds =
+        const reported =
           result.success && "heartbeatSeconds" in result.data ? result.data.heartbeatSeconds : 60;
+        const seconds = typeof reported === "number" ? reported : 60;
         window.clearInterval(timer);
         timer = window.setInterval(beat, Math.max(30, seconds) * 1000);
       });
