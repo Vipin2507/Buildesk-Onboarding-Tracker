@@ -1564,3 +1564,99 @@ export const projectFiles = sqliteTable(
     index("project_files_uploaded_idx").on(t.uploadedAt),
   ],
 );
+
+/** Command Center — authenticated work sessions. One row per login session. */
+export const workSessions = sqliteTable(
+  "work_sessions",
+  {
+    id: text("id").primaryKey(),
+    employeeId: text("employee_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    application: text("application").notNull(),
+    module: text("module").notNull().default(""),
+    loginAt: text("login_at").notNull(),
+    lastHeartbeatAt: text("last_heartbeat_at").notNull(),
+    lastActiveAt: text("last_active_at").notNull(),
+    logoutAt: text("logout_at"),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    device: text("device"),
+    browser: text("browser"),
+    os: text("os"),
+    status: text("status").notNull().default("online"),
+    terminatedBy: text("terminated_by"),
+  },
+  (t) => [
+    index("work_sessions_employee_idx").on(t.employeeId),
+    index("work_sessions_login_idx").on(t.loginAt),
+    index("work_sessions_status_idx").on(t.status),
+  ],
+);
+
+/** Command Center — business and access events. Append-only. */
+export const monitoringEvents = sqliteTable(
+  "monitoring_events",
+  {
+    id: text("id").primaryKey(),
+    employeeId: text("employee_id"),
+    employeeName: text("employee_name"),
+    application: text("application").notNull(),
+    module: text("module").notNull().default(""),
+    eventType: text("event_type").notNull(),
+    action: text("action").notNull(),
+    resourceType: text("resource_type"),
+    resourceId: text("resource_id"),
+    metadataJson: text("metadata_json"),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    sessionId: text("session_id"),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [
+    index("monitoring_events_created_idx").on(t.createdAt),
+    index("monitoring_events_employee_idx").on(t.employeeId),
+    index("monitoring_events_app_idx").on(t.application),
+    index("monitoring_events_type_idx").on(t.eventType),
+  ],
+);
+
+export const securityEvents = sqliteTable(
+  "security_events",
+  {
+    id: text("id").primaryKey(),
+    employeeId: text("employee_id"),
+    employeeName: text("employee_name"),
+    eventType: text("event_type").notNull(),
+    severity: text("severity").notNull(),
+    application: text("application").notNull().default(""),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    metadataJson: text("metadata_json"),
+    investigationStatus: text("investigation_status").notNull().default("open"),
+    notes: text("notes"),
+    reviewedBy: text("reviewed_by"),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [
+    index("security_events_created_idx").on(t.createdAt),
+    index("security_events_status_idx").on(t.investigationStatus),
+  ],
+);
+
+/** Command Center admin actions. Insert-only. */
+export const adminAuditLogs = sqliteTable(
+  "admin_audit_logs",
+  {
+    id: text("id").primaryKey(),
+    adminId: text("admin_id").notNull(),
+    adminName: text("admin_name").notNull(),
+    action: text("action").notNull(),
+    resourceType: text("resource_type").notNull(),
+    resourceId: text("resource_id"),
+    metadataJson: text("metadata_json"),
+    ipAddress: text("ip_address"),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [index("admin_audit_logs_created_idx").on(t.createdAt)],
+);

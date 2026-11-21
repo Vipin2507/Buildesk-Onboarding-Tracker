@@ -29,6 +29,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const setHydrated = useAuthStore((s) => s.setHydrated);
   const isPublic = isPublicPath(pathname);
   const isCrmPath = pathname === "/crm" || pathname.startsWith("/crm/");
+  const isAdminPath = pathname === "/admin" || pathname.startsWith("/admin/");
   const isGoogleOAuthCallback = isGoogleOAuthCallbackPath(pathname);
 
   useEffect(() => {
@@ -63,13 +64,20 @@ export function AuthGate({ children }: { children: ReactNode }) {
     // Let the OAuth callback finish before product-scope redirects.
     if (isGoogleOAuthCallback) return;
 
+    if (isAdminPath) {
+      if (user.role !== "Admin") {
+        void navigate({ to: homePathForUser(user), replace: true });
+      }
+      return;
+    }
+
     const crmUser = isCrmUser(user);
     if (crmUser && !isCrmPath) {
       void navigate({ to: "/crm", replace: true });
     } else if (!crmUser && isCrmPath) {
       void navigate({ to: "/", replace: true });
     }
-  }, [user, hydrated, isPublic, isCrmPath, isGoogleOAuthCallback, navigate]);
+  }, [user, hydrated, isPublic, isCrmPath, isAdminPath, isGoogleOAuthCallback, navigate]);
 
   if (!hydrated) {
     return <RedirectingScreen message="Loading session…" />;
@@ -85,6 +93,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   if (user) {
     if (isGoogleOAuthCallback) {
+      return <>{children}</>;
+    }
+    if (isAdminPath) {
+      if (user.role !== "Admin") {
+        return <RedirectingScreen message="Command Center is for admins…" />;
+      }
       return <>{children}</>;
     }
     const crmUser = isCrmUser(user);

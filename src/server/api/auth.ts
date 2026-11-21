@@ -20,6 +20,7 @@ import {
   SESSION_COOKIE,
 } from "@/server/auth/session";
 import { getCookie } from "@tanstack/react-start/server";
+import { closeWorkSession, noteFailedLogin, openWorkSession } from "@/server/lib/command-center";
 
 const loginInput = z.object({
   email: z.string().email(),
@@ -48,12 +49,20 @@ export const authLogin = createServerFn({ method: "POST" })
     const db = getDb();
     const email = data.email.trim().toLowerCase();
     const row = db.select().from(users).where(eq(users.email, email)).get();
-    if (!row) return resultErr("No account found with that email.");
+    if (!row) {
+      noteFailedLogin(email);
+      return resultErr("No account found with that email.");
+    }
     if (!row.active) return resultErr("This account is inactive. Contact your admin.");
     const ok = await verifyPassword(data.password, row.passwordHash);
-    if (!ok) return resultErr("Incorrect password. Try again.");
-    await createSession(row.id);
-    return resultOk({ user: toPublicUser(row) });
+    if (!ok) {
+      noteFailedLogin(email);
+      return resultErr("Incorrect password. Try again.");
+    }
+    const sessionId = await createSession(row.id);
+    const user = toPublicUser(row);
+    openWorkSession(user, sessionId);
+    return resultOk({ user });
   });
 
 export const authRegister = createServerFn({ method: "POST" })
@@ -65,8 +74,10 @@ export const authRegister = createServerFn({ method: "POST" })
 
 export const authLogout = createServerFn({ method: "POST" }).handler(async () => {
   const sessionId = getCookie(SESSION_COOKIE);
-  if (sessionId) destroySession(sessionId);
-  else clearSessionCookie();
+  if (sessionId) {
+    closeWorkSession(sessionId, "logout");
+    destroySession(sessionId);
+  } else clearSessionCookie();
   return resultOk(true);
 });
 

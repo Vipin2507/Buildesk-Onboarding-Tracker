@@ -224,15 +224,21 @@ function Dashboard() {
     if (!drillDown) return null;
     const resolved = resolveDrillDown(drillDown);
     if (!rangeStart) return resolved;
-    if (resolved.kind === "companies" || resolved.kind === "account_health") {
+    if (resolved.kind === "companies") {
       return {
-        ...resolved,
+        kind: "companies" as const,
+        companies: resolved.companies.filter((company) => rangedIds.has(company.id)),
+      };
+    }
+    if (resolved.kind === "account_health") {
+      return {
+        kind: "account_health" as const,
         companies: resolved.companies.filter((company) => rangedIds.has(company.id)),
       };
     }
     if (resolved.kind === "checklist") {
       return {
-        ...resolved,
+        kind: "checklist" as const,
         groups: resolved.groups.filter((group) => rangedIds.has(group.companyId)),
       };
     }

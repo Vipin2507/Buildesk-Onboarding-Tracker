@@ -1,21 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import {
-  Search,
-  ChevronDown,
-  LogOut,
-  Settings,
-  User,
-  UserRound,
-  Menu,
-} from "lucide-react";
+import { Search, ChevronDown, LogOut, Settings, User, UserRound, Menu, Shield } from "lucide-react";
 import { toast } from "sonner";
 
 import { EditProfileDialog } from "@/components/edit-profile-dialog";
-import {
-  GlobalSearchDropdown,
-  type GlobalSearchScope,
-} from "@/components/global-search-dropdown";
+import { GlobalSearchDropdown, type GlobalSearchScope } from "@/components/global-search-dropdown";
 import { MobileNavSheet } from "@/components/mobile-nav-sheet";
 import { NotificationsBell } from "@/components/notifications-panel";
 import { ThemeToggle, ThemeToggleCompact } from "@/components/theme-toggle";
@@ -70,7 +59,12 @@ export function TopBar() {
   }, [crm]);
 
   const showSearchPanel = open && query.length > 0;
-  const initials = currentUser?.name.split(" ").map((n) => n[0]).join("").slice(0, 2) ?? "??";
+  const initials =
+    currentUser?.name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .slice(0, 2) ?? "??";
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -231,8 +225,17 @@ export function TopBar() {
                   Invite CRM user
                 </DropdownMenuItem>
               )}
+              {currentUser?.role === "Admin" && (
+                <DropdownMenuItem onClick={() => void navigate({ to: "/admin" })}>
+                  <Shield className="mr-2 h-4 w-4" />
+                  Command Center
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+              <DropdownMenuItem
+                onClick={handleLogout}
+                className="text-destructive focus:text-destructive"
+              >
                 <LogOut className="mr-2 h-4 w-4" />
                 Sign out
               </DropdownMenuItem>

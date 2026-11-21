@@ -36,8 +36,10 @@ import { Route as CrmRouteImport } from './routes/crm'
 import { Route as CompaniesRouteImport } from './routes/companies'
 import { Route as ClientVisitsRouteImport } from './routes/client-visits'
 import { Route as AutomationRouteImport } from './routes/automation'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CrmIndexRouteImport } from './routes/crm.index'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as TicketsLinksRouteImport } from './routes/tickets.links'
 import { Route as TicketsTicketIdRouteImport } from './routes/tickets.$ticketId'
 import { Route as SupportTicketIdRouteImport } from './routes/support.$ticketId'
@@ -60,6 +62,17 @@ import { Route as CrmAutomationRouteImport } from './routes/crm.automation'
 import { Route as CrmActivityRouteImport } from './routes/crm.activity'
 import { Route as CrmAccountsRouteImport } from './routes/crm.accounts'
 import { Route as CompaniesCompanyIdRouteImport } from './routes/companies.$companyId'
+import { Route as AdminWorkRouteImport } from './routes/admin.work'
+import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
+import { Route as AdminSecurityRouteImport } from './routes/admin.security'
+import { Route as AdminReportsRouteImport } from './routes/admin.reports'
+import { Route as AdminHealthRouteImport } from './routes/admin.health'
+import { Route as AdminErpRouteImport } from './routes/admin.erp'
+import { Route as AdminEmployeesRouteImport } from './routes/admin.employees'
+import { Route as AdminCrmRouteImport } from './routes/admin.crm'
+import { Route as AdminAuditRouteImport } from './routes/admin.audit'
+import { Route as AdminAttendanceRouteImport } from './routes/admin.attendance'
+import { Route as AdminActivityRouteImport } from './routes/admin.activity'
 import { Route as PortalSlugIndexRouteImport } from './routes/portal.$slug.index'
 import { Route as PortalSlugTicketsRouteImport } from './routes/portal.$slug.tickets'
 import { Route as PortalSlugSolvedRouteImport } from './routes/portal.$slug.solved'
@@ -73,6 +86,7 @@ import { Route as CrmTicketsLinksRouteImport } from './routes/crm.tickets.links'
 import { Route as CrmTicketsTicketIdRouteImport } from './routes/crm.tickets.$ticketId'
 import { Route as CrmSupportTicketIdRouteImport } from './routes/crm.support.$ticketId'
 import { Route as CrmAccountsAccountIdRouteImport } from './routes/crm.accounts.$accountId'
+import { Route as AdminEmployeesUserIdRouteImport } from './routes/admin.employees.$userId'
 import { Route as CrmAccountsAccountIdIndexRouteImport } from './routes/crm.accounts.$accountId.index'
 import { Route as PortalSlugTicketsTicketIdRouteImport } from './routes/portal.$slug.tickets.$ticketId'
 import { Route as PortalSlugAcademyTutorialIdRouteImport } from './routes/portal.$slug.academy.$tutorialId'
@@ -216,6 +230,11 @@ const AutomationRoute = AutomationRouteImport.update({
   path: '/automation',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -225,6 +244,11 @@ const CrmIndexRoute = CrmIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => CrmRoute,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
 } as any)
 const TicketsLinksRoute = TicketsLinksRouteImport.update({
   id: '/links',
@@ -336,6 +360,61 @@ const CompaniesCompanyIdRoute = CompaniesCompanyIdRouteImport.update({
   path: '/$companyId',
   getParentRoute: () => CompaniesRoute,
 } as any)
+const AdminWorkRoute = AdminWorkRouteImport.update({
+  id: '/work',
+  path: '/work',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSecurityRoute = AdminSecurityRouteImport.update({
+  id: '/security',
+  path: '/security',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminReportsRoute = AdminReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminHealthRoute = AdminHealthRouteImport.update({
+  id: '/health',
+  path: '/health',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminErpRoute = AdminErpRouteImport.update({
+  id: '/erp',
+  path: '/erp',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminEmployeesRoute = AdminEmployeesRouteImport.update({
+  id: '/employees',
+  path: '/employees',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCrmRoute = AdminCrmRouteImport.update({
+  id: '/crm',
+  path: '/crm',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAuditRoute = AdminAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAttendanceRoute = AdminAttendanceRouteImport.update({
+  id: '/attendance',
+  path: '/attendance',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminActivityRoute = AdminActivityRouteImport.update({
+  id: '/activity',
+  path: '/activity',
+  getParentRoute: () => AdminRoute,
+} as any)
 const PortalSlugIndexRoute = PortalSlugIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -401,6 +480,11 @@ const CrmAccountsAccountIdRoute = CrmAccountsAccountIdRouteImport.update({
   path: '/$accountId',
   getParentRoute: () => CrmAccountsRoute,
 } as any)
+const AdminEmployeesUserIdRoute = AdminEmployeesUserIdRouteImport.update({
+  id: '/$userId',
+  path: '/$userId',
+  getParentRoute: () => AdminEmployeesRoute,
+} as any)
 const CrmAccountsAccountIdIndexRoute =
   CrmAccountsAccountIdIndexRouteImport.update({
     id: '/',
@@ -446,6 +530,7 @@ const CompaniesCompanyIdModulesPostSalesProjectsProjectIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/automation': typeof AutomationRoute
   '/client-visits': typeof ClientVisitsRoute
   '/companies': typeof CompaniesRouteWithChildren
@@ -473,6 +558,17 @@ export interface FileRoutesByFullPath {
   '/tickets': typeof TicketsRouteWithChildren
   '/training': typeof TrainingRoute
   '/vendors': typeof VendorsRoute
+  '/admin/activity': typeof AdminActivityRoute
+  '/admin/attendance': typeof AdminAttendanceRoute
+  '/admin/audit': typeof AdminAuditRoute
+  '/admin/crm': typeof AdminCrmRoute
+  '/admin/employees': typeof AdminEmployeesRouteWithChildren
+  '/admin/erp': typeof AdminErpRoute
+  '/admin/health': typeof AdminHealthRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/security': typeof AdminSecurityRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/work': typeof AdminWorkRoute
   '/companies/$companyId': typeof CompaniesCompanyIdRouteWithChildren
   '/crm/accounts': typeof CrmAccountsRouteWithChildren
   '/crm/activity': typeof CrmActivityRoute
@@ -495,7 +591,9 @@ export interface FileRoutesByFullPath {
   '/support/$ticketId': typeof SupportTicketIdRoute
   '/tickets/$ticketId': typeof TicketsTicketIdRoute
   '/tickets/links': typeof TicketsLinksRoute
+  '/admin/': typeof AdminIndexRoute
   '/crm/': typeof CrmIndexRoute
+  '/admin/employees/$userId': typeof AdminEmployeesUserIdRoute
   '/crm/accounts/$accountId': typeof CrmAccountsAccountIdRouteWithChildren
   '/crm/support/$ticketId': typeof CrmSupportTicketIdRoute
   '/crm/tickets/$ticketId': typeof CrmTicketsTicketIdRoute
@@ -545,6 +643,17 @@ export interface FileRoutesByTo {
   '/tickets': typeof TicketsRouteWithChildren
   '/training': typeof TrainingRoute
   '/vendors': typeof VendorsRoute
+  '/admin/activity': typeof AdminActivityRoute
+  '/admin/attendance': typeof AdminAttendanceRoute
+  '/admin/audit': typeof AdminAuditRoute
+  '/admin/crm': typeof AdminCrmRoute
+  '/admin/employees': typeof AdminEmployeesRouteWithChildren
+  '/admin/erp': typeof AdminErpRoute
+  '/admin/health': typeof AdminHealthRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/security': typeof AdminSecurityRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/work': typeof AdminWorkRoute
   '/companies/$companyId': typeof CompaniesCompanyIdRouteWithChildren
   '/crm/accounts': typeof CrmAccountsRouteWithChildren
   '/crm/activity': typeof CrmActivityRoute
@@ -566,7 +675,9 @@ export interface FileRoutesByTo {
   '/support/$ticketId': typeof SupportTicketIdRoute
   '/tickets/$ticketId': typeof TicketsTicketIdRoute
   '/tickets/links': typeof TicketsLinksRoute
+  '/admin': typeof AdminIndexRoute
   '/crm': typeof CrmIndexRoute
+  '/admin/employees/$userId': typeof AdminEmployeesUserIdRoute
   '/crm/support/$ticketId': typeof CrmSupportTicketIdRoute
   '/crm/tickets/$ticketId': typeof CrmTicketsTicketIdRoute
   '/crm/tickets/links': typeof CrmTicketsLinksRoute
@@ -590,6 +701,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/automation': typeof AutomationRoute
   '/client-visits': typeof ClientVisitsRoute
   '/companies': typeof CompaniesRouteWithChildren
@@ -617,6 +729,17 @@ export interface FileRoutesById {
   '/tickets': typeof TicketsRouteWithChildren
   '/training': typeof TrainingRoute
   '/vendors': typeof VendorsRoute
+  '/admin/activity': typeof AdminActivityRoute
+  '/admin/attendance': typeof AdminAttendanceRoute
+  '/admin/audit': typeof AdminAuditRoute
+  '/admin/crm': typeof AdminCrmRoute
+  '/admin/employees': typeof AdminEmployeesRouteWithChildren
+  '/admin/erp': typeof AdminErpRoute
+  '/admin/health': typeof AdminHealthRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/security': typeof AdminSecurityRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/work': typeof AdminWorkRoute
   '/companies/$companyId': typeof CompaniesCompanyIdRouteWithChildren
   '/crm/accounts': typeof CrmAccountsRouteWithChildren
   '/crm/activity': typeof CrmActivityRoute
@@ -639,7 +762,9 @@ export interface FileRoutesById {
   '/support/$ticketId': typeof SupportTicketIdRoute
   '/tickets/$ticketId': typeof TicketsTicketIdRoute
   '/tickets/links': typeof TicketsLinksRoute
+  '/admin/': typeof AdminIndexRoute
   '/crm/': typeof CrmIndexRoute
+  '/admin/employees/$userId': typeof AdminEmployeesUserIdRoute
   '/crm/accounts/$accountId': typeof CrmAccountsAccountIdRouteWithChildren
   '/crm/support/$ticketId': typeof CrmSupportTicketIdRoute
   '/crm/tickets/$ticketId': typeof CrmTicketsTicketIdRoute
@@ -665,6 +790,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/automation'
     | '/client-visits'
     | '/companies'
@@ -692,6 +818,17 @@ export interface FileRouteTypes {
     | '/tickets'
     | '/training'
     | '/vendors'
+    | '/admin/activity'
+    | '/admin/attendance'
+    | '/admin/audit'
+    | '/admin/crm'
+    | '/admin/employees'
+    | '/admin/erp'
+    | '/admin/health'
+    | '/admin/reports'
+    | '/admin/security'
+    | '/admin/settings'
+    | '/admin/work'
     | '/companies/$companyId'
     | '/crm/accounts'
     | '/crm/activity'
@@ -714,7 +851,9 @@ export interface FileRouteTypes {
     | '/support/$ticketId'
     | '/tickets/$ticketId'
     | '/tickets/links'
+    | '/admin/'
     | '/crm/'
+    | '/admin/employees/$userId'
     | '/crm/accounts/$accountId'
     | '/crm/support/$ticketId'
     | '/crm/tickets/$ticketId'
@@ -764,6 +903,17 @@ export interface FileRouteTypes {
     | '/tickets'
     | '/training'
     | '/vendors'
+    | '/admin/activity'
+    | '/admin/attendance'
+    | '/admin/audit'
+    | '/admin/crm'
+    | '/admin/employees'
+    | '/admin/erp'
+    | '/admin/health'
+    | '/admin/reports'
+    | '/admin/security'
+    | '/admin/settings'
+    | '/admin/work'
     | '/companies/$companyId'
     | '/crm/accounts'
     | '/crm/activity'
@@ -785,7 +935,9 @@ export interface FileRouteTypes {
     | '/support/$ticketId'
     | '/tickets/$ticketId'
     | '/tickets/links'
+    | '/admin'
     | '/crm'
+    | '/admin/employees/$userId'
     | '/crm/support/$ticketId'
     | '/crm/tickets/$ticketId'
     | '/crm/tickets/links'
@@ -808,6 +960,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/automation'
     | '/client-visits'
     | '/companies'
@@ -835,6 +988,17 @@ export interface FileRouteTypes {
     | '/tickets'
     | '/training'
     | '/vendors'
+    | '/admin/activity'
+    | '/admin/attendance'
+    | '/admin/audit'
+    | '/admin/crm'
+    | '/admin/employees'
+    | '/admin/erp'
+    | '/admin/health'
+    | '/admin/reports'
+    | '/admin/security'
+    | '/admin/settings'
+    | '/admin/work'
     | '/companies/$companyId'
     | '/crm/accounts'
     | '/crm/activity'
@@ -857,7 +1021,9 @@ export interface FileRouteTypes {
     | '/support/$ticketId'
     | '/tickets/$ticketId'
     | '/tickets/links'
+    | '/admin/'
     | '/crm/'
+    | '/admin/employees/$userId'
     | '/crm/accounts/$accountId'
     | '/crm/support/$ticketId'
     | '/crm/tickets/$ticketId'
@@ -882,6 +1048,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
   AutomationRoute: typeof AutomationRoute
   ClientVisitsRoute: typeof ClientVisitsRoute
   CompaniesRoute: typeof CompaniesRouteWithChildren
@@ -1104,6 +1271,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AutomationRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -1117,6 +1291,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/crm/'
       preLoaderRoute: typeof CrmIndexRouteImport
       parentRoute: typeof CrmRoute
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/tickets/links': {
       id: '/tickets/links'
@@ -1272,6 +1453,83 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CompaniesCompanyIdRouteImport
       parentRoute: typeof CompaniesRoute
     }
+    '/admin/work': {
+      id: '/admin/work'
+      path: '/work'
+      fullPath: '/admin/work'
+      preLoaderRoute: typeof AdminWorkRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/security': {
+      id: '/admin/security'
+      path: '/security'
+      fullPath: '/admin/security'
+      preLoaderRoute: typeof AdminSecurityRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/reports': {
+      id: '/admin/reports'
+      path: '/reports'
+      fullPath: '/admin/reports'
+      preLoaderRoute: typeof AdminReportsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/health': {
+      id: '/admin/health'
+      path: '/health'
+      fullPath: '/admin/health'
+      preLoaderRoute: typeof AdminHealthRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/erp': {
+      id: '/admin/erp'
+      path: '/erp'
+      fullPath: '/admin/erp'
+      preLoaderRoute: typeof AdminErpRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/employees': {
+      id: '/admin/employees'
+      path: '/employees'
+      fullPath: '/admin/employees'
+      preLoaderRoute: typeof AdminEmployeesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/crm': {
+      id: '/admin/crm'
+      path: '/crm'
+      fullPath: '/admin/crm'
+      preLoaderRoute: typeof AdminCrmRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/audit': {
+      id: '/admin/audit'
+      path: '/audit'
+      fullPath: '/admin/audit'
+      preLoaderRoute: typeof AdminAuditRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/attendance': {
+      id: '/admin/attendance'
+      path: '/attendance'
+      fullPath: '/admin/attendance'
+      preLoaderRoute: typeof AdminAttendanceRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/activity': {
+      id: '/admin/activity'
+      path: '/activity'
+      fullPath: '/admin/activity'
+      preLoaderRoute: typeof AdminActivityRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/portal/$slug/': {
       id: '/portal/$slug/'
       path: '/'
@@ -1363,6 +1621,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CrmAccountsAccountIdRouteImport
       parentRoute: typeof CrmAccountsRoute
     }
+    '/admin/employees/$userId': {
+      id: '/admin/employees/$userId'
+      path: '/$userId'
+      fullPath: '/admin/employees/$userId'
+      preLoaderRoute: typeof AdminEmployeesUserIdRouteImport
+      parentRoute: typeof AdminEmployeesRoute
+    }
     '/crm/accounts/$accountId/': {
       id: '/crm/accounts/$accountId/'
       path: '/'
@@ -1414,6 +1679,50 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface AdminEmployeesRouteChildren {
+  AdminEmployeesUserIdRoute: typeof AdminEmployeesUserIdRoute
+}
+
+const AdminEmployeesRouteChildren: AdminEmployeesRouteChildren = {
+  AdminEmployeesUserIdRoute: AdminEmployeesUserIdRoute,
+}
+
+const AdminEmployeesRouteWithChildren = AdminEmployeesRoute._addFileChildren(
+  AdminEmployeesRouteChildren,
+)
+
+interface AdminRouteChildren {
+  AdminActivityRoute: typeof AdminActivityRoute
+  AdminAttendanceRoute: typeof AdminAttendanceRoute
+  AdminAuditRoute: typeof AdminAuditRoute
+  AdminCrmRoute: typeof AdminCrmRoute
+  AdminEmployeesRoute: typeof AdminEmployeesRouteWithChildren
+  AdminErpRoute: typeof AdminErpRoute
+  AdminHealthRoute: typeof AdminHealthRoute
+  AdminReportsRoute: typeof AdminReportsRoute
+  AdminSecurityRoute: typeof AdminSecurityRoute
+  AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminWorkRoute: typeof AdminWorkRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminActivityRoute: AdminActivityRoute,
+  AdminAttendanceRoute: AdminAttendanceRoute,
+  AdminAuditRoute: AdminAuditRoute,
+  AdminCrmRoute: AdminCrmRoute,
+  AdminEmployeesRoute: AdminEmployeesRouteWithChildren,
+  AdminErpRoute: AdminErpRoute,
+  AdminHealthRoute: AdminHealthRoute,
+  AdminReportsRoute: AdminReportsRoute,
+  AdminSecurityRoute: AdminSecurityRoute,
+  AdminSettingsRoute: AdminSettingsRoute,
+  AdminWorkRoute: AdminWorkRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface CompaniesCompanyIdRouteChildren {
   CompaniesCompanyIdModulesModuleKeyRoute: typeof CompaniesCompanyIdModulesModuleKeyRoute
@@ -1642,6 +1951,7 @@ const PortalSlugRouteWithChildren = PortalSlugRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
   AutomationRoute: AutomationRoute,
   ClientVisitsRoute: ClientVisitsRoute,
   CompaniesRoute: CompaniesRouteWithChildren,

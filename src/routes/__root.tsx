@@ -23,6 +23,7 @@ import { DesignTicketBootstrap } from "@/components/design-ticket-bootstrap";
 import { ChatBootstrap } from "@/components/chat/chat-bootstrap";
 import { ChatNotificationListener } from "@/components/chat/chat-notification-listener";
 import { ThemeProvider, useTheme } from "@/components/theme-provider";
+import { SessionMonitor } from "@/components/command-center/session-monitor";
 import { RouterDebug } from "@/components/router-debug";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 
@@ -142,6 +143,7 @@ function RootComponent() {
   const isAuthPage = pathname === "/login";
   const isPortal = pathname.startsWith("/portal");
   const isCrmApp = pathname === "/crm" || pathname.startsWith("/crm/");
+  const isAdminApp = pathname === "/admin" || pathname.startsWith("/admin/");
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -159,19 +161,26 @@ function RootComponent() {
                 <Outlet />
               ) : (
                 <ServerDataBootstrap>
+                  <SessionMonitor />
                   <NavigationLoadingOverlay />
-                  <DesignTicketBootstrap />
-                  <ChatBootstrap />
-                  <ChatNotificationListener />
-                  <div className="flex min-h-screen w-full bg-background text-foreground">
-                    {isCrmApp ? <CrmSidebar /> : <AppSidebar />}
-                    <div className="flex min-w-0 flex-1 flex-col">
-                      <TopBar />
-                      <main className="min-w-0 flex-1 pb-[env(safe-area-inset-bottom)]">
-                        <Outlet />
-                      </main>
-                    </div>
-                  </div>
+                  {isAdminApp ? (
+                    <Outlet />
+                  ) : (
+                    <>
+                      <DesignTicketBootstrap />
+                      <ChatBootstrap />
+                      <ChatNotificationListener />
+                      <div className="flex min-h-screen w-full bg-background text-foreground">
+                        {isCrmApp ? <CrmSidebar /> : <AppSidebar />}
+                        <div className="flex min-w-0 flex-1 flex-col">
+                          <TopBar />
+                          <main className="min-w-0 flex-1 pb-[env(safe-area-inset-bottom)]">
+                            <Outlet />
+                          </main>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </ServerDataBootstrap>
               )}
               <RouterDebug />

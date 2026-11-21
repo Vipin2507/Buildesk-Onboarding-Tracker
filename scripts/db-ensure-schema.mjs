@@ -1675,5 +1675,98 @@ if (!tableExists("crm_winback_templates")) {
   console.log("+ CREATE TABLE crm_winback_templates");
 }
 
+if (!tableExists("work_sessions")) {
+  sqlite.exec(`
+    CREATE TABLE work_sessions (
+      id TEXT PRIMARY KEY NOT NULL,
+      employee_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      application TEXT NOT NULL,
+      module TEXT NOT NULL DEFAULT '',
+      login_at TEXT NOT NULL,
+      last_heartbeat_at TEXT NOT NULL,
+      last_active_at TEXT NOT NULL,
+      logout_at TEXT,
+      ip_address TEXT,
+      user_agent TEXT,
+      device TEXT,
+      browser TEXT,
+      os TEXT,
+      status TEXT NOT NULL DEFAULT 'online',
+      terminated_by TEXT
+    );
+    CREATE INDEX IF NOT EXISTS work_sessions_employee_idx ON work_sessions(employee_id);
+    CREATE INDEX IF NOT EXISTS work_sessions_login_idx ON work_sessions(login_at);
+    CREATE INDEX IF NOT EXISTS work_sessions_status_idx ON work_sessions(status);
+  `);
+  console.log("+ CREATE TABLE work_sessions");
+}
+
+if (!tableExists("monitoring_events")) {
+  sqlite.exec(`
+    CREATE TABLE monitoring_events (
+      id TEXT PRIMARY KEY NOT NULL,
+      employee_id TEXT,
+      employee_name TEXT,
+      application TEXT NOT NULL,
+      module TEXT NOT NULL DEFAULT '',
+      event_type TEXT NOT NULL,
+      action TEXT NOT NULL,
+      resource_type TEXT,
+      resource_id TEXT,
+      metadata_json TEXT,
+      ip_address TEXT,
+      user_agent TEXT,
+      session_id TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS monitoring_events_created_idx ON monitoring_events(created_at);
+    CREATE INDEX IF NOT EXISTS monitoring_events_employee_idx ON monitoring_events(employee_id);
+    CREATE INDEX IF NOT EXISTS monitoring_events_app_idx ON monitoring_events(application);
+    CREATE INDEX IF NOT EXISTS monitoring_events_type_idx ON monitoring_events(event_type);
+  `);
+  console.log("+ CREATE TABLE monitoring_events");
+}
+
+if (!tableExists("security_events")) {
+  sqlite.exec(`
+    CREATE TABLE security_events (
+      id TEXT PRIMARY KEY NOT NULL,
+      employee_id TEXT,
+      employee_name TEXT,
+      event_type TEXT NOT NULL,
+      severity TEXT NOT NULL,
+      application TEXT NOT NULL DEFAULT '',
+      ip_address TEXT,
+      user_agent TEXT,
+      metadata_json TEXT,
+      investigation_status TEXT NOT NULL DEFAULT 'open',
+      notes TEXT,
+      reviewed_by TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS security_events_created_idx ON security_events(created_at);
+    CREATE INDEX IF NOT EXISTS security_events_status_idx ON security_events(investigation_status);
+  `);
+  console.log("+ CREATE TABLE security_events");
+}
+
+if (!tableExists("admin_audit_logs")) {
+  sqlite.exec(`
+    CREATE TABLE admin_audit_logs (
+      id TEXT PRIMARY KEY NOT NULL,
+      admin_id TEXT NOT NULL,
+      admin_name TEXT NOT NULL,
+      action TEXT NOT NULL,
+      resource_type TEXT NOT NULL,
+      resource_id TEXT,
+      metadata_json TEXT,
+      ip_address TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS admin_audit_logs_created_idx ON admin_audit_logs(created_at);
+  `);
+  console.log("+ CREATE TABLE admin_audit_logs");
+}
+
 sqlite.close();
 console.log("db:ensure complete");

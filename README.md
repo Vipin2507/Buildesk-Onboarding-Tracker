@@ -391,6 +391,12 @@ Per-company or per-CRM-account portal at **`/portal/{slug}`**:
 
 ---
 
+## Command Center (`/admin`)
+
+Admin accounts open this from the profile menu. It is a separate shell from the ERP and CRM sidebars.
+
+It reads the same SQLite database. Logins, logouts, page visits, and heartbeats are stored from the moment this release is running. Older history is not backfilled. Counts for companies, CRM accounts, tasks, payments, and tickets come from those existing records. GPS location, CPU, and background-job health are shown as unavailable rather than invented. Session time is time between login and the last heartbeat, not a productivity score.
+
 ## Shared capabilities
 
 | Area | Features |
