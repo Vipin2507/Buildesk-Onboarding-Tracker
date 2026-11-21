@@ -14,6 +14,8 @@ export type DashboardKpiCardProps = {
   tone?: string;
   variant?: "primary" | "in_progress" | "completed" | "on_hold";
   trend?: string;
+  /** Explains the percentage, shown on hover. */
+  trendTitle?: string;
   hint?: string;
   delay?: number;
   active?: boolean;
@@ -83,6 +85,7 @@ export function DashboardKpiCard({
   tone,
   variant,
   trend,
+  trendTitle,
   hint,
   delay = 0,
   active,
@@ -223,7 +226,10 @@ export function DashboardKpiCard({
             <CountUp to={value} />
           </span>
           {trend ? (
-            <span className={cn("inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-bold leading-none", cfg.trendClass)}>
+            <span
+              title={trendTitle}
+              className={cn("inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-bold leading-none", cfg.trendClass)}
+            >
               {trend}
             </span>
           ) : null}

@@ -55,19 +55,22 @@ Route prefix: **`/crm`**. Navigation is defined in `src/lib/crm-nav.ts`.
 
 | Module | Route | Purpose |
 | --- | --- | --- |
-| **Dashboard** | `/crm` | Portfolio KPIs, pending work chips, module adoption, health, recent tasks & queries, activity preview |
-| **Accounts** | `/crm/accounts` | CRM customer accounts — filters, bulk upload/export, date bulk update, API-key bulk, client transfer, commercial fields |
-| **Payments** | `/crm/payments` | Collection board — installment allocation, ledger, renewals, reminders |
+| **Dashboard** | `/crm` | Portfolio KPIs, pending tasks and queries, module adoption, health, recent work, drill-down lists |
+| **Accounts** | `/crm/accounts` | Customer accounts — filters, bulk upload/export, date bulk update, API-key bulk, client transfer, commercial fields |
+| **Usage** | `/crm/usage` | Daily CRM usage for Onboarding, Live, and Active accounts; saved days, nightly refresh, fill-missing-days |
+| **Payments** | `/crm/payments` | Collection board — installments, ledger, renewals, reminders, executive overdue digest |
 | **Meetings** | `/crm/bookings` | Portal booking requests, executive availability, Google Calendar + Meet, end-early |
-| **Tasks** | `/crm/tasks` | Follow-up tasks — calendar views, assignees, reminders (incl. Reminder type) |
-| **Account queries** | `/crm/queries` | Internal account discussions — create, filter, search, attachments, mentions |
+| **Tasks** | `/crm/tasks` | Follow-up tasks — list and calendar, assignees, reminders (including Reminder type) |
+| **Account queries** | `/crm/queries` | Internal discussions — threads, attachments, mentions |
+| **Broadcast** | `/crm/broadcasts` | WhatsApp broadcasts to account groups — send now or schedule |
+| **Win-back** | `/crm/win-back` | Outreach for accounts that need a win-back conversation |
 | **Activity history** | `/crm/activity` | Unified feed — visits, tasks, bookings, tickets, tracker, modules, queries |
 | **Support Desk** | `/crm/support` | Internal `TKT-*` engineering tickets |
-| **Ticket Tracking** | `/crm/tickets` | Client `DT-*` portal tickets |
+| **Ticket Tracking** | `/crm/tickets` | Client `DT-*` portal tickets, Support 1 assignment, pending-by-executive chart |
 | **Live Chat** | `/crm/live-chat` | Portal chat inbox |
-| **Automation** | `/crm/automation` | CRM rules — bookings, task reminders, payments, n8n / WAHA (admin) |
-| **Master** | `/crm/master` | CRM catalogs — modules, migration/training/report checklists, call types, booking defaults (admin) |
-| **Settings** | `/crm/settings` | CRM org settings, users, web push devices, Google Calendar |
+| **Automation** | `/crm/automation` | CRM rules — bookings, tasks, payments, queries, SLA, n8n / WAHA (admin) |
+| **Master** | `/crm/master` | Fields, picklists, modules, checklists, call types, booking defaults, data control (admin) |
+| **Settings** | `/crm/settings` | Users, branding, alerts, onboarding SLA targets, Google Calendar, web push, profile |
 
 ### Account workspace
 
@@ -83,6 +86,7 @@ Each CRM account opens a hub at `/crm/accounts/$accountId` with tabs:
 | **Tickets** | Portal / support tickets for the account |
 | **Queries** | Threaded internal queries with attachments & mentions |
 | **Comms** | Communication log |
+| **WhatsApp** | Linked group for kickoff and broadcast messages, where configured |
 
 ### Opt-in product modules
 
@@ -159,6 +163,59 @@ Cal.com-style booking for CRM accounts:
 - Recent open tasks (with assignees) and queries
 - Session-persisted filters across list pages
 
+### Usage (`/crm/usage`)
+
+- Board for Onboarding, Live, and Active accounts
+- Windows for recent days; cards for leads-only, missing days, suspended, and not connected
+- Saved daily reports open immediately
+- Nightly job (12:10am IST) refetches yesterday and replaces the stored day
+- **Fill missing days** backfills gaps
+- Lead receipt alone is not treated as CRM use
+- Account detail at `/crm/usage/$accountId`
+
+### Broadcast (`/crm/broadcasts`)
+
+- Compose a WhatsApp message for selected account groups
+- Send immediately or schedule
+- Optional media attachment
+- Uses the CRM WAHA session
+
+### Win-back (`/crm/win-back`)
+
+WhatsApp outreach to former clients, separate from live CRM accounts:
+
+- Import contacts from CSV (`CompanyName`, `ContactPerson`, `Mobile`)
+- Contacts, campaigns, templates, and delivery activity
+- Campaigns send in waves; pause, resume, retry, and cancel
+- Compose a message (and optional media) for the selected contacts
+
+### Ticket Tracking (`/crm/tickets`)
+
+- KPI cards: all, awaiting pickup, being worked, resolved + closed, active at least 7 days
+- Pending chart grouped by the account’s Support 1
+- Filters for status, priority, category, account, Support 1 / 2, and sales
+- **Assign to Support 1** assigns every unassigned open or in-progress ticket to the account’s Support 1 user
+- Preview sheet, full ticket thread, and portal-link admin at `/crm/tickets/links`
+
+### CRM automation rules
+
+Stored in SQLite (`app_config` key `crm-automation`) so toggles survive deploy. Seed triggers include:
+
+- Ticket created, updated, closed, and team reply
+- Portal ticket created
+- Booking created and booking status changed
+- Task reminder before start
+- Payment overdue and executive payment digest
+- Account renewal reminder
+- Query response
+- Live chat started
+- Onboarding SLA behind target (WhatsApp to Support 1, Support 2, and admins)
+
+### CRM settings and master
+
+- **Settings** — org profile, users and roles, notification devices, Google Calendar connection, onboarding SLA day-buckets, backups
+- **Master** — custom account fields, picklists, product modules, migration / training / report checklists, and a reset for the CRM catalog
+
 ---
 
 ## ERP Onboarding Tracker
@@ -167,33 +224,41 @@ Route prefix: **`/`** (default for `productScope: erp`). Navigation in `src/lib/
 
 ### ERP navigation
 
+Primary sidebar:
+
 | Module | Route | Purpose |
 | --- | --- | --- |
-| **Dashboard** | `/` | Company/project KPIs, pipeline, module adoption, health, charts |
-| **Companies** | `/companies` | Company CRUD and company hub |
-| **Onboarding Tracker** | `/onboarding` | Cross-company checklist / pipeline view |
-| **Modules & Add-ons** | `/modules` | Opt-in ERP modules (Post Sales, Vendor, Labor, Customer App, Construction, Project Mgmt, …) |
-| **Data Migration** | `/data-migration` | Migration checklists / uploads |
-| **Document Templates** | `/documents` | Template + required-doc tracking |
-| **Customer App** | `/customer-app` | Customer-app rollout tracking |
-| **Vendor Management** | `/vendors` | Vendor flows (incl. DnD) |
-| **Labor Management** | `/labor` | Labor tracking |
-| **Integrations & Triggers** | `/integrations` | Integration / trigger setup |
-| **Training** | `/training` | Training sessions |
+| **Dashboard** | `/` | Command center — status, checklist, adoption, health, closest accounts, act-next queue |
+| **Companies** | `/companies` | Company list, create/edit, bulk assign manager, company hub |
+| **Payments** | `/payments` | ERP company collection board (separate from CRM payments) |
 | **Support Desk** | `/support` | Internal `TKT-*` tickets |
-| **Ticket Tracking** | `/tickets` | Client `DT-*` tickets |
-| **Live Chat** | `/live-chat` | Portal chat inbox |
-| **Tasks** | `/tasks` | ERP follow-up tasks |
-| **My DPR** | `/dpr` | Daily progress report entries, templates, day submit |
-| **DPR Tracker** | `/dpr/tracker` | Manager view — executive DPR compliance |
-| **Meetings** | `/meetings` | ERP meetings (types, formats, status), list + calendar, Google Calendar |
-| **Client Visits** | `/client-visits` | Field visit logging |
-| **Renewals** | `/renewals` | Renewal / billing lifecycle |
-| **Employees** | `/employees` | Staff directory |
-| **Reports** | `/reports` | Operational reports |
-| **Master Config** | `/master` | Catalogs (admin) |
-| **Automation** | `/automation` | n8n / WAHA rules (admin) |
-| **Settings** | `/settings` | Org config, users, permissions |
+| **Ticket Tracking** | `/tickets` | Client `DT-*` tickets; portal links at `/tickets/links` |
+| **Live Chat** | `/live-chat` | Portal chat inbox (`manageTickets`) |
+| **Tasks** | `/tasks` | ERP follow-up tasks (`manageTasks`) |
+| **My DPR** | `/dpr` | Daily progress report (`manageDpr`) |
+| **Meetings** | `/meetings` | ERP meetings (`manageErpMeetings`) |
+| **Reports** | `/reports` | Operational reports (`viewReports`) |
+| **Settings** | `/settings` | Org, users, permissions, and the operations catalog |
+
+Reached from Settings, not the main sidebar:
+
+| Module | Route | Purpose |
+| --- | --- | --- |
+| **Onboarding Tracker** | `/onboarding` | Cross-company checklist pipeline |
+| **Modules & Add-ons** | `/modules` | Post Sales, Vendor, Labor, Customer App, Construction, Project Management, and the rest of the catalog |
+| **Data Migration** | `/data-migration` | Migration checklists and uploads |
+| **Document Templates** | `/documents` | Required-document tracking |
+| **Customer App** | `/customer-app` | Customer-app rollout |
+| **Vendor Management** | `/vendors` | Vendor board |
+| **Labor Management** | `/labor` | Labor board |
+| **Integrations & Triggers** | `/integrations` | Integration setup |
+| **Training** | `/training` | Training sessions |
+| **DPR Tracker** | `/dpr/tracker` | Executive DPR compliance (`viewDprTracker`) |
+| **Client Visits** | `/client-visits` | Field visits (`manageClientVisits`) |
+| **Renewals** | `/renewals` | Plan expiry and billing lifecycle |
+| **Employees** | `/employees` | Staff directory (`manageEmployees`) |
+| **Master Config** | `/master` | Platform catalogs (admin) |
+| **Automation** | `/automation` | n8n email and WAHA WhatsApp (admin) |
 
 ### Company → project lifecycle
 
@@ -213,9 +278,80 @@ Company
   └── Billing / renewals context
 ```
 
+### ERP dashboard (`/`)
+
+- **Date range** — Last 7 / 30 / 90 days or all time. A company is included when its start date (else agreement date, else created date) falls in the range. Cards, onboarding mix, modules, health, pipeline, recent companies, and activity follow that range. Pending overview stays the live open queue.
+- **Company cards** — Total, in progress, completed, on hold. The percentage is that count divided by the companies in the selected range (the total card’s percentage is the range divided by every company). Hover the percentage for the counts.
+- **Onboarding mix** — Chart menu switches the donut between status, plan, region, and health. A slice opens those companies.
+- **Modules opted** — The companies menu recounts opt-ins for all, in progress, completed, or on hold, and can show the top 6 modules or every module. A bar opens the companies that opted in.
+- **Pipeline completion** — Completed checklist steps divided by every collect, upload, and go-live step for companies in the range.
+- **Pending overview** — Current overdue follow-ups, tickets, checklist bottlenecks, visits, and renewals. Those chips are not filtered by the date range.
+- Counts and chart slices open the drill-down sheet. **+ New Onboarding** goes to `/companies`.
+
+### ERP payments (`/payments`)
+
+- Company-level commercial collection, not the CRM installment board
+- Sort by pending, overdue, next due, collected percent, or name
+- Bulk update payments from a sheet
+- Empty and error states stay on this page; company commercial fields are edited on the company Details tab
+
 ### Company hub tabs
 
-Overview · Modules · Progress · Projects · Tickets · Tasks · Meetings · Visits · Notes · History · Billing
+Details · Modules · Tickets · Tasks · Meetings · Visits · Notes & Files · History · Payments · Billing · WhatsApp
+
+WhatsApp stores the implementation group used by company-created automation. Payments on the hub is the company’s own ledger, linked to `/payments`.
+
+### Companies list
+
+- Search, filters, create and edit (POC, owner, Support 1 / 2, sales agent, modules, commercial plan)
+- Bulk assign onboarding manager
+- Delete with confirmation
+- Sheet import/export where enabled
+
+### Support Desk and Ticket Tracking
+
+- **Support Desk** (`/support`, `/support/$ticketId`) — internal engineering tickets, status pipeline, updates, edit and delete
+- **Ticket Tracking** (`/tickets`, `/tickets/$ticketId`) — client portal tickets; bulk assign, status, and priority; company portal links at `/tickets/links`
+
+### Tasks, visits, meetings, DPR
+
+- **Tasks** — ERP follow-ups tied to companies
+- **Client visits** (`/client-visits`) — field visits and follow-up dates (`manageClientVisits`)
+- **Meetings** — types (kickoff, training, review, demo, check-in, and others), formats (online, in person, phone), statuses (scheduled, completed, cancelled, postponed, no-show), list and calendar, optional Google Calendar for online meetings
+- **My DPR** — daily log with templates, categories, priorities, and day submit
+- **DPR Tracker** (`/dpr/tracker`) — manager compliance view across executives (`viewDprTracker`)
+
+### Operations catalog (from Settings)
+
+- **Onboarding tracker** — all companies’ checklist position
+- **Modules & add-ons** — Post Sales, Vendor, Labor, Customer App, Construction, Project Management, and the rest of the ERP catalog
+- **Data migration** — migration checklists and uploads
+- **Document templates** — required documents per implementation
+- **Customer app** — rollout tracking
+- **Vendors** and **Labor** — operational boards, including drag-and-drop where the board uses it
+- **Integrations & triggers** — integration setup
+- **Training** — training sessions
+- **Renewals** — plan expiry / billing lifecycle
+- **Employees** — staff directory (`manageEmployees`)
+- **Master Config** (`/master`, admin) — platform catalogs
+- **Automation** (`/automation`, admin) — n8n email and WAHA WhatsApp
+
+### ERP automation
+
+Rules persist in SQLite (`app_config` key `automation`). The enable-automation toggle, webhook base, and WAHA session name are saved from the Automation page (admin). Seed rules:
+
+- Ticket created and ticket closed — email and WhatsApp
+- **Company created** — implementation email to the POC (owner CC when different) and WhatsApp to the company group
+- Attachments (Excel, PDF, Word, images, `.zip`, `.rar`) go out as multipart files (`email_file`) on email and as WAHA media on WhatsApp
+- Kickoff signatures use `{{managerName}}`, `{{managerPhone}}`, and `{{managerEmail}}` from the company’s Support 1 (then onboarding manager, then CSM)
+
+### Reports (`/reports`)
+
+Chart plus detail table and download. Report set includes commercial, vendor, labor, people, churn, integrations, defects, time, and work-mix views driven by ERP data already in the app.
+
+### Projects
+
+`/projects` lists implementation projects. `/projects/$projectId` is the project workspace: onboarding checklist, progress, migration, documents, vendors, labor, integrations, training, tickets, and go-live. Post-sales module projects open at `/companies/$companyId/modules/post-sales/projects/$projectId`.
 
 ### Daily Progress Reports (DPR)
 
@@ -223,12 +359,6 @@ Overview · Modules · Progress · Projects · Tickets · Tasks · Meetings · V
 | --- | --- | --- |
 | **My DPR** | `/dpr` | Executives log daily work — templates, categories, priorities, day submit |
 | **DPR Tracker** | `/dpr/tracker` | Managers filter/search compliance across executives |
-
-### ERP Meetings
-
-- Meeting types (kickoff, training, review, demo, check-in, …) and formats (online, in person, phone)
-- Statuses: scheduled, completed, cancelled, postponed, no-show
-- List + calendar views; optional Google Calendar sync for online meetings
 
 ---
 
@@ -239,9 +369,10 @@ Per-company or per-CRM-account portal at **`/portal/{slug}`**:
 | Page | Purpose |
 | --- | --- |
 | Dashboard | KPI cards, recent tickets, booking status |
-| Create ticket | Self-service request form |
-| My Tickets / Solved | Active and closed ticket lists |
-| Book a call | Cal.com-style slot booking (CRM) |
+| Create ticket | Self-service request with attachments |
+| My Tickets / Solved | Active and closed ticket lists and ticket thread |
+| Book a call | Slot booking against executive availability (CRM) |
+| Academy | Tutorials list and tutorial detail |
 | Profile | Contact details |
 
 - **Buildesk Assistant** chatbot with knowledge base and escalation to live agents
@@ -266,7 +397,7 @@ Per-company or per-CRM-account portal at **`/portal/{slug}`**:
 | --- | --- |
 | **Auth & roles** | Session cookie, bcrypt, Admin / Manager / Viewer (+ permission keys); product scope ERP vs CRM |
 | **Notifications** | In-app bell; booking request alerts; web push for CRM task reminders |
-| **Automation** | n8n (email) + WAHA (WhatsApp) — tickets, bookings, tasks, payments, queries, live chat |
+| **Automation** | Separate ERP and CRM rule sets in SQLite. n8n email (JSON, or multipart when a file is attached). WAHA WhatsApp text and media. |
 | **Search** | Global search scoped to active product |
 | **Theme** | Light / dark |
 | **Bulk data** | Spreadsheet import/export (`xlsx`) for accounts, payments, companies, and related flows |
@@ -503,7 +634,7 @@ data/                     # SQLite file (local)
 3. Configure **integrations** as opted in
 4. Run **go-live verification** (account moves to Live; progress syncs)
 5. Share **portal link** — clients book calls and raise tickets
-6. Track **payments**, **tasks**, **queries**, and **activity history** from dashboard and hubs
+6. Track **payments**, **usage**, **tasks**, **queries**, **broadcasts**, **win-back**, and **activity history**
 7. Approve **meeting** requests → Join Meet → **End meeting** early if needed to free the calendar
 
 ### ERP implementation manager

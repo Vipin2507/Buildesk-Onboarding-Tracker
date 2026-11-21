@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   PieChart,
   Pie,
@@ -29,7 +29,8 @@ import {
 } from "lucide-react";
 
 import { DashboardDrillDownSheet } from "@/components/dashboard/dashboard-drill-down-sheet";
-import type { DashboardDrillDownData } from "@/components/dashboard/dashboard-drill-down-sheet";
+import { MODULE_CATALOG } from "@/data/module-catalog";
+import { summarizeChecklistPhases } from "@/lib/checklist";
 import { DashboardKpiCard } from "@/components/dashboard/dashboard-kpi-card";
 import { DashboardPendingSummary } from "@/components/dashboard/dashboard-pending-summary";
 import { OnboardingPipelineSection } from "@/components/dashboard/onboarding-pipeline";
@@ -40,13 +41,12 @@ import { Button } from "@/components/ui/button";
 import { resolveAssigneeLabel } from "@/lib/managers";
 import type { ChecklistPhaseBucket } from "@/lib/checklist";
 import {
-  useAccountHealth,
+  useActivityStore,
   useCompanyStore,
   useDashboardOverview,
   useEmployeeStore,
-  useModuleAdoption,
+  useOnboardingStore,
   useProjectStore,
-  useRecentActivity,
   useUserStore,
 } from "@/stores";
 import type { DashboardDrillDownFilter } from "@/stores/dashboard-selectors";
@@ -79,118 +79,304 @@ function getInitials(name: string) {
   return name.slice(0, 2).toUpperCase() || "CO";
 }
 
+type RangeId = "7" | "30" | "90" | "all";
+type ChartMode = "status" | "plan" | "region" | "health";
+type ModuleAudience = "all" | "in_progress" | "completed" | "on_hold";
+
+const RANGES: { id: RangeId; label: string; days: number | null }[] = [
+  { id: "7", label: "Last 7 days", days: 7 },
+  { id: "30", label: "Last 30 days", days: 30 },
+  { id: "90", label: "Last 90 days", days: 90 },
+  { id: "all", label: "All time", days: null },
+];
+
+const CHART_MODES: { id: ChartMode; label: string }[] = [
+  { id: "status", label: "By status" },
+  { id: "plan", label: "By plan" },
+  { id: "region", label: "By region" },
+  { id: "health", label: "By health" },
+];
+
+const MODULE_AUDIENCES: { id: ModuleAudience; label: string }[] = [
+  { id: "all", label: "All companies" },
+  { id: "in_progress", label: "In progress" },
+  { id: "completed", label: "Completed" },
+  { id: "on_hold", label: "On hold" },
+];
+
+const SLICE_COLORS = ["#2563eb", "#10b981", "#8b5cf6", "#f59e0b", "#06b6d4", "#f43f5e", "#64748b", "#84cc16"];
+
+function localDate(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function addDays(iso: string, days: number) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const date = new Date(y, (m || 1) - 1, d || 1);
+  date.setDate(date.getDate() + days);
+  return localDate(date);
+}
+
+function companyStartDate(company: { startDate?: string; agreementDate?: string; createdAt?: string }) {
+  const raw = company.startDate || company.agreementDate || company.createdAt || "";
+  return raw.slice(0, 10);
+}
+
+function shareLabel(part: number, total: number) {
+  if (!total) return "0%";
+  return `${Math.round((part / total) * 100)}%`;
+}
+
 function Dashboard() {
   const navigate = useNavigate();
-  const { kpis, phaseStats, openDesignTickets, resolveDrillDown } = useDashboardOverview();
-  const moduleData = useModuleAdoption();
-  const health = useAccountHealth();
-  const activities = useRecentActivity(6);
+  const { kpis, openDesignTickets, resolveDrillDown } = useDashboardOverview();
   const employees = useEmployeeStore((s) => s.employees);
   const users = useUserStore((s) => s.users);
   const projects = useProjectStore((s) => s.projects);
   const companies = useCompanyStore((s) => s.companies);
+  const checklistItems = useOnboardingStore((s) => s.checklistItems);
+  const activitiesAll = useActivityStore((s) => s.activities);
 
   const [drillDown, setDrillDown] = useState<DashboardDrillDownFilter | null>(null);
   const [activePhase, setActivePhase] = useState<ChecklistPhaseBucket | undefined>();
-  const [timeframe, setTimeframe] = useState("Last 30 days");
-  const [showTimeframeMenu, setShowTimeframeMenu] = useState(false);
+  const [rangeId, setRangeId] = useState<RangeId>("all");
+  const [openMenu, setOpenMenu] = useState<"range" | "chart" | "modules" | null>(null);
+  const [chartMode, setChartMode] = useState<ChartMode>("status");
+  const [moduleAudience, setModuleAudience] = useState<ModuleAudience>("all");
+  const [moduleLimit, setModuleLimit] = useState<number | null>(6);
+  const [sliceOverride, setSliceOverride] = useState<{
+    title: string;
+    subtitle: string;
+    companies: typeof kpis.companiesWithProgress;
+  } | null>(null);
 
-  const drillDownData = useMemo(
-    () => (drillDown ? resolveDrillDown(drillDown) : null),
-    [drillDown, resolveDrillDown],
-  ) as DashboardDrillDownData | null;
+  const range = RANGES.find((item) => item.id === rangeId) ?? RANGES[3];
+  const today = localDate();
+  const rangeStart = range.days ? addDays(today, -(range.days - 1)) : null;
+
+  const rangedCompanies = useMemo(() => {
+    if (!rangeStart) return kpis.companiesWithProgress;
+    return kpis.companiesWithProgress.filter((company) => {
+      const start = companyStartDate(company);
+      return Boolean(start) && start >= rangeStart && start <= today;
+    });
+  }, [kpis.companiesWithProgress, rangeStart, today]);
+
+  const rangedIds = useMemo(() => new Set(rangedCompanies.map((company) => company.id)), [rangedCompanies]);
+
+  function inAudience(company: (typeof rangedCompanies)[number], audience: ModuleAudience) {
+    if (audience === "all") return true;
+    if (audience === "completed") return company.isLive || company.computedStatus === "completed";
+    if (audience === "in_progress") return company.computedStatus === "in_progress";
+    return company.status === "on_hold";
+  }
+
+  const moduleCompanies = rangedCompanies.filter((company) => inAudience(company, moduleAudience));
+
+  const moduleData = useMemo(() => {
+    const rows = MODULE_CATALOG.map((mod) => ({
+      key: mod.key,
+      name: mod.label,
+      opted: moduleCompanies.filter((company) =>
+        company.modules.some((module) => module.moduleKey === mod.key && module.optedIn),
+      ).length,
+    })).sort((a, b) => b.opted - a.opted || a.name.localeCompare(b.name));
+    return moduleLimit ? rows.slice(0, moduleLimit) : rows;
+  }, [moduleCompanies, moduleLimit]);
+
+  const phaseStats = useMemo(() => {
+    const projectIds = new Set(
+      projects.filter((project) => rangedIds.has(project.companyId)).map((project) => project.id),
+    );
+    return summarizeChecklistPhases(checklistItems.filter((item) => projectIds.has(item.projectId)));
+  }, [projects, checklistItems, rangedIds]);
+
+  const activities = useMemo(() => {
+    return [...activitiesAll]
+      .filter((entry) => {
+        if (!rangeStart) return true;
+        const day = entry.createdAt.slice(0, 10);
+        if (day < rangeStart || day > today) return false;
+        return !entry.companyId || rangedIds.has(entry.companyId);
+      })
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, 6);
+  }, [activitiesAll, rangeStart, today, rangedIds]);
+
+  useEffect(() => {
+    if (!openMenu) return;
+    function close(event: MouseEvent) {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("[data-dashboard-menu]")) return;
+      setOpenMenu(null);
+    }
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [openMenu]);
+
+  const drillDownData = useMemo(() => {
+    if (sliceOverride) {
+      return { kind: "companies" as const, companies: sliceOverride.companies };
+    }
+    if (!drillDown) return null;
+    const resolved = resolveDrillDown(drillDown);
+    if (!rangeStart) return resolved;
+    if (resolved.kind === "companies" || resolved.kind === "account_health") {
+      return {
+        ...resolved,
+        companies: resolved.companies.filter((company) => rangedIds.has(company.id)),
+      };
+    }
+    if (resolved.kind === "checklist") {
+      return {
+        ...resolved,
+        groups: resolved.groups.filter((group) => rangedIds.has(group.companyId)),
+      };
+    }
+    return resolved;
+  }, [sliceOverride, drillDown, resolveDrillDown, rangeStart, rangedIds]);
 
   function openDrillDown(filter: DashboardDrillDownFilter) {
+    setSliceOverride(null);
     setDrillDown(filter);
     if (filter.type === "checklist") setActivePhase(filter.phase);
+    else setActivePhase(undefined);
   }
 
   function closeDrillDown() {
     setDrillDown(null);
+    setSliceOverride(null);
+    setActivePhase(undefined);
+  }
+
+  function openCompanySlice(title: string, subtitle: string, rows: typeof rangedCompanies) {
+    setSliceOverride({ title, subtitle, companies: rows });
+    setDrillDown({ type: "companies", status: "all" });
     setActivePhase(undefined);
   }
 
   const companyNameById = (id: string) => companies.find((c) => c.id === id)?.name ?? "Unknown";
 
+  const totalInRange = rangedCompanies.length;
+  const inProgressCount = rangedCompanies.filter((company) => company.computedStatus === "in_progress").length;
+  const completedCount = rangedCompanies.filter(
+    (company) => company.isLive || company.computedStatus === "completed",
+  ).length;
+  const onHoldCount = rangedCompanies.filter((company) => company.status === "on_hold").length;
+  const portfolioBase = kpis.totalCompanies;
+  const rangeNote = range.days
+    ? `Companies whose start date is in the last ${range.days} days`
+    : "All companies, any start date";
+
   const portfolioKpis = [
     {
       label: "Total Companies",
-      value: kpis.totalCompanies,
+      value: totalInRange,
       icon: Building2,
-      trend: "+12%",
+      trend: shareLabel(totalInRange, portfolioBase),
+      trendTitle: `${totalInRange} of ${portfolioBase} companies. ${rangeNote}.`,
       variant: "primary" as const,
       filter: { type: "companies" as const, status: "all" as const },
     },
     {
       label: "In Progress",
-      value: kpis.activeOnboarding,
+      value: inProgressCount,
       icon: TrendingUp,
-      trend: "+8%",
+      trend: shareLabel(inProgressCount, totalInRange),
+      trendTitle: `${inProgressCount} of ${totalInRange} companies in this range are still onboarding.`,
       variant: "in_progress" as const,
       filter: { type: "companies" as const, status: "in_progress" as const },
     },
     {
       label: "Completed",
-      value: kpis.completed,
+      value: completedCount,
       icon: CheckCircle2,
-      trend: "+16%",
+      trend: shareLabel(completedCount, totalInRange),
+      trendTitle: `${completedCount} of ${totalInRange} companies in this range are live or completed.`,
       variant: "completed" as const,
       filter: { type: "companies" as const, status: "completed" as const },
     },
     {
       label: "On Hold",
-      value: kpis.onHold,
+      value: onHoldCount,
       icon: Clock,
-      trend: "0%",
+      trend: shareLabel(onHoldCount, totalInRange),
+      trendTitle: `${onHoldCount} of ${totalInRange} companies in this range are on hold.`,
       variant: "on_hold" as const,
       filter: { type: "companies" as const, status: "on_hold" as const },
     },
   ];
 
-  const reviewCount = kpis.companiesWithProgress.filter((c) => c.computedStatus === "review").length;
-  const notStartedCount = kpis.companiesWithProgress.filter((c) => c.computedStatus === "not_started").length;
+  const reviewCount = rangedCompanies.filter((c) => c.computedStatus === "review").length;
+  const notStartedCount = rangedCompanies.filter((c) => c.computedStatus === "not_started").length;
 
-  const donutData = [
-    {
-      name: "Completed",
-      value: kpis.completed,
-      color: "#10b981", // green
-      filter: { type: "companies" as const, status: "completed" as const },
-    },
-    {
-      name: "In Progress",
-      value: kpis.activeOnboarding,
-      color: "#2563eb", // blue
-      filter: { type: "companies" as const, status: "in_progress" as const },
-    },
-    {
-      name: "Pending Review",
-      value: reviewCount,
-      color: "#06b6d4", // cyan
-      filter: { type: "companies" as const, status: "review" as const },
-    },
-    {
-      name: "On Hold",
-      value: kpis.onHold,
-      color: "#f59e0b", // amber
-      filter: { type: "companies" as const, status: "on_hold" as const },
-    },
-    ...(notStartedCount > 0
-      ? [
-          {
-            name: "Not Started",
-            value: notStartedCount,
-            color: "#94a3b8", // slate
-            filter: { type: "companies" as const, status: "not_started" as const },
-          },
-        ]
-      : []),
-  ];
+  const chartSlices = (() => {
+    if (chartMode === "status") {
+      return [
+        {
+          name: "Completed",
+          value: completedCount,
+          color: "#10b981",
+          rows: rangedCompanies.filter((c) => c.isLive || c.computedStatus === "completed"),
+        },
+        {
+          name: "In Progress",
+          value: inProgressCount,
+          color: "#2563eb",
+          rows: rangedCompanies.filter((c) => c.computedStatus === "in_progress"),
+        },
+        {
+          name: "Pending Review",
+          value: reviewCount,
+          color: "#06b6d4",
+          rows: rangedCompanies.filter((c) => c.computedStatus === "review"),
+        },
+        {
+          name: "On Hold",
+          value: onHoldCount,
+          color: "#f59e0b",
+          rows: rangedCompanies.filter((c) => c.status === "on_hold"),
+        },
+        {
+          name: "Not Started",
+          value: notStartedCount,
+          color: "#94a3b8",
+          rows: rangedCompanies.filter((c) => c.computedStatus === "not_started"),
+        },
+      ].filter((slice) => slice.value > 0);
+    }
+    const field = chartMode as "plan" | "region" | "health";
+    const counts = new Map<string, typeof rangedCompanies>();
+    for (const company of rangedCompanies) {
+      const name = String(company[field] || "Unset");
+      const rows = counts.get(name) ?? [];
+      rows.push(company);
+      counts.set(name, rows);
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
+      .map(([name, rows], index) => ({
+        name,
+        value: rows.length,
+        color: SLICE_COLORS[index % SLICE_COLORS.length],
+        rows,
+      }));
+  })();
 
-  const healthTotal = health.Healthy + health.Moderate + health.Critical;
-  const healthPct = healthTotal ? Math.round((health.Healthy / healthTotal) * 100) : 100;
+  const chartTotal = chartSlices.reduce((sum, slice) => sum + slice.value, 0);
 
-  const recent = kpis.companiesWithProgress
+  const healthCounts = {
+    Healthy: rangedCompanies.filter((c) => c.health === "Healthy").length,
+    Moderate: rangedCompanies.filter((c) => c.health === "Moderate").length,
+    Critical: rangedCompanies.filter((c) => c.health === "Critical").length,
+  };
+  const healthTotal = healthCounts.Healthy + healthCounts.Moderate + healthCounts.Critical;
+  const healthPct = healthTotal ? Math.round((healthCounts.Healthy / healthTotal) * 100) : 0;
+
+  const recent = [...rangedCompanies]
     .filter((c) => c.computedStatus !== "completed")
     .sort((a, b) => b.progress - a.progress)
     .slice(0, 5);
@@ -204,40 +390,44 @@ function Dashboard() {
             Dashboard
           </h1>
           <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
-            Track your progress, manage onboarding and grow your business.
+            {range.days
+              ? `${totalInRange} companies started in the last ${range.days} days. Status percentages are their share of that set. Total is that set’s share of every company.`
+              : "All companies. Each percentage is that status’s share of the portfolio."}
           </p>
         </div>
 
         <div className="flex items-center gap-2.5">
           {/* Timeframe Dropdown */}
-          <div className="relative">
+          <div className="relative" data-dashboard-menu>
             <button
               type="button"
-              onClick={() => setShowTimeframeMenu(!showTimeframeMenu)}
+              title="Filters companies by their onboarding start date. Open work above stays current."
+              onClick={() => setOpenMenu(openMenu === "range" ? null : "range")}
               className="flex items-center gap-2 rounded-xl border border-border/80 bg-card px-3 py-2 text-xs font-semibold text-foreground shadow-2xs hover:bg-muted/40 transition-colors"
             >
               <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-              <span>{timeframe}</span>
+              <span>{range.label}</span>
               <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
 
-            {showTimeframeMenu && (
-              <div className="absolute right-0 top-full z-20 mt-1 w-36 overflow-hidden rounded-xl border border-border/80 bg-card p-1 shadow-lg backdrop-blur-md">
-                {["Last 7 days", "Last 30 days", "Last 90 days", "All time"].map((item) => (
+            {openMenu === "range" && (
+              <div className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-xl border border-border/80 bg-card p-1 shadow-lg">
+                {RANGES.map((item) => (
                   <button
-                    key={item}
+                    key={item.id}
                     type="button"
                     onClick={() => {
-                      setTimeframe(item);
-                      setShowTimeframeMenu(false);
+                      setRangeId(item.id);
+                      setOpenMenu(null);
+                      setSliceOverride(null);
                     }}
                     className={`flex w-full items-center rounded-lg px-2.5 py-1.5 text-xs text-left transition-colors ${
-                      timeframe === item
+                      rangeId === item.id
                         ? "bg-primary text-primary-foreground font-semibold"
                         : "text-foreground hover:bg-muted"
                     }`}
                   >
-                    {item}
+                    {item.label}
                   </button>
                 ))}
               </div>
@@ -278,6 +468,7 @@ function Dashboard() {
               value={k.value}
               icon={k.icon}
               trend={k.trend}
+              trendTitle={k.trendTitle}
               variant={k.variant}
               delay={i * 0.04}
               active={
@@ -314,9 +505,36 @@ function Dashboard() {
                 </div>
                 <h3 className="text-xs sm:text-sm font-bold text-foreground">Onboarding Mix</h3>
               </div>
-              <span className="rounded-lg border border-border/60 bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                Chart ▾
-              </span>
+              <div className="relative" data-dashboard-menu>
+                <button
+                  type="button"
+                  onClick={() => setOpenMenu(openMenu === "chart" ? null : "chart")}
+                  className="rounded-lg border border-border/60 bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                  {CHART_MODES.find((mode) => mode.id === chartMode)?.label} ▾
+                </button>
+                {openMenu === "chart" && (
+                  <div className="absolute right-0 top-full z-20 mt-1 w-32 overflow-hidden rounded-xl border border-border/80 bg-card p-1 shadow-lg">
+                    {CHART_MODES.map((mode) => (
+                      <button
+                        key={mode.id}
+                        type="button"
+                        onClick={() => {
+                          setChartMode(mode.id);
+                          setOpenMenu(null);
+                        }}
+                        className={`flex w-full rounded-lg px-2 py-1.5 text-left text-[11px] ${
+                          chartMode === mode.id
+                            ? "bg-primary font-semibold text-primary-foreground"
+                            : "hover:bg-muted"
+                        }`}
+                      >
+                        {mode.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 my-auto py-1">
@@ -325,7 +543,7 @@ function Dashboard() {
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={donutData}
+                      data={chartSlices}
                       innerRadius={42}
                       outerRadius={58}
                       dataKey="value"
@@ -333,11 +551,11 @@ function Dashboard() {
                       stroke="none"
                       className="cursor-pointer outline-none"
                       onClick={(_, index) => {
-                        const seg = donutData[index];
-                        if (seg?.filter) openDrillDown(seg.filter);
+                        const seg = chartSlices[index];
+                        if (seg) openCompanySlice(seg.name, `${seg.value} companies · ${range.label}`, seg.rows);
                       }}
                     >
-                      {donutData.map((d, i) => (
+                      {chartSlices.map((d, i) => (
                         <Cell key={i} fill={d.color} className="transition-opacity hover:opacity-80" />
                       ))}
                     </Pie>
@@ -359,7 +577,7 @@ function Dashboard() {
                 </ResponsiveContainer>
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
                   <span className="text-xl font-black tabular-nums text-foreground leading-none">
-                    {kpis.totalCompanies}
+                    {chartTotal}
                   </span>
                   <span className="text-[10px] font-medium text-muted-foreground mt-0.5">Total</span>
                 </div>
@@ -367,17 +585,14 @@ function Dashboard() {
 
               {/* Legend List */}
               <div className="flex flex-col gap-1 w-full sm:w-auto flex-1 sm:pl-2 text-xs">
-                {donutData.map((d) => {
-                  const selected =
-                    drillDown?.type === "companies" &&
-                    "status" in drillDown &&
-                    drillDown.status === d.filter.status;
+                {chartSlices.map((d) => {
+                  const selected = sliceOverride?.title === d.name;
 
                   return (
                     <button
                       key={d.name}
                       type="button"
-                      onClick={() => openDrillDown(d.filter)}
+                      onClick={() => openCompanySlice(d.name, `${d.value} companies · ${range.label}`, d.rows)}
                       className={`group flex items-center justify-between rounded-lg px-2 py-0.5 text-left transition-colors hover:bg-muted/60 ${
                         selected ? "bg-muted" : ""
                       }`}
@@ -413,9 +628,62 @@ function Dashboard() {
                 </div>
                 <h3 className="text-xs sm:text-sm font-bold text-foreground">Modules Opted</h3>
               </div>
-              <span className="text-[11px] font-semibold text-muted-foreground">
-                {kpis.totalCompanies} companies ▾
-              </span>
+              <div className="relative" data-dashboard-menu>
+                <button
+                  type="button"
+                  title="Recounts each module for this group of companies in the selected date range."
+                  onClick={() => setOpenMenu(openMenu === "modules" ? null : "modules")}
+                  className="text-[11px] font-semibold text-muted-foreground hover:text-foreground"
+                >
+                  {moduleCompanies.length} companies ▾
+                </button>
+                {openMenu === "modules" && (
+                  <div className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-xl border border-border/80 bg-card p-1 shadow-lg">
+                    {MODULE_AUDIENCES.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setModuleAudience(item.id);
+                          setOpenMenu(null);
+                        }}
+                        className={`flex w-full rounded-lg px-2 py-1.5 text-left text-[11px] ${
+                          moduleAudience === item.id
+                            ? "bg-primary font-semibold text-primary-foreground"
+                            : "hover:bg-muted"
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                    <div className="my-1 h-px bg-border" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setModuleLimit(6);
+                        setOpenMenu(null);
+                      }}
+                      className={`flex w-full rounded-lg px-2 py-1.5 text-left text-[11px] ${
+                        moduleLimit === 6 ? "bg-primary font-semibold text-primary-foreground" : "hover:bg-muted"
+                      }`}
+                    >
+                      Top 6 modules
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setModuleLimit(null);
+                        setOpenMenu(null);
+                      }}
+                      className={`flex w-full rounded-lg px-2 py-1.5 text-left text-[11px] ${
+                        moduleLimit === null ? "bg-primary font-semibold text-primary-foreground" : "hover:bg-muted"
+                      }`}
+                    >
+                      All modules
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="h-36 w-full pt-1">
@@ -447,16 +715,25 @@ function Dashboard() {
                   <Tooltip
                     cursor={{ fill: "var(--color-muted)", opacity: 0.4 }}
                     formatter={(value: number) => {
-                      const pct = kpis.totalCompanies
-                        ? Math.round((Number(value) / kpis.totalCompanies) * 100)
+                      const pct = moduleCompanies.length
+                        ? Math.round((Number(value) / moduleCompanies.length) * 100)
                         : 0;
-                      return [`${value} companies (${pct}%)`, "Opted In"];
+                      return [`${value} companies (${pct}%)`, "Opted in"];
                     }}
                   />
                   <Bar
                     dataKey="opted"
                     fill="url(#modulesBarGradient)"
                     radius={[5, 5, 0, 0]}
+                    className="cursor-pointer"
+                    onClick={(_, index) => {
+                      const match = moduleData[index];
+                      if (!match) return;
+                      const rows = moduleCompanies.filter((company) =>
+                        company.modules.some((module) => module.moduleKey === match.key && module.optedIn),
+                      );
+                      openCompanySlice(match.name, `${rows.length} opted in · ${range.label}`, rows);
+                    }}
                   >
                     <LabelList
                       dataKey="opted"
@@ -522,9 +799,9 @@ function Dashboard() {
               {/* Health Breakdown Legend */}
               <div className="space-y-1 text-xs">
                 {[
-                  { label: "Healthy" as const, color: "bg-emerald-500", count: health.Healthy },
-                  { label: "Moderate" as const, color: "bg-amber-500", count: health.Moderate },
-                  { label: "Critical" as const, color: "bg-rose-500", count: health.Critical },
+                  { label: "Healthy" as const, color: "bg-emerald-500", count: healthCounts.Healthy },
+                  { label: "Moderate" as const, color: "bg-amber-500", count: healthCounts.Moderate },
+                  { label: "Critical" as const, color: "bg-rose-500", count: healthCounts.Critical },
                 ].map(({ label, color, count }) => (
                   <button
                     key={label}
@@ -715,6 +992,8 @@ function Dashboard() {
         data={drillDownData}
         onClose={closeDrillDown}
         companyNameById={companyNameById}
+        title={sliceOverride?.title}
+        subtitle={sliceOverride?.subtitle}
       />
     </PageWrap>
   );

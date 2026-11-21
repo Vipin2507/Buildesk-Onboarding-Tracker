@@ -99,9 +99,12 @@ export function OnboardingPipelineSection({
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+          <span
+            title="Completed checklist steps divided by every collect, upload, and go-live step for companies in the selected range."
+            className="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-bold text-emerald-600 dark:text-emerald-400"
+          >
             <TrendingUp className="h-3 w-3" />
-            <CountUp to={stats.progressPercent} format={(n) => `${Math.round(n)}% Completion ▾`} />
+            <CountUp to={stats.progressPercent} format={(n) => `${Math.round(n)}% complete`} />
           </span>
         </div>
       </div>

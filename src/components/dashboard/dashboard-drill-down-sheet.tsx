@@ -135,6 +135,8 @@ type Props = {
   data: ResolvedData | null;
   onClose: () => void;
   companyNameById: (id: string) => string;
+  title?: string;
+  subtitle?: string;
 };
 
 function ChecklistHierarchy({
@@ -301,6 +303,8 @@ export function DashboardDrillDownSheet({
   data,
   onClose,
   companyNameById,
+  title: titleOverride,
+  subtitle: subtitleOverride,
 }: Props) {
   const [search, setSearch] = useState("");
 
@@ -319,8 +323,8 @@ export function DashboardDrillDownSheet({
 
   if (!filter || !data) return null;
 
-  const title = drillDownTitle(filter);
-  const subtitle = drillDownSubtitle(filter);
+  const title = titleOverride || drillDownTitle(filter);
+  const subtitle = subtitleOverride || drillDownSubtitle(filter);
   const q = search.trim().toLowerCase();
   const matches = (...parts: Array<string | undefined | null>) =>
     !q || parts.some((part) => part?.toLowerCase().includes(q));
