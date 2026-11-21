@@ -255,7 +255,7 @@ function Dashboard() {
         </div>
       </div>
 
-      <div className="space-y-4 pt-1">
+      <div className="space-y-2.5 pt-1">
         {/* Smart Pending Work Overview */}
         <div id="overview">
           <DashboardPendingSummary
@@ -270,7 +270,7 @@ function Dashboard() {
         </div>
 
         {/* Portfolio KPI Cards Row (4 cards matching screenshot) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
           {portfolioKpis.map((k, i) => (
             <DashboardKpiCard
               key={k.label}
@@ -299,35 +299,35 @@ function Dashboard() {
         </div>
 
         {/* Analytics 3-Column Row matching reference screenshot */}
-        <div id="analytics" className="grid gap-3 lg:grid-cols-12">
+        <div id="analytics" className="grid gap-2.5 lg:grid-cols-12">
           {/* Card 1: Onboarding Mix (Donut Chart) */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, delay: 0.08, ease: EASE }}
-            className="rounded-2xl border border-border/70 bg-card p-4 shadow-2xs lg:col-span-4 flex flex-col justify-between"
+            transition={{ duration: 0.32, delay: 0.08, ease: EASE }}
+            className="rounded-2xl border border-border/70 bg-card p-3.5 shadow-2xs lg:col-span-4 flex flex-col justify-between"
           >
-            <div className="mb-2 flex items-center justify-between">
+            <div className="mb-1.5 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <PieChartIcon className="h-4 w-4" />
+                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <PieChartIcon className="h-3.5 w-3.5" />
                 </div>
                 <h3 className="text-xs sm:text-sm font-bold text-foreground">Onboarding Mix</h3>
               </div>
-              <span className="rounded-lg border border-border/60 bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+              <span className="rounded-lg border border-border/60 bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                 Chart ▾
               </span>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 my-auto py-2">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 my-auto py-1">
               {/* Donut Chart with Center Text */}
-              <div className="relative h-44 w-44 shrink-0">
+              <div className="relative h-36 w-36 shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={donutData}
-                      innerRadius={52}
-                      outerRadius={70}
+                      innerRadius={42}
+                      outerRadius={58}
                       dataKey="value"
                       paddingAngle={3}
                       stroke="none"
@@ -346,7 +346,7 @@ function Dashboard() {
                         if (active && payload && payload.length) {
                           const data = payload[0].payload;
                           return (
-                            <div className="rounded-lg border border-border/80 bg-popover px-2.5 py-1.5 text-xs shadow-md">
+                            <div className="rounded-lg border border-border/80 bg-popover px-2 py-1 text-xs shadow-md">
                               <span className="font-semibold text-foreground">{data.name}: </span>
                               <span className="font-bold text-primary">{data.value}</span>
                             </div>
@@ -358,15 +358,15 @@ function Dashboard() {
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-2xl font-black tabular-nums text-foreground leading-none">
+                  <span className="text-xl font-black tabular-nums text-foreground leading-none">
                     {kpis.totalCompanies}
                   </span>
-                  <span className="text-[11px] font-medium text-muted-foreground mt-0.5">Total</span>
+                  <span className="text-[10px] font-medium text-muted-foreground mt-0.5">Total</span>
                 </div>
               </div>
 
               {/* Legend List */}
-              <div className="flex flex-col gap-1.5 w-full sm:w-auto flex-1 sm:pl-2 text-xs">
+              <div className="flex flex-col gap-1 w-full sm:w-auto flex-1 sm:pl-2 text-xs">
                 {donutData.map((d) => {
                   const selected =
                     drillDown?.type === "companies" &&
@@ -378,7 +378,7 @@ function Dashboard() {
                       key={d.name}
                       type="button"
                       onClick={() => openDrillDown(d.filter)}
-                      className={`group flex items-center justify-between rounded-lg px-2 py-1 text-left transition-colors hover:bg-muted/60 ${
+                      className={`group flex items-center justify-between rounded-lg px-2 py-0.5 text-left transition-colors hover:bg-muted/60 ${
                         selected ? "bg-muted" : ""
                       }`}
                     >
@@ -387,11 +387,11 @@ function Dashboard() {
                           className="h-2 w-2 shrink-0 rounded-full"
                           style={{ backgroundColor: d.color }}
                         />
-                        <span className="truncate text-muted-foreground group-hover:text-foreground transition-colors">
+                        <span className="truncate text-muted-foreground group-hover:text-foreground transition-colors text-[11px]">
                           {d.name}
                         </span>
                       </div>
-                      <span className="ml-2 font-bold tabular-nums text-foreground">{d.value}</span>
+                      <span className="ml-2 font-bold tabular-nums text-foreground text-xs">{d.value}</span>
                     </button>
                   );
                 })}
@@ -403,24 +403,24 @@ function Dashboard() {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, delay: 0.1, ease: EASE }}
-            className="rounded-2xl border border-border/70 bg-card p-4 shadow-2xs lg:col-span-5 flex flex-col justify-between"
+            transition={{ duration: 0.32, delay: 0.1, ease: EASE }}
+            className="rounded-2xl border border-border/70 bg-card p-3.5 shadow-2xs lg:col-span-5 flex flex-col justify-between"
           >
-            <div className="mb-2 flex items-center justify-between">
+            <div className="mb-1.5 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <LayoutGrid className="h-4 w-4" />
+                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <LayoutGrid className="h-3.5 w-3.5" />
                 </div>
                 <h3 className="text-xs sm:text-sm font-bold text-foreground">Modules Opted</h3>
               </div>
-              <span className="text-xs font-semibold text-muted-foreground">
+              <span className="text-[11px] font-semibold text-muted-foreground">
                 {kpis.totalCompanies} companies ▾
               </span>
             </div>
 
-            <div className="h-44 w-full pt-2">
+            <div className="h-36 w-full pt-1">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={moduleData} margin={{ top: 18, right: 8, bottom: 4, left: -24 }}>
+                <BarChart data={moduleData} margin={{ top: 14, right: 6, bottom: 2, left: -26 }}>
                   <defs>
                     <linearGradient id="modulesBarGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.95} />
@@ -430,7 +430,7 @@ function Dashboard() {
                   <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--color-border)" opacity={0.6} />
                   <XAxis
                     dataKey="name"
-                    tick={{ fontSize: 9.5, fill: "var(--color-muted-foreground)" }}
+                    tick={{ fontSize: 9, fill: "var(--color-muted-foreground)" }}
                     stroke="var(--color-border)"
                     tickLine={false}
                     interval={0}
@@ -440,7 +440,7 @@ function Dashboard() {
                     }}
                   />
                   <YAxis
-                    tick={{ fontSize: 9.5, fill: "var(--color-muted-foreground)" }}
+                    tick={{ fontSize: 9, fill: "var(--color-muted-foreground)" }}
                     stroke="var(--color-border)"
                     tickLine={false}
                   />
@@ -456,15 +456,15 @@ function Dashboard() {
                   <Bar
                     dataKey="opted"
                     fill="url(#modulesBarGradient)"
-                    radius={[6, 6, 0, 0]}
+                    radius={[5, 5, 0, 0]}
                   >
                     <LabelList
                       dataKey="opted"
                       position="top"
                       fill="var(--color-foreground)"
-                      fontSize={11}
+                      fontSize={10.5}
                       fontWeight={700}
-                      offset={6}
+                      offset={4}
                     />
                   </Bar>
                 </BarChart>
@@ -476,22 +476,22 @@ function Dashboard() {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, delay: 0.12, ease: EASE }}
-            className="relative overflow-hidden rounded-2xl border border-border/70 bg-card p-4 shadow-2xs lg:col-span-3 flex flex-col justify-between"
+            transition={{ duration: 0.32, delay: 0.12, ease: EASE }}
+            className="relative overflow-hidden rounded-2xl border border-border/70 bg-card p-3.5 shadow-2xs lg:col-span-3 flex flex-col justify-between"
           >
-            <div className="mb-2 flex items-center justify-between">
+            <div className="mb-1.5 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
-                  <ActivityIcon className="h-4 w-4" />
+                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
+                  <ActivityIcon className="h-3.5 w-3.5" />
                 </div>
                 <h3 className="text-xs sm:text-sm font-bold text-foreground">Account Health</h3>
               </div>
             </div>
 
-            <div className="flex items-center justify-around gap-2 my-auto py-3">
+            <div className="flex items-center justify-around gap-2 my-auto py-2">
               {/* Circular Gauge */}
               <div className="relative flex flex-col items-center">
-                <div className="relative h-20 w-20 flex items-center justify-center">
+                <div className="relative h-16 w-16 flex items-center justify-center">
                   <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36">
                     <path
                       className="text-muted/40"
@@ -511,16 +511,16 @@ function Dashboard() {
                     />
                   </svg>
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-lg font-black text-foreground">{healthPct}%</span>
+                    <span className="text-base font-black text-foreground">{healthPct}%</span>
                   </div>
                 </div>
-                <span className="mt-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                <span className="mt-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
                   Healthy
                 </span>
               </div>
 
               {/* Health Breakdown Legend */}
-              <div className="space-y-1.5 text-xs">
+              <div className="space-y-1 text-xs">
                 {[
                   { label: "Healthy" as const, color: "bg-emerald-500", count: health.Healthy },
                   { label: "Moderate" as const, color: "bg-amber-500", count: health.Moderate },
@@ -530,20 +530,20 @@ function Dashboard() {
                     key={label}
                     type="button"
                     onClick={() => openDrillDown({ type: "account_health", health: label })}
-                    className="flex w-28 items-center justify-between rounded-lg px-2 py-1 hover:bg-muted/50 transition-colors"
+                    className="flex w-24 items-center justify-between rounded-lg px-1.5 py-0.5 hover:bg-muted/50 transition-colors"
                   >
-                    <div className="flex items-center gap-2">
-                      <span className={`h-2 w-2 rounded-full ${color}`} />
-                      <span className="text-muted-foreground">{label}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`h-1.5 w-1.5 rounded-full ${color}`} />
+                      <span className="text-muted-foreground text-[11px]">{label}</span>
                     </div>
-                    <span className="font-bold tabular-nums text-foreground">{count}</span>
+                    <span className="font-bold tabular-nums text-foreground text-xs">{count}</span>
                   </button>
                 ))}
               </div>
             </div>
 
             {/* Bottom Mint Wave Backdrop matching reference image */}
-            <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-12 overflow-hidden opacity-35 dark:opacity-20">
+            <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-10 overflow-hidden opacity-30 dark:opacity-15">
               <svg
                 viewBox="0 0 300 60"
                 preserveAspectRatio="none"
