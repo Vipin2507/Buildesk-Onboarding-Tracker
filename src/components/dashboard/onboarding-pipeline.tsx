@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { CheckCircle2, CloudUpload, Package, Radio } from "lucide-react";
+import { CheckCircle2, ChevronRight, CloudUpload, Layers, Package, Radio, TrendingUp } from "lucide-react";
 
 import { CountUp } from "@/components/count-up";
 import { cn } from "@/lib/utils";
@@ -14,26 +14,29 @@ const PHASES: {
   shortLabel: string;
   description: string;
   icon: typeof Package;
-  barClass: string;
-  cardTone: string;
+  barColor: string;
+  dotColor: string;
+  iconTone: string;
 }[] = [
   {
     phase: "awaiting_collection",
     label: "Awaiting Collection",
     shortLabel: "Collect",
-    description: "Waiting for client masters, formats, or historical data.",
+    description: "Waiting for client-provided masters or formats.",
     icon: Package,
-    barClass: "bg-info",
-    cardTone: "bg-info/15 text-info",
+    barColor: "bg-[#009bff]",
+    dotColor: "bg-blue-500",
+    iconTone: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
   },
   {
     phase: "awaiting_upload",
     label: "Awaiting Upload",
     shortLabel: "Upload",
-    description: "Data received and still needs to be loaded into the ERP.",
+    description: "Data received and awaiting ERP loading.",
     icon: CloudUpload,
-    barClass: "bg-warning",
-    cardTone: "bg-warning/15 text-warning-foreground",
+    barColor: "bg-[#8b5cf6]",
+    dotColor: "bg-purple-500",
+    iconTone: "bg-purple-500/15 text-purple-600 dark:text-purple-400",
   },
   {
     phase: "awaiting_live",
@@ -41,8 +44,9 @@ const PHASES: {
     shortLabel: "Live",
     description: "Setup is ready for verification and go-live.",
     icon: Radio,
-    barClass: "bg-primary",
-    cardTone: "bg-primary/15 text-primary",
+    barColor: "bg-[#06b6d4]",
+    dotColor: "bg-cyan-500",
+    iconTone: "bg-cyan-500/15 text-cyan-600 dark:text-cyan-400",
   },
   {
     phase: "complete",
@@ -50,8 +54,9 @@ const PHASES: {
     shortLabel: "Done",
     description: "Checklist items successfully completed.",
     icon: CheckCircle2,
-    barClass: "bg-success",
-    cardTone: "bg-success/15 text-success",
+    barColor: "bg-[#10b981]",
+    dotColor: "bg-emerald-500",
+    iconTone: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
   },
 ];
 
@@ -79,10 +84,10 @@ export function OnboardingPipelineSection({
     stats.awaitingCollection + stats.awaitingUpload + stats.awaitingLive + stats.complete || 1;
 
   const segments = [
-    { count: stats.awaitingCollection, className: "bg-info" },
-    { count: stats.awaitingUpload, className: "bg-warning" },
-    { count: stats.awaitingLive, className: "bg-primary" },
-    { count: stats.complete, className: "bg-success" },
+    { count: stats.awaitingCollection, color: "bg-[#009bff]", label: "Collection" },
+    { count: stats.awaitingUpload, color: "bg-[#8b5cf6]", label: "Upload" },
+    { count: stats.awaitingLive, color: "bg-[#06b6d4]", label: "Go-Live" },
+    { count: stats.complete, color: "bg-[#10b981]", label: "Complete" },
   ];
 
   const values: Record<ChecklistPhaseBucket, number> = {
@@ -92,144 +97,111 @@ export function OnboardingPipelineSection({
     complete: stats.complete,
   };
 
-  if (compact) {
-    return (
-      <motion.section
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, delay: 0.06, ease: EASE }}
-        className="card-soft p-2.5 sm:p-3"
-      >
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <div className="text-xs font-semibold">
-            Onboarding pipeline
-            <span className="ml-2 font-normal text-muted-foreground">
-              {stats.applicable} tasks
-            </span>
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.38, delay: 0.08, ease: EASE }}
+      className="rounded-2xl border border-border/80 bg-card p-4 sm:p-5 shadow-xs transition-shadow duration-300 hover:shadow-sm"
+    >
+      <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Layers className="h-4.5 w-4.5" />
           </div>
-          <div className="text-sm font-semibold tabular-nums text-primary">
-            <CountUp to={stats.progressPercent} format={(n) => `${Math.round(n)}%`} />
+          <div>
+            <h2 className="text-sm sm:text-base font-bold tracking-tight text-foreground">
+              Onboarding Pipeline
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              {stats.applicable.toLocaleString()} tasks across your onboarding flow · click a phase to inspect
+            </p>
           </div>
         </div>
-        <div className="mb-2 flex h-2 overflow-hidden rounded-full bg-muted">
+
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 shadow-2xs">
+            <TrendingUp className="h-3.5 w-3.5" />
+            <CountUp to={stats.progressPercent} format={(n) => `${Math.round(n)}% Completion`} />
+          </span>
+        </div>
+      </div>
+
+      {/* Multi-Segment Stacked Progress Bar */}
+      <div className="mb-4">
+        <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted/60 p-0.5">
           {segments.map((seg, i) =>
             seg.count > 0 ? (
-              <div
+              <motion.div
                 key={i}
-                className={cn("h-full first:rounded-l-full last:rounded-r-full", seg.className)}
-                style={{ width: `${(seg.count / total) * 100}%` }}
+                title={`${seg.label}: ${seg.count} (${Math.round((seg.count / total) * 100)}%)`}
+                initial={{ width: 0 }}
+                animate={{ width: `${(seg.count / total) * 100}%` }}
+                transition={{ duration: 0.65, delay: 0.1 + i * 0.05, ease: EASE }}
+                className={cn("h-full first:rounded-l-full last:rounded-r-full transition-all", seg.color)}
+                role="progressbar"
+                aria-valuenow={seg.count}
+                aria-valuemin={0}
+                aria-valuemax={total}
               />
             ) : null,
           )}
         </div>
-        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-          {PHASES.map((phase) => {
-            const Icon = phase.icon;
-            const value = values[phase.phase];
-            const isActive = activePhase === phase.phase;
-            return (
-              <button
-                key={phase.phase}
-                type="button"
-                onClick={() => onPhaseClick({ type: "checklist", phase: phase.phase })}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-md border px-1.5 py-1 text-left transition-colors hover:bg-muted/50",
-                  isActive && "border-primary/40 ring-1 ring-primary/30",
-                )}
-              >
-                <div className={cn("rounded p-1", phase.cardTone)}>
-                  <Icon className="h-3 w-3" />
-                </div>
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold tabular-nums leading-none">
-                    <CountUp to={value} />
-                  </div>
-                  <div className="truncate text-[9px] text-muted-foreground">{phase.shortLabel}</div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </motion.section>
-    );
-  }
-
-  return (
-    <motion.section
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, delay: 0.12, ease: EASE }}
-      className="card-soft p-4 sm:p-5"
-    >
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="text-base font-semibold tracking-tight">Onboarding pipeline</h2>
-          <p className="mt-0.5 text-[13px] text-muted-foreground">
-            {stats.applicable} applicable checklist items · one company can sit in more than one phase
-          </p>
-        </div>
-        <div className="text-right">
-          <div className="text-2xl font-semibold tabular-nums">
-            <CountUp to={stats.progressPercent} format={(n) => `${Math.round(n)}%`} />
-          </div>
-          <div className="text-[11px] text-muted-foreground">Overall phase completion</div>
-        </div>
       </div>
 
-      <div className="mb-4 flex h-3 overflow-hidden rounded-full bg-muted">
-        {segments.map((seg, i) =>
-          seg.count > 0 ? (
-            <motion.div
-              key={i}
-              title={`${PHASES[i]?.label ?? "Phase"}: ${seg.count}`}
-              initial={{ width: 0 }}
-              animate={{ width: `${(seg.count / total) * 100}%` }}
-              transition={{ duration: 0.7, delay: 0.15 + i * 0.08, ease: EASE }}
-              className={cn("h-full first:rounded-l-full last:rounded-r-full", seg.className)}
-              role="img"
-              aria-label={`${PHASES[i]?.label ?? "Phase"} ${seg.count}`}
-            />
-          ) : null,
-        )}
-      </div>
-
+      {/* 4 Phase Cards */}
       <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
         {PHASES.map((phase, i) => {
           const Icon = phase.icon;
           const value = values[phase.phase];
           const isActive = activePhase === phase.phase;
+          const pct = Math.round((value / total) * 100);
+
           return (
             <motion.button
               key={phase.phase}
               type="button"
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.18 + i * 0.05, duration: 0.35, ease: EASE }}
+              transition={{ delay: 0.12 + i * 0.04, duration: 0.32, ease: EASE }}
               whileHover={{ y: -2 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => onPhaseClick({ type: "checklist", phase: phase.phase })}
               className={cn(
-                "rounded-xl border bg-card/60 p-3 text-left transition-colors hover:border-primary/35 hover:bg-card sm:p-3.5",
-                isActive && "border-primary/50 ring-2 ring-primary/30",
+                "group relative flex flex-col justify-between rounded-xl border border-border/70 bg-card p-3.5 text-left transition-all duration-200 hover:border-primary/40 hover:bg-muted/[0.15] hover:shadow-xs",
+                isActive && "border-primary ring-2 ring-primary/40 shadow-xs bg-muted/20",
               )}
             >
-              <div className="flex items-center justify-between gap-2">
-                <div className={cn("rounded-lg p-2", phase.cardTone)}>
-                  <Icon className="h-4 w-4" />
+              <div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg transition-transform group-hover:scale-105", phase.iconTone)}>
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
                 </div>
-                <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+
+                <div className="mt-3 flex items-baseline justify-between gap-1">
+                  <div className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums text-foreground">
+                    <CountUp to={value} />
+                  </div>
+                  <span className="text-[11px] font-medium text-muted-foreground tabular-nums">
+                    {pct}%
+                  </span>
+                </div>
+
+                <div className="mt-0.5 text-xs font-semibold text-foreground">
                   {phase.shortLabel}
-                </span>
+                </div>
+                <div className="mt-1 line-clamp-1 text-[11px] text-muted-foreground">
+                  {phase.description}
+                </div>
               </div>
-              <div className="mt-2 text-xl font-semibold tabular-nums sm:text-2xl">
-                <CountUp to={value} />
-              </div>
-              <div className="mt-0.5 text-[13px] font-medium leading-snug">{phase.label}</div>
-              <p className="mt-1 text-[12px] leading-snug text-muted-foreground">{phase.description}</p>
-              <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted">
+
+              {/* Progress track */}
+              <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-muted/70">
                 <div
-                  className={cn("h-full rounded-full", phase.barClass)}
-                  style={{ width: `${Math.round((value / total) * 100)}%` }}
+                  className={cn("h-full rounded-full transition-all duration-500", phase.barColor)}
+                  style={{ width: `${Math.max(pct, value > 0 ? 3 : 0)}%` }}
                 />
               </div>
             </motion.button>

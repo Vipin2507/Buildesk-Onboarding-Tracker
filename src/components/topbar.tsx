@@ -47,9 +47,23 @@ export function TopBar() {
   const navigate = useNavigate();
   const setUser = useAuthStore((s) => s.setUser);
   const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const canSearchCrm = crm;
   const canSearchErp = !crm;
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        inputRef.current?.focus();
+        inputRef.current?.select();
+        setOpen(true);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   useEffect(() => {
     setSearchScope(crm ? "crm" : "erp");
@@ -101,6 +115,7 @@ export function TopBar() {
         <div className="relative min-w-0 max-w-xl flex-1" ref={ref}>
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
+            ref={inputRef}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -112,13 +127,18 @@ export function TopBar() {
                 ? "Search CRM accounts, tasks…"
                 : "Search ERP companies, projects, tasks…"
             }
-            className="h-10 w-full rounded-lg border border-input bg-card pl-9 pr-3 text-sm outline-none transition-shadow focus:ring-2 focus:ring-ring/40"
+            className="h-10 w-full rounded-lg border border-input bg-card pl-9 pr-11 text-sm outline-none transition-shadow focus:ring-2 focus:ring-ring/40"
             aria-label={
               searchScope === "crm"
                 ? "Search CRM accounts and tasks"
                 : "Search ERP companies, projects, tasks, and visits"
             }
           />
+          {!query && (
+            <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center gap-0.5 rounded border border-border/70 bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground shadow-2xs">
+              ⌘K
+            </kbd>
+          )}
           {showSearchPanel ? (
             <GlobalSearchDropdown
               results={results}
