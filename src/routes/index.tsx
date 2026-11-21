@@ -165,7 +165,26 @@ function Dashboard() {
         }
       />
 
-      <div className="space-y-2.5">
+      <nav className="mb-2 flex flex-wrap gap-1.5 text-[12px]" aria-label="Dashboard sections">
+        {[
+          ["overview", "Overview"],
+          ["pipeline", "Pipeline"],
+          ["analytics", "Analytics"],
+          ["recent", "Recent onboarding"],
+          ["activity", "Activity"],
+        ].map(([id, label]) => (
+          <a
+            key={id}
+            href={`#${id}`}
+            className="rounded-full border bg-card px-2.5 py-1 text-muted-foreground hover:border-primary/30 hover:text-foreground"
+          >
+            {label}
+          </a>
+        ))}
+      </nav>
+
+      <div className="space-y-3">
+        <div id="overview">
         <DashboardPendingSummary
           openDesignTickets={openDesignTickets}
           overdueFollowUps={kpis.overdueFollowUpTasks ?? 0}
@@ -175,6 +194,7 @@ function Dashboard() {
           onOpen={openDrillDown}
           activeFilter={drillDown}
         />
+        </div>
 
         <div className="grid grid-cols-2 gap-1.5 lg:grid-cols-4">
           {portfolioKpis.map((k, i) => (
@@ -195,14 +215,15 @@ function Dashboard() {
           ))}
         </div>
 
-        <OnboardingPipelineSection
-          compact
-          stats={phaseStats}
-          activePhase={activePhase}
-          onPhaseClick={openDrillDown}
-        />
+        <div id="pipeline">
+          <OnboardingPipelineSection
+            stats={phaseStats}
+            activePhase={activePhase}
+            onPhaseClick={openDrillDown}
+          />
+        </div>
 
-        <div className="grid gap-2.5 lg:grid-cols-12">
+        <div id="analytics" className="grid gap-2.5 lg:grid-cols-12">
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -213,13 +234,13 @@ function Dashboard() {
               <h3 className="text-xs font-semibold">Onboarding mix</h3>
               <Pill tone="info">Click</Pill>
             </div>
-            <div className="h-32">
+            <div className="relative h-40">
               <ResponsiveContainer>
                 <PieChart>
                   <Pie
                     data={donutData}
-                    innerRadius={32}
-                    outerRadius={52}
+                    innerRadius={46}
+                    outerRadius={64}
                     dataKey="value"
                     paddingAngle={2}
                     stroke="none"
@@ -236,20 +257,36 @@ function Dashboard() {
                   <Tooltip />
                 </PieChart>
               </ResponsiveContainer>
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                <div className="text-lg font-semibold tabular-nums">{kpis.totalCompanies}</div>
+                <div className="text-[10px] text-muted-foreground">Companies</div>
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-0.5 text-[10px]">
-              {donutData.map((d) => (
-                <button
-                  key={d.name}
-                  type="button"
-                  onClick={() => openDrillDown(d.filter)}
-                  className="flex items-center gap-1 rounded px-0.5 py-0.5 text-left hover:bg-muted/60"
-                >
-                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: d.color }} />
-                  <span className="truncate text-muted-foreground">{d.name}</span>
-                  <span className="ml-auto font-medium">{d.value}</span>
-                </button>
-              ))}
+            <div className="grid grid-cols-1 gap-0.5 text-[11px]">
+              {donutData.map((d) => {
+                const pct = kpis.totalCompanies
+                  ? Math.round((d.value / kpis.totalCompanies) * 100)
+                  : 0;
+                const selected =
+                  drillDown?.type === "companies" &&
+                  "status" in drillDown &&
+                  drillDown.status === d.filter.status;
+                return (
+                  <button
+                    key={d.name}
+                    type="button"
+                    onClick={() => openDrillDown(d.filter)}
+                    className={`flex items-center gap-1.5 rounded px-1 py-0.5 text-left hover:bg-muted/60 ${selected ? "bg-muted" : ""}`}
+                  >
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: d.color }} />
+                    <span className="truncate text-muted-foreground">{d.name}</span>
+                    <span className="ml-auto font-medium tabular-nums">
+                      {d.value}
+                      <span className="ml-1 font-normal text-muted-foreground">{pct}%</span>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </motion.div>
 
@@ -269,7 +306,15 @@ function Dashboard() {
                   <CartesianGrid vertical={false} stroke="var(--color-border)" />
                   <XAxis dataKey="name" tick={{ fontSize: 9 }} stroke="var(--color-muted-foreground)" />
                   <YAxis tick={{ fontSize: 9 }} stroke="var(--color-muted-foreground)" />
-                  <Tooltip cursor={{ fill: "var(--color-muted)" }} />
+                  <Tooltip
+                    cursor={{ fill: "var(--color-muted)" }}
+                    formatter={(value: number) => {
+                      const pct = kpis.totalCompanies
+                        ? Math.round((Number(value) / kpis.totalCompanies) * 100)
+                        : 0;
+                      return [`${value} companies · ${pct}% of portfolio`, "Opted"];
+                    }}
+                  />
                   <Bar dataKey="opted" fill="var(--color-primary)" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -309,10 +354,13 @@ function Dashboard() {
           </motion.div>
         </div>
 
-        <div className="grid gap-2.5 lg:grid-cols-3">
+        <div id="recent" className="grid gap-2.5 lg:grid-cols-3">
           <div className="card-soft p-3 lg:col-span-2">
             <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-xs font-semibold">Recent onboarding</h3>
+              <div>
+                <h2 className="text-xs font-semibold">Recent onboarding</h2>
+                <p className="text-[11px] text-muted-foreground">Implementations closest to completion.</p>
+              </div>
               <Link to="/companies" className="text-[10px] font-medium text-primary hover:underline">
                 View all
               </Link>
@@ -414,31 +462,33 @@ function Dashboard() {
             </div>
           </div>
 
-          <div className="card-soft p-3">
-            <h3 className="mb-2 text-xs font-semibold">Recent activity</h3>
-            <ol className="space-y-2">
-              {activities.map((a) => (
-                <li key={a.id} className="flex gap-2 text-xs">
-                  <span
-                    className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${
-                      a.kind === "success"
-                        ? "bg-success"
-                        : a.kind === "warning"
-                          ? "bg-warning"
-                          : a.kind === "danger"
-                            ? "bg-destructive"
-                            : "bg-primary"
-                    }`}
-                  />
-                  <div className="min-w-0">
+          <div id="activity" className="card-soft p-3">
+            <h2 className="mb-2 text-xs font-semibold">Recent activity</h2>
+            {activities.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No recent portfolio activity.</p>
+            ) : (
+              <ol className="relative space-y-3 border-l border-border pl-3">
+                {activities.map((a) => (
+                  <li key={a.id} className="relative text-xs">
+                    <span
+                      className={`absolute -left-[17px] top-1 h-2 w-2 rounded-full ring-2 ring-card ${
+                        a.kind === "success"
+                          ? "bg-success"
+                          : a.kind === "warning"
+                            ? "bg-warning"
+                            : a.kind === "danger"
+                              ? "bg-destructive"
+                              : "bg-primary"
+                      }`}
+                    />
                     <div className="line-clamp-2 leading-snug">{a.what}</div>
-                    <div className="text-[10px] text-muted-foreground">
+                    <div className="text-[11px] text-muted-foreground">
                       {a.who} · {formatRelativeTime(a.createdAt)}
                     </div>
-                  </div>
-                </li>
-              ))}
-            </ol>
+                  </li>
+                ))}
+              </ol>
+            )}
           </div>
         </div>
       </div>

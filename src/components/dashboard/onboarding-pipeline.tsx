@@ -12,6 +12,7 @@ const PHASES: {
   phase: ChecklistPhaseBucket;
   label: string;
   shortLabel: string;
+  description: string;
   icon: typeof Package;
   barClass: string;
   cardTone: string;
@@ -20,6 +21,7 @@ const PHASES: {
     phase: "awaiting_collection",
     label: "Awaiting Collection",
     shortLabel: "Collect",
+    description: "Waiting for client masters, formats, or historical data.",
     icon: Package,
     barClass: "bg-info",
     cardTone: "bg-info/15 text-info",
@@ -28,6 +30,7 @@ const PHASES: {
     phase: "awaiting_upload",
     label: "Awaiting Upload",
     shortLabel: "Upload",
+    description: "Data received and still needs to be loaded into the ERP.",
     icon: CloudUpload,
     barClass: "bg-warning",
     cardTone: "bg-warning/15 text-warning-foreground",
@@ -36,6 +39,7 @@ const PHASES: {
     phase: "awaiting_live",
     label: "Awaiting Go-Live",
     shortLabel: "Live",
+    description: "Setup is ready for verification and go-live.",
     icon: Radio,
     barClass: "bg-primary",
     cardTone: "bg-primary/15 text-primary",
@@ -44,6 +48,7 @@ const PHASES: {
     phase: "complete",
     label: "Fully Complete",
     shortLabel: "Done",
+    description: "Checklist items successfully completed.",
     icon: CheckCircle2,
     barClass: "bg-success",
     cardTone: "bg-success/15 text-success",
@@ -158,9 +163,9 @@ export function OnboardingPipelineSection({
     >
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h3 className="font-semibold">Onboarding Task Pipeline</h3>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {stats.applicable} tasks across all companies · Collected → Uploaded → Live
+          <h2 className="text-base font-semibold tracking-tight">Onboarding pipeline</h2>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">
+            {stats.applicable} applicable checklist items · one company can sit in more than one phase
           </p>
         </div>
         <div className="text-right">
@@ -176,10 +181,13 @@ export function OnboardingPipelineSection({
           seg.count > 0 ? (
             <motion.div
               key={i}
+              title={`${PHASES[i]?.label ?? "Phase"}: ${seg.count}`}
               initial={{ width: 0 }}
               animate={{ width: `${(seg.count / total) * 100}%` }}
               transition={{ duration: 0.7, delay: 0.15 + i * 0.08, ease: EASE }}
               className={cn("h-full first:rounded-l-full last:rounded-r-full", seg.className)}
+              role="img"
+              aria-label={`${PHASES[i]?.label ?? "Phase"} ${seg.count}`}
             />
           ) : null,
         )}
@@ -216,7 +224,14 @@ export function OnboardingPipelineSection({
               <div className="mt-2 text-xl font-semibold tabular-nums sm:text-2xl">
                 <CountUp to={value} />
               </div>
-              <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{phase.label}</div>
+              <div className="mt-0.5 text-[13px] font-medium leading-snug">{phase.label}</div>
+              <p className="mt-1 text-[12px] leading-snug text-muted-foreground">{phase.description}</p>
+              <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted">
+                <div
+                  className={cn("h-full rounded-full", phase.barClass)}
+                  style={{ width: `${Math.round((value / total) * 100)}%` }}
+                />
+              </div>
             </motion.button>
           );
         })}

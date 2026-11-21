@@ -280,26 +280,30 @@ export function DashboardDrillDownSheet({
 
   const title = drillDownTitle(filter);
   const subtitle = drillDownSubtitle(filter);
+  const q = search.trim().toLowerCase();
+  const matches = (...parts: Array<string | undefined | null>) =>
+    !q || parts.some((part) => part?.toLowerCase().includes(q));
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-xl md:max-w-2xl">
+      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-xl md:max-w-[52vw] lg:max-w-3xl">
         <SheetHeader className="border-b px-5 py-4 pr-12 text-left">
           <SheetTitle>{title}</SheetTitle>
           <SheetDescription>{subtitle}</SheetDescription>
         </SheetHeader>
 
-        {data.kind === "checklist" ? (
-          <div className="flex flex-col gap-2 border-b px-5 py-3 sm:flex-row sm:flex-wrap">
-            <div className="relative min-w-0 flex-1">
-              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search company, project, task…"
-                className="h-9 pl-8 text-sm"
-              />
-            </div>
+        <div className="flex flex-col gap-2 border-b px-5 py-3 sm:flex-row sm:flex-wrap">
+          <div className="relative min-w-0 flex-1">
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search company, project, task, ticket…"
+              className="h-9 pl-8 text-sm"
+              aria-label="Filter records in this list"
+            />
+          </div>
+          {data.kind === "checklist" ? (
             <select
               value={sectionFilter}
               onChange={(e) => setSectionFilter(e.target.value)}
@@ -312,8 +316,8 @@ export function DashboardDrillDownSheet({
                 </option>
               ))}
             </select>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {data.kind === "companies" ? (
@@ -352,7 +356,9 @@ export function DashboardDrillDownSheet({
 
           {data.kind === "support_tickets" ? (
             <div className="space-y-2">
-              {data.tickets.map((t) => (
+              {data.tickets
+                .filter((t) => matches(t.title, t.status, companyNameById(t.companyId ?? "")))
+                .map((t) => (
                 <Link
                   key={t.id}
                   to="/support/$ticketId"
@@ -371,7 +377,9 @@ export function DashboardDrillDownSheet({
           {data.kind === "design_tickets" ? (
             <div className="space-y-3">
               <div className="space-y-2">
-                {data.tickets.map((t) => (
+                {data.tickets
+                  .filter((t) => matches(t.ticketNumber, t.subject, t.status, companyNameById(t.companyId)))
+                  .map((t) => (
                   <Link
                     key={t.id}
                     to="/tickets/$ticketId"
@@ -399,7 +407,9 @@ export function DashboardDrillDownSheet({
 
           {data.kind === "follow_ups" ? (
             <div className="space-y-2">
-              {data.tasks.map((t) => (
+              {data.tasks
+                .filter((t) => matches(t.title, t.status, companyNameById(t.companyId)))
+                .map((t) => (
                 <Link
                   key={t.id}
                   to="/companies/$companyId"
@@ -413,7 +423,9 @@ export function DashboardDrillDownSheet({
                   </div>
                 </Link>
               ))}
-              {data.visits.map((v) => (
+              {data.visits
+                .filter((v) => matches(v.purpose, companyNameById(v.companyId)))
+                .map((v) => (
                 <Link
                   key={v.id}
                   to="/companies/$companyId"
@@ -472,7 +484,9 @@ export function DashboardDrillDownSheet({
 
           {data.kind === "renewals" ? (
             <div className="space-y-2">
-              {data.companies.map((c) => (
+              {data.companies
+                .filter((c) => matches(c.name, c.plan))
+                .map((c) => (
                 <Link
                   key={c.id}
                   to="/companies/$companyId"
