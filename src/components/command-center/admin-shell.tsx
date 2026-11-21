@@ -90,11 +90,11 @@ function Shell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="command-center flex min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div className="command-center flex min-h-screen bg-[#F4F7FC] text-[#0F172A] dark:bg-[#07111F] dark:text-slate-100">
       <aside
         className={cn(
           "sticky top-0 flex h-screen shrink-0 flex-col bg-[#0B1F3A] text-slate-100 transition-[width]",
-          collapsed ? "w-[72px]" : "w-[248px]",
+          collapsed ? "w-[72px]" : "w-[250px]",
         )}
       >
         <div className="flex items-center gap-[13px] px-[13px] py-[21px]">
@@ -156,7 +156,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex flex-wrap items-center gap-[13px] border-b border-slate-200 bg-white/90 px-[21px] py-[13px] backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
+        <header className="sticky top-0 z-20 flex h-[68px] flex-wrap items-center gap-[13px] border-b border-slate-200/80 bg-white/85 px-[21px] backdrop-blur dark:border-white/10 dark:bg-[#0B1730]/90">
           <button
             type="button"
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -263,7 +263,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             <Shield className="h-4 w-4" />
           </button>
         </header>
-        <main className="min-w-0 flex-1 px-[21px] py-[21px]">{children}</main>
+        <main className="min-w-0 flex-1 px-[21px] py-[13px]">{children}</main>
       </div>
     </div>
   );
