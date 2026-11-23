@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { CHECKLIST_TEMPLATE } from "@/data/constants";
+import { checklistTemplateForProject } from "@/server/lib/checklist-template";
 import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
@@ -18,10 +18,11 @@ function ensureChecklist(projectId: string) {
     .where(eq(t.onboardingChecklistItems.projectId, projectId))
     .all();
   const now = nowIso();
+  const template = checklistTemplateForProject(projectId);
 
   // Keep required-document extras; prune/rename default items to match current template.
   const allowed = new Set(
-    Object.entries(CHECKLIST_TEMPLATE).flatMap(([section, labels]) =>
+    Object.entries(template).flatMap(([section, labels]) =>
       labels.map((label) => `${section}::${label}`),
     ),
   );
@@ -40,7 +41,7 @@ function ensureChecklist(projectId: string) {
   const have = new Set(remaining.map((r) => `${r.section}::${r.label}`));
   const created: (typeof t.onboardingChecklistItems.$inferSelect)[] = [...remaining];
 
-  for (const [section, labels] of Object.entries(CHECKLIST_TEMPLATE)) {
+  for (const [section, labels] of Object.entries(template)) {
     for (const label of labels) {
       const key = `${section}::${label}`;
       if (have.has(key)) continue;
@@ -97,7 +98,10 @@ function ensureCustomerAppConfig(projectId: string) {
 
 export const listProjects = createServerFn({ method: "GET" })
   .inputValidator((data: unknown) =>
-    z.object({ companyId: z.string().optional() }).optional().parse(data ?? {}),
+    z
+      .object({ companyId: z.string().optional() })
+      .optional()
+      .parse(data ?? {}),
   )
   .handler(async ({ data }) => {
     requireUser();
@@ -453,8 +457,10 @@ export const upsertProjectProgress = createServerFn({ method: "POST" })
       .run();
     return {
       projectId: data.projectId,
-      contactPerson: (data.contactPerson !== undefined ? data.contactPerson : row.contactPerson) ?? undefined,
-      contactNumber: (data.contactNumber !== undefined ? data.contactNumber : row.contactNumber) ?? undefined,
+      contactPerson:
+        (data.contactPerson !== undefined ? data.contactPerson : row.contactPerson) ?? undefined,
+      contactNumber:
+        (data.contactNumber !== undefined ? data.contactNumber : row.contactNumber) ?? undefined,
       checks: checks as ProjectManualProgress["checks"],
       notApplicable: notApplicable as ProjectManualProgress["notApplicable"],
       remarks: data.remarks !== undefined ? data.remarks : row.remarks,
@@ -469,16 +475,14 @@ export const listAllProgress = createServerFn({ method: "GET" }).handler(async (
     .select()
     .from(t.projectManualProgress)
     .all()
-    .map(
-      (row): ProjectManualProgress => ({
-        projectId: row.projectId,
-        contactPerson: row.contactPerson ?? undefined,
-        contactNumber: row.contactNumber ?? undefined,
-        checks: JSON.parse(row.checksJson || "{}"),
-        notApplicable: JSON.parse(row.notApplicableJson || "{}"),
-        remarks: row.remarks,
-        createdAt: row.createdAt,
-        updatedAt: row.updatedAt,
-      }),
-    );
+    .map((row): ProjectManualProgress => ({
+      projectId: row.projectId,
+      contactPerson: row.contactPerson ?? undefined,
+      contactNumber: row.contactNumber ?? undefined,
+      checks: JSON.parse(row.checksJson || "{}"),
+      notApplicable: JSON.parse(row.notApplicableJson || "{}"),
+      remarks: row.remarks,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    }));
 });

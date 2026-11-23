@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 
 import { DashboardDrillDownSheet } from "@/components/dashboard/dashboard-drill-down-sheet";
+import { DashboardWorkQueues } from "@/components/dashboard/dashboard-work-queues";
 import { MODULE_CATALOG } from "@/data/module-catalog";
 import { summarizeChecklistPhases } from "@/lib/checklist";
 import { DashboardKpiCard } from "@/components/dashboard/dashboard-kpi-card";
@@ -104,7 +105,16 @@ const MODULE_AUDIENCES: { id: ModuleAudience; label: string }[] = [
   { id: "on_hold", label: "On hold" },
 ];
 
-const SLICE_COLORS = ["#2563eb", "#10b981", "#8b5cf6", "#f59e0b", "#06b6d4", "#f43f5e", "#64748b", "#84cc16"];
+const SLICE_COLORS = [
+  "#2563eb",
+  "#10b981",
+  "#8b5cf6",
+  "#f59e0b",
+  "#06b6d4",
+  "#f43f5e",
+  "#64748b",
+  "#84cc16",
+];
 
 function localDate(date = new Date()) {
   const y = date.getFullYear();
@@ -120,7 +130,11 @@ function addDays(iso: string, days: number) {
   return localDate(date);
 }
 
-function companyStartDate(company: { startDate?: string; agreementDate?: string; createdAt?: string }) {
+function companyStartDate(company: {
+  startDate?: string;
+  agreementDate?: string;
+  createdAt?: string;
+}) {
   const raw = company.startDate || company.agreementDate || company.createdAt || "";
   return raw.slice(0, 10);
 }
@@ -165,7 +179,10 @@ function Dashboard() {
     });
   }, [kpis.companiesWithProgress, rangeStart, today]);
 
-  const rangedIds = useMemo(() => new Set(rangedCompanies.map((company) => company.id)), [rangedCompanies]);
+  const rangedIds = useMemo(
+    () => new Set(rangedCompanies.map((company) => company.id)),
+    [rangedCompanies],
+  );
 
   function inAudience(company: (typeof rangedCompanies)[number], audience: ModuleAudience) {
     if (audience === "all") return true;
@@ -191,7 +208,9 @@ function Dashboard() {
     const projectIds = new Set(
       projects.filter((project) => rangedIds.has(project.companyId)).map((project) => project.id),
     );
-    return summarizeChecklistPhases(checklistItems.filter((item) => projectIds.has(item.projectId)));
+    return summarizeChecklistPhases(
+      checklistItems.filter((item) => projectIds.has(item.projectId)),
+    );
   }, [projects, checklistItems, rangedIds]);
 
   const activities = useMemo(() => {
@@ -267,7 +286,9 @@ function Dashboard() {
   const companyNameById = (id: string) => companies.find((c) => c.id === id)?.name ?? "Unknown";
 
   const totalInRange = rangedCompanies.length;
-  const inProgressCount = rangedCompanies.filter((company) => company.computedStatus === "in_progress").length;
+  const inProgressCount = rangedCompanies.filter(
+    (company) => company.computedStatus === "in_progress",
+  ).length;
   const completedCount = rangedCompanies.filter(
     (company) => company.isLive || company.computedStatus === "completed",
   ).length;
@@ -452,6 +473,7 @@ function Dashboard() {
       </div>
 
       <div className="space-y-2.5 pt-1">
+        <DashboardWorkQueues companies={kpis.companiesWithProgress} />
         {/* Smart Pending Work Overview */}
         <div id="overview">
           <DashboardPendingSummary
@@ -558,11 +580,20 @@ function Dashboard() {
                       className="cursor-pointer outline-none"
                       onClick={(_, index) => {
                         const seg = chartSlices[index];
-                        if (seg) openCompanySlice(seg.name, `${seg.value} companies · ${range.label}`, seg.rows);
+                        if (seg)
+                          openCompanySlice(
+                            seg.name,
+                            `${seg.value} companies · ${range.label}`,
+                            seg.rows,
+                          );
                       }}
                     >
                       {chartSlices.map((d, i) => (
-                        <Cell key={i} fill={d.color} className="transition-opacity hover:opacity-80" />
+                        <Cell
+                          key={i}
+                          fill={d.color}
+                          className="transition-opacity hover:opacity-80"
+                        />
                       ))}
                     </Pie>
                     <Tooltip
@@ -585,7 +616,9 @@ function Dashboard() {
                   <span className="text-xl font-black tabular-nums text-foreground leading-none">
                     {chartTotal}
                   </span>
-                  <span className="text-[10px] font-medium text-muted-foreground mt-0.5">Total</span>
+                  <span className="text-[10px] font-medium text-muted-foreground mt-0.5">
+                    Total
+                  </span>
                 </div>
               </div>
 
@@ -598,7 +631,9 @@ function Dashboard() {
                     <button
                       key={d.name}
                       type="button"
-                      onClick={() => openCompanySlice(d.name, `${d.value} companies · ${range.label}`, d.rows)}
+                      onClick={() =>
+                        openCompanySlice(d.name, `${d.value} companies · ${range.label}`, d.rows)
+                      }
                       className={`group flex items-center justify-between rounded-lg px-2 py-0.5 text-left transition-colors hover:bg-muted/60 ${
                         selected ? "bg-muted" : ""
                       }`}
@@ -612,7 +647,9 @@ function Dashboard() {
                           {d.name}
                         </span>
                       </div>
-                      <span className="ml-2 font-bold tabular-nums text-foreground text-xs">{d.value}</span>
+                      <span className="ml-2 font-bold tabular-nums text-foreground text-xs">
+                        {d.value}
+                      </span>
                     </button>
                   );
                 })}
@@ -670,7 +707,9 @@ function Dashboard() {
                         setOpenMenu(null);
                       }}
                       className={`flex w-full rounded-lg px-2 py-1.5 text-left text-[11px] ${
-                        moduleLimit === 6 ? "bg-primary font-semibold text-primary-foreground" : "hover:bg-muted"
+                        moduleLimit === 6
+                          ? "bg-primary font-semibold text-primary-foreground"
+                          : "hover:bg-muted"
                       }`}
                     >
                       Top 6 modules
@@ -682,7 +721,9 @@ function Dashboard() {
                         setOpenMenu(null);
                       }}
                       className={`flex w-full rounded-lg px-2 py-1.5 text-left text-[11px] ${
-                        moduleLimit === null ? "bg-primary font-semibold text-primary-foreground" : "hover:bg-muted"
+                        moduleLimit === null
+                          ? "bg-primary font-semibold text-primary-foreground"
+                          : "hover:bg-muted"
                       }`}
                     >
                       All modules
@@ -701,7 +742,12 @@ function Dashboard() {
                       <stop offset="100%" stopColor="#60a5fa" stopOpacity={0.4} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--color-border)" opacity={0.6} />
+                  <CartesianGrid
+                    vertical={false}
+                    strokeDasharray="3 3"
+                    stroke="var(--color-border)"
+                    opacity={0.6}
+                  />
                   <XAxis
                     dataKey="name"
                     tick={{ fontSize: 9, fill: "var(--color-muted-foreground)" }}
@@ -736,9 +782,15 @@ function Dashboard() {
                       const match = moduleData[index];
                       if (!match) return;
                       const rows = moduleCompanies.filter((company) =>
-                        company.modules.some((module) => module.moduleKey === match.key && module.optedIn),
+                        company.modules.some(
+                          (module) => module.moduleKey === match.key && module.optedIn,
+                        ),
                       );
-                      openCompanySlice(match.name, `${rows.length} opted in · ${range.label}`, rows);
+                      openCompanySlice(
+                        match.name,
+                        `${rows.length} opted in · ${range.label}`,
+                        rows,
+                      );
                     }}
                   >
                     <LabelList
@@ -805,9 +857,21 @@ function Dashboard() {
               {/* Health Breakdown Legend */}
               <div className="space-y-1 text-xs">
                 {[
-                  { label: "Healthy" as const, color: "bg-emerald-500", count: healthCounts.Healthy },
-                  { label: "Moderate" as const, color: "bg-amber-500", count: healthCounts.Moderate },
-                  { label: "Critical" as const, color: "bg-rose-500", count: healthCounts.Critical },
+                  {
+                    label: "Healthy" as const,
+                    color: "bg-emerald-500",
+                    count: healthCounts.Healthy,
+                  },
+                  {
+                    label: "Moderate" as const,
+                    color: "bg-amber-500",
+                    count: healthCounts.Moderate,
+                  },
+                  {
+                    label: "Critical" as const,
+                    color: "bg-rose-500",
+                    count: healthCounts.Critical,
+                  },
                 ].map(({ label, color, count }) => (
                   <button
                     key={label}
@@ -877,7 +941,11 @@ function Dashboard() {
                 <tbody className="divide-y divide-border/50">
                   {recent.map((c) => {
                     const project = projects.find((p) => p.companyId === c.id);
-                    const managerName = resolveAssigneeLabel(c.onboardingManagerId, users, employees);
+                    const managerName = resolveAssigneeLabel(
+                      c.onboardingManagerId,
+                      users,
+                      employees,
+                    );
                     const tone = getAvatarTone(c.name);
                     const initials = getInitials(c.name);
 

@@ -1,7 +1,17 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, ArrowRight, Clock, ChevronRight, ArrowLeft, Rocket, Ban, Pencil, CheckCheck } from "lucide-react";
+import {
+  Check,
+  ArrowRight,
+  Clock,
+  ChevronRight,
+  ArrowLeft,
+  Rocket,
+  Ban,
+  Pencil,
+  CheckCheck,
+} from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -63,6 +73,7 @@ const SECTION_TO_STEP: Record<OnboardingSectionKey, number> = {
   customer: 3,
   payment: 4,
   documents: 5,
+  vendor: 5,
   integrations: 6,
   golive: 7,
 };
@@ -100,21 +111,21 @@ function ProjectDetailPage() {
   const allCharges = useOnboardingStore((s) => s.otherCharges);
   const allActivities = useActivityStore((s) => s.activities);
   const users = useActiveUsers();
-  const checklist = useMemo(() => allChecklist.filter((i) => i.projectId === projectId), [allChecklist, projectId]);
+  const checklist = useMemo(
+    () => allChecklist.filter((i) => i.projectId === projectId),
+    [allChecklist, projectId],
+  );
   const progress = useMemo(
     () => calcProjectProgress(projectId, allChecklist),
     [projectId, allChecklist],
   );
-  const canGoLive = useMemo(
-    () => {
-      const goliveItems = checklist.filter((i) => i.section === "golive");
-      return (
-        goliveItems.length > 0 &&
-        goliveItems.every((i) => i.notApplicable || (i.collected && i.uploaded && i.live))
-      );
-    },
-    [checklist],
-  );
+  const canGoLive = useMemo(() => {
+    const goliveItems = checklist.filter((i) => i.section === "golive");
+    return (
+      goliveItems.length > 0 &&
+      goliveItems.every((i) => i.notApplicable || (i.collected && i.uploaded && i.live))
+    );
+  }, [checklist]);
   const toggleChecklist = useOnboardingStore((s) => s.toggleChecklist);
   const setChecklistPhaseDate = useOnboardingStore((s) => s.setChecklistPhaseDate);
   const setNotApplicable = useOnboardingStore((s) => s.setChecklistNotApplicable);
@@ -129,10 +140,16 @@ function ProjectDetailPage() {
   }, [projectId, initChecklistForProject]);
   const updateProject = useProjectStore((s) => s.updateProject);
   const activities = useMemo(
-    () => allActivities.filter((a) => a.projectId === projectId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    () =>
+      allActivities
+        .filter((a) => a.projectId === projectId)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     [allActivities, projectId],
   );
-  const otherCharges = useMemo(() => allCharges.filter((c) => c.projectId === projectId), [allCharges, projectId]);
+  const otherCharges = useMemo(
+    () => allCharges.filter((c) => c.projectId === projectId),
+    [allCharges, projectId],
+  );
   const addOtherCharge = useOnboardingStore((s) => s.addOtherCharge);
   const deleteOtherCharge = useOnboardingStore((s) => s.deleteOtherCharge);
 
@@ -177,6 +194,10 @@ function ProjectDetailPage() {
     }
     return map;
   }, [checklist]);
+
+  const visibleSections = ONBOARDING_SECTIONS.filter(
+    (s) => s.key !== "vendor" || (sectionItems.vendor?.length ?? 0) > 0,
+  );
 
   if (loading) return <DetailPageSkeleton />;
   if (!project) {
@@ -224,7 +245,11 @@ function ProjectDetailPage() {
       return;
     }
     const at =
-      phase === "collected" ? item.collectedAt : phase === "uploaded" ? item.uploadedAt : item.liveAt;
+      phase === "collected"
+        ? item.collectedAt
+        : phase === "uploaded"
+          ? item.uploadedAt
+          : item.liveAt;
     setPhaseDialog({
       itemId: item.id,
       label: item.label,
@@ -283,7 +308,13 @@ function ProjectDetailPage() {
         actions={
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-xs tabular-nums text-muted-foreground">{progress}%</span>
-            <Button type="button" size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={() => setEditOpen(true)}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1 text-xs"
+              onClick={() => setEditOpen(true)}
+            >
               <Pencil className="h-3.5 w-3.5" /> Edit
             </Button>
             <Button
@@ -297,7 +328,10 @@ function ProjectDetailPage() {
             </Button>
             <Button
               size="sm"
-              className={cn("h-8 gap-1 bg-primary text-xs", goLiveAnim && "animate-pulse ring-4 ring-success/40")}
+              className={cn(
+                "h-8 gap-1 bg-primary text-xs",
+                goLiveAnim && "animate-pulse ring-4 ring-success/40",
+              )}
               disabled={!canGoLive || !!project.goLiveAt}
               onClick={handleGoLive}
             >
@@ -342,7 +376,11 @@ function ProjectDetailPage() {
                 const active = i === currentStep;
                 return (
                   <div key={s} className="flex min-w-[88px] flex-1 items-center gap-0.5">
-                    <button type="button" onClick={() => goToStep(i)} className="group flex flex-col items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => goToStep(i)}
+                      className="group flex flex-col items-center gap-1"
+                    >
                       <motion.div
                         initial={false}
                         animate={{
@@ -371,7 +409,10 @@ function ProjectDetailPage() {
                     </button>
                     {i < ONBOARDING_STEPS.length - 1 && (
                       <div className="mb-3 h-0.5 flex-1 bg-muted">
-                        <motion.div animate={{ width: done ? "100%" : "0%" }} className="h-full bg-success" />
+                        <motion.div
+                          animate={{ width: done ? "100%" : "0%" }}
+                          className="h-full bg-success"
+                        />
                       </div>
                     )}
                   </div>
@@ -382,7 +423,7 @@ function ProjectDetailPage() {
 
           <div className="grid gap-2.5 lg:grid-cols-[240px_1fr]">
             <nav className="card-soft flex h-fit max-w-full gap-0.5 overflow-x-auto overscroll-x-contain p-1.5 touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:block lg:overflow-visible">
-              {ONBOARDING_SECTIONS.map((s) => {
+              {visibleSections.map((s) => {
                 const active = s.key === section;
                 const pct = sectionProgress(s.key);
                 const items = sectionItems[s.key] ?? [];
@@ -431,14 +472,14 @@ function ProjectDetailPage() {
                       size="sm"
                       className="h-8 w-full gap-1 text-xs sm:w-auto"
                       onClick={() => {
-                        const idx = ONBOARDING_SECTIONS.findIndex((s) => s.key === section);
+                        const idx = visibleSections.findIndex((s) => s.key === section);
                         if (idx < 0) return;
-                        if (idx >= ONBOARDING_SECTIONS.length - 1) {
+                        if (idx >= visibleSections.length - 1) {
                           goToStep(ONBOARDING_STEPS.length - 1);
                           toast.success("Last section saved — checklist is ready for Go Live");
                           return;
                         }
-                        const next = ONBOARDING_SECTIONS[idx + 1]!;
+                        const next = visibleSections[idx + 1]!;
                         goToSection(next.key);
                         toast.success(`Saved — moved to ${next.label}`);
                       }}
@@ -450,13 +491,20 @@ function ProjectDetailPage() {
                   {section === "project" && (
                     <div className="mb-3">
                       <div className="mb-1.5 flex items-center justify-between">
-                        <h4 className="text-xs font-semibold text-muted-foreground">Other Charges</h4>
+                        <h4 className="text-xs font-semibold text-muted-foreground">
+                          Other Charges
+                        </h4>
                         <Button
                           size="sm"
                           variant="outline"
                           className="h-7 text-xs"
                           onClick={() =>
-                            addOtherCharge({ projectId, name: "New Charge", amount: 0, type: "One-time" })
+                            addOtherCharge({
+                              projectId,
+                              name: "New Charge",
+                              amount: 0,
+                              type: "One-time",
+                            })
                           }
                         >
                           + Add
@@ -468,7 +516,9 @@ function ProjectDetailPage() {
                             <input
                               defaultValue={c.name}
                               onBlur={(e) =>
-                                useOnboardingStore.getState().updateOtherCharge(c.id, { name: e.target.value })
+                                useOnboardingStore
+                                  .getState()
+                                  .updateOtherCharge(c.id, { name: e.target.value })
                               }
                               className="mb-1.5 w-full rounded border px-2 py-1 text-sm"
                               placeholder="Charge name"
@@ -485,7 +535,12 @@ function ProjectDetailPage() {
                                 className="w-full rounded border px-2 py-1 text-sm"
                                 placeholder="Amount"
                               />
-                              <Button size="sm" variant="ghost" className="h-7" onClick={() => deleteOtherCharge(c.id)}>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7"
+                                onClick={() => deleteOtherCharge(c.id)}
+                              >
                                 ×
                               </Button>
                             </div>
@@ -500,7 +555,9 @@ function ProjectDetailPage() {
                                 <input
                                   defaultValue={c.name}
                                   onBlur={(e) =>
-                                    useOnboardingStore.getState().updateOtherCharge(c.id, { name: e.target.value })
+                                    useOnboardingStore
+                                      .getState()
+                                      .updateOtherCharge(c.id, { name: e.target.value })
                                   }
                                   className="w-full rounded border px-2 py-1 text-sm"
                                 />
@@ -518,7 +575,12 @@ function ProjectDetailPage() {
                                 />
                               </td>
                               <td className="py-1.5 text-right">
-                                <Button size="sm" variant="ghost" className="h-7" onClick={() => deleteOtherCharge(c.id)}>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7"
+                                  onClick={() => deleteOtherCharge(c.id)}
+                                >
                                   ×
                                 </Button>
                               </td>
@@ -533,132 +595,145 @@ function ProjectDetailPage() {
                     {(sectionItems[section] ?? []).map((item) => {
                       const na = !!item.notApplicable;
                       return (
-                      <div key={item.id} className={cn("rounded-lg border border-border p-3", na && "bg-muted/30 opacity-90")}>
-                        <div className="flex items-start justify-between gap-2">
-                          <div className={cn("text-sm font-medium", na && "text-muted-foreground line-through")}>
-                            {item.label}
-                            {item.source === "required-document" && (
-                              <span className="ml-2 inline-flex align-middle rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                                Required
-                              </span>
-                            )}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setNotApplicable(item.id, !na)}
-                            className={cn(
-                              "inline-flex min-h-9 shrink-0 items-center gap-1 rounded-lg border px-2.5 text-[11px] font-medium",
-                              na
-                                ? "border-muted-foreground/40 bg-muted text-muted-foreground"
-                                : "border-input bg-background text-muted-foreground hover:border-foreground/40",
-                            )}
-                          >
-                            <Ban className="h-3.5 w-3.5" />
-                            N/A
-                          </button>
-                        </div>
-                        {na ? (
-                          <p className="mt-2 text-xs text-muted-foreground">Not applicable for this project</p>
-                        ) : (
-                          <>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {(["collected", "uploaded", "live"] as const).map((phase) => {
-                            const allowed = canToggleChecklistPhase(item, phase);
-                            const at =
-                              phase === "collected"
-                                ? item.collectedAt
-                                : phase === "uploaded"
-                                  ? item.uploadedAt
-                                  : item.liveAt;
-                            return (
-                            <button
-                              key={phase}
-                              type="button"
-                              disabled={!allowed && !item[phase]}
-                              title={
-                                !allowed && !item[phase]
-                                  ? "Complete prior steps first (Collected → Uploaded → Live)"
-                                  : at
-                                    ? formatDateTime(at)
-                                    : undefined
-                              }
-                              onClick={() => openPhaseDialog(item, phase)}
+                        <div
+                          key={item.id}
+                          className={cn(
+                            "rounded-lg border border-border p-3",
+                            na && "bg-muted/30 opacity-90",
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div
                               className={cn(
-                                "inline-flex min-h-10 min-w-[5.5rem] flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-1.5 text-xs font-medium capitalize",
-                                item[phase]
-                                  ? "border-success bg-success text-white"
-                                  : allowed
-                                    ? "border-input bg-background hover:border-primary"
-                                    : "cursor-not-allowed border-input bg-muted/40 text-muted-foreground opacity-50",
+                                "text-sm font-medium",
+                                na && "text-muted-foreground line-through",
                               )}
                             >
-                              <span className="inline-flex items-center gap-1">
-                                {item[phase] && <Check className="h-3.5 w-3.5" />}
-                                {phase}
-                              </span>
-                              {item[phase] && at ? (
-                                <span className="text-[9px] font-normal opacity-90 normal-case">
-                                  {formatDate(at)}
-                                </span>
-                              ) : (
-                                <span className="text-[9px] font-normal opacity-70 normal-case">
-                                  Pick date
+                              {item.label}
+                              {item.source === "required-document" && (
+                                <span className="ml-2 inline-flex align-middle rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                                  Required
                                 </span>
                               )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setNotApplicable(item.id, !na)}
+                              className={cn(
+                                "inline-flex min-h-9 shrink-0 items-center gap-1 rounded-lg border px-2.5 text-[11px] font-medium",
+                                na
+                                  ? "border-muted-foreground/40 bg-muted text-muted-foreground"
+                                  : "border-input bg-background text-muted-foreground hover:border-foreground/40",
+                              )}
+                            >
+                              <Ban className="h-3.5 w-3.5" />
+                              N/A
                             </button>
-                            );
-                          })}
+                          </div>
+                          {na ? (
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              Not applicable for this project
+                            </p>
+                          ) : (
+                            <>
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {(["collected", "uploaded", "live"] as const).map((phase) => {
+                                  const allowed = canToggleChecklistPhase(item, phase);
+                                  const at =
+                                    phase === "collected"
+                                      ? item.collectedAt
+                                      : phase === "uploaded"
+                                        ? item.uploadedAt
+                                        : item.liveAt;
+                                  return (
+                                    <button
+                                      key={phase}
+                                      type="button"
+                                      disabled={!allowed && !item[phase]}
+                                      title={
+                                        !allowed && !item[phase]
+                                          ? "Complete prior steps first (Collected → Uploaded → Live)"
+                                          : at
+                                            ? formatDateTime(at)
+                                            : undefined
+                                      }
+                                      onClick={() => openPhaseDialog(item, phase)}
+                                      className={cn(
+                                        "inline-flex min-h-10 min-w-[5.5rem] flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-1.5 text-xs font-medium capitalize",
+                                        item[phase]
+                                          ? "border-success bg-success text-white"
+                                          : allowed
+                                            ? "border-input bg-background hover:border-primary"
+                                            : "cursor-not-allowed border-input bg-muted/40 text-muted-foreground opacity-50",
+                                      )}
+                                    >
+                                      <span className="inline-flex items-center gap-1">
+                                        {item[phase] && <Check className="h-3.5 w-3.5" />}
+                                        {phase}
+                                      </span>
+                                      {item[phase] && at ? (
+                                        <span className="text-[9px] font-normal opacity-90 normal-case">
+                                          {formatDate(at)}
+                                        </span>
+                                      ) : (
+                                        <span className="text-[9px] font-normal opacity-70 normal-case">
+                                          Pick date
+                                        </span>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              <input
+                                value={item.remarks}
+                                onChange={(e) => updateRemarks(item.id, e.target.value)}
+                                placeholder="Add note…"
+                                className="mt-3 h-10 w-full rounded-lg border bg-background px-3 text-sm"
+                              />
+                              <div className="mt-2 grid grid-cols-2 gap-2">
+                                <select
+                                  value={item.assigneeUserId ?? ""}
+                                  onChange={(e) =>
+                                    updateAssignment(item.id, {
+                                      assigneeUserId: e.target.value || undefined,
+                                      dueDate: item.dueDate,
+                                    })
+                                  }
+                                  className="h-9 rounded-md border bg-background px-2 text-xs"
+                                  aria-label={`Assignee for ${item.label}`}
+                                >
+                                  <option value="">Company manager</option>
+                                  {users.map((user) => (
+                                    <option key={user.id} value={user.id}>
+                                      {user.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <input
+                                  type="date"
+                                  value={item.dueDate ?? ""}
+                                  onChange={(e) =>
+                                    updateAssignment(item.id, {
+                                      assigneeUserId: item.assigneeUserId,
+                                      dueDate: e.target.value || undefined,
+                                    })
+                                  }
+                                  className="h-9 rounded-md border bg-background px-2 text-xs"
+                                  aria-label={`Due date for ${item.label}`}
+                                />
+                              </div>
+                            </>
+                          )}
+                          {na && (
+                            <input
+                              value={item.remarks}
+                              onChange={(e) => updateRemarks(item.id, e.target.value)}
+                              placeholder="Why not applicable…"
+                              className="mt-3 h-10 w-full rounded-lg border bg-background px-3 text-sm"
+                            />
+                          )}
                         </div>
-                        <input
-                          value={item.remarks}
-                          onChange={(e) => updateRemarks(item.id, e.target.value)}
-                          placeholder="Add note…"
-                          className="mt-3 h-10 w-full rounded-lg border bg-background px-3 text-sm"
-                        />
-                        <div className="mt-2 grid grid-cols-2 gap-2">
-                          <select
-                            value={item.assigneeUserId ?? ""}
-                            onChange={(e) =>
-                              updateAssignment(item.id, {
-                                assigneeUserId: e.target.value || undefined,
-                                dueDate: item.dueDate,
-                              })
-                            }
-                            className="h-9 rounded-md border bg-background px-2 text-xs"
-                            aria-label={`Assignee for ${item.label}`}
-                          >
-                            <option value="">Company manager</option>
-                            {users.map((user) => (
-                              <option key={user.id} value={user.id}>
-                                {user.name}
-                              </option>
-                            ))}
-                          </select>
-                          <input
-                            type="date"
-                            value={item.dueDate ?? ""}
-                            onChange={(e) =>
-                              updateAssignment(item.id, {
-                                assigneeUserId: item.assigneeUserId,
-                                dueDate: e.target.value || undefined,
-                              })
-                            }
-                            className="h-9 rounded-md border bg-background px-2 text-xs"
-                            aria-label={`Due date for ${item.label}`}
-                          />
-                        </div>
-                          </>
-                        )}
-                        {na && (
-                          <input
-                            value={item.remarks}
-                            onChange={(e) => updateRemarks(item.id, e.target.value)}
-                            placeholder="Why not applicable…"
-                            className="mt-3 h-10 w-full rounded-lg border bg-background px-3 text-sm"
-                          />
-                        )}
-                      </div>
-                    );
+                      );
                     })}
                   </div>
 
@@ -680,134 +755,152 @@ function ProjectDetailPage() {
                         {(sectionItems[section] ?? []).map((item) => {
                           const na = !!item.notApplicable;
                           return (
-                          <tr key={item.id} className={cn("border-t", na && "bg-muted/20")}>
-                            <td className={cn("px-3 py-2 font-medium", na && "text-muted-foreground line-through")}>
-                              {item.label}
-                              {item.source === "required-document" && (
-                                <span className="ml-2 inline-flex align-middle rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                                  Required
-                                </span>
-                              )}
-                            </td>
-                            {(["collected", "uploaded", "live"] as const).map((phase) => {
-                              const allowed = !na && canToggleChecklistPhase(item, phase);
-                              const at =
-                                phase === "collected"
-                                  ? item.collectedAt
-                                  : phase === "uploaded"
-                                    ? item.uploadedAt
-                                    : item.liveAt;
-                              return (
-                              <td key={phase} className="px-2 py-2 text-center">
-                                <button
-                                  type="button"
-                                  disabled={na || (!allowed && !item[phase])}
-                                  title={
-                                    na
-                                      ? "Not applicable"
-                                      : !allowed && !item[phase]
-                                        ? "Complete prior steps first"
-                                        : at
-                                          ? formatDateTime(at)
-                                          : undefined
-                                  }
-                                  onClick={() => openPhaseDialog(item, phase)}
-                                  className={cn(
-                                    "inline-flex min-h-9 min-w-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-md border px-1.5 py-1",
-                                    (na || (!allowed && !item[phase])) && "cursor-not-allowed opacity-40",
-                                    !na && item[phase] && "border-success bg-success text-white",
-                                    !na && !item[phase] && allowed && "border-input hover:border-primary",
-                                  )}
-                                >
-                                  {!na && item[phase] && <Check className="h-3.5 w-3.5" />}
-                                  {na && <span className="text-[10px] text-muted-foreground">—</span>}
-                                  {!na && item[phase] && at ? (
-                                    <span className="text-[9px] font-normal leading-tight opacity-90">
-                                      {formatDate(at)}
-                                    </span>
-                                  ) : !na && allowed ? (
-                                    <span className="text-[9px] font-normal leading-tight text-muted-foreground">
-                                      Date
-                                    </span>
-                                  ) : null}
-                                </button>
-                              </td>
-                              );
-                            })}
-                            <td className="px-2 py-2 text-center">
-                              <button
-                                type="button"
-                                title={na ? "Mark as applicable" : "Not applicable for this project"}
-                                onClick={() => setNotApplicable(item.id, !na)}
+                            <tr key={item.id} className={cn("border-t", na && "bg-muted/20")}>
+                              <td
                                 className={cn(
-                                  "inline-flex h-7 items-center gap-1 rounded-md border px-1.5 text-[10px] font-medium",
-                                  na
-                                    ? "border-muted-foreground/50 bg-muted text-muted-foreground"
-                                    : "border-input hover:border-foreground/40 hover:bg-muted/50",
+                                  "px-3 py-2 font-medium",
+                                  na && "text-muted-foreground line-through",
                                 )}
                               >
-                                <Ban className="h-3 w-3" />
-                                N/A
-                              </button>
-                            </td>
-                            <td className="px-2 py-2">
-                              <select
-                                value={item.assigneeUserId ?? ""}
-                                onChange={(e) =>
-                                  updateAssignment(item.id, {
-                                    assigneeUserId: e.target.value || undefined,
-                                    dueDate: item.dueDate,
-                                  })
-                                }
-                                className="h-7 w-32 rounded border bg-background px-1.5 text-[11px]"
-                                aria-label={`Assignee for ${item.label}`}
-                              >
-                                <option value="">Company manager</option>
-                                {users.map((user) => (
-                                  <option key={user.id} value={user.id}>
-                                    {user.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </td>
-                            <td className="px-2 py-2">
-                              <input
-                                type="date"
-                                value={item.dueDate ?? ""}
-                                onChange={(e) =>
-                                  updateAssignment(item.id, {
-                                    assigneeUserId: item.assigneeUserId,
-                                    dueDate: e.target.value || undefined,
-                                  })
-                                }
-                                className="h-7 w-28 rounded border bg-background px-1.5 text-[11px]"
-                                aria-label={`Due date for ${item.label}`}
-                              />
-                            </td>
-                            <td className="px-2 py-2">
-                              <input
-                                value={item.remarks}
-                                onChange={(e) => updateRemarks(item.id, e.target.value)}
-                                placeholder={na ? "Why not applicable…" : "Add note…"}
-                                className="h-7 w-full rounded border bg-background px-1.5 text-[11px]"
-                              />
-                            </td>
-                          </tr>
-                        );
+                                {item.label}
+                                {item.source === "required-document" && (
+                                  <span className="ml-2 inline-flex align-middle rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                                    Required
+                                  </span>
+                                )}
+                              </td>
+                              {(["collected", "uploaded", "live"] as const).map((phase) => {
+                                const allowed = !na && canToggleChecklistPhase(item, phase);
+                                const at =
+                                  phase === "collected"
+                                    ? item.collectedAt
+                                    : phase === "uploaded"
+                                      ? item.uploadedAt
+                                      : item.liveAt;
+                                return (
+                                  <td key={phase} className="px-2 py-2 text-center">
+                                    <button
+                                      type="button"
+                                      disabled={na || (!allowed && !item[phase])}
+                                      title={
+                                        na
+                                          ? "Not applicable"
+                                          : !allowed && !item[phase]
+                                            ? "Complete prior steps first"
+                                            : at
+                                              ? formatDateTime(at)
+                                              : undefined
+                                      }
+                                      onClick={() => openPhaseDialog(item, phase)}
+                                      className={cn(
+                                        "inline-flex min-h-9 min-w-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-md border px-1.5 py-1",
+                                        (na || (!allowed && !item[phase])) &&
+                                          "cursor-not-allowed opacity-40",
+                                        !na &&
+                                          item[phase] &&
+                                          "border-success bg-success text-white",
+                                        !na &&
+                                          !item[phase] &&
+                                          allowed &&
+                                          "border-input hover:border-primary",
+                                      )}
+                                    >
+                                      {!na && item[phase] && <Check className="h-3.5 w-3.5" />}
+                                      {na && (
+                                        <span className="text-[10px] text-muted-foreground">—</span>
+                                      )}
+                                      {!na && item[phase] && at ? (
+                                        <span className="text-[9px] font-normal leading-tight opacity-90">
+                                          {formatDate(at)}
+                                        </span>
+                                      ) : !na && allowed ? (
+                                        <span className="text-[9px] font-normal leading-tight text-muted-foreground">
+                                          Date
+                                        </span>
+                                      ) : null}
+                                    </button>
+                                  </td>
+                                );
+                              })}
+                              <td className="px-2 py-2 text-center">
+                                <button
+                                  type="button"
+                                  title={
+                                    na ? "Mark as applicable" : "Not applicable for this project"
+                                  }
+                                  onClick={() => setNotApplicable(item.id, !na)}
+                                  className={cn(
+                                    "inline-flex h-7 items-center gap-1 rounded-md border px-1.5 text-[10px] font-medium",
+                                    na
+                                      ? "border-muted-foreground/50 bg-muted text-muted-foreground"
+                                      : "border-input hover:border-foreground/40 hover:bg-muted/50",
+                                  )}
+                                >
+                                  <Ban className="h-3 w-3" />
+                                  N/A
+                                </button>
+                              </td>
+                              <td className="px-2 py-2">
+                                <select
+                                  value={item.assigneeUserId ?? ""}
+                                  onChange={(e) =>
+                                    updateAssignment(item.id, {
+                                      assigneeUserId: e.target.value || undefined,
+                                      dueDate: item.dueDate,
+                                    })
+                                  }
+                                  className="h-7 w-32 rounded border bg-background px-1.5 text-[11px]"
+                                  aria-label={`Assignee for ${item.label}`}
+                                >
+                                  <option value="">Company manager</option>
+                                  {users.map((user) => (
+                                    <option key={user.id} value={user.id}>
+                                      {user.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="px-2 py-2">
+                                <input
+                                  type="date"
+                                  value={item.dueDate ?? ""}
+                                  onChange={(e) =>
+                                    updateAssignment(item.id, {
+                                      assigneeUserId: item.assigneeUserId,
+                                      dueDate: e.target.value || undefined,
+                                    })
+                                  }
+                                  className="h-7 w-28 rounded border bg-background px-1.5 text-[11px]"
+                                  aria-label={`Due date for ${item.label}`}
+                                />
+                              </td>
+                              <td className="px-2 py-2">
+                                <input
+                                  value={item.remarks}
+                                  onChange={(e) => updateRemarks(item.id, e.target.value)}
+                                  placeholder={na ? "Why not applicable…" : "Add note…"}
+                                  className="h-7 w-full rounded border bg-background px-1.5 text-[11px]"
+                                />
+                              </td>
+                            </tr>
+                          );
                         })}
                       </tbody>
                     </table>
                   </div>
 
                   <div className="mt-4">
-                    <h4 className="mb-2 text-xs font-semibold text-muted-foreground">Activity log</h4>
+                    <h4 className="mb-2 text-xs font-semibold text-muted-foreground">
+                      Activity log
+                    </h4>
                     <ol className="relative space-y-2.5 border-l-2 border-border pl-3.5">
                       {activities.slice(0, 5).map((a) => (
                         <li key={a.id} className="relative">
                           <span className="absolute -left-[19px] top-1.5 h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-primary/20" />
                           <div className="text-xs font-medium">{a.what}</div>
                           <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                            <Clock className="h-2.5 w-2.5" /> {formatRelativeTime(a.createdAt)} · {a.who}
+                            <Clock className="h-2.5 w-2.5" /> {formatRelativeTime(a.createdAt)} ·{" "}
+                            {a.who}
                           </div>
                         </li>
                       ))}

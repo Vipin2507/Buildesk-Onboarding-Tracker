@@ -26,19 +26,56 @@ export const ONBOARDING_SECTIONS = [
   { key: "customer", label: "Customer Data" },
   { key: "payment", label: "Payment Information" },
   { key: "documents", label: "Documents & Formats" },
+  { key: "vendor", label: "Vendor, Contractor & BOQ" },
   { key: "integrations", label: "Integrations (WATI etc.)" },
   { key: "golive", label: "Go Live & Handover" },
 ] as const;
 
 export const CHECKLIST_TEMPLATE: Record<string, string[]> = {
-  project: ["Project master created", "Address & RERA captured", "POCs assigned", "Other charges defined"],
+  project: [
+    "Project master created",
+    "Address & RERA captured",
+    "POCs assigned",
+    "Other charges defined",
+  ],
   unit: ["Unit Detail Uploaded"],
   customer: ["Excel Uploaded"],
   payment: ["Uploaded"],
-  documents: ["Agreement template uploaded", "Demand letter tested", "Receipt template live", "Reminder templates approved"],
+  documents: [
+    "Agreement template uploaded",
+    "Demand letter tested",
+    "Receipt template live",
+    "Reminder templates approved",
+  ],
   integrations: ["WATI API connected", "SMS gateway configured", "Email SMTP verified"],
   golive: ["Team training completed", "Client sign-off received", "Go-live date confirmed"],
 };
+
+/** Added only for companies that opted into Vendor Management. */
+export const VENDOR_CHECKLIST_LABELS = [
+  "Supplier list received",
+  "Product list received",
+  "Product price list received and updated",
+  "Old purchase orders and bills received",
+  "Contractor list received and uploaded",
+  "Purchase requirement format uploaded",
+  "Purchase order format uploaded",
+  "Indent / inward format uploaded",
+  "Work order format uploaded",
+  "BOQ format received",
+  "BOQ uploaded",
+] as const;
+
+export const DOCUMENTATION_CHECKLIST_SECTIONS = ["documents", "vendor"] as const;
+
+export const ONBOARDING_WORK_SECTIONS = [
+  "project",
+  "unit",
+  "customer",
+  "payment",
+  "integrations",
+  "golive",
+] as const;
 
 export const DOCUMENT_TEMPLATE_NAMES = [
   { name: "Welcome Letter", category: "Customer" },

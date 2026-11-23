@@ -2,13 +2,17 @@ import { createServerFn } from "@tanstack/react-start";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { CHECKLIST_TEMPLATE } from "@/data/constants";
+import { checklistTemplateForProject } from "@/server/lib/checklist-template";
 import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { logActivity } from "@/server/api/mappers";
 import type { ChecklistPhase, OnboardingChecklistItem, OtherCharge } from "@/types";
-import { applyChecklistPhaseToggle, stampChecklistPhaseDates, applyChecklistPhaseDate } from "@/lib/checklist";
+import {
+  applyChecklistPhaseToggle,
+  stampChecklistPhaseDates,
+  applyChecklistPhaseDate,
+} from "@/lib/checklist";
 
 function ensureDefaultChecklist(projectId: string) {
   const db = getDb();
@@ -19,7 +23,7 @@ function ensureDefaultChecklist(projectId: string) {
     .get();
   if (existing) return;
   const now = nowIso();
-  for (const [section, labels] of Object.entries(CHECKLIST_TEMPLATE)) {
+  for (const [section, labels] of Object.entries(checklistTemplateForProject(projectId))) {
     for (const label of labels) {
       db.insert(t.onboardingChecklistItems)
         .values({
@@ -43,7 +47,9 @@ function ensureDefaultChecklist(projectId: string) {
   }
 }
 
-function mapChecklist(row: typeof t.onboardingChecklistItems.$inferSelect): OnboardingChecklistItem {
+function mapChecklist(
+  row: typeof t.onboardingChecklistItems.$inferSelect,
+): OnboardingChecklistItem {
   return {
     id: row.id,
     projectId: row.projectId,
@@ -77,15 +83,18 @@ export const listChecklist = createServerFn({ method: "GET" })
       .where(eq(t.onboardingChecklistItems.projectId, data.projectId))
       .all();
 
+    const template = checklistTemplateForProject(data.projectId);
     const allowed = new Set(
-      Object.entries(CHECKLIST_TEMPLATE).flatMap(([section, labels]) =>
+      Object.entries(template).flatMap(([section, labels]) =>
         labels.map((label) => `${section}::${label}`),
       ),
     );
     for (const row of rows) {
       if (row.source === "required-document") continue;
       if (!allowed.has(`${row.section}::${row.label}`)) {
-        db.delete(t.onboardingChecklistItems).where(eq(t.onboardingChecklistItems.id, row.id)).run();
+        db.delete(t.onboardingChecklistItems)
+          .where(eq(t.onboardingChecklistItems.id, row.id))
+          .run();
       }
     }
     rows = db
@@ -94,7 +103,7 @@ export const listChecklist = createServerFn({ method: "GET" })
       .where(eq(t.onboardingChecklistItems.projectId, data.projectId))
       .all();
     const have = new Set(rows.map((r) => `${r.section}::${r.label}`));
-    for (const [section, labels] of Object.entries(CHECKLIST_TEMPLATE)) {
+    for (const [section, labels] of Object.entries(template)) {
       for (const label of labels) {
         if (have.has(`${section}::${label}`)) continue;
         db.insert(t.onboardingChecklistItems)
@@ -149,12 +158,16 @@ export const setChecklistState = createServerFn({ method: "POST" })
     const collected = notApplicable ? false : data.collected;
     const uploaded = notApplicable ? false : data.uploaded && collected;
     const live = notApplicable ? false : data.live && uploaded && collected;
-    const dates = stampChecklistPhaseDates(mapChecklist(row), {
-      collected,
-      uploaded,
-      live,
-      notApplicable,
-    }, now);
+    const dates = stampChecklistPhaseDates(
+      mapChecklist(row),
+      {
+        collected,
+        uploaded,
+        live,
+        notApplicable,
+      },
+      now,
+    );
     db.update(t.onboardingChecklistItems)
       .set({
         notApplicable,
@@ -495,7 +508,11 @@ export const updateOtherCharge = createServerFn({ method: "POST" })
     z
       .object({
         id: z.string(),
-        patch: z.object({ name: z.string().optional(), amount: z.number().optional(), type: z.string().optional() }),
+        patch: z.object({
+          name: z.string().optional(),
+          amount: z.number().optional(),
+          type: z.string().optional(),
+        }),
       })
       .parse(data),
   )
@@ -521,7 +538,11 @@ export const listUploads = createServerFn({ method: "GET" })
   .inputValidator((data: unknown) => z.object({ projectId: z.string() }).parse(data))
   .handler(async ({ data }) => {
     requireUser();
-    return getDb().select().from(t.unitUploads).where(eq(t.unitUploads.projectId, data.projectId)).all();
+    return getDb()
+      .select()
+      .from(t.unitUploads)
+      .where(eq(t.unitUploads.projectId, data.projectId))
+      .all();
   });
 
 export const simulateUpload = createServerFn({ method: "POST" })
