@@ -30,6 +30,7 @@ import {
 import { MODULE_CATALOG, getModuleLabel } from "@/data/module-catalog";
 import { milestonesForModule } from "@/lib/module-progress";
 import { ModuleSubscriptionPanel } from "@/components/module-subscription-panel";
+import { VendorModuleChecklist } from "@/components/vendor-module-checklist";
 import type { ModuleKey, Project } from "@/types";
 import { formatRelativeTime } from "@/types/common";
 import { cn } from "@/lib/utils";
@@ -65,7 +66,8 @@ function ModuleLandingPage() {
   const catalog = MODULE_CATALOG.find((m) => m.key === moduleKey);
 
   if (loading) return <DetailPageSkeleton />;
-  if (!company) return <EntityNotFound entity="Company" listPath="/companies" listLabel="Companies" />;
+  if (!company)
+    return <EntityNotFound entity="Company" listPath="/companies" listLabel="Companies" />;
 
   const companyModule = company.modules.find((m) => m.moduleKey === moduleKey);
   if (!companyModule?.optedIn) {
@@ -78,13 +80,18 @@ function ModuleLandingPage() {
             { label: getModuleLabel(moduleKey as ModuleKey) },
           ]}
         />
-        <PageHeader title={catalog?.label ?? moduleKey} subtitle="This module is not purchased for this company." />
+        <PageHeader
+          title={catalog?.label ?? moduleKey}
+          subtitle="This module is not purchased for this company."
+        />
       </PageWrap>
     );
   }
 
   if (moduleKey === "post-sales") {
-    return <PostSalesModulePage companyId={companyId} companyName={company.name} progress={progress} />;
+    return (
+      <PostSalesModulePage companyId={companyId} companyName={company.name} progress={progress} />
+    );
   }
 
   return (
@@ -242,7 +249,11 @@ function GenericModuleHub({
             <span>{progress}%</span>
           </div>
           <ProgressBar value={progress} />
-          {description ? <p className="mt-3 text-sm text-muted-foreground">{description}</p> : null}
+          <p className="mt-3 text-sm text-muted-foreground">
+            {moduleKey === "vendor-management"
+              ? "Counted from supplier, product, contractor, format, and BOQ items only."
+              : description}
+          </p>
         </div>
         <div className="card-soft space-y-3 p-4">
           <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -275,46 +286,50 @@ function GenericModuleHub({
         </div>
       </div>
 
-      <div className="card-soft p-4">
-        <h3 className="mb-1 font-semibold">Task checklist</h3>
-        <p className="mb-4 text-xs text-muted-foreground">
-          Derived from project onboarding milestones across {projects.length} project
-          {projects.length === 1 ? "" : "s"}. Update checklist phases on each project.
-        </p>
-        {checklist.length === 0 ? (
-          <EmptyState
-            title="No milestone tasks mapped"
-            description="This module uses overall project readiness until specific milestones are configured."
-          />
-        ) : (
-          <div className="space-y-2">
-            {checklist.map((item) => (
-              <div
-                key={item.key}
-                className={cn(
-                  "flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2.5",
-                  item.complete ? "border-success/40 bg-success/5" : "border-border",
-                )}
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium">{item.label}</div>
-                  {item.description ? (
-                    <div className="text-xs text-muted-foreground">{item.description}</div>
-                  ) : null}
+      {moduleKey === "vendor-management" ? (
+        <VendorModuleChecklist companyId={companyId} />
+      ) : (
+        <div className="card-soft p-4">
+          <h3 className="mb-1 font-semibold">Task checklist</h3>
+          <p className="mb-4 text-xs text-muted-foreground">
+            Derived from project onboarding milestones across {projects.length} project
+            {projects.length === 1 ? "" : "s"}. Update checklist phases on each project.
+          </p>
+          {checklist.length === 0 ? (
+            <EmptyState
+              title="No milestone tasks mapped"
+              description="This module uses overall project readiness until specific milestones are configured."
+            />
+          ) : (
+            <div className="space-y-2">
+              {checklist.map((item) => (
+                <div
+                  key={item.key}
+                  className={cn(
+                    "flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2.5",
+                    item.complete ? "border-success/40 bg-success/5" : "border-border",
+                  )}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium">{item.label}</div>
+                    {item.description ? (
+                      <div className="text-xs text-muted-foreground">{item.description}</div>
+                    ) : null}
+                  </div>
+                  <div className="text-xs tabular-nums text-muted-foreground">
+                    {item.total === 0 ? "—" : `${item.done}/${item.total}`}
+                  </div>
+                  <Pill tone={item.complete ? "success" : "muted"}>
+                    {item.complete ? "Done" : "Open"}
+                  </Pill>
                 </div>
-                <div className="text-xs tabular-nums text-muted-foreground">
-                  {item.total === 0 ? "—" : `${item.done}/${item.total}`}
-                </div>
-                <Pill tone={item.complete ? "success" : "muted"}>
-                  {item.complete ? "Done" : "Open"}
-                </Pill>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-      {projects.length > 0 ? (
+      {moduleKey !== "vendor-management" && projects.length > 0 ? (
         <div className="mt-4 card-soft p-4">
           <h3 className="mb-3 text-sm font-semibold">Linked onboarding projects</h3>
           <div className="space-y-2">
@@ -335,20 +350,22 @@ function GenericModuleHub({
                     </div>
                   </div>
                   <ProgressBar value={pct} className="w-24" />
-                  <span className="w-10 text-right text-xs tabular-nums text-muted-foreground">{pct}%</span>
+                  <span className="w-10 text-right text-xs tabular-nums text-muted-foreground">
+                    {pct}%
+                  </span>
                 </Link>
               );
             })}
           </div>
         </div>
-      ) : (
+      ) : moduleKey !== "vendor-management" ? (
         <div className="mt-4">
           <EmptyState
             title="No onboarding projects yet"
             description="Import a sheet or add a project on the company Project tab. Module progress follows those projects."
           />
         </div>
-      )}
+      ) : null}
     </PageWrap>
   );
 }
@@ -539,7 +556,9 @@ function PostSalesModulePage({
                     <td className="px-4 py-3 text-muted-foreground">
                       {p.checklistDone}/{p.checklistTotal}
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">{formatRelativeTime(p.updatedAt)}</td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {formatRelativeTime(p.updatedAt)}
+                    </td>
                     <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <Button size="icon" variant="ghost" onClick={() => openEdit(p)}>
                         <Pencil className="h-4 w-4" />
@@ -579,7 +598,9 @@ function PostSalesModulePage({
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title="Delete project?"
-        description={deleting ? `Remove ${deleting.name}? Checklist data will be deleted.` : undefined}
+        description={
+          deleting ? `Remove ${deleting.name}? Checklist data will be deleted.` : undefined
+        }
         onConfirm={() => {
           if (deleting) {
             deleteProject(deleting.id);

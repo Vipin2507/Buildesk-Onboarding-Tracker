@@ -52,19 +52,36 @@ export const CHECKLIST_TEMPLATE: Record<string, string[]> = {
 };
 
 /** Added only for companies that opted into Vendor Management. */
-export const VENDOR_CHECKLIST_LABELS = [
-  "Supplier list received",
-  "Product list received",
-  "Product price list received and updated",
-  "Old purchase orders and bills received",
-  "Contractor list received and uploaded",
-  "Purchase requirement format uploaded",
-  "Purchase order format uploaded",
-  "Indent / inward format uploaded",
-  "Work order format uploaded",
-  "BOQ format received",
-  "BOQ uploaded",
+export const VENDOR_CHECKLIST_GROUPS = [
+  {
+    key: "data",
+    label: "Data uploading",
+    items: [
+      "Supplier list received",
+      "Product list received",
+      "Product price list received and updated",
+      "Old purchase orders and bills received",
+      "Contractor list received and uploaded",
+    ],
+  },
+  {
+    key: "formats",
+    label: "Document formats",
+    items: [
+      "Purchase requirement format uploaded",
+      "Purchase order format uploaded",
+      "Indent / inward format uploaded",
+      "Work order format uploaded",
+    ],
+  },
+  {
+    key: "boq",
+    label: "BOQ",
+    items: ["BOQ format received", "BOQ uploaded"],
+  },
 ] as const;
+
+export const VENDOR_CHECKLIST_LABELS = VENDOR_CHECKLIST_GROUPS.flatMap((group) => group.items);
 
 export const DOCUMENTATION_CHECKLIST_SECTIONS = ["documents", "vendor"] as const;
 

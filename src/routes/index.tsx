@@ -473,7 +473,6 @@ function Dashboard() {
       </div>
 
       <div className="space-y-2.5 pt-1">
-        <DashboardWorkQueues companies={kpis.companiesWithProgress} />
         {/* Smart Pending Work Overview */}
         <div id="overview">
           <DashboardPendingSummary
@@ -1057,6 +1056,8 @@ function Dashboard() {
             )}
           </div>
         </div>
+
+        <DashboardWorkQueues companies={kpis.companiesWithProgress} />
       </div>
 
       {/* Drill-down Drawer Sheet */}

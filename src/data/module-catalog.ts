@@ -18,7 +18,7 @@ export const MODULE_CATALOG: ModuleCatalogEntry[] = [
   {
     key: "vendor-management",
     label: "Vendor Management",
-    description: "Materials, suppliers, POs and contractors.",
+    description: "Supplier, product, and contractor data, purchase formats, and BOQ.",
     icon: "truck",
   },
   {
@@ -98,9 +98,7 @@ export function setMasterModuleLabelResolver(fn: (key: string) => string | undef
 
 export function getModuleLabel(key: ModuleKey): string {
   return (
-    masterModuleLabelResolver?.(key) ??
-    MODULE_CATALOG.find((m) => m.key === key)?.label ??
-    key
+    masterModuleLabelResolver?.(key) ?? MODULE_CATALOG.find((m) => m.key === key)?.label ?? key
   );
 }
 
@@ -126,9 +124,7 @@ export function createCompanyModules(optedKeys: ModuleKey[], optedOnDate?: strin
 /** Project subscription fields for legacy rows that only have optedIn/optedOnDate. */
 export function withSubscriptionProjection(m: CompanyModule): CompanyModule {
   const start = m.subscriptionStartDate ?? m.optedOnDate;
-  const status =
-    m.subscriptionStatus ??
-    (m.optedIn ? ("active" as const) : ("inactive" as const));
+  const status = m.subscriptionStatus ?? (m.optedIn ? ("active" as const) : ("inactive" as const));
   return {
     ...m,
     subscriptionStatus: status,
@@ -160,13 +156,16 @@ export function normalizeCompanyModules(input: unknown): CompanyModule[] {
   if (input.every((x) => x && typeof x === "object" && "moduleKey" in (x as object))) {
     const byKey = new Map(
       (input as CompanyModule[])
-        .filter((m) => m && typeof m === "object" && MODULE_CATALOG.some((c) => c.key === m.moduleKey))
+        .filter(
+          (m) => m && typeof m === "object" && MODULE_CATALOG.some((c) => c.key === m.moduleKey),
+        )
         .map((m) => [
           m.moduleKey,
           withSubscriptionProjection({
             moduleKey: m.moduleKey,
             // Prefer live Master label on client; keep DB label on server.
-            label: masterModuleLabelResolver?.(m.moduleKey) ?? m.label ?? getModuleLabel(m.moduleKey),
+            label:
+              masterModuleLabelResolver?.(m.moduleKey) ?? m.label ?? getModuleLabel(m.moduleKey),
             optedIn: Boolean(m.optedIn),
             optedOnDate: m.optedOnDate,
             liveAt: m.liveAt,
@@ -184,7 +183,9 @@ export function normalizeCompanyModules(input: unknown): CompanyModule[] {
 
   // Legacy shape: string[]
   if (input.every((x) => typeof x === "string")) {
-    const keys = (input as string[]).map((s) => legacyModuleStringToKey(s)).filter(Boolean) as ModuleKey[];
+    const keys = (input as string[])
+      .map((s) => legacyModuleStringToKey(s))
+      .filter(Boolean) as ModuleKey[];
     return createCompanyModules(keys);
   }
 

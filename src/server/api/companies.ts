@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { createCompanyModules } from "@/data/module-catalog";
+import { ensureVendorChecklistForCompany } from "@/server/lib/checklist-template";
 import { isCrmAccountCompanyStub } from "@/lib/design-ticket-portal";
 import { requireActiveUserId, requirePermission } from "@/server/auth/permissions";
 import { ApiError, newId, nowIso, requireUser } from "@/server/auth/session";
@@ -112,6 +113,10 @@ function upsertCompanyModules(companyId: string, modules: ModuleUpsertRow[], now
       .where(eq(t.companyModules.id, prev.id))
       .run();
   }
+
+  if (modules.some((module) => module.moduleKey === "vendor-management" && module.optedIn)) {
+    ensureVendorChecklistForCompany(companyId);
+  }
 }
 
 export const listCompanies = createServerFn({ method: "GET" }).handler(async () => {
@@ -128,14 +133,11 @@ export const getCompany = createServerFn({ method: "GET" })
     return company;
   });
 
-const optionalNumber = z.preprocess(
-  (value) => {
-    if (value === "" || value === null || value === undefined) return undefined;
-    const n = typeof value === "number" ? value : Number(value);
-    return Number.isFinite(n) ? n : undefined;
-  },
-  z.number().optional().nullable(),
-);
+const optionalNumber = z.preprocess((value) => {
+  if (value === "" || value === null || value === undefined) return undefined;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : undefined;
+}, z.number().optional().nullable());
 
 function parseCompanyInput(data: unknown) {
   try {
@@ -328,7 +330,12 @@ export const createCompany = createServerFn({ method: "POST" })
         pocMobile: m.pocMobile,
       }));
     upsertCompanyModules(id, modules, now);
-    logActivity({ who: user.name, what: `Created company ${data.name}`, kind: "success", companyId: id });
+    logActivity({
+      who: user.name,
+      what: `Created company ${data.name}`,
+      kind: "success",
+      companyId: id,
+    });
     return loadCompany(id)!;
   });
 
@@ -361,7 +368,12 @@ export const updateCompany = createServerFn({ method: "POST" })
     const db = getDb();
     const existing = loadCompany(data.id);
     if (!existing) throw new ApiError(404, "Company not found");
-    const { modules, moduleKeys: _mk, salesAgentId, ...rest } = data.patch as typeof data.patch & {
+    const {
+      modules,
+      moduleKeys: _mk,
+      salesAgentId,
+      ...rest
+    } = data.patch as typeof data.patch & {
       moduleKeys?: string[];
     };
     if (salesAgentId !== undefined && salesAgentId !== (existing.salesAgentId ?? null)) {
@@ -425,14 +437,16 @@ export const updateCompany = createServerFn({ method: "POST" })
     if (installmentAmount !== undefined) {
       set.installmentAmount = installmentAmount != null ? String(installmentAmount) : null;
     }
-    db.update(t.companies)
-      .set(set)
-      .where(eq(t.companies.id, data.id))
-      .run();
+    db.update(t.companies).set(set).where(eq(t.companies.id, data.id)).run();
     if (modules) {
       upsertCompanyModules(data.id, modules, nowIso());
     }
-    logActivity({ who: user.name, what: `Updated company ${existing.name}`, kind: "info", companyId: data.id });
+    logActivity({
+      who: user.name,
+      what: `Updated company ${existing.name}`,
+      kind: "info",
+      companyId: data.id,
+    });
     return loadCompany(data.id)!;
   });
 
@@ -443,7 +457,12 @@ export const deleteCompany = createServerFn({ method: "POST" })
     const existing = loadCompany(data.id);
     if (!existing) return { ok: true as const, skipped: true as const };
     getDb().delete(t.companies).where(eq(t.companies.id, data.id)).run();
-    logActivity({ who: user.name, what: `Deleted company ${existing.name}`, kind: "warning", companyId: data.id });
+    logActivity({
+      who: user.name,
+      what: `Deleted company ${existing.name}`,
+      kind: "warning",
+      companyId: data.id,
+    });
     return { ok: true as const };
   });
 
@@ -457,13 +476,20 @@ export const renewCompany = createServerFn({ method: "POST" })
     if (!existing) throw new ApiError(404, "Company not found");
     const expiry =
       data.planExpiry ??
-      new Date(new Date(existing.planExpiry).getTime() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      new Date(new Date(existing.planExpiry).getTime() + 365 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 10);
     getDb()
       .update(t.companies)
       .set({ planExpiry: expiry, renewedAt: nowIso(), health: "Healthy", updatedAt: nowIso() })
       .where(eq(t.companies.id, data.id))
       .run();
-    logActivity({ who: user.name, what: `Renewed ${existing.name}`, kind: "success", companyId: data.id });
+    logActivity({
+      who: user.name,
+      what: `Renewed ${existing.name}`,
+      kind: "success",
+      companyId: data.id,
+    });
     return loadCompany(data.id)!;
   });
 
@@ -551,8 +577,17 @@ export const updateCompaniesCommercialBatch = createServerFn({ method: "POST" })
       const existing = loadCompany(row.id);
       if (!existing) continue;
 
-      const { dealSize, totalCost, paymentReceived, pendingAmount, amountWithGst, taxableAmount, gstAmount, installmentAmount, ...scalarRest } =
-        row.patch;
+      const {
+        dealSize,
+        totalCost,
+        paymentReceived,
+        pendingAmount,
+        amountWithGst,
+        taxableAmount,
+        gstAmount,
+        installmentAmount,
+        ...scalarRest
+      } = row.patch;
       const set: Record<string, unknown> = { ...scalarRest, updatedAt: now };
       if (dealSize !== undefined) set.dealSize = dealSize != null ? String(dealSize) : null;
       if (totalCost !== undefined) set.totalCost = totalCost != null ? String(totalCost) : null;

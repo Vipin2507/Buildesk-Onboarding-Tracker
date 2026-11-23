@@ -65,6 +65,19 @@ export function getModuleProgressPercent(
     return calcCompanyOnboardingProjectsAverage(companyId) ?? 0;
   }
 
+  if (moduleKey === "vendor-management") {
+    const projectIds = new Set(
+      useProjectStore
+        .getState()
+        .projects.filter((project) => project.companyId === companyId)
+        .map((project) => project.id),
+    );
+    const vendorItems = useOnboardingStore
+      .getState()
+      .checklistItems.filter((item) => projectIds.has(item.projectId) && item.section === "vendor");
+    return calcChecklistProgress(vendorItems);
+  }
+
   const groups = MODULE_MILESTONE_GROUPS[moduleKey];
   if (!groups) return 0;
 
@@ -253,16 +266,10 @@ export function useDashboardKpis() {
       (v) => v.status === "scheduled" && v.scheduledAt.slice(0, 10) >= today,
     ).length;
     const upcomingVisitFollowUps = clientVisits.filter(
-      (v) =>
-        v.status !== "cancelled" &&
-        v.nextFollowUpDate &&
-        v.nextFollowUpDate >= today,
+      (v) => v.status !== "cancelled" && v.nextFollowUpDate && v.nextFollowUpDate >= today,
     ).length;
     const overdueVisitFollowUps = clientVisits.filter(
-      (v) =>
-        v.status !== "cancelled" &&
-        v.nextFollowUpDate &&
-        v.nextFollowUpDate < today,
+      (v) => v.status !== "cancelled" && v.nextFollowUpDate && v.nextFollowUpDate < today,
     ).length;
     const upcomingRenewals = companies.filter((c) => {
       const u = getRenewalUrgency(c.planExpiry);
@@ -271,8 +278,10 @@ export function useDashboardKpis() {
 
     return {
       totalCompanies: companies.length,
-      activeOnboarding: companiesWithProgress.filter((c) => c.computedStatus === "in_progress").length,
-      completed: companiesWithProgress.filter((c) => c.isLive || c.computedStatus === "completed").length,
+      activeOnboarding: companiesWithProgress.filter((c) => c.computedStatus === "in_progress")
+        .length,
+      completed: companiesWithProgress.filter((c) => c.isLive || c.computedStatus === "completed")
+        .length,
       onHold: companiesWithProgress.filter((c) => c.status === "on_hold").length,
       /** Existing meaning: open support tickets (unchanged). */
       pendingTasks: openTickets,
@@ -304,7 +313,8 @@ export function useModuleAdoption() {
     () =>
       MODULE_CATALOG.map((mod) => ({
         name: mod.label,
-        opted: companies.filter((c) => c.modules.some((m) => m.moduleKey === mod.key && m.optedIn)).length,
+        opted: companies.filter((c) => c.modules.some((m) => m.moduleKey === mod.key && m.optedIn))
+          .length,
       })),
     [companies],
   );
@@ -407,9 +417,7 @@ export function useGlobalSearch(query: string): GlobalSearchResults {
     return {
       crm: {
         accounts: visibleCrmAccounts
-          .filter((a) =>
-            matchesText(a.name, a.city, a.contact, a.ownerName, a.email, a.ownerEmail),
-          )
+          .filter((a) => matchesText(a.name, a.city, a.contact, a.ownerName, a.email, a.ownerEmail))
           .slice(0, 5),
         tasks: crmTasks
           .filter((t) => (t.productScope ?? "crm") === "crm" && t.title.toLowerCase().includes(q))
@@ -423,9 +431,7 @@ export function useGlobalSearch(query: string): GlobalSearchResults {
           .filter((p) => p.name.toLowerCase().includes(q) || p.city.toLowerCase().includes(q))
           .slice(0, 5),
         tasks: erpTasks.filter((t) => t.title.toLowerCase().includes(q)).slice(0, 5),
-        visits: visits
-          .filter((v) => matchesText(v.purpose, v.outcome))
-          .slice(0, 5),
+        visits: visits.filter((v) => matchesText(v.purpose, v.outcome)).slice(0, 5),
       },
     };
   }, [q, companies, visibleCrmAccounts, crmTasks, projects, erpTasks, visits]);
