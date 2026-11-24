@@ -1,6 +1,11 @@
 import { desc, eq, sql } from "drizzle-orm";
 
-import { originalInstallments, parseInstallmentsJson, roundMoney, serializeInstallments } from "@/lib/crm-account-commercial";
+import {
+  originalInstallments,
+  parseInstallmentsJson,
+  roundMoney,
+  serializeInstallments,
+} from "@/lib/crm-account-commercial";
 import {
   buildCycleAwarePaymentAllocation,
   classifyPaymentTransactionRenewal,
@@ -138,11 +143,7 @@ export function insertPaymentTransaction(
 
   syncAccountPaymentTotals(db, input.accountId);
 
-  const row = db
-    .select()
-    .from(t.paymentTransactions)
-    .where(eq(t.paymentTransactions.id, id))
-    .get();
+  const row = db.select().from(t.paymentTransactions).where(eq(t.paymentTransactions.id, id)).get();
   if (!row) throw new Error("Failed to save payment transaction");
   return mapTransactionRow(row);
 }
@@ -357,9 +358,7 @@ export function replaceAccountPaymentLedgerForImport(
   createdBy?: string,
 ) {
   const target = roundMoney(Math.max(0, targetPaid));
-  db.delete(t.paymentTransactions)
-    .where(eq(t.paymentTransactions.accountId, accountId))
-    .run();
+  db.delete(t.paymentTransactions).where(eq(t.paymentTransactions.accountId, accountId)).run();
 
   if (target > 0) {
     const now = nowIso();
@@ -442,9 +441,7 @@ export function runPaymentsBackfillIfNeeded(db: ReturnType<typeof getDb>) {
     })
     .run();
 
-  console.log(
-    `[payments-backfill] inserted=${inserted} skippedZeroPaymentReceived=${skippedZero}`,
-  );
+  console.log(`[payments-backfill] inserted=${inserted} skippedZeroPaymentReceived=${skippedZero}`);
 }
 
 export type PaymentsListFilters = {
@@ -454,6 +451,12 @@ export type PaymentsListFilters = {
   supportManager2?: string;
   dueDateFrom?: string;
   dueDateTo?: string;
+  installmentFrom?: string;
+  installmentTo?: string;
+  renewalFrom?: string;
+  renewalTo?: string;
+  scenario?: "installment" | "renewal";
+  collection?: "under_50" | "50_to_90" | "over_90";
   search?: string;
   page?: number;
   pageSize?: number;
@@ -463,10 +466,7 @@ export type PaymentsListFilters = {
   sortDir?: "asc" | "desc";
 };
 
-function matchesNamedManagerFilter(
-  value: string | undefined,
-  filter: string | undefined,
-): boolean {
+function matchesNamedManagerFilter(value: string | undefined, filter: string | undefined): boolean {
   if (!filter || filter === "all") return true;
   if (filter === "unassigned") return !value?.trim();
   return value === filter;
@@ -505,33 +505,49 @@ function applyPaymentsToolbarFilters(
     );
   }
 
-  const useRenewalDates = filters.status === "renewal";
-  if (filters.dueDateFrom) {
-    const from = filters.dueDateFrom.slice(0, 10);
-    rows = rows.filter((row) => {
-      if (useRenewalDates) {
-        return Boolean(row.renewalDate && row.renewalDate.slice(0, 10) >= from);
-      }
-      return (
-        row.nextDueInstallment &&
-        row.nextDueInstallment.dueDate.slice(0, 10) >= from
-      );
-    });
+  if (filters.scenario === "installment") {
+    rows = rows.filter(
+      (row) => Boolean(row.nextDueInstallment) && row.paymentStatus !== "fully_paid",
+    );
   }
-  if (filters.dueDateTo) {
-    const to = filters.dueDateTo.slice(0, 10);
-    rows = rows.filter((row) => {
-      if (useRenewalDates) {
-        return Boolean(row.renewalDate && row.renewalDate.slice(0, 10) <= to);
-      }
-      return (
-        row.nextDueInstallment &&
-        row.nextDueInstallment.dueDate.slice(0, 10) <= to
-      );
-    });
+  if (filters.scenario === "renewal") {
+    rows = rows.filter((row) => Boolean(row.renewalDate));
+  }
+
+  const legacyIsRenewal = filters.status === "renewal";
+  const installmentFrom =
+    filters.installmentFrom ?? (legacyIsRenewal ? undefined : filters.dueDateFrom);
+  const installmentTo = filters.installmentTo ?? (legacyIsRenewal ? undefined : filters.dueDateTo);
+  const renewalFrom = filters.renewalFrom ?? (legacyIsRenewal ? filters.dueDateFrom : undefined);
+  const renewalTo = filters.renewalTo ?? (legacyIsRenewal ? filters.dueDateTo : undefined);
+
+  if (installmentFrom || installmentTo) {
+    rows = rows.filter((row) =>
+      dateInRange(row.nextDueInstallment?.dueDate, installmentFrom, installmentTo),
+    );
+  }
+  if (renewalFrom || renewalTo) {
+    rows = rows.filter((row) => dateInRange(row.renewalDate, renewalFrom, renewalTo));
+  }
+
+  if (filters.collection === "under_50") {
+    rows = rows.filter((row) => row.collectionPercent < 50);
+  } else if (filters.collection === "50_to_90") {
+    rows = rows.filter((row) => row.collectionPercent >= 50 && row.collectionPercent < 90);
+  } else if (filters.collection === "over_90") {
+    rows = rows.filter((row) => row.collectionPercent >= 90);
   }
 
   return rows;
+}
+
+function dateInRange(value: string | undefined, from?: string, to?: string) {
+  if (!from && !to) return true;
+  if (!value) return false;
+  const day = value.slice(0, 10);
+  if (from && day < from.slice(0, 10)) return false;
+  if (to && day > to.slice(0, 10)) return false;
+  return true;
 }
 
 function applyPaymentsStatusFilter(
@@ -627,7 +643,8 @@ function mapAccountsToPaymentListItems(
     const snap = buildAccountPaymentSnapshot(account, received, today);
     const endDate = account.endDate?.slice(0, 10) || undefined;
     const paymentCycleBaseline =
-      typeof account.paymentCycleBaseline === "number" && Number.isFinite(account.paymentCycleBaseline)
+      typeof account.paymentCycleBaseline === "number" &&
+      Number.isFinite(account.paymentCycleBaseline)
         ? account.paymentCycleBaseline
         : undefined;
     const base = {
@@ -702,8 +719,7 @@ export function queryPaymentListItems(
 
   items = applyPaymentsListFilters(items, filters, today);
 
-  const sortBy =
-    filters.sortBy ?? (filters.status === "renewal" ? "renewalDate" : "nextDueDate");
+  const sortBy = filters.sortBy ?? (filters.status === "renewal" ? "renewalDate" : "nextDueDate");
   const sortDir = filters.sortDir ?? "asc";
   const dir = sortDir === "desc" ? -1 : 1;
 
@@ -774,6 +790,240 @@ function buildCollectionTrend(db: ReturnType<typeof getDb>) {
   return any ? months : [];
 }
 
+export type PaymentsAnalysis = {
+  installmentCount: number;
+  paidCount: number;
+  partialCount: number;
+  pendingCount: number;
+  overdueInstallmentCount: number;
+  scheduledAmount: number;
+  paidOnInstallments: number;
+  remainingAmount: number;
+  renewalInstallmentRemaining: number;
+  renewalAccountCount: number;
+  renewalCollected: number;
+  avgCollectionPercent: number;
+  schedule: {
+    month: string;
+    label: string;
+    dealRemaining: number;
+    renewalRemaining: number;
+    count: number;
+  }[];
+  renewalsByMonth: { month: string; label: string; count: number; dealValue: number }[];
+  collectionBands: { key: string; label: string; count: number; pending: number }[];
+  bySupport: { name: string; accounts: number; received: number; pending: number; rate: number }[];
+  largestPending: {
+    id: string;
+    name: string;
+    pending: number;
+    received: number;
+    deal: number;
+    percent: number;
+  }[];
+  largestOverdue: { id: string; name: string; overdue: number; days: number | null }[];
+};
+
+function monthKey(ymd: string) {
+  return ymd.slice(0, 7);
+}
+
+function shiftMonth(ym: string, delta: number) {
+  const [year, month] = ym.split("-").map(Number);
+  const date = new Date(year, (month || 1) - 1 + delta, 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthLabel(ym: string) {
+  if (ym === "earlier") return "Earlier";
+  if (ym === "later") return "Later";
+  const [year, month] = ym.split("-").map(Number);
+  return new Date(year, (month || 1) - 1, 1).toLocaleString("en-IN", {
+    month: "short",
+    year: "2-digit",
+  });
+}
+
+function buildPaymentsAnalysis(
+  db: ReturnType<typeof getDb>,
+  rows: PaymentListItem[],
+): PaymentsAnalysis {
+  const today = new Date().toISOString().slice(0, 10);
+  const windowStart = shiftMonth(today.slice(0, 7), -1);
+  const windowEnd = shiftMonth(today.slice(0, 7), 8);
+  const ids = new Set(rows.map((row) => row.id));
+  const receivedByAccount = paymentReceivedByAccount(db);
+  const accounts = db
+    .select()
+    .from(t.crmAccounts)
+    .all()
+    .filter((account) => ids.has(account.id));
+
+  let installmentCount = 0;
+  let paidCount = 0;
+  let partialCount = 0;
+  let pendingCount = 0;
+  let overdueInstallmentCount = 0;
+  let scheduledAmount = 0;
+  let paidOnInstallments = 0;
+  let remainingAmount = 0;
+  let renewalInstallmentRemaining = 0;
+  const schedule = new Map<
+    string,
+    { dealRemaining: number; renewalRemaining: number; count: number }
+  >();
+
+  function addSchedule(due: string, renewal: boolean, remaining: number) {
+    const key = monthKey(due);
+    const bucketKey = key < windowStart ? "earlier" : key > windowEnd ? "later" : key;
+    const bucket = schedule.get(bucketKey) ?? { dealRemaining: 0, renewalRemaining: 0, count: 0 };
+    if (renewal) bucket.renewalRemaining = roundMoney(bucket.renewalRemaining + remaining);
+    else bucket.dealRemaining = roundMoney(bucket.dealRemaining + remaining);
+    bucket.count += 1;
+    schedule.set(bucketKey, bucket);
+  }
+
+  for (const account of accounts) {
+    const snap = buildAccountPaymentSnapshot(
+      account,
+      receivedByAccount.get(account.id) ?? 0,
+      today,
+    );
+    for (const installment of snap.installments) {
+      installmentCount += 1;
+      scheduledAmount = roundMoney(scheduledAmount + installment.amount);
+      paidOnInstallments = roundMoney(paidOnInstallments + installment.paidAmount);
+      remainingAmount = roundMoney(remainingAmount + installment.remainingAmount);
+      const renewal = installment.kind === "renewal";
+      if (renewal) {
+        renewalInstallmentRemaining = roundMoney(
+          renewalInstallmentRemaining + installment.remainingAmount,
+        );
+      }
+      if (installment.status === "paid") paidCount += 1;
+      else if (installment.status === "partially_paid") partialCount += 1;
+      else if (installment.status === "overdue") overdueInstallmentCount += 1;
+      else pendingCount += 1;
+      if (installment.remainingAmount > 0.01) {
+        addSchedule(installment.dueDate, renewal, installment.remainingAmount);
+      }
+    }
+  }
+
+  const scheduleRows = [...schedule.entries()]
+    .sort((a, b) => {
+      const rank = (key: string) => (key === "earlier" ? "0000" : key === "later" ? "9999" : key);
+      return rank(a[0]).localeCompare(rank(b[0]));
+    })
+    .map(([month, bucket]) => ({
+      month,
+      label: monthLabel(month),
+      ...bucket,
+    }));
+
+  const renewalMonths = new Map<string, { count: number; dealValue: number }>();
+  for (const row of rows) {
+    if (!row.renewalDate) continue;
+    const key = monthKey(row.renewalDate);
+    const bucketKey = key < windowStart ? "earlier" : key > windowEnd ? "later" : key;
+    const bucket = renewalMonths.get(bucketKey) ?? { count: 0, dealValue: 0 };
+    bucket.count += 1;
+    bucket.dealValue = roundMoney(bucket.dealValue + row.totalDealValue);
+    renewalMonths.set(bucketKey, bucket);
+  }
+  const renewalsByMonth = [...renewalMonths.entries()]
+    .sort((a, b) => {
+      const rank = (key: string) => (key === "earlier" ? "0000" : key === "later" ? "9999" : key);
+      return rank(a[0]).localeCompare(rank(b[0]));
+    })
+    .map(([month, bucket]) => ({ month, label: monthLabel(month), ...bucket }));
+
+  const bands = [
+    { key: "under_50", label: "Under 50%", test: (n: number) => n < 50 },
+    { key: "50_to_90", label: "50–90%", test: (n: number) => n >= 50 && n < 90 },
+    { key: "over_90", label: "90% and above", test: (n: number) => n >= 90 },
+  ];
+  const collectionBands = bands.map((band) => {
+    const matched = rows.filter((row) => band.test(row.collectionPercent));
+    return {
+      key: band.key,
+      label: band.label,
+      count: matched.length,
+      pending: roundMoney(matched.reduce((sum, row) => sum + row.pendingAmount, 0)),
+    };
+  });
+
+  const support = new Map<
+    string,
+    { accounts: number; received: number; pending: number; deal: number }
+  >();
+  for (const row of rows) {
+    const name = row.supportManager1?.trim() || "Unassigned";
+    const bucket = support.get(name) ?? { accounts: 0, received: 0, pending: 0, deal: 0 };
+    bucket.accounts += 1;
+    bucket.received = roundMoney(bucket.received + row.paymentReceived);
+    bucket.pending = roundMoney(bucket.pending + row.pendingAmount);
+    bucket.deal = roundMoney(bucket.deal + row.totalDealValue);
+    support.set(name, bucket);
+  }
+  const bySupport = [...support.entries()]
+    .map(([name, bucket]) => ({
+      name,
+      accounts: bucket.accounts,
+      received: bucket.received,
+      pending: bucket.pending,
+      rate: bucket.deal > 0 ? roundMoney((bucket.received / bucket.deal) * 100) : 0,
+    }))
+    .sort((a, b) => b.pending - a.pending)
+    .slice(0, 6);
+
+  const avgCollectionPercent =
+    rows.length > 0
+      ? roundMoney(rows.reduce((sum, row) => sum + row.collectionPercent, 0) / rows.length)
+      : 0;
+
+  return {
+    installmentCount,
+    paidCount,
+    partialCount,
+    pendingCount,
+    overdueInstallmentCount,
+    scheduledAmount,
+    paidOnInstallments,
+    remainingAmount,
+    renewalInstallmentRemaining,
+    renewalAccountCount: rows.filter((row) => Boolean(row.renewalDate)).length,
+    renewalCollected: roundMoney(rows.reduce((sum, row) => sum + row.renewalAmount, 0)),
+    avgCollectionPercent,
+    schedule: scheduleRows,
+    renewalsByMonth,
+    collectionBands,
+    bySupport,
+    largestPending: [...rows]
+      .sort((a, b) => b.pendingAmount - a.pendingAmount)
+      .slice(0, 6)
+      .filter((row) => row.pendingAmount > 0.01)
+      .map((row) => ({
+        id: row.id,
+        name: row.accountName,
+        pending: row.pendingAmount,
+        received: row.paymentReceived,
+        deal: row.totalDealValue,
+        percent: row.collectionPercent,
+      })),
+    largestOverdue: [...rows]
+      .filter((row) => row.overdueAmount > 0.01)
+      .sort((a, b) => b.overdueAmount - a.overdueAmount)
+      .slice(0, 6)
+      .map((row) => ({
+        id: row.id,
+        name: row.accountName,
+        overdue: row.overdueAmount,
+        days: row.overdueDays,
+      })),
+  };
+}
+
 export function summarizePaymentList(
   db: ReturnType<typeof getDb>,
   filters: PaymentsListFilters,
@@ -801,9 +1051,7 @@ export function summarizePaymentList(
   const totalReceived = roundMoney(tableRows.reduce((s, r) => s + r.paymentReceived, 0));
   const totalPending = roundMoney(tableRows.reduce((s, r) => s + r.pendingAmount, 0));
   const overdueRows = applyPaymentsStatusFilter(tableRows, "overdue", today);
-  const totalOverdueAmount = roundMoney(
-    overdueRows.reduce((s, r) => s + r.overdueAmount, 0),
-  );
+  const totalOverdueAmount = roundMoney(overdueRows.reduce((s, r) => s + r.overdueAmount, 0));
   const overdueAccountCount = overdueRows.length;
   const dueThisWeekRows = applyPaymentsStatusFilter(tableRows, "due_this_week", today);
   const dueThisMonthRows = applyPaymentsStatusFilter(tableRows, "due_this_month", today);
@@ -820,9 +1068,7 @@ export function summarizePaymentList(
   const suspendedRows = countScope.filter((row) =>
     isSuspendedCrmAccountForPayments(row.accountStatus),
   );
-  const suspendAndCloseRows = countScope.filter(
-    (row) => row.accountStatus === "suspend_and_close",
-  );
+  const suspendAndCloseRows = countScope.filter((row) => row.accountStatus === "suspend_and_close");
   const inactiveRows = countScope.filter((row) =>
     isLegacyInactiveCrmAccountForPayments(row.accountStatus),
   );
@@ -832,21 +1078,13 @@ export function summarizePaymentList(
   const customerLostRows = suspendAndCloseRows.filter(
     (row) => classifyCrmPaymentsLostOutcome(row)?.kind === "customer_lost",
   );
-  const salesLostAmount = roundMoney(
-    salesLostRows.reduce((s, r) => s + (r.lostValue ?? 0), 0),
-  );
+  const salesLostAmount = roundMoney(salesLostRows.reduce((s, r) => s + (r.lostValue ?? 0), 0));
   const customerLostAmount = roundMoney(
     customerLostRows.reduce((s, r) => s + (r.lostValue ?? 0), 0),
   );
-  const suspendedDealValue = roundMoney(
-    suspendedRows.reduce((s, r) => s + r.totalDealValue, 0),
-  );
-  const salesLostDealValue = roundMoney(
-    salesLostRows.reduce((s, r) => s + r.totalDealValue, 0),
-  );
-  const salesLostPaidAmount = roundMoney(
-    salesLostRows.reduce((s, r) => s + r.paymentReceived, 0),
-  );
+  const suspendedDealValue = roundMoney(suspendedRows.reduce((s, r) => s + r.totalDealValue, 0));
+  const salesLostDealValue = roundMoney(salesLostRows.reduce((s, r) => s + r.totalDealValue, 0));
+  const salesLostPaidAmount = roundMoney(salesLostRows.reduce((s, r) => s + r.paymentReceived, 0));
   const customerLostDealValue = roundMoney(
     customerLostRows.reduce((s, r) => s + r.totalDealValue, 0),
   );
@@ -899,13 +1137,11 @@ export function summarizePaymentList(
     customerLostPaidAmount,
     collectionTrend: buildCollectionTrend(db),
     statusCounts,
+    analysis: buildPaymentsAnalysis(db, tableRows),
   };
 }
 
-export function listAccountInstallmentsWithStatus(
-  db: ReturnType<typeof getDb>,
-  accountId: string,
-) {
+export function listAccountInstallmentsWithStatus(db: ReturnType<typeof getDb>, accountId: string) {
   const account = db.select().from(t.crmAccounts).where(eq(t.crmAccounts.id, accountId)).get();
   if (!account) return null;
   const received = getAccountPaymentReceived(db, accountId);

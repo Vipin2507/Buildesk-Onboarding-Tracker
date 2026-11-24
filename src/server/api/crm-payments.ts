@@ -60,6 +60,12 @@ const listFiltersSchema = z.object({
   supportManager2: z.string().optional(),
   dueDateFrom: z.string().optional(),
   dueDateTo: z.string().optional(),
+  installmentFrom: z.string().optional(),
+  installmentTo: z.string().optional(),
+  renewalFrom: z.string().optional(),
+  renewalTo: z.string().optional(),
+  scenario: z.enum(["installment", "renewal"]).optional(),
+  collection: z.enum(["under_50", "50_to_90", "over_90"]).optional(),
   search: z.string().optional(),
   page: z.coerce.number().int().min(1).optional(),
   pageSize: z.coerce.number().int().min(1).max(100).optional(),
@@ -115,6 +121,12 @@ function toListFilters(data: z.infer<typeof listFiltersSchema>): PaymentsListFil
     supportManager2: data.supportManager2,
     dueDateFrom: data.dueDateFrom,
     dueDateTo: data.dueDateTo,
+    installmentFrom: data.installmentFrom,
+    installmentTo: data.installmentTo,
+    renewalFrom: data.renewalFrom,
+    renewalTo: data.renewalTo,
+    scenario: data.scenario,
+    collection: data.collection,
     search: data.search,
     page: data.page,
     pageSize: data.pageSize,
@@ -280,11 +292,7 @@ export const deleteCrmPaymentRemark = createServerFn({ method: "POST" })
     const user = requireUser();
     assertCanViewAccountId(user, data.accountId);
     const db = getDb();
-    const row = db
-      .select()
-      .from(t.paymentRemarks)
-      .where(eq(t.paymentRemarks.id, data.id))
-      .get();
+    const row = db.select().from(t.paymentRemarks).where(eq(t.paymentRemarks.id, data.id)).get();
     if (!row || row.accountId !== data.accountId) {
       throw new ApiError(404, "Remark not found");
     }
@@ -402,9 +410,7 @@ export const deleteCrmPaymentTransaction = createServerFn({ method: "POST" })
       .where(eq(t.crmAccounts.id, data.accountId))
       .get();
     const received = account ? getAccountPaymentReceived(db, data.accountId) : 0;
-    const snapshot = account
-      ? buildAccountPaymentSnapshot(account, received)
-      : null;
+    const snapshot = account ? buildAccountPaymentSnapshot(account, received) : null;
     return { ok: true as const, snapshot };
   });
 
@@ -428,9 +434,7 @@ async function sendPaymentReminderForAccount(
         recipientEmail: overrides.recipientEmail?.trim() || undefined,
         subject: overrides.subject?.trim() || undefined,
         body: overrides.body?.trim() || undefined,
-        extraCc: (overrides.extraCc ?? [])
-          .map((e) => e.trim())
-          .filter(Boolean),
+        extraCc: (overrides.extraCc ?? []).map((e) => e.trim()).filter(Boolean),
       }
     : undefined;
   const result = await dispatchServerPaymentClientReminder(db, accountId, cleaned);

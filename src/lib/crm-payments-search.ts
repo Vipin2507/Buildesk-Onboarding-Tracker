@@ -32,13 +32,24 @@ function normalizePaymentStatusTab(value: unknown): CrmPaymentStatusTabId | unde
   return undefined;
 }
 
+export const CRM_PAYMENT_SCENARIOS = ["installment", "renewal"] as const;
+export const CRM_PAYMENT_COLLECTION_BANDS = ["under_50", "50_to_90", "over_90"] as const;
+export const CRM_PAYMENT_VIEWS = ["ledger", "analysis"] as const;
+
 export const crmPaymentsSearchSchema = z.object({
   status: z.preprocess(normalizePaymentStatusTab, z.enum(CRM_PAYMENT_STATUS_TAB_IDS).optional()),
+  view: z.enum(CRM_PAYMENT_VIEWS).optional(),
+  scenario: z.enum(CRM_PAYMENT_SCENARIOS).optional(),
+  collection: z.enum(CRM_PAYMENT_COLLECTION_BANDS).optional(),
   salesManager: z.string().optional(),
   supportManager1: z.string().optional(),
   supportManager2: z.string().optional(),
   dueDateFrom: z.string().optional(),
   dueDateTo: z.string().optional(),
+  installmentFrom: z.string().optional(),
+  installmentTo: z.string().optional(),
+  renewalFrom: z.string().optional(),
+  renewalTo: z.string().optional(),
   search: z.string().optional(),
   page: z.coerce.number().int().min(1).optional(),
   pageSize: z.coerce.number().int().min(1).max(100).optional(),
@@ -60,6 +71,12 @@ export function crmPaymentsSearchToApiFilters(search: CrmPaymentsSearch) {
     supportManager2: search.supportManager2,
     dueDateFrom: search.dueDateFrom,
     dueDateTo: search.dueDateTo,
+    installmentFrom: search.installmentFrom,
+    installmentTo: search.installmentTo,
+    renewalFrom: search.renewalFrom,
+    renewalTo: search.renewalTo,
+    scenario: search.scenario,
+    collection: search.collection,
     search: search.search,
     page: search.page ?? 1,
     pageSize: search.pageSize ?? 15,

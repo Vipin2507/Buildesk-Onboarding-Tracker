@@ -1,11 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import {
-  Bell,
-  ChevronDown,
-  ChevronRight,
-  MoreHorizontal,
-  Search,
-} from "lucide-react";
+import { Bell, ChevronDown, ChevronRight, MoreHorizontal, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -13,7 +7,7 @@ import { CrmAccountPaymentBulkUpdateModal } from "@/components/crm/crm-account-p
 import { CrmAccountRenewDialog } from "@/components/crm/crm-account-renew-dialog";
 import { CrmExecutivePaymentReminderDialog } from "@/components/crm/crm-executive-payment-reminder-dialog";
 import { CrmPaymentsExpandedRow } from "@/components/crm/crm-payments-expanded-row";
-import { PaymentsAnalytics } from "@/components/crm/payments/payments-analytics";
+import { PaymentsAnalysisBoard } from "@/components/crm/payments/payments-analysis-board";
 import { formatPaymentsInr } from "@/components/crm/payments/payments-format";
 import { PaymentsHeader } from "@/components/crm/payments/payments-header";
 import { PaymentsKpiCards } from "@/components/crm/payments/payments-kpi-cards";
@@ -45,10 +39,7 @@ import {
   useRemindCrmPaymentsBulk,
 } from "@/hooks/use-crm-payments";
 import type { PaymentStatus } from "@/lib/crm-payment-allocation";
-import {
-  crmRenewalWindowLabel,
-  isCrmAccountInRenewalWindow,
-} from "@/lib/crm-account-renewal";
+import { crmRenewalWindowLabel, isCrmAccountInRenewalWindow } from "@/lib/crm-account-renewal";
 import { crmAccountStatusLabel } from "@/lib/crm-account-status";
 import {
   crmPaymentsSearchSchema,
@@ -80,6 +71,38 @@ const STATUS_TABS: { id: CrmPaymentStatusTabId; label: string }[] = [
 ];
 
 type ManagerField = "salesManagerName" | "supportManager1" | "supportManager2";
+
+function localYmd(date: Date) {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function paymentWindowPreset(preset: "month" | "30" | "90" | "quarter") {
+  const today = new Date();
+  const from = new Date(today);
+  const to = new Date(today);
+  if (preset === "month") {
+    from.setDate(1);
+    to.setMonth(to.getMonth() + 1, 0);
+  } else if (preset === "30") {
+    to.setDate(to.getDate() + 30);
+  } else if (preset === "90") {
+    to.setDate(to.getDate() + 90);
+  } else {
+    const quarterStart = Math.floor(today.getMonth() / 3) * 3;
+    from.setMonth(quarterStart, 1);
+    to.setMonth(quarterStart + 3, 0);
+  }
+  return { from: localYmd(from), to: localYmd(to) };
+}
+
+const WINDOW_PRESETS = [
+  { id: "month", label: "This month" },
+  { id: "30", label: "30 days" },
+  { id: "90", label: "90 days" },
+  { id: "quarter", label: "Quarter" },
+] as const;
 
 function buildManagerFilterOptions(
   accounts: { salesManagerName?: string; supportManager1?: string; supportManager2?: string }[],
@@ -134,6 +157,7 @@ function CrmPaymentsPage() {
   const markRenewalCancelled = useCrmAccountStore((s) => s.markRenewalCancelled);
 
   const statusTab = parseCrmPaymentStatusTab(search.status);
+  const view = search.view ?? "ledger";
   const page = search.page ?? 1;
   const pageSize = useMemo(() => {
     if (search.pageSize) return search.pageSize;
@@ -156,7 +180,7 @@ function CrmPaymentsPage() {
   const [renewalCancelId, setRenewalCancelId] = useState<string | null>(null);
   const [cancellingRenewal, setCancellingRenewal] = useState(false);
   const renewAccount = useMemo(
-    () => (renewAccountId ? accounts.find((a) => a.id === renewAccountId) ?? null : null),
+    () => (renewAccountId ? (accounts.find((a) => a.id === renewAccountId) ?? null) : null),
     [accounts, renewAccountId],
   );
 
@@ -240,6 +264,12 @@ function CrmPaymentsPage() {
             "supportManager2" in patch ||
             "dueDateFrom" in patch ||
             "dueDateTo" in patch ||
+            "installmentFrom" in patch ||
+            "installmentTo" in patch ||
+            "renewalFrom" in patch ||
+            "renewalTo" in patch ||
+            "scenario" in patch ||
+            "collection" in patch ||
             "sortBy" in patch;
           if (resetsPage) next.page = undefined;
           return next;
@@ -368,23 +398,49 @@ function CrmPaymentsPage() {
           onBulkUpdate={() => setBulkPaymentOpen(true)}
         />
 
-        <PaymentsKpiCards summary={summary} loading={summaryQuery.isLoading} />
+        <div className="flex w-fit rounded-full border bg-card p-0.5">
+          {(
+            [
+              { id: "ledger", label: "Payments" },
+              { id: "analysis", label: "Analysis" },
+            ] as const
+          ).map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => patchSearch({ view: item.id === "ledger" ? undefined : item.id })}
+              className={cn(
+                "h-7 rounded-full px-3 text-xs font-medium",
+                view === item.id
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
 
-        <PaymentsUpcomingPerformance
-          summary={summary}
-          loading={summaryQuery.isLoading}
-          onFilter={onStatusFilter}
-        />
-
-        <PaymentsLostSummary
-          summary={summary}
-          loading={summaryQuery.isLoading}
-          onFilter={onStatusFilter}
-        />
-
-        <PaymentsAnalytics summary={summary} loading={summaryQuery.isLoading} />
-
-        <PaymentsStatusTabs tabs={statusTabItems} active={statusTab} onChange={onStatusFilter} />
+        {view === "ledger" ? (
+          <>
+            <PaymentsKpiCards summary={summary} loading={summaryQuery.isLoading} />
+            <PaymentsUpcomingPerformance
+              summary={summary}
+              loading={summaryQuery.isLoading}
+              onFilter={onStatusFilter}
+            />
+            <PaymentsLostSummary
+              summary={summary}
+              loading={summaryQuery.isLoading}
+              onFilter={onStatusFilter}
+            />
+            <PaymentsStatusTabs
+              tabs={statusTabItems}
+              active={statusTab}
+              onChange={onStatusFilter}
+            />
+          </>
+        ) : null}
 
         <div className="space-y-1.5">
           <div className="relative max-w-md">
@@ -409,6 +465,12 @@ function CrmPaymentsPage() {
                   supportManager2: undefined,
                   dueDateFrom: undefined,
                   dueDateTo: undefined,
+                  installmentFrom: undefined,
+                  installmentTo: undefined,
+                  renewalFrom: undefined,
+                  renewalTo: undefined,
+                  scenario: undefined,
+                  collection: undefined,
                   sortBy: undefined,
                   sortDir: undefined,
                   page: undefined,
@@ -421,9 +483,7 @@ function CrmPaymentsPage() {
               <DesignTicketSelect
                 compact
                 value={search.supportManager1 ?? "all"}
-                onChange={(v) =>
-                  patchSearch({ supportManager1: v === "all" ? undefined : v })
-                }
+                onChange={(v) => patchSearch({ supportManager1: v === "all" ? undefined : v })}
                 options={supportManager1Options}
               />
             </DesignTicketFilterField>
@@ -431,9 +491,7 @@ function CrmPaymentsPage() {
               <DesignTicketSelect
                 compact
                 value={search.supportManager2 ?? "all"}
-                onChange={(v) =>
-                  patchSearch({ supportManager2: v === "all" ? undefined : v })
-                }
+                onChange={(v) => patchSearch({ supportManager2: v === "all" ? undefined : v })}
                 options={supportManager2Options}
               />
             </DesignTicketFilterField>
@@ -441,53 +499,117 @@ function CrmPaymentsPage() {
               <DesignTicketSelect
                 compact
                 value={search.salesManager ?? "all"}
-                onChange={(v) =>
-                  patchSearch({ salesManager: v === "all" ? undefined : v })
-                }
+                onChange={(v) => patchSearch({ salesManager: v === "all" ? undefined : v })}
                 options={salesManagerOptions}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketFilterField label="Scenario" className="min-w-[9.5rem]">
+              <DesignTicketSelect
+                compact
+                value={search.scenario ?? "all"}
+                onChange={(v) =>
+                  patchSearch({
+                    scenario: v === "installment" || v === "renewal" ? v : undefined,
+                  })
+                }
+                options={[
+                  { value: "all", label: "All accounts" },
+                  { value: "installment", label: "Open installments" },
+                  { value: "renewal", label: "Renewals" },
+                ]}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketFilterField label="Collected" className="min-w-[8.5rem]">
+              <DesignTicketSelect
+                compact
+                value={search.collection ?? "all"}
+                onChange={(v) =>
+                  patchSearch({
+                    collection:
+                      v === "under_50" || v === "50_to_90" || v === "over_90" ? v : undefined,
+                  })
+                }
+                options={[
+                  { value: "all", label: "Any %" },
+                  { value: "under_50", label: "Under 50%" },
+                  { value: "50_to_90", label: "50–90%" },
+                  { value: "over_90", label: "90%+" },
+                ]}
               />
             </DesignTicketFilterField>
             <DesignTicketDateField
               compact
-              label={statusTab === "renewal" ? "Renewal from" : "Due from"}
-              value={search.dueDateFrom ?? ""}
-              onChange={(v) => patchSearch({ dueDateFrom: v || undefined })}
+              label="Installment from"
+              value={search.installmentFrom ?? ""}
+              onChange={(v) => patchSearch({ installmentFrom: v || undefined })}
             />
             <DesignTicketDateField
               compact
-              label={statusTab === "renewal" ? "Renewal to" : "Due to"}
-              value={search.dueDateTo ?? ""}
-              onChange={(v) => patchSearch({ dueDateTo: v || undefined })}
+              label="Installment to"
+              value={search.installmentTo ?? ""}
+              onChange={(v) => patchSearch({ installmentTo: v || undefined })}
             />
+            <div className="flex items-end gap-1 pb-0.5">
+              {WINDOW_PRESETS.map((preset) => (
+                <button
+                  key={`inst-${preset.id}`}
+                  type="button"
+                  className="h-7 rounded-full border px-2 text-[10px] text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                  onClick={() => {
+                    const range = paymentWindowPreset(preset.id);
+                    patchSearch({ installmentFrom: range.from, installmentTo: range.to });
+                  }}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+            <DesignTicketDateField
+              compact
+              label="Renewal from"
+              value={search.renewalFrom ?? ""}
+              onChange={(v) => patchSearch({ renewalFrom: v || undefined })}
+            />
+            <DesignTicketDateField
+              compact
+              label="Renewal to"
+              value={search.renewalTo ?? ""}
+              onChange={(v) => patchSearch({ renewalTo: v || undefined })}
+            />
+            <div className="flex items-end gap-1 pb-0.5">
+              {WINDOW_PRESETS.map((preset) => (
+                <button
+                  key={`ren-${preset.id}`}
+                  type="button"
+                  className="h-7 rounded-full border px-2 text-[10px] text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                  onClick={() => {
+                    const range = paymentWindowPreset(preset.id);
+                    patchSearch({ renewalFrom: range.from, renewalTo: range.to });
+                  }}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
             <DesignTicketFilterField label="Sort" className="min-w-[9rem]">
               <DesignTicketSelect
                 compact
-                value={`${search.sortBy ?? (statusTab === "renewal" ? "renewalDate" : "nextDueDate")}:${search.sortDir ?? "asc"}`}
+                value={`${search.sortBy ?? "nextDueDate"}:${search.sortDir ?? "asc"}`}
                 onChange={(v) => {
                   const [sortBy, sortDir] = v.split(":") as [
                     "nextDueDate" | "overdueAmount" | "collectionPercent" | "renewalDate",
                     "asc" | "desc",
                   ];
                   patchSearch({
-                    sortBy:
-                      sortBy === "nextDueDate" && statusTab !== "renewal"
-                        ? undefined
-                        : sortBy === "renewalDate" && statusTab === "renewal"
-                          ? undefined
-                          : sortBy,
+                    sortBy: sortBy === "nextDueDate" ? undefined : sortBy,
                     sortDir: sortDir === "asc" ? undefined : sortDir,
                   });
                 }}
                 options={[
-                  ...(statusTab === "renewal"
-                    ? [
-                        { value: "renewalDate:asc", label: "Renewal ↑" },
-                        { value: "renewalDate:desc", label: "Renewal ↓" },
-                      ]
-                    : [
-                        { value: "nextDueDate:asc", label: "Next due ↑" },
-                        { value: "nextDueDate:desc", label: "Next due ↓" },
-                      ]),
+                  { value: "nextDueDate:asc", label: "Next due ↑" },
+                  { value: "nextDueDate:desc", label: "Next due ↓" },
+                  { value: "renewalDate:asc", label: "Renewal ↑" },
+                  { value: "renewalDate:desc", label: "Renewal ↓" },
                   { value: "overdueAmount:desc", label: "Overdue ↓" },
                   { value: "collectionPercent:asc", label: "Collected % ↑" },
                   { value: "collectionPercent:desc", label: "Collected % ↓" },
@@ -496,7 +618,6 @@ function CrmPaymentsPage() {
             </DesignTicketFilterField>
           </DesignTicketFilterBar>
         </div>
-
       </div>
 
       {selectedIds.size > 0 ? (
@@ -515,7 +636,9 @@ function CrmPaymentsPage() {
         </div>
       ) : null}
 
-      {listQuery.isLoading ? (
+      {view === "analysis" ? (
+        <PaymentsAnalysisBoard summary={summary} loading={summaryQuery.isLoading} />
+      ) : listQuery.isLoading ? (
         <p className="px-0 py-8 text-center text-sm text-muted-foreground">Loading payments…</p>
       ) : rows.length === 0 ? (
         <div className="border-t px-0 py-8 text-center text-sm text-muted-foreground">
@@ -562,7 +685,11 @@ function CrmPaymentsPage() {
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-44" onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenuContent
+                    align="end"
+                    className="w-44"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     {canRenew ? (
                       <DropdownMenuItem onClick={() => setRenewAccountId(r.id)} className="text-xs">
                         Renew
@@ -673,7 +800,9 @@ function CrmPaymentsPage() {
                 key: "totalDealValue",
                 header: "Deal value",
                 render: (r) => (
-                  <span className="tabular-nums text-xs">{formatPaymentsInr(r.totalDealValue)}</span>
+                  <span className="tabular-nums text-xs">
+                    {formatPaymentsInr(r.totalDealValue)}
+                  </span>
                 ),
               },
               {
@@ -733,7 +862,9 @@ function CrmPaymentsPage() {
                         {formatPaymentsInr(r.overdueAmount)}
                       </div>
                       {r.overdueDays != null ? (
-                        <div className="text-[10px] text-destructive/80">{r.overdueDays}d overdue</div>
+                        <div className="text-[10px] text-destructive/80">
+                          {r.overdueDays}d overdue
+                        </div>
                       ) : null}
                     </div>
                   ) : (
@@ -862,7 +993,9 @@ function CrmPaymentsPage() {
               await Promise.all([listQuery.refetch(), summaryQuery.refetch()]);
             })
             .catch((error) => {
-              toast.error(error instanceof Error ? error.message : "Could not mark renewal cancelled");
+              toast.error(
+                error instanceof Error ? error.message : "Could not mark renewal cancelled",
+              );
             })
             .finally(() => setCancellingRenewal(false));
         }}
