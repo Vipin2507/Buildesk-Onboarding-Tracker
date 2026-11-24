@@ -64,10 +64,7 @@ import {
   crmAccountStatusLabel,
   isCrmAccountLiveForList,
 } from "@/lib/crm-account-status";
-import {
-  crmRenewalWindowLabel,
-  isCrmAccountInRenewalWindow,
-} from "@/lib/crm-account-renewal";
+import { crmRenewalWindowLabel, isCrmAccountInRenewalWindow } from "@/lib/crm-account-renewal";
 import { isAdminRoleKey } from "@/lib/permissions";
 import {
   listActiveCrmImplementationStages,
@@ -91,10 +88,7 @@ import {
   useCrmAccountStore,
   useCrmOnboardingStore,
 } from "@/stores";
-import {
-  useCrmDashboardOverview,
-  type CrmAccountRow,
-} from "@/stores/crm-dashboard-selectors";
+import { useCrmDashboardOverview, type CrmAccountRow } from "@/stores/crm-dashboard-selectors";
 import { filterCrmAccountsForTableSearch } from "@/lib/crm-account-sheet-export";
 import {
   composeCrmAccountSortBy,
@@ -168,7 +162,14 @@ const ACCOUNT_LIST_FILTER_DEFAULTS: {
 
 function parseCsvFilterKeys(value: string): string[] {
   if (!value.trim() || value.trim() === "all") return [];
-  return [...new Set(value.split(",").map((item) => item.trim()).filter(Boolean))];
+  return [
+    ...new Set(
+      value
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  ];
 }
 
 function parseModuleFilterKeys(value: string): string[] {
@@ -243,9 +244,7 @@ function accountStatusTone(status: CrmAccount["status"]) {
 function twoLinePersonName(value?: string | null) {
   const name = value?.trim();
   if (!name) {
-    return (
-      <span className="block min-h-[2rem] text-xs leading-4 text-muted-foreground">—</span>
-    );
+    return <span className="block min-h-[2rem] text-xs leading-4 text-muted-foreground">—</span>;
   }
   const parts = name.split(/\s+/).filter(Boolean);
   const splitAt = Math.max(1, Math.ceil(parts.length / 2));
@@ -354,8 +353,7 @@ function matchesAccountListFilters(row: CrmAccountRow, f: AccountListFilters) {
 function CrmAccountsLayout() {
   const isDetail = useRouterState({
     select: (s) =>
-      s.location.pathname.startsWith("/crm/accounts/") &&
-      s.location.pathname !== "/crm/accounts",
+      s.location.pathname.startsWith("/crm/accounts/") && s.location.pathname !== "/crm/accounts",
   });
   if (isDetail) return <Outlet />;
   return <CrmAccountsPage />;
@@ -486,10 +484,7 @@ function CrmAccountsPage() {
     (value: string) => setListFilters({ engagedTo: value }),
     [setListFilters],
   );
-  const { field: sortField, dir: sortDir } = useMemo(
-    () => parseCrmAccountSortBy(sortBy),
-    [sortBy],
-  );
+  const { field: sortField, dir: sortDir } = useMemo(() => parseCrmAccountSortBy(sortBy), [sortBy]);
   const setSortField = useCallback(
     (field: string) =>
       setListFilters({
@@ -553,9 +548,7 @@ function CrmAccountsPage() {
 
   function openBulkStage() {
     const firstId = [...selectedIds][0];
-    const firstStage = firstId
-      ? overview.rows.find((r) => r.id === firstId)?.stage
-      : undefined;
+    const firstStage = firstId ? overview.rows.find((r) => r.id === firstId)?.stage : undefined;
     setBulkStage((firstStage as CrmImplementationStage | undefined) ?? "new_account");
     setBulkStageOpen(true);
   }
@@ -688,10 +681,7 @@ function CrmAccountsPage() {
 
   /** Toolbar filters + status tab — KPI pill applied separately. */
   const scopedRows = useMemo(
-    () =>
-      rows.filter((r) =>
-        matchesAccountListFilters(r, { ...toolbarFilters, statusFilter }),
-      ),
+    () => rows.filter((r) => matchesAccountListFilters(r, { ...toolbarFilters, statusFilter })),
     [rows, toolbarFilters, statusFilter],
   );
 
@@ -863,15 +853,20 @@ function CrmAccountsPage() {
               ...data,
               status: "onboarding",
             });
-            useCompanyPortalStore.getState().generateAccessForCompany(
+            const portalResult = await useCompanyPortalStore.getState().setPortalApiKey(
               {
                 id: created.id,
                 name: created.name,
                 contact: created.contact,
                 email: created.email,
               },
-              { slug: portalSlug },
+              portalSlug,
             );
+            if (!portalResult.ok) {
+              toast.error(portalResult.error);
+              setEditing(created);
+              return;
+            }
             const record = ensure(created.id, created.companyType);
             const catalogKeys = new Set(getCrmMasterProductModuleCatalog().map((m) => m.key));
             for (const mod of record.productModules) {
@@ -1095,313 +1090,318 @@ function CrmAccountsPage() {
               </div>
             }
           >
-        <DesignTicketFilterField label="Type" compact>
-          <DesignTicketSelect
-            compact
-            value={typeFilter}
-            onChange={setTypeFilter}
-            options={[
-              { value: "all", label: "All types" },
-              ...COMPANY_TYPES.map((t) => ({ value: t, label: t })),
-            ]}
-          />
-        </DesignTicketFilterField>
-        <DesignTicketFilterField label="Module" compact>
-          <DesignTicketMultiSelect
-            compact
-            values={moduleFilterKeys}
-            onChange={setModuleFilterKeys}
-            placeholder="All modules"
-            searchPlaceholder="Search modules…"
-            options={moduleOptions}
-          />
-        </DesignTicketFilterField>
-        <DesignTicketFilterField label="Status" compact>
-          <DesignTicketMultiSelect
-            compact
-            values={statusFilterKeys}
-            onChange={setStatusFilterKeys}
-            placeholder="All statuses"
-            searchPlaceholder="Search statuses…"
-            options={CRM_ACCOUNT_STATUSES.map((status) => ({
-              value: status,
-              label: crmAccountStatusLabel(status),
-            }))}
-          />
-        </DesignTicketFilterField>
-        <DesignTicketFilterField label="Progress" compact>
-          <DesignTicketSelect
-            compact
-            value={progressFilter}
-            onChange={setProgressFilter}
-            options={[
-              { value: "all", label: "Any progress" },
-              { value: "0", label: "Not started (0%)" },
-              { value: "1-49", label: "Early (1–49%)" },
-              { value: "50-99", label: "Advanced (50–99%)" },
-              { value: "100", label: "Complete (100%)" },
-            ]}
-          />
-        </DesignTicketFilterField>
-        <DesignTicketFilterField label="Stage" compact>
-          <DesignTicketMultiSelect
-            compact
-            values={stageFilterKeys}
-            onChange={setStageFilterKeys}
-            placeholder="All stages"
-            searchPlaceholder="Search stages…"
-            options={stages.map((s) => ({
-              value: s,
-              label: resolveCrmStageLabel(s),
-            }))}
-          />
-        </DesignTicketFilterField>
-        <DesignTicketFilterField label="Sales Manager" compact>
-          <DesignTicketSelect
-            compact
-            value={managerFilter}
-            onChange={setManagerFilter}
-            options={[
-              { value: "all", label: "All managers" },
-              ...(unassignedManagerCount > 0
-                ? [{ value: "unassigned", label: `Unassigned (${unassignedManagerCount})` }]
-                : []),
-              ...managers.map((m) => ({ value: m, label: m })),
-            ]}
-          />
-        </DesignTicketFilterField>
-        <DesignTicketFilterField label="Support Manager 1" compact>
-          <DesignTicketSelect
-            compact
-            value={supportManager1Filter}
-            onChange={setSupportManager1Filter}
-            options={[
-              { value: "all", label: "All support managers 1" },
-              ...(unassignedSupportManager1Count > 0
-                ? [
-                    {
-                      value: "unassigned",
-                      label: `Unassigned (${unassignedSupportManager1Count})`,
-                    },
-                  ]
-                : []),
-              ...supportManagers1.map((m) => ({ value: m, label: m })),
-            ]}
-          />
-        </DesignTicketFilterField>
-        <DesignTicketFilterField label="Support Manager 2" compact>
-          <DesignTicketSelect
-            compact
-            value={supportManager2Filter}
-            onChange={setSupportManager2Filter}
-            options={[
-              { value: "all", label: "All support managers 2" },
-              ...(unassignedSupportManager2Count > 0
-                ? [
-                    {
-                      value: "unassigned",
-                      label: `Unassigned (${unassignedSupportManager2Count})`,
-                    },
-                  ]
-                : []),
-              ...supportManagers2.map((m) => ({ value: m, label: m })),
-            ]}
-          />
-        </DesignTicketFilterField>
-        <DesignTicketFilterField label="Provider" compact>
-          <DesignTicketSelect
-            compact
-            value={providerFilter}
-            onChange={setProviderFilter}
-            options={[
-              { value: "all", label: "All providers" },
-              { value: "none", label: "No provider" },
-              ...providers.map((p) => ({ value: p, label: p })),
-            ]}
-          />
-        </DesignTicketFilterField>
-        {cities.length > 1 ? (
-          <DesignTicketFilterField label="City" compact>
-            <DesignTicketSelect
+            <DesignTicketFilterField label="Type" compact>
+              <DesignTicketSelect
+                compact
+                value={typeFilter}
+                onChange={setTypeFilter}
+                options={[
+                  { value: "all", label: "All types" },
+                  ...COMPANY_TYPES.map((t) => ({ value: t, label: t })),
+                ]}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketFilterField label="Module" compact>
+              <DesignTicketMultiSelect
+                compact
+                values={moduleFilterKeys}
+                onChange={setModuleFilterKeys}
+                placeholder="All modules"
+                searchPlaceholder="Search modules…"
+                options={moduleOptions}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketFilterField label="Status" compact>
+              <DesignTicketMultiSelect
+                compact
+                values={statusFilterKeys}
+                onChange={setStatusFilterKeys}
+                placeholder="All statuses"
+                searchPlaceholder="Search statuses…"
+                options={CRM_ACCOUNT_STATUSES.map((status) => ({
+                  value: status,
+                  label: crmAccountStatusLabel(status),
+                }))}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketFilterField label="Progress" compact>
+              <DesignTicketSelect
+                compact
+                value={progressFilter}
+                onChange={setProgressFilter}
+                options={[
+                  { value: "all", label: "Any progress" },
+                  { value: "0", label: "Not started (0%)" },
+                  { value: "1-49", label: "Early (1–49%)" },
+                  { value: "50-99", label: "Advanced (50–99%)" },
+                  { value: "100", label: "Complete (100%)" },
+                ]}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketFilterField label="Stage" compact>
+              <DesignTicketMultiSelect
+                compact
+                values={stageFilterKeys}
+                onChange={setStageFilterKeys}
+                placeholder="All stages"
+                searchPlaceholder="Search stages…"
+                options={stages.map((s) => ({
+                  value: s,
+                  label: resolveCrmStageLabel(s),
+                }))}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketFilterField label="Sales Manager" compact>
+              <DesignTicketSelect
+                compact
+                value={managerFilter}
+                onChange={setManagerFilter}
+                options={[
+                  { value: "all", label: "All managers" },
+                  ...(unassignedManagerCount > 0
+                    ? [{ value: "unassigned", label: `Unassigned (${unassignedManagerCount})` }]
+                    : []),
+                  ...managers.map((m) => ({ value: m, label: m })),
+                ]}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketFilterField label="Support Manager 1" compact>
+              <DesignTicketSelect
+                compact
+                value={supportManager1Filter}
+                onChange={setSupportManager1Filter}
+                options={[
+                  { value: "all", label: "All support managers 1" },
+                  ...(unassignedSupportManager1Count > 0
+                    ? [
+                        {
+                          value: "unassigned",
+                          label: `Unassigned (${unassignedSupportManager1Count})`,
+                        },
+                      ]
+                    : []),
+                  ...supportManagers1.map((m) => ({ value: m, label: m })),
+                ]}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketFilterField label="Support Manager 2" compact>
+              <DesignTicketSelect
+                compact
+                value={supportManager2Filter}
+                onChange={setSupportManager2Filter}
+                options={[
+                  { value: "all", label: "All support managers 2" },
+                  ...(unassignedSupportManager2Count > 0
+                    ? [
+                        {
+                          value: "unassigned",
+                          label: `Unassigned (${unassignedSupportManager2Count})`,
+                        },
+                      ]
+                    : []),
+                  ...supportManagers2.map((m) => ({ value: m, label: m })),
+                ]}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketFilterField label="Provider" compact>
+              <DesignTicketSelect
+                compact
+                value={providerFilter}
+                onChange={setProviderFilter}
+                options={[
+                  { value: "all", label: "All providers" },
+                  { value: "none", label: "No provider" },
+                  ...providers.map((p) => ({ value: p, label: p })),
+                ]}
+              />
+            </DesignTicketFilterField>
+            {cities.length > 1 ? (
+              <DesignTicketFilterField label="City" compact>
+                <DesignTicketSelect
+                  compact
+                  value={cityFilter}
+                  onChange={setCityFilter}
+                  options={[
+                    { value: "all", label: "All cities" },
+                    ...cities.map((city) => ({ value: city, label: city })),
+                  ]}
+                />
+              </DesignTicketFilterField>
+            ) : null}
+            {regions.length > 1 ? (
+              <DesignTicketFilterField label="Region" compact>
+                <DesignTicketSelect
+                  compact
+                  value={regionFilter}
+                  onChange={setRegionFilter}
+                  options={[
+                    { value: "all", label: "All regions" },
+                    ...regions.map((region) => ({ value: region, label: region })),
+                  ]}
+                />
+              </DesignTicketFilterField>
+            ) : null}
+            <DesignTicketDateField
               compact
-              value={cityFilter}
-              onChange={setCityFilter}
-              options={[
-                { value: "all", label: "All cities" },
-                ...cities.map((city) => ({ value: city, label: city })),
-              ]}
+              label="Start from"
+              value={dateFrom}
+              onChange={setDateFrom}
+              placeholder="From"
             />
-          </DesignTicketFilterField>
-        ) : null}
-        {regions.length > 1 ? (
-          <DesignTicketFilterField label="Region" compact>
-            <DesignTicketSelect
+            <DesignTicketDateField
               compact
-              value={regionFilter}
-              onChange={setRegionFilter}
-              options={[
-                { value: "all", label: "All regions" },
-                ...regions.map((region) => ({ value: region, label: region })),
-              ]}
+              label="Start to"
+              value={dateTo}
+              onChange={setDateTo}
+              placeholder="To"
             />
-          </DesignTicketFilterField>
-        ) : null}
-        <DesignTicketDateField
-          compact
-          label="Start from"
-          value={dateFrom}
-          onChange={setDateFrom}
-          placeholder="From"
-        />
-        <DesignTicketDateField
-          compact
-          label="Start to"
-          value={dateTo}
-          onChange={setDateTo}
-          placeholder="To"
-        />
-        <DesignTicketFilterField label="Last engaged" compact>
-          <DesignTicketSelect
-            compact
-            value={engagedRecencyFilter}
-            onChange={setEngagedRecencyFilter}
-            options={CRM_LAST_ENGAGED_RECENCY_OPTIONS.map((opt) => ({
-              value: opt.value,
-              label: opt.label,
-            }))}
-          />
-        </DesignTicketFilterField>
-        <DesignTicketFilterField label="Engaged via" compact>
-          <DesignTicketSelect
-            compact
-            value={engagedKindFilter}
-            onChange={setEngagedKindFilter}
-            options={CRM_LAST_ENGAGED_KIND_OPTIONS.map((opt) => ({
-              value: opt.value,
-              label: opt.label,
-            }))}
-          />
-        </DesignTicketFilterField>
-        <DesignTicketDateField
-          compact
-          label="Engaged from"
-          value={engagedFrom}
-          onChange={setEngagedFrom}
-          placeholder="From"
-        />
-        <DesignTicketDateField
-          compact
-          label="Engaged to"
-          value={engagedTo}
-          onChange={setEngagedTo}
-          placeholder="To"
-        />
-        <DesignTicketFilterField label="Sort by" compact>
-          <DesignTicketSelect
-            compact
-            value={sortField}
-            onChange={setSortField}
-            options={CRM_ACCOUNT_SORT_FIELDS.map((opt) => ({
-              value: opt.value,
-              label: opt.label,
-            }))}
-          />
-        </DesignTicketFilterField>
-        <DesignTicketFilterField label="Order" compact>
-          <DesignTicketSelect
-            compact
-            value={sortDir}
-            onChange={setSortDir}
-            options={CRM_ACCOUNT_SORT_DIRS.map((opt) => ({
-              value: opt.value,
-              label: opt.label,
-            }))}
-          />
-        </DesignTicketFilterField>
+            <DesignTicketFilterField label="Last engaged" compact>
+              <DesignTicketSelect
+                compact
+                value={engagedRecencyFilter}
+                onChange={setEngagedRecencyFilter}
+                options={CRM_LAST_ENGAGED_RECENCY_OPTIONS.map((opt) => ({
+                  value: opt.value,
+                  label: opt.label,
+                }))}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketFilterField label="Engaged via" compact>
+              <DesignTicketSelect
+                compact
+                value={engagedKindFilter}
+                onChange={setEngagedKindFilter}
+                options={CRM_LAST_ENGAGED_KIND_OPTIONS.map((opt) => ({
+                  value: opt.value,
+                  label: opt.label,
+                }))}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketDateField
+              compact
+              label="Engaged from"
+              value={engagedFrom}
+              onChange={setEngagedFrom}
+              placeholder="From"
+            />
+            <DesignTicketDateField
+              compact
+              label="Engaged to"
+              value={engagedTo}
+              onChange={setEngagedTo}
+              placeholder="To"
+            />
+            <DesignTicketFilterField label="Sort by" compact>
+              <DesignTicketSelect
+                compact
+                value={sortField}
+                onChange={setSortField}
+                options={CRM_ACCOUNT_SORT_FIELDS.map((opt) => ({
+                  value: opt.value,
+                  label: opt.label,
+                }))}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketFilterField label="Order" compact>
+              <DesignTicketSelect
+                compact
+                value={sortDir}
+                onChange={setSortDir}
+                options={CRM_ACCOUNT_SORT_DIRS.map((opt) => ({
+                  value: opt.value,
+                  label: opt.label,
+                }))}
+              />
+            </DesignTicketFilterField>
           </DesignTicketFilterBar>
         </div>
 
-      <div ref={tableRef} className="min-w-0">
-        {selectedIds.size > 0 ? (
-          <motion.div
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mx-3 mb-2 flex flex-wrap items-center gap-1.5 rounded-lg border border-primary/25 bg-primary/5 px-2.5 py-1.5 sm:mx-4 lg:mx-5"
-          >
-            <span className="text-xs font-medium">
-              {selectedIds.size} {selectedIds.size === 1 ? "account" : "accounts"} selected
-            </span>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 gap-1 text-xs"
-              onClick={() => setTransferOpen(true)}
+        <div ref={tableRef} className="min-w-0">
+          {selectedIds.size > 0 ? (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mx-3 mb-2 flex flex-wrap items-center gap-1.5 rounded-lg border border-primary/25 bg-primary/5 px-2.5 py-1.5 sm:mx-4 lg:mx-5"
             >
-              <ArrowLeftRight className="h-3.5 w-3.5" />
-              Transfer selected
-            </Button>
-            {isAdmin ? (
+              <span className="text-xs font-medium">
+                {selectedIds.size} {selectedIds.size === 1 ? "account" : "accounts"} selected
+              </span>
               <Button
                 size="sm"
                 variant="outline"
                 className="h-7 gap-1 text-xs"
-                onClick={openBulkStage}
+                onClick={() => setTransferOpen(true)}
               >
-                <Layers className="h-3.5 w-3.5" />
-                Update stage
+                <ArrowLeftRight className="h-3.5 w-3.5" />
+                Transfer selected
               </Button>
-            ) : null}
-            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setSelectedIds(new Set())}>
-              Clear
-            </Button>
-          </motion.div>
-        ) : null}
-        {rows.length === 0 ? (
-          <div className="px-3 sm:px-4 lg:px-5">
-            <EmptyState
-              title="No CRM accounts yet"
-              description="Create your first CRM customer account to start onboarding."
-              actionLabel="+ Add account"
-              onAction={openCreate}
-            />
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="px-3 sm:px-4 lg:px-5">
-            <EmptyState
-              title="No matches"
-              description="Try another filter, clear filters, or adjust your search."
-              actionLabel="Clear filters"
-              onAction={clearFilters}
-            />
-          </div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            className="bg-card [&_tbody_tr]:bg-card [&_thead]:bg-card"
-          >
-            <DataTable
-              key={sortBy}
-              flush
-              data={filtered}
-              initialSortKey={tableSort.key}
-              initialSortDir={tableSort.dir}
-              getRowId={(r) => r.id}
-              getRowClassName={(r) =>
-                isCrmAccountInRenewalWindow(r)
-                  ? "border-amber-500/50 bg-amber-500/[0.07] dark:bg-amber-500/10"
-                  : undefined
-              }
-              selection={{
-                selectedIds,
-                onToggle: toggleSelection,
-                onToggleAll: toggleSelectionAll,
-              }}
-              hideSearch
-              searchQuery={tableSearch}
-              onSearchQueryChange={setTableSearch}
-              searchKeys={[
+              {isAdmin ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 gap-1 text-xs"
+                  onClick={openBulkStage}
+                >
+                  <Layers className="h-3.5 w-3.5" />
+                  Update stage
+                </Button>
+              ) : null}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs"
+                onClick={() => setSelectedIds(new Set())}
+              >
+                Clear
+              </Button>
+            </motion.div>
+          ) : null}
+          {rows.length === 0 ? (
+            <div className="px-3 sm:px-4 lg:px-5">
+              <EmptyState
+                title="No CRM accounts yet"
+                description="Create your first CRM customer account to start onboarding."
+                actionLabel="+ Add account"
+                onAction={openCreate}
+              />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="px-3 sm:px-4 lg:px-5">
+              <EmptyState
+                title="No matches"
+                description="Try another filter, clear filters, or adjust your search."
+                actionLabel="Clear filters"
+                onAction={clearFilters}
+              />
+            </div>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              className="bg-card [&_tbody_tr]:bg-card [&_thead]:bg-card"
+            >
+              <DataTable
+                key={sortBy}
+                flush
+                data={filtered}
+                initialSortKey={tableSort.key}
+                initialSortDir={tableSort.dir}
+                getRowId={(r) => r.id}
+                getRowClassName={(r) =>
+                  isCrmAccountInRenewalWindow(r)
+                    ? "border-amber-500/50 bg-amber-500/[0.07] dark:bg-amber-500/10"
+                    : undefined
+                }
+                selection={{
+                  selectedIds,
+                  onToggle: toggleSelection,
+                  onToggleAll: toggleSelectionAll,
+                }}
+                hideSearch
+                searchQuery={tableSearch}
+                onSearchQueryChange={setTableSearch}
+                searchKeys={[
                   "name",
                   "userId",
                   "city",
@@ -1426,7 +1426,9 @@ function CrmAccountsPage() {
                     header: "Account",
                     sortable: true,
                     render: (r) => {
-                      const location = [r.city?.trim(), r.region?.trim()].filter(Boolean).join(" · ");
+                      const location = [r.city?.trim(), r.region?.trim()]
+                        .filter(Boolean)
+                        .join(" · ");
                       return (
                         <div className="min-w-[10rem]">
                           <div className="font-medium">
@@ -1459,9 +1461,7 @@ function CrmAccountsPage() {
                   {
                     key: "subscribedModules",
                     header: "Modules",
-                    render: (r) => (
-                      <CrmAccountModulesCell modules={r.subscribedModules} />
-                    ),
+                    render: (r) => <CrmAccountModulesCell modules={r.subscribedModules} />,
                   },
                   {
                     key: "usersPurchased",
@@ -1609,7 +1609,7 @@ function CrmAccountsPage() {
               />
             </motion.div>
           )}
-      </div>
+        </div>
       </div>
 
       <CrmAccountWhatsappSyncModal

@@ -65,9 +65,7 @@ function lookupCrmAccountIdentity(db: ReturnType<typeof getDb>, companyId: strin
 }
 
 function deletePortalForCompany(db: ReturnType<typeof getDb>, companyId: string) {
-  db.delete(t.companyPortalAccess)
-    .where(eq(t.companyPortalAccess.companyId, companyId))
-    .run();
+  db.delete(t.companyPortalAccess).where(eq(t.companyPortalAccess.companyId, companyId)).run();
 }
 
 type PortalTargetHints = {
@@ -119,10 +117,7 @@ function removeOrphanPortalsForSameClient(
   }
 }
 
-function isOrphanCrmPortalCompany(
-  db: ReturnType<typeof getDb>,
-  companyId: string,
-): boolean {
+function isOrphanCrmPortalCompany(db: ReturnType<typeof getDb>, companyId: string): boolean {
   const crmAccount = lookupCrmAccountIdentity(db, companyId);
   if (crmAccount) return false;
   const company = db
@@ -214,8 +209,7 @@ function ensureCompanyRowForPortal(access: CompanyPortalAccess) {
 
   const now = nowIso();
   const day = now.slice(0, 10);
-  const email =
-    access.contactEmail?.includes("@") ? access.contactEmail : "portal@buildesk.local";
+  const email = access.contactEmail?.includes("@") ? access.contactEmail : "portal@buildesk.local";
 
   db.insert(t.companies)
     .values({
@@ -351,6 +345,12 @@ export const upsertCompanyPortalAccess = createServerFn({ method: "POST" })
 
     assertPortalSlugAvailable(db, portalData.slug, portalData.companyId, targetHints);
 
+    // A random key is created as soon as the account exists. Ignore that write
+    // when a newer save (the key typed on create) is already stored.
+    if (existing && existing.updatedAt > portalData.updatedAt) {
+      return mapPortalRow(existing);
+    }
+
     if (existing) {
       db.update(t.companyPortalAccess)
         .set({
@@ -364,18 +364,39 @@ export const upsertCompanyPortalAccess = createServerFn({ method: "POST" })
         .where(eq(t.companyPortalAccess.companyId, portalData.companyId))
         .run();
     } else {
-      db.insert(t.companyPortalAccess)
-        .values({
-          companyId: portalData.companyId,
-          companyName: portalData.companyName,
-          slug: portalData.slug,
-          contactName: portalData.contactName,
-          contactEmail: portalData.contactEmail,
-          isActive: portalData.isActive,
-          createdAt: portalData.createdAt,
-          updatedAt: portalData.updatedAt,
-        })
-        .run();
+      try {
+        db.insert(t.companyPortalAccess)
+          .values({
+            companyId: portalData.companyId,
+            companyName: portalData.companyName,
+            slug: portalData.slug,
+            contactName: portalData.contactName,
+            contactEmail: portalData.contactEmail,
+            isActive: portalData.isActive,
+            createdAt: portalData.createdAt,
+            updatedAt: portalData.updatedAt,
+          })
+          .run();
+      } catch (error) {
+        const raced = db
+          .select()
+          .from(t.companyPortalAccess)
+          .where(eq(t.companyPortalAccess.companyId, portalData.companyId))
+          .get();
+        if (!raced) throw error;
+        if (raced.updatedAt > portalData.updatedAt) return mapPortalRow(raced);
+        db.update(t.companyPortalAccess)
+          .set({
+            companyName: portalData.companyName,
+            slug: portalData.slug,
+            contactName: portalData.contactName,
+            contactEmail: portalData.contactEmail,
+            isActive: portalData.isActive,
+            updatedAt: portalData.updatedAt,
+          })
+          .where(eq(t.companyPortalAccess.companyId, portalData.companyId))
+          .run();
+      }
     }
 
     const row = db

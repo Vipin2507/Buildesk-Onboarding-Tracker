@@ -7,7 +7,11 @@ import {
   updateCompanyPortalContact,
   upsertCompanyPortalAccess,
 } from "@/lib/api";
-import { generatePortalSlug, isValidPortalSlug, normalizePortalSlug } from "@/lib/design-ticket-portal";
+import {
+  generatePortalSlug,
+  isValidPortalSlug,
+  normalizePortalSlug,
+} from "@/lib/design-ticket-portal";
 import { findPortalSlugConflictMessage } from "@/lib/portal-slug-conflict";
 import { isSameCrmAccountIdentity } from "@/lib/portal-slug-identity";
 import { serverSync } from "@/lib/sync";
@@ -37,9 +41,7 @@ type CompanyPortalState = {
   setPortalApiKey: (
     company: Pick<Company, "id" | "name" | "contact" | "email">,
     slugInput: string,
-  ) => Promise<
-    { ok: true; slug: string; unchanged?: boolean } | { ok: false; error: string }
-  >;
+  ) => Promise<{ ok: true; slug: string; unchanged?: boolean } | { ok: false; error: string }>;
   setActive: (companyId: string, isActive: boolean) => void;
   updateContact: (
     companyId: string,
@@ -62,10 +64,17 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
 
     hydrateAccess: (records) => {
       set((s) => {
+        const localByCompany = new Map(s.access.map((row) => [row.companyId, row]));
+        const merged = records.map((remote) => {
+          const local = localByCompany.get(remote.companyId);
+          if (local && local.slug !== remote.slug && local.updatedAt > remote.updatedAt)
+            return local;
+          return remote;
+        });
         const serverIds = new Set(records.map((r) => r.companyId));
         // Keep local-only rows (e.g. CRM portals mid-sync) until the server has them.
         const localOnly = s.access.filter((a) => !serverIds.has(a.companyId));
-        return { access: [...records, ...localOnly] };
+        return { access: [...merged, ...localOnly] };
       });
     },
 
@@ -80,8 +89,13 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
     },
 
     generateAccessForCompany: (company, opts) => {
+      const requested = opts?.slug ? normalizePortalSlug(opts.slug) : "";
       const existing = get().getByCompanyId(company.id);
       if (existing) {
+        if (requested && isValidPortalSlug(requested) && existing.slug !== requested) {
+          const updated = get().updateSlug(company.id, requested);
+          if (updated.ok) return get().getByCompanyId(company.id) ?? existing;
+        }
         if (existing.companyName !== company.name) {
           get().updateContact(company.id, { companyName: company.name });
           return get().getByCompanyId(company.id)!;
@@ -93,7 +107,6 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
 
       const now = nowIso();
       const taken = new Set(get().access.map((a) => a.slug));
-      const requested = opts?.slug ? normalizePortalSlug(opts.slug) : "";
       const slug = requested || generatePortalSlug([...taken]);
       const record: CompanyPortalAccess = {
         companyId: company.id,
@@ -106,9 +119,18 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
         updatedAt: now,
       };
 
-      set((s) => ({ access: [...s.access, record] }));
-      syncPortal(record);
-      return record;
+      set((s) => {
+        const current = s.access.find((row) => row.companyId === company.id);
+        if (current && (!requested || current.slug === requested || current.updatedAt >= now)) {
+          return s;
+        }
+        return {
+          access: [...s.access.filter((row) => row.companyId !== company.id), record],
+        };
+      });
+      const saved = get().getByCompanyId(company.id);
+      if (saved && saved.slug === slug) syncPortal(saved);
+      return saved ?? record;
     },
 
     ensureAllCompanies: (companies) => {
@@ -130,7 +152,9 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
       const current = get().getByCompanyId(companyId);
       if (!current) return undefined;
       const slug = generatePortalSlug(
-        get().access.filter((a) => a.companyId !== companyId).map((a) => a.slug),
+        get()
+          .access.filter((a) => a.companyId !== companyId)
+          .map((a) => a.slug),
       );
       const updated = touch({ ...current, slug });
       set((s) => ({
@@ -178,13 +202,10 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
         ),
       }));
 
-      const conflict = findPortalSlugConflictMessage(
-        get().access,
-        slug,
-        companyId,
-        accountLookup,
-        { targetCompanyName: current.companyName, targetClientId },
-      );
+      const conflict = findPortalSlugConflictMessage(get().access, slug, companyId, accountLookup, {
+        targetCompanyName: current.companyName,
+        targetClientId,
+      });
       if (conflict) return { ok: false, error: conflict };
       if (slug === current.slug) return { ok: true, slug, unchanged: true };
 
@@ -257,13 +278,9 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
             updatedAt: now,
           };
 
-      if (existing) {
-        set((s) => ({
-          access: s.access.map((a) => (a.companyId === company.id ? record : a)),
-        }));
-      } else {
-        set((s) => ({ access: [...s.access, record] }));
-      }
+      set((s) => ({
+        access: [...s.access.filter((row) => row.companyId !== company.id), record],
+      }));
 
       try {
         const remote = await upsertCompanyPortalAccess({
@@ -298,9 +315,7 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
 
     setActive: (companyId, isActive) => {
       set((s) => ({
-        access: s.access.map((a) =>
-          a.companyId === companyId ? touch({ ...a, isActive }) : a,
-        ),
+        access: s.access.map((a) => (a.companyId === companyId ? touch({ ...a, isActive }) : a)),
       }));
       serverSync("portal active", () =>
         setCompanyPortalActive({ data: { companyId, isActive } }).then((record) => {
@@ -311,9 +326,7 @@ export const useCompanyPortalStore = createPersistedStore<CompanyPortalState>(
 
     updateContact: (companyId, data) => {
       set((s) => ({
-        access: s.access.map((a) =>
-          a.companyId === companyId ? touch({ ...a, ...data }) : a,
-        ),
+        access: s.access.map((a) => (a.companyId === companyId ? touch({ ...a, ...data }) : a)),
       }));
       serverSync("portal contact", () =>
         updateCompanyPortalContact({ data: { companyId, ...data } }).then((record) => {
