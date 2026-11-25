@@ -623,59 +623,54 @@ function CrmPaymentsPage() {
                 ]}
               />
             </DesignTicketFilterField>
-            <div className="col-span-full flex flex-col gap-2 sm:flex-row sm:items-end">
-              <DesignTicketFilterField label="Date applies to" compact className="sm:w-44">
-                <DesignTicketSelect
-                  compact
-                  value={dateTarget}
-                  onChange={(value) => {
-                    const target = value === "renewal" ? "renewal" : "installment";
-                    applyPaymentDates(target, dateRange.from, dateRange.to);
-                  }}
-                  options={[
-                    { value: "installment", label: "Installment due" },
-                    { value: "renewal", label: "Renewal date" },
-                  ]}
-                />
-              </DesignTicketFilterField>
-              <DesignTicketFilterField label="Range" compact className="sm:w-44">
-                <DesignTicketSelect
-                  compact
-                  value={dateChoice}
-                  onChange={(value) => {
-                    if (value === "custom") return;
-                    if (value === "any") {
-                      applyPaymentDates(dateTarget);
-                      return;
-                    }
-                    const range = paymentWindowPreset(value as (typeof WINDOW_PRESETS)[number]["id"]);
-                    applyPaymentDates(dateTarget, range.from, range.to);
-                  }}
-                  options={[
-                    { value: "any", label: "Any date" },
-                    ...WINDOW_PRESETS.map((preset) => ({ value: preset.id, label: preset.label })),
-                    { value: "custom", label: "Custom range" },
-                  ]}
-                />
-              </DesignTicketFilterField>
-              <div className="flex min-w-0 flex-1 items-end gap-2">
-                <DesignTicketDateField
-                  compact
-                  label="From"
-                  className="min-w-0 flex-1"
-                  value={dateRange.from}
-                  onChange={(value) => applyPaymentDates(dateTarget, value, dateRange.to)}
-                />
-                <span className="mb-2 shrink-0 text-xs text-muted-foreground">to</span>
-                <DesignTicketDateField
-                  compact
-                  label="To"
-                  className="min-w-0 flex-1"
-                  value={dateRange.to}
-                  onChange={(value) => applyPaymentDates(dateTarget, dateRange.from, value)}
-                />
-              </div>
-            </div>
+            <DesignTicketFilterField label="Date applies to" compact className="min-w-0">
+              <DesignTicketSelect
+                compact
+                value={dateTarget}
+                onChange={(value) => {
+                  const target = value === "renewal" ? "renewal" : "installment";
+                  applyPaymentDates(target, dateRange.from, dateRange.to);
+                }}
+                options={[
+                  { value: "installment", label: "Installment due" },
+                  { value: "renewal", label: "Renewal date" },
+                ]}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketFilterField label="Range" compact className="min-w-0">
+              <DesignTicketSelect
+                compact
+                value={dateChoice}
+                onChange={(value) => {
+                  if (value === "custom") return;
+                  if (value === "any") {
+                    applyPaymentDates(dateTarget);
+                    return;
+                  }
+                  const range = paymentWindowPreset(value as (typeof WINDOW_PRESETS)[number]["id"]);
+                  applyPaymentDates(dateTarget, range.from, range.to);
+                }}
+                options={[
+                  { value: "any", label: "Any date" },
+                  ...WINDOW_PRESETS.map((preset) => ({ value: preset.id, label: preset.label })),
+                  { value: "custom", label: "Custom range" },
+                ]}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketDateField
+              compact
+              label="From"
+              className="min-w-0"
+              value={dateRange.from}
+              onChange={(value) => applyPaymentDates(dateTarget, value, dateRange.to)}
+            />
+            <DesignTicketDateField
+              compact
+              label="To"
+              className="min-w-0"
+              value={dateRange.to}
+              onChange={(value) => applyPaymentDates(dateTarget, dateRange.from, value)}
+            />
           </DesignTicketFilterBar>
         </div>
       </div>
