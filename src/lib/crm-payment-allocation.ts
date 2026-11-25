@@ -284,8 +284,14 @@ export function allocateAccountPayments(input: {
   const totalDealValue = roundMoney(Math.max(0, input.totalDealValue));
   const ordered = [...input.installments].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   const originalRows = originalInstallments(ordered);
+  const renewalRows = ordered.filter((row) => isRenewalInstallment(row));
+  // A renewal cycle's schedule is only renewal rows. Those lines are the new deal,
+  // so the payment that covers the deal clears them. Surplus still pays extra
+  // renewal rows that sit on top of an original installment plan.
+  const payRenewalsFromDeal = originalRows.length === 0 && renewalRows.length > 0;
+  const scheduleRows = payRenewalsFromDeal ? renewalRows : originalRows;
 
-  let originalPool = installmentAllocatablePool(totalReceived, totalDealValue, originalRows);
+  let originalPool = installmentAllocatablePool(totalReceived, totalDealValue, scheduleRows);
   let renewalPool = renewalAmountFromTotals(totalReceived, totalDealValue);
   const allocated: AllocatedInstallment[] = [];
   let overdueAmount = 0;
@@ -294,7 +300,8 @@ export function allocateAccountPayments(input: {
     const row = ordered[i]!;
     const amount = roundMoney(Number(row.amount) || 0);
     const isRenewal = isRenewalInstallment(row);
-    let pool = isRenewal ? renewalPool : originalPool;
+    const fromDeal = !isRenewal || payRenewalsFromDeal;
+    let pool = fromDeal ? originalPool : renewalPool;
     let paidAmount = 0;
     let remainingAmount = amount;
     let status: InstallmentDerivedStatus = "pending";
@@ -311,8 +318,8 @@ export function allocateAccountPayments(input: {
       status = "partially_paid";
     }
 
-    if (isRenewal) renewalPool = pool;
-    else originalPool = pool;
+    if (fromDeal) originalPool = pool;
+    else renewalPool = pool;
 
     if (remainingAmount > 0) {
       const isOverdue = row.dueDate.slice(0, 10) < today;
