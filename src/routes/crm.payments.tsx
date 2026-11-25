@@ -99,10 +99,49 @@ function paymentWindowPreset(preset: "month" | "30" | "90" | "quarter") {
 
 const WINDOW_PRESETS = [
   { id: "month", label: "This month" },
-  { id: "30", label: "30 days" },
-  { id: "90", label: "90 days" },
-  { id: "quarter", label: "Quarter" },
+  { id: "30", label: "Next 30 days" },
+  { id: "90", label: "Next 90 days" },
+  { id: "quarter", label: "This quarter" },
 ] as const;
+
+type PaymentDateTarget = "installment" | "renewal";
+type PaymentWindowChoice = (typeof WINDOW_PRESETS)[number]["id"] | "any" | "custom";
+
+function paymentDateTarget(search: {
+  installmentFrom?: string;
+  installmentTo?: string;
+  renewalFrom?: string;
+  renewalTo?: string;
+}): PaymentDateTarget {
+  const renewal = Boolean(search.renewalFrom || search.renewalTo);
+  const installment = Boolean(search.installmentFrom || search.installmentTo);
+  if (renewal && !installment) return "renewal";
+  return "installment";
+}
+
+function paymentDateRange(
+  search: {
+    installmentFrom?: string;
+    installmentTo?: string;
+    renewalFrom?: string;
+    renewalTo?: string;
+  },
+  target: PaymentDateTarget,
+) {
+  if (target === "renewal") {
+    return { from: search.renewalFrom ?? "", to: search.renewalTo ?? "" };
+  }
+  return { from: search.installmentFrom ?? "", to: search.installmentTo ?? "" };
+}
+
+function paymentWindowChoice(from: string, to: string): PaymentWindowChoice {
+  if (!from && !to) return "any";
+  for (const preset of WINDOW_PRESETS) {
+    const range = paymentWindowPreset(preset.id);
+    if (range.from === from && range.to === to) return preset.id;
+  }
+  return "custom";
+}
 
 function buildManagerFilterOptions(
   accounts: { salesManagerName?: string; supportManager1?: string; supportManager2?: string }[],
@@ -384,6 +423,27 @@ function CrmPaymentsPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const accountCount = summary?.accountCount ?? total;
+  const dateTarget = paymentDateTarget(search);
+  const dateRange = paymentDateRange(search, dateTarget);
+  const dateChoice = paymentWindowChoice(dateRange.from, dateRange.to);
+
+  function applyPaymentDates(target: PaymentDateTarget, from?: string, to?: string) {
+    if (target === "installment") {
+      patchSearch({
+        installmentFrom: from || undefined,
+        installmentTo: to || undefined,
+        renewalFrom: undefined,
+        renewalTo: undefined,
+      });
+      return;
+    }
+    patchSearch({
+      renewalFrom: from || undefined,
+      renewalTo: to || undefined,
+      installmentFrom: undefined,
+      installmentTo: undefined,
+    });
+  }
 
   return (
     <PageWrap compact flushTop>
@@ -456,7 +516,8 @@ function CrmPaymentsPage() {
 
           <DesignTicketFilterBar
             variant="inline"
-            onClear={() =>
+            className="sm:!grid-cols-3 lg:!grid-cols-6"
+            onClear={() => {
               void navigate({
                 search: (prev: typeof search) => ({
                   ...prev,
@@ -479,7 +540,7 @@ function CrmPaymentsPage() {
               })
             }
           >
-            <DesignTicketFilterField label="Support 1" className="min-w-[8.5rem]">
+            <DesignTicketFilterField label="Support 1" compact className="min-w-0">
               <DesignTicketSelect
                 compact
                 value={search.supportManager1 ?? "all"}
@@ -487,7 +548,7 @@ function CrmPaymentsPage() {
                 options={supportManager1Options}
               />
             </DesignTicketFilterField>
-            <DesignTicketFilterField label="Support 2" className="min-w-[8.5rem]">
+            <DesignTicketFilterField label="Support 2" compact className="min-w-0">
               <DesignTicketSelect
                 compact
                 value={search.supportManager2 ?? "all"}
@@ -495,7 +556,7 @@ function CrmPaymentsPage() {
                 options={supportManager2Options}
               />
             </DesignTicketFilterField>
-            <DesignTicketFilterField label="Sales manager" className="min-w-[8.5rem]">
+            <DesignTicketFilterField label="Sales manager" compact className="min-w-0">
               <DesignTicketSelect
                 compact
                 value={search.salesManager ?? "all"}
@@ -503,7 +564,7 @@ function CrmPaymentsPage() {
                 options={salesManagerOptions}
               />
             </DesignTicketFilterField>
-            <DesignTicketFilterField label="Scenario" className="min-w-[9.5rem]">
+            <DesignTicketFilterField label="Scenario" compact className="min-w-0">
               <DesignTicketSelect
                 compact
                 value={search.scenario ?? "all"}
@@ -519,7 +580,7 @@ function CrmPaymentsPage() {
                 ]}
               />
             </DesignTicketFilterField>
-            <DesignTicketFilterField label="Collected" className="min-w-[8.5rem]">
+            <DesignTicketFilterField label="Collected" compact className="min-w-0">
               <DesignTicketSelect
                 compact
                 value={search.collection ?? "all"}
@@ -537,61 +598,7 @@ function CrmPaymentsPage() {
                 ]}
               />
             </DesignTicketFilterField>
-            <DesignTicketDateField
-              compact
-              label="Installment from"
-              value={search.installmentFrom ?? ""}
-              onChange={(v) => patchSearch({ installmentFrom: v || undefined })}
-            />
-            <DesignTicketDateField
-              compact
-              label="Installment to"
-              value={search.installmentTo ?? ""}
-              onChange={(v) => patchSearch({ installmentTo: v || undefined })}
-            />
-            <div className="flex items-end gap-1 pb-0.5">
-              {WINDOW_PRESETS.map((preset) => (
-                <button
-                  key={`inst-${preset.id}`}
-                  type="button"
-                  className="h-7 rounded-full border px-2 text-[10px] text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                  onClick={() => {
-                    const range = paymentWindowPreset(preset.id);
-                    patchSearch({ installmentFrom: range.from, installmentTo: range.to });
-                  }}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-            <DesignTicketDateField
-              compact
-              label="Renewal from"
-              value={search.renewalFrom ?? ""}
-              onChange={(v) => patchSearch({ renewalFrom: v || undefined })}
-            />
-            <DesignTicketDateField
-              compact
-              label="Renewal to"
-              value={search.renewalTo ?? ""}
-              onChange={(v) => patchSearch({ renewalTo: v || undefined })}
-            />
-            <div className="flex items-end gap-1 pb-0.5">
-              {WINDOW_PRESETS.map((preset) => (
-                <button
-                  key={`ren-${preset.id}`}
-                  type="button"
-                  className="h-7 rounded-full border px-2 text-[10px] text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                  onClick={() => {
-                    const range = paymentWindowPreset(preset.id);
-                    patchSearch({ renewalFrom: range.from, renewalTo: range.to });
-                  }}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-            <DesignTicketFilterField label="Sort" className="min-w-[9rem]">
+            <DesignTicketFilterField label="Sort" compact className="min-w-0">
               <DesignTicketSelect
                 compact
                 value={`${search.sortBy ?? "nextDueDate"}:${search.sortDir ?? "asc"}`}
@@ -616,6 +623,59 @@ function CrmPaymentsPage() {
                 ]}
               />
             </DesignTicketFilterField>
+            <div className="col-span-full flex flex-col gap-2 sm:flex-row sm:items-end">
+              <DesignTicketFilterField label="Date applies to" compact className="sm:w-44">
+                <DesignTicketSelect
+                  compact
+                  value={dateTarget}
+                  onChange={(value) => {
+                    const target = value === "renewal" ? "renewal" : "installment";
+                    applyPaymentDates(target, dateRange.from, dateRange.to);
+                  }}
+                  options={[
+                    { value: "installment", label: "Installment due" },
+                    { value: "renewal", label: "Renewal date" },
+                  ]}
+                />
+              </DesignTicketFilterField>
+              <DesignTicketFilterField label="Range" compact className="sm:w-44">
+                <DesignTicketSelect
+                  compact
+                  value={dateChoice}
+                  onChange={(value) => {
+                    if (value === "custom") return;
+                    if (value === "any") {
+                      applyPaymentDates(dateTarget);
+                      return;
+                    }
+                    const range = paymentWindowPreset(value as (typeof WINDOW_PRESETS)[number]["id"]);
+                    applyPaymentDates(dateTarget, range.from, range.to);
+                  }}
+                  options={[
+                    { value: "any", label: "Any date" },
+                    ...WINDOW_PRESETS.map((preset) => ({ value: preset.id, label: preset.label })),
+                    { value: "custom", label: "Custom range" },
+                  ]}
+                />
+              </DesignTicketFilterField>
+              <div className="flex min-w-0 flex-1 items-end gap-2">
+                <DesignTicketDateField
+                  compact
+                  label="From"
+                  className="min-w-0 flex-1"
+                  value={dateRange.from}
+                  onChange={(value) => applyPaymentDates(dateTarget, value, dateRange.to)}
+                />
+                <span className="mb-2 shrink-0 text-xs text-muted-foreground">to</span>
+                <DesignTicketDateField
+                  compact
+                  label="To"
+                  className="min-w-0 flex-1"
+                  value={dateRange.to}
+                  onChange={(value) => applyPaymentDates(dateTarget, dateRange.from, value)}
+                />
+              </div>
+            </div>
           </DesignTicketFilterBar>
         </div>
       </div>
