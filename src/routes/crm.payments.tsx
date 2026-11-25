@@ -537,8 +537,8 @@ function CrmPaymentsPage() {
                   page: undefined,
                 }),
                 replace: true,
-              })
-            }
+              });
+            }}
           >
             <DesignTicketFilterField label="Support 1" compact className="min-w-0">
               <DesignTicketSelect
