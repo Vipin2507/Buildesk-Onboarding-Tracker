@@ -19,8 +19,8 @@ import {
 import { useSessionFilter } from "@/hooks/use-session-filter";
 import {
   androidApkReady,
-  isAndroidUpgradeAvailable,
   loadAndroidRelease,
+  needsNewerAndroidApp,
   openAndroidApk,
 } from "@/lib/native/android-release";
 import { setMobileNavOpen, useMobileNavOpen } from "@/lib/native/shell-state";
@@ -62,7 +62,7 @@ export function TopBar() {
       try {
         const { App } = await import("@capacitor/app");
         const info = await App.getInfo();
-        if (!isAndroidUpgradeAvailable(info.version, release.latestVersion)) return;
+        if (!needsNewerAndroidApp({ version: info.version, build: info.build }, release)) return;
         if (cancelled) return;
         setApkUrl(release.apkUrl);
         setApkAction("upgrade");

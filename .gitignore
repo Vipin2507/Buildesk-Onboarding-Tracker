@@ -34,6 +34,7 @@ android/app/release/
 *.jks
 *.keystore
 public/downloads/*.apk
+!public/downloads/trackdesk.apk
 
 # Wrangler / Cloudflare
 .wrangler/

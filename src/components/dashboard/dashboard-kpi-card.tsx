@@ -125,7 +125,12 @@ export function DashboardKpiCard({
           !interactive && "cursor-default",
         )}
       >
-        <div className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg", cfg.iconBg)}>
+        <div
+          className={cn(
+            "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
+            tone ?? cfg.iconBg,
+          )}
+        >
           <Icon className="h-3.5 w-3.5" />
         </div>
         <div className="min-w-0 flex-1">

@@ -105,9 +105,9 @@ cd android
 .\gradlew.bat assembleRelease
 ```
 
-The APK is `android/app/build/outputs/apk/release/`. Copy the signed file to `public/downloads/buildesk-compass.apk` and deploy the server. That path is gitignored. Do not commit the APK.
+The APK committed for download is `public/downloads/trackdesk.apk` (about 4 MB). A push to `main` deploys it with the rest of the site. `scripts/deploy.sh` reads `versionName` and `versionCode` from that file and writes them into `public/native-release.json` before the build. You do not copy the APK onto the server by hand.
 
-The signed-in profile menu on the website shows **Download APK** when that file is reachable. Inside an installed app, the same menu shows **Upgrade app** only when `versionName` is older than `latestVersion` in `public/native-release.json`. The update banner uses the same action. Both open the HTTPS APK. Android shows its own install confirmation. The app does not install or replace itself in the background.
+Build the new signed APK with a higher `versionName` or `versionCode` in `android/app/build.gradle`, replace `public/downloads/trackdesk.apk`, and push. Installed apps show **Upgrade app** when their reported version is lower. Replacing the file without raising either number updates the download for new people, and phones that already have that same version do not see an upgrade. Android shows its own install confirmation. The app does not replace itself in the background.
 
 Google Play, if you use it, stays on Play’s update path. Do not add an updater that installs an APK silently or skips Play review.
 
@@ -138,7 +138,7 @@ Capacitor’s own types describe `server.url` as a live-reload feature and say i
 4. Install the build on a device and sign in, leave the app, and return. The session should still be there.
 5. Turn the network off. The banner must say changes are not saved. Turn it back on and confirm a real save.
 6. Open a company or account, a task or ticket, and the Android back control. Back closes a dialog first, then returns through pages, and asks before leaving from Home.
-7. Raise `versionName` and `versionCode` for the new binary. Set `latestVersion` in `public/native-release.json` to that `versionName`, copy the signed APK to `public/downloads/buildesk-compass.apk`, then deploy the server. Installed older apps then show **Upgrade app**. If older binaries must stop, also set `minimumVersion` to that `versionName`. Deploy the web app only after the APK file is in place.
+7. Raise `versionName` or `versionCode`, replace `public/downloads/trackdesk.apk`, and push to `main`. Deploy reads the new version from the APK. Installed older apps then show **Upgrade app**. If older binaries must stop, also set `minimumVersion` in `public/native-release.json` before the push.
 8. To roll back a bad web deploy, redeploy the previous server build. Installed apps pick it up on the next load. To roll back a bad native build, distribute the previous signed AAB/APK or halt the Play rollout. The app will not silently replace itself.
 
 `public/native-release.json` is public and has no secrets. The app fetches it with `cache: "no-store"`. If the file is missing, the app does not block.

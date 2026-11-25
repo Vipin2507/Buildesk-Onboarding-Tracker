@@ -3,6 +3,7 @@ import { compareVersions } from "@/lib/native/deep-link";
 export type AndroidRelease = {
   minimumVersion?: string;
   latestVersion?: string;
+  latestVersionCode?: number;
   message?: string;
   apkUrl?: string;
 };
@@ -11,6 +12,7 @@ type ReleaseFile = {
   android?: {
     minimumVersion?: string;
     latestVersion?: string;
+    latestVersionCode?: number;
     message?: string;
     apkPath?: string;
   };
@@ -41,6 +43,8 @@ export async function loadAndroidRelease(origin = window.location.origin): Promi
     return {
       minimumVersion: android.minimumVersion,
       latestVersion: android.latestVersion,
+      latestVersionCode:
+        typeof android.latestVersionCode === "number" ? android.latestVersionCode : undefined,
       message: android.message,
       apkUrl: androidApkUrl(android.apkPath, origin),
     };
@@ -62,6 +66,20 @@ export async function androidApkReady(url: string) {
 export function isAndroidUpgradeAvailable(installedVersion: string, latestVersion?: string) {
   if (!latestVersion) return false;
   return compareVersions(installedVersion, latestVersion) < 0;
+}
+
+export function needsNewerAndroidApp(
+  installed: { version: string; build?: string },
+  release: Pick<AndroidRelease, "latestVersion" | "latestVersionCode">,
+) {
+  const nameOlder =
+    !!release.latestVersion && compareVersions(installed.version, release.latestVersion) < 0;
+  const installedCode = Number.parseInt(installed.build ?? "", 10);
+  const codeOlder =
+    typeof release.latestVersionCode === "number" &&
+    Number.isFinite(installedCode) &&
+    installedCode < release.latestVersionCode;
+  return nameOlder || codeOlder;
 }
 
 /** Opens the signed APK. Android shows its own install confirmation. */

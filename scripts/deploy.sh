@@ -49,6 +49,9 @@ echo "==> Applying DB schema patches (safe / non-interactive)"
 # Prefer db:ensure over drizzle-kit push — push can prompt for destructive drops in CI.
 npm run db:ensure
 
+echo "==> Publishing the Android APK version from public/downloads/trackdesk.apk"
+node scripts/sync-android-release.mjs
+
 echo "==> Building"
 npm run build
 

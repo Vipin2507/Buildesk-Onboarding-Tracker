@@ -16,6 +16,7 @@ import {
   androidApkReady,
   isAndroidUpgradeAvailable,
   loadAndroidRelease,
+  needsNewerAndroidApp,
   openAndroidApk,
 } from "@/lib/native/android-release";
 import { safeInAppPath } from "@/lib/native/deep-link";
@@ -247,9 +248,12 @@ export function AndroidRuntime() {
           );
           return;
         }
-        if (isAndroidUpgradeAvailable(info.version, latest)) {
+        if (needsNewerAndroidApp({ version: info.version, build: info.build }, release)) {
+          const published = release.latestVersionCode
+            ? `${latest ?? info.version} (${release.latestVersionCode})`
+            : (latest ?? "a newer build");
           setSoftUpdate(
-            `Android build ${latest} is ready. Upgrade app opens the signed APK. Android asks you to confirm the install. This screen can stay on ${info.version}.`,
+            `Android build ${published} is ready. Upgrade app opens the signed APK. Android asks you to confirm the install. This screen can stay on ${info.version}.`,
           );
         }
       } catch {
