@@ -1,4 +1,10 @@
-import { createFileRoute, Link, Outlet, useChildMatches, useNavigate } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  Outlet,
+  useChildMatches,
+  useNavigate,
+} from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { z } from "zod";
@@ -37,6 +43,7 @@ import { CrmAccountWhatsappGroupPanel } from "@/components/crm/crm-account-whats
 import { EntityNotFound } from "@/components/empty-state";
 import { DetailPageSkeleton } from "@/components/loading-skeleton";
 import { ConfirmDeleteDialog } from "@/components/entity-form-modal";
+import { cn } from "@/lib/utils";
 import {
   ProjectFormModal,
   formValuesToProjectPatch,
@@ -122,6 +129,7 @@ function CompanyDetailContent() {
   const navigate = useNavigate({ from: "/companies/$companyId" });
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [projectModalOpen, setProjectModalOpen] = useState(false);
+  const [showCompanyFacts, setShowCompanyFacts] = useState(false);
 
   const setTab = (next: TabId) => {
     void navigate({ search: { tab: next }, replace: true });
@@ -169,17 +177,14 @@ function CompanyDetailContent() {
       (s) => s.status === "expired" || (s.validUntil && s.validUntil < today),
     ).length;
     const expiring = companySubscriptions.filter(
-      (s) =>
-        s.status === "active" &&
-        s.validUntil &&
-        s.validUntil >= today &&
-        s.validUntil <= in30,
+      (s) => s.status === "active" && s.validUntil && s.validUntil >= today && s.validUntil <= in30,
     ).length;
     return { active, expiring, expired, rows: companySubscriptions };
   }, [companySubscriptions]);
 
   if (loading) return <DetailPageSkeleton />;
-  if (!company) return <EntityNotFound entity="Company" listPath="/companies" listLabel="Companies" />;
+  if (!company)
+    return <EntityNotFound entity="Company" listPath="/companies" listLabel="Companies" />;
 
   const managerName = resolveAssigneeName(company.onboardingManagerId, users, employees);
   const salesAgentName = resolveAssigneeName(company.salesAgentId, users, employees);
@@ -189,12 +194,13 @@ function CompanyDetailContent() {
   const visitCount = companyVisits.length;
   const meetingCount = companyMeetings.length;
   const optedModules = modulesWithProgress.filter((m) => m.optedIn);
-  const companyLive =
-    optedModules.length > 0 && optedModules.every((m) => m.isLive);
+  const companyLive = optedModules.length > 0 && optedModules.every((m) => m.isLive);
   const avgModuleProgress =
     optedModules.length === 0
       ? 0
-      : Math.round(optedModules.reduce((sum, m) => sum + m.progressPercent, 0) / optedModules.length);
+      : Math.round(
+          optedModules.reduce((sum, m) => sum + m.progressPercent, 0) / optedModules.length,
+        );
 
   function handleDelete() {
     if (checklistProjects.length > 0) {
@@ -234,7 +240,12 @@ function CompanyDetailContent() {
   return (
     <PageWrap compact>
       <AnimatedSection className="mb-2">
-        <Button variant="ghost" size="sm" className="-ml-2 gap-1.5 text-muted-foreground" asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="-ml-2 gap-1.5 text-muted-foreground max-md:min-h-12 max-md:px-3 max-md:text-sm"
+          asChild
+        >
           <Link to="/companies">
             <ArrowLeft className="h-4 w-4" /> Companies
           </Link>
@@ -246,7 +257,7 @@ function CompanyDetailContent() {
         title={company.name}
         subtitle={`${company.city}${company.region ? ` · ${company.region}` : ""} · ${company.plan} · Started ${formatDate(company.startDate || company.agreementDate)}`}
         actions={
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5 max-md:w-full">
             {companyLive ? (
               <Pill tone="success">Live</Pill>
             ) : (
@@ -263,13 +274,17 @@ function CompanyDetailContent() {
             >
               {company.health}
             </Pill>
-            <Button size="sm" className="h-8 gap-1 bg-primary" onClick={openAddProject}>
+            <Button
+              size="sm"
+              className="h-8 gap-1 bg-primary max-md:min-h-12 max-md:flex-1 max-md:text-sm"
+              onClick={openAddProject}
+            >
               <Plus className="h-3.5 w-3.5" /> Add Project
             </Button>
             <Button
               variant="outline"
               size="sm"
-              className="h-8 text-destructive hover:bg-destructive/10"
+              className="h-8 text-destructive hover:bg-destructive/10 max-md:min-h-12 max-md:min-w-12"
               onClick={() => setDeleteOpen(true)}
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -278,7 +293,10 @@ function CompanyDetailContent() {
         }
       />
 
-      <AnimatedSection delay={0.04} className="mb-3 grid grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-5">
+      <AnimatedSection
+        delay={0.04}
+        className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5 max-md:!grid-cols-1"
+      >
         <StatCard
           label="Progress"
           icon={TrendingUp}
@@ -286,6 +304,7 @@ function CompanyDetailContent() {
           foot={<ProgressBar value={progress} className="mt-1.5" />}
         />
         <StatCard
+          className={showCompanyFacts ? undefined : "max-md:hidden"}
           label="Modules"
           icon={Layers}
           value={String(optedModules.length)}
@@ -296,6 +315,7 @@ function CompanyDetailContent() {
           }
         />
         <StatCard
+          className={showCompanyFacts ? undefined : "max-md:hidden"}
           label="Manager"
           icon={Building2}
           value={managerName ?? "—"}
@@ -314,6 +334,7 @@ function CompanyDetailContent() {
           }
         />
         <StatCard
+          className={showCompanyFacts ? undefined : "max-md:hidden"}
           label="Go-Live"
           icon={CalendarClock}
           value={formatDate(company.goLiveTarget)}
@@ -324,6 +345,13 @@ function CompanyDetailContent() {
           }
         />
       </AnimatedSection>
+      <button
+        type="button"
+        className="mb-3 min-h-12 w-full rounded-xl border bg-card text-sm font-semibold md:hidden"
+        onClick={() => setShowCompanyFacts((open) => !open)}
+      >
+        {showCompanyFacts ? "Hide company details" : "Company details"}
+      </button>
 
       <DesignTicketTabNav
         compact
@@ -338,177 +366,202 @@ function CompanyDetailContent() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.28, ease: TICKET_EASE }}
       >
-      {tab === "Overview" && <CompanyOverviewTab company={company} />}
+        {tab === "Overview" && <CompanyOverviewTab company={company} />}
 
-      {tab === "Modules" && (
-        <DesignTicketSection compact title="Module catalog" delay={0.02}>
-          <p className="mb-2 text-xs text-muted-foreground">
-            Enable modules, mark Live, and open hubs for Customer App, Vendors, or Labor.
-          </p>
-          <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
-            {modulesWithProgress.map((m) => (
-              <ModuleCard
-                key={m.moduleKey}
-                companyId={companyId}
-                moduleKey={m.moduleKey}
-                label={m.label}
-                optedIn={m.optedIn}
-                progressPercent={m.progressPercent}
-                isLive={m.isLive}
-              />
-            ))}
-          </div>
-        </DesignTicketSection>
-      )}
-
-      {tab === "Tickets" && <CompanyDesignTicketsPanel companyId={companyId} />}
-
-      {tab === "Tasks" && <CompanyTasksPanel companyId={companyId} />}
-
-      {tab === "Meetings" && <CompanyMeetingsPanel companyId={companyId} />}
-
-      {tab === "Visits" && <CompanyVisitsPanel companyId={companyId} />}
-
-      {tab === "Notes & Attachments" && <CompanyNotesAttachmentsTab companyId={companyId} />}
-
-      {tab === "History" && <CompanyHistoryTab companyId={companyId} />}
-
-      {tab === "Payments" && <CompanyPaymentsTab companyId={companyId} />}
-
-      {tab === "WhatsApp" && (
-        <CrmAccountWhatsappGroupPanel accountId={companyId} scope="company" />
-      )}
-
-      {tab === "Billing" && (
-        <DesignTicketSection compact title="Billing & subscription" delay={0.02}>
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs text-muted-foreground">
-              Plan, agreement, and renewal details for this account.
+        {tab === "Modules" && (
+          <DesignTicketSection compact title="Module catalog" delay={0.02}>
+            <p className="mb-2 text-xs text-muted-foreground">
+              Enable modules, mark Live, and open hubs for Customer App, Vendors, or Labor.
             </p>
-            <Button
-              size="sm"
-              className="h-7 gap-1 text-xs"
-              onClick={() => {
-                markRenewed(companyId);
-                toast.success("Plan renewed for 12 months");
-              }}
-            >
-              <RefreshCw className="h-3 w-3" /> Mark Renewed
-            </Button>
-          </div>
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-            <div className="card-soft p-3">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Plan</div>
-              <div className="mt-1.5">
-                <Pill tone="accent">{company.plan}</Pill>
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                {company.billingInfo || "No custom billing notes"}
+            <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+              {modulesWithProgress.map((m) => (
+                <ModuleCard
+                  key={m.moduleKey}
+                  companyId={companyId}
+                  moduleKey={m.moduleKey}
+                  label={m.label}
+                  optedIn={m.optedIn}
+                  progressPercent={m.progressPercent}
+                  isLive={m.isLive}
+                />
+              ))}
+            </div>
+          </DesignTicketSection>
+        )}
+
+        {tab === "Tickets" && <CompanyDesignTicketsPanel companyId={companyId} />}
+
+        {tab === "Tasks" && <CompanyTasksPanel companyId={companyId} />}
+
+        {tab === "Meetings" && <CompanyMeetingsPanel companyId={companyId} />}
+
+        {tab === "Visits" && <CompanyVisitsPanel companyId={companyId} />}
+
+        {tab === "Notes & Attachments" && <CompanyNotesAttachmentsTab companyId={companyId} />}
+
+        {tab === "History" && <CompanyHistoryTab companyId={companyId} />}
+
+        {tab === "Payments" && <CompanyPaymentsTab companyId={companyId} />}
+
+        {tab === "WhatsApp" && (
+          <CrmAccountWhatsappGroupPanel accountId={companyId} scope="company" />
+        )}
+
+        {tab === "Billing" && (
+          <DesignTicketSection compact title="Billing & subscription" delay={0.02}>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground">
+                Plan, agreement, and renewal details for this account.
               </p>
+              <Button
+                size="sm"
+                className="h-7 gap-1 text-xs"
+                onClick={() => {
+                  markRenewed(companyId);
+                  toast.success("Plan renewed for 12 months");
+                }}
+              >
+                <RefreshCw className="h-3 w-3" /> Mark Renewed
+              </Button>
             </div>
-            <div className="card-soft p-3">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Start Date</div>
-              <div className="mt-1.5 text-base font-semibold">
-                {formatDate(company.startDate || company.agreementDate)}
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              <div className="card-soft p-3">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Plan
+                </div>
+                <div className="mt-1.5">
+                  <Pill tone="accent">{company.plan}</Pill>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {company.billingInfo || "No custom billing notes"}
+                </p>
+              </div>
+              <div className="card-soft p-3">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Start Date
+                </div>
+                <div className="mt-1.5 text-base font-semibold">
+                  {formatDate(company.startDate || company.agreementDate)}
+                </div>
+              </div>
+              <div className="card-soft p-3">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Agreement
+                </div>
+                <div className="mt-1.5 text-base font-semibold">
+                  {formatDate(company.agreementDate)}
+                </div>
+              </div>
+              <div className="card-soft p-3">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Plan Expiry
+                </div>
+                <div className="mt-1.5 text-base font-semibold">
+                  {formatDate(company.planExpiry)}
+                </div>
+                {company.renewedAt && (
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    Last renewed {new Date(company.renewedAt).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+              <div className="card-soft p-3 md:col-span-2 xl:col-span-2">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  GST / Tax
+                </div>
+                <div className="mt-1 text-sm font-medium">{company.gstNumber || "—"}</div>
+                <div className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Billing Address
+                </div>
+                <div className="mt-0.5 text-xs">{company.officeAddress || company.city}</div>
               </div>
             </div>
-            <div className="card-soft p-3">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Agreement</div>
-              <div className="mt-1.5 text-base font-semibold">{formatDate(company.agreementDate)}</div>
-            </div>
-            <div className="card-soft p-3">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Plan Expiry</div>
-              <div className="mt-1.5 text-base font-semibold">{formatDate(company.planExpiry)}</div>
-              {company.renewedAt && (
-                <p className="mt-1 text-[10px] text-muted-foreground">
-                  Last renewed {new Date(company.renewedAt).toLocaleDateString()}
+
+            <div className="card-soft mt-2 space-y-2.5 p-3">
+              <div>
+                <div className="text-xs font-semibold">Module subscriptions</div>
+                <p className="text-[10px] text-muted-foreground">
+                  Commercial entitlement status (separate from module go-live).
+                </p>
+              </div>
+              <div className="grid gap-1.5 sm:grid-cols-3">
+                <div className="rounded-lg border bg-muted/30 px-2.5 py-2">
+                  <div className="text-[10px] text-muted-foreground">Active</div>
+                  <div className="mt-0.5 text-lg font-semibold tabular-nums">
+                    {subscriptionSummary.active}
+                  </div>
+                </div>
+                <div className="rounded-lg border bg-muted/30 px-2.5 py-2">
+                  <div className="text-[10px] text-muted-foreground">Expiring (30d)</div>
+                  <div className="mt-0.5 text-lg font-semibold tabular-nums">
+                    {subscriptionSummary.expiring}
+                  </div>
+                </div>
+                <div className="rounded-lg border bg-muted/30 px-2.5 py-2">
+                  <div className="text-[10px] text-muted-foreground">Expired</div>
+                  <div className="mt-0.5 text-lg font-semibold tabular-nums">
+                    {subscriptionSummary.expired}
+                  </div>
+                </div>
+              </div>
+              {subscriptionSummary.rows.length > 0 ? (
+                <>
+                  <div className="space-y-2 md:hidden">
+                    {subscriptionSummary.rows.map((s) => (
+                      <div key={s.id} className="rounded-lg border bg-card p-3 text-sm">
+                        <div className="font-medium">{getModuleLabel(s.moduleKey)}</div>
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                          <Pill>{s.status}</Pill>
+                          <span className="text-muted-foreground">
+                            Start {formatDate(s.startDate)}
+                          </span>
+                          <span className="text-muted-foreground">
+                            Until {s.validUntil ? formatDate(s.validUntil) : "—"}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="hidden overflow-x-auto md:block">
+                    <table className="w-full text-left text-sm">
+                      <thead className="text-xs text-muted-foreground">
+                        <tr>
+                          <th className="py-1.5 pr-3 font-medium">Module</th>
+                          <th className="py-1.5 pr-3 font-medium">Status</th>
+                          <th className="py-1.5 pr-3 font-medium">Start</th>
+                          <th className="py-1.5 font-medium">Valid until</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {subscriptionSummary.rows.map((s) => (
+                          <tr key={s.id} className="border-t">
+                            <td className="py-2 pr-3">{getModuleLabel(s.moduleKey)}</td>
+                            <td className="py-2 pr-3">
+                              <Pill>{s.status}</Pill>
+                            </td>
+                            <td className="py-2 pr-3">{formatDate(s.startDate)}</td>
+                            <td className="py-2">
+                              {s.validUntil ? formatDate(s.validUntil) : "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <p className="text-[10px] text-muted-foreground">
+                  No subscription rows yet — created when modules are opted in or managed from each
+                  hub.
                 </p>
               )}
             </div>
-            <div className="card-soft p-3 md:col-span-2 xl:col-span-2">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">GST / Tax</div>
-              <div className="mt-1 text-sm font-medium">{company.gstNumber || "—"}</div>
-              <div className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground">
-                Billing Address
-              </div>
-              <div className="mt-0.5 text-xs">{company.officeAddress || company.city}</div>
-            </div>
-          </div>
 
-          <div className="card-soft mt-2 space-y-2.5 p-3">
-            <div>
-              <div className="text-xs font-semibold">Module subscriptions</div>
-              <p className="text-[10px] text-muted-foreground">
-                Commercial entitlement status (separate from module go-live).
-              </p>
-            </div>
-            <div className="grid gap-1.5 sm:grid-cols-3">
-              <div className="rounded-lg border bg-muted/30 px-2.5 py-2">
-                <div className="text-[10px] text-muted-foreground">Active</div>
-                <div className="mt-0.5 text-lg font-semibold tabular-nums">{subscriptionSummary.active}</div>
-              </div>
-              <div className="rounded-lg border bg-muted/30 px-2.5 py-2">
-                <div className="text-[10px] text-muted-foreground">Expiring (30d)</div>
-                <div className="mt-0.5 text-lg font-semibold tabular-nums">{subscriptionSummary.expiring}</div>
-              </div>
-              <div className="rounded-lg border bg-muted/30 px-2.5 py-2">
-                <div className="text-[10px] text-muted-foreground">Expired</div>
-                <div className="mt-0.5 text-lg font-semibold tabular-nums">{subscriptionSummary.expired}</div>
-              </div>
-            </div>
-            {subscriptionSummary.rows.length > 0 ? (
-              <>
-                <div className="space-y-2 md:hidden">
-                  {subscriptionSummary.rows.map((s) => (
-                    <div key={s.id} className="rounded-lg border bg-card p-3 text-sm">
-                      <div className="font-medium">{getModuleLabel(s.moduleKey)}</div>
-                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                        <Pill>{s.status}</Pill>
-                        <span className="text-muted-foreground">Start {formatDate(s.startDate)}</span>
-                        <span className="text-muted-foreground">
-                          Until {s.validUntil ? formatDate(s.validUntil) : "—"}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="hidden overflow-x-auto md:block">
-                <table className="w-full text-left text-sm">
-                  <thead className="text-xs text-muted-foreground">
-                    <tr>
-                      <th className="py-1.5 pr-3 font-medium">Module</th>
-                      <th className="py-1.5 pr-3 font-medium">Status</th>
-                      <th className="py-1.5 pr-3 font-medium">Start</th>
-                      <th className="py-1.5 font-medium">Valid until</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {subscriptionSummary.rows.map((s) => (
-                      <tr key={s.id} className="border-t">
-                        <td className="py-2 pr-3">{getModuleLabel(s.moduleKey)}</td>
-                        <td className="py-2 pr-3">
-                          <Pill>{s.status}</Pill>
-                        </td>
-                        <td className="py-2 pr-3">{formatDate(s.startDate)}</td>
-                        <td className="py-2">{s.validUntil ? formatDate(s.validUntil) : "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              </>
-            ) : (
-              <p className="text-[10px] text-muted-foreground">
-                No subscription rows yet — created when modules are opted in or managed from each hub.
-              </p>
-            )}
-          </div>
-
-          <p className="mt-2 text-[10px] text-muted-foreground">
-            Edit plan, dates, GST, and billing notes from the Details tab.
-          </p>
-        </DesignTicketSection>
-      )}
+            <p className="mt-2 text-[10px] text-muted-foreground">
+              Edit plan, dates, GST, and billing notes from the Details tab.
+            </p>
+          </DesignTicketSection>
+        )}
       </motion.div>
 
       <ProjectFormModal
@@ -536,14 +589,16 @@ function StatCard({
   icon: Icon,
   value,
   foot,
+  className,
 }: {
   label: string;
   icon: typeof TrendingUp;
   value: string;
   foot?: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="card-soft flex flex-col gap-0.5 px-2.5 py-2">
+    <div className={cn("card-soft flex flex-col gap-0.5 px-2.5 py-2", className)}>
       <div className="flex items-center justify-between gap-1">
         <div className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           {label}

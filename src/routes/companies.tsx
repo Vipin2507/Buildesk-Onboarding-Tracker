@@ -17,6 +17,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 
 import { PageWrap } from "@/components/page-header";
+import { PhoneToolbar, phoneStatChip, phoneStatTrack } from "@/components/phone-toolbar";
 import {
   DesignTicketDateField,
   DesignTicketFilterField,
@@ -195,7 +196,9 @@ function inputClass(hasError?: boolean) {
   );
 }
 
-function deriveCompanyGstPercent(company: Pick<Company, "taxableAmount" | "dealSize" | "gstAmount">) {
+function deriveCompanyGstPercent(
+  company: Pick<Company, "taxableAmount" | "dealSize" | "gstAmount">,
+) {
   const taxable = company.taxableAmount ?? company.dealSize;
   const gst = company.gstAmount;
   if (taxable && gst && taxable > 0) {
@@ -282,14 +285,7 @@ const STATUS_CHIPS = [
 type CompanyKpiFilter = "all" | "pending" | "in_progress" | "live";
 
 type CompanyFilterPillId =
-  | "all"
-  | "pending"
-  | "active"
-  | "live"
-  | "not_started"
-  | "in_progress"
-  | "on_hold"
-  | "completed";
+  "all" | "pending" | "active" | "live" | "not_started" | "in_progress" | "on_hold" | "completed";
 
 type CompanyFilterTone = "muted" | "warning" | "success" | "info" | "danger";
 
@@ -529,7 +525,9 @@ function CompaniesListPage() {
     const ids = [...selectedIds];
     assignOnboardingManagerBulk(ids, assignManagerId);
     const managerName = resolveAssigneeLabel(assignManagerId, users, employees);
-    toast.success(`Assigned ${managerName} to ${ids.length} ${ids.length === 1 ? "company" : "companies"}`);
+    toast.success(
+      `Assigned ${managerName} to ${ids.length} ${ids.length === 1 ? "company" : "companies"}`,
+    );
     setSelectedIds(new Set());
     setAssignOpen(false);
   }
@@ -538,7 +536,11 @@ function CompaniesListPage() {
     if (planFilter !== "all" && c.plan !== planFilter) return false;
     if (healthFilter !== "all" && c.health !== healthFilter) return false;
     if (managerFilter === "unassigned" && c.onboardingManagerId) return false;
-    if (managerFilter !== "all" && managerFilter !== "unassigned" && c.onboardingManagerId !== managerFilter) {
+    if (
+      managerFilter !== "all" &&
+      managerFilter !== "unassigned" &&
+      c.onboardingManagerId !== managerFilter
+    ) {
       return false;
     }
     if (salesAgentFilter === "unassigned" && c.salesAgentId) return false;
@@ -581,12 +583,12 @@ function CompaniesListPage() {
 
   function companyFilterPillCount(id: CompanyFilterPillId) {
     if (id === "all") return toolbarScoped.length;
-    if (id === "pending") return toolbarScoped.filter((c) => matchesCompanyKpi(c, "pending")).length;
-    if (id === "active") return toolbarScoped.filter((c) => matchesCompanyKpi(c, "in_progress")).length;
+    if (id === "pending")
+      return toolbarScoped.filter((c) => matchesCompanyKpi(c, "pending")).length;
+    if (id === "active")
+      return toolbarScoped.filter((c) => matchesCompanyKpi(c, "in_progress")).length;
     if (id === "live") return toolbarScoped.filter((c) => matchesCompanyKpi(c, "live")).length;
-    return toolbarScoped.filter(
-      (c) => c.computedStatus === id || c.status === id,
-    ).length;
+    return toolbarScoped.filter((c) => c.computedStatus === id || c.status === id).length;
   }
 
   function selectCompanyFilterPill(id: CompanyFilterPillId) {
@@ -696,8 +698,12 @@ function CompaniesListPage() {
   function openEdit(c: Company) {
     setEditing(c);
     form.reset({
-      name: c.name, contact: c.contact, designation: c.designation,
-      phone: c.phone, email: c.email, city: c.city,
+      name: c.name,
+      contact: c.contact,
+      designation: c.designation,
+      phone: c.phone,
+      email: c.email,
+      city: c.city,
       region: c.region ?? "Rest of India",
       ownerName: c.ownerName || "",
       ownerMobile: c.ownerMobile || "",
@@ -707,11 +713,14 @@ function CompaniesListPage() {
       pocEmail: c.pocEmail || c.email,
       whatsappGroupId: c.whatsappGroupId || "",
       whatsappGroupName: c.whatsappGroupName || "",
-      onboardingManagerId: c.onboardingManagerId, csmId: c.csmId,
+      onboardingManagerId: c.onboardingManagerId,
+      csmId: c.csmId,
       salesAgentId: c.salesAgentId ?? "",
       plan: c.plan,
       health: c.health,
-      modules: normalizeCompanyModules(c.modules).filter((m) => m.optedIn).map((m) => m.moduleKey),
+      modules: normalizeCompanyModules(c.modules)
+        .filter((m) => m.optedIn)
+        .map((m) => m.moduleKey),
       agreementDate: c.agreementDate,
       startDate: c.startDate || c.agreementDate,
       goLiveTarget: c.goLiveTarget,
@@ -787,7 +796,8 @@ function CompaniesListPage() {
             description: `${company.name} is stored and will remain after refresh.`,
             action: {
               label: "View",
-              onClick: () => navigate({ to: "/companies/$companyId", params: { companyId: company.id } }),
+              onClick: () =>
+                navigate({ to: "/companies/$companyId", params: { companyId: company.id } }),
             },
           });
           setModalOpen(false);
@@ -818,7 +828,10 @@ function CompaniesListPage() {
     const removed = deleteCompany(deleting.id);
     if (removed) {
       toast.success("Company deleted", {
-        action: { label: "Undo", onClick: () => void addCompany({ ...removed, status: removed.status }) },
+        action: {
+          label: "Undo",
+          onClick: () => void addCompany({ ...removed, status: removed.status }),
+        },
       });
     }
     setDeleteOpen(false);
@@ -835,7 +848,21 @@ function CompaniesListPage() {
               {filtered.length} {filtered.length === 1 ? "company" : "companies"}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5">
+          <PhoneToolbar
+            className="max-md:w-full"
+            primary={
+              canManageCompanies ? (
+                <Button
+                  size="sm"
+                  className="h-8 gap-1 bg-primary px-3 text-xs"
+                  onClick={openCreate}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add company
+                </Button>
+              ) : null
+            }
+          >
             <Button
               size="sm"
               variant="outline"
@@ -875,20 +902,19 @@ function CompaniesListPage() {
                   <FileSpreadsheet className="h-3.5 w-3.5" />
                   Update commercial
                 </Button>
-                <Button size="sm" className="h-8 gap-1 bg-primary px-3 text-xs" onClick={openCreate}>
-                  <Plus className="h-3.5 w-3.5" />
-                  Add company
-                </Button>
               </>
             ) : null}
-          </div>
+          </PhoneToolbar>
         </div>
 
         <div className="mt-2 flex flex-col gap-2 lg:flex-row lg:items-stretch">
           <div
             role="tablist"
             aria-label="Company filters"
-            className="grid min-w-0 flex-1 grid-cols-2 gap-1.5 sm:grid-cols-4 xl:grid-cols-8"
+            className={cn(
+              "grid min-w-0 flex-1 grid-cols-2 gap-1.5 sm:grid-cols-4 xl:grid-cols-8",
+              phoneStatTrack,
+            )}
           >
             {COMPANY_FILTER_PILLS.map((pill) => {
               const tone = companyFilterPillTone(pill.id);
@@ -902,6 +928,7 @@ function CompaniesListPage() {
                   onClick={() => selectCompanyFilterPill(pill.id)}
                   className={cn(
                     "flex min-w-0 flex-col rounded-lg border bg-card px-2.5 py-2 text-left shadow-sm transition-all",
+                    phoneStatChip,
                     "hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
                     active
                       ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"
@@ -958,103 +985,103 @@ function CompaniesListPage() {
               </div>
             }
           >
-        <DesignTicketFilterField label="Plan" compact>
-          <DesignTicketSelect
-            compact
-            value={planFilter}
-            onChange={setPlanFilter}
-            options={[
-              { value: "all", label: "All plans" },
-              { value: "Annual", label: "Annual" },
-              { value: "Half-Yearly", label: "Half-Yearly" },
-              { value: "AMC", label: "AMC" },
-            ]}
-          />
-        </DesignTicketFilterField>
-        <DesignTicketFilterField label="Health" compact>
-          <DesignTicketSelect
-            compact
-            value={healthFilter}
-            onChange={setHealthFilter}
-            options={[
-              { value: "all", label: "All health" },
-              { value: "Healthy", label: "Healthy" },
-              { value: "Moderate", label: "Moderate" },
-              { value: "Critical", label: "Critical" },
-            ]}
-          />
-        </DesignTicketFilterField>
-        <DesignTicketFilterField label="Progress" compact>
-          <DesignTicketSelect
-            compact
-            value={progressFilter}
-            onChange={setProgressFilter}
-            options={[
-              { value: "all", label: "Any progress" },
-              { value: "0", label: "Not started (0%)" },
-              { value: "1-49", label: "Early (1–49%)" },
-              { value: "50-99", label: "Advanced (50–99%)" },
-              { value: "100", label: "Complete (100%)" },
-            ]}
-          />
-        </DesignTicketFilterField>
-        <DesignTicketFilterField label="Manager" compact>
-          <DesignTicketSelect
-            compact
-            value={managerFilter}
-            onChange={setManagerFilter}
-            options={[
-              { value: "all", label: "All managers" },
-              ...(unassignedCount > 0
-                ? [{ value: "unassigned", label: `Unassigned (${unassignedCount})` }]
-                : []),
-              ...managers.map((m) => ({ value: m.id, label: m.name })),
-            ]}
-          />
-        </DesignTicketFilterField>
-        <DesignTicketFilterField label="Sales Agent" compact>
-          <DesignTicketSelect
-            compact
-            value={salesAgentFilter}
-            onChange={setSalesAgentFilter}
-            options={[
-              { value: "all", label: "All sales agents" },
-              ...(unassignedSalesCount > 0
-                ? [{ value: "unassigned", label: `Unassigned (${unassignedSalesCount})` }]
-                : []),
-              ...salesAgents.map((m) => ({ value: m.id, label: m.name })),
-            ]}
-          />
-        </DesignTicketFilterField>
-        {cities.length > 1 ? (
-          <DesignTicketFilterField label="City" compact>
-            <DesignTicketSelect
+            <DesignTicketFilterField label="Plan" compact>
+              <DesignTicketSelect
+                compact
+                value={planFilter}
+                onChange={setPlanFilter}
+                options={[
+                  { value: "all", label: "All plans" },
+                  { value: "Annual", label: "Annual" },
+                  { value: "Half-Yearly", label: "Half-Yearly" },
+                  { value: "AMC", label: "AMC" },
+                ]}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketFilterField label="Health" compact>
+              <DesignTicketSelect
+                compact
+                value={healthFilter}
+                onChange={setHealthFilter}
+                options={[
+                  { value: "all", label: "All health" },
+                  { value: "Healthy", label: "Healthy" },
+                  { value: "Moderate", label: "Moderate" },
+                  { value: "Critical", label: "Critical" },
+                ]}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketFilterField label="Progress" compact>
+              <DesignTicketSelect
+                compact
+                value={progressFilter}
+                onChange={setProgressFilter}
+                options={[
+                  { value: "all", label: "Any progress" },
+                  { value: "0", label: "Not started (0%)" },
+                  { value: "1-49", label: "Early (1–49%)" },
+                  { value: "50-99", label: "Advanced (50–99%)" },
+                  { value: "100", label: "Complete (100%)" },
+                ]}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketFilterField label="Manager" compact>
+              <DesignTicketSelect
+                compact
+                value={managerFilter}
+                onChange={setManagerFilter}
+                options={[
+                  { value: "all", label: "All managers" },
+                  ...(unassignedCount > 0
+                    ? [{ value: "unassigned", label: `Unassigned (${unassignedCount})` }]
+                    : []),
+                  ...managers.map((m) => ({ value: m.id, label: m.name })),
+                ]}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketFilterField label="Sales Agent" compact>
+              <DesignTicketSelect
+                compact
+                value={salesAgentFilter}
+                onChange={setSalesAgentFilter}
+                options={[
+                  { value: "all", label: "All sales agents" },
+                  ...(unassignedSalesCount > 0
+                    ? [{ value: "unassigned", label: `Unassigned (${unassignedSalesCount})` }]
+                    : []),
+                  ...salesAgents.map((m) => ({ value: m.id, label: m.name })),
+                ]}
+              />
+            </DesignTicketFilterField>
+            {cities.length > 1 ? (
+              <DesignTicketFilterField label="City" compact>
+                <DesignTicketSelect
+                  compact
+                  value={cityFilter}
+                  onChange={setCityFilter}
+                  options={[
+                    { value: "all", label: "All cities" },
+                    ...cities.map((city) => ({ value: city, label: city })),
+                  ]}
+                />
+              </DesignTicketFilterField>
+            ) : null}
+            <DesignTicketDateField
               compact
-              value={cityFilter}
-              onChange={setCityFilter}
-              options={[
-                { value: "all", label: "All cities" },
-                ...cities.map((city) => ({ value: city, label: city })),
-              ]}
+              displayFormat="dd/MM/yyyy"
+              label="Start from"
+              value={dateFrom}
+              onChange={setDateFrom}
+              placeholder="DD/MM/YYYY"
             />
-          </DesignTicketFilterField>
-        ) : null}
-        <DesignTicketDateField
-          compact
-          displayFormat="dd/MM/yyyy"
-          label="Start from"
-          value={dateFrom}
-          onChange={setDateFrom}
-          placeholder="DD/MM/YYYY"
-        />
-        <DesignTicketDateField
-          compact
-          displayFormat="dd/MM/yyyy"
-          label="Start to"
-          value={dateTo}
-          onChange={setDateTo}
-          placeholder="DD/MM/YYYY"
-        />
+            <DesignTicketDateField
+              compact
+              displayFormat="dd/MM/yyyy"
+              label="Start to"
+              value={dateTo}
+              onChange={setDateTo}
+              placeholder="DD/MM/YYYY"
+            />
           </DesignTicketFilterBar>
 
           <div ref={tableRef}>
@@ -1067,11 +1094,21 @@ function CompaniesListPage() {
                 <span className="text-xs font-medium">
                   {selectedIds.size} {selectedIds.size === 1 ? "company" : "companies"} selected
                 </span>
-                <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={openBulkAssign}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 gap-1 text-xs"
+                  onClick={openBulkAssign}
+                >
                   <UserRound className="h-3.5 w-3.5" />
                   Assign manager
                 </Button>
-                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setSelectedIds(new Set())}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs"
+                  onClick={() => setSelectedIds(new Set())}
+                >
                   Clear
                 </Button>
               </motion.div>
@@ -1084,7 +1121,8 @@ function CompaniesListPage() {
                 className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2"
               >
                 <p className="text-xs text-muted-foreground">
-                  Showing {filtered.length} of {enriched.length} companies — filters may be hiding some rows.
+                  Showing {filtered.length} of {enriched.length} companies — filters may be hiding
+                  some rows.
                 </p>
                 <Button size="sm" variant="outline" className="h-7 text-xs" onClick={clearFilters}>
                   Clear filters
@@ -1299,18 +1337,28 @@ function CompaniesListPage() {
       >
         <div className="grid gap-4">
           <div className="space-y-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Company</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Company
+            </div>
             <div>
               <label className="text-xs font-medium">{FIELD_LABELS.name}</label>
-              <input {...form.register("name")} className={inputClass(!!form.formState.errors.name)} />
+              <input
+                {...form.register("name")}
+                className={inputClass(!!form.formState.errors.name)}
+              />
               {form.formState.errors.name ? (
-                <p className="mt-1 text-xs text-destructive">{form.formState.errors.name.message}</p>
+                <p className="mt-1 text-xs text-destructive">
+                  {form.formState.errors.name.message}
+                </p>
               ) : null}
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="text-xs font-medium">{FIELD_LABELS.city}</label>
-                <input {...form.register("city")} className={inputClass(!!form.formState.errors.city)} />
+                <input
+                  {...form.register("city")}
+                  className={inputClass(!!form.formState.errors.city)}
+                />
               </div>
               <div>
                 <label className="text-xs font-medium">State</label>
@@ -1340,7 +1388,9 @@ function CompaniesListPage() {
           </div>
 
           <div className="space-y-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Primary Contact</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Primary Contact
+            </div>
             <p className="text-xs text-muted-foreground">
               Main signatory / day-to-day contact. Owner and POC default to these if left blank.
             </p>
@@ -1351,11 +1401,18 @@ function CompaniesListPage() {
                   <input
                     {...form.register(field)}
                     type={field === "email" ? "email" : field === "phone" ? "tel" : "text"}
+                    inputMode={field === "email" ? "email" : field === "phone" ? "tel" : undefined}
+                    autoComplete={
+                      field === "email" ? "email" : field === "phone" ? "tel" : undefined
+                    }
+                    autoCapitalize={field === "email" ? "none" : undefined}
                     placeholder={field === "phone" ? "10-digit mobile" : undefined}
                     className={inputClass(!!form.formState.errors[field])}
                   />
                   {form.formState.errors[field] ? (
-                    <p className="mt-1 text-xs text-destructive">{form.formState.errors[field]?.message}</p>
+                    <p className="mt-1 text-xs text-destructive">
+                      {form.formState.errors[field]?.message}
+                    </p>
                   ) : null}
                 </div>
               ))}
@@ -1364,18 +1421,30 @@ function CompaniesListPage() {
 
           <div className="space-y-3">
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Owner & POC <span className="font-normal normal-case text-muted-foreground">(optional)</span>
+              Owner & POC{" "}
+              <span className="font-normal normal-case text-muted-foreground">(optional)</span>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-2.5 rounded-lg border border-border/70 bg-muted/20 p-3">
                 <div className="text-xs font-semibold text-foreground">Owner</div>
                 <div>
                   <label className="text-xs font-medium">Owner Name</label>
-                  <input {...form.register("ownerName")} placeholder="Defaults to contact person" className={inputClass()} />
+                  <input
+                    {...form.register("ownerName")}
+                    placeholder="Defaults to contact person"
+                    className={inputClass()}
+                  />
                 </div>
                 <div>
                   <label className="text-xs font-medium">Owner Mobile</label>
-                  <input {...form.register("ownerMobile")} placeholder="Defaults to mobile above" className={inputClass()} />
+                  <input
+                    {...form.register("ownerMobile")}
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    placeholder="Defaults to mobile above"
+                    className={inputClass()}
+                  />
                 </div>
                 <div>
                   <label className="text-xs font-medium">Owner Email</label>
@@ -1386,7 +1455,9 @@ function CompaniesListPage() {
                     className={inputClass(!!form.formState.errors.ownerEmail)}
                   />
                   {form.formState.errors.ownerEmail ? (
-                    <p className="mt-1 text-xs text-destructive">{form.formState.errors.ownerEmail.message}</p>
+                    <p className="mt-1 text-xs text-destructive">
+                      {form.formState.errors.ownerEmail.message}
+                    </p>
                   ) : null}
                 </div>
               </div>
@@ -1395,11 +1466,22 @@ function CompaniesListPage() {
                 <div className="text-xs font-semibold text-foreground">POC (Point of Contact)</div>
                 <div>
                   <label className="text-xs font-medium">POC Name</label>
-                  <input {...form.register("pocName")} placeholder="Defaults to contact person" className={inputClass()} />
+                  <input
+                    {...form.register("pocName")}
+                    placeholder="Defaults to contact person"
+                    className={inputClass()}
+                  />
                 </div>
                 <div>
                   <label className="text-xs font-medium">POC Mobile</label>
-                  <input {...form.register("pocMobile")} placeholder="Defaults to mobile above" className={inputClass()} />
+                  <input
+                    {...form.register("pocMobile")}
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    placeholder="Defaults to mobile above"
+                    className={inputClass()}
+                  />
                 </div>
                 <div>
                   <label className="text-xs font-medium">POC Email</label>
@@ -1410,7 +1492,9 @@ function CompaniesListPage() {
                     className={inputClass(!!form.formState.errors.pocEmail)}
                   />
                   {form.formState.errors.pocEmail ? (
-                    <p className="mt-1 text-xs text-destructive">{form.formState.errors.pocEmail.message}</p>
+                    <p className="mt-1 text-xs text-destructive">
+                      {form.formState.errors.pocEmail.message}
+                    </p>
                   ) : (
                     <p className="mt-1 text-[11px] text-muted-foreground">
                       Kickoff recipient; Owner is CC’d when different.
@@ -1447,11 +1531,14 @@ function CompaniesListPage() {
                   )}
                 </select>
                 {form.formState.errors.onboardingManagerId ? (
-                  <p className="mt-1 text-xs text-destructive">{form.formState.errors.onboardingManagerId.message}</p>
+                  <p className="mt-1 text-xs text-destructive">
+                    {form.formState.errors.onboardingManagerId.message}
+                  </p>
                 ) : null}
                 {!isAdmin ? (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Assigned automatically to {resolveAssigneeLabel(form.watch("onboardingManagerId"), users, employees)}.
+                    Assigned automatically to{" "}
+                    {resolveAssigneeLabel(form.watch("onboardingManagerId"), users, employees)}.
                   </p>
                 ) : null}
               </div>
@@ -1490,7 +1577,11 @@ function CompaniesListPage() {
 
               <div className="flex items-center pt-5">
                 <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
-                  <input type="checkbox" {...form.register("annualLicense")} className="rounded border-border" />
+                  <input
+                    type="checkbox"
+                    {...form.register("annualLicense")}
+                    className="rounded border-border"
+                  />
                   Annual License
                 </label>
               </div>
@@ -1503,8 +1594,8 @@ function CompaniesListPage() {
                 Commercial & Support
               </div>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Enter deal value or amount with GST and GST % — taxable and GST amount auto-fill on blur. You can
-                override them manually.
+                Enter deal value or amount with GST and GST % — taxable and GST amount auto-fill on
+                blur. You can override them manually.
               </p>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1594,15 +1685,30 @@ function CompaniesListPage() {
               </div>
               <div>
                 <label className="text-xs font-medium">Taxable</label>
-                <input type="number" step="any" {...form.register("taxableAmount")} className={inputClass()} />
+                <input
+                  type="number"
+                  step="any"
+                  {...form.register("taxableAmount")}
+                  className={inputClass()}
+                />
               </div>
               <div>
                 <label className="text-xs font-medium">GST Amount</label>
-                <input type="number" step="any" {...form.register("gstAmount")} className={inputClass()} />
+                <input
+                  type="number"
+                  step="any"
+                  {...form.register("gstAmount")}
+                  className={inputClass()}
+                />
               </div>
               <div>
                 <label className="text-xs font-medium">Total Cost</label>
-                <input type="number" step="any" {...form.register("totalCost")} className={inputClass()} />
+                <input
+                  type="number"
+                  step="any"
+                  {...form.register("totalCost")}
+                  className={inputClass()}
+                />
               </div>
               <div>
                 <label className="text-xs font-medium">Payment Status</label>
@@ -1617,15 +1723,30 @@ function CompaniesListPage() {
               </div>
               <div>
                 <label className="text-xs font-medium">Payment Received</label>
-                <input type="number" step="any" {...form.register("paymentReceived")} className={inputClass()} />
+                <input
+                  type="number"
+                  step="any"
+                  {...form.register("paymentReceived")}
+                  className={inputClass()}
+                />
               </div>
               <div>
                 <label className="text-xs font-medium">Pending Amount</label>
-                <input type="number" step="any" {...form.register("pendingAmount")} className={inputClass()} />
+                <input
+                  type="number"
+                  step="any"
+                  {...form.register("pendingAmount")}
+                  className={inputClass()}
+                />
               </div>
               <div>
                 <label className="text-xs font-medium">Installment Amount</label>
-                <input type="number" step="any" {...form.register("installmentAmount")} className={inputClass()} />
+                <input
+                  type="number"
+                  step="any"
+                  {...form.register("installmentAmount")}
+                  className={inputClass()}
+                />
               </div>
               <div>
                 <label className="text-xs font-medium">Installment Due Date</label>
@@ -1640,7 +1761,13 @@ function CompaniesListPage() {
               </div>
               <div>
                 <label className="text-xs font-medium">Installments</label>
-                <input type="number" min={0} step={1} {...form.register("installmentCount")} className={inputClass()} />
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  {...form.register("installmentCount")}
+                  className={inputClass()}
+                />
               </div>
               <div>
                 <label className="text-xs font-medium">GST Number</label>
@@ -1648,7 +1775,11 @@ function CompaniesListPage() {
               </div>
               <div className="sm:col-span-2">
                 <label className="text-xs font-medium">Billing Info</label>
-                <input {...form.register("billingInfo")} placeholder="e.g. Annual plan" className={inputClass()} />
+                <input
+                  {...form.register("billingInfo")}
+                  placeholder="e.g. Annual plan"
+                  className={inputClass()}
+                />
               </div>
             </div>
           </div>
@@ -1665,11 +1796,15 @@ function CompaniesListPage() {
                   compact
                   displayFormat="dd/MM/yyyy"
                   value={form.watch("startDate") ?? ""}
-                  onChange={(v) => form.setValue("startDate", v, { shouldDirty: true, shouldValidate: true })}
+                  onChange={(v) =>
+                    form.setValue("startDate", v, { shouldDirty: true, shouldValidate: true })
+                  }
                   className="mt-1"
                 />
                 {form.formState.errors.startDate ? (
-                  <p className="mt-1 text-xs text-destructive">{form.formState.errors.startDate.message}</p>
+                  <p className="mt-1 text-xs text-destructive">
+                    {form.formState.errors.startDate.message}
+                  </p>
                 ) : null}
               </div>
               <div>
@@ -1718,7 +1853,9 @@ function CompaniesListPage() {
               </div>
               <div className="flex flex-col justify-center rounded-lg border border-dashed border-border/70 bg-muted/10 px-3 py-2 text-[11px] text-muted-foreground">
                 <span className="font-medium text-foreground">Subscription Renewal</span>
-                <span>Plan expiry date controls access lifecycle and automated renewal alerts.</span>
+                <span>
+                  Plan expiry date controls access lifecycle and automated renewal alerts.
+                </span>
               </div>
             </div>
           </div>
@@ -1754,7 +1891,9 @@ function CompaniesListPage() {
                     />
                     <span className="min-w-0">
                       <span className="block text-xs font-medium">{getModuleLabel(m.key)}</span>
-                      <span className="block text-[11px] leading-snug text-muted-foreground">{m.description}</span>
+                      <span className="block text-[11px] leading-snug text-muted-foreground">
+                        {m.description}
+                      </span>
                     </span>
                   </label>
                 );
@@ -1798,7 +1937,9 @@ function CompaniesListPage() {
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title="Delete company?"
-        description={deleting ? `Remove ${deleting.name}? This cannot be undone if projects exist.` : undefined}
+        description={
+          deleting ? `Remove ${deleting.name}? This cannot be undone if projects exist.` : undefined
+        }
         onConfirm={confirmDelete}
       />
 

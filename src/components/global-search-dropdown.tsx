@@ -1,11 +1,5 @@
 import type { ReactNode } from "react";
-import {
-  BriefcaseBusiness,
-  Building2,
-  Boxes,
-  CheckSquare,
-  MapPin,
-} from "lucide-react";
+import { BriefcaseBusiness, Building2, Boxes, CheckSquare, MapPin } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 
 import { cn } from "@/lib/utils";
@@ -139,7 +133,9 @@ export function GlobalSearchDropdown({
 
       {showCrmResults ? (
         crmCount === 0 ? (
-          <div className="px-4 py-6 text-center text-xs text-muted-foreground">No CRM matches</div>
+          <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+            No matches. Try another name, email, or number.
+          </div>
         ) : (
           <>
             {results.crm.accounts.length > 0 ? (
@@ -152,7 +148,10 @@ export function GlobalSearchDropdown({
                     title={a.name}
                     subtitle={[a.city, a.status].filter(Boolean).join(" · ")}
                     onClick={() => {
-                      void navigate({ to: "/crm/accounts/$accountId", params: { accountId: a.id } });
+                      void navigate({
+                        to: "/crm/accounts/$accountId",
+                        params: { accountId: a.id },
+                      });
                       onClose();
                     }}
                   />
@@ -186,7 +185,9 @@ export function GlobalSearchDropdown({
 
       {showErpResults ? (
         erpCount === 0 ? (
-          <div className="px-4 py-6 text-center text-xs text-muted-foreground">No ERP matches</div>
+          <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+            No matches. Try another company, project, or task name.
+          </div>
         ) : (
           <>
             {results.erp.companies.length > 0 ? (

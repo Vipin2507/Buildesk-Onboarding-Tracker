@@ -25,8 +25,7 @@ function stubServerDbForClient(): Plugin {
     /(?:^|\/)node_modules\/drizzle-orm\/better-sqlite3(?:\/|$)/.test(source);
 
   const isDbClient = (source: string) =>
-    source === "@/server/db/client" ||
-    /(?:^|\/)server\/db\/client(?:\.ts)?$/.test(source);
+    source === "@/server/db/client" || /(?:^|\/)server\/db\/client(?:\.ts)?$/.test(source);
 
   return {
     name: "stub-server-db-for-client",
@@ -81,7 +80,16 @@ export default defineConfig({
     exclude: ["better-sqlite3", "drizzle-orm/better-sqlite3"],
   },
   ssr: {
-    external: ["better-sqlite3"],
+    external: [
+      "better-sqlite3",
+      "@capacitor/core",
+      "@capacitor/app",
+      "@capacitor/status-bar",
+      "@capacitor/keyboard",
+      "@capacitor/network",
+      "@capacitor/browser",
+      "@capacitor/splash-screen",
+    ],
   },
   plugins: [
     stubServerDbForClient(),

@@ -9,10 +9,15 @@ import {
   useRouterState,
 } from "@tanstack/react-router";
 import { type ReactNode } from "react";
+import { MotionConfig } from "framer-motion";
 
 import appCss from "../styles.css?url";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CrmSidebar } from "@/components/crm/crm-sidebar";
+import { AndroidRuntime } from "@/components/native/android-runtime";
+import { BottomNav } from "@/components/native/bottom-nav";
+import { ConnectionBanner } from "@/components/native/connection-banner";
+import { MobileWorkbenchNote } from "@/components/native/mobile-workbench-note";
 import { TopBar } from "@/components/topbar";
 import { Toaster } from "@/components/ui/sonner";
 import { StoreHydrationGate } from "@/components/store-hydration-gate";
@@ -88,7 +93,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      {
+        name: "viewport",
+        content:
+          "width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content",
+      },
       { title: "Buildesk Onboarding Tracker" },
       {
         name: "description",
@@ -147,48 +156,57 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <StoreHydrationGate>
-          {isPortal ? (
-            <>
-              <Outlet />
-              <RouterDebug />
-              <ThemedToaster />
-            </>
-          ) : (
-            <AuthGate>
-              {isAuthPage ? (
+      <MotionConfig reducedMotion="user">
+        <ThemeProvider>
+          <AndroidRuntime />
+          <ConnectionBanner />
+          <StoreHydrationGate>
+            {isPortal ? (
+              <>
                 <Outlet />
-              ) : (
-                <ServerDataBootstrap>
-                  <SessionMonitor />
-                  <NavigationLoadingOverlay />
-                  {isAdminApp ? (
-                    <Outlet />
-                  ) : (
-                    <>
-                      <DesignTicketBootstrap />
-                      <ChatBootstrap />
-                      <ChatNotificationListener />
-                      <div className="flex min-h-screen w-full bg-background text-foreground">
-                        {isCrmApp ? <CrmSidebar /> : <AppSidebar />}
-                        <div className="flex min-w-0 flex-1 flex-col">
-                          <TopBar />
-                          <main className="min-w-0 flex-1 pb-[env(safe-area-inset-bottom)]">
-                            <Outlet />
-                          </main>
-                        </div>
+                <RouterDebug />
+                <ThemedToaster />
+              </>
+            ) : (
+              <AuthGate>
+                {isAuthPage ? (
+                  <Outlet />
+                ) : (
+                  <ServerDataBootstrap>
+                    <SessionMonitor />
+                    <NavigationLoadingOverlay />
+                    {isAdminApp ? (
+                      <div className="min-h-screen">
+                        <MobileWorkbenchNote pathname={pathname} />
+                        <Outlet />
                       </div>
-                    </>
-                  )}
-                </ServerDataBootstrap>
-              )}
-              <RouterDebug />
-              <ThemedToaster />
-            </AuthGate>
-          )}
-        </StoreHydrationGate>
-      </ThemeProvider>
+                    ) : (
+                      <>
+                        <DesignTicketBootstrap />
+                        <ChatBootstrap />
+                        <ChatNotificationListener />
+                        <div className="flex min-h-screen w-full bg-background text-foreground">
+                          {isCrmApp ? <CrmSidebar /> : <AppSidebar />}
+                          <div className="flex min-w-0 flex-1 flex-col">
+                            <TopBar />
+                            <MobileWorkbenchNote pathname={pathname} />
+                            <main className="min-w-0 flex-1 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
+                              <Outlet />
+                            </main>
+                            <BottomNav />
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </ServerDataBootstrap>
+                )}
+                <RouterDebug />
+                <ThemedToaster />
+              </AuthGate>
+            )}
+          </StoreHydrationGate>
+        </ThemeProvider>
+      </MotionConfig>
     </QueryClientProvider>
   );
 }

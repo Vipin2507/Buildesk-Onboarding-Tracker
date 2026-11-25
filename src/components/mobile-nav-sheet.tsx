@@ -1,17 +1,14 @@
+import { useEffect } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Building, Contact } from "lucide-react";
 import { motion } from "framer-motion";
 
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { APP_NAV, filterNavItems, isNavActive } from "@/lib/nav";
 import { CRM_NAV } from "@/lib/crm-nav";
 import { isCrmUser } from "@/lib/product-scope";
 import { usePermissions } from "@/hooks/use-permissions";
+import { setMobileNavOpen } from "@/lib/native/shell-state";
 import { useUpcomingTaskReminderCount } from "@/hooks/use-upcoming-task-reminders";
 import { useAuthStore } from "@/stores";
 import { useChatStore } from "@/stores/useChatStore";
@@ -35,6 +32,10 @@ export function MobileNavSheet({
     : filterNavItems(APP_NAV, { isAdmin, can });
   const chatBadge = useChatStore((s) => s.getLiveChatBadgeCount(crm ? "crm" : "erp"));
   const upcomingTaskBadge = useUpcomingTaskReminderCount();
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [pathname]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -73,7 +74,7 @@ export function MobileNavSheet({
                   to={item.to}
                   onClick={() => onOpenChange(false)}
                   className={cn(
-                    "relative flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                    "relative flex min-h-12 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                     active
                       ? "bg-sidebar-accent text-white"
                       : "text-sidebar-foreground/85 hover:bg-sidebar-accent/70 hover:text-white",

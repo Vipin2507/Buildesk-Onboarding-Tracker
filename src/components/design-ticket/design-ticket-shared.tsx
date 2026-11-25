@@ -4,6 +4,7 @@ import { ChevronDown, ListFilter, MessageCircle, RotateCcw, type LucideIcon } fr
 import { useState, type ReactNode } from "react";
 
 import { CountUp } from "@/components/count-up";
+import { phoneStatChip, phoneStatTrack } from "@/components/phone-toolbar";
 import { usePortalContentScope } from "@/components/portal-content-context";
 import { usePortalEmbedMode } from "@/components/portal-embed-context";
 import { Button } from "@/components/ui/button";
@@ -115,7 +116,14 @@ export function DesignTicketKpiGrid({
   const gapClass = size === "compact" ? "gap-1.5" : "gap-2.5 sm:gap-3";
 
   return (
-    <div className={cn("grid min-w-0 grid-cols-2", gapClass, colClass)}>
+    <div
+      className={cn(
+        "grid min-w-0 grid-cols-2",
+        gapClass,
+        colClass,
+        size === "compact" && phoneStatTrack,
+      )}
+    >
       {items.map((k, i) => {
         const Icon = k.icon;
         const clickable = Boolean(k.onClick);
@@ -127,7 +135,7 @@ export function DesignTicketKpiGrid({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: Math.min(i * 0.04, 0.2), ease: TICKET_EASE }}
             whileHover={clickable ? { y: -1, transition: { duration: 0.15 } } : undefined}
-            className="min-w-0 h-full"
+            className={cn("min-w-0 h-full", size === "compact" && phoneStatChip)}
           >
             <Wrapper
               type={clickable ? "button" : undefined}
@@ -161,7 +169,12 @@ export function DesignTicketKpiGrid({
                       {k.label}
                     </span>
                   </div>
-                  <span className={cn("shrink-0 text-base font-semibold tabular-nums leading-none", k.tone)}>
+                  <span
+                    className={cn(
+                      "shrink-0 text-base font-semibold tabular-nums leading-none",
+                      k.tone,
+                    )}
+                  >
                     <CountUp to={k.value} />
                   </span>
                 </>
@@ -180,7 +193,9 @@ export function DesignTicketKpiGrid({
                       />
                     ) : null}
                   </div>
-                  <div className={cn("mt-1.5 text-xl font-semibold tabular-nums sm:text-2xl", k.tone)}>
+                  <div
+                    className={cn("mt-1.5 text-xl font-semibold tabular-nums sm:text-2xl", k.tone)}
+                  >
                     <CountUp to={k.value} />
                   </div>
                   {clickable ? (
@@ -271,7 +286,9 @@ export function DesignTicketSection({
       {(title || action) && (
         <div className="flex flex-wrap items-center justify-between gap-2">
           {title ? (
-            <h2 className={cn("font-semibold", compact ? "text-xs text-muted-foreground" : "text-sm")}>
+            <h2
+              className={cn("font-semibold", compact ? "text-xs text-muted-foreground" : "text-sm")}
+            >
               {title}
             </h2>
           ) : (
@@ -352,8 +369,8 @@ export function DesignTicketTabNav({
             type="button"
             onClick={() => onChange(tab.id)}
             className={cn(
-              "flex shrink-0 snap-start items-center gap-1 rounded-md font-medium transition-all duration-200",
-              compact ? "px-2.5 py-1.5 text-xs" : "px-3.5 py-2 text-sm",
+              "flex shrink-0 snap-start items-center gap-1 rounded-md font-medium transition-all duration-200 max-md:min-h-12 max-md:px-3 max-md:text-sm",
+              compact ? "px-2.5 py-1.5 text-xs md:min-h-0" : "px-3.5 py-2 text-sm",
               active
                 ? "bg-card text-foreground shadow-sm"
                 : "text-muted-foreground hover:bg-card/60 hover:text-foreground",
@@ -420,8 +437,8 @@ export function DesignTicketFilterBar({
         !inline && (compact ? "p-2.5" : "p-3 sm:p-4"),
       )}
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 max-md:flex-col max-md:items-stretch">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 max-md:w-full">
           <Button
             type="button"
             variant="outline"
@@ -429,6 +446,7 @@ export function DesignTicketFilterBar({
             className={cn(
               "gap-1.5 border-input bg-card dark:bg-muted/40 dark:hover:bg-muted/55",
               compact || inline ? "h-8 text-xs" : "h-9",
+              "max-md:min-h-12 max-md:px-4 max-md:text-sm",
               filtersOpen && "border-primary/40 bg-primary/10 text-primary dark:bg-primary/15",
             )}
             aria-expanded={filtersOpen}
@@ -476,7 +494,7 @@ export function DesignTicketFilterBar({
           </AnimatePresence>
         </div>
 
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 max-md:w-full max-md:[&>*]:!w-full max-md:[&>*]:!max-w-none">
           {trailing}
           {typeof resultCount === "number" && inline ? (
             <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
@@ -502,12 +520,7 @@ export function DesignTicketFilterBar({
               filtersOpen ? "translate-y-0 opacity-100" : "-translate-y-1.5 opacity-0",
             )}
           >
-            <div
-              className={cn(
-                "grid gap-2 sm:grid-cols-2 lg:grid-cols-3",
-                className,
-              )}
-            >
+            <div className={cn("grid gap-2 sm:grid-cols-2 lg:grid-cols-3", className)}>
               {children}
             </div>
             {onApply ? (

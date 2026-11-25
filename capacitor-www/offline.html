@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Connection lost · Buildesk Compass</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f4f7fb;
+        --fg: #0f172a;
+        --muted: #5b6b7c;
+        --card: #ffffff;
+        --line: #dbe3ec;
+        --brand: #009bff;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #060e18;
+          --fg: #e8eef6;
+          --muted: #8fa3b8;
+          --card: #0c1826;
+          --line: rgba(148, 163, 184, 0.2);
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom));
+        background: var(--bg);
+        color: var(--fg);
+        font: 16px/1.45 Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+      main {
+        width: min(100%, 28rem);
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 24px;
+      }
+      h1 { font-size: 1.35rem; margin: 0 0 8px; }
+      p { margin: 0 0 12px; color: var(--muted); }
+      button {
+        min-height: 48px;
+        width: 100%;
+        border: 0;
+        border-radius: 12px;
+        background: var(--brand);
+        color: white;
+        font: inherit;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Can’t reach Buildesk Compass</h1>
+      <p>The server did not respond. Changes are not saved on this phone, and nothing waiting in a form has been submitted.</p>
+      <p>Check the connection, then try again. You need the Buildesk server for sign-in and every update.</p>
+      <button type="button" id="retry">Try again</button>
+    </main>
+    <script src="./server-url.js"></script>
+    <script>
+      document.getElementById("retry").addEventListener("click", function () {
+        var target = window.BUILDESK_SERVER_URL;
+        if (typeof target === "string" && /^https:\/\//.test(target)) {
+          window.location.replace(target);
+          return;
+        }
+        window.location.reload();
+      });
+    </script>
+  </body>
+</html>

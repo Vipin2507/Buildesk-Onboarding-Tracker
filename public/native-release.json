@@ -1,0 +1,8 @@
+{
+  "android": {
+    "minimumVersion": "1.0.0",
+    "latestVersion": "1.0.0",
+    "apkPath": "/downloads/buildesk-compass.apk",
+    "message": "This Android build is missing a required native update. Use Upgrade app. Android will ask you to confirm the install."
+  }
+}

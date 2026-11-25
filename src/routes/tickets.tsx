@@ -380,12 +380,21 @@ function TicketsDashboard() {
         title="Ticket Tracking"
         subtitle="Client portal tickets — triage, assign, and resolve across all companies."
         actions={
-          <div className="flex flex-wrap gap-1.5">
-            <Button size="sm" className="gap-1 bg-primary" onClick={() => setCreateOpen(true)}>
+          <div className="flex flex-wrap gap-1.5 max-md:w-full max-md:flex-col">
+            <Button
+              size="sm"
+              className="gap-1 bg-primary max-md:min-h-12 max-md:w-full max-md:text-sm"
+              onClick={() => setCreateOpen(true)}
+            >
               <Plus className="h-3.5 w-3.5" />
               New Ticket
             </Button>
-            <Button size="sm" variant="outline" className="gap-1" asChild>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1 max-md:min-h-12 max-md:w-full max-md:text-sm"
+              asChild
+            >
               <Link to="/tickets/links">
                 <Link2 className="h-3.5 w-3.5" />
                 Portal Links

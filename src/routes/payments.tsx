@@ -21,6 +21,7 @@ import { DesignTicketFilterBar } from "@/components/design-ticket/design-ticket-
 import { EmptyState } from "@/components/empty-state";
 import { ErpPaymentsExpandedRow } from "@/components/erp/erp-payments-expanded-row";
 import { PageWrap } from "@/components/page-header";
+import { PhoneToolbar } from "@/components/phone-toolbar";
 import { ProgressBar } from "@/components/progress-bar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,7 +35,10 @@ import {
 } from "@/lib/erp-payments-search";
 import { cn, formatDate, formatInr } from "@/lib/utils";
 import type { CompanyPaymentStatus } from "@/types";
-import type { ErpCompanyPaymentListItem } from "@/types/company-payment";
+import type {
+  ErpCompanyPaymentListItem,
+  ErpCompanyPaymentsSummary,
+} from "@/types/company-payment";
 
 export const Route = createFileRoute("/payments")({
   validateSearch: (search) => erpPaymentsSearchSchema.parse(search),
@@ -109,6 +113,106 @@ function rowMatchesTab(row: ErpCompanyPaymentListItem, tab: ErpPaymentStatusTabI
   return true;
 }
 
+const PHONE_PAYMENT_TOTALS = ["Pending", "Overdue", "Due this week", "Received"] as const;
+
+type PaymentSummaryItem = {
+  label: string;
+  value: string;
+  sub?: string;
+  tone?: string;
+};
+
+function paymentSummaryItems(summary: ErpCompanyPaymentsSummary): PaymentSummaryItem[] {
+  return [
+    { label: "Companies", value: String(summary.companyCount) },
+    { label: "Total deal", value: formatInr(summary.totalDealSize) },
+    { label: "Received", value: formatInr(summary.totalReceived) },
+    { label: "Pending", value: formatInr(summary.totalPending) },
+    {
+      label: "Overdue",
+      value: formatInr(summary.totalOverdueAmount),
+      sub: `${summary.overdueCompanyCount} companies`,
+      tone: "text-destructive",
+    },
+    {
+      label: "Due this week",
+      value: formatInr(summary.dueThisWeekAmount),
+      sub: `${summary.dueThisWeekCount} companies`,
+      tone: "text-amber-600 dark:text-amber-400",
+    },
+    {
+      label: "Due this month",
+      value: formatInr(summary.dueThisMonthAmount),
+      sub: `${summary.dueThisMonthCount} companies`,
+      tone: "text-orange-600 dark:text-orange-400",
+    },
+    { label: "Collection rate", value: `${summary.collectionRatePercent}%` },
+  ];
+}
+
+function PaymentSummary({
+  summary,
+  showAllTotals,
+  onToggleTotals,
+}: {
+  summary: ErpCompanyPaymentsSummary;
+  showAllTotals: boolean;
+  onToggleTotals: () => void;
+}) {
+  const items = paymentSummaryItems(summary);
+  const phoneItems = showAllTotals
+    ? items
+    : PHONE_PAYMENT_TOTALS.map((label) => items.find((item) => item.label === label)).filter(
+        (item) => item != null,
+      );
+
+  return (
+    <>
+      <div className="mt-2 hidden overflow-x-auto rounded-lg border border-border bg-card md:block">
+        <div className="flex min-w-[720px] divide-x divide-border">
+          {items.map((item) => (
+            <div key={item.label} className="min-w-0 flex-1 px-3 py-2">
+              <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                {item.label}
+              </div>
+              <div className={cn("mt-0.5 text-sm font-semibold tabular-nums", item.tone)}>
+                {item.value}
+              </div>
+              {item.sub ? (
+                <div className={cn("text-[10px] tabular-nums", item.tone ?? "text-muted-foreground")}>
+                  {item.sub}
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2 md:hidden">
+        {phoneItems.map((item) => (
+          <div key={item.label} className="min-h-16 rounded-xl border border-border bg-card px-3 py-3">
+            <div className="text-xs font-medium text-muted-foreground">{item.label}</div>
+            <div className={cn("mt-1 text-base font-semibold tabular-nums", item.tone)}>
+              {item.value}
+            </div>
+            {item.sub ? (
+              <div className={cn("mt-0.5 text-xs tabular-nums", item.tone ?? "text-muted-foreground")}>
+                {item.sub}
+              </div>
+            ) : null}
+          </div>
+        ))}
+        <button
+          type="button"
+          className="col-span-2 inline-flex min-h-12 items-center justify-center rounded-xl border bg-card text-sm font-semibold"
+          onClick={onToggleTotals}
+        >
+          {showAllTotals ? "Fewer totals" : "More totals"}
+        </button>
+      </div>
+    </>
+  );
+}
+
 function ErpPaymentsPage() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
@@ -118,6 +222,7 @@ function ErpPaymentsPage() {
   const [searchDraft, setSearchDraft] = useState(search.search ?? "");
   const [bulkOpen, setBulkOpen] = useState(false);
   const [expandedRowIds, setExpandedRowIds] = useState<Set<string>>(() => new Set());
+  const [showAllTotals, setShowAllTotals] = useState(false);
 
   useEffect(() => {
     setSearchDraft(search.search ?? "");
@@ -215,7 +320,7 @@ function ErpPaymentsPage() {
               {summary ? ` · ${filteredRows.length} shown` : ""}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5">
+          <PhoneToolbar className="max-md:w-full">
             <Button
               size="sm"
               variant="outline"
@@ -245,56 +350,15 @@ function ErpPaymentsPage() {
               <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
               Refresh
             </Button>
-          </div>
+          </PhoneToolbar>
         </div>
 
         {summary ? (
-          <div className="mt-2 overflow-x-auto rounded-lg border border-border bg-card">
-            <div className="flex min-w-[720px] divide-x divide-border">
-              {[
-                { label: "Companies", value: String(summary.companyCount) },
-                { label: "Total deal", value: formatInr(summary.totalDealSize) },
-                { label: "Received", value: formatInr(summary.totalReceived) },
-                { label: "Pending", value: formatInr(summary.totalPending) },
-                {
-                  label: "Overdue",
-                  value: formatInr(summary.totalOverdueAmount),
-                  sub: `${summary.overdueCompanyCount} companies`,
-                  tone: "text-destructive",
-                },
-                {
-                  label: "Due this week",
-                  value: formatInr(summary.dueThisWeekAmount),
-                  sub: `${summary.dueThisWeekCount} companies`,
-                  tone: "text-amber-600 dark:text-amber-400",
-                },
-                {
-                  label: "Due this month",
-                  value: formatInr(summary.dueThisMonthAmount),
-                  sub: `${summary.dueThisMonthCount} companies`,
-                  tone: "text-orange-600 dark:text-orange-400",
-                },
-                {
-                  label: "Collection rate",
-                  value: `${summary.collectionRatePercent}%`,
-                },
-              ].map((item) => (
-                <div key={item.label} className="min-w-0 flex-1 px-3 py-2">
-                  <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                    {item.label}
-                  </div>
-                  <div className={cn("mt-0.5 text-sm font-semibold tabular-nums", item.tone)}>
-                    {item.value}
-                  </div>
-                  {"sub" in item && item.sub ? (
-                    <div className={cn("text-[10px] tabular-nums", item.tone ?? "text-muted-foreground")}>
-                      {item.sub}
-                    </div>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          </div>
+          <PaymentSummary
+            summary={summary}
+            showAllTotals={showAllTotals}
+            onToggleTotals={() => setShowAllTotals((open) => !open)}
+          />
         ) : null}
 
         <div
@@ -315,7 +379,7 @@ function ErpPaymentsPage() {
                   patchSearch({ status: tab.id === "all" ? undefined : tab.id })
                 }
                 className={cn(
-                  "flex min-w-[5.5rem] shrink-0 flex-col rounded-lg border bg-card px-2.5 py-2 text-left shadow-sm transition-all",
+                  "flex min-w-[5.5rem] shrink-0 flex-col rounded-lg border bg-card px-2.5 py-2 text-left shadow-sm transition-all max-md:min-h-14 max-md:min-w-[7.75rem]",
                   "hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
                   active
                     ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"

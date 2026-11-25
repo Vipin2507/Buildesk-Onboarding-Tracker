@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { PageWrap } from "@/components/page-header";
+import { phoneStatChip, phoneStatTrack } from "@/components/phone-toolbar";
 import {
   DesignTicketDateField,
   DesignTicketFilterField,
@@ -311,8 +312,8 @@ function ErpMeetingsPage() {
               ERP onboarding meetings — separate from CRM portal bookings
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <div className="flex rounded-lg border bg-card p-0.5">
+          <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:flex-wrap md:items-center">
+            <div className="flex rounded-lg border bg-card p-0.5 max-md:w-full">
               {VIEW_TABS.map((tab) => {
                 const Icon = tab.icon;
                 const active = viewTab === tab.id;
@@ -322,7 +323,7 @@ function ErpMeetingsPage() {
                     type="button"
                     onClick={() => setViewTab(tab.id)}
                     className={cn(
-                      "flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs transition-colors",
+                      "flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs transition-colors max-md:min-h-12 max-md:flex-1 max-md:justify-center max-md:text-sm",
                       active
                         ? "bg-primary text-primary-foreground"
                         : "text-muted-foreground hover:text-foreground",
@@ -335,7 +336,11 @@ function ErpMeetingsPage() {
               })}
             </div>
             {canManage && viewTab === "all" ? (
-              <Button size="sm" className="h-8 gap-1 bg-primary px-3 text-xs" onClick={openCreate}>
+              <Button
+                size="sm"
+                className="h-8 gap-1 bg-primary px-3 text-xs max-md:min-h-12 max-md:w-full max-md:text-sm"
+                onClick={openCreate}
+              >
                 <Plus className="h-3.5 w-3.5" />
                 Schedule meeting
               </Button>
@@ -357,7 +362,10 @@ function ErpMeetingsPage() {
         <div
           role="tablist"
           aria-label="Meeting filters"
-          className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4 xl:grid-cols-7"
+          className={cn(
+            "mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4 xl:grid-cols-7",
+            phoneStatTrack,
+          )}
         >
           {STATUS_PILLS.map((pill) => {
             const active = statusFilter === pill.id;
@@ -370,6 +378,7 @@ function ErpMeetingsPage() {
                 onClick={() => setStatusFilter(pill.id)}
                 className={cn(
                   "flex min-w-0 flex-col rounded-lg border bg-card px-2.5 py-2 text-left shadow-sm transition-all",
+                  phoneStatChip,
                   "hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
                   active
                     ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"

@@ -115,9 +115,7 @@ export function DataTable<T>({
   const [sortDir, setSortDir] = useState<"asc" | "desc">(initialSortDir);
   const [page, setPage] = useState(0);
   const allowPageSizeSelect = pageSizeOptions.length > 0;
-  const resolvedOptions = allowPageSizeSelect
-    ? [...pageSizeOptions]
-    : [pageSizeProp];
+  const resolvedOptions = allowPageSizeSelect ? [...pageSizeOptions] : [pageSizeProp];
   const [pageSize, setPageSize] = useState(() => {
     if (!allowPageSizeSelect) return pageSizeProp;
     const stored = readStoredTablePageSize(pageSizeProp);
@@ -137,7 +135,11 @@ export function DataTable<T>({
     if (search && searchKeys) {
       const q = search.toLowerCase();
       rows = rows.filter((row) =>
-        searchKeys.some((k) => String(row[k] ?? "").toLowerCase().includes(q)),
+        searchKeys.some((k) =>
+          String(row[k] ?? "")
+            .toLowerCase()
+            .includes(q),
+        ),
       );
     }
     if (sortKey) {
@@ -201,9 +203,9 @@ export function DataTable<T>({
   const tertiary = columns.find(
     (c) => /status|progress/i.test(c.key) || /status|progress/i.test(c.header),
   );
-  const mobileExtras = columns.slice(2, 5).filter(
-    (c) => c !== primary && c !== secondary && c !== tertiary,
-  );
+  const mobileExtras = columns
+    .slice(2, 5)
+    .filter((c) => c !== primary && c !== secondary && c !== tertiary);
 
   return (
     <div>
@@ -225,14 +227,12 @@ export function DataTable<T>({
         </div>
       )}
 
-      <div className="space-y-2 md:hidden">
+      <div className="space-y-3 md:hidden">
         {selection && filtered.length > 0 && (
           <label className="flex items-center gap-2 rounded-lg border bg-muted/30 px-2.5 py-1.5 text-xs">
             <Checkbox
               checked={allFilteredSelected ? true : someFilteredSelected ? "indeterminate" : false}
-              onCheckedChange={(checked) =>
-                selection.onToggleAll(filteredIds, checked === true)
-              }
+              onCheckedChange={(checked) => selection.onToggleAll(filteredIds, checked === true)}
               aria-label="Select all filtered rows"
             />
             Select all ({filtered.length})
@@ -242,8 +242,7 @@ export function DataTable<T>({
           {paged.map((row, i) => {
             const id = getRowId?.(row) ?? String(i);
             const selected = selection?.selectedIds.has(id) ?? false;
-            const expanded =
-              expandedRowIds?.has(id) ?? expandedRowId === id;
+            const expanded = expandedRowIds?.has(id) ?? expandedRowId === id;
             return (
               <motion.div
                 key={id}
@@ -252,7 +251,7 @@ export function DataTable<T>({
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.2, delay: Math.min(i * 0.02, 0.16), ease }}
                 className={cn(
-                  "overflow-hidden rounded-lg border border-border bg-card",
+                  "overflow-hidden rounded-xl border border-border bg-card",
                   onRowClick && "active:bg-muted/50",
                   selected && "border-primary/40 bg-primary/5",
                   expanded && "border-primary/30 ring-1 ring-primary/15",
@@ -260,7 +259,7 @@ export function DataTable<T>({
                 )}
               >
                 <div
-                  className={cn("p-3", onRowClick && "cursor-pointer")}
+                  className={cn("min-h-14 p-3.5", onRowClick && "cursor-pointer")}
                   onClick={() => onRowClick?.(row)}
                   role={onRowClick ? "button" : undefined}
                 >
@@ -275,11 +274,18 @@ export function DataTable<T>({
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <div className={cn("font-medium text-foreground", compact ? "text-xs" : "text-sm")}>
+                      <div
+                        className={cn(
+                          "font-medium text-foreground",
+                          compact ? "text-sm" : "text-base",
+                        )}
+                      >
                         {primary?.render(row)}
                       </div>
                       {secondary && (
-                        <div className="mt-1 text-xs text-muted-foreground">{secondary.render(row)}</div>
+                        <div className="mt-1 text-sm text-muted-foreground">
+                          {secondary.render(row)}
+                        </div>
                       )}
                       {tertiary && tertiary !== primary && tertiary !== secondary && (
                         <div className="mt-2">{tertiary.render(row)}</div>
@@ -287,7 +293,7 @@ export function DataTable<T>({
                       {mobileExtras.map((col) => (
                         <div
                           key={col.key}
-                          className="mt-1.5 flex items-start justify-between gap-2 text-xs"
+                          className="mt-2 flex items-start justify-between gap-3 text-sm"
                         >
                           <span className="shrink-0 text-muted-foreground">{col.header}</span>
                           <span className="min-w-0 text-right">{col.render(row)}</span>
@@ -305,7 +311,7 @@ export function DataTable<T>({
                   </div>
                   {actions && (
                     <div
-                      className="mt-2.5 flex flex-wrap justify-end gap-1 border-t border-border/60 pt-2"
+                      className="mt-3 flex flex-wrap justify-end gap-2 border-t border-border/60 pt-2 [&_button]:min-h-11"
                       onClick={(e) => e.stopPropagation()}
                     >
                       {actions(row)}
@@ -350,7 +356,9 @@ export function DataTable<T>({
                 {selection && (
                   <th className={cn("w-9 align-middle", headPad)}>
                     <Checkbox
-                      checked={allFilteredSelected ? true : someFilteredSelected ? "indeterminate" : false}
+                      checked={
+                        allFilteredSelected ? true : someFilteredSelected ? "indeterminate" : false
+                      }
                       onCheckedChange={(checked) =>
                         selection.onToggleAll(filteredIds, checked === true)
                       }
@@ -390,7 +398,9 @@ export function DataTable<T>({
                   </th>
                 ))}
                 {actions && (
-                  <th className={cn(headPad, "align-middle whitespace-nowrap text-right font-medium")}>
+                  <th
+                    className={cn(headPad, "align-middle whitespace-nowrap text-right font-medium")}
+                  >
                     Actions
                   </th>
                 )}
@@ -400,10 +410,8 @@ export function DataTable<T>({
               {paged.map((row, i) => {
                 const id = getRowId?.(row) ?? String(i);
                 const selected = selection?.selectedIds.has(id) ?? false;
-                const expanded =
-              expandedRowIds?.has(id) ?? expandedRowId === id;
-                const colSpan =
-                  columns.length + (selection ? 1 : 0) + (actions ? 1 : 0);
+                const expanded = expandedRowIds?.has(id) ?? expandedRowId === id;
+                const colSpan = columns.length + (selection ? 1 : 0) + (actions ? 1 : 0);
                 return (
                   <Fragment key={id}>
                     <tr

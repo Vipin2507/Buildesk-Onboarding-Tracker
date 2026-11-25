@@ -15,15 +15,7 @@ import {
   CheckSquare,
   TrendingUp,
 } from "lucide-react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import { CrmDashboardActivityFeed } from "@/components/crm/crm-dashboard-activity-feed";
 import { CrmDashboardDrillDownSheet } from "@/components/crm/crm-dashboard-drill-down";
@@ -34,9 +26,7 @@ import { PageWrap } from "@/components/page-header";
 import { ProgressBar, ProgressRing } from "@/components/progress-bar";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
-import {
-  DesignTicketPageHeader,
-} from "@/components/design-ticket/design-ticket-shared";
+import { DesignTicketPageHeader } from "@/components/design-ticket/design-ticket-shared";
 import { isCrmAccountEnded } from "@/lib/crm-account-status";
 import { crmDashboardSearchSchema } from "@/lib/crm-route-search";
 import {
@@ -62,6 +52,7 @@ function CrmDashboardPage() {
   const overview = useCrmDashboardOverview();
 
   const [drillDown, setDrillDown] = useState<CrmDashboardDrillDownFilter | null>(null);
+  const [showOpsCounts, setShowOpsCounts] = useState(false);
   const drillDownData = useMemo(
     () => (drillDown ? overview.resolveDrillDown(drillDown) : null),
     [drillDown, overview],
@@ -211,7 +202,7 @@ function CrmDashboardPage() {
         actions={
           <Button
             size="sm"
-            className="h-8 gap-1 bg-primary text-xs"
+            className="min-h-11 h-11 gap-1 bg-primary text-sm sm:h-8 sm:text-xs"
             onClick={() => navigate({ to: "/crm/accounts" })}
           >
             <Plus className="h-3.5 w-3.5" />
@@ -220,8 +211,8 @@ function CrmDashboardPage() {
         }
       />
 
-      <div className="space-y-2.5">
-        <div className="grid grid-cols-2 gap-1.5 lg:grid-cols-4">
+      <div className="flex flex-col gap-2.5">
+        <div className="order-1 grid grid-cols-2 gap-1.5 lg:grid-cols-4">
           {portfolioKpis.map((k, i) => (
             <DashboardKpiCard
               key={k.label}
@@ -237,46 +228,50 @@ function CrmDashboardPage() {
           ))}
         </div>
 
-        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-6">
-          {opsKpis.map((k, i) => (
-            <DashboardKpiCard
-              key={k.label}
-              compact
-              label={k.label}
-              value={k.value}
-              icon={k.icon}
-              tone={k.tone}
-              delay={0.12 + i * 0.03}
-              active={
-                k.filter
-                  ? crmDrillDownFilterKey(drillDown) === k.activeKey
-                  : false
-              }
-              onClick={
-                k.onClick ??
-                (k.filter ? () => openDrillDown(k.filter!) : undefined)
-              }
-            />
-          ))}
+        <div className="order-2">
+          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-6">
+            {opsKpis.map((k, i) => (
+              <div key={k.label} className={i > 1 && !showOpsCounts ? "max-md:hidden" : undefined}>
+                <DashboardKpiCard
+                  compact
+                  label={k.label}
+                  value={k.value}
+                  icon={k.icon}
+                  tone={k.tone}
+                  delay={0.12 + i * 0.03}
+                  active={k.filter ? crmDrillDownFilterKey(drillDown) === k.activeKey : false}
+                  onClick={k.onClick ?? (k.filter ? () => openDrillDown(k.filter!) : undefined)}
+                />
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="mt-2 min-h-12 w-full rounded-xl border bg-card text-sm font-semibold md:hidden"
+            onClick={() => setShowOpsCounts((open) => !open)}
+          >
+            {showOpsCounts ? "Show fewer counts" : "More open work"}
+          </button>
         </div>
 
-        <CrmDashboardOpsPanel
-          tasks={recentOpenTasks}
-          queries={recentOpenQueries}
-          taskTotals={{
-            open: kpis.openTasks,
-            overdue: kpis.overdueTasks,
-            dueToday: kpis.dueTodayTasks,
-          }}
-          queryTotal={kpis.openQueries}
-        />
+        <div className="order-3">
+          <CrmDashboardOpsPanel
+            tasks={recentOpenTasks}
+            queries={recentOpenQueries}
+            taskTotals={{
+              open: kpis.openTasks,
+              overdue: kpis.overdueTasks,
+              dueToday: kpis.dueTodayTasks,
+            }}
+            queryTotal={kpis.openQueries}
+          />
+        </div>
 
-        <CrmDashboardExecutiveAnalysis
-          accounts={rows}
-          onOpenDrillDown={openDrillDown}
-        />
+        <div className="order-6 md:order-4">
+          <CrmDashboardExecutiveAnalysis accounts={rows} onOpenDrillDown={openDrillDown} />
+        </div>
 
-        <div className="grid gap-2.5 lg:grid-cols-2">
+        <div className="order-5 grid gap-2.5 lg:grid-cols-2">
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -285,7 +280,9 @@ function CrmDashboardPage() {
           >
             <div className="mb-2 flex items-center justify-between">
               <h3 className="text-xs font-semibold">Modules opted</h3>
-              <span className="text-[10px] text-muted-foreground">{kpis.totalAccounts} accounts</span>
+              <span className="text-[10px] text-muted-foreground">
+                {kpis.totalAccounts} accounts
+              </span>
             </div>
             <div className="h-36">
               <ResponsiveContainer>
@@ -300,7 +297,11 @@ function CrmDashboardPage() {
                     textAnchor="end"
                     height={40}
                   />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 9 }} stroke="var(--color-muted-foreground)" />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fontSize: 9 }}
+                    stroke="var(--color-muted-foreground)"
+                  />
                   <Tooltip
                     cursor={{ fill: "var(--color-muted)" }}
                     formatter={(value: number, _name, item) => [
@@ -387,7 +388,7 @@ function CrmDashboardPage() {
           </motion.div>
         </div>
 
-        <div className="grid gap-2.5 lg:grid-cols-3">
+        <div className="order-4 grid gap-2.5 md:order-6 lg:grid-cols-3">
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -475,14 +476,20 @@ function CrmDashboardPage() {
                             </Link>
                           </td>
                           <td className="px-2 py-1.5">
-                            <Pill tone={a.overdue ? "danger" : a.status === "live" ? "success" : "muted"}>
+                            <Pill
+                              tone={
+                                a.overdue ? "danger" : a.status === "live" ? "success" : "muted"
+                              }
+                            >
                               {a.status}
                             </Pill>
                           </td>
                           <td className="px-2 py-1.5">
                             <div className="flex items-center gap-1.5">
                               <ProgressBar value={a.progress} className="w-16" />
-                              <span className="text-[10px] text-muted-foreground">{a.progress}%</span>
+                              <span className="text-[10px] text-muted-foreground">
+                                {a.progress}%
+                              </span>
                             </div>
                           </td>
                           <td className="max-w-[100px] truncate px-2 py-1.5 text-muted-foreground">
@@ -502,7 +509,12 @@ function CrmDashboardPage() {
                             </div>
                           </td>
                           <td className="px-2 py-1.5 text-right">
-                            <Button size="sm" variant="ghost" className="h-7 gap-0.5 px-1.5 text-primary" asChild>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 gap-0.5 px-1.5 text-primary"
+                              asChild
+                            >
                               <Link to="/crm/accounts/$accountId" params={{ accountId: a.id }}>
                                 Open <ArrowRight className="h-3 w-3" />
                               </Link>

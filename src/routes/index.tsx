@@ -166,6 +166,7 @@ function Dashboard() {
     subtitle: string;
     companies: typeof kpis.companiesWithProgress;
   } | null>(null);
+  const [showAllPortfolio, setShowAllPortfolio] = useState(false);
 
   const range = RANGES.find((item) => item.id === rangeId) ?? RANGES[3];
   const today = localDate();
@@ -423,14 +424,14 @@ function Dashboard() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           {/* Timeframe Dropdown */}
           <div className="relative" data-dashboard-menu>
             <button
               type="button"
               title="Filters companies by their onboarding start date. Open work above stays current."
               onClick={() => setOpenMenu(openMenu === "range" ? null : "range")}
-              className="flex items-center gap-2 rounded-xl border border-border/80 bg-card px-3 py-2 text-xs font-semibold text-foreground shadow-2xs hover:bg-muted/40 transition-colors"
+              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-border/80 bg-card px-3 py-2 text-sm font-semibold text-foreground shadow-2xs transition-colors hover:bg-muted/40 sm:w-auto sm:text-xs"
             >
               <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
               <span>{range.label}</span>
@@ -464,7 +465,7 @@ function Dashboard() {
           {/* New Onboarding Action */}
           <Button
             size="sm"
-            className="rounded-xl bg-primary px-4 py-2 font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all cursor-pointer"
+            className="min-h-12 w-full cursor-pointer rounded-xl bg-primary px-4 py-2 font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 sm:w-auto"
             onClick={() => navigate({ to: "/companies" })}
           >
             + New Onboarding
@@ -472,9 +473,9 @@ function Dashboard() {
         </div>
       </div>
 
-      <div className="space-y-2.5 pt-1">
+      <div className="flex flex-col gap-2.5 pt-1">
         {/* Smart Pending Work Overview */}
-        <div id="overview">
+        <div id="overview" className="order-1">
           <DashboardPendingSummary
             openDesignTickets={openDesignTickets}
             overdueFollowUps={kpis.overdueFollowUpTasks ?? 0}
@@ -486,29 +487,41 @@ function Dashboard() {
           />
         </div>
 
-        {/* Portfolio KPI Cards Row (4 cards matching screenshot) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-          {portfolioKpis.map((k, i) => (
-            <DashboardKpiCard
-              key={k.label}
-              label={k.label}
-              value={k.value}
-              icon={k.icon}
-              trend={k.trend}
-              trendTitle={k.trendTitle}
-              variant={k.variant}
-              delay={i * 0.04}
-              active={
-                drillDown?.type === k.filter.type &&
-                JSON.stringify(drillDown) === JSON.stringify(k.filter)
-              }
-              onClick={() => openDrillDown(k.filter)}
-            />
-          ))}
+        <div className="order-2">
+          <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+            {portfolioKpis.map((k, i) => (
+              <div
+                key={k.label}
+                className={i > 1 && !showAllPortfolio ? "max-md:hidden" : undefined}
+              >
+                <DashboardKpiCard
+                  label={k.label}
+                  value={k.value}
+                  icon={k.icon}
+                  trend={k.trend}
+                  trendTitle={k.trendTitle}
+                  variant={k.variant}
+                  delay={i * 0.04}
+                  active={
+                    drillDown?.type === k.filter.type &&
+                    JSON.stringify(drillDown) === JSON.stringify(k.filter)
+                  }
+                  onClick={() => openDrillDown(k.filter)}
+                />
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="mt-2 min-h-12 w-full rounded-xl border bg-card text-sm font-semibold md:hidden"
+            onClick={() => setShowAllPortfolio((open) => !open)}
+          >
+            {showAllPortfolio ? "Show fewer numbers" : "More portfolio numbers"}
+          </button>
         </div>
 
         {/* Onboarding Pipeline Section */}
-        <div id="pipeline">
+        <div id="pipeline" className="order-4 md:order-3">
           <OnboardingPipelineSection
             stats={phaseStats}
             activePhase={activePhase}
@@ -517,7 +530,7 @@ function Dashboard() {
         </div>
 
         {/* Analytics 3-Column Row matching reference screenshot */}
-        <div id="analytics" className="grid gap-2.5 lg:grid-cols-12">
+        <div id="analytics" className="order-5 grid gap-2.5 md:order-4 lg:grid-cols-12">
           {/* Card 1: Onboarding Mix (Donut Chart) */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -902,7 +915,7 @@ function Dashboard() {
         </div>
 
         {/* Bottom Row: Recent Onboarding Activity & Recent Activity */}
-        <div id="recent" className="grid gap-3 lg:grid-cols-12">
+        <div id="recent" className="order-3 grid gap-3 md:order-5 lg:grid-cols-12">
           {/* Recent Onboarding Activity (Table with initials & avatars) */}
           <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-2xs lg:col-span-7 flex flex-col justify-between">
             <div className="mb-3 flex items-center justify-between">
@@ -925,8 +938,36 @@ function Dashboard() {
               </Link>
             </div>
 
-            {/* Desktop Table View */}
-            <div className="overflow-x-auto rounded-xl border border-border/60">
+            <div className="space-y-2 md:hidden">
+              {recent.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  No companies in this range yet.
+                </p>
+              ) : (
+                recent.map((c) => {
+                  const managerName = resolveAssigneeLabel(c.onboardingManagerId, users, employees);
+                  return (
+                    <Link
+                      key={c.id}
+                      to="/companies/$companyId"
+                      params={{ companyId: c.id }}
+                      className="flex min-h-12 items-center gap-3 rounded-xl border border-border/70 px-3 py-2.5"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold">{c.name}</div>
+                        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                          <span className="truncate">{managerName}</span>
+                          <span className="font-semibold text-foreground">{c.progress}%</span>
+                        </div>
+                      </div>
+                      <StatusPill status={c.computedStatus} />
+                    </Link>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="hidden overflow-x-auto rounded-xl border border-border/60 md:block">
               <table className="w-full text-left text-xs">
                 <thead className="bg-muted/40 text-[11px] font-semibold text-muted-foreground">
                   <tr>
@@ -1057,7 +1098,9 @@ function Dashboard() {
           </div>
         </div>
 
-        <DashboardWorkQueues companies={kpis.companiesWithProgress} />
+        <div className="order-6">
+          <DashboardWorkQueues companies={kpis.companiesWithProgress} />
+        </div>
       </div>
 
       {/* Drill-down Drawer Sheet */}

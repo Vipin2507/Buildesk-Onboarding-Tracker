@@ -26,6 +26,7 @@ import {
 } from "@/components/design-ticket/design-ticket-shared";
 import { ConfirmDeleteDialog, EntityFormModal } from "@/components/entity-form-modal";
 import { PageWrap } from "@/components/page-header";
+import { PhoneToolbar, phoneStatChip, phoneStatTrack } from "@/components/phone-toolbar";
 import { Button } from "@/components/ui/button";
 import {
   TaskCalendarPanel,
@@ -562,17 +563,19 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
                 : "Calendar views across CRM accounts"}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {canCreate ? (
-              <>
-                <Button
-                  size="sm"
-                  className="h-8 gap-1 bg-primary px-3 text-xs"
-                  onClick={openCreate}
-                >
+          <PhoneToolbar
+            className="max-md:w-full"
+            primary={
+              canCreate ? (
+                <Button size="sm" className="h-8 gap-1 bg-primary px-3 text-xs" onClick={openCreate}>
                   <Plus className="h-3.5 w-3.5" />
                   Create task
                 </Button>
+              ) : null
+            }
+          >
+            {canCreate ? (
+              <>
                 {canCreateInternal ? (
                   <Button
                     size="sm"
@@ -595,14 +598,17 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
                 </Button>
               </>
             ) : null}
-          </div>
+          </PhoneToolbar>
         </div>
 
         <div className="mt-2 flex flex-col gap-2 lg:flex-row lg:items-stretch">
           <div
             role="tablist"
             aria-label="Task filters"
-            className="grid min-w-0 flex-1 grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-5"
+            className={cn(
+              "grid min-w-0 flex-1 grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-5",
+              phoneStatTrack,
+            )}
           >
             {TASK_FILTER_CHIPS.map((chip) => {
               const tone = taskFilterChipTone(chip.id);
@@ -617,6 +623,7 @@ export function CrmTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
                   onClick={() => onTabChange(chip.id)}
                   className={cn(
                     "flex min-w-0 flex-col rounded-lg border bg-card px-2.5 py-2 text-left shadow-sm transition-all",
+                    phoneStatChip,
                     "hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
                     active
                       ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"

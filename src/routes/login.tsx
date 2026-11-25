@@ -57,8 +57,8 @@ function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-muted/40 px-4 py-6 sm:py-10">
-      <div className="absolute right-4 top-4 sm:right-6 sm:top-6">
+    <div className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-muted/40 px-4 py-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:py-10">
+      <div className="absolute right-4 top-[max(1rem,env(safe-area-inset-top))] sm:right-6">
         <ThemeToggleCompact />
       </div>
       <div className="w-full max-w-md">
@@ -66,7 +66,7 @@ function LoginPage() {
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-[0_8px_24px_rgb(0_155_255_/_0.25)]">
             <Building2 className="h-6 w-6" />
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">Buildesk</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Buildesk Compass</h1>
           <p className="mt-1 text-sm text-muted-foreground">ERP Tracker & CRM Onboarding</p>
         </div>
 
@@ -83,43 +83,58 @@ function LoginPage() {
               onLogin();
             }}
           >
-            <label className="block text-xs font-medium">
+            <label className="block text-sm font-medium">
               Email
               <input
                 type="email"
+                inputMode="email"
                 autoComplete="email"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="next"
                 placeholder="you@company.com"
-                className="mt-1 h-10 w-full rounded-md border px-3 text-sm"
+                aria-invalid={loginForm.formState.errors.email ? true : undefined}
+                className="mt-1 min-h-12 w-full rounded-md border px-3 text-base"
                 {...loginForm.register("email")}
               />
+              {loginForm.formState.errors.email ? (
+                <p className="mt-1 text-sm text-destructive">
+                  {loginForm.formState.errors.email.message}
+                </p>
+              ) : null}
             </label>
-            <label className="block text-xs font-medium">
+            <label className="block text-sm font-medium">
               Password
               <div className="relative mt-1">
                 <input
                   type={showLoginPassword ? "text" : "password"}
                   autoComplete="current-password"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  enterKeyHint="go"
                   placeholder="••••••••"
-                  className="h-10 w-full rounded-md border px-3 pr-10 text-sm"
+                  aria-invalid={loginForm.formState.errors.password ? true : undefined}
+                  className="min-h-12 w-full rounded-md border px-3 pr-12 text-base"
                   {...loginForm.register("password")}
                 />
                 <button
                   type="button"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  className="absolute right-1 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center text-muted-foreground hover:text-foreground"
                   onClick={() => setShowLoginPassword((v) => !v)}
                   aria-label={showLoginPassword ? "Hide password" : "Show password"}
                 >
                   {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
+              {loginForm.formState.errors.password ? (
+                <p className="mt-1 text-sm text-destructive">
+                  {loginForm.formState.errors.password.message}
+                </p>
+              ) : null}
             </label>
-            {loginForm.formState.errors.email && (
-              <p className="text-xs text-destructive">{loginForm.formState.errors.email.message}</p>
-            )}
-            {loginForm.formState.errors.password && (
-              <p className="text-xs text-destructive">{loginForm.formState.errors.password.message}</p>
-            )}
-            <Button className="w-full" disabled={busy}>
+            <Button className="min-h-12 w-full text-base" disabled={busy}>
               {busy ? "Signing in…" : "Sign in"}
             </Button>
           </form>

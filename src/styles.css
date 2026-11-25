@@ -1120,3 +1120,24 @@ html.portal-embed-active {
 .crm-winback-row-dnc {
   opacity: 0.55;
 }
+
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]),
+  select,
+  textarea {
+    font-size: 1rem;
+    min-height: 2.75rem;
+  }
+
+  textarea {
+    min-height: 6.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.theme-animating,
+  html.theme-animating *:not([data-theme-ignore]) {
+    transition: none !important;
+  }
+}
+

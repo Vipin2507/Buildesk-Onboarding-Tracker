@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Buildesk Compass</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f4f7fb;
+        --fg: #0f172a;
+        --muted: #5b6b7c;
+        --card: #ffffff;
+        --line: #dbe3ec;
+        --brand: #009bff;
+        --navy: #0b1f33;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #060e18;
+          --fg: #e8eef6;
+          --muted: #8fa3b8;
+          --card: #0c1826;
+          --line: rgba(148, 163, 184, 0.2);
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom));
+        background: var(--bg);
+        color: var(--fg);
+        font: 16px/1.45 Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+      main {
+        width: min(100%, 28rem);
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 24px;
+      }
+      .mark {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        background: var(--brand);
+        color: white;
+        display: grid;
+        place-items: center;
+        font-weight: 700;
+      }
+      h1 { font-size: 1.35rem; margin: 16px 0 8px; }
+      p { margin: 0 0 12px; color: var(--muted); }
+      code {
+        font-family: ui-monospace, monospace;
+        font-size: 0.85em;
+        color: var(--fg);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="mark" aria-hidden="true">B</div>
+      <h1>Buildesk Compass</h1>
+      <p>This Android shell is not pointed at a server yet. Nothing is saved on the phone.</p>
+      <p>Set <code>CAPACITOR_SERVER_URL</code> to the public HTTPS origin, then run <code>npm run android:sync</code>.</p>
+    </main>
+  </body>
+</html>

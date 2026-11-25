@@ -343,7 +343,7 @@ export function ErpTasksHub({ tab, onTabChange, selectedTaskId, onSelectTask }: 
         subtitle="Schedule, assign, and track follow-ups across ERP companies"
         actions={
           canCreate ? (
-            <Button size="sm" className="gap-1.5" onClick={openCreate}>
+            <Button size="sm" className="gap-1.5 max-md:min-h-12 max-md:w-full max-md:text-sm" onClick={openCreate}>
               <Plus className="h-4 w-4" />
               Create task
             </Button>

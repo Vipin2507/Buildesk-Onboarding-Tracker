@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Search, ChevronDown, LogOut, Settings, User, UserRound, Menu, Shield } from "lucide-react";
+import { Search, ChevronDown, Download, LogOut, Settings, User, UserRound, Menu, Shield } from "lucide-react";
 import { toast } from "sonner";
 
 import { EditProfileDialog } from "@/components/edit-profile-dialog";
@@ -17,6 +17,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useSessionFilter } from "@/hooks/use-session-filter";
+import {
+  androidApkReady,
+  isAndroidUpgradeAvailable,
+  loadAndroidRelease,
+  openAndroidApk,
+} from "@/lib/native/android-release";
+import { setMobileNavOpen, useMobileNavOpen } from "@/lib/native/shell-state";
 import { useGlobalSearch, useAuthStore, useCurrentUser } from "@/stores";
 import { authLogout } from "@/lib/api";
 import { isCrmUser } from "@/lib/product-scope";
@@ -25,7 +32,9 @@ export function TopBar() {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [navOpen, setNavOpen] = useState(false);
+  const [apkAction, setApkAction] = useState<"download" | "upgrade" | null>(null);
+  const [apkUrl, setApkUrl] = useState<string | null>(null);
+  const navOpen = useMobileNavOpen();
   const currentUser = useCurrentUser();
   const crm = isCrmUser(currentUser);
   const [searchScope, setSearchScope] = useSessionFilter<GlobalSearchScope>(
@@ -35,6 +44,37 @@ export function TopBar() {
   const results = useGlobalSearch(query);
   const navigate = useNavigate();
   const setUser = useAuthStore((s) => s.setUser);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const release = await loadAndroidRelease();
+      if (cancelled || !release?.apkUrl) return;
+      if (!(await androidApkReady(release.apkUrl))) return;
+      if (cancelled) return;
+      const native = (
+        window as Window & { Capacitor?: { isNativePlatform?: () => boolean } }
+      ).Capacitor?.isNativePlatform?.();
+      if (!native) {
+        setApkUrl(release.apkUrl);
+        setApkAction("download");
+        return;
+      }
+      try {
+        const { App } = await import("@capacitor/app");
+        const info = await App.getInfo();
+        if (!isAndroidUpgradeAvailable(info.version, release.latestVersion)) return;
+        if (cancelled) return;
+        setApkUrl(release.apkUrl);
+        setApkAction("upgrade");
+      } catch {
+        /* The website profile menu still offers the download. */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -96,12 +136,12 @@ export function TopBar() {
 
   return (
     <>
-      <header className="sticky top-0 z-20 flex h-14 min-w-0 items-center gap-2 border-b bg-background/80 px-3 backdrop-blur md:h-16 md:gap-4 md:px-6">
+      <header className="sticky top-0 z-20 flex min-h-14 min-w-0 items-center gap-2 border-b bg-background/80 px-3 pt-[env(safe-area-inset-top)] backdrop-blur md:h-16 md:gap-4 md:px-6 md:pt-0">
         <button
           type="button"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-card text-foreground md:hidden"
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-card text-foreground md:hidden"
           aria-label="Open menu"
-          onClick={() => setNavOpen(true)}
+          onClick={() => setMobileNavOpen(true)}
         >
           <Menu className="h-5 w-5" />
         </button>
@@ -121,7 +161,7 @@ export function TopBar() {
                 ? "Search CRM accounts, tasks…"
                 : "Search ERP companies, projects, tasks…"
             }
-            className="h-10 w-full rounded-lg border border-input bg-card pl-9 pr-11 text-sm outline-none transition-shadow focus:ring-2 focus:ring-ring/40"
+            className="h-12 w-full rounded-lg border border-input bg-card pl-9 pr-11 text-base outline-none transition-shadow focus:ring-2 focus:ring-ring/40 md:h-10 md:text-sm"
             aria-label={
               searchScope === "crm"
                 ? "Search CRM accounts and tasks"
@@ -155,7 +195,7 @@ export function TopBar() {
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="flex items-center gap-2 rounded-lg border bg-card p-1.5 outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/40 md:pr-2.5"
+                className="flex min-h-12 items-center gap-2 rounded-lg border bg-card p-1.5 outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/40 md:min-h-0 md:pr-2.5"
               >
                 {currentUser?.avatarUrl ? (
                   <img
@@ -231,6 +271,19 @@ export function TopBar() {
                   Command Center
                 </DropdownMenuItem>
               )}
+              {apkAction && apkUrl ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => {
+                      void openAndroidApk(apkUrl);
+                    }}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    {apkAction === "upgrade" ? "Upgrade app" : "Download APK"}
+                  </DropdownMenuItem>
+                </>
+              ) : null}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={handleLogout}
@@ -244,7 +297,7 @@ export function TopBar() {
         </div>
       </header>
 
-      <MobileNavSheet open={navOpen} onOpenChange={setNavOpen} />
+      <MobileNavSheet open={navOpen} onOpenChange={setMobileNavOpen} />
       <EditProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />
     </>
   );

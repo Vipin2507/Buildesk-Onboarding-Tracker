@@ -48,6 +48,7 @@ import { EmptyState } from "@/components/empty-state";
 import { ConfirmDeleteDialog, EntityFormModal } from "@/components/entity-form-modal";
 import { inDateRange } from "@/components/list-toolbar";
 import { PageWrap } from "@/components/page-header";
+import { PhoneToolbar, phoneStatChip, phoneStatTrack } from "@/components/phone-toolbar";
 import { ProgressBar } from "@/components/progress-bar";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
@@ -938,7 +939,16 @@ function CrmAccountsPage() {
               {filtered.length} {filtered.length === 1 ? "account" : "accounts"}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5">
+          <PhoneToolbar
+            className="max-md:w-full"
+            moreLabel="More account actions"
+            primary={
+              <Button size="sm" className="h-8 gap-1 bg-primary px-3 text-xs" onClick={openCreate}>
+                <Plus className="h-3.5 w-3.5" />
+                Add account
+              </Button>
+            }
+          >
             <Button
               size="sm"
               variant="outline"
@@ -1008,18 +1018,14 @@ function CrmAccountsPage() {
               <Upload className="h-3.5 w-3.5" />
               Bulk upload
             </Button>
-            <Button size="sm" className="h-8 gap-1 bg-primary px-3 text-xs" onClick={openCreate}>
-              <Plus className="h-3.5 w-3.5" />
-              Add account
-            </Button>
-          </div>
+          </PhoneToolbar>
         </div>
 
         <div className="mt-2 flex items-stretch gap-1.5">
           <div
             role="tablist"
             aria-label="Account filters"
-            className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto pb-0.5"
+            className={cn("flex min-w-0 flex-1 gap-1.5 overflow-x-auto pb-0.5", phoneStatTrack)}
           >
             {STATUS_CHIPS.map((chip) => {
               const tone = filterPillTone(chip.id);
@@ -1034,6 +1040,7 @@ function CrmAccountsPage() {
                   onClick={() => selectAccountFilterPill(chip.id)}
                   className={cn(
                     "flex min-w-[4.75rem] flex-1 flex-col rounded-lg border bg-card px-2.5 py-2 text-left shadow-sm transition-all",
+                    phoneStatChip,
                     "hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
                     active
                       ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"

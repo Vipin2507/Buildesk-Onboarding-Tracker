@@ -1,5 +1,5 @@
 {
-  "include": ["src/**/*.ts", "src/**/*.tsx", "scripts/**/*.ts", "vite.config.ts", "eslint.config.js", "drizzle.config.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "scripts/**/*.ts", "vite.config.ts", "eslint.config.js", "drizzle.config.ts", "capacitor.config.ts"],
   "compilerOptions": {
     "target": "ES2022",
     "jsx": "react-jsx",

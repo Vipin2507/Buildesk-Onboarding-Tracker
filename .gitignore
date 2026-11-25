@@ -21,6 +21,19 @@ dist-ssr
 *.db-wal
 .env
 .env.local
+.env.*.local
+capacitor-www/server-url.js
+
+# Android build output, machine SDK path, and signing secrets
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/keystore.properties
+android/app/release/
+*.jks
+*.keystore
+public/downloads/*.apk
 
 # Wrangler / Cloudflare
 .wrangler/

@@ -26,6 +26,7 @@ Both products share authentication, SQLite storage, automation hooks, client por
 - [Getting started](#getting-started)
 - [Demo accounts](#demo-accounts)
 - [Scripts](#scripts)
+- [Android app](#android-app)
 - [Environment](#environment)
 - [Deployment](#deployment)
 - [Project layout](#project-layout)
@@ -537,6 +538,14 @@ Seed is idempotent: `npm run db:seed` skips when users already exist.
 | `npm run db:setup` | `db:push` → `db:ensure` → `db:seed` |
 | `npm run db:generate` / `db:migrate` | Drizzle kit generate / migrate |
 | `npm run test:crm` | CRM regression smoke check |
+| `npm run android:sync` | Point the Android shell at `CAPACITOR_SERVER_URL` and sync Capacitor |
+| `npm run android:open` | Open the Android project in Android Studio |
+| `npm run android:run` | Sync, then run a debug build on a device or emulator |
+| `npm run android:release` | HTTPS-only sync, then build a release AAB |
+
+## Android app
+
+The Android app is a Capacitor shell around this server. It does not bundle the database or server functions. Phone layout, cookies, back navigation, and release steps are in [ANDROID_APP.md](ANDROID_APP.md). Web development stays `npm run dev`.
 
 ---
 
