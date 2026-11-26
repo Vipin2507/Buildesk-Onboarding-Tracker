@@ -218,12 +218,39 @@ export const crmAccounts = sqliteTable(
     statusRemarks: text("status_remarks"),
     whatsappGroupId: text("whatsapp_group_id"),
     whatsappGroupName: text("whatsapp_group_name"),
+    /** Set when a sign-off file is stored on the account documents tab. */
+    signOffUploadedAt: text("sign_off_uploaded_at"),
     ...timestamps,
   },
   (t) => [
     index("crm_accounts_name_idx").on(t.name),
     index("crm_accounts_user_id_idx").on(t.userId),
     index("crm_accounts_status_idx").on(t.status),
+  ],
+);
+
+export const crmAccountDocuments = sqliteTable(
+  "crm_account_documents",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => crmAccounts.id, { onDelete: "cascade" }),
+    /** `file` for the general library, `signoff` for the single sign-off document. */
+    kind: text("kind").notNull(),
+    title: text("title"),
+    fileName: text("file_name").notNull(),
+    mimeType: text("mime_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    storageKey: text("storage_key").notNull(),
+    uploadedBy: text("uploaded_by").notNull(),
+    uploadedByUserId: text("uploaded_by_user_id"),
+    uploadedAt: text("uploaded_at").notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    index("crm_account_documents_account_idx").on(t.accountId),
+    index("crm_account_documents_kind_idx").on(t.accountId, t.kind),
   ],
 );
 

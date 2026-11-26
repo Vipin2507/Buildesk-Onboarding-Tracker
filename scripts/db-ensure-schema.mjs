@@ -340,6 +340,7 @@ const EXTRA_COLUMNS = [
   { table: "crm_accounts", name: "payment_cycle_baseline", ddl: "REAL" },
   { table: "crm_accounts", name: "renewal_cancelled", ddl: "INTEGER" },
   { table: "crm_accounts", name: "renewal_window_notified_for_end_date", ddl: "TEXT" },
+  { table: "crm_accounts", name: "sign_off_uploaded_at", ddl: "TEXT" },
   { table: "erp_meetings", name: "google_event_id", ddl: "TEXT" },
   { table: "erp_meetings", name: "meet_url", ddl: "TEXT" },
   { table: "erp_meetings", name: "google_sync_status", ddl: "TEXT NOT NULL DEFAULT 'none'" },
@@ -1707,6 +1708,29 @@ if (!tableExists("crm_winback_templates")) {
     CREATE INDEX IF NOT EXISTS crm_winback_templates_active_idx ON crm_winback_templates(active);
   `);
   console.log("+ CREATE TABLE crm_winback_templates");
+}
+
+if (tableExists("crm_accounts") && !tableExists("crm_account_documents")) {
+  sqlite.exec(`
+    CREATE TABLE crm_account_documents (
+      id TEXT PRIMARY KEY NOT NULL,
+      account_id TEXT NOT NULL REFERENCES crm_accounts(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL,
+      title TEXT,
+      file_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      storage_key TEXT NOT NULL,
+      uploaded_by TEXT NOT NULL,
+      uploaded_by_user_id TEXT,
+      uploaded_at TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS crm_account_documents_account_idx ON crm_account_documents(account_id);
+    CREATE INDEX IF NOT EXISTS crm_account_documents_kind_idx ON crm_account_documents(account_id, kind);
+  `);
+  console.log("+ CREATE TABLE crm_account_documents");
 }
 
 if (!tableExists("work_sessions")) {

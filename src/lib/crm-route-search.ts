@@ -71,6 +71,7 @@ export const CRM_ACCOUNT_TAB_IDS = [
   "queries",
   "whatsapp",
   "comms",
+  "documents",
 ] as const;
 
 export type CrmAccountTabId = (typeof CRM_ACCOUNT_TAB_IDS)[number];

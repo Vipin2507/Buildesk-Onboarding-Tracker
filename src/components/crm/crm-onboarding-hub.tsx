@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   CheckSquare,
   ClipboardList,
+  Files,
   HelpCircle,
   LayoutDashboard,
   MessageCircle,
@@ -37,6 +38,7 @@ import { CrmAccountModulesTab } from "@/components/crm/crm-account-modules-tab";
 import { CrmAccountStageSelect } from "@/components/crm/crm-account-stage-select";
 import { CrmAccountStatusSelect } from "@/components/crm/crm-account-status-select";
 import { CrmAccountPortalPanel } from "@/components/crm/crm-account-portal-panel";
+import { CrmAccountDocumentsTab } from "@/components/crm/crm-account-documents-tab";
 import { CrmAccountGoLiveActions } from "@/components/crm/crm-account-go-live-actions";
 import { crmAccountHasRenewalCycle } from "@/lib/crm-account-renewal";
 import { CrmAccountInstallmentSchedule } from "@/components/crm/crm-account-installment-schedule";
@@ -105,6 +107,7 @@ const TABS = [
   { id: "queries", label: "Queries", icon: HelpCircle },
   { id: "whatsapp", label: "WhatsApp", icon: MessageCircle },
   { id: "comms", label: "Comms", icon: MessageSquare },
+  { id: "documents", label: "Documents", icon: Files },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -339,6 +342,7 @@ export function CrmOnboardingHub({
           ) : null}
           {tab === "whatsapp" ? <CrmAccountWhatsappGroupPanel accountId={accountId} /> : null}
           {tab === "comms" ? <CommsTab companyId={accountId} /> : null}
+          {tab === "documents" ? <CrmAccountDocumentsTab accountId={accountId} /> : null}
         </motion.div>
       </AnimatePresence>
 

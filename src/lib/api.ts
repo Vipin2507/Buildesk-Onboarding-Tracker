@@ -170,6 +170,13 @@ export {
 } from "@/server/api/crm-accounts";
 
 export {
+  listCrmAccountDocuments,
+  uploadCrmAccountDocument,
+  updateCrmAccountDocument,
+  deleteCrmAccountDocument,
+} from "@/server/api/crm-account-documents";
+
+export {
   getCrmUsageBoard,
   getCrmUsageAccountPage,
   refreshCrmUsageAccount,

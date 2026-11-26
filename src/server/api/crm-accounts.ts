@@ -66,6 +66,7 @@ function mapRow(row: typeof t.crmAccounts.$inferSelect): CrmAccount {
     statusRemarks: row.statusRemarks ?? undefined,
     whatsappGroupId: row.whatsappGroupId ?? undefined,
     whatsappGroupName: row.whatsappGroupName ?? undefined,
+    signOffUploadedAt: row.signOffUploadedAt ?? undefined,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -266,6 +267,7 @@ export const upsertCrmAccount = createServerFn({ method: "POST" })
           ...toRowValues(data, id, existing.createdAt, updatedAt),
           id,
           createdAt: existing.createdAt,
+          signOffUploadedAt: existing.signOffUploadedAt,
           updatedAt,
         })
         .where(eq(t.crmAccounts.id, id))
@@ -312,6 +314,7 @@ export const upsertCrmAccountsBatch = createServerFn({ method: "POST" })
             ...toRowValues(item, id, existing.createdAt, updatedAt),
             id,
             createdAt: existing.createdAt,
+            signOffUploadedAt: existing.signOffUploadedAt,
             updatedAt,
           })
           .where(eq(t.crmAccounts.id, id))

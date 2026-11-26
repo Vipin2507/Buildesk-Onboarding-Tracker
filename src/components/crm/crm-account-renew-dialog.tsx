@@ -55,7 +55,7 @@ export function CrmAccountRenewDialog({
 
   const carried = account
     ? renewalCollectionCarryover({
-        cycleReceived: cycleCollected ?? Number(account.paymentReceived) || 0,
+        cycleReceived: cycleCollected ?? (Number(account.paymentReceived) || 0),
         previousDeal: Number(account.dealSize) || 0,
       })
     : 0;

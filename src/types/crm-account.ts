@@ -63,6 +63,8 @@ export type CrmAccount = Timestamps & {
   whatsappGroupId?: string;
   /** Cached group subject / display name */
   whatsappGroupName?: string;
+  /** Present when a sign-off document has been uploaded. */
+  signOffUploadedAt?: string;
 };
 
 export type CrmAccountInstallment = {

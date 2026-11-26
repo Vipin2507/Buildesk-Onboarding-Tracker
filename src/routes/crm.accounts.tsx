@@ -135,6 +135,7 @@ const ACCOUNT_LIST_FILTER_DEFAULTS: {
   engagedKindFilter: string;
   engagedFrom: string;
   engagedTo: string;
+  signOffFilter: string;
   sortBy: CrmAccountSortBy;
   tableSearch: string;
 } = {
@@ -159,6 +160,7 @@ const ACCOUNT_LIST_FILTER_DEFAULTS: {
   engagedKindFilter: "all",
   engagedFrom: "",
   engagedTo: "",
+  signOffFilter: "all",
   sortBy: DEFAULT_CRM_ACCOUNT_SORT,
   tableSearch: "",
 };
@@ -289,6 +291,7 @@ type AccountListFilters = {
   engagedKindFilter: string;
   engagedFrom: string;
   engagedTo: string;
+  signOffFilter?: string;
 };
 
 function matchesAccountListFilters(row: CrmAccountRow, f: AccountListFilters) {
@@ -358,6 +361,8 @@ function matchesAccountListFilters(row: CrmAccountRow, f: AccountListFilters) {
     if (!inDateRange(row.startDate, f.dateFrom, f.dateTo)) return false;
     if (!matchesCrmLastEngagedDateRange(row.lastEngaged, f.engagedFrom, f.engagedTo)) return false;
   }
+  if (f.signOffFilter === "done" && !row.signOffUploadedAt) return false;
+  if (f.signOffFilter === "missing" && row.signOffUploadedAt) return false;
   return true;
 }
 
@@ -410,6 +415,7 @@ function CrmAccountsPage() {
     engagedKindFilter,
     engagedFrom,
     engagedTo,
+    signOffFilter,
     sortBy,
     tableSearch,
   } = listFilters;
@@ -510,6 +516,10 @@ function CrmAccountsPage() {
   );
   const setEngagedKindFilter = useCallback(
     (value: string) => setListFilters({ engagedKindFilter: value }),
+    [setListFilters],
+  );
+  const setSignOffFilter = useCallback(
+    (value: string) => setListFilters({ signOffFilter: value }),
     [setListFilters],
   );
   const { field: sortField, dir: sortDir } = useMemo(() => parseCrmAccountSortBy(sortBy), [sortBy]);
@@ -680,6 +690,7 @@ function CrmAccountsPage() {
       engagedKindFilter,
       engagedFrom,
       engagedTo,
+      signOffFilter,
     }),
     [
       typeFilter,
@@ -698,6 +709,7 @@ function CrmAccountsPage() {
       engagedKindFilter,
       engagedFrom,
       engagedTo,
+      signOffFilter,
     ],
   );
 
@@ -793,6 +805,7 @@ function CrmAccountsPage() {
     Boolean(dateFrom || dateTo || engagedFrom || engagedTo),
     engagedRecencyFilter !== "all",
     engagedKindFilter !== "all",
+    signOffFilter !== "all",
     sortBy !== DEFAULT_CRM_ACCOUNT_SORT,
     kpiFilter !== "all",
   ].filter(Boolean).length;
@@ -1298,6 +1311,18 @@ function CrmAccountsPage() {
                   value: opt.value,
                   label: opt.label,
                 }))}
+              />
+            </DesignTicketFilterField>
+            <DesignTicketFilterField label="Sign off" compact>
+              <DesignTicketSelect
+                compact
+                value={signOffFilter}
+                onChange={setSignOffFilter}
+                options={[
+                  { value: "all", label: "Any" },
+                  { value: "done", label: "Done" },
+                  { value: "missing", label: "Not done" },
+                ]}
               />
             </DesignTicketFilterField>
             <DesignTicketFilterField label="Engaged via" compact>
