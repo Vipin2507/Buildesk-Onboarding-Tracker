@@ -456,6 +456,8 @@ export type PaymentsListFilters = {
   installmentTo?: string;
   renewalFrom?: string;
   renewalTo?: string;
+  startFrom?: string;
+  startTo?: string;
   scenario?: "installment" | "renewal";
   collection?: "under_50" | "50_to_90" | "over_90";
   search?: string;
@@ -522,13 +524,19 @@ function applyPaymentsToolbarFilters(
   const renewalFrom = filters.renewalFrom ?? (legacyIsRenewal ? filters.dueDateFrom : undefined);
   const renewalTo = filters.renewalTo ?? (legacyIsRenewal ? filters.dueDateTo : undefined);
 
+  const startFrom = filters.startFrom;
+  const startTo = filters.startTo;
   const hasInstallmentWindow = Boolean(installmentFrom || installmentTo);
   const hasRenewalWindow = Boolean(renewalFrom || renewalTo);
-  if (hasInstallmentWindow && hasRenewalWindow) {
+  const hasStartWindow = Boolean(startFrom || startTo);
+  const dateWindows = [hasInstallmentWindow, hasRenewalWindow, hasStartWindow].filter(Boolean).length;
+  if (dateWindows > 1) {
     rows = rows.filter(
       (row) =>
-        dateInRange(row.nextDueInstallment?.dueDate, installmentFrom, installmentTo) ||
-        dateInRange(row.renewalDate, renewalFrom, renewalTo),
+        (hasInstallmentWindow &&
+          dateInRange(row.nextDueInstallment?.dueDate, installmentFrom, installmentTo)) ||
+        (hasRenewalWindow && dateInRange(row.renewalDate, renewalFrom, renewalTo)) ||
+        (hasStartWindow && dateInRange(row.dealDate, startFrom, startTo)),
     );
   } else if (hasInstallmentWindow) {
     rows = rows.filter((row) =>
@@ -536,6 +544,8 @@ function applyPaymentsToolbarFilters(
     );
   } else if (hasRenewalWindow) {
     rows = rows.filter((row) => dateInRange(row.renewalDate, renewalFrom, renewalTo));
+  } else if (hasStartWindow) {
+    rows = rows.filter((row) => dateInRange(row.dealDate, startFrom, startTo));
   }
 
   if (filters.collection === "under_50") {

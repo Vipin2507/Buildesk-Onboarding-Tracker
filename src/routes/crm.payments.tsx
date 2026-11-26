@@ -105,7 +105,7 @@ const WINDOW_PRESETS = [
   { id: "quarter", label: "This quarter" },
 ] as const;
 
-type PaymentDateTarget = "all" | "installment" | "renewal";
+type PaymentDateTarget = "all" | "start" | "installment" | "renewal";
 type PaymentWindowChoice = (typeof WINDOW_PRESETS)[number]["id"] | "any" | "custom";
 
 function paymentDateTarget(search: {
@@ -113,13 +113,17 @@ function paymentDateTarget(search: {
   installmentTo?: string;
   renewalFrom?: string;
   renewalTo?: string;
+  startFrom?: string;
+  startTo?: string;
 }): PaymentDateTarget {
   const renewal = Boolean(search.renewalFrom || search.renewalTo);
   const installment = Boolean(search.installmentFrom || search.installmentTo);
-  if (installment && renewal) return "all";
+  const start = Boolean(search.startFrom || search.startTo);
+  const active = [start, installment, renewal].filter(Boolean).length;
+  if (active !== 1) return "all";
+  if (start) return "start";
   if (renewal) return "renewal";
-  if (installment) return "installment";
-  return "all";
+  return "installment";
 }
 
 function paymentDateRange(
@@ -128,9 +132,14 @@ function paymentDateRange(
     installmentTo?: string;
     renewalFrom?: string;
     renewalTo?: string;
+    startFrom?: string;
+    startTo?: string;
   },
   target: PaymentDateTarget,
 ) {
+  if (target === "start") {
+    return { from: search.startFrom ?? "", to: search.startTo ?? "" };
+  }
   if (target === "renewal") {
     return { from: search.renewalFrom ?? "", to: search.renewalTo ?? "" };
   }
@@ -138,8 +147,8 @@ function paymentDateRange(
     return { from: search.installmentFrom ?? "", to: search.installmentTo ?? "" };
   }
   return {
-    from: search.installmentFrom ?? search.renewalFrom ?? "",
-    to: search.installmentTo ?? search.renewalTo ?? "",
+    from: search.installmentFrom ?? search.renewalFrom ?? search.startFrom ?? "",
+    to: search.installmentTo ?? search.renewalTo ?? search.startTo ?? "",
   };
 }
 
@@ -316,6 +325,8 @@ function CrmPaymentsPage() {
             "installmentTo" in patch ||
             "renewalFrom" in patch ||
             "renewalTo" in patch ||
+            "startFrom" in patch ||
+            "startTo" in patch ||
             "scenario" in patch ||
             "collection" in patch ||
             "sortBy" in patch;
@@ -445,6 +456,19 @@ function CrmPaymentsPage() {
         installmentTo: end,
         renewalFrom: start,
         renewalTo: end,
+        startFrom: start,
+        startTo: end,
+      });
+      return;
+    }
+    if (target === "start") {
+      patchSearch({
+        startFrom: start,
+        startTo: end,
+        installmentFrom: undefined,
+        installmentTo: undefined,
+        renewalFrom: undefined,
+        renewalTo: undefined,
       });
       return;
     }
@@ -454,6 +478,8 @@ function CrmPaymentsPage() {
         installmentTo: end,
         renewalFrom: undefined,
         renewalTo: undefined,
+        startFrom: undefined,
+        startTo: undefined,
       });
       return;
     }
@@ -462,6 +488,8 @@ function CrmPaymentsPage() {
       renewalTo: end,
       installmentFrom: undefined,
       installmentTo: undefined,
+      startFrom: undefined,
+      startTo: undefined,
     });
   }
 
@@ -552,6 +580,8 @@ function CrmPaymentsPage() {
                   installmentTo: undefined,
                   renewalFrom: undefined,
                   renewalTo: undefined,
+                  startFrom: undefined,
+                  startTo: undefined,
                   scenario: undefined,
                   collection: undefined,
                   sortBy: undefined,
@@ -651,11 +681,12 @@ function CrmPaymentsPage() {
                 value={dateTarget}
                 onChange={(value) => {
                   const target: PaymentDateTarget =
-                    value === "renewal" || value === "all" ? value : "installment";
+                    value === "renewal" || value === "start" || value === "all" ? value : "installment";
                   applyPaymentDates(target, dateRange.from, dateRange.to);
                 }}
                 options={[
                   { value: "all", label: "All" },
+                  { value: "start", label: "Start date" },
                   { value: "installment", label: "Installment due" },
                   { value: "renewal", label: "Renewal date" },
                 ]}
