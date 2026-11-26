@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { BarChart3, ChevronDown, FileSpreadsheet, Search, SlidersHorizontal, Upload } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import {
@@ -30,7 +30,7 @@ import {
   ticketSectionVariants,
 } from "@/components/design-ticket/design-ticket-shared";
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { importCrmSeatSheets, listCrmSeatSheets } from "@/lib/api";
 import { parseSeatSheet, seatEconomics, type SeatEconomics, type SeatSheetRow } from "@/lib/crm-seat-sheet";
@@ -350,8 +350,7 @@ export function PaymentsSeatTab() {
           summary={`${money(totals.deal)} current · ${money(totals.netValue)} net`}
           icon={<BarChart3 className="h-3.5 w-3.5" />}
         >
-          {chartsOpen ? (
-            <div className="space-y-2">
+          <div className="space-y-2">
           <div className="grid items-stretch gap-2 sm:grid-cols-2 xl:grid-cols-4">
             <Metric
               label="Current deal"
@@ -631,8 +630,7 @@ export function PaymentsSeatTab() {
               }))}
             />
           </motion.div>
-            </div>
-          ) : null}
+          </div>
         </Fold>
       ) : null}
 
@@ -823,9 +821,10 @@ function Fold({
   icon: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const reduce = useReducedMotion();
   return (
     <Collapsible open={open} onOpenChange={onOpenChange}>
-      <div className="rounded-xl border bg-card">
+      <div className="overflow-hidden rounded-xl border bg-card">
         <CollapsibleTrigger asChild>
           <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -840,15 +839,26 @@ function Fold({
             <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">{summary}</span>
             <ChevronDown
               className={cn(
-                "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
+                "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-300 ease-out motion-reduce:transition-none",
                 open && "rotate-180",
               )}
             />
           </button>
         </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="space-y-2 border-t px-3 py-2.5">{children}</div>
-        </CollapsibleContent>
+        <AnimatePresence initial={false}>
+          {open ? (
+            <motion.div
+              key="panel"
+              initial={reduce ? false : { height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: reduce ? 0 : 0.32, ease: TICKET_EASE }}
+              className="overflow-hidden"
+            >
+              <div className="space-y-2 border-t px-3 py-2.5">{children}</div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </div>
     </Collapsible>
   );
