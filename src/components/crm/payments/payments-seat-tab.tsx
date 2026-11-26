@@ -25,7 +25,6 @@ import {
   DesignTicketSelect,
 } from "@/components/design-ticket/design-ticket-fields";
 import {
-  DesignTicketFilterBar,
   TICKET_EASE,
   ticketPageVariants,
   ticketSectionVariants,
@@ -201,67 +200,75 @@ export function PaymentsSeatTab() {
       variants={ticketPageVariants}
       initial="hidden"
       animate="show"
-      className="space-y-3 py-3"
+      className="space-y-4 py-3"
     >
-      <motion.div variants={ticketSectionVariants} className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold">Seat value</h2>
-          <p className="max-w-2xl text-[11px] leading-relaxed text-muted-foreground">
-            Upgrade gain and degrade loss use the sheet’s value per user. This view does not change
-            collected payments, installments, or the live deal.
-          </p>
-        </div>
-        {isAdmin ? (
-          <>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              className="hidden"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void onFile(file);
-              }}
+      <motion.div variants={ticketSectionVariants} className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-0 w-full sm:w-auto sm:flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={queryText}
+              onChange={(event) => setQueryText(event.target.value)}
+              placeholder="Search account or user id…"
+              aria-label="Search seat sheet"
+              className="h-9 w-full pl-8 text-xs max-md:min-h-12 max-md:text-sm"
             />
+          </div>
+          {rows.length > 0 ? (
+            <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+              {filtered.length} {filtered.length === 1 ? "account" : "accounts"}
+            </span>
+          ) : null}
+          {activeFilterCount > 0 ? (
             <Button
+              type="button"
+              variant="ghost"
               size="sm"
-              className="h-8 gap-1.5 text-xs max-md:min-h-12"
-              disabled={uploading}
-              onClick={() => fileRef.current?.click()}
+              className="h-9 shrink-0 px-2 text-xs text-muted-foreground"
+              onClick={clearFilters}
             >
-              {uploading ? <FileSpreadsheet className="h-3.5 w-3.5" /> : <Upload className="h-3.5 w-3.5" />}
-              Upload sheet
+              Clear
             </Button>
-          </>
-        ) : null}
-      </motion.div>
-
-      <motion.div variants={ticketSectionVariants} className="space-y-1.5">
-        <div className="relative max-w-md">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={queryText}
-            onChange={(event) => setQueryText(event.target.value)}
-            placeholder="Search account or user id…"
-            aria-label="Search seat sheet"
-            className="h-8 pl-8 text-xs max-md:min-h-12 max-md:text-sm"
-          />
+          ) : null}
+          {isAdmin ? (
+            <>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void onFile(file);
+                }}
+              />
+              <Button
+                size="sm"
+                className="h-9 shrink-0 gap-1.5 text-xs max-md:min-h-12"
+                disabled={uploading}
+                onClick={() => fileRef.current?.click()}
+              >
+                {uploading ? (
+                  <FileSpreadsheet className="h-3.5 w-3.5" />
+                ) : (
+                  <Upload className="h-3.5 w-3.5" />
+                )}
+                Upload
+              </Button>
+            </>
+          ) : null}
         </div>
-        <DesignTicketFilterBar
-          variant="inline"
-          defaultFiltersOpen
-          className="sm:!grid-cols-3 lg:!grid-cols-6"
-          activeFilterCount={activeFilterCount}
-          onClear={clearFilters}
-          resultCount={rows.length === 0 ? undefined : filtered.length}
-          resultLabel={filtered.length === 1 ? "account" : "accounts"}
-        >
+
+        <div className="grid grid-cols-2 items-end gap-x-2 gap-y-2 md:grid-cols-3 xl:grid-cols-6">
           <DesignTicketFilterField label="Sales manager" compact className="min-w-0">
             <DesignTicketSelect
               compact
               value={manager}
               onChange={setManager}
-              options={[{ value: "all", label: "All managers" }, ...managers.map((name) => ({ value: name, label: name }))]}
+              options={[
+                { value: "all", label: "All managers" },
+                ...managers.map((name) => ({ value: name, label: name })),
+              ]}
             />
           </DesignTicketFilterField>
           <DesignTicketFilterField label="Seat change" compact className="min-w-0">
@@ -327,7 +334,7 @@ export function PaymentsSeatTab() {
               setTo(value);
             }}
           />
-        </DesignTicketFilterBar>
+        </div>
       </motion.div>
 
       {query.isLoading ? (
@@ -342,7 +349,7 @@ export function PaymentsSeatTab() {
         </motion.div>
       ) : (
         <>
-          <motion.div variants={ticketSectionVariants} className="flex flex-wrap gap-1" role="tablist" aria-label="Seat outcome">
+          <motion.div variants={ticketSectionVariants} className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Seat outcome">
             {OUTCOMES.map((tab) => {
               const active = outcome === tab.id;
               return (
@@ -379,7 +386,7 @@ export function PaymentsSeatTab() {
             })}
           </motion.div>
 
-          <motion.div variants={ticketSectionVariants} className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <motion.div variants={ticketSectionVariants} className="grid items-stretch gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Metric
               label="Sheet deal"
               value={totals.deal}
@@ -410,12 +417,12 @@ export function PaymentsSeatTab() {
             />
           </motion.div>
 
-          <motion.div variants={ticketSectionVariants} className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(16rem,0.8fr)]">
-            <section className="rounded-2xl border bg-card p-3">
-              <div className="mb-2 flex items-baseline justify-between gap-2">
+          <motion.div variants={ticketSectionVariants} className="grid items-stretch gap-3 lg:grid-cols-2">
+            <section className="flex h-full flex-col rounded-2xl border bg-card p-4">
+              <div className="mb-3 flex items-baseline justify-between gap-3">
                 <h3 className="text-xs font-semibold">Outcome mix</h3>
-                <span className="text-[10px] text-muted-foreground">
-                  {scoped.length} accounts in the current search, manager, and end date
+                <span className="text-right text-[10px] leading-tight text-muted-foreground">
+                  {scoped.length} accounts
                 </span>
               </div>
               <MixBar
@@ -426,76 +433,94 @@ export function PaymentsSeatTab() {
                   { key: "unpriced", label: "No price", value: outcomeCounts.unpriced, color: BRAND },
                 ]}
               />
-              <p className="mt-3 text-[11px] text-muted-foreground">
+              <p className="mt-auto pt-4 text-[11px] leading-relaxed text-muted-foreground">
                 {totals.upgradeSeats} seats upgraded · {totals.degradeSeats} seats degraded · net{" "}
-                {signedSeats(totals.upgradeSeats - totals.degradeSeats)} seats in this filter
+                {signedSeats(totals.upgradeSeats - totals.degradeSeats)} seats
               </p>
             </section>
 
-            <section className="rounded-2xl border bg-card p-3">
-              <h3 className="mb-2 text-xs font-semibold">Seat movement</h3>
+            <section className="flex h-full flex-col rounded-2xl border bg-card p-4">
+              <div className="mb-3 flex items-baseline justify-between gap-3">
+                <h3 className="text-xs font-semibold">Seat movement</h3>
+                <span className="text-[10px] text-muted-foreground">Upgrade vs degrade</span>
+              </div>
               {totals.upgradeSeats + totals.degradeSeats === 0 ? (
-                <p className="flex h-40 items-center justify-center text-xs text-muted-foreground">
+                <p className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
                   No upgrade or degrade seats in this filter.
                 </p>
               ) : (
-                <div className="relative h-40">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={[
-                          { name: "Upgrade", value: totals.upgradeSeats, fill: GAIN },
-                          { name: "Degrade", value: totals.degradeSeats, fill: LOSS },
-                        ].filter((item) => item.value > 0)}
-                        dataKey="value"
-                        nameKey="name"
-                        innerRadius={46}
-                        outerRadius={62}
-                        paddingAngle={3}
-                        strokeWidth={0}
-                        isAnimationActive={!reduce}
-                        animationDuration={chartMotion}
+                <div className="flex flex-1 flex-col items-center justify-center">
+                  <div className="relative h-36 w-36">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={[
+                            { name: "Upgrade", value: totals.upgradeSeats, fill: GAIN },
+                            { name: "Degrade", value: totals.degradeSeats, fill: LOSS },
+                          ].filter((item) => item.value > 0)}
+                          dataKey="value"
+                          nameKey="name"
+                          innerRadius={42}
+                          outerRadius={62}
+                          paddingAngle={3}
+                          strokeWidth={0}
+                          isAnimationActive={!reduce}
+                          animationDuration={chartMotion}
+                        >
+                          {[
+                            { name: "Upgrade", value: totals.upgradeSeats, fill: GAIN },
+                            { name: "Degrade", value: totals.degradeSeats, fill: LOSS },
+                          ]
+                            .filter((item) => item.value > 0)
+                            .map((item) => (
+                              <Cell key={item.name} fill={item.fill} />
+                            ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value: number, name: string) => [`${value} seats`, name]}
+                          contentStyle={tooltipStyle}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                      <div
+                        className={cn(
+                          "text-base font-semibold tabular-nums leading-none",
+                          totals.upgradeSeats - totals.degradeSeats > 0
+                            ? "text-emerald-700 dark:text-emerald-400"
+                            : totals.upgradeSeats - totals.degradeSeats < 0
+                              ? "text-rose-700 dark:text-rose-400"
+                              : "text-foreground",
+                        )}
                       >
-                        {[
-                          { name: "Upgrade", value: totals.upgradeSeats, fill: GAIN },
-                          { name: "Degrade", value: totals.degradeSeats, fill: LOSS },
-                        ]
-                          .filter((item) => item.value > 0)
-                          .map((item) => (
-                            <Cell key={item.name} fill={item.fill} />
-                          ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(value: number, name: string) => [`${value} seats`, name]}
-                        contentStyle={tooltipStyle}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                    <div
-                      className={cn(
-                        "text-lg font-semibold tabular-nums",
-                        totals.netValue > 0
-                          ? "text-emerald-700 dark:text-emerald-400"
-                          : totals.netValue < 0
-                            ? "text-rose-700 dark:text-rose-400"
-                            : "text-foreground",
-                      )}
-                    >
-                      {money(totals.netValue)}
+                        {signedSeats(totals.upgradeSeats - totals.degradeSeats)}
+                      </div>
+                      <div className="mt-0.5 text-[10px] text-muted-foreground">seats</div>
                     </div>
-                    <div className="text-[10px] text-muted-foreground">Net seat value</div>
                   </div>
+                  <div
+                    className={cn(
+                      "mt-3 text-center text-sm font-semibold tabular-nums",
+                      totals.netValue > 0
+                        ? "text-emerald-700 dark:text-emerald-400"
+                        : totals.netValue < 0
+                          ? "text-rose-700 dark:text-rose-400"
+                          : "text-foreground",
+                    )}
+                  >
+                    {money(totals.netValue)}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">Net seat value</div>
                 </div>
               )}
-              <div className="mt-1 flex justify-center gap-4 text-[11px] text-muted-foreground">
+              <div className="mt-3 flex items-center justify-center gap-5 text-[11px] text-muted-foreground">
                 <LegendDot color={GAIN} label="Upgrade" />
                 <LegendDot color={LOSS} label="Degrade" />
               </div>
             </section>
           </motion.div>
 
-          <motion.div variants={ticketSectionVariants} className="grid gap-3 lg:grid-cols-2">
+          <motion.div variants={ticketSectionVariants} className="grid items-stretch gap-3 lg:grid-cols-2">
             <ChartCard
               title="Gain and loss by sales manager"
               hint="Click a manager to filter"
@@ -503,10 +528,19 @@ export function PaymentsSeatTab() {
               emptyLabel="No priced seat movement in this filter."
             >
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={managerChart} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+                <BarChart data={managerChart} margin={{ top: 8, right: 8, left: 4, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} />
-                  <YAxis tick={{ fontSize: 10 }} tickFormatter={shortInr} />
+                  <XAxis
+                    dataKey="name"
+                    interval={0}
+                    tick={{ fontSize: 10 }}
+                    tickMargin={8}
+                    height={48}
+                    angle={-24}
+                    textAnchor="end"
+                    tickFormatter={(value: string) => (value.length > 14 ? `${value.slice(0, 13)}…` : value)}
+                  />
+                  <YAxis width={44} tick={{ fontSize: 10 }} tickFormatter={shortInr} />
                   <Tooltip formatter={(value: number) => formatPaymentsInr(value)} contentStyle={tooltipStyle} />
                   <Bar
                     dataKey="gain"
@@ -544,10 +578,10 @@ export function PaymentsSeatTab() {
               emptyLabel="No end dates in this filter."
             >
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthChart} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+                <BarChart data={monthChart} margin={{ top: 8, right: 8, left: 4, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
-                  <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 10 }} tickFormatter={shortInr} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} tickMargin={8} height={48} />
+                  <YAxis width={44} tick={{ fontSize: 10 }} tickFormatter={shortInr} />
                   <Tooltip
                     formatter={(value: number, name: string) => [formatPaymentsInr(Math.abs(value)), name]}
                     contentStyle={tooltipStyle}
@@ -585,15 +619,15 @@ export function PaymentsSeatTab() {
                 <BarChart
                   data={movers}
                   layout="vertical"
-                  margin={{ top: 4, right: 12, left: 8, bottom: 0 }}
+                  margin={{ top: 4, right: 16, left: 4, bottom: 0 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} className="stroke-border" />
                   <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={shortInr} />
                   <YAxis
                     type="category"
                     dataKey="name"
-                    width={128}
-                    tick={{ fontSize: 10 }}
+                    width={132}
+                    tick={{ fontSize: 11 }}
                     tickFormatter={(value: string) => (value.length > 18 ? `${value.slice(0, 17)}…` : value)}
                   />
                   <Tooltip formatter={(value: number) => formatPaymentsInr(value)} contentStyle={tooltipStyle} />
@@ -607,7 +641,7 @@ export function PaymentsSeatTab() {
             </ChartCard>
           </motion.div>
 
-          <motion.div variants={ticketSectionVariants} className="grid gap-3 lg:grid-cols-2">
+          <motion.div variants={ticketSectionVariants} className="grid items-stretch gap-3 lg:grid-cols-2">
             <AccountList
               title="Largest gains"
               empty="No upgrade gain in this filter."
@@ -749,7 +783,7 @@ function Metric({
 }) {
   const reduce = useReducedMotion();
   const className = cn(
-    "rounded-2xl border bg-card px-3 py-2.5 text-left transition-[border-color,box-shadow,transform] duration-300",
+    "flex h-full min-h-[5.5rem] min-w-0 flex-col rounded-2xl border bg-card px-4 py-3 text-left transition-[border-color,box-shadow,transform] duration-300",
     onClick && !reduce && "hover:-translate-y-0.5 hover:border-primary/40",
     onClick && reduce && "hover:border-primary/40",
     active && "border-primary shadow-[0_0_0_3px_color-mix(in_srgb,var(--primary)_18%,transparent)]",
@@ -757,7 +791,7 @@ function Metric({
   const body = (
     <>
       <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className={cn("mt-1 text-lg font-semibold tabular-nums", tone)}>
+      <div className={cn("mt-1.5 truncate text-lg font-semibold leading-none tabular-nums", tone)}>
         {value == null ? (
           "—"
         ) : reduce ? (
@@ -766,7 +800,7 @@ function Metric({
           <CountUp to={value} format={(n) => formatPaymentsInr(Math.round(n))} />
         )}
       </div>
-      <div className="mt-0.5 text-[10px] leading-snug text-muted-foreground">{detail}</div>
+      <div className="mt-auto pt-2 text-[11px] leading-snug text-muted-foreground">{detail}</div>
     </>
   );
   if (onClick) {
@@ -803,14 +837,14 @@ function MixBar({
           />
         ))}
       </div>
-      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="mt-3 flex flex-wrap items-end gap-x-6 gap-y-2">
         {parts.map((part) => (
-          <div key={part.key}>
+          <div key={part.key} className="min-w-[4.5rem]">
             <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: part.color }} />
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: part.color }} />
               {part.label}
             </div>
-            <div className="text-sm font-semibold tabular-nums">{part.value}</div>
+            <div className="mt-0.5 pl-3 text-sm font-semibold tabular-nums">{part.value}</div>
           </div>
         ))}
       </div>
@@ -834,17 +868,15 @@ function ChartCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="min-w-0 rounded-2xl border bg-card p-3">
-      <div className="mb-2 flex items-baseline justify-between gap-2">
+    <section className="flex h-full min-w-0 flex-col rounded-2xl border bg-card p-4">
+      <div className="mb-3 flex items-baseline justify-between gap-3">
         <h3 className="text-xs font-semibold">{title}</h3>
-        {hint ? <span className="text-[10px] text-muted-foreground">{hint}</span> : null}
+        {hint ? <span className="text-right text-[10px] leading-tight text-muted-foreground">{hint}</span> : null}
       </div>
       {empty ? (
-        <p className={cn("flex items-center justify-center text-xs text-muted-foreground", tall ? "h-64" : "h-52")}>
-          {emptyLabel}
-        </p>
+        <p className="flex h-72 items-center justify-center text-xs text-muted-foreground">{emptyLabel}</p>
       ) : (
-        <div className={tall ? "h-64" : "h-52"}>{children}</div>
+        <div className={cn("min-h-0", tall ? "h-80" : "h-72")}>{children}</div>
       )}
     </section>
   );
@@ -860,8 +892,8 @@ function AccountList({
   rows: { id: string; name: string; primary: string; secondary: string; tone: string }[];
 }) {
   return (
-    <section className="rounded-2xl border bg-card p-3">
-      <h3 className="mb-2 text-xs font-semibold">{title}</h3>
+    <section className="flex h-full flex-col rounded-2xl border bg-card p-4">
+      <h3 className="mb-3 text-xs font-semibold">{title}</h3>
       {rows.length === 0 ? (
         <p className="text-xs text-muted-foreground">{empty}</p>
       ) : (
