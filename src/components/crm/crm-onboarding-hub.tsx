@@ -38,6 +38,7 @@ import { CrmAccountStageSelect } from "@/components/crm/crm-account-stage-select
 import { CrmAccountStatusSelect } from "@/components/crm/crm-account-status-select";
 import { CrmAccountPortalPanel } from "@/components/crm/crm-account-portal-panel";
 import { CrmAccountGoLiveActions } from "@/components/crm/crm-account-go-live-actions";
+import { crmAccountHasRenewalCycle } from "@/lib/crm-account-renewal";
 import { CrmAccountInstallmentSchedule } from "@/components/crm/crm-account-installment-schedule";
 import { CrmAccountTasksPanel } from "@/components/crm/crm-account-tasks-panel";
 import { CrmGoLiveChecklist } from "@/components/crm/crm-go-live-checklist";
@@ -598,7 +599,11 @@ function DashboardTab({
         onSubmit={saveAccount}
         contentClassName="max-w-3xl"
       >
-        <CrmAccountFormFields form={form} portalApiKeyRequired={false} />
+        <CrmAccountFormFields
+          form={form}
+          portalApiKeyRequired={false}
+          allowRenewalInstallments={crmAccountHasRenewalCycle(account.paymentCycleBaseline)}
+        />
       </EntityFormModal>
     </div>
   );

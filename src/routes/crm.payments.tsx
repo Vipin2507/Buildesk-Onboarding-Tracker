@@ -750,7 +750,17 @@ function CrmPaymentsPage() {
               onToggle: toggleSelection,
               onToggleAll: toggleSelectionAll,
             }}
-            renderExpandedRow={(r) => <CrmPaymentsExpandedRow row={r} search={search} />}
+            renderExpandedRow={(r) => (
+              <CrmPaymentsExpandedRow
+                row={r}
+                search={search}
+                onRenew={
+                  isCrmAccountInRenewalWindow({ endDate: r.renewalDate })
+                    ? () => setRenewAccountId(r.id)
+                    : undefined
+                }
+              />
+            )}
             actions={(r) => {
               const canRenew = isCrmAccountInRenewalWindow({ endDate: r.renewalDate });
               return (

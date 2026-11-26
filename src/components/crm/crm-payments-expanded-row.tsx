@@ -27,12 +27,14 @@ import {
   useUpdateCrmPaymentInstallment,
 } from "@/hooks/use-crm-payments";
 import { refreshAutomationLogsInStore } from "@/lib/automation-log-sync";
+import { crmAccountHasRenewalCycle } from "@/lib/crm-account-renewal";
 import type { CrmPaymentsSearch } from "@/lib/crm-payments-search";
 import { cn, formatDate } from "@/lib/utils";
 
 type PaymentRow = {
   id: string;
   accountName: string;
+  paymentCycleBaseline?: number;
 };
 
 function formatInr(value: number) {
@@ -62,9 +64,10 @@ function installmentStatusLabel(status: string) {
 type Props = {
   row: PaymentRow;
   search: CrmPaymentsSearch;
+  onRenew?: () => void;
 };
 
-export function CrmPaymentsExpandedRow({ row, search }: Props) {
+export function CrmPaymentsExpandedRow({ row, search, onRenew }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editInitial, setEditInitial] = useState<PaymentDialogInitial | null>(null);
   const [installmentDialogOpen, setInstallmentDialogOpen] = useState(false);
@@ -95,6 +98,10 @@ export function CrmPaymentsExpandedRow({ row, search }: Props) {
   }
 
   function openAddInstallment() {
+    if (!crmAccountHasRenewalCycle(row.paymentCycleBaseline)) {
+      toast.error("Renew this account from Payments before adding a renewal installment.");
+      return;
+    }
     setInstallmentInitial(null);
     setInstallmentDialogOpen(true);
   }
@@ -149,6 +156,7 @@ export function CrmPaymentsExpandedRow({ row, search }: Props) {
 
   const installments = installmentsQuery.data ?? [];
   const transactions = transactionsQuery.data ?? [];
+  const renewed = crmAccountHasRenewalCycle(row.paymentCycleBaseline);
 
   return (
     <div className="grid gap-3 border-t border-border/80 bg-muted/20 p-3 dark:bg-muted/10 md:grid-cols-2">
@@ -158,16 +166,28 @@ export function CrmPaymentsExpandedRow({ row, search }: Props) {
             Installment schedule
           </h4>
           <div className="flex flex-wrap gap-1">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="h-7 gap-1 px-2 text-[11px]"
-              onClick={openAddInstallment}
-            >
-              <Plus className="h-3 w-3" />
-              Add installment
-            </Button>
+            {renewed ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1 px-2 text-[11px]"
+                onClick={openAddInstallment}
+              >
+                <Plus className="h-3 w-3" />
+                Add installment
+              </Button>
+            ) : onRenew ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 px-2 text-[11px]"
+                onClick={onRenew}
+              >
+                Renew account
+              </Button>
+            ) : null}
             <Button
               type="button"
               size="sm"
@@ -195,9 +215,21 @@ export function CrmPaymentsExpandedRow({ row, search }: Props) {
           <p className="py-2 text-xs text-muted-foreground">Loading schedule…</p>
         ) : installments.length === 0 ? (
           <p className="py-2 text-xs text-muted-foreground">
-            No installments configured. Add a renewal installment to schedule the next due.
+            {renewed
+              ? "No installments configured. Add a renewal installment to schedule the next due."
+              : onRenew
+                ? "Renew this account before adding a renewal installment."
+                : "Renew this account from Payments when the renewal window opens, then add the installment."}
           </p>
         ) : (
+          <>
+            {!renewed ? (
+              <p className="mb-2 text-xs text-muted-foreground">
+                {onRenew
+                  ? "Renew this account before adding a renewal installment."
+                  : "Renew this account from Payments when the renewal window opens, then add the installment."}
+              </p>
+            ) : null}
           <div className="overflow-x-auto rounded-md border border-border">
             <table className="w-full min-w-[280px] text-xs">
               <thead className="bg-card text-muted-foreground">
@@ -276,6 +308,7 @@ export function CrmPaymentsExpandedRow({ row, search }: Props) {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 

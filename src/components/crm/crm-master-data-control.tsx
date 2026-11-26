@@ -11,6 +11,7 @@ import {
   type CrmAccountFormValues,
 } from "@/components/crm/crm-account-form";
 import { ConfirmDeleteDialog, EntityFormModal } from "@/components/entity-form-modal";
+import { crmAccountHasRenewalCycle } from "@/lib/crm-account-renewal";
 import { Pill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { calcCrmOnboardingProgress } from "@/data/crm-onboarding-defaults";
@@ -207,7 +208,12 @@ export function CrmMasterDataControl() {
         onSubmit={onSubmit}
         contentClassName="max-w-3xl"
       >
-        <CrmAccountFormFields form={form} />
+        <CrmAccountFormFields
+          form={form}
+          allowRenewalInstallments={
+            editing ? crmAccountHasRenewalCycle(editing.paymentCycleBaseline) : false
+          }
+        />
       </EntityFormModal>
 
       <ConfirmDeleteDialog

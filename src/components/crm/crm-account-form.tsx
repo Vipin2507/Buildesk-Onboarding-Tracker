@@ -279,6 +279,7 @@ export function CrmAccountFormFields({
   portalApiKeyRequired = false,
   selectedModules,
   onSelectedModulesChange,
+  allowRenewalInstallments = true,
 }: {
   form: UseFormReturn<CrmAccountFormValues>;
   showModulePicker?: boolean;
@@ -286,6 +287,7 @@ export function CrmAccountFormFields({
   portalApiKeyRequired?: boolean;
   selectedModules?: CrmProductModuleKey[];
   onSelectedModulesChange?: (keys: CrmProductModuleKey[]) => void;
+  allowRenewalInstallments?: boolean;
 }) {
   const errors = form.formState.errors;
   const users = useUserStore((s) => s.users);
@@ -485,7 +487,10 @@ export function CrmAccountFormFields({
       </Section>
 
       <Section title="Commercial">
-        <CrmAccountCommercialFields form={form} />
+        <CrmAccountCommercialFields
+          form={form}
+          allowRenewalInstallments={allowRenewalInstallments}
+        />
       </Section>
 
       {showModulePicker && selectedModules && onSelectedModulesChange ? (

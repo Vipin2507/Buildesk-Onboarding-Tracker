@@ -13,6 +13,13 @@ import type { CrmAccount, CrmAccountInstallment } from "@/types/crm-account";
 /** Reminder / highlight opens this many days before the next renewal start. */
 export const CRM_RENEWAL_REMINDER_DAYS = 30;
 
+/** True after Payments → Renew has started a cycle (baseline is stored, including 0). */
+export function crmAccountHasRenewalCycle(
+  paymentCycleBaseline: number | null | undefined,
+): boolean {
+  return typeof paymentCycleBaseline === "number" && Number.isFinite(paymentCycleBaseline);
+}
+
 export function todayYmd(now = new Date()): string {
   return now.toISOString().slice(0, 10);
 }

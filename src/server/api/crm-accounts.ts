@@ -10,7 +10,7 @@ import { sortCrmAccountsByStartDateDesc } from "@/lib/crm-account-sort";
 import { CRM_ACCOUNT_COMPANY_MARKER } from "@/lib/design-ticket-portal";
 import { isAdminRoleKey, roleHasPermission } from "@/lib/permissions";
 import { loadServerRoles } from "@/server/auth/permissions";
-import { parseInstallmentsJson } from "@/lib/crm-account-commercial";
+import { parseInstallmentsJson, renewalInstallments, roundMoney } from "@/lib/crm-account-commercial";
 import {
   ensureInitialPaymentOnAccountCreate,
   getAccountPaymentReceived,
@@ -18,8 +18,7 @@ import {
   replaceAccountPaymentLedgerForImport,
   syncAccountPaymentTotals,
 } from "@/server/lib/crm-payments";
-import { buildCrmAccountRenewPatch, renewPatchToApiFields } from "@/lib/crm-account-renewal";
-import { roundMoney } from "@/lib/crm-account-commercial";
+import { buildCrmAccountRenewPatch, crmAccountHasRenewalCycle, renewPatchToApiFields } from "@/lib/crm-account-renewal";
 import type { CrmAccount } from "@/types/crm-account";
 import type { CompanyType } from "@/types/company";
 
@@ -232,6 +231,22 @@ function assertCanMutateAccount(
   }
 }
 
+function assertRenewalInstallmentsFollowRenew(
+  existing: { paymentCycleBaseline: number | null; installmentsJson: string | null } | undefined,
+  nextJson: string | null | undefined,
+) {
+  if (nextJson == null) return;
+  const nextCount = renewalInstallments(parseInstallmentsJson(nextJson)).length;
+  if (nextCount === 0) return;
+  if (existing && crmAccountHasRenewalCycle(existing.paymentCycleBaseline)) return;
+  const previousCount = existing
+    ? renewalInstallments(parseInstallmentsJson(existing.installmentsJson)).length
+    : 0;
+  if (nextCount > previousCount) {
+    throw new ApiError(400, "Renew this account from Payments before adding a renewal installment.");
+  }
+}
+
 export const upsertCrmAccount = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => accountInput.parse(data))
   .handler(async ({ data }) => {
@@ -242,6 +257,7 @@ export const upsertCrmAccount = createServerFn({ method: "POST" })
     const existing = db.select().from(t.crmAccounts).where(eq(t.crmAccounts.id, id)).get();
 
     assertCanMutateAccount(user, existing, data.salesManagerName);
+    assertRenewalInstallmentsFollowRenew(existing, data.installmentsJson);
 
     if (existing) {
       const updatedAt = data.updatedAt ?? now;
@@ -288,6 +304,7 @@ export const upsertCrmAccountsBatch = createServerFn({ method: "POST" })
       const id = item.id ?? newId();
       const existing = db.select().from(t.crmAccounts).where(eq(t.crmAccounts.id, id)).get();
       assertCanMutateAccount(user, existing, item.salesManagerName);
+      assertRenewalInstallmentsFollowRenew(existing, item.installmentsJson);
       if (existing) {
         const updatedAt = item.updatedAt ?? now;
         db.update(t.crmAccounts)
@@ -385,6 +402,9 @@ export const bulkUpdateCrmAccountPayments = createServerFn({ method: "POST" })
       if (!existing) continue;
 
       assertCanMutateAccount(user, existing, existing.salesManagerName);
+      if (patch.installmentsJson !== undefined) {
+        assertRenewalInstallmentsFollowRenew(existing, patch.installmentsJson);
+      }
 
       const set: Record<string, unknown> = { updatedAt: now };
       if (patch.userId !== undefined) set.userId = patch.userId?.trim() || null;

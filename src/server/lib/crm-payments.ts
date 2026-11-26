@@ -6,6 +6,7 @@ import {
   roundMoney,
   serializeInstallments,
 } from "@/lib/crm-account-commercial";
+import { crmAccountHasRenewalCycle } from "@/lib/crm-account-renewal";
 import {
   buildCycleAwarePaymentAllocation,
   classifyPaymentTransactionRenewal,
@@ -1186,6 +1187,9 @@ export function addAccountRenewalInstallment(
   if (amount <= 0) throw new Error("Installment amount must be greater than zero");
   const dueDate = input.dueDate.slice(0, 10);
   if (!dueDate) throw new Error("Due date is required");
+  if (!crmAccountHasRenewalCycle(account.paymentCycleBaseline)) {
+    throw new Error("Renew this account from Payments before adding a renewal installment.");
+  }
   const existing = parseInstallmentsJson(account.installmentsJson);
   return persistAccountInstallments(db, accountId, [
     ...existing,

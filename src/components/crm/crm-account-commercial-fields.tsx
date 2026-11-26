@@ -53,8 +53,10 @@ function Label({ children, required }: { children: React.ReactNode; required?: b
 
 export function CrmAccountCommercialFields({
   form,
+  allowRenewalInstallments = true,
 }: {
   form: UseFormReturn<CrmAccountFormValues>;
+  allowRenewalInstallments?: boolean;
 }) {
   const errors = form.formState.errors;
   const driverRef = useRef<CommercialDriver | null>(null);
@@ -405,31 +407,35 @@ export function CrmAccountCommercialFields({
       <div className="rounded-lg border border-dashed border-violet-500/30 bg-violet-500/5 p-3">
         <div className="mb-1 flex items-center justify-between gap-2">
           <div className="text-xs font-semibold">Renewal installments</div>
-          <button
-            type="button"
-            className="text-[11px] font-medium text-primary hover:underline"
-            onClick={() => {
-              const today = new Date().toISOString().slice(0, 10);
-              const lastDue =
-                renewalRows[renewalRows.length - 1]?.dueDate ||
-                originalRows[originalRows.length - 1]?.dueDate ||
-                startDate ||
-                today;
-              const nextDue = lastDue ? lastDue : today;
-              setCommercial({
-                installments: [
-                  ...originalRows,
-                  ...renewalRows,
-                  { amount: 0, dueDate: nextDue, kind: "renewal" },
-                ],
-              });
-            }}
-          >
-            + Add installment
-          </button>
+          {allowRenewalInstallments ? (
+            <button
+              type="button"
+              className="text-[11px] font-medium text-primary hover:underline"
+              onClick={() => {
+                const today = new Date().toISOString().slice(0, 10);
+                const lastDue =
+                  renewalRows[renewalRows.length - 1]?.dueDate ||
+                  originalRows[originalRows.length - 1]?.dueDate ||
+                  startDate ||
+                  today;
+                const nextDue = lastDue ? lastDue : today;
+                setCommercial({
+                  installments: [
+                    ...originalRows,
+                    ...renewalRows,
+                    { amount: 0, dueDate: nextDue, kind: "renewal" },
+                  ],
+                });
+              }}
+            >
+              + Add installment
+            </button>
+          ) : null}
         </div>
         <p className="mb-2 text-[10px] text-muted-foreground">
-          Schedule extra dues after the original deal is paid. These are not counted against deal value.
+          {allowRenewalInstallments
+            ? "Schedule extra dues after the original deal is paid. These are not counted against deal value."
+            : "Renew this account from Payments before adding a renewal installment."}
         </p>
         {renewalRows.length > 0 ? (
           <div className="overflow-hidden rounded-lg border bg-background">

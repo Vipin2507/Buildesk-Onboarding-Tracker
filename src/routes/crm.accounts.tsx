@@ -65,7 +65,7 @@ import {
   crmAccountStatusLabel,
   isCrmAccountLiveForList,
 } from "@/lib/crm-account-status";
-import { crmRenewalWindowLabel, isCrmAccountInRenewalWindow } from "@/lib/crm-account-renewal";
+import { crmAccountHasRenewalCycle, crmRenewalWindowLabel, isCrmAccountInRenewalWindow } from "@/lib/crm-account-renewal";
 import { isAdminRoleKey } from "@/lib/permissions";
 import {
   listActiveCrmImplementationStages,
@@ -1697,6 +1697,9 @@ function CrmAccountsPage() {
           form={form}
           showModulePicker={!editing}
           portalApiKeyRequired={!editing}
+          allowRenewalInstallments={
+            editing ? crmAccountHasRenewalCycle(editing.paymentCycleBaseline) : false
+          }
           selectedModules={selectedModules}
           onSelectedModulesChange={setSelectedModules}
         />
