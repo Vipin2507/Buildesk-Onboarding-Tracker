@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { BarChart3, ChevronDown, FileSpreadsheet, Search, SlidersHorizontal, Upload } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import {
@@ -416,7 +416,7 @@ export function PaymentsSeatTab() {
               ) : (
                 <div className="flex flex-1 flex-col items-center justify-center">
                   <div className="relative h-28 w-28">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height={112}>
                       <PieChart>
                         <Pie
                           data={[
@@ -492,7 +492,7 @@ export function PaymentsSeatTab() {
               empty={managerChart.length === 0}
               emptyLabel="No priced seat movement in this filter."
             >
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={176}>
                 <BarChart data={managerChart} margin={{ top: 8, right: 8, left: 4, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
                   <XAxis
@@ -542,7 +542,7 @@ export function PaymentsSeatTab() {
               empty={monthChart.length === 0}
               emptyLabel="No end dates in this filter."
             >
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={176}>
                 <BarChart data={monthChart} margin={{ top: 8, right: 8, left: 4, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
                   <XAxis dataKey="label" tick={{ fontSize: 10 }} tickMargin={8} height={48} />
@@ -580,7 +580,7 @@ export function PaymentsSeatTab() {
               emptyLabel="No priced accounts in this filter."
               tall
             >
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={208}>
                 <BarChart
                   data={movers}
                   layout="vertical"
@@ -824,7 +824,7 @@ function Fold({
   const reduce = useReducedMotion();
   return (
     <Collapsible open={open} onOpenChange={onOpenChange}>
-      <div className="overflow-hidden rounded-xl border bg-card">
+      <div className="rounded-xl border bg-card">
         <CollapsibleTrigger asChild>
           <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -845,20 +845,17 @@ function Fold({
             />
           </button>
         </CollapsibleTrigger>
-        <AnimatePresence initial={false}>
-          {open ? (
-            <motion.div
-              key="panel"
-              initial={reduce ? false : { height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: reduce ? 0 : 0.32, ease: TICKET_EASE }}
-              className="overflow-hidden"
-            >
-              <div className="space-y-2 border-t px-3 py-2.5">{children}</div>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
+        <div
+          className={cn(
+            "grid transition-[grid-template-rows] duration-300 ease-out motion-reduce:transition-none",
+            open ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+            reduce && "duration-0",
+          )}
+        >
+          <div className="min-h-0 overflow-hidden">
+            <div className="space-y-2 border-t px-3 py-2.5">{children}</div>
+          </div>
+        </div>
       </div>
     </Collapsible>
   );
@@ -974,7 +971,9 @@ function ChartCard({
       {empty ? (
         <p className="flex h-32 items-center justify-center text-xs text-muted-foreground">{emptyLabel}</p>
       ) : (
-        <div className={cn("min-h-0", tall ? "h-52" : "h-44")}>{children}</div>
+        <div className="min-h-0 w-full" style={{ height: tall ? 208 : 176 }}>
+          {children}
+        </div>
       )}
     </section>
   );
