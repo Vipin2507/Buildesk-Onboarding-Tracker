@@ -5,7 +5,9 @@ import { CheckCircle2, Circle } from "lucide-react";
 import { toast } from "sonner";
 
 import { OverviewBoard } from "@/components/command-center/overview-board";
+import { UserAdminPanel } from "@/components/command-center/user-admin-panel";
 import { downloadCsv, useAdminFilters } from "@/components/command-center/filters";
+import { useAuthStore } from "@/stores";
 import {
   adminAudit,
   adminCrm,
@@ -763,6 +765,8 @@ export function AuditPage() {
 }
 
 export function SettingsPage() {
+  const owner = useAuthStore((s) => Boolean(s.user?.platformOwner));
+  const [tab, setTab] = useState<"monitor" | "users">("monitor");
   const query = useQuery({ queryKey: ["admin-settings"], queryFn: () => adminSettings() });
   const client = useQueryClient();
   const config = query.data?.success ? query.data.data : null;
@@ -771,9 +775,32 @@ export function SettingsPage() {
   return (
     <Section
       title="Admin settings"
-      note="Every Admin account can open Command Center. Finer roles such as HR or read-only are not on the user record, so they are not pretended here. These values do not change the 14-day login cookie."
+      note="Monitoring values apply to every Admin. User add, edit, and delete stay with the platform owner account."
     >
-      {current ? (
+      {owner ? (
+        <div className="flex w-fit rounded-full border bg-white p-0.5 dark:bg-[#0E1C33]">
+          {(
+            [
+              { id: "monitor", label: "Monitoring" },
+              { id: "users", label: "Users" },
+            ] as const
+          ).map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setTab(item.id)}
+              className={`h-7 rounded-full px-3 text-xs font-medium ${
+                tab === item.id ? "bg-[#009bff] text-white" : "text-slate-500"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {owner && tab === "users" ? <UserAdminPanel /> : null}
+      {!owner || tab === "monitor" ? (
+      current ? (
         <form
           className="grid max-w-lg gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#0E1C33]"
           onSubmit={(event) => {
@@ -822,7 +849,8 @@ export function SettingsPage() {
         </form>
       ) : (
         <p className="text-sm text-slate-500">Loading settings…</p>
-      )}
+      )
+      ) : null}
     </Section>
   );
 }

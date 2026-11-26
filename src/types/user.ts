@@ -19,6 +19,8 @@ export type User = Timestamps & {
   active: boolean;
   /** erp = Buildesk tracker; crm = separate CRM product */
   productScope?: ProductScope;
+  /** Command Center user directory. Only the seeded owner has this. */
+  platformOwner?: boolean;
   /** Data URL or remote URL for avatar. */
   avatarUrl?: string;
   phone?: string;

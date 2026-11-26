@@ -296,7 +296,7 @@ export function PaymentsSeatTab() {
                 { value: "gain_desc", label: "Upgrade gain" },
                 { value: "loss_desc", label: "Degrade loss" },
                 { value: "per_user_desc", label: "Value per user" },
-                { value: "users_desc", label: "Users" },
+                { value: "users_desc", label: "Current users" },
                 { value: "name", label: "Account A–Z" },
               ]}
             />
@@ -345,7 +345,8 @@ export function PaymentsSeatTab() {
           className="rounded-2xl border border-dashed bg-card px-4 py-10 text-center text-sm text-muted-foreground"
         >
           No seat sheet yet. An admin can upload Account, User Id, Start date, End date, Deal value,
-          Deal value with GST, Users, Upgrade, and Degrade.
+          Deal value with GST, Users, Upgrade, and Degrade. Deal value is the amount after the seat
+          change. Users is the count before it.
         </motion.div>
       ) : (
         <>
@@ -388,21 +389,21 @@ export function PaymentsSeatTab() {
 
           <motion.div variants={ticketSectionVariants} className="grid items-stretch gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Metric
-              label="Sheet deal"
+              label="Current deal"
               value={totals.deal}
-              detail={`${filtered.length} of ${rows.length} accounts`}
+              detail={`Previous ${money(totals.previous)} · after seat changes`}
               tone="text-foreground"
             />
             <Metric
               label="Value per user"
               value={totals.valuePerUser}
-              detail={totals.users > 0 ? `${totals.users} users on the sheet` : "No user counts"}
+              detail={totals.users > 0 ? `Current deal ÷ ${totals.users} current users` : "No user counts"}
               tone="text-foreground"
             />
             <Metric
               label="Upgrade gain"
               value={totals.upgradeValue}
-              detail={`${totals.upgradeSeats} seats added`}
+              detail={`${totals.upgradeSeats} seats added into the current deal`}
               tone="text-emerald-700 dark:text-emerald-400"
               active={movement === "upgrade"}
               onClick={() => setMovement((current) => (current === "upgrade" ? "all" : "upgrade"))}
@@ -410,7 +411,7 @@ export function PaymentsSeatTab() {
             <Metric
               label="Degrade loss"
               value={totals.degradeValue}
-              detail={`Net ${money(totals.netValue)}`}
+              detail={`Removed from the earlier deal · net ${money(totals.netValue)}`}
               tone="text-rose-700 dark:text-rose-400"
               active={movement === "degrade"}
               onClick={() => setMovement((current) => (current === "degrade" ? "all" : "degrade"))}
@@ -682,9 +683,11 @@ export function PaymentsSeatTab() {
                           "Manager",
                           "Start",
                           "End",
-                          "Deal value",
+                          "Current deal",
+                          "Previous deal",
                           "With GST",
-                          "Users",
+                          "Current users",
+                          "Previous users",
                           "Upgrade",
                           "Degrade",
                           "Per user",
@@ -715,7 +718,9 @@ export function PaymentsSeatTab() {
                           <td className="px-3 py-2">{row.startDate ? formatDate(row.startDate) : "—"}</td>
                           <td className="px-3 py-2">{row.endDate ? formatDate(row.endDate) : "—"}</td>
                           <td className="px-3 py-2 tabular-nums">{money(row.dealValue)}</td>
+                          <td className="px-3 py-2 tabular-nums">{money(row.economics.previousValue)}</td>
                           <td className="px-3 py-2 tabular-nums">{money(row.dealValueWithGst)}</td>
+                          <td className="px-3 py-2 tabular-nums">{count(row.economics.currentUsers)}</td>
                           <td className="px-3 py-2 tabular-nums">{count(row.users)}</td>
                           <td className="px-3 py-2 tabular-nums">{count(row.upgrade)}</td>
                           <td className="px-3 py-2 tabular-nums">{count(row.degrade)}</td>
@@ -998,12 +1003,13 @@ function compareRows(a: ViewRow, b: ViewRow, sortKey: SortKey) {
   if (sortKey === "gain_desc") return gain(b) - gain(a);
   if (sortKey === "loss_desc") return loss(b) - loss(a);
   if (sortKey === "per_user_desc") return perUser(b) - perUser(a);
-  if (sortKey === "users_desc") return (b.users ?? -1) - (a.users ?? -1);
+  if (sortKey === "users_desc") return (b.economics.currentUsers ?? -1) - (a.economics.currentUsers ?? -1);
   return net(b) - net(a);
 }
 
 function summarize(rows: ViewRow[]) {
   let deal = 0;
+  let previous = 0;
   let users = 0;
   let upgradeValue = 0;
   let degradeValue = 0;
@@ -1014,19 +1020,22 @@ function summarize(rows: ViewRow[]) {
   let pricedDeal = 0;
   for (const row of rows) {
     if (row.economics.base != null) deal += row.economics.base;
-    if ((row.users ?? 0) > 0) users += row.users ?? 0;
+    if (row.economics.previousValue != null) previous += row.economics.previousValue;
+    const currentUsers = row.economics.currentUsers;
+    if (currentUsers != null && currentUsers > 0) users += currentUsers;
     upgradeValue += row.economics.upgradeValue ?? 0;
     degradeValue += row.economics.degradeValue ?? 0;
     netValue += row.economics.netValue ?? 0;
     upgradeSeats += row.upgrade ?? 0;
     degradeSeats += row.degrade ?? 0;
-    if (row.economics.valuePerUser != null && (row.users ?? 0) > 0 && row.economics.base != null) {
-      pricedUsers += row.users ?? 0;
+    if (row.economics.valuePerUser != null && currentUsers != null && currentUsers > 0 && row.economics.base != null) {
+      pricedUsers += currentUsers;
       pricedDeal += row.economics.base;
     }
   }
   return {
     deal,
+    previous,
     users,
     valuePerUser: pricedUsers > 0 ? Math.round((pricedDeal / pricedUsers) * 100) / 100 : null,
     upgradeValue,

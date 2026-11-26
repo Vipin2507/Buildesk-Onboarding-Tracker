@@ -46,6 +46,7 @@ export function toPublicUser(row: typeof users.$inferSelect): User {
     role: row.role as UserRole,
     active: row.active,
     productScope: ((row as { productScope?: string }).productScope as User["productScope"]) || "erp",
+    platformOwner: Boolean((row as { platformOwner?: boolean }).platformOwner),
     avatarUrl: row.avatarUrl ?? undefined,
     phone: row.phone ?? undefined,
     jobTitle: row.jobTitle ?? undefined,

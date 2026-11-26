@@ -22,7 +22,13 @@ export type SeatSheetRow = SeatSheetInput & {
 };
 
 export type SeatEconomics = {
+  /** Deal value on the sheet: the amount after upgrade and degrade. */
   base: number | null;
+  /** Users column plus upgrades, minus degrades. */
+  currentUsers: number | null;
+  /** Users column on the sheet: the count before upgrade and degrade. */
+  previousUsers: number | null;
+  previousValue: number | null;
   valuePerUser: number | null;
   upgradeValue: number | null;
   degradeValue: number | null;
@@ -80,20 +86,30 @@ function dateCell(value: unknown): string | null {
   return normalizeImportDate(value);
 }
 
+function roundMoney(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
 export function seatEconomics(row: Pick<
   SeatSheetInput,
   "dealValue" | "dealValueWithGst" | "users" | "upgrade" | "degrade"
 >): SeatEconomics {
   const base = row.dealValue ?? row.dealValueWithGst;
-  const userCount = row.users ?? 0;
   const upgrade = row.upgrade ?? 0;
   const degrade = row.degrade ?? 0;
+  const previousUsers = row.users;
+  const currentUsers = row.users == null ? null : row.users + upgrade - degrade;
   const valuePerUser =
-    userCount > 0 && base != null ? Math.round((base / userCount) * 100) / 100 : null;
+    currentUsers != null && currentUsers > 0 && base != null
+      ? roundMoney(base / currentUsers)
+      : null;
   const scale = (count: number) =>
-    valuePerUser == null ? null : Math.round(count * valuePerUser * 100) / 100;
+    valuePerUser == null ? null : roundMoney(count * valuePerUser);
   return {
     base,
+    currentUsers,
+    previousUsers,
+    previousValue: previousUsers == null ? null : scale(previousUsers),
     valuePerUser,
     upgradeValue: scale(upgrade),
     degradeValue: scale(degrade),

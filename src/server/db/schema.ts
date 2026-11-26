@@ -14,6 +14,8 @@ export const users = sqliteTable("users", {
   passwordHash: text("password_hash").notNull(),
   role: text("role").notNull().default("Viewer"),
   productScope: text("product_scope").notNull().default("erp"),
+  /** Only this account can add, edit, or delete users from Command Center. */
+  platformOwner: integer("platform_owner", { mode: "boolean" }).notNull().default(false),
   active: integer("active", { mode: "boolean" }).notNull().default(true),
   avatarUrl: text("avatar_url"),
   phone: text("phone"),

@@ -10,13 +10,17 @@ import {
   getMonitorConfig,
   heartbeat,
   listAudit,
+  listDirectoryUsers,
   listEmployees,
   listEvents,
   listSecurity,
   listSessions,
   recordNavigation,
   requireAdmin,
+  removeDirectoryUser,
+  requirePlatformOwner,
   reviewSecurity,
+  saveDirectoryUser,
   saveMonitorConfig,
   searchCommandCenter,
   systemHealth,
@@ -184,3 +188,39 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
       .parse(data),
   )
   .handler(async ({ data }) => guard(() => saveMonitorConfig(requireAdmin(), data)));
+
+export const adminDirectory = createServerFn({ method: "GET" }).handler(async () =>
+  guard(() => (requirePlatformOwner(), listDirectoryUsers())),
+);
+
+const directoryUserInput = z.object({
+  id: z.string().optional(),
+  name: z.string().min(2),
+  email: z.string().email(),
+  role: z.enum(["Admin", "Manager", "Viewer"]),
+  productScope: z.enum(["erp", "crm"]),
+  active: z.boolean(),
+  phone: z.string().optional(),
+  jobTitle: z.string().optional(),
+  department: z.string().optional(),
+  password: z.string().optional(),
+});
+
+export const adminSaveDirectoryUser = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => directoryUserInput.parse(data))
+  .handler(async ({ data }) => {
+    try {
+      const saved = await saveDirectoryUser({
+        ...data,
+        password: data.password?.trim() ? data.password : undefined,
+      });
+      return resultOk(saved);
+    } catch (error) {
+      if (error instanceof ApiError) return resultErr(error.message);
+      throw error;
+    }
+  });
+
+export const adminDeleteDirectoryUser = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string() }).parse(data))
+  .handler(async ({ data }) => guard(() => removeDirectoryUser(data.id)));

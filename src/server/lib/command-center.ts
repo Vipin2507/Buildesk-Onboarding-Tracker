@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, lte, or, sql } from "drizzle-orm";
 import { getCookie, getRequestHeader } from "@tanstack/react-start/server";
 
-import { ApiError, newId, nowIso, requireUser, SESSION_COOKIE } from "@/server/auth/session";
+import { ApiError, hashPassword, newId, nowIso, requireUser, SESSION_COOKIE, toPublicUser } from "@/server/auth/session";
 import { getDb, getSqlite } from "@/server/db/client";
 import {
   activityEntries,
@@ -122,6 +122,114 @@ export function requireAdmin() {
   }
   ensureMonitoringSchema();
   return user;
+}
+
+export function requirePlatformOwner() {
+  const user = requireAdmin();
+  if (!user.platformOwner) {
+    throw new ApiError(403, "Only the platform owner can manage users.");
+  }
+  return user;
+}
+
+export function listDirectoryUsers() {
+  requirePlatformOwner();
+  return getDb()
+    .select()
+    .from(users)
+    .all()
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((row) => toPublicUser(row));
+}
+
+export async function saveDirectoryUser(input: {
+  id?: string;
+  name: string;
+  email: string;
+  role: string;
+  productScope: "erp" | "crm";
+  active: boolean;
+  phone?: string;
+  jobTitle?: string;
+  department?: string;
+  password?: string;
+}) {
+  const actor = requirePlatformOwner();
+  const db = getDb();
+  const email = input.email.trim().toLowerCase();
+  const now = nowIso();
+  if (input.id) {
+    const row = db.select().from(users).where(eq(users.id, input.id)).get();
+    if (!row) throw new ApiError(404, "User not found");
+    const taken = db.select().from(users).where(eq(users.email, email)).get();
+    if (taken && taken.id !== row.id) throw new ApiError(400, "Email already exists");
+    const owner = Boolean(row.platformOwner);
+    db.update(users)
+      .set({
+        name: input.name.trim(),
+        email: owner ? row.email : email,
+        role: owner ? "Admin" : input.role,
+        productScope: owner ? row.productScope : input.productScope,
+        active: owner ? true : input.active,
+        phone: input.phone?.trim() || null,
+        jobTitle: input.jobTitle?.trim() || null,
+        department: input.department?.trim() || null,
+        updatedAt: now,
+      })
+      .where(eq(users.id, row.id))
+      .run();
+    if (input.password) {
+      if (input.password.length < 6) {
+        throw new ApiError(400, "A password of at least 6 characters is required");
+      }
+      const passwordHash = await hashPassword(input.password);
+      db.update(users).set({ passwordHash, updatedAt: now }).where(eq(users.id, row.id)).run();
+    }
+    writeAdminAudit(actor, "user.update", "user", row.id, { email });
+    return toPublicUser(db.select().from(users).where(eq(users.id, row.id)).get()!);
+  }
+  if (db.select().from(users).where(eq(users.email, email)).get()) {
+    throw new ApiError(400, "Email already exists");
+  }
+  if (!input.password || input.password.length < 6) {
+    throw new ApiError(400, "A password of at least 6 characters is required");
+  }
+  const id = newId();
+  const passwordHash = await hashPassword(input.password);
+  db.insert(users)
+    .values({
+      id,
+      name: input.name.trim(),
+      email,
+      passwordHash,
+      role: input.role,
+      productScope: input.productScope,
+      platformOwner: false,
+      active: input.active,
+      phone: input.phone?.trim() || null,
+      jobTitle: input.jobTitle?.trim() || null,
+      department: input.department?.trim() || null,
+      notifyEmail: true,
+      notifyInApp: true,
+      timezone: "Asia/Kolkata",
+      createdAt: now,
+      updatedAt: now,
+    })
+    .run();
+  writeAdminAudit(actor, "user.create", "user", id, { email });
+  return toPublicUser(db.select().from(users).where(eq(users.id, id)).get()!);
+}
+
+export function removeDirectoryUser(id: string) {
+  const actor = requirePlatformOwner();
+  if (actor.id === id) throw new ApiError(400, "You cannot delete your own account");
+  const db = getDb();
+  const row = db.select().from(users).where(eq(users.id, id)).get();
+  if (!row) throw new ApiError(404, "User not found");
+  if (row.platformOwner) throw new ApiError(400, "The platform owner account cannot be deleted");
+  db.delete(users).where(eq(users.id, id)).run();
+  writeAdminAudit(actor, "user.delete", "user", id, { email: row.email });
+  return { ok: true };
 }
 
 export function getMonitorConfig(): MonitorConfig {

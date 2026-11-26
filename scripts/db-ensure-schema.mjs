@@ -5,6 +5,7 @@
  * No tsx required (works with production installs).
  */
 import fs from "node:fs";
+import bcrypt from "bcryptjs";
 import Database from "better-sqlite3";
 
 import { loadAppDotEnv, resolveDbPath } from "./lib/resolve-db-path.mjs";
@@ -41,6 +42,36 @@ function tableExists(table) {
     .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`)
     .get(table);
   return Boolean(row);
+}
+
+const PLATFORM_OWNER_EMAIL = "owner@buildesk.com";
+const PLATFORM_OWNER_PASSWORD = "buildesk123";
+
+function ensurePlatformOwner(db) {
+  if (!tableExists("users") || !existingColumns("users").has("platform_owner")) return;
+  const owner = db.prepare(`SELECT id FROM users WHERE platform_owner = 1 LIMIT 1`).get();
+  if (owner) {
+    console.log("platform owner already present");
+    return;
+  }
+  const now = new Date().toISOString();
+  const existing = db.prepare(`SELECT id FROM users WHERE email = ?`).get(PLATFORM_OWNER_EMAIL);
+  if (existing) {
+    db.prepare(`UPDATE users SET platform_owner = 1, role = 'Admin', active = 1, updated_at = ? WHERE id = ?`).run(
+      now,
+      existing.id,
+    );
+    console.log(`platform owner marked: ${PLATFORM_OWNER_EMAIL}`);
+    return;
+  }
+  const passwordHash = bcrypt.hashSync(PLATFORM_OWNER_PASSWORD, 10);
+  db.prepare(
+    `INSERT INTO users (
+      id, name, email, password_hash, role, product_scope, platform_owner, active,
+      job_title, department, timezone, notify_email, notify_in_app, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, 'Admin', 'erp', 1, 1, 'Platform owner', 'Operations', 'Asia/Kolkata', 1, 1, ?, ?)`,
+  ).run(crypto.randomUUID(), "Buildesk Owner", PLATFORM_OWNER_EMAIL, passwordHash, now, now);
+  console.log(`platform owner created: ${PLATFORM_OWNER_EMAIL}`);
 }
 
 function existingColumns(table) {
@@ -264,6 +295,7 @@ const EXTRA_COLUMNS = [
   { table: "companies", name: "plan_name", ddl: "TEXT" },
   { table: "users", name: "product_scope", ddl: "TEXT NOT NULL DEFAULT 'erp'" },
   { table: "users", name: "work_email", ddl: "TEXT" },
+  { table: "users", name: "platform_owner", ddl: "INTEGER NOT NULL DEFAULT 0" },
   { table: "booking_appointments", name: "google_event_id", ddl: "TEXT" },
   { table: "booking_appointments", name: "meet_url", ddl: "TEXT" },
   {
@@ -336,6 +368,8 @@ for (const col of EXTRA_COLUMNS) {
   console.log(`+ ${sql}`);
   sqlite.exec(sql);
 }
+
+ensurePlatformOwner(sqlite);
 
 if (!tableExists("notifications")) {
   sqlite.exec(`
