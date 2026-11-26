@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { motion, useReducedMotion } from "framer-motion";
-import { FileSpreadsheet, Search, Upload } from "lucide-react";
+import { BarChart3, ChevronDown, FileSpreadsheet, Search, SlidersHorizontal, Upload } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import {
   Bar,
@@ -30,6 +30,7 @@ import {
   ticketSectionVariants,
 } from "@/components/design-ticket/design-ticket-shared";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { importCrmSeatSheets, listCrmSeatSheets } from "@/lib/api";
 import { parseSeatSheet, seatEconomics, type SeatEconomics, type SeatSheetRow } from "@/lib/crm-seat-sheet";
@@ -75,6 +76,8 @@ export function PaymentsSeatTab() {
   const [rangeChoice, setRangeChoice] = useState<RangeChoice>("any");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [chartsOpen, setChartsOpen] = useState(false);
 
   const query = useQuery({
     queryKey: ["crm-seat-sheets"],
@@ -138,13 +141,26 @@ export function PaymentsSeatTab() {
     [filtered],
   );
 
-  const activeFilterCount =
+  const sheetFilterCount =
     (manager === "all" ? 0 : 1) +
     (outcome === "all" ? 0 : 1) +
     (movement === "all" ? 0 : 1) +
     (sortKey === "net_desc" ? 0 : 1) +
-    (from || to ? 1 : 0) +
-    (queryText.trim() ? 1 : 0);
+    (from || to ? 1 : 0);
+  const activeFilterCount = sheetFilterCount + (queryText.trim() ? 1 : 0);
+  const filterSummary = useMemo(() => {
+    const bits: string[] = [];
+    if (manager !== "all") bits.push(manager);
+    const outcomeLabel = OUTCOMES.find((item) => item.id === outcome)?.label;
+    if (outcome !== "all" && outcomeLabel) bits.push(outcomeLabel);
+    if (movement === "upgrade") bits.push("Upgrades");
+    else if (movement === "degrade") bits.push("Degrades");
+    else if (movement === "both") bits.push("Both");
+    else if (movement === "still") bits.push("No change");
+    if (from || to) bits.push(`${from || "…"} – ${to || "…"}`);
+    if (sortKey !== "net_desc") bits.push("Custom sort");
+    return bits.length > 0 ? bits.join(" · ") : "Manager, seat change, license end";
+  }, [manager, outcome, movement, from, to, sortKey]);
 
   function applyRange(choice: RangeChoice) {
     setRangeChoice(choice);
@@ -200,65 +216,53 @@ export function PaymentsSeatTab() {
       variants={ticketPageVariants}
       initial="hidden"
       animate="show"
-      className="space-y-4 py-3"
+      className="space-y-3 py-3"
     >
-      <motion.div variants={ticketSectionVariants} className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-0 w-full sm:w-auto sm:flex-1">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={queryText}
-              onChange={(event) => setQueryText(event.target.value)}
-              placeholder="Search account or user id…"
-              aria-label="Search seat sheet"
-              className="h-9 w-full pl-8 text-xs max-md:min-h-12 max-md:text-sm"
-            />
+      {rows.length > 0 ? (
+        <Fold
+          open={filtersOpen}
+          onOpenChange={setFiltersOpen}
+          title="Filters"
+          summary={filterSummary}
+          badge={sheetFilterCount > 0 ? String(sheetFilterCount) : undefined}
+          icon={<SlidersHorizontal className="h-3.5 w-3.5" />}
+        >
+          <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Seat outcome">
+            {OUTCOMES.map((tab) => {
+              const active = outcome === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setOutcome(tab.id)}
+                  className={cn(
+                    "relative inline-flex h-7 items-center gap-1 overflow-hidden rounded-full border px-2.5 text-[10px] font-medium max-md:min-h-11 max-md:px-3 max-md:text-xs",
+                    active
+                      ? "border-primary text-primary-foreground"
+                      : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                  )}
+                >
+                  {active ? (
+                    <motion.span
+                      layoutId="seat-outcome"
+                      className="absolute inset-0 bg-primary"
+                      transition={
+                        reduce
+                          ? { duration: 0 }
+                          : { type: "spring", bounce: 0.16, duration: 0.42 }
+                      }
+                    />
+                  ) : null}
+                  <span className="relative z-10">{tab.label}</span>
+                  <span className={cn("relative z-10 tabular-nums", active ? "text-primary-foreground/90" : "text-muted-foreground")}>
+                    {outcomeCounts[tab.id]}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-          {rows.length > 0 ? (
-            <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-              {filtered.length} {filtered.length === 1 ? "account" : "accounts"}
-            </span>
-          ) : null}
-          {activeFilterCount > 0 ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-9 shrink-0 px-2 text-xs text-muted-foreground"
-              onClick={clearFilters}
-            >
-              Clear
-            </Button>
-          ) : null}
-          {isAdmin ? (
-            <>
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                className="hidden"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) void onFile(file);
-                }}
-              />
-              <Button
-                size="sm"
-                className="h-9 shrink-0 gap-1.5 text-xs max-md:min-h-12"
-                disabled={uploading}
-                onClick={() => fileRef.current?.click()}
-              >
-                {uploading ? (
-                  <FileSpreadsheet className="h-3.5 w-3.5" />
-                ) : (
-                  <Upload className="h-3.5 w-3.5" />
-                )}
-                Upload
-              </Button>
-            </>
-          ) : null}
-        </div>
-
         <div className="grid grid-cols-2 items-end gap-x-2 gap-y-2 md:grid-cols-3 xl:grid-cols-6">
           <DesignTicketFilterField label="Sales manager" compact className="min-w-0">
             <DesignTicketSelect
@@ -335,59 +339,20 @@ export function PaymentsSeatTab() {
             }}
           />
         </div>
-      </motion.div>
+        </Fold>
+      ) : null}
 
-      {query.isLoading ? (
-        <div className="h-64 animate-pulse rounded-2xl border bg-card" />
-      ) : rows.length === 0 ? (
-        <motion.div
-          variants={ticketSectionVariants}
-          className="rounded-2xl border border-dashed bg-card px-4 py-10 text-center text-sm text-muted-foreground"
+      {rows.length > 0 ? (
+        <Fold
+          open={chartsOpen}
+          onOpenChange={setChartsOpen}
+          title="Charts"
+          summary={`${money(totals.deal)} current · ${money(totals.netValue)} net`}
+          icon={<BarChart3 className="h-3.5 w-3.5" />}
         >
-          No seat sheet yet. An admin can upload Account, User Id, Start date, End date, Deal value,
-          Deal value with GST, Users, Upgrade, and Degrade. Deal value is the amount after the seat
-          change. Users is the count before it.
-        </motion.div>
-      ) : (
-        <>
-          <motion.div variants={ticketSectionVariants} className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Seat outcome">
-            {OUTCOMES.map((tab) => {
-              const active = outcome === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => setOutcome(tab.id)}
-                  className={cn(
-                    "relative inline-flex h-7 items-center gap-1 overflow-hidden rounded-full border px-2.5 text-[10px] font-medium max-md:min-h-11 max-md:px-3 max-md:text-xs",
-                    active
-                      ? "border-primary text-primary-foreground"
-                      : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground",
-                  )}
-                >
-                  {active ? (
-                    <motion.span
-                      layoutId="seat-outcome"
-                      className="absolute inset-0 bg-primary"
-                      transition={
-                        reduce
-                          ? { duration: 0 }
-                          : { type: "spring", bounce: 0.16, duration: 0.42 }
-                      }
-                    />
-                  ) : null}
-                  <span className="relative z-10">{tab.label}</span>
-                  <span className={cn("relative z-10 tabular-nums", active ? "text-primary-foreground/90" : "text-muted-foreground")}>
-                    {outcomeCounts[tab.id]}
-                  </span>
-                </button>
-              );
-            })}
-          </motion.div>
-
-          <motion.div variants={ticketSectionVariants} className="grid items-stretch gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {chartsOpen ? (
+            <div className="space-y-2">
+          <div className="grid items-stretch gap-2 sm:grid-cols-2 xl:grid-cols-4">
             <Metric
               label="Current deal"
               value={totals.deal}
@@ -416,11 +381,11 @@ export function PaymentsSeatTab() {
               active={movement === "degrade"}
               onClick={() => setMovement((current) => (current === "degrade" ? "all" : "degrade"))}
             />
-          </motion.div>
+          </div>
 
-          <motion.div variants={ticketSectionVariants} className="grid items-stretch gap-3 lg:grid-cols-2">
-            <section className="flex h-full flex-col rounded-2xl border bg-card p-4">
-              <div className="mb-3 flex items-baseline justify-between gap-3">
+          <motion.div variants={ticketSectionVariants} className="grid items-stretch gap-2 lg:grid-cols-2">
+            <section className="flex h-full flex-col rounded-xl border bg-card p-3">
+              <div className="mb-2 flex items-baseline justify-between gap-2">
                 <h3 className="text-xs font-semibold">Outcome mix</h3>
                 <span className="text-right text-[10px] leading-tight text-muted-foreground">
                   {scoped.length} accounts
@@ -434,14 +399,14 @@ export function PaymentsSeatTab() {
                   { key: "unpriced", label: "No price", value: outcomeCounts.unpriced, color: BRAND },
                 ]}
               />
-              <p className="mt-auto pt-4 text-[11px] leading-relaxed text-muted-foreground">
+              <p className="mt-auto pt-2 text-[11px] leading-relaxed text-muted-foreground">
                 {totals.upgradeSeats} seats upgraded · {totals.degradeSeats} seats degraded · net{" "}
                 {signedSeats(totals.upgradeSeats - totals.degradeSeats)} seats
               </p>
             </section>
 
-            <section className="flex h-full flex-col rounded-2xl border bg-card p-4">
-              <div className="mb-3 flex items-baseline justify-between gap-3">
+            <section className="flex h-full flex-col rounded-xl border bg-card p-3">
+              <div className="mb-2 flex items-baseline justify-between gap-2">
                 <h3 className="text-xs font-semibold">Seat movement</h3>
                 <span className="text-[10px] text-muted-foreground">Upgrade vs degrade</span>
               </div>
@@ -451,7 +416,7 @@ export function PaymentsSeatTab() {
                 </p>
               ) : (
                 <div className="flex flex-1 flex-col items-center justify-center">
-                  <div className="relative h-36 w-36">
+                  <div className="relative h-28 w-28">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -461,8 +426,8 @@ export function PaymentsSeatTab() {
                           ].filter((item) => item.value > 0)}
                           dataKey="value"
                           nameKey="name"
-                          innerRadius={42}
-                          outerRadius={62}
+                          innerRadius={34}
+                          outerRadius={50}
                           paddingAngle={3}
                           strokeWidth={0}
                           isAnimationActive={!reduce}
@@ -514,14 +479,14 @@ export function PaymentsSeatTab() {
                   <div className="text-[10px] text-muted-foreground">Net seat value</div>
                 </div>
               )}
-              <div className="mt-3 flex items-center justify-center gap-5 text-[11px] text-muted-foreground">
+              <div className="mt-2 flex items-center justify-center gap-4 text-[11px] text-muted-foreground">
                 <LegendDot color={GAIN} label="Upgrade" />
                 <LegendDot color={LOSS} label="Degrade" />
               </div>
             </section>
           </motion.div>
 
-          <motion.div variants={ticketSectionVariants} className="grid items-stretch gap-3 lg:grid-cols-2">
+          <motion.div variants={ticketSectionVariants} className="grid items-stretch gap-2 lg:grid-cols-2">
             <ChartCard
               title="Gain and loss by sales manager"
               hint="Click a manager to filter"
@@ -642,7 +607,7 @@ export function PaymentsSeatTab() {
             </ChartCard>
           </motion.div>
 
-          <motion.div variants={ticketSectionVariants} className="grid items-stretch gap-3 lg:grid-cols-2">
+          <motion.div variants={ticketSectionVariants} className="grid items-stretch gap-2 lg:grid-cols-2">
             <AccountList
               title="Largest gains"
               empty="No upgrade gain in this filter."
@@ -666,7 +631,77 @@ export function PaymentsSeatTab() {
               }))}
             />
           </motion.div>
+            </div>
+          ) : null}
+        </Fold>
+      ) : null}
 
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-0 w-full sm:min-w-[16rem] sm:flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={queryText}
+              onChange={(event) => setQueryText(event.target.value)}
+              placeholder="Search account or user id…"
+              aria-label="Search seat sheet"
+              className="h-9 w-full pl-8 text-xs max-md:min-h-12 max-md:text-sm"
+            />
+          </div>
+          {rows.length > 0 ? (
+            <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+              {filtered.length} {filtered.length === 1 ? "account" : "accounts"}
+            </span>
+          ) : null}
+          {activeFilterCount > 0 ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-9 shrink-0 px-2 text-xs text-muted-foreground"
+              onClick={clearFilters}
+            >
+              Clear
+            </Button>
+          ) : null}
+          {isAdmin ? (
+            <>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void onFile(file);
+                }}
+              />
+              <Button
+                size="sm"
+                className="h-9 shrink-0 gap-1.5 text-xs max-md:min-h-12"
+                disabled={uploading}
+                onClick={() => fileRef.current?.click()}
+              >
+                {uploading ? (
+                  <FileSpreadsheet className="h-3.5 w-3.5" />
+                ) : (
+                  <Upload className="h-3.5 w-3.5" />
+                )}
+                Upload
+              </Button>
+            </>
+          ) : null}
+        </div>
+
+        {query.isLoading ? (
+          <div className="h-24 animate-pulse rounded-xl border bg-card" />
+        ) : rows.length === 0 ? (
+          <div className="rounded-xl border border-dashed bg-card px-4 py-10 text-center text-sm text-muted-foreground">
+            No seat sheet yet. An admin can upload Account, User Id, Start date, End date, Deal value,
+            Deal value with GST, Users, Upgrade, and Degrade. Deal value is the amount after the seat
+            change. Users is the count before it.
+          </div>
+        ) : (
           <motion.div variants={ticketSectionVariants}>
               {filtered.length === 0 ? (
                 <div className="rounded-2xl border bg-card px-4 py-10 text-center text-sm text-muted-foreground">
@@ -750,8 +785,8 @@ export function PaymentsSeatTab() {
                 </div>
               )}
           </motion.div>
-        </>
-      )}
+        )}
+      </div>
 
       {unmatched.length > 0 ? (
         <div className="rounded-2xl border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs">
@@ -771,6 +806,54 @@ export function PaymentsSeatTab() {
 
 const tooltipStyle = { fontSize: 12, borderRadius: 8 };
 
+function Fold({
+  open,
+  onOpenChange,
+  title,
+  summary,
+  badge,
+  icon,
+  children,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  summary: string;
+  badge?: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <Collapsible open={open} onOpenChange={onOpenChange}>
+      <div className="rounded-xl border bg-card">
+        <CollapsibleTrigger asChild>
+          <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              {icon}
+            </span>
+            <span className="shrink-0 text-xs font-semibold">{title}</span>
+            {badge ? (
+              <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-primary">
+                {badge}
+              </span>
+            ) : null}
+            <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">{summary}</span>
+            <ChevronDown
+              className={cn(
+                "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
+                open && "rotate-180",
+              )}
+            />
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="space-y-2 border-t px-3 py-2.5">{children}</div>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
+  );
+}
+
 function Metric({
   label,
   value,
@@ -788,7 +871,7 @@ function Metric({
 }) {
   const reduce = useReducedMotion();
   const className = cn(
-    "flex h-full min-h-[5.5rem] min-w-0 flex-col rounded-2xl border bg-card px-4 py-3 text-left transition-[border-color,box-shadow,transform] duration-300",
+    "flex h-full min-w-0 flex-col rounded-xl border bg-card px-3 py-2 text-left transition-[border-color,box-shadow,transform] duration-300",
     onClick && !reduce && "hover:-translate-y-0.5 hover:border-primary/40",
     onClick && reduce && "hover:border-primary/40",
     active && "border-primary shadow-[0_0_0_3px_color-mix(in_srgb,var(--primary)_18%,transparent)]",
@@ -796,7 +879,7 @@ function Metric({
   const body = (
     <>
       <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className={cn("mt-1.5 truncate text-lg font-semibold leading-none tabular-nums", tone)}>
+      <div className={cn("mt-1 truncate text-base font-semibold leading-none tabular-nums", tone)}>
         {value == null ? (
           "—"
         ) : reduce ? (
@@ -873,15 +956,15 @@ function ChartCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="flex h-full min-w-0 flex-col rounded-2xl border bg-card p-4">
-      <div className="mb-3 flex items-baseline justify-between gap-3">
+    <section className="flex h-full min-w-0 flex-col rounded-xl border bg-card p-3">
+      <div className="mb-2 flex items-baseline justify-between gap-2">
         <h3 className="text-xs font-semibold">{title}</h3>
         {hint ? <span className="text-right text-[10px] leading-tight text-muted-foreground">{hint}</span> : null}
       </div>
       {empty ? (
-        <p className="flex h-72 items-center justify-center text-xs text-muted-foreground">{emptyLabel}</p>
+        <p className="flex h-32 items-center justify-center text-xs text-muted-foreground">{emptyLabel}</p>
       ) : (
-        <div className={cn("min-h-0", tall ? "h-80" : "h-72")}>{children}</div>
+        <div className={cn("min-h-0", tall ? "h-52" : "h-44")}>{children}</div>
       )}
     </section>
   );
@@ -897,12 +980,12 @@ function AccountList({
   rows: { id: string; name: string; primary: string; secondary: string; tone: string }[];
 }) {
   return (
-    <section className="flex h-full flex-col rounded-2xl border bg-card p-4">
-      <h3 className="mb-3 text-xs font-semibold">{title}</h3>
+    <section className="flex h-full flex-col rounded-xl border bg-card p-3">
+      <h3 className="mb-2 text-xs font-semibold">{title}</h3>
       {rows.length === 0 ? (
         <p className="text-xs text-muted-foreground">{empty}</p>
       ) : (
-        <ul className="space-y-2">
+        <ul className="space-y-1.5">
           {rows.map((row) => (
             <li key={row.id} className="flex items-start justify-between gap-2 text-xs">
               <div className="min-w-0">
