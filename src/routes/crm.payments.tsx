@@ -1094,6 +1094,11 @@ function CrmPaymentsPage() {
       />
       <CrmAccountRenewDialog
         account={renewAccount}
+        cycleCollected={
+          renewAccountId
+            ? rows.find((row) => row.id === renewAccountId)?.paymentReceived
+            : undefined
+        }
         open={Boolean(renewAccount)}
         onOpenChange={(open) => {
           if (!open) setRenewAccountId(null);

@@ -1119,7 +1119,7 @@ function CrmAccountsPage() {
           <DesignTicketFilterBar
             variant="inline"
             compact
-            className="xl:grid-cols-4"
+            className="items-end lg:!grid-cols-4"
             activeFilterCount={activeFilterCount}
             onClear={clearFilters}
             onApply={applyFilters}
@@ -1311,22 +1311,22 @@ function CrmAccountsPage() {
                 }))}
               />
             </DesignTicketFilterField>
-            <div className="col-span-full grid grid-cols-2 items-end gap-2 lg:grid-cols-4">
-              <DesignTicketFilterField label="Date applies to" compact className="col-span-2 min-w-0">
-                <DesignTicketSelect
-                  compact
-                  value={dateTarget}
-                  onChange={(value) => {
-                    const target = value === "start" || value === "engaged" ? value : "all";
-                    applyAccountDates(target, dateRange.from, dateRange.to);
-                  }}
-                  options={[
-                    { value: "all", label: "All" },
-                    { value: "start", label: "Start date" },
-                    { value: "engaged", label: "Last engaged" },
-                  ]}
-                />
-              </DesignTicketFilterField>
+            <DesignTicketFilterField label="Date applies to" compact className="min-w-0">
+              <DesignTicketSelect
+                compact
+                value={dateTarget}
+                onChange={(value) => {
+                  const target = value === "start" || value === "engaged" ? value : "all";
+                  applyAccountDates(target, dateRange.from, dateRange.to);
+                }}
+                options={[
+                  { value: "all", label: "All" },
+                  { value: "start", label: "Start date" },
+                  { value: "engaged", label: "Last engaged" },
+                ]}
+              />
+            </DesignTicketFilterField>
+            <div className="grid min-w-0 grid-cols-2 items-end gap-2 sm:col-span-2">
               <DesignTicketDateField
                 compact
                 label="From"

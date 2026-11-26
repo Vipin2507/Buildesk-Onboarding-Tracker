@@ -6,14 +6,17 @@ import { EntityFormModal } from "@/components/entity-form-modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  renewalInstallments,
   roundMoney,
   sumInstallments,
   validateInstallmentTotal,
 } from "@/lib/crm-account-commercial";
 import {
   buildEqualRenewalInstallments,
+  crmAccountHasRenewalCycle,
   defaultRenewalEndDate,
   nextRenewalStartDate,
+  renewalCollectionCarryover,
 } from "@/lib/crm-account-renewal";
 import { renewCrmAccount } from "@/lib/api";
 import { cn, formatDate } from "@/lib/utils";
@@ -25,9 +28,17 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onRenewed?: (account: CrmAccount) => void;
+  /** Collected in the cycle being closed. Payments list passes the live ledger figure. */
+  cycleCollected?: number;
 };
 
-export function CrmAccountRenewDialog({ account, open, onOpenChange, onRenewed }: Props) {
+export function CrmAccountRenewDialog({
+  account,
+  open,
+  onOpenChange,
+  onRenewed,
+  cycleCollected,
+}: Props) {
   const previousEnd = account?.endDate?.slice(0, 10) ?? "";
   const nextStart = account ? nextRenewalStartDate(account.endDate) : null;
 
@@ -42,9 +53,20 @@ export function CrmAccountRenewDialog({ account, open, onOpenChange, onRenewed }
   const [rows, setRows] = useState<CrmAccountInstallment[]>([]);
   const [saving, setSaving] = useState(false);
 
+  const carried = account
+    ? renewalCollectionCarryover({
+        cycleReceived: cycleCollected ?? Number(account.paymentReceived) || 0,
+        previousDeal: Number(account.dealSize) || 0,
+      })
+    : 0;
+
   /** Renewal installments schedule against pending only (never fall back to full deal). */
   function scheduleTotal(pending: number) {
     return pending > 0 ? roundMoney(pending) : 0;
+  }
+
+  function pendingAfter(deal: number, extraReceived: number) {
+    return roundMoney(Math.max(0, deal - carried - extraReceived));
   }
 
   function syncRows(count: number, pending: number, start: string) {
@@ -63,16 +85,29 @@ export function CrmAccountRenewDialog({ account, open, onOpenChange, onRenewed }
     const gst = Number(account.gstPercent) || 18;
     const months = 12;
     const end = defaultRenewalEndDate(previousEnd, months);
+    const pending = roundMoney(Math.max(0, deal - carried));
+    const drafts = crmAccountHasRenewalCycle(account.paymentCycleBaseline)
+      ? []
+      : renewalInstallments(account.installments ?? []);
+    const draftTotal = sumInstallments(drafts);
     setDealSize(deal);
     setPaymentReceived(0);
-    setPendingAmount(deal);
+    setPendingAmount(pending);
     setUsersPurchased(users);
     setGstPercent(gst);
     setTermMonths(months);
     setEndDate(end);
-    setInstallmentCount(deal > 0 ? 1 : 0);
-    syncRows(deal > 0 ? 1 : 0, deal, nextStart);
-  }, [open, account?.id, previousEnd, nextStart, account]);
+    if (pending <= 0) {
+      setInstallmentCount(0);
+      setRows([]);
+    } else if (drafts.length > 0 && Math.abs(draftTotal - pending) < 0.01) {
+      setInstallmentCount(drafts.length);
+      setRows(drafts.map((row) => ({ ...row, kind: "renewal" as const })));
+    } else {
+      setInstallmentCount(1);
+      syncRows(1, pending, nextStart);
+    }
+  }, [open, account?.id, previousEnd, nextStart, account, carried]);
 
   useEffect(() => {
     if (!open || !previousEnd) return;
@@ -95,8 +130,8 @@ export function CrmAccountRenewDialog({ account, open, onOpenChange, onRenewed }
 
   function onDealChange(nextDeal: number) {
     const deal = roundMoney(Math.max(0, nextDeal));
-    const received = roundMoney(Math.min(deal, paymentReceived));
-    const pending = roundMoney(Math.max(0, deal - received));
+    const received = roundMoney(Math.min(Math.max(0, deal - carried), paymentReceived));
+    const pending = pendingAfter(deal, received);
     setDealSize(deal);
     setPaymentReceived(received);
     setPendingAmount(pending);
@@ -109,8 +144,8 @@ export function CrmAccountRenewDialog({ account, open, onOpenChange, onRenewed }
   }
 
   function onReceivedChange(nextReceived: number) {
-    const received = roundMoney(Math.min(dealSize, Math.max(0, nextReceived)));
-    const pending = roundMoney(Math.max(0, dealSize - received));
+    const received = roundMoney(Math.min(Math.max(0, dealSize - carried), Math.max(0, nextReceived)));
+    const pending = pendingAfter(dealSize, received);
     setPaymentReceived(received);
     setPendingAmount(pending);
     if (nextStart) {
@@ -121,8 +156,9 @@ export function CrmAccountRenewDialog({ account, open, onOpenChange, onRenewed }
   }
 
   function onPendingChange(nextPending: number) {
-    const pending = roundMoney(Math.min(dealSize, Math.max(0, nextPending)));
-    const received = roundMoney(Math.max(0, dealSize - pending));
+    const room = roundMoney(Math.max(0, dealSize - carried));
+    const pending = roundMoney(Math.min(room, Math.max(0, nextPending)));
+    const received = roundMoney(Math.max(0, room - pending));
     setPendingAmount(pending);
     setPaymentReceived(received);
     if (nextStart) {
@@ -240,7 +276,9 @@ export function CrmAccountRenewDialog({ account, open, onOpenChange, onRenewed }
             className="h-8 text-xs"
           />
           <p className="mt-0.5 text-[10px] text-muted-foreground">
-            Initial collection for this deal — added to payment history.
+            {carried > 0
+              ? `₹${carried.toLocaleString("en-IN")} already collected above the previous deal counts toward this renewal. Enter only a new collection here.`
+              : "Initial collection for this deal — added to payment history."}
           </p>
         </div>
         <div>

@@ -20,6 +20,34 @@ export function crmAccountHasRenewalCycle(
   return typeof paymentCycleBaseline === "number" && Number.isFinite(paymentCycleBaseline);
 }
 
+/**
+ * Money already collected above the deal being closed.
+ * A renewal installment paid before Renew belongs to the new cycle, not the baseline.
+ */
+export function renewalCollectionCarryover(input: {
+  cycleReceived: number;
+  previousDeal: number;
+}): number {
+  const collected = roundMoney(Math.max(0, input.cycleReceived));
+  const previousDeal = roundMoney(Math.max(0, input.previousDeal));
+  return roundMoney(Math.max(0, collected - previousDeal));
+}
+
+/** Baseline freezes only the closed deal. Surplus stays available for the new cycle. */
+export function renewalBaselineAfterClose(input: {
+  lifetimeReceived: number;
+  existingBaseline: number;
+  previousDeal: number;
+}): number {
+  const lifetime = roundMoney(Math.max(0, input.lifetimeReceived));
+  const existingBaseline = roundMoney(Math.max(0, input.existingBaseline));
+  const collectedThisCycle = roundMoney(Math.max(0, lifetime - existingBaseline));
+  const previousDeal = roundMoney(Math.max(0, input.previousDeal));
+  const closed =
+    previousDeal > 0 ? roundMoney(Math.min(collectedThisCycle, previousDeal)) : collectedThisCycle;
+  return roundMoney(existingBaseline + closed);
+}
+
 export function todayYmd(now = new Date()): string {
   return now.toISOString().slice(0, 10);
 }
@@ -105,10 +133,12 @@ export function buildCrmAccountRenewPatch(
   const valuePerUser = calcValuePerUserExGst(dealSize, gstPercent, usersPurchased);
   const lifetime = roundMoney(Math.max(0, input.lifetimePaymentReceived));
   const existingBaseline = roundMoney(Number(account.paymentCycleBaseline) || 0);
-  const cycleSoFar = roundMoney(Number(account.paymentReceived) || 0);
-  const paymentCycleBaseline = roundMoney(
-    Math.max(lifetime, existingBaseline + cycleSoFar, existingBaseline),
-  );
+  const previousDeal = roundMoney(Math.max(0, Number(account.dealSize) || 0));
+  const paymentCycleBaseline = renewalBaselineAfterClose({
+    lifetimeReceived: lifetime,
+    existingBaseline,
+    previousDeal,
+  });
 
   const initialReceived = roundMoney(
     Math.min(dealSize, Math.max(0, Number(input.initialPaymentReceived) || 0)),
@@ -119,15 +149,21 @@ export function buildCrmAccountRenewPatch(
       : Math.max(0, dealSize - initialReceived),
   );
 
-  const kept = originalInstallments(account.installments ?? []).concat(
-    renewalInstallments(account.installments ?? []),
-  );
+  const originals = originalInstallments(account.installments ?? []);
+  const existingRenewals = renewalInstallments(account.installments ?? []);
+  const firstRenewal = !crmAccountHasRenewalCycle(account.paymentCycleBaseline);
   const freshRenewalRows = input.renewalInstallments.map((row) => ({
     ...row,
     amount: roundMoney(Math.max(0, Number(row.amount) || 0)),
     dueDate: row.dueDate.slice(0, 10),
     kind: "renewal" as const,
   }));
+  // The installment created before the first Renew is that cycle's schedule.
+  // Confirming Renew must not add a second copy on top of it.
+  const renewalSchedule =
+    freshRenewalRows.length > 0 ? freshRenewalRows : firstRenewal ? existingRenewals : [];
+  const renewalHistory = firstRenewal ? [] : existingRenewals;
+  const kept = [...originals, ...renewalHistory, ...renewalSchedule];
 
   return {
     startDate,
@@ -140,7 +176,7 @@ export function buildCrmAccountRenewPatch(
     paymentReceived: initialReceived,
     pendingAmount,
     paymentCycleBaseline,
-    installments: [...kept, ...freshRenewalRows],
+    installments: kept,
     annualLicense: true,
     renewalWindowNotifiedForEndDate: undefined,
   };
