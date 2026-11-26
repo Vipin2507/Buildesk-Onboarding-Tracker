@@ -130,6 +130,7 @@ const ACCOUNT_LIST_FILTER_DEFAULTS: {
   moduleFilter: string;
   dateFrom: string;
   dateTo: string;
+  dateAppliesTo: string;
   engagedRecencyFilter: CrmLastEngagedRecencyFilter;
   engagedKindFilter: string;
   engagedFrom: string;
@@ -153,6 +154,7 @@ const ACCOUNT_LIST_FILTER_DEFAULTS: {
   moduleFilter: "",
   dateFrom: "",
   dateTo: "",
+  dateAppliesTo: "all",
   engagedRecencyFilter: "all",
   engagedKindFilter: "all",
   engagedFrom: "",
@@ -344,10 +346,18 @@ function matchesAccountListFilters(row: CrmAccountRow, f: AccountListFilters) {
   if (f.progressFilter === "1-49" && !(row.progress >= 1 && row.progress <= 49)) return false;
   if (f.progressFilter === "50-99" && !(row.progress >= 50 && row.progress <= 99)) return false;
   if (f.progressFilter === "100" && row.progress !== 100) return false;
-  if (!inDateRange(row.startDate, f.dateFrom, f.dateTo)) return false;
   if (!matchesCrmLastEngagedRecency(row.lastEngaged, f.engagedRecencyFilter)) return false;
   if (!matchesCrmLastEngagedKind(row.lastEngaged, f.engagedKindFilter)) return false;
-  if (!matchesCrmLastEngagedDateRange(row.lastEngaged, f.engagedFrom, f.engagedTo)) return false;
+  const hasStartWindow = Boolean(f.dateFrom || f.dateTo);
+  const hasEngagedWindow = Boolean(f.engagedFrom || f.engagedTo);
+  if (hasStartWindow && hasEngagedWindow) {
+    const startOk = inDateRange(row.startDate, f.dateFrom, f.dateTo);
+    const engagedOk = matchesCrmLastEngagedDateRange(row.lastEngaged, f.engagedFrom, f.engagedTo);
+    if (!startOk && !engagedOk) return false;
+  } else {
+    if (!inDateRange(row.startDate, f.dateFrom, f.dateTo)) return false;
+    if (!matchesCrmLastEngagedDateRange(row.lastEngaged, f.engagedFrom, f.engagedTo)) return false;
+  }
   return true;
 }
 
@@ -395,6 +405,7 @@ function CrmAccountsPage() {
     moduleFilter,
     dateFrom,
     dateTo,
+    dateAppliesTo,
     engagedRecencyFilter,
     engagedKindFilter,
     engagedFrom,
@@ -460,12 +471,36 @@ function CrmAccountsPage() {
     (keys: string[]) => setListFilters({ moduleFilter: keys.join(",") }),
     [setListFilters],
   );
-  const setDateFrom = useCallback(
-    (value: string) => setListFilters({ dateFrom: value }),
-    [setListFilters],
-  );
-  const setDateTo = useCallback(
-    (value: string) => setListFilters({ dateTo: value }),
+  const applyAccountDates = useCallback(
+    (target: "all" | "start" | "engaged", from: string, to: string) => {
+      if (target === "start") {
+        setListFilters({
+          dateAppliesTo: "start",
+          dateFrom: from,
+          dateTo: to,
+          engagedFrom: "",
+          engagedTo: "",
+        });
+        return;
+      }
+      if (target === "engaged") {
+        setListFilters({
+          dateAppliesTo: "engaged",
+          dateFrom: "",
+          dateTo: "",
+          engagedFrom: from,
+          engagedTo: to,
+        });
+        return;
+      }
+      setListFilters({
+        dateAppliesTo: "all",
+        dateFrom: from,
+        dateTo: to,
+        engagedFrom: from,
+        engagedTo: to,
+      });
+    },
     [setListFilters],
   );
   const setEngagedRecencyFilter = useCallback(
@@ -475,14 +510,6 @@ function CrmAccountsPage() {
   );
   const setEngagedKindFilter = useCallback(
     (value: string) => setListFilters({ engagedKindFilter: value }),
-    [setListFilters],
-  );
-  const setEngagedFrom = useCallback(
-    (value: string) => setListFilters({ engagedFrom: value }),
-    [setListFilters],
-  );
-  const setEngagedTo = useCallback(
-    (value: string) => setListFilters({ engagedTo: value }),
     [setListFilters],
   );
   const { field: sortField, dir: sortDir } = useMemo(() => parseCrmAccountSortBy(sortBy), [sortBy]);
@@ -763,12 +790,9 @@ function CrmAccountsPage() {
     stageFilterKeys.length > 0,
     providerFilter !== "all",
     moduleFilterKeys.length > 0,
-    Boolean(dateFrom),
-    Boolean(dateTo),
+    Boolean(dateFrom || dateTo || engagedFrom || engagedTo),
     engagedRecencyFilter !== "all",
     engagedKindFilter !== "all",
-    Boolean(engagedFrom),
-    Boolean(engagedTo),
     sortBy !== DEFAULT_CRM_ACCOUNT_SORT,
     kpiFilter !== "all",
   ].filter(Boolean).length;
@@ -780,6 +804,23 @@ function CrmAccountsPage() {
   function clearFilters() {
     setListFilters({ ...ACCOUNT_LIST_FILTER_DEFAULTS });
   }
+
+  const hasStartWindow = Boolean(dateFrom || dateTo);
+  const hasEngagedWindow = Boolean(engagedFrom || engagedTo);
+  const dateTarget: "all" | "start" | "engaged" =
+    hasStartWindow && !hasEngagedWindow
+      ? "start"
+      : hasEngagedWindow && !hasStartWindow
+        ? "engaged"
+        : dateAppliesTo === "start" || dateAppliesTo === "engaged"
+          ? dateAppliesTo
+          : "all";
+  const dateRange =
+    dateTarget === "engaged"
+      ? { from: engagedFrom, to: engagedTo }
+      : dateTarget === "start"
+        ? { from: dateFrom, to: dateTo }
+        : { from: dateFrom || engagedFrom, to: dateTo || engagedTo };
 
   function openCreate() {
     setEditing(null);
@@ -1248,20 +1289,6 @@ function CrmAccountsPage() {
                 />
               </DesignTicketFilterField>
             ) : null}
-            <DesignTicketDateField
-              compact
-              label="Start from"
-              value={dateFrom}
-              onChange={setDateFrom}
-              placeholder="From"
-            />
-            <DesignTicketDateField
-              compact
-              label="Start to"
-              value={dateTo}
-              onChange={setDateTo}
-              placeholder="To"
-            />
             <DesignTicketFilterField label="Last engaged" compact>
               <DesignTicketSelect
                 compact
@@ -1284,20 +1311,39 @@ function CrmAccountsPage() {
                 }))}
               />
             </DesignTicketFilterField>
-            <DesignTicketDateField
-              compact
-              label="Engaged from"
-              value={engagedFrom}
-              onChange={setEngagedFrom}
-              placeholder="From"
-            />
-            <DesignTicketDateField
-              compact
-              label="Engaged to"
-              value={engagedTo}
-              onChange={setEngagedTo}
-              placeholder="To"
-            />
+            <div className="col-span-full grid grid-cols-2 items-end gap-2 lg:grid-cols-4">
+              <DesignTicketFilterField label="Date applies to" compact className="col-span-2 min-w-0">
+                <DesignTicketSelect
+                  compact
+                  value={dateTarget}
+                  onChange={(value) => {
+                    const target = value === "start" || value === "engaged" ? value : "all";
+                    applyAccountDates(target, dateRange.from, dateRange.to);
+                  }}
+                  options={[
+                    { value: "all", label: "All" },
+                    { value: "start", label: "Start date" },
+                    { value: "engaged", label: "Last engaged" },
+                  ]}
+                />
+              </DesignTicketFilterField>
+              <DesignTicketDateField
+                compact
+                label="From"
+                className="min-w-0"
+                value={dateRange.from}
+                onChange={(value) => applyAccountDates(dateTarget, value, dateRange.to)}
+                placeholder="From"
+              />
+              <DesignTicketDateField
+                compact
+                label="To"
+                className="min-w-0"
+                value={dateRange.to}
+                onChange={(value) => applyAccountDates(dateTarget, dateRange.from, value)}
+                placeholder="To"
+              />
+            </div>
             <DesignTicketFilterField label="Sort by" compact>
               <DesignTicketSelect
                 compact

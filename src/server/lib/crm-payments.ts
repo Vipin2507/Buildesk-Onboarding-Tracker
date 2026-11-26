@@ -521,12 +521,19 @@ function applyPaymentsToolbarFilters(
   const renewalFrom = filters.renewalFrom ?? (legacyIsRenewal ? filters.dueDateFrom : undefined);
   const renewalTo = filters.renewalTo ?? (legacyIsRenewal ? filters.dueDateTo : undefined);
 
-  if (installmentFrom || installmentTo) {
+  const hasInstallmentWindow = Boolean(installmentFrom || installmentTo);
+  const hasRenewalWindow = Boolean(renewalFrom || renewalTo);
+  if (hasInstallmentWindow && hasRenewalWindow) {
+    rows = rows.filter(
+      (row) =>
+        dateInRange(row.nextDueInstallment?.dueDate, installmentFrom, installmentTo) ||
+        dateInRange(row.renewalDate, renewalFrom, renewalTo),
+    );
+  } else if (hasInstallmentWindow) {
     rows = rows.filter((row) =>
       dateInRange(row.nextDueInstallment?.dueDate, installmentFrom, installmentTo),
     );
-  }
-  if (renewalFrom || renewalTo) {
+  } else if (hasRenewalWindow) {
     rows = rows.filter((row) => dateInRange(row.renewalDate, renewalFrom, renewalTo));
   }
 

@@ -105,7 +105,7 @@ const WINDOW_PRESETS = [
   { id: "quarter", label: "This quarter" },
 ] as const;
 
-type PaymentDateTarget = "installment" | "renewal";
+type PaymentDateTarget = "all" | "installment" | "renewal";
 type PaymentWindowChoice = (typeof WINDOW_PRESETS)[number]["id"] | "any" | "custom";
 
 function paymentDateTarget(search: {
@@ -116,8 +116,10 @@ function paymentDateTarget(search: {
 }): PaymentDateTarget {
   const renewal = Boolean(search.renewalFrom || search.renewalTo);
   const installment = Boolean(search.installmentFrom || search.installmentTo);
-  if (renewal && !installment) return "renewal";
-  return "installment";
+  if (installment && renewal) return "all";
+  if (renewal) return "renewal";
+  if (installment) return "installment";
+  return "all";
 }
 
 function paymentDateRange(
@@ -132,7 +134,13 @@ function paymentDateRange(
   if (target === "renewal") {
     return { from: search.renewalFrom ?? "", to: search.renewalTo ?? "" };
   }
-  return { from: search.installmentFrom ?? "", to: search.installmentTo ?? "" };
+  if (target === "installment") {
+    return { from: search.installmentFrom ?? "", to: search.installmentTo ?? "" };
+  }
+  return {
+    from: search.installmentFrom ?? search.renewalFrom ?? "",
+    to: search.installmentTo ?? search.renewalTo ?? "",
+  };
 }
 
 function paymentWindowChoice(from: string, to: string): PaymentWindowChoice {
@@ -429,18 +437,29 @@ function CrmPaymentsPage() {
   const dateChoice = paymentWindowChoice(dateRange.from, dateRange.to);
 
   function applyPaymentDates(target: PaymentDateTarget, from?: string, to?: string) {
+    const start = from || undefined;
+    const end = to || undefined;
+    if (target === "all") {
+      patchSearch({
+        installmentFrom: start,
+        installmentTo: end,
+        renewalFrom: start,
+        renewalTo: end,
+      });
+      return;
+    }
     if (target === "installment") {
       patchSearch({
-        installmentFrom: from || undefined,
-        installmentTo: to || undefined,
+        installmentFrom: start,
+        installmentTo: end,
         renewalFrom: undefined,
         renewalTo: undefined,
       });
       return;
     }
     patchSearch({
-      renewalFrom: from || undefined,
-      renewalTo: to || undefined,
+      renewalFrom: start,
+      renewalTo: end,
       installmentFrom: undefined,
       installmentTo: undefined,
     });
@@ -631,10 +650,12 @@ function CrmPaymentsPage() {
                 compact
                 value={dateTarget}
                 onChange={(value) => {
-                  const target = value === "renewal" ? "renewal" : "installment";
+                  const target: PaymentDateTarget =
+                    value === "renewal" || value === "all" ? value : "installment";
                   applyPaymentDates(target, dateRange.from, dateRange.to);
                 }}
                 options={[
+                  { value: "all", label: "All" },
                   { value: "installment", label: "Installment due" },
                   { value: "renewal", label: "Renewal date" },
                 ]}
