@@ -1130,16 +1130,22 @@ export function searchCommandCenter(q: string) {
   return { people, companies: companyHits, projects: projectHits, tasks: taskHits };
 }
 
-export function usageSplit(from: string, to: string) {
+export function usageSplit(from: string, to: string, app: MonitorApp = "all") {
   ensureMonitoringSchema();
   const db = getDb();
+  const appFilter = app === "all" ? undefined : eq(monitoringEvents.application, app);
+  const where = and(
+    gte(monitoringEvents.createdAt, from),
+    lte(monitoringEvents.createdAt, to),
+    appFilter,
+  );
   const rows = db
     .select({
       application: monitoringEvents.application,
       n: sql<number>`count(*)`,
     })
     .from(monitoringEvents)
-    .where(and(gte(monitoringEvents.createdAt, from), lte(monitoringEvents.createdAt, to)))
+    .where(where)
     .groupBy(monitoringEvents.application)
     .all();
   const modules = db
@@ -1149,11 +1155,30 @@ export function usageSplit(from: string, to: string) {
       n: sql<number>`count(*)`,
     })
     .from(monitoringEvents)
-    .where(and(gte(monitoringEvents.createdAt, from), lte(monitoringEvents.createdAt, to)))
+    .where(where)
     .groupBy(monitoringEvents.application, monitoringEvents.module)
     .all()
     .sort((a, b) => num(b.n) - num(a.n))
     .slice(0, 8);
+  const days = db
+    .select({
+      day: sql<string>`substr(${monitoringEvents.createdAt}, 1, 10)`,
+      application: monitoringEvents.application,
+      n: sql<number>`count(*)`,
+    })
+    .from(monitoringEvents)
+    .where(where)
+    .groupBy(sql`substr(${monitoringEvents.createdAt}, 1, 10)`, monitoringEvents.application)
+    .all();
+  const byDayMap = new Map<string, { day: string; label: string; erp: number; crm: number; admin: number }>();
+  for (const row of days) {
+    const day = row.day || "";
+    if (!day) continue;
+    const current = byDayMap.get(day) ?? { day, label: dayLabel(day), erp: 0, crm: 0, admin: 0 };
+    const key = row.application === "crm" || row.application === "erp" ? row.application : "admin";
+    current[key] += num(row.n);
+    byDayMap.set(day, current);
+  }
   return {
     byApp: rows.map((row) => ({ application: row.application, count: num(row.n) })),
     modules: modules.map((row) => ({
@@ -1161,5 +1186,12 @@ export function usageSplit(from: string, to: string) {
       module: row.module || "unknown",
       count: num(row.n),
     })),
+    byDay: [...byDayMap.values()].sort((a, b) => a.day.localeCompare(b.day)),
   };
+}
+
+function dayLabel(day: string) {
+  const date = new Date(`${day}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return day.slice(5);
+  return date.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }

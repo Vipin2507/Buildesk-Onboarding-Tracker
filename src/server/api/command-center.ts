@@ -155,7 +155,9 @@ export const adminAudit = createServerFn({ method: "GET" })
 
 export const adminUsage = createServerFn({ method: "GET" })
   .inputValidator((data: unknown) => rangeInput.parse(data))
-  .handler(async ({ data }) => guard(() => (requireAdmin(), usageSplit(data.from, data.to))));
+  .handler(async ({ data }) =>
+    guard(() => (requireAdmin(), usageSplit(data.from, data.to, data.app))),
+  );
 
 export const adminHealth = createServerFn({ method: "GET" }).handler(async () =>
   guard(() => (requireAdmin(), systemHealth())),

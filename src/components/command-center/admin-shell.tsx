@@ -156,7 +156,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex h-[68px] flex-wrap items-center gap-[13px] border-b border-slate-200/80 bg-white/85 px-[21px] backdrop-blur dark:border-white/10 dark:bg-[#0B1730]/90">
+        <header className="sticky top-0 z-20 flex h-14 flex-wrap items-center gap-2 border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur dark:border-white/10 dark:bg-[#0B1730]/90">
           <button
             type="button"
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -263,7 +263,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             <Shield className="h-4 w-4" />
           </button>
         </header>
-        <main className="min-w-0 flex-1 px-[21px] py-[13px]">{children}</main>
+        <main className="min-w-0 flex-1 px-4 py-3">{children}</main>
       </div>
     </div>
   );

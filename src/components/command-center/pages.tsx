@@ -1,20 +1,10 @@
 import { Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
-import { Activity, CheckCircle2, Circle, LogIn, LogOut, Shield } from "lucide-react";
-import {
-  Bar,
-  BarChart,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { useMemo, useState } from "react";
+import { CheckCircle2, Circle } from "lucide-react";
 import { toast } from "sonner";
 
+import { OverviewBoard } from "@/components/command-center/overview-board";
 import { downloadCsv, useAdminFilters } from "@/components/command-center/filters";
 import {
   adminAudit,
@@ -24,14 +14,12 @@ import {
   adminErp,
   adminEvents,
   adminHealth,
-  adminOverview,
   adminReviewSecurity,
   adminSaveSettings,
   adminSecurity,
   adminSessions,
   adminSettings,
   adminTerminateSession,
-  adminUsage,
   adminWork,
 } from "@/server/api/command-center";
 
@@ -49,367 +37,13 @@ function unwrap<T>(
   return result.data as T;
 }
 
-const APP_COLOR: Record<string, string> = {
-  erp: "#0891b2",
-  crm: "#7c3aed",
-  admin: "#2563eb",
-  auth: "#64748b",
-};
-
 function initials(name: string) {
   const parts = name.trim().split(/\s+/);
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "•";
 }
 
-function changeLabel(change: number | null) {
-  if (change === null) return "No earlier period to compare";
-  return `${change > 0 ? "+" : ""}${change}% vs previous period`;
-}
-
 export function OverviewPage() {
-  const range = useRange();
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(new Date()), 30_000);
-    return () => window.clearInterval(id);
-  }, []);
-  const overview = useQuery({
-    queryKey: ["admin-overview", range],
-    queryFn: () => adminOverview({ data: range }),
-    refetchInterval: 30_000,
-  });
-  const usage = useQuery({
-    queryKey: ["admin-usage", range],
-    queryFn: () => adminUsage({ data: range }),
-    refetchInterval: 30_000,
-  });
-  const health = useQuery({
-    queryKey: ["admin-health"],
-    queryFn: () => adminHealth(),
-    refetchInterval: 20_000,
-  });
-  const work = useQuery({
-    queryKey: ["admin-work", range],
-    queryFn: () => adminWork({ data: range }),
-  });
-  const data = overview.data?.success ? overview.data.data : null;
-  const split = usage.data?.success ? usage.data.data : null;
-  const healthData = health.data?.success ? health.data.data : null;
-  const workData = work.data?.success ? work.data.data : null;
-  const online = (data?.presence ?? []).filter((person) => person.status !== "offline");
-  const tiles = data
-    ? [
-        {
-          label: "Total employees",
-          metric: data.metrics.totalEmployees,
-          href: "/admin/employees",
-          tone: "bg-white text-slate-900 border-slate-200 dark:bg-[#0E1C33] dark:text-white dark:border-white/10",
-        },
-        {
-          label: "Currently online",
-          metric: data.metrics.currentlyOnline,
-          href: "/admin/attendance",
-          tone: "bg-emerald-50 text-emerald-950 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-50 dark:border-emerald-800",
-        },
-        {
-          label: "Active now",
-          metric: data.metrics.activeNow,
-          href: "/admin/activity",
-          tone: "bg-cyan-50 text-cyan-950 border-cyan-200 dark:bg-cyan-950/40 dark:text-cyan-50 dark:border-cyan-800",
-        },
-        {
-          label: "Offline",
-          metric: data.metrics.offline,
-          href: "/admin/employees",
-          tone: "bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-800/60 dark:text-slate-100 dark:border-white/10",
-        },
-        {
-          label: "Sessions",
-          metric: data.metrics.sessions,
-          href: "/admin/attendance",
-          tone: "bg-gradient-to-br from-blue-600 to-blue-800 text-white border-transparent",
-        },
-        {
-          label: "Recorded events",
-          metric: data.metrics.activities,
-          href: "/admin/activity",
-          tone: "bg-violet-50 text-violet-950 border-violet-200 dark:bg-violet-950/40 dark:text-violet-50 dark:border-violet-800",
-        },
-        {
-          label: "Tasks completed",
-          metric: data.metrics.tasksCompleted,
-          href: "/admin/work",
-          tone: "bg-emerald-600 text-white border-transparent",
-        },
-        {
-          label: "Pending tasks",
-          metric: data.metrics.tasksPending,
-          href: "/admin/work",
-          tone: "bg-amber-50 text-amber-950 border-amber-200 dark:bg-amber-950/40 dark:text-amber-50 dark:border-amber-800",
-        },
-        {
-          label: "Security alerts",
-          metric: data.metrics.securityAlerts,
-          href: "/admin/security",
-          tone: "bg-red-50 text-red-950 border-red-200 dark:bg-red-950/40 dark:text-red-50 dark:border-red-900",
-        },
-        {
-          label: "People with events",
-          metric: data.metrics.activePeople,
-          href: "/admin/activity",
-          tone: "bg-indigo-50 text-indigo-950 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-50 dark:border-indigo-800",
-        },
-      ]
-    : [];
-
-  return (
-    <div className="space-y-[13px]">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-[32px] font-semibold leading-none tracking-tight">Command Center</h1>
-          <p className="mt-2 text-sm text-slate-500">
-            {now.toLocaleString("en-IN", {
-              weekday: "short",
-              day: "numeric",
-              month: "short",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-            {" · "}
-            Counts follow the header date range and ERP/CRM filter.
-          </p>
-        </div>
-        <span className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-70" />
-            <span className="relative h-2 w-2 rounded-full bg-emerald-500" />
-          </span>
-          Live
-        </span>
-      </div>
-      {overview.data && !overview.data.success ? (
-        <p className="text-sm text-red-600">{overview.data.error}</p>
-      ) : null}
-
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
-        {tiles.map((tile) => (
-          <a
-            key={tile.label}
-            href={tile.href}
-            className={`flex h-[118px] flex-col justify-between rounded-2xl border px-3 py-3 ${tile.tone}`}
-          >
-            <div className="text-[12px] font-medium opacity-80">{tile.label}</div>
-            <div className="text-[34px] font-semibold leading-none tabular-nums">
-              {tile.metric.value}
-            </div>
-            <div className="truncate text-[11px] opacity-75">{changeLabel(tile.metric.change)}</div>
-          </a>
-        ))}
-      </div>
-
-      <div className="grid items-start gap-[13px] lg:grid-cols-[1.618fr_1fr]">
-        <section className="rounded-2xl border border-slate-200/80 bg-white p-[13px] dark:border-white/10 dark:bg-[#0E1C33]">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Live activity</h2>
-            <a href="/admin/activity" className="text-xs font-semibold text-blue-600">
-              View all
-            </a>
-          </div>
-          {(data?.recentEvents ?? []).length === 0 ? (
-            <p className="py-8 text-center text-sm text-slate-500">
-              No recorded events in this range yet.
-            </p>
-          ) : (
-            <ol className="relative space-y-1 border-l border-slate-200 pl-4 dark:border-white/10">
-              {data?.recentEvents.map((event) => {
-                const name = event.employeeName || "Unknown";
-                const Icon =
-                  event.eventType === "auth" && /out/i.test(event.action)
-                    ? LogOut
-                    : event.eventType === "auth"
-                      ? LogIn
-                      : event.eventType === "security"
-                        ? Shield
-                        : Activity;
-                return (
-                  <li key={event.id} className="relative py-1.5">
-                    <span className="absolute -left-[21px] top-3 h-2 w-2 rounded-full bg-blue-500" />
-                    <div className="flex items-start gap-2">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-700 dark:bg-white/10 dark:text-slate-100">
-                        {initials(name)}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-1.5 text-sm">
-                          <span className="font-semibold">{name}</span>
-                          <span className="text-slate-600 dark:text-slate-300">{event.action}</span>
-                          <AppBadge app={event.application} />
-                          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] uppercase text-slate-500 dark:bg-white/10">
-                            {event.eventType}
-                          </span>
-                        </div>
-                        <div className="mt-0.5 flex flex-wrap gap-2 text-[11px] text-slate-500">
-                          <span className="inline-flex items-center gap-1">
-                            <Icon className="h-3 w-3" />
-                            {event.module || "—"}
-                          </span>
-                          <span>
-                            {event.userAgent ? event.userAgent.slice(0, 42) : "Device not recorded"}
-                          </span>
-                          <span>Location unavailable</span>
-                          <time>{new Date(event.createdAt).toLocaleString()}</time>
-                        </div>
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-          )}
-        </section>
-
-        <section className="rounded-2xl border border-slate-200/80 bg-white p-[13px] dark:border-white/10 dark:bg-[#0E1C33]">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Presence</h2>
-            <a href="/admin/employees" className="text-xs font-semibold text-blue-600">
-              View all
-            </a>
-          </div>
-          <div className="mb-2 flex gap-2 text-[11px]">
-            <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-emerald-700 dark:text-emerald-300">
-              {online.filter((p) => p.status === "active").length} active
-            </span>
-            <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-amber-700 dark:text-amber-300">
-              {online.filter((p) => p.status === "idle").length} idle
-            </span>
-            <span className="rounded-full bg-slate-200 px-2 py-0.5 text-slate-600 dark:bg-white/10 dark:text-slate-300">
-              {(data?.presence ?? []).filter((p) => p.status === "offline").length} offline
-            </span>
-          </div>
-          <ul className="space-y-1">
-            {(online.length ? online : (data?.presence ?? []).slice(0, 6))
-              .slice(0, 8)
-              .map((person) => (
-                <li key={person.id}>
-                  <Link
-                    to="/admin/employees/$userId"
-                    params={{ userId: person.id }}
-                    className="flex items-center gap-2 rounded-lg px-1 py-1 hover:bg-slate-50 dark:hover:bg-white/5"
-                  >
-                    <span
-                      className={`h-2 w-2 rounded-full ${person.status === "active" ? "bg-emerald-500" : person.status === "idle" ? "bg-amber-500" : "bg-slate-400"}`}
-                    />
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-800 dark:bg-blue-500/20 dark:text-blue-100">
-                      {initials(person.name)}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium">{person.name}</span>
-                      <span className="block truncate text-[11px] text-slate-500">
-                        {person.module || person.jobTitle || "No page recorded"} ·{" "}
-                        {person.lastActiveAt
-                          ? new Date(person.lastActiveAt).toLocaleTimeString()
-                          : "no activity"}
-                      </span>
-                    </span>
-                    <AppBadge app={person.application} />
-                  </Link>
-                </li>
-              ))}
-          </ul>
-        </section>
-      </div>
-
-      <div className="grid gap-[13px] lg:grid-cols-[1.618fr_1fr]">
-        <section className="rounded-2xl border border-slate-200/80 bg-white p-[13px] dark:border-white/10 dark:bg-[#0E1C33]">
-          <h2 className="mb-2 text-sm font-semibold">ERP and CRM events</h2>
-          {(split?.byApp.length ?? 0) === 0 ? (
-            <p className="py-6 text-sm text-slate-500">
-              No events in this range, so the chart stays empty.
-            </p>
-          ) : (
-            <div className="grid items-center gap-3 md:grid-cols-[180px_1fr]">
-              <div className="h-40">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={split?.byApp ?? []}
-                      dataKey="count"
-                      nameKey="application"
-                      innerRadius={42}
-                      outerRadius={62}
-                      stroke="none"
-                    >
-                      {(split?.byApp ?? []).map((row) => (
-                        <Cell
-                          key={row.application}
-                          fill={APP_COLOR[row.application] ?? "#64748b"}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="h-40">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={split?.modules ?? []}
-                    layout="vertical"
-                    margin={{ left: 8, right: 8 }}
-                  >
-                    <XAxis type="number" hide />
-                    <YAxis type="category" dataKey="module" width={88} tick={{ fontSize: 11 }} />
-                    <Tooltip />
-                    <Bar dataKey="count" radius={[0, 6, 6, 0]}>
-                      {(split?.modules ?? []).map((row) => (
-                        <Cell
-                          key={`${row.application}-${row.module}`}
-                          fill={APP_COLOR[row.application] ?? "#2563eb"}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          )}
-          {workData ? (
-            <p className="mt-2 text-xs text-slate-500">
-              Follow-up tasks on record: {workData.byScope.erp} ERP, {workData.byScope.crm} CRM.
-              Completed in range: {workData.completedInRange}. Pending: {workData.pending}.
-            </p>
-          ) : null}
-        </section>
-        <section className="rounded-2xl border border-slate-200/80 bg-white p-[13px] dark:border-white/10 dark:bg-[#0E1C33]">
-          <h2 className="mb-2 text-sm font-semibold">System health</h2>
-          {healthData ? (
-            <ul className="space-y-2 text-sm">
-              <HealthRow
-                label="Database"
-                value={healthData.database.ok ? "Connected" : "Down"}
-                ok={healthData.database.ok}
-              />
-              <HealthRow
-                label="Query time"
-                value={`${healthData.database.latencyMs} ms`}
-                ok={healthData.database.ok}
-              />
-              <HealthRow
-                label="This process"
-                value={`${Math.round(healthData.processUptimeSeconds / 60)} min up`}
-                ok
-              />
-              <HealthRow label="Memory" value={`${healthData.processMemoryMb} MB`} ok />
-              <HealthRow label="CPU" value="Unavailable" ok={false} />
-              <HealthRow label="Background workers" value="Unavailable" ok={false} />
-            </ul>
-          ) : (
-            <p className="text-sm text-slate-500">Checking the database…</p>
-          )}
-          <p className="mt-3 text-[11px] text-slate-500">{healthData?.note}</p>
-        </section>
-      </div>
-    </div>
-  );
+  return <OverviewBoard />;
 }
 
 function AppBadge({ app }: { app: string }) {
@@ -488,14 +122,14 @@ export function EmployeesPage() {
   return (
     <div className="space-y-[13px]">
       <div>
-        <h1 className="text-[32px] font-semibold leading-none tracking-tight">
+        <h1 className="text-[26px] font-semibold leading-none tracking-tight">
           Employee Intelligence
         </h1>
-        <p className="mt-2 text-sm text-slate-500">
+        <p className="mt-1 text-[13px] text-slate-500">
           Status comes from the session heartbeat. Location is not collected.
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
         <Mini label="Employees" value={counts.total} tone="bg-white dark:bg-[#0E1C33]" />
         <Mini
           label="Online"
@@ -691,11 +325,11 @@ export function EmployeesPage() {
   );
 }
 
-function Mini({ label, value, tone }: { label: string; value: number; tone: string }) {
+function Mini({ label, value }: { label: string; value: number; tone?: string }) {
   return (
-    <div className={`rounded-xl border border-slate-200/70 px-3 py-2 dark:border-white/10 ${tone}`}>
-      <div className="text-[11px] opacity-70">{label}</div>
-      <div className="text-2xl font-semibold tabular-nums">{value}</div>
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-white/10 dark:bg-[#0E1C33]">
+      <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="mt-1 text-xl font-semibold leading-none tabular-nums">{value}</div>
     </div>
   );
 }
@@ -1141,7 +775,7 @@ export function SettingsPage() {
     >
       {current ? (
         <form
-          className="grid max-w-lg gap-3"
+          className="grid max-w-lg gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#0E1C33]"
           onSubmit={(event) => {
             event.preventDefault();
             void adminSaveSettings({ data: current }).then((result) => {
@@ -1225,32 +859,30 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-[13px]">
+    <div className="space-y-3">
       <div>
-        <h1 className="text-[32px] font-semibold leading-none tracking-tight">{title}</h1>
-        {note ? <p className="mt-1 max-w-3xl text-sm text-slate-500">{note}</p> : null}
+        <h1 className="text-[26px] font-semibold leading-none tracking-tight">{title}</h1>
+        {note ? <p className="mt-1 max-w-3xl text-[13px] text-slate-500">{note}</p> : null}
       </div>
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-[13px] dark:border-white/10 dark:bg-[#0E1C33]">
-        {children}
-      </div>
+      {children}
     </div>
   );
 }
 
 function Stat({ label, value }: { label: string; value: number | string }) {
   return (
-    <div className="rounded-xl border border-slate-200/80 bg-slate-50 p-3 dark:border-white/10 dark:bg-[#07111F]">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className="text-2xl font-semibold tabular-nums">{value}</div>
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-white/10 dark:bg-[#0E1C33]">
+      <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="mt-1 text-xl font-semibold leading-none tabular-nums">{value}</div>
     </div>
   );
 }
 
 function Table({ columns, rows }: { columns: string[]; rows: React.ReactNode[][] }) {
-  if (!rows.length) return <p className="text-sm text-slate-500">Nothing in this range.</p>;
+  if (!rows.length) return <p className="rounded-lg border border-dashed border-slate-200 px-3 py-8 text-center text-[13px] text-slate-500">Nothing in this range.</p>;
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
+    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-[#0E1C33]">
+      <table className="w-full text-left text-[13px]">
         <thead>
           <tr className="border-b border-slate-200 text-xs text-slate-500 dark:border-slate-800">
             {columns.map((column) => (
