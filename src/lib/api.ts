@@ -235,6 +235,8 @@ export {
   sendCrmExecutivePaymentDigest,
 } from "@/server/api/crm-payments";
 
+export { importCrmSeatSheets, listCrmSeatSheets } from "@/server/api/crm-seat-sheets";
+
 export {
   getCompanyPayments,
   listErpCompanyPayments,

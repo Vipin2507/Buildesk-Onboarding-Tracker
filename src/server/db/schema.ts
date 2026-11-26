@@ -225,6 +225,28 @@ export const crmAccounts = sqliteTable(
   ],
 );
 
+/** Uploaded contract seats. Does not write the live payment ledger or account deal. */
+export const crmAccountSeatSheets = sqliteTable(
+  "crm_account_seat_sheets",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => crmAccounts.id, { onDelete: "cascade" }),
+    userId: text("user_id"),
+    accountName: text("account_name").notNull(),
+    startDate: text("start_date"),
+    endDate: text("end_date"),
+    dealValue: real("deal_value"),
+    dealValueWithGst: real("deal_value_with_gst"),
+    users: integer("users"),
+    upgrade: integer("upgrade"),
+    degrade: integer("degrade"),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("crm_account_seat_sheets_account_idx").on(t.accountId)],
+);
+
 /** Cached WAHA WhatsApp group messages for ERP companies. */
 export const companyWhatsappGroupMessages = sqliteTable(
   "company_whatsapp_group_messages",

@@ -1768,5 +1768,29 @@ if (!tableExists("admin_audit_logs")) {
   console.log("+ CREATE TABLE admin_audit_logs");
 }
 
+if (!tableExists("crm_account_seat_sheets")) {
+  sqlite.exec(`
+    CREATE TABLE crm_account_seat_sheets (
+      id TEXT PRIMARY KEY NOT NULL,
+      account_id TEXT NOT NULL,
+      user_id TEXT,
+      account_name TEXT NOT NULL,
+      start_date TEXT,
+      end_date TEXT,
+      deal_value REAL,
+      deal_value_with_gst REAL,
+      users INTEGER,
+      upgrade INTEGER,
+      degrade INTEGER,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (account_id) REFERENCES crm_accounts(id) ON DELETE CASCADE
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS crm_account_seat_sheets_account_idx
+      ON crm_account_seat_sheets(account_id);
+  `);
+  console.log("+ CREATE TABLE crm_account_seat_sheets");
+}
+
 sqlite.close();
 console.log("db:ensure complete");

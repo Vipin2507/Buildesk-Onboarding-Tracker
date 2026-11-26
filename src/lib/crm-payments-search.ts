@@ -34,7 +34,7 @@ function normalizePaymentStatusTab(value: unknown): CrmPaymentStatusTabId | unde
 
 export const CRM_PAYMENT_SCENARIOS = ["installment", "renewal"] as const;
 export const CRM_PAYMENT_COLLECTION_BANDS = ["under_50", "50_to_90", "over_90"] as const;
-export const CRM_PAYMENT_VIEWS = ["ledger", "analysis"] as const;
+export const CRM_PAYMENT_VIEWS = ["ledger", "analysis", "seats"] as const;
 
 export const crmPaymentsSearchSchema = z.object({
   status: z.preprocess(normalizePaymentStatusTab, z.enum(CRM_PAYMENT_STATUS_TAB_IDS).optional()),

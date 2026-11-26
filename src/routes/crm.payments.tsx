@@ -8,6 +8,7 @@ import { CrmAccountRenewDialog } from "@/components/crm/crm-account-renew-dialog
 import { CrmExecutivePaymentReminderDialog } from "@/components/crm/crm-executive-payment-reminder-dialog";
 import { CrmPaymentsExpandedRow } from "@/components/crm/crm-payments-expanded-row";
 import { PaymentsAnalysisBoard } from "@/components/crm/payments/payments-analysis-board";
+import { PaymentsSeatTab } from "@/components/crm/payments/payments-seat-tab";
 import { formatPaymentsInr } from "@/components/crm/payments/payments-format";
 import { PaymentsHeader } from "@/components/crm/payments/payments-header";
 import { PaymentsKpiCards } from "@/components/crm/payments/payments-kpi-cards";
@@ -463,6 +464,7 @@ function CrmPaymentsPage() {
             [
               { id: "ledger", label: "Payments" },
               { id: "analysis", label: "Analysis" },
+              { id: "seats", label: "Seat value" },
             ] as const
           ).map((item) => (
             <button
@@ -502,6 +504,7 @@ function CrmPaymentsPage() {
           </>
         ) : null}
 
+        {view === "seats" ? null : (
         <div className="space-y-1.5">
           <div className="relative max-w-md">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -673,9 +676,10 @@ function CrmPaymentsPage() {
             />
           </DesignTicketFilterBar>
         </div>
+        )}
       </div>
 
-      {selectedIds.size > 0 ? (
+      {view === "ledger" && selectedIds.size > 0 ? (
         <div className="flex items-center justify-between gap-2 border-b border-border bg-primary/5 px-0 py-2 text-xs">
           <span>{selectedIds.size} selected</span>
           <Button
@@ -691,7 +695,9 @@ function CrmPaymentsPage() {
         </div>
       ) : null}
 
-      {view === "analysis" ? (
+      {view === "seats" ? (
+        <PaymentsSeatTab />
+      ) : view === "analysis" ? (
         <PaymentsAnalysisBoard summary={summary} loading={summaryQuery.isLoading} />
       ) : listQuery.isLoading ? (
         <p className="px-0 py-8 text-center text-sm text-muted-foreground">Loading payments…</p>
