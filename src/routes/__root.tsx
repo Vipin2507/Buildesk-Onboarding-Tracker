@@ -176,7 +176,7 @@ function RootComponent() {
                     <SessionMonitor />
                     <NavigationLoadingOverlay />
                     {isAdminApp ? (
-                      <div className="min-h-screen">
+                      <div className="h-dvh overflow-hidden">
                         <MobileWorkbenchNote pathname={pathname} />
                         <Outlet />
                       </div>
