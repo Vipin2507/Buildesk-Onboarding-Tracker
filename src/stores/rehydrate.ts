@@ -20,13 +20,23 @@ const persistedStores = [
   useCrmSettingsStore,
 ] as const;
 
-export async function rehydrateAllStores() {
-  purgeLegacyEntityCaches();
-  await Promise.all(
-    persistedStores.map(async (store) => {
-      if ("persist" in store && store.persist?.rehydrate) {
-        await store.persist.rehydrate();
-      }
-    }),
-  );
+let rehydrateInflight: Promise<void> | null = null;
+
+export function rehydrateAllStores() {
+  if (!rehydrateInflight) {
+    rehydrateInflight = (async () => {
+      purgeLegacyEntityCaches();
+      await Promise.all(
+        persistedStores.map(async (store) => {
+          if ("persist" in store && store.persist?.rehydrate) {
+            await store.persist.rehydrate();
+          }
+        }),
+      );
+    })().catch((error) => {
+      rehydrateInflight = null;
+      throw error;
+    });
+  }
+  return rehydrateInflight;
 }

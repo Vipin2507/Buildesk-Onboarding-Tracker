@@ -43,20 +43,22 @@ function toFilters(search: CrmPaymentsSearch) {
   return crmPaymentsSearchToApiFilters(search);
 }
 
-export function useCrmPaymentsList(search: CrmPaymentsSearch) {
+export function useCrmPaymentsList(search: CrmPaymentsSearch, enabled = true) {
   const filters = toFilters(search);
   return useQuery({
     queryKey: crmPaymentsKeys.list(filters),
     queryFn: () => listCrmPayments({ data: filters }),
+    enabled,
     staleTime: 15_000,
   });
 }
 
-export function useCrmPaymentsSummary(search: CrmPaymentsSearch) {
+export function useCrmPaymentsSummary(search: CrmPaymentsSearch, enabled = true) {
   const filters = toFilters(search);
   return useQuery({
     queryKey: crmPaymentsKeys.summary(filters),
     queryFn: () => getCrmPaymentsSummary({ data: filters }),
+    enabled,
     staleTime: 15_000,
   });
 }

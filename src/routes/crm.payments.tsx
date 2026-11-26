@@ -260,8 +260,8 @@ function CrmPaymentsPage() {
     return () => window.clearTimeout(handle);
   }, [searchDraft, search.search, navigate]);
 
-  const listQuery = useCrmPaymentsList(search);
-  const summaryQuery = useCrmPaymentsSummary(search);
+  const listQuery = useCrmPaymentsList(search, view === "ledger");
+  const summaryQuery = useCrmPaymentsSummary(search, view !== "seats");
   const bulkRemind = useRemindCrmPaymentsBulk();
 
   const rows = listQuery.data?.rows ?? [];

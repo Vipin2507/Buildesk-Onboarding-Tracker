@@ -52,6 +52,7 @@ import {
   wireConfigPersistence,
 } from "@/lib/config-persistence";
 import { isAdminRoleKey } from "@/lib/permissions";
+import { isCrmUser } from "@/lib/product-scope";
 import { mapTicket, mapTicketActivity } from "@/lib/tickets";
 import {
   useActivityStore,
@@ -95,6 +96,7 @@ import { hydrateCrmMasterFromServer, useCrmMasterStore } from "@/stores/useCrmMa
 import type { CrmOnboardingRecord } from "@/types/crm-onboarding";
 import type { AutomationLogWire } from "@/types/automation";
 import { wireToAutomationLogs } from "@/lib/automation-log-sync";
+import { rehydrateAllStores } from "@/stores/rehydrate";
 
 function readLegacyCrmOnboarding(): CrmOnboardingRecord[] {
   if (typeof window === "undefined") return [];
@@ -138,8 +140,402 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
     resetAutomationConfigPersistReady();
 
     (async () => {
+      let shown = false;
+      const showApp = () => {
+        if (cancelled || shown) return;
+        shown = true;
+        setReady(true);
+      };
       try {
-        const [
+        await rehydrateAllStores();
+        if (cancelled) return;
+        const crmUser = isCrmUser(user);
+        const loaded = await (async () => {
+          if (crmUser) {
+            const [
+              users,
+              notifications,
+              followUpTasks,
+              crmAccounts,
+              crmOnboarding,
+              crmSettings,
+              crmMaster,
+              crmAutomation,
+            ] = await Promise.all([
+              listUsers()
+                .then((u) => ({ ok: true as const, users: u }))
+                .catch(() => ({ ok: false as const, users: [] as Awaited<ReturnType<typeof listUsers>> })),
+              listNotifications({ data: { limit: 80 } }).catch(() => []),
+              listFollowUpTasks({ data: {} }).catch(() => []),
+              listCrmAccounts().catch((err) => {
+                console.warn("[bootstrap] listCrmAccounts failed", err);
+                return null;
+              }),
+              listCrmOnboardingRecords().catch((err) => {
+                console.warn("[bootstrap] listCrmOnboardingRecords failed", err);
+                return null;
+              }),
+              getAppConfig({ data: { key: "crm-settings" } }).catch(() => ({})),
+              getAppConfig({ data: { key: "crm-master" } }).catch(() => ({})),
+              getAppConfig({ data: { key: "crm-automation" } }).catch((err) => {
+                console.warn("[bootstrap] getAppConfig(crm-automation) failed", err);
+                return null;
+              }),
+            ]);
+            if (cancelled) return null;
+            if (users.ok) useUserStore.setState({ users: users.users });
+            useNotificationStore.setState({ notifications });
+            useCrmTaskStore.setState({ tasks: followUpTasks });
+            if (crmAccounts) useCrmAccountStore.getState().hydrateAccounts(crmAccounts);
+            if (crmOnboarding) useCrmOnboardingStore.getState().hydrateRecords(crmOnboarding);
+            showApp();
+            const [
+              companies,
+              projects,
+              employees,
+              tickets,
+              ticketActivities,
+              training,
+              activity,
+              vendors,
+              labor,
+              documents,
+              integrations,
+              postSales,
+              master,
+              settings,
+              automation,
+              notes,
+              attachments,
+              checklist,
+              charges,
+              uploads,
+              progressRows,
+              customerApps,
+              erpFollowUpTasks,
+              clientVisits,
+              erpMeetings,
+              moduleSubscriptions,
+              subscriptionEvents,
+              crmEvents,
+              portalAccess,
+              designTickets,
+              chatSessions,
+              bookingEventTypes,
+              bookingAppointments,
+              bookingAvailability,
+              bookingBlocks,
+            ] = await Promise.all([
+              listCompanies().catch((err) => {
+                console.warn("[bootstrap] listCompanies failed", err);
+                return [];
+              }),
+              listProjects({ data: {} }).catch((err) => {
+                console.warn("[bootstrap] listProjects failed", err);
+                return [];
+              }),
+              listEmployees().catch((err) => {
+                console.warn("[bootstrap] listEmployees failed", err);
+                return [];
+              }),
+              listTickets().catch((err) => {
+                console.warn("[bootstrap] listTickets failed", err);
+                return [];
+              }),
+              listTicketActivities({ data: {} }).catch(() => []),
+              listTraining().catch(() => []),
+              listActivity({ data: { limit: 100 } }).catch(() => []),
+              getVendorBundle().catch(() => ({
+                materials: [],
+                suppliers: [],
+                contractors: [],
+                purchaseOrders: [],
+                workOrders: [],
+                boqs: [],
+                approvalFlows: [],
+              })),
+              getLaborBundle().catch(() => ({ labor: [], attendance: [] })),
+              listDocuments().catch(() => []),
+              getIntegrationsBundle().catch(() => ({ integrations: [], triggers: [] })),
+              listPostSalesProjects({ data: {} }).catch(() => []),
+              getAppConfig({ data: { key: "master" } }).catch(() => ({})),
+              getAppConfig({ data: { key: "settings" } }).catch(() => ({})),
+              getAppConfig({ data: { key: "automation" } }).catch((err) => {
+                console.warn("[bootstrap] getAppConfig(automation) failed", err);
+                return null;
+              }),
+              listAllNotes().catch(() => []),
+              listAllAttachments().catch(() => []),
+              listAllChecklist().catch(() => []),
+              listAllOtherCharges().catch(() => []),
+              listAllUploads().catch(() => []),
+              listAllProgress().catch(() => []),
+              listAllCustomerAppConfigs().catch(() => []),
+              listErpFollowUpTasks({ data: {} }).catch(() => []),
+              listClientVisits({ data: {} }).catch(() => []),
+              listErpMeetings({ data: {} }).catch(() => []),
+              listModuleSubscriptions({ data: {} }).catch(() => []),
+              listModuleSubscriptionEvents({ data: {} }).catch(() => []),
+              listCrmEvents({ data: { limit: 200 } }).catch(() => []),
+              ensureCompanyPortals().catch(() => []),
+              listDesignTickets({ data: {} }).catch((err) => {
+                console.warn("[bootstrap] listDesignTickets failed", err);
+                return null;
+              }),
+              listChatSessions().catch((err) => {
+                console.warn("[bootstrap] listChatSessions failed", err);
+                return null;
+              }),
+              listBookingEventTypes({ data: {} }).catch((err) => {
+                console.warn("[bootstrap] listBookingEventTypes failed", err);
+                return null;
+              }),
+              listBookingAppointments({ data: {} }).catch((err) => {
+                console.warn("[bootstrap] listBookingAppointments failed", err);
+                return null;
+              }),
+              listBookingAvailability({ data: {} }).catch((err) => {
+                console.warn("[bootstrap] listBookingAvailability failed", err);
+                return null;
+              }),
+              listBookingBlocks({ data: {} }).catch((err) => {
+                console.warn("[bootstrap] listBookingBlocks failed", err);
+                return null;
+              }),
+            ]);
+            if (cancelled) return null;
+            return {
+              companies,
+              projects,
+              employees,
+              users,
+              tickets,
+              ticketActivities,
+              training,
+              activity,
+              notifications,
+              vendors,
+              labor,
+              documents,
+              integrations,
+              postSales,
+              master,
+              settings,
+              automation,
+              crmAutomation,
+              crmSettings,
+              crmMaster,
+              notes,
+              attachments,
+              checklist,
+              charges,
+              uploads,
+              progressRows,
+              customerApps,
+              followUpTasks,
+              erpFollowUpTasks,
+              clientVisits,
+              erpMeetings,
+              moduleSubscriptions,
+              subscriptionEvents,
+              crmEvents,
+              portalAccess,
+              crmAccounts,
+              crmOnboarding,
+              designTickets,
+              chatSessions,
+              bookingEventTypes,
+              bookingAppointments,
+              bookingAvailability,
+              bookingBlocks,
+            };
+          }
+
+          const [
+            companies,
+            projects,
+            employees,
+            users,
+            tickets,
+            activity,
+            notifications,
+            master,
+            settings,
+          ] = await Promise.all([
+            listCompanies(),
+            listProjects({ data: {} }),
+            listEmployees(),
+            listUsers()
+              .then((u) => ({ ok: true as const, users: u }))
+              .catch(() => ({ ok: false as const, users: [] as Awaited<ReturnType<typeof listUsers>> })),
+            listTickets(),
+            listActivity({ data: { limit: 100 } }),
+            listNotifications({ data: { limit: 80 } }).catch(() => []),
+            getAppConfig({ data: { key: "master" } }).catch(() => ({})),
+            getAppConfig({ data: { key: "settings" } }).catch(() => ({})),
+          ]);
+          if (cancelled) return null;
+          useCompanyStore.setState({ companies });
+          useProjectStore.setState({ projects });
+          useEmployeeStore.setState({ employees });
+          if (users.ok) useUserStore.setState({ users: users.users });
+          useTicketStore.setState({
+            tickets: tickets.map((t) => mapTicket(t as Record<string, unknown>)),
+            activities: [],
+          });
+          useActivityStore.setState({ activities: activity });
+          useNotificationStore.setState({ notifications });
+          showApp();
+          const [
+            ticketActivities,
+            training,
+            vendors,
+            labor,
+            documents,
+            integrations,
+            postSales,
+            automation,
+            crmAutomation,
+            crmSettings,
+            crmMaster,
+            notes,
+            attachments,
+            checklist,
+            charges,
+            uploads,
+            progressRows,
+            customerApps,
+            followUpTasks,
+            erpFollowUpTasks,
+            clientVisits,
+            erpMeetings,
+            moduleSubscriptions,
+            subscriptionEvents,
+            crmEvents,
+            portalAccess,
+            crmAccounts,
+            crmOnboarding,
+            designTickets,
+            chatSessions,
+            bookingEventTypes,
+            bookingAppointments,
+            bookingAvailability,
+            bookingBlocks,
+          ] = await Promise.all([
+            listTicketActivities({ data: {} }).catch(() => []),
+            listTraining().catch(() => []),
+            getVendorBundle(),
+            getLaborBundle(),
+            listDocuments(),
+            getIntegrationsBundle(),
+            listPostSalesProjects({ data: {} }),
+            getAppConfig({ data: { key: "automation" } }).catch((err) => {
+              console.warn("[bootstrap] getAppConfig(automation) failed", err);
+              return null;
+            }),
+            getAppConfig({ data: { key: "crm-automation" } }).catch((err) => {
+              console.warn("[bootstrap] getAppConfig(crm-automation) failed", err);
+              return null;
+            }),
+            getAppConfig({ data: { key: "crm-settings" } }).catch(() => ({})),
+            getAppConfig({ data: { key: "crm-master" } }).catch(() => ({})),
+            listAllNotes().catch(() => []),
+            listAllAttachments().catch(() => []),
+            listAllChecklist().catch(() => []),
+            listAllOtherCharges().catch(() => []),
+            listAllUploads().catch(() => []),
+            listAllProgress().catch(() => []),
+            listAllCustomerAppConfigs().catch(() => []),
+            listFollowUpTasks({ data: {} }).catch(() => []),
+            listErpFollowUpTasks({ data: {} }).catch(() => []),
+            listClientVisits({ data: {} }).catch(() => []),
+            listErpMeetings({ data: {} }).catch(() => []),
+            listModuleSubscriptions({ data: {} }).catch(() => []),
+            listModuleSubscriptionEvents({ data: {} }).catch(() => []),
+            listCrmEvents({ data: { limit: 200 } }).catch(() => []),
+            ensureCompanyPortals().catch(() => []),
+            listCrmAccounts().catch((err) => {
+              console.warn("[bootstrap] listCrmAccounts failed", err);
+              return null;
+            }),
+            listCrmOnboardingRecords().catch((err) => {
+              console.warn("[bootstrap] listCrmOnboardingRecords failed", err);
+              return null;
+            }),
+            listDesignTickets({ data: {} }).catch((err) => {
+              console.warn("[bootstrap] listDesignTickets failed", err);
+              return null;
+            }),
+            listChatSessions().catch((err) => {
+              console.warn("[bootstrap] listChatSessions failed", err);
+              return null;
+            }),
+            listBookingEventTypes({ data: {} }).catch((err) => {
+              console.warn("[bootstrap] listBookingEventTypes failed", err);
+              return null;
+            }),
+            listBookingAppointments({ data: {} }).catch((err) => {
+              console.warn("[bootstrap] listBookingAppointments failed", err);
+              return null;
+            }),
+            listBookingAvailability({ data: {} }).catch((err) => {
+              console.warn("[bootstrap] listBookingAvailability failed", err);
+              return null;
+            }),
+            listBookingBlocks({ data: {} }).catch((err) => {
+              console.warn("[bootstrap] listBookingBlocks failed", err);
+              return null;
+            }),
+          ]);
+          if (cancelled) return null;
+          return {
+            companies,
+            projects,
+            employees,
+            users,
+            tickets,
+            ticketActivities,
+            training,
+            activity,
+            notifications,
+            vendors,
+            labor,
+            documents,
+            integrations,
+            postSales,
+            master,
+            settings,
+            automation,
+            crmAutomation,
+            crmSettings,
+            crmMaster,
+            notes,
+            attachments,
+            checklist,
+            charges,
+            uploads,
+            progressRows,
+            customerApps,
+            followUpTasks,
+            erpFollowUpTasks,
+            clientVisits,
+            erpMeetings,
+            moduleSubscriptions,
+            subscriptionEvents,
+            crmEvents,
+            portalAccess,
+            crmAccounts,
+            crmOnboarding,
+            designTickets,
+            chatSessions,
+            bookingEventTypes,
+            bookingAppointments,
+            bookingAvailability,
+            bookingBlocks,
+          };
+        })();
+        if (!loaded) return;
+        const {
           companies,
           projects,
           employees,
@@ -183,83 +579,7 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
           bookingAppointments,
           bookingAvailability,
           bookingBlocks,
-        ] = await Promise.all([
-          listCompanies(),
-          listProjects({ data: {} }),
-          listEmployees(),
-          listUsers()
-            .then((u) => ({ ok: true as const, users: u }))
-            .catch(() => ({ ok: false as const, users: [] as Awaited<ReturnType<typeof listUsers>> })),
-          listTickets(),
-          listTicketActivities({ data: { } }).catch(() => []),
-          listTraining(),
-          listActivity({ data: { limit: 100 } }),
-          listNotifications({ data: { limit: 80 } }).catch(() => []),
-          getVendorBundle(),
-          getLaborBundle(),
-          listDocuments(),
-          getIntegrationsBundle(),
-          listPostSalesProjects({ data: {} }),
-          getAppConfig({ data: { key: "master" } }).catch(() => ({})),
-          getAppConfig({ data: { key: "settings" } }).catch(() => ({})),
-          getAppConfig({ data: { key: "automation" } }).catch((err) => {
-            console.warn("[bootstrap] getAppConfig(automation) failed", err);
-            return null;
-          }),
-          getAppConfig({ data: { key: "crm-automation" } }).catch((err) => {
-            console.warn("[bootstrap] getAppConfig(crm-automation) failed", err);
-            return null;
-          }),
-          getAppConfig({ data: { key: "crm-settings" } }).catch(() => ({})),
-          getAppConfig({ data: { key: "crm-master" } }).catch(() => ({})),
-          listAllNotes().catch(() => []),
-          listAllAttachments().catch(() => []),
-          listAllChecklist().catch(() => []),
-          listAllOtherCharges().catch(() => []),
-          listAllUploads().catch(() => []),
-          listAllProgress().catch(() => []),
-          listAllCustomerAppConfigs().catch(() => []),
-          listFollowUpTasks({ data: {} }).catch(() => []),
-          listErpFollowUpTasks({ data: {} }).catch(() => []),
-          listClientVisits({ data: {} }).catch(() => []),
-          listErpMeetings({ data: {} }).catch(() => []),
-          listModuleSubscriptions({ data: {} }).catch(() => []),
-          listModuleSubscriptionEvents({ data: {} }).catch(() => []),
-          listCrmEvents({ data: { limit: 200 } }).catch(() => []),
-          ensureCompanyPortals().catch(() => []),
-          listCrmAccounts().catch((err) => {
-            console.warn("[bootstrap] listCrmAccounts failed", err);
-            return null;
-          }),
-          listCrmOnboardingRecords().catch((err) => {
-            console.warn("[bootstrap] listCrmOnboardingRecords failed", err);
-            return null;
-          }),
-          listDesignTickets({ data: {} }).catch((err) => {
-            console.warn("[bootstrap] listDesignTickets failed", err);
-            return null;
-          }),
-          listChatSessions().catch((err) => {
-            console.warn("[bootstrap] listChatSessions failed", err);
-            return null;
-          }),
-          listBookingEventTypes({ data: {} }).catch((err) => {
-            console.warn("[bootstrap] listBookingEventTypes failed", err);
-            return null;
-          }),
-          listBookingAppointments({ data: {} }).catch((err) => {
-            console.warn("[bootstrap] listBookingAppointments failed", err);
-            return null;
-          }),
-          listBookingAvailability({ data: {} }).catch((err) => {
-            console.warn("[bootstrap] listBookingAvailability failed", err);
-            return null;
-          }),
-          listBookingBlocks({ data: {} }).catch((err) => {
-            console.warn("[bootstrap] listBookingBlocks failed", err);
-            return null;
-          }),
-        ]);
+        } = loaded;
 
         if (cancelled) return;
 
@@ -560,12 +880,13 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
         }
 
         setReady(true);
-      } catch (e) {
-        if (!cancelled) {
+        } catch (e) {
+        if (!cancelled && !shown) {
           console.error(e);
           setError(e instanceof Error ? e.message : "Failed to load server data");
-          // Fail closed — do not mount the app on a hollow/empty Zustand cache.
           setReady(false);
+        } else if (!cancelled) {
+          console.warn("[bootstrap] background load failed", e);
         }
       }
     })();
@@ -600,12 +921,11 @@ export function ServerDataBootstrap({ children }: { children: ReactNode }) {
   if (!ready) {
     return (
       <AppLoadingScreen
-        messages={[
-          "Preparing your workspace…",
-          "Loading accounts & projects…",
-          "Syncing CRM & meetings…",
-          "Almost ready…",
-        ]}
+        messages={
+          isCrmUser(user)
+            ? ["Opening CRM…", "Loading accounts…"]
+            : ["Opening workspace…", "Loading companies…"]
+        }
       />
     );
   }
