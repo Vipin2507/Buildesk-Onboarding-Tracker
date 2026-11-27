@@ -7,6 +7,7 @@ import {
   serializeInstallments,
 } from "@/lib/crm-account-commercial";
 import { crmAccountHasRenewalCycle } from "@/lib/crm-account-renewal";
+import type { CrmPaymentSortField } from "@/lib/crm-payments-search";
 import { summarizeAccountRenewals } from "@/lib/crm-renewal-years";
 import {
   buildCycleAwarePaymentAllocation,
@@ -466,7 +467,7 @@ export type PaymentsListFilters = {
   pageSize?: number;
   /** Skip pagination — used for CSV export and summary rollups. */
   unpaged?: boolean;
-  sortBy?: "nextDueDate" | "overdueAmount" | "collectionPercent" | "renewalDate";
+  sortBy?: CrmPaymentSortField;
   sortDir?: "asc" | "desc";
 };
 
@@ -775,26 +776,15 @@ export function queryPaymentListItems(
 
   items = applyPaymentsListFilters(items, filters, today);
 
-  const sortBy = filters.sortBy ?? (filters.status === "renewal" ? "renewalDate" : "nextDueDate");
-  const sortDir = filters.sortDir ?? "asc";
-  const dir = sortDir === "desc" ? -1 : 1;
+  const sortBy =
+    filters.sortBy && !(filters.status === "renewal" && filters.sortBy === "nextDueDate")
+      ? filters.sortBy
+      : filters.status === "renewal"
+        ? "renewalDate"
+        : (filters.sortBy ?? "nextDueDate");
+  const dir = filters.sortDir === "desc" ? -1 : 1;
 
-  items.sort((a, b) => {
-    if (sortBy === "overdueAmount") {
-      return (a.overdueAmount - b.overdueAmount) * dir;
-    }
-    if (sortBy === "collectionPercent") {
-      return (a.collectionPercent - b.collectionPercent) * dir;
-    }
-    if (sortBy === "renewalDate" || filters.status === "renewal") {
-      const ad = a.renewalDate ?? "9999-12-31";
-      const bd = b.renewalDate ?? "9999-12-31";
-      return ad.localeCompare(bd) * dir;
-    }
-    const ad = a.nextDueInstallment?.dueDate ?? "9999-12-31";
-    const bd = b.nextDueInstallment?.dueDate ?? "9999-12-31";
-    return ad.localeCompare(bd) * dir;
-  });
+  items.sort((a, b) => comparePaymentRows(a, b, sortBy, dir));
 
   const total = items.length;
   if (filters.unpaged) {
@@ -806,6 +796,58 @@ export function queryPaymentListItems(
   items = items.slice(start, start + pageSize);
 
   return { rows: items, total };
+}
+
+function paymentSortValue(row: PaymentListItem, sortBy: CrmPaymentSortField): string | number | null {
+  switch (sortBy) {
+    case "accountName":
+      return row.accountName;
+    case "supportManager1":
+      return row.supportManager1?.trim() || null;
+    case "supportManager2":
+      return row.supportManager2?.trim() || null;
+    case "salesManager":
+      return row.salesManager?.trim() || null;
+    case "totalDealValue":
+      return row.totalDealValue;
+    case "renewalCount":
+      return row.renewalCount;
+    case "lifetimeValue":
+      return row.lifetimeValue;
+    case "paymentReceived":
+      return row.paymentReceived;
+    case "pendingAmount":
+      return row.pendingAmount;
+    case "nextDueDate":
+      return row.nextDueInstallment?.dueDate ?? null;
+    case "renewalDate":
+      return row.renewalDate ?? null;
+    case "overdueAmount":
+      return row.overdueAmount;
+    case "collectionPercent":
+      return row.collectionPercent;
+    case "paymentStatus":
+      return row.paymentStatus;
+  }
+}
+
+function comparePaymentRows(
+  a: PaymentListItem,
+  b: PaymentListItem,
+  sortBy: CrmPaymentSortField,
+  dir: 1 | -1,
+) {
+  const av = paymentSortValue(a, sortBy);
+  const bv = paymentSortValue(b, sortBy);
+  const aMissing = av == null || av === "";
+  const bMissing = bv == null || bv === "";
+  if (aMissing && bMissing) return 0;
+  if (aMissing) return 1;
+  if (bMissing) return -1;
+  if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
+  return (
+    String(av).localeCompare(String(bv), undefined, { sensitivity: "base", numeric: true }) * dir
+  );
 }
 
 function sumDueAmount(rows: PaymentListItem[]) {

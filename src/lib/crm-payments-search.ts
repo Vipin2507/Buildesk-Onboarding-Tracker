@@ -36,6 +36,25 @@ export const CRM_PAYMENT_SCENARIOS = ["installment", "renewal"] as const;
 export const CRM_PAYMENT_COLLECTION_BANDS = ["under_50", "50_to_90", "over_90"] as const;
 export const CRM_PAYMENT_VIEWS = ["ledger", "analysis", "seats"] as const;
 
+export const CRM_PAYMENT_SORT_FIELDS = [
+  "accountName",
+  "supportManager1",
+  "supportManager2",
+  "salesManager",
+  "totalDealValue",
+  "renewalCount",
+  "lifetimeValue",
+  "paymentReceived",
+  "pendingAmount",
+  "nextDueDate",
+  "renewalDate",
+  "overdueAmount",
+  "collectionPercent",
+  "paymentStatus",
+] as const;
+
+export type CrmPaymentSortField = (typeof CRM_PAYMENT_SORT_FIELDS)[number];
+
 export const crmPaymentsSearchSchema = z.object({
   status: z.preprocess(normalizePaymentStatusTab, z.enum(CRM_PAYMENT_STATUS_TAB_IDS).optional()),
   view: z.enum(CRM_PAYMENT_VIEWS).optional(),
@@ -55,7 +74,7 @@ export const crmPaymentsSearchSchema = z.object({
   search: z.string().optional(),
   page: z.coerce.number().int().min(1).optional(),
   pageSize: z.coerce.number().int().min(1).max(100).optional(),
-  sortBy: z.enum(["nextDueDate", "overdueAmount", "collectionPercent", "renewalDate"]).optional(),
+  sortBy: z.enum(CRM_PAYMENT_SORT_FIELDS).optional(),
   sortDir: z.enum(["asc", "desc"]).optional(),
 });
 
@@ -84,7 +103,7 @@ export function crmPaymentsSearchToApiFilters(search: CrmPaymentsSearch) {
     search: search.search,
     page: search.page ?? 1,
     pageSize: search.pageSize ?? 15,
-    sortBy: search.sortBy ?? "nextDueDate",
-    sortDir: search.sortDir ?? "asc",
+    sortBy: search.sortBy,
+    sortDir: search.sortDir,
   };
 }

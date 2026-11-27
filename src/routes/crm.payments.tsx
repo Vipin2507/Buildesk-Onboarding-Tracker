@@ -49,6 +49,7 @@ import {
   crmPaymentsSearchToApiFilters,
   parseCrmPaymentStatusTab,
   type CrmPaymentStatusTabId,
+  type CrmPaymentsSearch,
 } from "@/lib/crm-payments-search";
 import { cn, formatDate } from "@/lib/utils";
 import { useAuthStore, useCrmAccountStore } from "@/stores";
@@ -334,7 +335,8 @@ function CrmPaymentsPage() {
             "startTo" in patch ||
             "scenario" in patch ||
             "collection" in patch ||
-            "sortBy" in patch;
+            "sortBy" in patch ||
+            "sortDir" in patch;
           if (resetsPage) next.page = undefined;
           return next;
         },
@@ -715,31 +717,6 @@ function CrmPaymentsPage() {
                 ]}
               />
             </DesignTicketFilterField>
-            <DesignTicketFilterField label="Sort" compact className="min-w-0">
-              <DesignTicketSelect
-                compact
-                value={`${search.sortBy ?? "nextDueDate"}:${search.sortDir ?? "asc"}`}
-                onChange={(v) => {
-                  const [sortBy, sortDir] = v.split(":") as [
-                    "nextDueDate" | "overdueAmount" | "collectionPercent" | "renewalDate",
-                    "asc" | "desc",
-                  ];
-                  patchSearch({
-                    sortBy: sortBy === "nextDueDate" ? undefined : sortBy,
-                    sortDir: sortDir === "asc" ? undefined : sortDir,
-                  });
-                }}
-                options={[
-                  { value: "nextDueDate:asc", label: "Next due ↑" },
-                  { value: "nextDueDate:desc", label: "Next due ↓" },
-                  { value: "renewalDate:asc", label: "Renewal ↑" },
-                  { value: "renewalDate:desc", label: "Renewal ↓" },
-                  { value: "overdueAmount:desc", label: "Overdue ↓" },
-                  { value: "collectionPercent:asc", label: "Collected % ↑" },
-                  { value: "collectionPercent:desc", label: "Collected % ↓" },
-                ]}
-              />
-            </DesignTicketFilterField>
             <DesignTicketFilterField label="Date applies to" compact className="min-w-0">
               <DesignTicketSelect
                 compact
@@ -834,6 +811,14 @@ function CrmPaymentsPage() {
             pageSize={Math.max(rows.length, 1)}
             pageSizeOptions={[]}
             density="compact"
+            sortKey={search.sortBy ?? (statusTab === "renewal" ? "renewalDate" : "nextDueDate")}
+            sortDir={search.sortDir ?? "asc"}
+            onSortChange={(key, dir) =>
+              patchSearch({
+                sortBy: key as CrmPaymentsSearch["sortBy"],
+                sortDir: dir === "asc" ? undefined : dir,
+              })
+            }
             expandedRowIds={expandedRowIds}
             onRowClick={(r) => toggleExpanded(r.id)}
             getRowClassName={(r) =>
@@ -915,6 +900,7 @@ function CrmPaymentsPage() {
               {
                 key: "accountName",
                 header: "Account",
+                sortable: true,
                 render: (r) => (
                   <div>
                     <Link
@@ -957,6 +943,7 @@ function CrmPaymentsPage() {
               {
                 key: "supportManager1",
                 header: "Support 1",
+                sortable: true,
                 render: (r) =>
                   r.supportManager1?.trim() ? (
                     <span className="text-xs">{r.supportManager1}</span>
@@ -967,6 +954,7 @@ function CrmPaymentsPage() {
               {
                 key: "supportManager2",
                 header: "Support 2",
+                sortable: true,
                 render: (r) =>
                   r.supportManager2?.trim() ? (
                     <span className="text-xs">{r.supportManager2}</span>
@@ -977,6 +965,7 @@ function CrmPaymentsPage() {
               {
                 key: "salesManager",
                 header: "Sales manager",
+                sortable: true,
                 render: (r) =>
                   r.salesManager?.trim() ? (
                     <span className="text-xs">{r.salesManager}</span>
@@ -987,6 +976,7 @@ function CrmPaymentsPage() {
               {
                 key: "totalDealValue",
                 header: "Deal value",
+                sortable: true,
                 render: (r) => (
                   <span className="tabular-nums text-xs">
                     {formatPaymentsInr(r.totalDealValue)}
@@ -996,6 +986,7 @@ function CrmPaymentsPage() {
               {
                 key: "renewalCount",
                 header: "Renewals",
+                sortable: true,
                 render: (r) => (
                   <div className="text-xs">
                     <div className="tabular-nums font-medium">{r.renewalCount}</div>
@@ -1010,6 +1001,7 @@ function CrmPaymentsPage() {
               {
                 key: "lifetimeValue",
                 header: "Total value",
+                sortable: true,
                 render: (r) => (
                   <span className="tabular-nums text-xs">{formatPaymentsInr(r.lifetimeValue)}</span>
                 ),
@@ -1017,6 +1009,8 @@ function CrmPaymentsPage() {
               {
                 key: "payment",
                 header: "Payment",
+                sortable: true,
+                sortKey: "paymentReceived",
                 render: (r) => (
                   <div className="text-xs">
                     <div className="tabular-nums text-emerald-700 dark:text-emerald-400">
@@ -1036,6 +1030,8 @@ function CrmPaymentsPage() {
               {
                 key: "nextDue",
                 header: statusTab === "renewal" ? "Renewal date" : "Next due",
+                sortable: true,
+                sortKey: statusTab === "renewal" ? "renewalDate" : "nextDueDate",
                 render: (r) =>
                   statusTab === "renewal" ? (
                     r.renewalDate ? (
@@ -1064,6 +1060,8 @@ function CrmPaymentsPage() {
               {
                 key: "overdue",
                 header: "Overdue",
+                sortable: true,
+                sortKey: "overdueAmount",
                 render: (r) =>
                   r.overdueAmount > 0 ? (
                     <div className="text-xs">
@@ -1083,6 +1081,7 @@ function CrmPaymentsPage() {
               {
                 key: "collectionPercent",
                 header: "Progress",
+                sortable: true,
                 render: (r) => (
                   <div className="min-w-[5.5rem]">
                     <div className="mb-0.5 text-[10px] tabular-nums text-muted-foreground">
@@ -1096,6 +1095,7 @@ function CrmPaymentsPage() {
               {
                 key: "paymentStatus",
                 header: "Status",
+                sortable: true,
                 render: (r) => {
                   const badge = paymentStatusBadge(r.paymentStatus);
                   return (

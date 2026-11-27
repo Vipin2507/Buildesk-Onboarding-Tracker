@@ -63,6 +63,9 @@ export function DataTable<T>({
   density = "compact",
   initialSortKey = null,
   initialSortDir = "asc",
+  sortKey: controlledSortKey,
+  sortDir: controlledSortDir,
+  onSortChange,
   expandedRowId = null,
   expandedRowIds,
   renderExpandedRow,
@@ -76,6 +79,8 @@ export function DataTable<T>({
     header: string;
     render: (row: T) => ReactNode;
     sortable?: boolean;
+    /** Row field used when the column key is only a display id. */
+    sortKey?: string;
     /** Width and alignment for both the header and the cell. */
     className?: string;
   }[];
@@ -97,6 +102,10 @@ export function DataTable<T>({
   density?: "default" | "compact";
   initialSortKey?: string | null;
   initialSortDir?: "asc" | "desc";
+  /** When set with onSortChange, the parent owns sort order (server-paged tables). */
+  sortKey?: string | null;
+  sortDir?: "asc" | "desc";
+  onSortChange?: (key: string, dir: "asc" | "desc") => void;
   /** When set, renders expanded panels beneath matching rows (multi-expand). */
   expandedRowIds?: Set<string>;
   /** Single expanded row (legacy — use expandedRowIds for multi). */
@@ -142,12 +151,14 @@ export function DataTable<T>({
         ),
       );
     }
-    if (sortKey) {
-      const col = columns.find((c) => c.key === sortKey);
+    const activeSortKey = onSortChange ? null : sortKey;
+    if (activeSortKey) {
+      const col = columns.find((c) => (c.sortKey ?? c.key) === activeSortKey || c.key === activeSortKey);
       if (col) {
+        const valueKey = col.sortKey ?? col.key;
         rows = [...rows].sort((a, b) => {
-          const av = sortValue(a, sortKey);
-          const bv = sortValue(b, sortKey);
+          const av = sortValue(a, valueKey);
+          const bv = sortValue(b, valueKey);
           if (typeof av === "number" && typeof bv === "number") {
             return sortDir === "asc" ? av - bv : bv - av;
           }
@@ -160,7 +171,7 @@ export function DataTable<T>({
       }
     }
     return rows;
-  }, [data, search, searchKeys, sortKey, sortDir, columns]);
+  }, [data, search, searchKeys, sortKey, sortDir, columns, onSortChange]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages - 1);
@@ -366,7 +377,11 @@ export function DataTable<T>({
                     />
                   </th>
                 )}
-                {columns.map((col) => (
+                {columns.map((col) => {
+                  const columnSortKey = col.sortKey ?? col.key;
+                  const activeKey = onSortChange ? (controlledSortKey ?? null) : sortKey;
+                  const activeDir = onSortChange ? (controlledSortDir ?? "asc") : sortDir;
+                  return (
                   <th
                     key={col.key}
                     className={cn(
@@ -377,9 +392,15 @@ export function DataTable<T>({
                     )}
                     onClick={() => {
                       if (!col.sortable) return;
-                      if (sortKey === col.key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+                      const nextDir =
+                        activeKey === columnSortKey && activeDir === "asc" ? "desc" : "asc";
+                      if (onSortChange) {
+                        onSortChange(columnSortKey, nextDir);
+                        return;
+                      }
+                      if (sortKey === columnSortKey) setSortDir(nextDir);
                       else {
-                        setSortKey(col.key);
+                        setSortKey(columnSortKey);
                         setSortDir("asc");
                       }
                       setPage(0);
@@ -387,8 +408,8 @@ export function DataTable<T>({
                   >
                     <span className="inline-flex items-center gap-1">
                       {col.header}
-                      {col.sortable && sortKey === col.key ? (
-                        sortDir === "asc" ? (
+                      {col.sortable && activeKey === columnSortKey ? (
+                        activeDir === "asc" ? (
                           <ArrowUp className="h-3 w-3 text-primary" />
                         ) : (
                           <ArrowDown className="h-3 w-3 text-primary" />
@@ -396,7 +417,8 @@ export function DataTable<T>({
                       ) : null}
                     </span>
                   </th>
-                ))}
+                  );
+                })}
                 {actions && (
                   <th
                     className={cn(headPad, "align-middle whitespace-nowrap text-right font-medium")}

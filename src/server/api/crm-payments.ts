@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { canViewCrmAccount } from "@/lib/crm-account-access";
 import type { PaymentListFilterStatus } from "@/lib/crm-payment-allocation";
+import { CRM_PAYMENT_SORT_FIELDS } from "@/lib/crm-payments-search";
 import { isAdminRoleKey } from "@/lib/permissions";
 import { ApiError, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
@@ -71,7 +72,7 @@ const listFiltersSchema = z.object({
   search: z.string().optional(),
   page: z.coerce.number().int().min(1).optional(),
   pageSize: z.coerce.number().int().min(1).max(100).optional(),
-  sortBy: z.enum(["nextDueDate", "overdueAmount", "collectionPercent", "renewalDate"]).optional(),
+  sortBy: z.enum(CRM_PAYMENT_SORT_FIELDS).optional(),
   sortDir: z.enum(["asc", "desc"]).optional(),
 });
 

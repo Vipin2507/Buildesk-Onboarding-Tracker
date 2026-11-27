@@ -39,6 +39,7 @@ import { CrmAccountStageSelect } from "@/components/crm/crm-account-stage-select
 import { CrmAccountStatusSelect } from "@/components/crm/crm-account-status-select";
 import { CrmAccountPortalPanel } from "@/components/crm/crm-account-portal-panel";
 import { CrmAccountDocumentsTab } from "@/components/crm/crm-account-documents-tab";
+import { CrmAccountPaymentHistory } from "@/components/crm/crm-account-payment-history";
 import { CrmAccountRenewalSummary } from "@/components/crm/crm-account-renewal-summary";
 import { CrmAccountGoLiveActions } from "@/components/crm/crm-account-go-live-actions";
 import { crmAccountHasRenewalCycle } from "@/lib/crm-account-renewal";
@@ -571,7 +572,10 @@ function DashboardTab({
       </div>
 
       <DesignTicketSection compact title="Commercial & installments">
-        <CrmAccountInstallmentSchedule account={account} />
+        <div className="space-y-4">
+          <CrmAccountInstallmentSchedule account={account} />
+          <CrmAccountPaymentHistory accountId={accountId} />
+        </div>
       </DesignTicketSection>
 
       <DesignTicketSection

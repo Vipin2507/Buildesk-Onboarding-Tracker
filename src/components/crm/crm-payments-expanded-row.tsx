@@ -2,6 +2,10 @@ import { Bell, Mail, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import {
+  RenewalDealHistoryItems,
+  useAccountRenewalDeals,
+} from "@/components/crm/crm-account-payment-history";
 import { CrmClientPaymentReminderDialog } from "@/components/crm/crm-client-payment-reminder-dialog";
 import { CrmPaymentRemarksPanel } from "@/components/crm/crm-payment-remarks-panel";
 import {
@@ -156,6 +160,7 @@ export function CrmPaymentsExpandedRow({ row, search, onRenew }: Props) {
 
   const installments = installmentsQuery.data ?? [];
   const transactions = transactionsQuery.data ?? [];
+  const { deals: renewalDeals } = useAccountRenewalDeals(row.id);
   const renewed = crmAccountHasRenewalCycle(row.paymentCycleBaseline);
 
   return (
@@ -330,10 +335,11 @@ export function CrmPaymentsExpandedRow({ row, search, onRenew }: Props) {
         </div>
         {transactionsQuery.isLoading ? (
           <p className="py-2 text-xs text-muted-foreground">Loading payments…</p>
-        ) : transactions.length === 0 ? (
+        ) : transactions.length === 0 && renewalDeals.length === 0 ? (
           <p className="py-2 text-xs text-muted-foreground">No payments recorded yet.</p>
         ) : (
           <ul className="divide-y divide-border rounded-md border border-border bg-card">
+            <RenewalDealHistoryItems deals={renewalDeals} />
             {transactions.map((txn) => (
               <li key={txn.id} className="flex items-start justify-between gap-2 px-2.5 py-2">
                 <div className="min-w-0 flex-1">

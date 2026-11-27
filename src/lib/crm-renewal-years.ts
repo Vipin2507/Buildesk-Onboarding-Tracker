@@ -70,6 +70,17 @@ export function parseFinancialYearHeader(raw: string): number | null {
   return startYear;
 }
 
+/** Years after the first filled year. Those are the renewals; the first year is the original deal. */
+export function renewalYearDeals(summary: RenewalYearSummary) {
+  if (!summary.yearsKnown) return [];
+  return summary.years.slice(1);
+}
+
+export function sumRenewalDealValue(summary: RenewalYearSummary) {
+  const total = renewalYearDeals(summary).reduce((sum, year) => sum + year.dealValue, 0);
+  return Math.round(total * 100) / 100;
+}
+
 export function summarizeAccountRenewals(input: {
   years: RenewalYearValue[];
   currentDeal: number | null;

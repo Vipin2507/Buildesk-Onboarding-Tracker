@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { getCrmAccountRenewalSummary } from "@/lib/api";
+import { sumRenewalDealValue } from "@/lib/crm-renewal-years";
 
 function inr(value: number) {
   return `₹${value.toLocaleString("en-IN")}`;
@@ -15,6 +16,7 @@ export function CrmAccountRenewalSummary({ accountId }: { accountId: string }) {
   if (!summary) return null;
 
   const notRenewed = summary.yearsKnown && !summary.renewedThisYear;
+  const renewalAmount = sumRenewalDealValue(summary);
 
   return (
     <div className="mt-2 space-y-1 border-t border-border/60 pt-2 text-xs text-muted-foreground">
@@ -25,6 +27,12 @@ export function CrmAccountRenewalSummary({ accountId }: { accountId: string }) {
         Total value:{" "}
         <span className="font-medium tabular-nums text-foreground">{inr(summary.lifetimeValue)}</span>
       </div>
+      {renewalAmount > 0 ? (
+        <div>
+          Renewal amount:{" "}
+          <span className="font-medium tabular-nums text-foreground">{inr(renewalAmount)}</span>
+        </div>
+      ) : null}
       {summary.latestFyLabel ? <div>Latest year: {summary.latestFyLabel}</div> : null}
       {notRenewed ? (
         <div className="font-medium text-amber-700 dark:text-amber-400">
