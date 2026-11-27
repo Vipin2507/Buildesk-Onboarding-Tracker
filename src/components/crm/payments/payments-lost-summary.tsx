@@ -1,4 +1,4 @@
-import { Ban, HeartCrack, UserX } from "lucide-react";
+import { Ban, HeartCrack, TrendingDown, UserX } from "lucide-react";
 
 import { formatPaymentsInr, type PaymentsSummaryView } from "@/components/crm/payments/payments-format";
 import { Button } from "@/components/ui/button";
@@ -54,14 +54,21 @@ export function PaymentsLostSummary({
     },
   ];
 
+  const total = {
+    count: cards.reduce((sum, card) => sum + card.count, 0),
+    deal: cards.reduce((sum, card) => sum + card.deal, 0),
+    paid: cards.reduce((sum, card) => sum + (card.paid ?? 0), 0),
+    lost: cards.reduce((sum, card) => sum + card.lost, 0),
+  };
+
   return (
-    <div className="grid gap-2 md:grid-cols-3">
+    <div className="grid items-stretch gap-2 sm:grid-cols-2 lg:grid-cols-4">
       {cards.map((card) => {
         const Icon = card.icon;
         return (
           <div
             key={card.id}
-            className="flex items-center gap-2 rounded-lg border border-border/80 bg-card px-2.5 py-1.5 shadow-sm"
+            className="flex h-full items-center gap-2 rounded-lg border border-border/80 bg-card px-2.5 py-1.5 shadow-sm"
           >
             <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${card.iconWrap}`}>
               <Icon className="h-3.5 w-3.5" />
@@ -104,6 +111,34 @@ export function PaymentsLostSummary({
           </div>
         );
       })}
+      <div className="flex h-full items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/[0.04] px-2.5 py-1.5 shadow-sm">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+          <TrendingDown className="h-3.5 w-3.5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-1">
+            <div className="truncate text-[11px] font-semibold text-foreground">
+              Total loss
+              <span className="ml-1 font-normal tabular-nums text-muted-foreground">· {total.count}</span>
+            </div>
+            <span className="h-6 w-9 shrink-0" aria-hidden />
+          </div>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] tabular-nums">
+            <span className="text-muted-foreground">
+              Deal <span className="font-medium text-foreground">{formatPaymentsInr(total.deal)}</span>
+            </span>
+            <span className="text-muted-foreground">
+              Paid{" "}
+              <span className="font-medium text-emerald-700 dark:text-emerald-400">
+                {formatPaymentsInr(total.paid)}
+              </span>
+            </span>
+            <span className="text-muted-foreground">
+              Lost <span className="font-semibold text-destructive">{formatPaymentsInr(total.lost)}</span>
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
