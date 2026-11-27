@@ -322,20 +322,24 @@ const portalAccessSchema = z.object({
   updatedAt: z.string(),
   /** Client ID hint for reclaiming stale portal rows; not persisted on portal access. */
   clientUserId: z.string().nullable().optional(),
+  /**
+   * Background ensure/sync must not replace a key that clients already use.
+   * Only an explicit edit (form, bulk upload, regenerate) sets this.
+   */
+  replaceSlug: z.boolean().optional(),
 });
 
 export const upsertCompanyPortalAccess = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => portalAccessSchema.parse(data))
   .handler(async ({ data }) => {
     requireUser();
-    const { clientUserId, ...portalData } = data;
+    const { clientUserId, replaceSlug, ...portalData } = data;
     const targetHints: PortalTargetHints = {
       companyName: portalData.companyName,
       userId: clientUserId,
     };
     ensureCompanyRowForPortal(portalData);
     const db = getDb();
-    removeOrphanPortalsForSameClient(db, portalData.companyId, targetHints);
 
     const existing = db
       .select()
@@ -343,13 +347,41 @@ export const upsertCompanyPortalAccess = createServerFn({ method: "POST" })
       .where(eq(t.companyPortalAccess.companyId, portalData.companyId))
       .get();
 
-    assertPortalSlugAvailable(db, portalData.slug, portalData.companyId, targetHints);
-
-    // A random key is created as soon as the account exists. Ignore that write
-    // when a newer save (the key typed on create) is already stored.
-    if (existing && existing.updatedAt > portalData.updatedAt) {
+    // A missing portal row can be created. An existing API key stays until the
+    // user (or bulk upload) explicitly replaces it. A newer random slug from
+    // account-form bootstrap must not win just because its timestamp is later.
+    if (existing && !replaceSlug) {
+      const nameChanged = existing.companyName !== portalData.companyName;
+      const contactChanged =
+        existing.contactName !== portalData.contactName ||
+        existing.contactEmail !== portalData.contactEmail;
+      if (nameChanged || contactChanged) {
+        const now = nowIso();
+        db.update(t.companyPortalAccess)
+          .set({
+            companyName: portalData.companyName,
+            contactName: portalData.contactName,
+            contactEmail: portalData.contactEmail,
+            updatedAt: now,
+          })
+          .where(eq(t.companyPortalAccess.companyId, portalData.companyId))
+          .run();
+        return mapPortalRow({
+          ...existing,
+          companyName: portalData.companyName,
+          contactName: portalData.contactName,
+          contactEmail: portalData.contactEmail,
+          updatedAt: now,
+        });
+      }
       return mapPortalRow(existing);
     }
+
+    if (replaceSlug) {
+      removeOrphanPortalsForSameClient(db, portalData.companyId, targetHints);
+    }
+
+    assertPortalSlugAvailable(db, portalData.slug, portalData.companyId, targetHints);
 
     if (existing) {
       db.update(t.companyPortalAccess)
@@ -384,7 +416,9 @@ export const upsertCompanyPortalAccess = createServerFn({ method: "POST" })
           .where(eq(t.companyPortalAccess.companyId, portalData.companyId))
           .get();
         if (!raced) throw error;
-        if (raced.updatedAt > portalData.updatedAt) return mapPortalRow(raced);
+        // A random key created in parallel must not replace the key from the form,
+        // and a background ensure must not replace a key that is already stored.
+        if (!replaceSlug) return mapPortalRow(raced);
         db.update(t.companyPortalAccess)
           .set({
             companyName: portalData.companyName,

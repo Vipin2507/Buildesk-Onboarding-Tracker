@@ -9,6 +9,7 @@ import { useAuthStore, useBookingStore, useCompanyPortalStore, useCrmAccountStor
 export function CrmPortalBootstrap() {
   const user = useAuthStore((s) => s.user);
   const accounts = useCrmAccountStore((s) => s.accounts);
+  const portalsReady = useCompanyPortalStore((s) => s.portalsReady);
   const generateAccess = useCompanyPortalStore((s) => s.generateAccessForCompany);
   const getByCompanyId = useCompanyPortalStore((s) => s.getByCompanyId);
   const ensureDefaultsBatch = useBookingStore((s) => s.ensureDefaultsBatch);
@@ -16,6 +17,7 @@ export function CrmPortalBootstrap() {
   const bookingBatchKey = useRef<string | null>(null);
 
   useEffect(() => {
+    if (!portalsReady) return;
     for (const account of accounts) {
       if (attempted.current.has(account.id)) continue;
       if (getByCompanyId(account.id)) {
@@ -30,7 +32,7 @@ export function CrmPortalBootstrap() {
         email: account.email,
       });
     }
-  }, [accounts, generateAccess, getByCompanyId]);
+  }, [accounts, generateAccess, getByCompanyId, portalsReady]);
 
   useEffect(() => {
     if (!user) return;
