@@ -19,6 +19,8 @@ export type RenewalYearDeal = {
   fyStartYear: number;
   label: string;
   dealValue: number;
+  /** False for the first filled year. That year is the original contract, not a renewal. */
+  isRenewal: boolean;
 };
 
 export function useAccountRenewalDeals(accountId: string) {
@@ -27,8 +29,18 @@ export function useAccountRenewalDeals(accountId: string) {
     queryFn: () => getCrmAccountRenewalSummary({ data: { accountId } }),
   });
   const summary: RenewalYearSummary | undefined = query.data;
+  const renewalYears = new Set(
+    summary ? renewalYearDeals(summary).map((year) => year.fyStartYear) : [],
+  );
   return {
-    deals: summary ? renewalYearDeals(summary) : [],
+    deals: summary
+      ? summary.years
+          .filter((year) => year.dealValue > 0.01)
+          .map((year) => ({
+            ...year,
+            isRenewal: renewalYears.has(year.fyStartYear),
+          }))
+      : [],
     ready: summary != null,
   };
 }
@@ -70,12 +82,14 @@ export function RenewalPaymentHistory<T extends { id: string; paidDate: string; 
         <li key={`renewal-${group.year.fyStartYear}`} className="px-2.5 py-2">
           <div className="flex flex-wrap items-center gap-1.5">
             <div className="text-xs font-medium tabular-nums">{inr(group.year.dealValue)}</div>
-            <Badge
-              variant="outline"
-              className="rounded-md border-violet-500/30 bg-violet-500/10 px-1.5 py-0 text-[10px] font-medium text-violet-700 dark:text-violet-400"
-            >
-              Renewal
-            </Badge>
+            {group.year.isRenewal ? (
+              <Badge
+                variant="outline"
+                className="rounded-md border-violet-500/30 bg-violet-500/10 px-1.5 py-0 text-[10px] font-medium text-violet-700 dark:text-violet-400"
+              >
+                Renewal
+              </Badge>
+            ) : null}
             <span className="text-[10px] text-muted-foreground">{group.year.label}</span>
           </div>
           <div className="text-[10px] text-muted-foreground">

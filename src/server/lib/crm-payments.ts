@@ -8,7 +8,11 @@ import {
 } from "@/lib/crm-account-commercial";
 import { crmAccountHasRenewalCycle } from "@/lib/crm-account-renewal";
 import type { CrmPaymentSortField } from "@/lib/crm-payments-search";
-import { summarizeAccountRenewals } from "@/lib/crm-renewal-years";
+import {
+  financialYearLabel,
+  financialYearStartFromYmd,
+  summarizeAccountRenewals,
+} from "@/lib/crm-renewal-years";
 import {
   buildCycleAwarePaymentAllocation,
   classifyPaymentTransactionRenewal,
@@ -19,6 +23,8 @@ import {
   isRenewalPaymentAccount,
   matchesPaymentDueFilter,
   PAYMENT_BACKFILL_NOTE,
+  YEAR_FULL_PAYMENT_NOTE_PREFIX,
+  isYearFullPaymentNote,
   sumPaymentTransactions,
   type PaymentAllocationResult,
   type PaymentListFilterStatus,
@@ -59,11 +65,73 @@ export type PaymentTransactionRow = {
 
 export function getAccountPaymentReceived(db: ReturnType<typeof getDb>, accountId: string): number {
   const rows = db
-    .select({ amount: t.paymentTransactions.amount })
+    .select({ amount: t.paymentTransactions.amount, note: t.paymentTransactions.note })
     .from(t.paymentTransactions)
     .where(eq(t.paymentTransactions.accountId, accountId))
     .all();
-  return sumPaymentTransactions(rows);
+  // Sheet-year settlements belong to past contracts. They stay in history and
+  // do not change what is still due on the deal open now.
+  return sumPaymentTransactions(rows.filter((row) => !isYearFullPaymentNote(row.note)));
+}
+
+/**
+ * Each filled renewal-sheet year is one full payment for that year.
+ * If that financial year already has any payment, leave it alone.
+ * The year of the open deal is left alone when its amount is still the live deal.
+ */
+export function syncAccountRenewalYearPayments(db: ReturnType<typeof getDb>, accountId: string) {
+  const account = db
+    .select({
+      startDate: t.crmAccounts.startDate,
+      dealSize: t.crmAccounts.dealSize,
+    })
+    .from(t.crmAccounts)
+    .where(eq(t.crmAccounts.id, accountId))
+    .get();
+  if (!account) return 0;
+
+  const years = db
+    .select({
+      fyStartYear: t.crmAccountRenewalYears.fyStartYear,
+      dealValue: t.crmAccountRenewalYears.dealValue,
+    })
+    .from(t.crmAccountRenewalYears)
+    .where(eq(t.crmAccountRenewalYears.accountId, accountId))
+    .all();
+  if (years.length === 0) return 0;
+
+  const existing = db
+    .select({ paidDate: t.paymentTransactions.paidDate })
+    .from(t.paymentTransactions)
+    .where(eq(t.paymentTransactions.accountId, accountId))
+    .all();
+  const occupied = new Set<number>();
+  for (const txn of existing) {
+    const fy = financialYearStartFromYmd(txn.paidDate);
+    if (fy != null) occupied.add(fy);
+  }
+
+  const openFy = financialYearStartFromYmd(account.startDate);
+  const openDeal = roundMoney(Number(account.dealSize) || 0);
+  let inserted = 0;
+
+  for (const year of years) {
+    const amount = roundMoney(Number(year.dealValue) || 0);
+    if (amount <= 0.01) continue;
+    if (occupied.has(year.fyStartYear)) continue;
+    if (openFy != null && year.fyStartYear === openFy && Math.abs(openDeal - amount) <= 0.01) continue;
+
+    insertPaymentTransaction(db, {
+      accountId,
+      amount,
+      paidDate: `${year.fyStartYear}-04-01`,
+      note: `${YEAR_FULL_PAYMENT_NOTE_PREFIX}${financialYearLabel(year.fyStartYear)}`,
+    });
+    occupied.add(year.fyStartYear);
+    inserted += 1;
+  }
+
+  return inserted;
 }
 
 /** Denormalize payment_received + pending_amount from the ledger (respects renewal cycle baseline). */
@@ -1333,6 +1401,7 @@ export function listAccountPaymentTransactions(
   db: ReturnType<typeof getDb>,
   accountId: string,
 ): PaymentTransactionRow[] {
+  syncAccountRenewalYearPayments(db, accountId);
   const account = db.select().from(t.crmAccounts).where(eq(t.crmAccounts.id, accountId)).get();
   const dealValue = roundMoney(Number(account?.dealSize) || 0);
   const rows = db

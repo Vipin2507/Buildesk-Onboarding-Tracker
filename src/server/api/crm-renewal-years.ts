@@ -13,6 +13,7 @@ import { isAdminRoleKey } from "@/lib/permissions";
 import { ApiError, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import * as t from "@/server/db/schema";
+import { syncAccountRenewalYearPayments } from "@/server/lib/crm-payments";
 import { newId, nowIso } from "@/types";
 
 const importRowSchema = z.object({
@@ -139,6 +140,7 @@ export const importCrmAccountRenewalYears = createServerFn({ method: "POST" })
             .run();
         }
       }
+      syncAccountRenewalYearPayments(db, accountId);
       saved += 1;
     }
 

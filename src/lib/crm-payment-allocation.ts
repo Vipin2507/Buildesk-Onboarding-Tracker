@@ -3,6 +3,13 @@ import type { CrmAccountInstallment } from "@/types/crm-account";
 
 export const PAYMENT_BACKFILL_NOTE = "migration:initial-backfill";
 
+/** One ledger row for a sheet year that was already paid in full. */
+export const YEAR_FULL_PAYMENT_NOTE_PREFIX = "Full year payment ";
+
+export function isYearFullPaymentNote(note: string | null | undefined) {
+  return (note ?? "").startsWith(YEAR_FULL_PAYMENT_NOTE_PREFIX);
+}
+
 export type PaymentStatus =
   | "overdue"
   | "due_this_week"
