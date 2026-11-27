@@ -1,14 +1,25 @@
 import { useQuery } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { useCrmPaymentTransactions } from "@/hooks/use-crm-payments";
 import { getCrmAccountRenewalSummary } from "@/lib/api";
-import { renewalYearDeals, type RenewalYearSummary } from "@/lib/crm-renewal-years";
+import {
+  financialYearStartFromYmd,
+  renewalYearDeals,
+  type RenewalYearSummary,
+} from "@/lib/crm-renewal-years";
 import { formatDate } from "@/lib/utils";
 
 function inr(value: number) {
   return `₹${value.toLocaleString("en-IN")}`;
 }
+
+export type RenewalYearDeal = {
+  fyStartYear: number;
+  label: string;
+  dealValue: number;
+};
 
 export function useAccountRenewalDeals(accountId: string) {
   const query = useQuery({
@@ -22,26 +33,68 @@ export function useAccountRenewalDeals(accountId: string) {
   };
 }
 
-export function RenewalDealHistoryItems({
+export function groupPaymentsByRenewalYear<T extends { id: string; paidDate: string; amount: number }>(
+  transactions: T[],
+  deals: RenewalYearDeal[],
+) {
+  const used = new Set<string>();
+  const groups = [...deals]
+    .filter((year) => year.dealValue > 0.01)
+    .sort((a, b) => b.fyStartYear - a.fyStartYear)
+    .map((year) => {
+      const rows = transactions.filter(
+        (txn) => financialYearStartFromYmd(txn.paidDate) === year.fyStartYear,
+      );
+      for (const row of rows) used.add(row.id);
+      const received =
+        Math.round(rows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0) * 100) / 100;
+      return { year, rows, received };
+    });
+  const other = transactions.filter((txn) => !used.has(txn.id));
+  return { groups, other };
+}
+
+export function RenewalPaymentHistory<T extends { id: string; paidDate: string; amount: number }>({
+  transactions,
   deals,
+  renderTransaction,
 }: {
-  deals: { fyStartYear: number; label: string; dealValue: number }[];
+  transactions: T[];
+  deals: RenewalYearDeal[];
+  renderTransaction: (txn: T) => ReactNode;
 }) {
+  const { groups, other } = groupPaymentsByRenewalYear(transactions, deals);
   return (
     <>
-      {deals.map((year) => (
-        <li key={`renewal-${year.fyStartYear}`} className="px-2.5 py-2">
+      {groups.map((group) => (
+        <li key={`renewal-${group.year.fyStartYear}`} className="px-2.5 py-2">
           <div className="flex flex-wrap items-center gap-1.5">
-            <div className="text-xs font-medium tabular-nums">{inr(year.dealValue)}</div>
+            <div className="text-xs font-medium tabular-nums">{inr(group.year.dealValue)}</div>
             <Badge
               variant="outline"
               className="rounded-md border-violet-500/30 bg-violet-500/10 px-1.5 py-0 text-[10px] font-medium text-violet-700 dark:text-violet-400"
             >
               Renewal
             </Badge>
+            <span className="text-[10px] text-muted-foreground">{group.year.label}</span>
           </div>
-          <div className="text-[10px] text-muted-foreground">{year.label}</div>
-          <div className="mt-0.5 text-[10px] text-muted-foreground">Renewal deal</div>
+          <div className="text-[10px] text-muted-foreground">
+            {group.rows.length === 0
+              ? "No payment recorded"
+              : `Received ${inr(group.received)}`}
+          </div>
+          {group.rows.length > 0 ? (
+            <ul className="mt-1.5 space-y-1.5 border-l border-violet-500/30 pl-2">
+              {group.rows.map((txn) => (
+                <li key={txn.id}>{renderTransaction(txn)}</li>
+              ))}
+            </ul>
+          ) : null}
+        </li>
+      ))}
+      {other.map((txn) => (
+        <li key={txn.id} className="px-2.5 py-2">
+          {renderTransaction(txn)}
         </li>
       ))}
     </>
@@ -52,7 +105,7 @@ export function CrmAccountPaymentHistory({ accountId }: { accountId: string }) {
   const transactionsQuery = useCrmPaymentTransactions(accountId, true);
   const { deals } = useAccountRenewalDeals(accountId);
   const transactions = transactionsQuery.data ?? [];
-  const loading = transactionsQuery.isLoading;
+  const loading = transactionsQuery.isLoading && transactions.length === 0;
 
   return (
     <div className="space-y-2">
@@ -65,28 +118,31 @@ export function CrmAccountPaymentHistory({ accountId }: { accountId: string }) {
         <p className="text-xs text-muted-foreground">No payments recorded yet.</p>
       ) : (
         <ul className="divide-y divide-border rounded-md border border-border bg-card">
-          <RenewalDealHistoryItems deals={deals} />
-          {transactions.map((txn) => (
-            <li key={txn.id} className="px-2.5 py-2">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <div className="text-xs font-medium tabular-nums">{inr(txn.amount)}</div>
-                {txn.isRenewal ? (
-                  <Badge
-                    variant="outline"
-                    className="rounded-md border-violet-500/30 bg-violet-500/10 px-1.5 py-0 text-[10px] font-medium text-violet-700 dark:text-violet-400"
-                  >
-                    {txn.dealAmount && txn.dealAmount > 0.01
-                      ? `Renewal ${inr(txn.renewalAmount ?? 0)}`
-                      : "Renewal"}
-                  </Badge>
+          <RenewalPaymentHistory
+            transactions={transactions}
+            deals={deals}
+            renderTransaction={(txn) => (
+              <div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <div className="text-xs font-medium tabular-nums">{inr(txn.amount)}</div>
+                  {txn.isRenewal ? (
+                    <Badge
+                      variant="outline"
+                      className="rounded-md border-violet-500/30 bg-violet-500/10 px-1.5 py-0 text-[10px] font-medium text-violet-700 dark:text-violet-400"
+                    >
+                      {txn.dealAmount && txn.dealAmount > 0.01
+                        ? `Renewal ${inr(txn.renewalAmount ?? 0)}`
+                        : "Renewal"}
+                    </Badge>
+                  ) : null}
+                </div>
+                <div className="text-[10px] text-muted-foreground">{formatDate(txn.paidDate)}</div>
+                {txn.note ? (
+                  <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{txn.note}</div>
                 ) : null}
               </div>
-              <div className="text-[10px] text-muted-foreground">{formatDate(txn.paidDate)}</div>
-              {txn.note ? (
-                <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{txn.note}</div>
-              ) : null}
-            </li>
-          ))}
+            )}
+          />
         </ul>
       )}
     </div>

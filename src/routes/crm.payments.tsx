@@ -793,7 +793,7 @@ function CrmPaymentsPage() {
         <PaymentsSeatTab />
       ) : view === "analysis" ? (
         <PaymentsAnalysisBoard summary={summary} loading={summaryQuery.isLoading} />
-      ) : listQuery.isLoading ? (
+      ) : listQuery.isLoading && !listQuery.data ? (
         <p className="px-0 py-8 text-center text-sm text-muted-foreground">Loading payments…</p>
       ) : rows.length === 0 ? (
         <div className="border-t px-0 py-8 text-center text-sm text-muted-foreground">

@@ -89,7 +89,10 @@ export function summarizeAccountRenewals(input: {
 }): RenewalYearSummary {
   const currentFyStart = financialYearStartYear(input.now ?? new Date());
   const years = input.years
-    .filter((year) => Number.isFinite(year.fyStartYear) && Number.isFinite(year.dealValue))
+    .filter(
+      (year) =>
+        Number.isFinite(year.fyStartYear) && Number.isFinite(year.dealValue) && year.dealValue > 0.01,
+    )
     .map((year) => ({
       fyStartYear: year.fyStartYear,
       dealValue: roundMoney(year.dealValue),

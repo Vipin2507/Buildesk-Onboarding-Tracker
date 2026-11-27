@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   createCrmPaymentRemark,
@@ -50,16 +50,24 @@ export function useCrmPaymentsList(search: CrmPaymentsSearch, enabled = true) {
     queryFn: () => listCrmPayments({ data: filters }),
     enabled,
     staleTime: 15_000,
+    placeholderData: keepPreviousData,
   });
 }
 
 export function useCrmPaymentsSummary(search: CrmPaymentsSearch, enabled = true) {
   const filters = toFilters(search);
   return useQuery({
-    queryKey: crmPaymentsKeys.summary(filters),
+    queryKey: crmPaymentsKeys.summary({
+      ...filters,
+      page: 1,
+      pageSize: 15,
+      sortBy: undefined,
+      sortDir: undefined,
+    }),
     queryFn: () => getCrmPaymentsSummary({ data: filters }),
     enabled,
     staleTime: 15_000,
+    placeholderData: keepPreviousData,
   });
 }
 

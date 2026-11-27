@@ -131,7 +131,7 @@ export const importCrmAccountRenewalYears = createServerFn({ method: "POST" })
           eq(t.crmAccountRenewalYears.accountId, accountId),
           eq(t.crmAccountRenewalYears.fyStartYear, year.fyStartYear),
         );
-        if (year.dealValue == null) {
+        if (year.dealValue == null || year.dealValue <= 0) {
           db.delete(t.crmAccountRenewalYears).where(where).run();
           continue;
         }

@@ -1,4 +1,6 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
+
+import { useIsMobile } from "@/hooks/use-mobile";
 import { ArrowDown, ArrowUp, ChevronRight, Search } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -117,6 +119,7 @@ export function DataTable<T>({
   /** `fixed` keeps percentage column widths from stretching short values. */
   layout?: "auto" | "fixed";
 }) {
+  const isMobile = useIsMobile();
   const [internalSearch, setInternalSearch] = useState("");
   const search = searchQuery ?? internalSearch;
   const setSearch = onSearchQueryChange ?? setInternalSearch;
@@ -330,7 +333,7 @@ export function DataTable<T>({
                   )}
                 </div>
                 <AnimatePresence initial={false}>
-                  {expanded && renderExpandedRow ? (
+                  {expanded && renderExpandedRow && isMobile ? (
                     <motion.div
                       key={`${id}-expanded`}
                       initial={{ height: 0, opacity: 0 }}
@@ -473,7 +476,7 @@ export function DataTable<T>({
                       )}
                     </tr>
                     <AnimatePresence initial={false}>
-                      {expanded && renderExpandedRow ? (
+                      {expanded && renderExpandedRow && !isMobile ? (
                         <tr key={`${id}-expanded`} className="border-t-0">
                           <td
                             colSpan={colSpan}
