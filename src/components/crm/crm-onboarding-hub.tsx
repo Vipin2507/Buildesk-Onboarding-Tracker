@@ -39,6 +39,7 @@ import { CrmAccountStageSelect } from "@/components/crm/crm-account-stage-select
 import { CrmAccountStatusSelect } from "@/components/crm/crm-account-status-select";
 import { CrmAccountPortalPanel } from "@/components/crm/crm-account-portal-panel";
 import { CrmAccountDocumentsTab } from "@/components/crm/crm-account-documents-tab";
+import { CrmAccountRenewalSummary } from "@/components/crm/crm-account-renewal-summary";
 import { CrmAccountGoLiveActions } from "@/components/crm/crm-account-go-live-actions";
 import { crmAccountHasRenewalCycle } from "@/lib/crm-account-renewal";
 import { CrmAccountInstallmentSchedule } from "@/components/crm/crm-account-installment-schedule";
@@ -517,6 +518,7 @@ function DashboardTab({
               {account.startDate ? formatDate(account.startDate) : "—"} →{" "}
               {account.endDate ? formatDate(account.endDate) : "—"}
             </div>
+            <CrmAccountRenewalSummary accountId={accountId} />
           </div>
         </div>
         <div className="card-soft p-3">

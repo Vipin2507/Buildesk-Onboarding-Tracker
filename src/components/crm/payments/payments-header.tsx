@@ -1,4 +1,4 @@
-import { Bell, Download, FileSpreadsheet, MoreHorizontal, Users } from "lucide-react";
+import { Bell, Download, FileSpreadsheet, History, MoreHorizontal, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +16,7 @@ export function PaymentsHeader({
   onRemindExecutives,
   onExport,
   onBulkUpdate,
+  onUploadYears,
 }: {
   accountCount: number;
   selectedCount: number;
@@ -24,6 +25,7 @@ export function PaymentsHeader({
   onRemindExecutives: () => void;
   onExport: () => void;
   onBulkUpdate: () => void;
+  onUploadYears?: () => void;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -71,11 +73,17 @@ export function PaymentsHeader({
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
+          <DropdownMenuContent align="end" className="w-52">
             <DropdownMenuItem onClick={onBulkUpdate} className="gap-2 text-xs">
               <FileSpreadsheet className="h-3.5 w-3.5" />
               Bulk update
             </DropdownMenuItem>
+            {onUploadYears ? (
+              <DropdownMenuItem onClick={onUploadYears} className="gap-2 text-xs">
+                <History className="h-3.5 w-3.5" />
+                Renewal years
+              </DropdownMenuItem>
+            ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

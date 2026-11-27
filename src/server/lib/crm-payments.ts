@@ -7,6 +7,7 @@ import {
   serializeInstallments,
 } from "@/lib/crm-account-commercial";
 import { crmAccountHasRenewalCycle } from "@/lib/crm-account-renewal";
+import { summarizeAccountRenewals } from "@/lib/crm-renewal-years";
 import {
   buildCycleAwarePaymentAllocation,
   classifyPaymentTransactionRenewal,
@@ -649,16 +650,48 @@ export type PaymentListItem = {
   lostValue?: number;
   /** Payments action: full deal value is Customer Lost. */
   renewalCancelled?: boolean;
+  /** Times the account has been renewed. First year is the original deal. */
+  renewalCount: number;
+  /** Sum of yearly deal values, or the current deal when no year history exists. */
+  lifetimeValue: number;
+  /** Current financial year has a deal value on file. */
+  renewedThisYear: boolean;
+  /** Year history was imported or recorded, so a missing current year means not renewed. */
+  renewalYearsKnown: boolean;
 };
+
+function renewalYearsByAccount(db: ReturnType<typeof getDb>) {
+  const grouped = new Map<string, { fyStartYear: number; dealValue: number }[]>();
+  const rows = db
+    .select({
+      accountId: t.crmAccountRenewalYears.accountId,
+      fyStartYear: t.crmAccountRenewalYears.fyStartYear,
+      dealValue: t.crmAccountRenewalYears.dealValue,
+    })
+    .from(t.crmAccountRenewalYears)
+    .all();
+  for (const row of rows) {
+    const list = grouped.get(row.accountId) ?? [];
+    list.push({ fyStartYear: row.fyStartYear, dealValue: row.dealValue });
+    grouped.set(row.accountId, list);
+  }
+  return grouped;
+}
 
 function mapAccountsToPaymentListItems(
   accounts: (typeof t.crmAccounts.$inferSelect)[],
   receivedByAccount: Map<string, number>,
+  yearsByAccount: Map<string, { fyStartYear: number; dealValue: number }[]>,
   today: string,
 ): PaymentListItem[] {
   return accounts.map((account) => {
     const received = receivedByAccount.get(account.id) ?? 0;
     const snap = buildAccountPaymentSnapshot(account, received, today);
+    const renewal = summarizeAccountRenewals({
+      years: yearsByAccount.get(account.id) ?? [],
+      currentDeal: account.dealSize,
+      hasRenewalCycle: crmAccountHasRenewalCycle(account.paymentCycleBaseline),
+    });
     const endDate = account.endDate?.slice(0, 10) || undefined;
     const paymentCycleBaseline =
       typeof account.paymentCycleBaseline === "number" &&
@@ -689,6 +722,10 @@ function mapAccountsToPaymentListItems(
       renewalAmount: snap.renewalAmount,
       paymentCycleBaseline,
       renewalCancelled: account.renewalCancelled === true,
+      renewalCount: renewal.renewalCount,
+      lifetimeValue: renewal.lifetimeValue,
+      renewedThisYear: renewal.renewedThisYear,
+      renewalYearsKnown: renewal.yearsKnown,
     };
     const lost = classifyCrmPaymentsLostOutcome(base);
     return {
@@ -732,8 +769,9 @@ export function queryPaymentListItems(
   }
 
   const receivedByAccount = paymentReceivedByAccount(db);
+  const yearsByAccount = renewalYearsByAccount(db);
 
-  let items = mapAccountsToPaymentListItems(accounts, receivedByAccount, today);
+  let items = mapAccountsToPaymentListItems(accounts, receivedByAccount, yearsByAccount, today);
 
   items = applyPaymentsListFilters(items, filters, today);
 
@@ -1061,7 +1099,12 @@ export function summarizePaymentList(
     countAccounts = countAccounts.filter((a) => allowedAccountIds.has(a.id));
   }
   const countScope = applyPaymentsToolbarFilters(
-    mapAccountsToPaymentListItems(countAccounts, paymentReceivedByAccount(db), today),
+    mapAccountsToPaymentListItems(
+      countAccounts,
+      paymentReceivedByAccount(db),
+      renewalYearsByAccount(db),
+      today,
+    ),
     filters,
   );
 

@@ -177,6 +177,11 @@ export {
 } from "@/server/api/crm-account-documents";
 
 export {
+  getCrmAccountRenewalSummary,
+  importCrmAccountRenewalYears,
+} from "@/server/api/crm-renewal-years";
+
+export {
   getCrmUsageBoard,
   getCrmUsageAccountPage,
   refreshCrmUsageAccount,

@@ -254,6 +254,25 @@ export const crmAccountDocuments = sqliteTable(
   ],
 );
 
+/** Deal value for one Indian financial year. Empty years are not stored. */
+export const crmAccountRenewalYears = sqliteTable(
+  "crm_account_renewal_years",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => crmAccounts.id, { onDelete: "cascade" }),
+    /** Calendar year in which the financial year starts (2021 = FY 21-22). */
+    fyStartYear: integer("fy_start_year").notNull(),
+    dealValue: real("deal_value").notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("crm_account_renewal_years_account_fy_idx").on(t.accountId, t.fyStartYear),
+    index("crm_account_renewal_years_account_idx").on(t.accountId),
+  ],
+);
+
 /** Uploaded contract seats. Does not write the live payment ledger or account deal. */
 export const crmAccountSeatSheets = sqliteTable(
   "crm_account_seat_sheets",

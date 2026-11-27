@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Bell, ChevronDown, ChevronRight, MoreHorizontal, Search } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { CrmAccountPaymentBulkUpdateModal } from "@/components/crm/crm-account-payment-bulk-update-modal";
@@ -41,6 +41,8 @@ import {
 } from "@/hooks/use-crm-payments";
 import type { PaymentStatus } from "@/lib/crm-payment-allocation";
 import { crmRenewalWindowLabel, isCrmAccountInRenewalWindow } from "@/lib/crm-account-renewal";
+import { parseRenewalYearSheet } from "@/lib/crm-renewal-years";
+import { isAdminRoleKey } from "@/lib/permissions";
 import { crmAccountStatusLabel } from "@/lib/crm-account-status";
 import {
   crmPaymentsSearchSchema,
@@ -49,7 +51,7 @@ import {
   type CrmPaymentStatusTabId,
 } from "@/lib/crm-payments-search";
 import { cn, formatDate } from "@/lib/utils";
-import { useCrmAccountStore } from "@/stores";
+import { useAuthStore, useCrmAccountStore } from "@/stores";
 
 export const Route = createFileRoute("/crm/payments")({
   validateSearch: (search) => crmPaymentsSearchSchema.parse(search),
@@ -236,6 +238,9 @@ function CrmPaymentsPage() {
   const [renewAccountId, setRenewAccountId] = useState<string | null>(null);
   const [renewalCancelId, setRenewalCancelId] = useState<string | null>(null);
   const [cancellingRenewal, setCancellingRenewal] = useState(false);
+  const [uploadingYears, setUploadingYears] = useState(false);
+  const yearFileRef = useRef<HTMLInputElement>(null);
+  const isAdmin = isAdminRoleKey(useAuthStore((s) => s.user?.role));
   const renewAccount = useMemo(
     () => (renewAccountId ? (accounts.find((a) => a.id === renewAccountId) ?? null) : null),
     [accounts, renewAccountId],
@@ -386,6 +391,44 @@ function CrmPaymentsPage() {
     }
   }
 
+  async function handleYearFile(file: File) {
+    setUploadingYears(true);
+    try {
+      const parsed = parseRenewalYearSheet(await file.arrayBuffer());
+      if (parsed.rows.length === 0) {
+        toast.error(parsed.errors[0] ?? "Could not read the sheet");
+        return;
+      }
+      const { importCrmAccountRenewalYears } = await import("@/lib/api");
+      const result = await importCrmAccountRenewalYears({
+        data: {
+          rows: parsed.rows.map((row) => ({
+            accountName: row.accountName,
+            years: row.years,
+          })),
+        },
+      });
+      await listQuery.refetch();
+      const missed = result.unmatched.length;
+      toast.success(
+        missed > 0
+          ? `Saved yearly deals for ${result.saved} accounts. ${missed} did not match.`
+          : `Saved yearly deals for ${result.saved} accounts.`,
+      );
+      if (missed > 0) {
+        const names = result.unmatched
+          .slice(0, 4)
+          .map((row) => row.accountName)
+          .join(", ");
+        toast.message(missed > 4 ? `${names}, and ${missed - 4} more` : names);
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Upload failed");
+    } finally {
+      setUploadingYears(false);
+    }
+  }
+
   async function handleExport() {
     try {
       const filters = crmPaymentsSearchToApiFilters({ ...search, page: 1 });
@@ -399,6 +442,8 @@ function CrmPaymentsPage() {
         "Deal date",
         "Users",
         "Deal value",
+        "Renewals",
+        "Total value",
         "Received",
         "Pending",
         "Next due amount",
@@ -416,6 +461,8 @@ function CrmPaymentsPage() {
           r.dealDate ?? "",
           r.usersPurchased ?? "",
           r.totalDealValue,
+          r.renewalCount,
+          r.lifetimeValue,
           r.paymentReceived,
           r.pendingAmount,
           r.nextDueInstallment?.remainingAmount ?? "",
@@ -504,6 +551,24 @@ function CrmPaymentsPage() {
           onRemindExecutives={() => setExecutiveDigestOpen(true)}
           onExport={() => void handleExport()}
           onBulkUpdate={() => setBulkPaymentOpen(true)}
+          onUploadYears={
+            isAdmin
+              ? () => {
+                  if (!uploadingYears) yearFileRef.current?.click();
+                }
+              : undefined
+          }
+        />
+        <input
+          ref={yearFileRef}
+          type="file"
+          accept=".xlsx,.xls,.csv"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (file) void handleYearFile(file);
+          }}
         />
 
         <div className="flex w-fit rounded-full border bg-card p-0.5">
@@ -926,6 +991,27 @@ function CrmPaymentsPage() {
                   <span className="tabular-nums text-xs">
                     {formatPaymentsInr(r.totalDealValue)}
                   </span>
+                ),
+              },
+              {
+                key: "renewalCount",
+                header: "Renewals",
+                render: (r) => (
+                  <div className="text-xs">
+                    <div className="tabular-nums font-medium">{r.renewalCount}</div>
+                    {r.renewalYearsKnown && !r.renewedThisYear ? (
+                      <div className="text-[10px] font-medium text-amber-700 dark:text-amber-400">
+                        Not this year
+                      </div>
+                    ) : null}
+                  </div>
+                ),
+              },
+              {
+                key: "lifetimeValue",
+                header: "Total value",
+                render: (r) => (
+                  <span className="tabular-nums text-xs">{formatPaymentsInr(r.lifetimeValue)}</span>
                 ),
               },
               {

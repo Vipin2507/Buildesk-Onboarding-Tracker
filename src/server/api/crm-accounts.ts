@@ -18,6 +18,7 @@ import {
   replaceAccountPaymentLedgerForImport,
   syncAccountPaymentTotals,
 } from "@/server/lib/crm-payments";
+import { recordRenewalYearsOnRenew } from "@/server/lib/crm-renewal-years";
 import { buildCrmAccountRenewPatch, crmAccountHasRenewalCycle, renewPatchToApiFields } from "@/lib/crm-account-renewal";
 import type { CrmAccount } from "@/types/crm-account";
 import type { CompanyType } from "@/types/company";
@@ -529,6 +530,13 @@ export const renewCrmAccount = createServerFn({ method: "POST" })
 
     // Cycle totals from ledger − baseline (handles 0 initial received too).
     syncAccountPaymentTotals(db, data.accountId);
+    recordRenewalYearsOnRenew(db, {
+      accountId: data.accountId,
+      previousStart: existing.startDate,
+      previousDeal: existing.dealSize,
+      nextStart: String(patch.startDate ?? ""),
+      nextDeal: dealSize,
+    });
 
     const row = db.select().from(t.crmAccounts).where(eq(t.crmAccounts.id, data.accountId)).get();
     if (!row) throw new ApiError(500, "Renew failed");

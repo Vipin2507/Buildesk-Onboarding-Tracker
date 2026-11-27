@@ -1733,6 +1733,24 @@ if (tableExists("crm_accounts") && !tableExists("crm_account_documents")) {
   console.log("+ CREATE TABLE crm_account_documents");
 }
 
+if (tableExists("crm_accounts") && !tableExists("crm_account_renewal_years")) {
+  sqlite.exec(`
+    CREATE TABLE crm_account_renewal_years (
+      id TEXT PRIMARY KEY NOT NULL,
+      account_id TEXT NOT NULL REFERENCES crm_accounts(id) ON DELETE CASCADE,
+      fy_start_year INTEGER NOT NULL,
+      deal_value REAL NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS crm_account_renewal_years_account_fy_idx
+      ON crm_account_renewal_years(account_id, fy_start_year);
+    CREATE INDEX IF NOT EXISTS crm_account_renewal_years_account_idx
+      ON crm_account_renewal_years(account_id);
+  `);
+  console.log("+ CREATE TABLE crm_account_renewal_years");
+}
+
 if (!tableExists("work_sessions")) {
   sqlite.exec(`
     CREATE TABLE work_sessions (

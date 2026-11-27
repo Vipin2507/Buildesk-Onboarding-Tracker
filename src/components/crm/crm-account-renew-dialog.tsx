@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -39,6 +40,7 @@ export function CrmAccountRenewDialog({
   onRenewed,
   cycleCollected,
 }: Props) {
+  const queryClient = useQueryClient();
   const previousEnd = account?.endDate?.slice(0, 10) ?? "";
   const nextStart = account ? nextRenewalStartDate(account.endDate) : null;
 
@@ -216,6 +218,7 @@ export function CrmAccountRenewDialog({
         useCrmAccountStore.getState().accounts.map((a) => (a.id === updated.id ? updated : a)),
       );
       toast.success(`${account.name} renewed through ${formatDate(updated.endDate)}`);
+      void queryClient.invalidateQueries({ queryKey: ["crm-account-renewal-years", account.id] });
       onRenewed?.(updated);
       onOpenChange(false);
     } catch (err) {
