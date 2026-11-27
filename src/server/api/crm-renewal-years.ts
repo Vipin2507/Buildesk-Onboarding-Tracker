@@ -63,6 +63,7 @@ export const getCrmAccountRenewalSummary = createServerFn({ method: "GET" })
       years: yearsForAccount(account.id),
       currentDeal: account.dealSize,
       hasRenewalCycle: crmAccountHasRenewalCycle(account.paymentCycleBaseline),
+      cycleStartDate: account.startDate,
     });
   });
 

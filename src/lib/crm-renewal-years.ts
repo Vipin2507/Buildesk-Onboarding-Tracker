@@ -29,6 +29,8 @@ export type RenewalYearSummary = {
   currentFyStart: number;
   currentFyLabel: string;
   latestFyLabel: string | null;
+  /** Financial year of the current contract, after Renew. */
+  cycleFyStart: number | null;
   years: { fyStartYear: number; label: string; dealValue: number }[];
 };
 
@@ -70,9 +72,15 @@ export function parseFinancialYearHeader(raw: string): number | null {
   return startYear;
 }
 
-/** Years after the first filled year. Those are the renewals; the first year is the original deal. */
+/** Years after the first filled year. A Renew-button cycle with no earlier year is itself a renewal. */
 export function renewalYearDeals(summary: RenewalYearSummary) {
-  if (!summary.yearsKnown) return [];
+  if (!summary.yearsKnown || summary.years.length === 0) return [];
+  const onlyCycleYear =
+    summary.renewalCount > 0 &&
+    summary.years.length === 1 &&
+    summary.cycleFyStart != null &&
+    summary.years[0]?.fyStartYear === summary.cycleFyStart;
+  if (onlyCycleYear) return summary.years;
   return summary.years.slice(1);
 }
 
@@ -85,9 +93,14 @@ export function summarizeAccountRenewals(input: {
   years: RenewalYearValue[];
   currentDeal: number | null;
   hasRenewalCycle: boolean;
+  /** Start date of the contract open now. After Renew, this is the new period. */
+  cycleStartDate?: string | null;
   now?: Date;
 }): RenewalYearSummary {
   const currentFyStart = financialYearStartYear(input.now ?? new Date());
+  const cycleFy = input.hasRenewalCycle ? financialYearStartFromYmd(input.cycleStartDate) : null;
+  const currentDeal =
+    input.currentDeal != null && Number.isFinite(input.currentDeal) ? roundMoney(input.currentDeal) : 0;
   const years = input.years
     .filter(
       (year) =>
@@ -100,28 +113,45 @@ export function summarizeAccountRenewals(input: {
     }))
     .sort((a, b) => a.fyStartYear - b.fyStartYear);
 
+  if (cycleFy != null && currentDeal > 0.01 && !years.some((year) => year.fyStartYear === cycleFy)) {
+    years.push({
+      fyStartYear: cycleFy,
+      dealValue: currentDeal,
+      label: financialYearLabel(cycleFy),
+    });
+    years.sort((a, b) => a.fyStartYear - b.fyStartYear);
+  }
+
+  const empty = {
+    renewedThisYear: false,
+    yearsKnown: false,
+    currentFyStart,
+    currentFyLabel: financialYearLabel(currentFyStart),
+    latestFyLabel: null,
+    cycleFyStart: cycleFy,
+    years: [],
+  };
+
   if (years.length === 0) {
-    const deal = input.currentDeal != null && Number.isFinite(input.currentDeal) ? input.currentDeal : 0;
     return {
+      ...empty,
       renewalCount: input.hasRenewalCycle ? 1 : 0,
-      lifetimeValue: roundMoney(deal),
-      renewedThisYear: false,
-      yearsKnown: false,
-      currentFyStart,
-      currentFyLabel: financialYearLabel(currentFyStart),
-      latestFyLabel: null,
-      years: [],
+      lifetimeValue: currentDeal,
     };
   }
 
+  const cycleYearIsTheOnlyYear =
+    input.hasRenewalCycle && years.length === 1 && years[0]?.fyStartYear === cycleFy;
+
   return {
-    renewalCount: Math.max(0, years.length - 1),
+    renewalCount: cycleYearIsTheOnlyYear ? 1 : Math.max(0, years.length - 1),
     lifetimeValue: roundMoney(years.reduce((sum, year) => sum + year.dealValue, 0)),
     renewedThisYear: years.some((year) => year.fyStartYear === currentFyStart),
     yearsKnown: true,
     currentFyStart,
     currentFyLabel: financialYearLabel(currentFyStart),
     latestFyLabel: years[years.length - 1]?.label ?? null,
+    cycleFyStart: cycleFy,
     years,
   };
 }

@@ -692,6 +692,7 @@ function mapAccountsToPaymentListItems(
       years: yearsByAccount.get(account.id) ?? [],
       currentDeal: account.dealSize,
       hasRenewalCycle: crmAccountHasRenewalCycle(account.paymentCycleBaseline),
+      cycleStartDate: account.startDate,
     });
     const endDate = account.endDate?.slice(0, 10) || undefined;
     const paymentCycleBaseline =
