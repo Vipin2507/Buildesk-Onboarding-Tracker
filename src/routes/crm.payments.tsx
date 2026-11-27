@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Bell, ChevronDown, ChevronRight, MoreHorizontal, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -7,6 +8,10 @@ import { CrmAccountPaymentBulkUpdateModal } from "@/components/crm/crm-account-p
 import { CrmAccountRenewDialog } from "@/components/crm/crm-account-renew-dialog";
 import { CrmExecutivePaymentReminderDialog } from "@/components/crm/crm-executive-payment-reminder-dialog";
 import { CrmPaymentsExpandedRow } from "@/components/crm/crm-payments-expanded-row";
+import {
+  CrmRenewalYearMatchDialog,
+  type RenewalYearUnmatchedRow,
+} from "@/components/crm/crm-renewal-year-match-dialog";
 import { PaymentsAnalysisBoard } from "@/components/crm/payments/payments-analysis-board";
 import { PaymentsSeatTab } from "@/components/crm/payments/payments-seat-tab";
 import { formatPaymentsInr } from "@/components/crm/payments/payments-format";
@@ -41,7 +46,7 @@ import {
 } from "@/hooks/use-crm-payments";
 import type { PaymentStatus } from "@/lib/crm-payment-allocation";
 import { crmRenewalWindowLabel, isCrmAccountInRenewalWindow } from "@/lib/crm-account-renewal";
-import { parseRenewalYearSheet } from "@/lib/crm-renewal-years";
+import { matchRenewalYearAccount, parseRenewalYearSheet, type RenewalYearSheetRow } from "@/lib/crm-renewal-years";
 import { isAdminRoleKey } from "@/lib/permissions";
 import { crmAccountStatusLabel } from "@/lib/crm-account-status";
 import {
@@ -212,6 +217,7 @@ function paymentStatusBadge(status: PaymentStatus) {
 
 function CrmPaymentsPage() {
   const navigate = useNavigate({ from: "/crm/payments" });
+  const queryClient = useQueryClient();
   const search = Route.useSearch();
   const accounts = useCrmAccountStore((s) => s.accounts);
   const markRenewalCancelled = useCrmAccountStore((s) => s.markRenewalCancelled);
@@ -240,6 +246,10 @@ function CrmPaymentsPage() {
   const [renewalCancelId, setRenewalCancelId] = useState<string | null>(null);
   const [cancellingRenewal, setCancellingRenewal] = useState(false);
   const [uploadingYears, setUploadingYears] = useState(false);
+  const [yearMatchOpen, setYearMatchOpen] = useState(false);
+  const [yearMatchRows, setYearMatchRows] = useState<RenewalYearUnmatchedRow[]>([]);
+  const [yearMatchSaved, setYearMatchSaved] = useState(0);
+  const [yearMatchReserved, setYearMatchReserved] = useState<string[]>([]);
   const yearFileRef = useRef<HTMLInputElement>(null);
   const isAdmin = isAdminRoleKey(useAuthStore((s) => s.user?.role));
   const renewAccount = useMemo(
@@ -393,6 +403,13 @@ function CrmPaymentsPage() {
     }
   }
 
+  async function importRenewalRows(
+    rows: { accountName: string; accountId?: string; years: RenewalYearSheetRow["years"] }[],
+  ) {
+    const { importCrmAccountRenewalYears } = await import("@/lib/api");
+    return importCrmAccountRenewalYears({ data: { rows } });
+  }
+
   async function handleYearFile(file: File) {
     setUploadingYears(true);
     try {
@@ -401,29 +418,73 @@ function CrmPaymentsPage() {
         toast.error(parsed.errors[0] ?? "Could not read the sheet");
         return;
       }
-      const { importCrmAccountRenewalYears } = await import("@/lib/api");
-      const result = await importCrmAccountRenewalYears({
-        data: {
-          rows: parsed.rows.map((row) => ({
-            accountName: row.accountName,
-            years: row.years,
-          })),
-        },
+      const catalog = accounts.map((account) => ({ id: account.id, name: account.name }));
+      const matched: { row: RenewalYearSheetRow; accountId: string }[] = [];
+      const unmatched: RenewalYearUnmatchedRow[] = [];
+      parsed.rows.forEach((row, index) => {
+        const hit = matchRenewalYearAccount(row.accountName, catalog);
+        if (hit.accountId) matched.push({ row, accountId: hit.accountId });
+        else {
+          unmatched.push({
+            key: `${index}-${row.accountName}`,
+            row,
+            reason: hit.reason ?? "No matching CRM account.",
+          });
+        }
       });
-      await listQuery.refetch();
-      const missed = result.unmatched.length;
-      toast.success(
-        missed > 0
-          ? `Saved yearly deals for ${result.saved} accounts. ${missed} did not match.`
-          : `Saved yearly deals for ${result.saved} accounts.`,
-      );
-      if (missed > 0) {
-        const names = result.unmatched
-          .slice(0, 4)
-          .map((row) => row.accountName)
-          .join(", ");
-        toast.message(missed > 4 ? `${names}, and ${missed - 4} more` : names);
+      if (matched.length > 0) {
+        await importRenewalRows(
+          matched.map((item) => ({
+            accountName: item.row.accountName,
+            accountId: item.accountId,
+            years: item.row.years,
+          })),
+        );
+        await listQuery.refetch();
+        void queryClient.invalidateQueries({ queryKey: ["crm-account-renewal-years"] });
       }
+      if (unmatched.length > 0) {
+        setYearMatchRows(unmatched);
+        setYearMatchSaved(matched.length);
+        setYearMatchReserved(matched.map((item) => item.accountId));
+        setYearMatchOpen(true);
+        toast.message(
+          matched.length > 0
+            ? `Saved ${matched.length}. ${unmatched.length} names need a manual match.`
+            : `${unmatched.length} names need a manual match.`,
+        );
+        return;
+      }
+      toast.success(`Saved yearly deals for ${matched.length} accounts.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Upload failed");
+    } finally {
+      setUploadingYears(false);
+    }
+  }
+
+  async function saveYearMatches(picks: { key: string; accountId: string }[]) {
+    const byKey = new Map(yearMatchRows.map((row) => [row.key, row]));
+    setUploadingYears(true);
+    try {
+      const result = await importRenewalRows(
+        picks.flatMap((pick) => {
+          const item = byKey.get(pick.key);
+          if (!item) return [];
+          return [
+            {
+              accountName: item.row.accountName,
+              accountId: pick.accountId,
+              years: item.row.years,
+            },
+          ];
+        }),
+      );
+      await listQuery.refetch();
+      void queryClient.invalidateQueries({ queryKey: ["crm-account-renewal-years"] });
+      toast.success(`Saved yearly deals for ${result.saved} more accounts.`);
+      setYearMatchOpen(false);
+      setYearMatchRows([]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Upload failed");
     } finally {
@@ -1208,6 +1269,17 @@ function CrmPaymentsPage() {
             })
             .finally(() => setCancellingRenewal(false));
         }}
+      />
+      <CrmRenewalYearMatchDialog
+        key={yearMatchRows.map((row) => row.key).join("|")}
+        open={yearMatchOpen}
+        onOpenChange={setYearMatchOpen}
+        savedCount={yearMatchSaved}
+        rows={yearMatchRows}
+        accounts={accounts.map((account) => ({ id: account.id, name: account.name }))}
+        reservedAccountIds={yearMatchReserved}
+        saving={uploadingYears}
+        onSave={(picks) => void saveYearMatches(picks)}
       />
       <CrmAccountRenewDialog
         account={renewAccount}

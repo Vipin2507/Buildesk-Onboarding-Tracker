@@ -8,6 +8,38 @@ export type RenewalYearCell = {
   dealValue: number | null;
 };
 
+export function normalizeRenewalAccountName(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/** Exact name, then a single unique partial name of at least 4 characters. */
+export function matchRenewalYearAccount(
+  accountName: string,
+  accounts: { id: string; name: string }[],
+): { accountId?: string; reason?: string } {
+  const nameKey = normalizeRenewalAccountName(accountName);
+  if (!nameKey) return { reason: "Missing account name." };
+  const byName = new Map<string, string[]>();
+  for (const account of accounts) {
+    const key = normalizeRenewalAccountName(account.name);
+    const list = byName.get(key) ?? [];
+    list.push(account.id);
+    byName.set(key, list);
+  }
+  const exact = byName.get(nameKey) ?? [];
+  if (exact.length === 1) return { accountId: exact[0] };
+  if (exact.length > 1) return { reason: "More than one account has this name." };
+  if (nameKey.length >= 4) {
+    const fuzzy = accounts.filter((account) => {
+      const name = normalizeRenewalAccountName(account.name);
+      return name.includes(nameKey) || nameKey.includes(name);
+    });
+    if (fuzzy.length === 1 && fuzzy[0]) return { accountId: fuzzy[0].id };
+    if (fuzzy.length > 1) return { reason: "Several accounts look like this name." };
+  }
+  return { reason: "No matching CRM account." };
+}
+
 export type RenewalYearSheetRow = {
   accountName: string;
   startDate: string | null;

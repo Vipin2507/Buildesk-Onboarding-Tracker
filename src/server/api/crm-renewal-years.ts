@@ -4,7 +4,11 @@ import { z } from "zod";
 
 import { canViewCrmAccount } from "@/lib/crm-account-access";
 import { crmAccountHasRenewalCycle } from "@/lib/crm-account-renewal";
-import { summarizeAccountRenewals, type RenewalYearSummary } from "@/lib/crm-renewal-years";
+import {
+  matchRenewalYearAccount,
+  summarizeAccountRenewals,
+  type RenewalYearSummary,
+} from "@/lib/crm-renewal-years";
 import { isAdminRoleKey } from "@/lib/permissions";
 import { ApiError, requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
@@ -13,6 +17,8 @@ import { newId, nowIso } from "@/types";
 
 const importRowSchema = z.object({
   accountName: z.string(),
+  /** Set when the user picked the account in the preview. Skips name matching. */
+  accountId: z.string().min(1).optional(),
   years: z
     .array(
       z.object({
@@ -22,10 +28,6 @@ const importRowSchema = z.object({
     )
     .max(40),
 });
-
-function norm(value: string) {
-  return value.trim().toLowerCase().replace(/\s+/g, " ");
-}
 
 function yearsForAccount(accountId: string) {
   const db = getDb();
@@ -81,50 +83,28 @@ export const importCrmAccountRenewalYears = createServerFn({ method: "POST" })
       .select({ id: t.crmAccounts.id, name: t.crmAccounts.name })
       .from(t.crmAccounts)
       .all();
-    const byName = new Map<string, string[]>();
-    for (const account of accounts) {
-      const key = norm(account.name);
-      const list = byName.get(key) ?? [];
-      list.push(account.id);
-      byName.set(key, list);
-    }
+    const accountIds = new Set(accounts.map((account) => account.id));
 
     const unmatched: { accountName: string; reason: string }[] = [];
     let saved = 0;
     const now = nowIso();
 
     for (const row of data.rows) {
-      const nameKey = norm(row.accountName);
-      if (!nameKey) {
-        unmatched.push({ accountName: "—", reason: "Missing account name." });
+      let accountId = row.accountId;
+      if (accountId && !accountIds.has(accountId)) {
+        unmatched.push({ accountName: row.accountName || "—", reason: "Selected account was not found." });
         continue;
       }
-      let accountId: string | undefined;
-      const exact = byName.get(nameKey) ?? [];
-      if (exact.length === 1) accountId = exact[0];
-      else if (exact.length > 1) {
-        unmatched.push({
-          accountName: row.accountName,
-          reason: "More than one account has this name.",
-        });
-        continue;
-      } else if (nameKey.length >= 4) {
-        const fuzzy = accounts.filter((account) => {
-          const name = norm(account.name);
-          return name.includes(nameKey) || nameKey.includes(name);
-        });
-        if (fuzzy.length === 1) accountId = fuzzy[0]?.id;
-        else if (fuzzy.length > 1) {
+      if (!accountId) {
+        const hit = matchRenewalYearAccount(row.accountName, accounts);
+        if (!hit.accountId) {
           unmatched.push({
-            accountName: row.accountName,
-            reason: "Several accounts look like this name.",
+            accountName: row.accountName || "—",
+            reason: hit.reason ?? "No matching CRM account.",
           });
           continue;
         }
-      }
-      if (!accountId) {
-        unmatched.push({ accountName: row.accountName, reason: "No matching CRM account." });
-        continue;
+        accountId = hit.accountId;
       }
 
       for (const year of row.years) {
